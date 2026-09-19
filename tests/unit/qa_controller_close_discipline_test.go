@@ -1,4 +1,4 @@
-// qa_controller_close_discipline_test.go — Close-discipline gate.
+// Close-discipline gate.
 //
 // tui.New/app.New start a background availability-save goroutine on first
 // cache write (queueAvailabilitySave -> runAvailabilitySaveLoop, see
@@ -78,9 +78,7 @@ func (v ccldConstructSite) String() string {
 
 // ccldRootConstructKind reports whether call is a "tui.New(...)" or
 // "app.New(...)" call, matched purely on the selector's package identifier
-// and method name (lexical, not type-resolved) — the same convention
-// qa_multifinding_no_legacy_gate_test.go's mfnlScanFileForDirectWrite uses
-// for its own selector matching.
+// and method name (lexical, not type-resolved).
 func ccldRootConstructKind(call *ast.CallExpr) (kind string, ok bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "New" {
@@ -127,9 +125,8 @@ func ccldBodyReferencesClose(body ast.Node) bool {
 // temp-dir-backed A9S_CONFIG_FOLDER in its own scope — either a call to
 // t.TempDir() (any selector named "TempDir"), or a Setenv call (t.Setenv/
 // os.Setenv) whose "A9S_CONFIG_FOLDER" argument is a literal string anywhere
-// in the body. This is the gate's narrowing precondition (see file header
-// "NARROWED SCOPE"): only a function that owns such a directory can race its
-// own leaked writer against its own TempDir RemoveAll.
+// in the body. Only a function that owns such a directory can race its own
+// leaked writer against its own TempDir RemoveAll.
 func ccldBodyOwnsTempDirBackedConfigFolder(body ast.Node) bool {
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -156,9 +153,8 @@ func ccldBodyOwnsTempDirBackedConfigFolder(body ast.Node) bool {
 // ccldScanFile parses path and returns one ccldConstructSite for every
 // top-level function declaration whose body (a) calls tui.New/app.New at
 // least once, AND (b) owns a temp-dir-backed A9S_CONFIG_FOLDER in that same
-// body (ccldBodyOwnsTempDirBackedConfigFolder — the gate's narrowing
-// precondition, see file header), but (c) never references a Close anywhere
-// in that same body.
+// body (ccldBodyOwnsTempDirBackedConfigFolder), but (c) never references a
+// Close anywhere in that same body.
 func ccldScanFile(fset *token.FileSet, path string) ([]ccldConstructSite, error) {
 	src, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
@@ -233,16 +229,13 @@ func ccldScanGlob(t *testing.T, pattern string) []ccldConstructSite {
 	return violations
 }
 
-// TestControllerCloseDiscipline_EveryRootConstructorClosesInSameBody is the
-// gate: every function across tests/unit/*.go and tests/integration/*.go
-// that calls tui.New(...)/app.New(...) AND owns a temp-dir-backed
-// A9S_CONFIG_FOLDER in its own body must also reference CloseController/
-// Close in that same body (typically via t.Cleanup(m.CloseController) or
-// t.Cleanup(c.Close), registered AFTER t.TempDir()/t.Setenv so LIFO cleanup
-// runs Close before any TempDir RemoveAll). A construct call with no such
-// directory in-body is out of scope — see file header "NARROWED SCOPE" for
-// why it cannot reproduce the race this gate targets. See this file's
-// header for the verified 0-violation census.
+// TestControllerCloseDiscipline_EveryRootConstructorClosesInSameBody: every
+// function across tests/unit/*.go and tests/integration/*.go that calls
+// tui.New(...)/app.New(...) AND owns a temp-dir-backed A9S_CONFIG_FOLDER in
+// its own body must also reference CloseController/Close in that same body
+// (typically via t.Cleanup(m.CloseController) or t.Cleanup(c.Close),
+// registered AFTER t.TempDir()/t.Setenv so LIFO cleanup runs Close before any
+// TempDir RemoveAll).
 func TestControllerCloseDiscipline_EveryRootConstructorClosesInSameBody(t *testing.T) {
 	var violations []ccldConstructSite
 	violations = append(violations, ccldScanGlob(t, "*.go")...)

@@ -1,6 +1,6 @@
 package unit
 
-// qa_cf_color_test.go — the CloudFront Distributions Color function reads
+// The CloudFront Distributions Color function reads
 // findings only.
 //
 // Colour derives from findings, so a resource carrying no findings is
@@ -35,7 +35,6 @@ func TestCloudFrontColor(t *testing.T) {
 		{
 			// Deployed + enabled=false → distribution is disabled → ColorDim.
 			// docs/attention-signals.md: Enabled==false → Dim for cf.
-			// Current colorer returns ColorHealthy (ignores enabled) — FAILS.
 			name:   "deployed_disabled",
 			fields: map[string]string{"status": "Deployed", "enabled": "false"},
 			want:   resource.ColorDim,
@@ -49,7 +48,6 @@ func TestCloudFrontColor(t *testing.T) {
 		{
 			// InProgress + enabled=false → disabled wins over in-progress → ColorDim.
 			// docs/attention-signals.md: disabled distributions are Dim regardless of status.
-			// Current colorer returns ColorWarning (ignores enabled) — FAILS.
 			name:   "inprogress_disabled",
 			fields: map[string]string{"status": "InProgress", "enabled": "false"},
 			want:   resource.ColorDim,

@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_codex_boundary_test.go — the lanes an external review found still
-// carrying AWS-supplied text to a painter.
-//
-// Each one is the same defect in a place the earlier pins did not look: a
-// string read back off the SDK struct the fetcher kept, an identifier the
-// boundary deliberately leaves raw, and a row written into the session store
-// by a lane that does not go through the controller's doors. What they have
-// in common is that a reader downstream of the boundary can still reintroduce
-// raw bytes, which is what "the boundary cleans everything a painter can
-// reach" has to mean to be worth anything.
+// AWS-supplied text reaching a painter through
+// a string read back off the SDK struct the fetcher kept, an identifier the
+// boundary deliberately leaves raw, or a row written into the session store
+// by a lane that bypasses the controller's doors. A reader downstream of the
+// boundary can still reintroduce raw bytes, which is what "the boundary cleans
+// everything a painter can reach" has to cover.
 package unit
 
 import (

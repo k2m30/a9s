@@ -1,15 +1,13 @@
 package unit
 
-// qa_lambda_color_test.go — Color contract pin for Lambda functions.
+// Color contract pin for Lambda functions.
 //
-// Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
-// colorLambda is colorFromAnyFinding-only (core/aws/catalog_compute.go) —
-// it has NO raw-field fallback at all. Every non-healthy case here attaches a
-// Finding shaped exactly like the real fetcher (core/aws/lambda.go, wave1
-// Findings, codes in lambda_codes.go), whose switch fires exactly ONE Finding
-// in precedence order: last-update failure, then deprecated runtime, then
-// lifecycle state, then no-DLQ fallback. Fields are kept for realism/context
-// only — they are no longer read by Color.
+// colorLambda is colorFromAnyFinding-only (core/aws/catalog_compute.go).
+// Every non-healthy case here attaches a Finding shaped exactly like the real
+// fetcher's (core/aws/lambda.go, codes in lambda_codes.go), whose switch fires
+// exactly ONE Finding in precedence order: last-update failure, then
+// deprecated runtime, then lifecycle state, then no-DLQ fallback. Fields are
+// context only; Color reads Findings.
 //
 // colorLambda is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does
 // not branch on finding Code, only on Severity, Source-prefix, and

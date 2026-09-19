@@ -30,14 +30,8 @@ func d1DbcSnapBaseline() rdstypes.DBClusterSnapshot {
 
 // TestDbcSnapColor pins the status → colour mapping for DB cluster snapshots.
 //
-// Three rows that the old table recorded as Healthy are Warning here, and the
-// difference is the point of the conversion rather than a change of intent: an
-// unencrypted snapshot and a manual snapshot nobody has restored in a year both
-// produce a wave-1 finding. They read as green only when the colour is asked of
-// a Fields map that carries no findings at all.
-//
-// The suffix rows ("failed (+1)", "creating: 47%") are gone: the suffix is
-// added by StatusPhrase for display, and a severity comparison never sees it.
+// An unencrypted snapshot and a manual snapshot nobody has restored in a
+// year both produce a wave-1 finding, so both rows are Warning.
 func TestDbcSnapColor(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -49,9 +43,8 @@ func TestDbcSnapColor(t *testing.T) {
 		{name: "empty_status", status: "", want: resource.ColorHealthy},
 
 		{name: "creating", status: "creating", want: resource.ColorWarning},
-		// A snapshot being copied is not yet restorable. AWS returns "copying"
-		// for both snapshot types, and neither findings predicate has a branch
-		// for it, so the row reads as ready when it is not.
+		// A snapshot being copied is not yet restorable; AWS returns "copying"
+		// for both snapshot types.
 		{name: "copying", status: "copying", want: resource.ColorWarning},
 		{name: "failed", status: "failed", want: resource.ColorBroken},
 		{name: "incompatible_restore", status: "incompatible-restore", want: resource.ColorBroken},

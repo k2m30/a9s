@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_status_key_test.go — one key answers for the status cell.
+// One key answers for the status cell.
 //
 // A status column is declared with a key like every other column, and the
-// cascade reads that key. Reading the lifecycle key first, then "status", then
-// the column's own key, means a type that declares its status under another
-// name (tg's health_summary, cb's last_build) shows whatever else happens to
-// be in Fields, and the declaration it made is consulted third or not at all.
+// cascade reads that key. A type that declares its status under another name
+// (tg's health_summary, cb's last_build) shows the value under that key, not
+// whatever else happens to be in Fields.
 //
 // The other half is the two lanes. The screen builds a cell from the row a
 // fetch produced; after a restart it builds the same cell from the row the
@@ -78,8 +77,7 @@ var views7StatusCases = []views7StatusCase{
 	},
 	{
 		// The same shape with the competing value under "status" rather than
-		// the lifecycle key — the second spelling the cascade reads before the
-		// column's own.
+		// the lifecycle key.
 		name:      "its own status key against a stored status",
 		shortName: "cb",
 		id:        "acme-api-build",

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_fetch_identity_test.go — every fetch says which screen asked.
+// Every fetch says which screen asked.
 //
 // Four fetch commands answer with the same two message types, through one
-// outcome value. Two of them fill in the screen that issued the request and
-// the sequence that orders it; two leave both zero, so their pages are routed
-// by resource type and lane alone. A filtered drill stacked on a filtered
-// drill, or a child list on a child list, is two screens the router cannot
-// tell apart: the deeper one's page lands on the newer one.
+// outcome value, and each fills in the screen that issued the request and the
+// sequence that orders it. Without them, a filtered drill stacked on a filtered
+// drill, or a child list on a child list, is two screens a router cannot tell
+// apart: the deeper one's page would land on the newer one.
 package unit_test
 
 import (
@@ -156,10 +155,9 @@ func TestFetchIdentity_TwoStackedDrillsEachKeepTheirOwnPages(t *testing.T) {
 	}
 }
 
-// TestFetchIdentity_APageNamingNoScreenReachesNeitherOfTwo pins the fallback's
-// deletion. With two screens of one type and one lane stacked, a result that
-// names no screen belongs to neither: routing it by type and lane picks the
-// topmost, which is a guess.
+// TestFetchIdentity_APageNamingNoScreenReachesNeitherOfTwo: with two screens of
+// one type and one lane stacked, a result that names no screen belongs to
+// neither: routing it by type and lane picks the topmost, which is a guess.
 func TestFetchIdentity_APageNamingNoScreenReachesNeitherOfTwo(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -183,16 +181,10 @@ func TestFetchIdentity_APageNamingNoScreenReachesNeitherOfTwo(t *testing.T) {
 	}
 }
 
-// TestFetchIdentity_APageNamingNoScreenReachesTheOnlyListEither is row 17's
-// gate. The by-type scan was narrowed to fire only when one screen answers to
-// the result's type and lane, which reads as safe and is not: no production
-// dispatch leaves the identity off, so the only messages that reach it are the
-// ones tests build by hand. A production path that routes a page by its type
-// is a path kept alive for the test suite, and it is the path that put the
-// deeper drill's page on the newer one.
-//
-// One canonical list, one page naming no screen: the page belongs to no
-// screen, and the list keeps what it had.
+// TestFetchIdentity_APageNamingNoScreenReachesTheOnlyListEither: no production
+// dispatch leaves the identity off, so a by-type route would only ever serve
+// hand-built test messages. One canonical list, one page naming no screen: the
+// page belongs to no screen, and the list keeps what it had.
 func TestFetchIdentity_APageNamingNoScreenReachesTheOnlyListEither(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})

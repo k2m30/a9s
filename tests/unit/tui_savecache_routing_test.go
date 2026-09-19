@@ -1,6 +1,6 @@
-// tui_savecache_routing_test.go — the TUI lane's sweep-completion save
-// persists the swept type's rows, not only its count (C6 + Goal 4 of
-// docs/design/cache-requirements.md). The headless lane's equivalent is
+// The TUI lane's sweep-completion save
+// persists the swept type's rows, not only its count
+// (docs/design/cache-requirements.md). The headless lane's equivalent is
 // TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen
 // in app_pilot_defects_test.go.
 //
@@ -32,11 +32,9 @@ import (
 
 // newSaveCacheApp builds a tui.Model wired to demo clients (no real AWS
 // calls) with on-disk caching ENABLED (unlike newEnrichApp in
-// app_enrich_test.go, which sets WithNoCache(true) — this pin is specifically
-// about what lands on disk, so caching must stay on here). A9S_CONFIG_FOLDER
-// is redirected to t.TempDir() so cache.LoadDirForTest/Store.SaveType write under an
-// isolated directory, matching the dispatch-time payload-freeze precedent in
-// app_pilot_defects_test.go.
+// app_enrich_test.go, which sets WithNoCache(true)), since what lands on disk
+// is the subject. A9S_CONFIG_FOLDER is redirected to t.TempDir() so
+// cache.LoadDirForTest/Store.SaveType write under an isolated directory.
 func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
 	t.Helper()
 	tmp := t.TempDir()
@@ -98,27 +96,18 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	}
 }
 
-// TestTUISaveCache_PersistsRowsToTypeFile pins the save-cache routing: a TUI-driven
-// availability-sweep-completion save must persist the swept type's rows to
-// disk, not just its availability count.
+// TestTUISaveCache_PersistsRowsToTypeFile: a TUI-driven
+// availability-sweep-completion save persists the swept type's rows to disk,
+// not just its availability count.
 //
-// This pin is about SAVE-PLUMBING, not enrichment: TaskKindSaveCache persists
-// from the dispatch-time SaveCachePayload snapshot taken BEFORE Wave-2
-// enrichment ever runs (handlers_availability.go's handleAvailabilityChecked
-// captures c.snapshotProbeResourcesForSave() specifically so a later
-// startEnrichment() mutation of ProbeResources cannot retroactively change
-// what gets persisted). So the finding under test here must already be
-// present on the Wave-1 resource at dispatch time — exactly what a real
-// Wave-1 fetcher can emit (fetcher-sourced findings, e.g. public bucket ACL
-// detected inline during ListBuckets/GetBucketAcl, are a real and current
-// Wave-1 surface; see docs/historical/refactor/03-finding-model.md). The Source label is
-// deliberately NOT "wave2" — since the wave-2-in-demo change made Wave-2
-// enrichment run for real even in demo mode, a "wave2:*" Source on a
-// synthetic finding that was never actually produced by the s3 enricher would
-// misrepresent what this pin asserts. The finding here stays synthetic
-// (Source: "wave1:s3") because this pin's point is that the save-cache dispatch
-// persists whatever Findings the row already carries at snapshot time — not
-// that any particular enricher produced them.
+// TaskKindSaveCache persists from the dispatch-time SaveCachePayload snapshot
+// taken BEFORE Wave-2 enrichment runs (handleAvailabilityChecked captures
+// c.snapshotProbeResourcesForSave() so a later startEnrichment() mutation of
+// ProbeResources cannot change what gets persisted), so the finding must
+// already be on the Wave-1 resource at dispatch time, as a fetcher-sourced
+// finding is. Wave-2 enrichment runs in demo mode too, so the synthetic
+// finding carries Source "wave1:s3" rather than a "wave2:*" label the s3
+// enricher never produced.
 func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	const profile, region = "savecache-tui-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
@@ -160,11 +149,8 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	}
 }
 
-// TestTUISaveCache_AvailabilityCountsStillPersist guards the half of the
-// save-cache dispatch that already works today: availability Count/HasResources
-// must keep persisting once the routing fix lands, so the save-cache reroute cannot
-// regress the one thing the intercepted TUI path got right. Green both before
-// and after the fix.
+// TestTUISaveCache_AvailabilityCountsStillPersist: availability
+// Count/HasResources persist through the same save-cache dispatch.
 func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	const profile, region = "savecache-tui-counts-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
@@ -188,25 +174,4 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	if tf.Count != 1 {
 		t.Errorf("s3 TypeFile.Count = %d, want 1 — availability count persistence must survive the save-cache routing fix", tf.Count)
 	}
-	// Issues is intentionally NOT asserted here: TaskKindSaveCache's issue
-	// count is derived from c.session.ResourceCache via
-	// availabilityFromResourceCache (core/runtime/executor.go), which
-	// classifies issues through the s3 catalog's own domain.Color function —
-	// a synthetic single-field fixture built purely for this cache-routing
-	// test does not reliably trigger that per-type classification. That
-	// classification fidelity is a different subsystem than this file's
-	// routing pin (which is about Rows, not Issues); Count/HasResources above
-	// are the load-bearing counts-still-work assertions for this guard.
 }
-
-// A third test driving the same session state through BOTH the headless
-// executor path (runtime.Core.ExecuteTask, per
-// TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen
-// in app_pilot_defects_test.go) and this file's TUI dispatch path, asserting
-// identical resulting TypeFiles, is skipped here: building a second,
-// independently-seeded Core/Controller pair to compare against the tui.Model
-// under test would duplicate nearly all of newSaveCacheApp/driveSweepCompletion
-// with no additional reachable-seam risk — TestTUISaveCache_PersistsRowsToTypeFile
-// already pins the exact rows/findings the executor path is known (via the
-// dispatch-time payload-freeze test) to persist, so a lane-parity diff would only restate the same
-// assertion through a heavier harness.

@@ -1,10 +1,10 @@
 package unit
 
-// qa_d4_fixture_pins_test.go — demo fixture contracts this batch changes.
+// Demo fixture contracts.
 //
 // A demo fixture set is the only bench any surface test has. When a filler
 // pool leaves a posture field unset, the finding fires on the filler rather
-// than on the witness planted for it; when every fixture is configured the
+// than on the row planted for it; when every fixture is configured the
 // same way, a pivot's empty state is never rendered and nothing notices when
 // it breaks. Both make the bench agree with itself while disagreeing with
 // what an operator would see.
@@ -46,14 +46,10 @@ func d4CarriersOf(rows []resource.Resource, code domain.FindingCode) []string {
 	return ids
 }
 
-// TestD4_DeletionProtectionHasOneWitness pins that the dbi filler pool no
-// longer decides a security finding by omission.
-//
-// The bulk pool exists to give the list realistic length, and its posture pass
-// forces every other predicate to the healthy value. DeletionProtection is
-// left unset, so the finding fires across the filler and the row planted to
-// demonstrate it is one of many — which means the demo cannot show what the
-// signal looks like, and any count that moves cannot be attributed.
+// TestD4_DeletionProtectionHasOneWitness pins that the dbi filler pool's
+// posture pass forces every predicate, DeletionProtection included, to the
+// healthy value, so the finding fires only on the row planted to demonstrate
+// it and any count that moves can be attributed.
 func TestD4_DeletionProtectionHasOneWitness(t *testing.T) {
 	rows := d4DemoRows(t, "dbi")
 	carriers := d4CarriersOf(rows, awsclient.CodeDBIDeletionProtectionOff)
@@ -109,11 +105,9 @@ func TestD4_S3AccessLogPivotShowsItsEmptyState(t *testing.T) {
 }
 
 // TestD4_ElasticIPAgreesWithItsInstance pins that the two places the demo
-// states one instance's public address agree.
-//
-// The instance carries a public IP and the Elastic IP allocation associated
-// with that instance carries another. Whichever the operator reads first is
-// the one they will paste into a firewall rule, and one of them is wrong.
+// states one instance's public address — the instance's public IP and the
+// Elastic IP allocation associated with it — agree. Whichever the operator
+// reads first is the one they paste into a firewall rule.
 func TestD4_ElasticIPAgreesWithItsInstance(t *testing.T) {
 	const instanceID = "i-0a1b2c3d4e5f60001"
 
@@ -144,12 +138,10 @@ func TestD4_ElasticIPAgreesWithItsInstance(t *testing.T) {
 	}
 }
 
-// TestD4_PlainHTTPListenerWitnessedOnAnNLB pins the other half of the
-// cleartext-listener rule.
-//
-// The finding covers an ALB serving HTTP and an NLB serving TCP, and the demo
-// witnesses only the first. The NLB half is the one an operator is more likely
-// to have by accident, and nothing on the bench shows it fires.
+// TestD4_PlainHTTPListenerWitnessedOnAnNLB pins the NLB half of the
+// cleartext-listener rule: the finding covers an ALB serving HTTP and an NLB
+// serving TCP, and the NLB half is the one an operator is more likely to
+// have by accident.
 func TestD4_PlainHTTPListenerWitnessedOnAnNLB(t *testing.T) {
 	td := resource.FindResourceType("elb")
 	if td == nil {

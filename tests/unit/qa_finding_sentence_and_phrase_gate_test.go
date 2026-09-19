@@ -1,10 +1,10 @@
-// qa_finding_sentence_and_phrase_gate_test.go — three standing rules over the
+// Three standing rules over the
 // FindingDef catalog, and the demo pins that hold their premises to the
 // rendered surfaces.
 //
 // RULE 1 (every issue-tier finding carries an operator sentence). A finding at
-// an issue tier reaches the detail Attention block (S3) and the enrichment
-// line (S5) per docs/attention-signals.md § "Wave → surface mapping". Those
+// an issue tier reaches the detail Attention block and the enrichment line per
+// docs/attention-signals.md ("Wave → surface mapping"). Those
 // two surfaces exist to tell an operator what the condition means and what to
 // do about it. A code that renders its phrase alone leaves the operator with a
 // two-word status and no next step, and the generated docs cell reads "—", so
@@ -23,11 +23,10 @@
 // RULE 3 (a Detail exists exactly where a surface shows it). The Attention
 // block skips a finding that is not an issue severity, so a Dim finding's
 // sentence is written, generated into the docs, and shown to nobody. The
-// contract in docs/attention-signals.md § "Wave → surface mapping" puts Dim on
-// S2 and S4 only — colour and status cell — and says in as many words that a
-// Dim finding reaches neither S3 nor S5. Under that contract a Dim sentence
-// has no reader, so declaring one is declaring a fact the product does not
-// hold: the sentence belongs deleted, not surfaced.
+// contract in docs/attention-signals.md ("Wave → surface mapping") puts Dim on
+// the row colour and the status cell only, never on the detail Attention block
+// or the enrichment line. Under that contract a Dim sentence has no reader, so
+// declaring one is declaring a fact the product does not hold.
 //
 // None of the three carries an allowlist. A rule that a surface either obeys
 // or does not has nothing to burn down.
@@ -89,8 +88,7 @@ var wholePlaceholderPhrase = regexp.MustCompile(`^<[^<>]*>$`)
 // minOperatorSentenceLen is the shortest string that can carry both halves of
 // an operator sentence — what the condition means, and what to do about it.
 // A one-word Detail ("Broken.", or the phrase repeated) satisfies "non-empty"
-// while telling the operator nothing, and 268 cells to fill is exactly the
-// situation where that shortcut gets taken.
+// while telling the operator nothing.
 const minOperatorSentenceLen = 40
 
 // sentenceBreaks counts the full stops a Detail puts between sentences. The
@@ -242,10 +240,10 @@ func TestAFindingDetailExistsOnlyAtATierASurfaceShows(t *testing.T) {
 	}
 }
 
-// demoCFDisabledID and demoACMInactiveID are the two rows the batch names: a
+// demoCFDisabledID and demoACMInactiveID are two Dim demo rows: a
 // distribution switched off by an administrator, and an imported certificate
 // nothing is serving. Both are terminal-but-fine states, which is what Dim
-// means, and both declare a sentence today.
+// means.
 const (
 	demoCFDisabledID   = "E3C4D5E6F7G8H9"
 	demoACMInactiveID  = "arn:aws:acm:us-east-1:123456789012:certificate/c9d0e1f2-3456-78ab-cdef-999999999999"
@@ -256,10 +254,8 @@ const (
 // TestTheDimSentenceReachesNoRenderedSurface holds Rule 3's premise to the
 // running app rather than to a reading of detail_fields.go: it drives the real
 // list body and the real detail body for the two named demo rows and shows
-// that the status cell is the only place their state appears. If a later
-// change starts rendering Dim findings in the Attention block, this pin fails
-// and Rule 3 is the thing to revisit — deleting the sentences is only correct
-// while the surface set stays as the contract describes it.
+// that the status cell is the only place their state appears. Rule 3 holds
+// only while Dim findings stay out of the Attention block.
 func TestTheDimSentenceReachesNoRenderedSurface(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 
@@ -338,17 +334,16 @@ func TestTheDimSentenceReachesNoRenderedSurface(t *testing.T) {
 	}
 }
 
-// splitPhraseRows are the four rows the batch splits: two Redshift states that
-// both read "modifying", and two ACM expiry tiers that both read "expires in
-// <N day(s)>". After the split each phrase has to say which condition it is —
-// what is being modified, and how soon the certificate goes.
+// splitPhraseRows are two Redshift states that could both read "modifying"
+// and two ACM expiry tiers that could both read "expires in <N day(s)>". Each
+// phrase has to say which condition it is — what is being modified, and how
+// soon the certificate goes.
 var splitPhraseRows = []struct {
 	shortName string
 	code      domain.FindingCode
 	wantSev   domain.Severity
-	// forbidden is the phrase the code carries today, which after the split
-	// must belong to at most one of the pair — the ambiguity is the whole
-	// defect, so keeping it on both is not a split.
+	// forbidden is the ambiguous phrase, which may belong to at most one of
+	// the pair.
 	forbidden string
 }{
 	{"redshift", "redshift.warn.modifying", domain.SevWarn, "modifying"},
@@ -389,8 +384,8 @@ func TestTheSplitPhrasesNameTheirDistinction(t *testing.T) {
 		}
 	}
 
-	// The two Redshift rows are on the demo bench, so the split is checkable on
-	// the surface an operator reads rather than only in the catalog.
+	// The two Redshift rows are on the demo bench, so the distinction is
+	// checkable on the surface an operator reads rather than only in the catalog.
 	td := catalog.FindAny("redshift")
 	if td == nil {
 		t.Fatal("redshift is not a registered type")

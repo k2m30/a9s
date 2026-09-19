@@ -1,16 +1,11 @@
 package unit
 
-// qa_enrich_pipeline_dispatch_test.go — CodePipeline enrichment dispatch.
+// CodePipeline enrichment dispatch.
 //
 // Wave 1 stores CodePipeline probe resources under ShortName "pipeline"
 // (core/resource/types_cicd.go), and buildEnrichQueue's order slice and the
 // enricher registration must use the same key, or buildEnrichQueue never
 // sees "pipeline" in probeResources and the enricher is never dispatched.
-//
-// This test seeds probeResources["pipeline"] via AvailabilityCheckedMsg (the
-// same path that Wave 1 uses at the end of the availability-probe cycle),
-// then checks that the returned cmd contains an EnrichmentCheckedMsg for
-// "pipeline".
 
 import (
 	"testing"
@@ -43,9 +38,8 @@ func pipelineProbeResources() []resource.Resource {
 // dispatches at most one follow-up TaskKindProbeEnrich per EnrichmentChecked
 // completion (core/runtime/handlers_availability.go's refill branch), so a
 // full drain must terminate within roughly the total number of registered
-// Wave2 enrichers (49 in the real catalog as of this writing). A refill bug
-// that re-dispatches or never terminates fails the test instead of hanging
-// the suite.
+// Wave2 enrichers. A refill bug that re-dispatches or never terminates fails
+// the test instead of hanging the suite.
 const maxEnrichmentDrainIterations = 200
 
 // collectEnrichmentMsgs executes cmd (recursing through nested tea.BatchMsg
@@ -63,9 +57,8 @@ const maxEnrichmentDrainIterations = 200
 // and keeps collecting from whatever cmd that redelivery produces, until no
 // new message is produced (quiescence).
 //
-// Unlike extractMsg, this helper does NOT call t.Fatal on a missing/short
-// result — it just returns what it finds; it only fails the test if the
-// drain fails to quiesce (see maxEnrichmentDrainIterations).
+// It returns whatever it finds and fails only when the drain does not
+// quiesce (see maxEnrichmentDrainIterations).
 func collectEnrichmentMsgs(t *testing.T, m tui.Model, cmd tea.Cmd) []messages.EnrichmentChecked {
 	t.Helper()
 	var found []messages.EnrichmentChecked
@@ -88,9 +81,7 @@ func collectEnrichmentMsgs(t *testing.T, m tui.Model, cmd tea.Cmd) []messages.En
 
 // extractEnrichmentChecked executes cmd (recursing through nested
 // tea.BatchMsg to any depth) and returns every messages.EnrichmentChecked
-// leaf found. Non-EnrichmentChecked messages are ignored — matching this
-// helper's pre-windowing behavior, which only ever cared about this one
-// message type.
+// leaf found.
 func extractEnrichmentChecked(cmd tea.Cmd) []messages.EnrichmentChecked {
 	if cmd == nil {
 		return nil
@@ -113,21 +104,16 @@ func extractEnrichmentChecked(cmd tea.Cmd) []messages.EnrichmentChecked {
 }
 
 // TestBuildEnrichQueue_DispatchesCodePipeline verifies that when probeResources
-// contains a "pipeline" entry (seeded by Wave 1), buildEnrichQueue includes
-// "pipeline" in the queue and probeEnrichment is dispatched.
-//
-// FAILS today: "pipe" key in buildEnrichQueue order slice doesn't match the
-// "pipeline" key stored in probeResources → empty queue → no dispatch.
-// PASSES after fix: rename "pipe" → "pipeline" in order slice and EnricherRegistry.
+// contains a "pipeline" entry, buildEnrichQueue includes "pipeline" in the
+// queue and probeEnrichment is dispatched.
 func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
 	// isDemo must be false (default) so startEnrichment is not skipped.
 
-	// Deliver AvailabilityCheckedMsg to seed probeResources["pipeline"] and
-	// trigger the availability-probe finalization path that calls startEnrichment.
-	// availTotal starts at 0; after incrementing availChecked to 1, 1 >= 0 → finalize.
+	// availTotal starts at 0, so the first AvailabilityChecked finalizes the
+	// availability probe and calls startEnrichment.
 	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
@@ -142,10 +128,6 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 		t.Fatal("AvailabilityCheckedMsg should return a non-nil cmd (at minimum a cache-save cmd)")
 	}
 
-	// Execute the returned cmd tree and look for EnrichmentCheckedMsg for "pipeline".
-	// If buildEnrichQueue includes "pipeline", probeEnrichment is dispatched and will
-	// return EnrichmentCheckedMsg{ResourceType: "pipeline", Err: "AWS clients not initialized"}.
-	// If not dispatched (bug), no EnrichmentCheckedMsg is produced.
 	found := collectEnrichmentMsgs(t, m, cmd)
 
 	dispatched := false

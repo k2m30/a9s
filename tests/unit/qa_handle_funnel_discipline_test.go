@@ -1,23 +1,10 @@
-// qa_handle_funnel_discipline_test.go — S2: the Handle funnel gate. P2 found
-// internal/tui/app.go's CostsLoaded case discarding Controller.Handle's
-// returned []runtime.TaskRequest entirely (`m.ctrl.Handle(msg); return m,
-// nil`) — the N3 granularity fallback's own re-fetch task was computed and
-// then silently dropped, leaving the frame Loading forever in the TUI lane
-// alone (the headless lane, which routes through the same Handle but never
-// discards the return, never showed the bug). That specific case is fixed
-// (see internal/tui/app.go's CostsLoaded case), but the fix was a single
-// call-site edit, not a structural guarantee — nothing stops a FUTURE
-// ctrl.Handle call site (a new event case, or a refactor of the existing
-// one) from reintroducing the same discard.
-//
-// This is a standing ratchet, not a burn-down: it scans every *.go file
-// under internal/tui (excluding tests) for a direct `<expr>.ctrl.Handle(...)`
-// call and asserts the returned second value (the []runtime.TaskRequest) is
-// never assigned to the blank identifier. Parameterized over every call site
-// found — today there is exactly one (app.go's CostsLoaded case), but a
-// second event case wired through Handle in the future is covered
-// automatically, with no allowlist to maintain (there is no known debt: the
-// one real call site is already correct).
+// Every `<expr>.ctrl.Handle(...)` call
+// site under internal/tui (tests excluded) routes its returned
+// []runtime.TaskRequest somewhere. A discarded return drops the tasks Handle
+// computed (e.g. the costs granularity fallback's re-fetch), leaving the
+// frame Loading forever in the TUI lane while the headless lane, which routes
+// the same return, works. Parameterized over every call site found, with no
+// allowlist.
 package unit_test
 
 import (
@@ -108,11 +95,10 @@ func hfdScanFile(fset *token.FileSet, path string) ([]hfdSite, error) {
 	return sites, nil
 }
 
-// TestHandleFunnelDiscipline_NoTUICallSiteDiscardsReturnedTasks is the S2
-// gate: every `.ctrl.Handle(...)` call site under internal/tui must route
-// its returned []runtime.TaskRequest somewhere (never `_`, never dropped as
-// a bare statement) — P2's specific bug, generalized to a standing ratchet
-// over every message kind Handle is ever wired to return tasks for.
+// TestHandleFunnelDiscipline_NoTUICallSiteDiscardsReturnedTasks: every
+// `.ctrl.Handle(...)` call site under internal/tui must route its returned
+// []runtime.TaskRequest somewhere (never `_`, never dropped as a bare
+// statement).
 func TestHandleFunnelDiscipline_NoTUICallSiteDiscardsReturnedTasks(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

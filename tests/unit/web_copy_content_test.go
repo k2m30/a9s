@@ -1,11 +1,8 @@
-// web_copy_content_test.go — pins for Controller.CopyContent(), the new
-// single source of truth for copy-content resolution shared by the TUI and
-// web renderers (fixes web mode's silent-no-op copy key). Mirrors the
-// reference semantics of internal/tui/runtime_adapter_navigate.go's
-// handleCopy (rsKindList/Detail/Text/Identity/Menu/Selector/Help/Costs), but
-// asserts directly against the CONTROLLER method and the new
-// ViewState.CopyText/CopyLabel snapshot fields — neither exists yet, so this
-// file is expected to fail to compile until both land.
+// Tests for Controller.CopyContent(), the single source of copy-content
+// resolution shared by the TUI and web renderers. The semantics mirror
+// internal/tui/runtime_adapter_navigate.go's handleCopy; the assertions run
+// against the controller method and the ViewState.CopyText/CopyLabel snapshot
+// fields.
 package unit_test
 
 import (
@@ -27,8 +24,6 @@ import (
 // wave4AssertCopyContent calls c.CopyContent() and cross-checks that
 // Snapshot().CopyText/CopyLabel expose the exact same pair at that moment —
 // the "single source of truth for both renderers" contract.
-// Every test in this file routes through this helper so the snapshot
-// exposure is pinned across all 9 behaviors, not just once.
 func wave4AssertCopyContent(t *testing.T, c *app.Controller) (content, label string) {
 	t.Helper()
 	content, label = c.CopyContent()
@@ -42,20 +37,10 @@ func wave4AssertCopyContent(t *testing.T, c *app.Controller) (content, label str
 	return content, label
 }
 
-// ===========================================================================
-// 1. List screen — CopyField precedence.
-//
-// Every CopyField entry in the entire catalog is on a CHILD type (grepped
-// core/aws/catalog_*.go: cb_builds, cb_build_logs, pipeline_stages,
-// eb_rule_targets, sfn_executions, sfn_execution_history, sns_subscriptions,
-// image_uri child, error_message child, message child, conditions_summary
-// child, user_name child — zero top-level types set it). "sns_subscriptions"
-// (CopyField: "endpoint") is used as the real CopyField-bearing type;
-// resource.FindResourceType only searches the TOP-LEVEL catalog (confirmed
-// by reading core/catalog/catalog.go's Find vs FindChild), so CopyContent
-// must resolve CopyField via the child registry too for this to pass — a
-// real bug this test is positioned to catch.
-// ===========================================================================
+// Every CopyField in the catalog is on a child type, and
+// resource.FindResourceType searches only the top-level catalog, so
+// CopyContent must resolve CopyField through the child registry too.
+// sns_subscriptions (CopyField: "endpoint") is the CopyField-bearing type.
 
 func wave4SNSSubscriptionResource(id, endpoint string) resource.Resource {
 	return resource.Resource{
@@ -153,10 +138,6 @@ func TestCopyContent_List_EmptySelection_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 2. Detail screen — related panel focused.
-// ===========================================================================
-
 func TestCopyContent_Detail_RelatedFocused_UsesSelectedRowDisplayName(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0abc123def456789a",
@@ -192,10 +173,6 @@ func TestCopyContent_Detail_RelatedFocused_UsesSelectedRowDisplayName(t *testing
 	}
 }
 
-// ===========================================================================
-// 3. Detail screen — related NOT focused, FieldCursor on a field row.
-// ===========================================================================
-
 // TestCopyContent_Detail_FieldCursor_UsesFieldValue uses an unregistered
 // synthetic resource type (no td.Project override) with EXACTLY ONE Fields
 // entry so the generic flat-alphabetical projector produces a single,
@@ -223,13 +200,12 @@ func TestCopyContent_Detail_FieldCursor_UsesFieldValue(t *testing.T) {
 	}
 }
 
-// TestCopyContent_Detail_FieldCursor_DashValue_CopiesDash pins the reachable
-// reality of a Fields entry whose map value is empty: core/fieldpath (frozen)
-// substitutes the display placeholder "-" for an empty value before the item
-// ever reaches domainItemToFieldItemDetail, so no projected row's Value is
-// ever the literal empty string — the projected row instead carries
-// Value:"-", and the live handleCopy/CopyContent path copies that dash
-// verbatim (TUI parity), not the Key.
+// TestCopyContent_Detail_FieldCursor_DashValue_CopiesDash: core/fieldpath
+// substitutes the display placeholder "-" for an empty Fields value before
+// the item reaches domainItemToFieldItemDetail, so no projected row's Value
+// is the literal empty string — the projected row carries Value:"-", and the
+// handleCopy/CopyContent path copies that dash verbatim (TUI parity), not the
+// Key.
 func TestCopyContent_Detail_FieldCursor_DashValue_CopiesDash(t *testing.T) {
 	res := resource.Resource{
 		ID:     "res-detail-002",
@@ -252,18 +228,13 @@ func TestCopyContent_Detail_FieldCursor_DashValue_CopiesDash(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 4. Detail screen — fallback to raw YAML when no usable field is focused.
-//
-// An unregistered synthetic type with NO Fields map produces a genuinely
-// EMPTY detail Fields slice regardless of RawStruct (confirmed by reading
-// core/semantics/projection/generic.go's buildItems: with no view config the
-// flat-rendering branch reads only r.Fields, never r.RawStruct, and the
-// ID/Name-synthesis branch is skipped whenever RawStruct is non-nil) — the
-// FieldCursor-in-range branch of the reference handleCopy logic can never
-// fire, forcing the YAML fallback. RawStruct is a real SDK-typed fixture
-// (core/demo/fixtures) so RawYAMLFromResource has real data to marshal.
-// ===========================================================================
+// An unregistered synthetic type with no Fields map produces an empty detail
+// Fields slice regardless of RawStruct: with no view config,
+// core/semantics/projection/generic.go's buildItems reads only r.Fields, and
+// the ID/Name-synthesis branch is skipped whenever RawStruct is non-nil. The
+// FieldCursor-in-range branch of handleCopy cannot fire, forcing the YAML
+// fallback. RawStruct is a real SDK-typed fixture (core/demo/fixtures) so
+// RawYAMLFromResource has real data to marshal.
 
 func TestCopyContent_Detail_FallbackToRawYAML_WhenNoUsableField(t *testing.T) {
 	inst := fixtures.NewEC2Fixtures().Reservations[0].Instances[0]
@@ -287,10 +258,6 @@ func TestCopyContent_Detail_FallbackToRawYAML_WhenNoUsableField(t *testing.T) {
 		t.Errorf("CopyContent() label = %q, want %q", label, "Copied detail to clipboard")
 	}
 }
-
-// ===========================================================================
-// 5. Text screen (YAML/JSON) — ANSI-stripped, newline-joined content.
-// ===========================================================================
 
 // wave4AssertTextScreenCopy pushes screenID with lines via the blessed
 // newTestController helper (see qa_controller_construction_discipline_test.go
@@ -352,10 +319,6 @@ func TestCopyContent_JSON_StripsANSI_JoinsLines(t *testing.T) {
 	m.SetSize(120, 40)
 	wave4AssertTextScreenCopy(t, runtime.ScreenJSON, m.ContentLines(), "Copied JSON to clipboard")
 }
-
-// ===========================================================================
-// 6. Identity screen.
-// ===========================================================================
 
 func TestCopyContent_Identity_LoadedWithARN_ReturnsARNAndBangLabel(t *testing.T) {
 	c := newTestController(t)
@@ -431,10 +394,8 @@ func TestCopyContent_Identity_NoOp(t *testing.T) {
 // HandleProfileSelected's own intents are MenuClearAvailabilityIntent,
 // PopSelectorIntent, and a FlashIntent — PopSelectorIntent (core/app/
 // intents.go) only pops the top screen when it is a profile/region/theme
-// SELECTOR, never ScreenIdentity, so the identity screen legitimately stays
-// on top of the stack across ActionSelectProfile (confirmed by the
-// Body.Kind precondition below) — no re-open/re-navigate is needed to
-// reproduce this on the real seam.
+// SELECTOR, never ScreenIdentity, so the identity screen stays on top of the
+// stack across ActionSelectProfile.
 func TestCopyContent_Identity_ClearedAfterRotation(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionOpenIdentity})
@@ -463,10 +424,6 @@ func TestCopyContent_Identity_ClearedAfterRotation(t *testing.T) {
 		t.Errorf("CopyContent() after a profile rotation must not serve the stale pre-switch ARN: got (%q, %q), want (\"\", \"\") until the refetch lands", content, label)
 	}
 }
-
-// ===========================================================================
-// 7. Menu / selector / help / costs screens — always a no-op.
-// ===========================================================================
 
 func TestCopyContent_NoOpScreens_ReturnEmpty(t *testing.T) {
 	t.Run("menu", func(t *testing.T) {
@@ -517,17 +474,12 @@ func TestCopyContent_NoOpScreens_ReturnEmpty(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 8. Concurrency — CopyContent() must be safe to call from multiple
-// goroutines. CopyContent() (core/app/copy.go) takes only c.mu.RLock(), and
-// its detail branch calls buildDetailBody -> buildDetailFieldItems, which —
-// whenever ds.Resource.AttentionDetails is already a non-nil map — merges
-// ds.AttentionDetails into it; that merge must not MUTATE a map shared
-// across every call, the same class of builder-mutation snapshot.go's own
-// doc comment says requires the WRITE lock ("buildListBody ... may populate
-// ListState.bodyMemo on a cache miss"). Concurrent CopyContent() calls on a
-// detail screen with pre-populated AttentionDetails must not race.
-// ===========================================================================
+// CopyContent() (core/app/copy.go) takes only c.mu.RLock(), and its detail
+// branch calls buildDetailBody -> buildDetailFieldItems, which — whenever
+// ds.Resource.AttentionDetails is already a non-nil map — merges
+// ds.AttentionDetails into it; that merge must not MUTATE a map shared across
+// every call. Concurrent CopyContent() calls on a detail screen with
+// pre-populated AttentionDetails must not race.
 
 // wave4ConcurrentCopyResource carries a non-nil, non-empty AttentionDetails
 // map (set on the resource itself, not just delivered later via

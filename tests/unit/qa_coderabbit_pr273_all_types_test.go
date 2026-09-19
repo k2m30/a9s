@@ -1,6 +1,6 @@
 package unit
 
-// qa_coderabbit_pr273_all_types_test.go — per-resource-type contract table.
+// Per-resource-type contract table.
 //
 // One row per registered ResourceTypeDef. Each row declares:
 //
@@ -142,7 +142,7 @@ var typeContracts = []typeContract{
 	{shortName: "elb", apiDoc: "https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html", statusField: "state", healthyStatuses: []string{"active"}, warningStatuses: []string{"provisioning", "active_impaired"}, brokenStatuses: []string{"failed"}, reasoning: "ELBv2 State.Code per DescribeLoadBalancers: active | provisioning | active_impaired | failed."},
 	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html", statusField: "status", healthyStatuses: []string{"in-use"}, warningStatuses: []string{"available", "attaching", "detaching"}, reasoning: "ENI Status per DescribeNetworkInterfaces: available | associated | attaching | in-use | detaching. 'available' with type != requester-managed → Warning (orphan ENI)."},
 	// "Inactive" is deliberately absent from warningStatuses: docs/resources/lambda.md
-	// §4 precedence table puts State==Inactive→Dim BEFORE the missing-DLQ Warning
+	// precedence table puts State==Inactive→Dim BEFORE the missing-DLQ Warning
 	// check (see colorLambda's switch-on-state, which returns before reaching the
 	// dlq_target_arn=="" branch). This table has no dim bucket to assert against;
 	// full Dim coverage lives in qa_lambda_color_test.go and
@@ -150,7 +150,7 @@ var typeContracts = []typeContract{
 	{shortName: "lambda", apiDoc: "https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html", statusField: "state", warningStatuses: []string{"Active", "Pending"}, brokenStatuses: []string{"Failed"}, reasoning: "Lambda FunctionConfiguration.State per GetFunctionConfiguration: Pending | Active | Inactive | Failed. Active→Warning (missing-DLQ, dlq_target_arn empty under minimal-field injection); Pending→Warning per §4. Inactive→Dim per lambda.md §4 precedence (State switch returns before the DLQ check), not asserted here — see qa_lambda_color_test.go."},
 	{shortName: "nat", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNatGateways.html", statusField: "state", healthyStatuses: []string{"available"}, warningStatuses: []string{"pending", "deleting"}, brokenStatuses: []string{"failed"}, reasoning: "NAT Gateway State per DescribeNatGateways: pending | failed | available | deleting | deleted."},
 	{shortName: "ng", apiDoc: "https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeNodegroup.html", statusField: "status", healthyStatuses: []string{"ACTIVE"}, warningStatuses: []string{"CREATING", "UPDATING", "DELETING"}, brokenStatuses: []string{"CREATE_FAILED", "DELETE_FAILED", "DEGRADED"}, reasoning: "EKS Nodegroup Status per DescribeNodegroup: CREATING | ACTIVE | UPDATING | DELETING | CREATE_FAILED | DELETE_FAILED | DEGRADED."},
-	// redis: post-migration (2026-04-23) Fields["status"] carries §4 PHRASES,
+	// redis: Fields["status"] carries the docs/resources/redis.md status phrases,
 	// not bare AWS API keywords. Healthy = empty string (silence). Color-function
 	// coverage is asserted by qa_redis_color_test.go; skipped here because this
 	// cross-cutting test models bare-keyword contracts.
@@ -262,7 +262,7 @@ func TestCR273_AllTypes_ColorClassification(t *testing.T) {
 
 // TestCR273_AllTypes_MenuCtrlZ_NoFalseNegatives asserts, for every
 // registered type, that the main-menu ctrl+z filter surfaces the type
-// when AWS reports issues for it. Post-AlwaysHealthy-purge every
+// when AWS reports issues for it. Every
 // registered type classifies via Color and/or Wave 2 enricher per
 // docs/attention-signals.md, so issues=2 must always make the type
 // visible under ctrl+z (excluding ExcludeFromIssueBadge types).

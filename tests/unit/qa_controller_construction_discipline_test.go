@@ -1,4 +1,4 @@
-// qa_controller_construction_discipline_test.go — one constructor, and this
+// One constructor, and this
 // gate says so.
 //
 // A test that builds a real *app.Controller (directly, or transitively via
@@ -12,12 +12,10 @@
 // happens to be current when the scheduler runs it. That is the flake this
 // gate exists to make unconstructible.
 //
-// The rule is structural and has no exceptions: every construction in this
-// directory goes through newBlessedController / newBlessedModel
-// (blessed_construction_test.go), which pair the close with t.Cleanup at the
-// one point where the ordering is knowable. An allowlist would put the leak
-// back for every entry on it, so there is none: a direct call fails, and the
-// fix is the helper rather than a new line in a census.
+// The rule is structural: every construction in this directory goes through
+// newBlessedController / newBlessedModel (blessed_construction_test.go), which
+// pair the close with t.Cleanup at the one point where the ordering is
+// knowable. A direct call fails, and the fix is the helper.
 package unit_test
 
 import (

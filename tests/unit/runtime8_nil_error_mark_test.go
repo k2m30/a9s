@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_nil_error_mark_test.go — an answer with no error is not a failure.
+// An answer with no error is not a failure.
 //
 // MarkSkipped reads the refused call off the error it is handed. Handed a nil
 // error it has nothing to read, so the row records an unnamed check and the

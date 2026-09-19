@@ -1,26 +1,13 @@
 package unit
 
-// qa_ec2_impaired_promotion_test.go — tests for EC2 impaired/initializing
-// status classification.
+// EC2 impaired/initializing status
+// classification.
 //
-// Post-cleanup contract (PR-03b): FetchEC2Instances no longer writes Resource.Status.
-// All lifecycle state is surfaced via:
-//   - r.Findings (wave1: stopped/terminated/pending)
-//   - r.Fields["system_status"] and r.Fields["instance_status"] (wave2 enrichment)
-//
-// Color classification is delegated to ec2td.Color(r), which reads Fields directly:
-//   - system_status or instance_status == "impaired"  → ColorBroken  (IsIssue=true)
-//   - system_status or instance_status == "initializing" → ColorWarning (IsIssue=true)
-//   - both == "ok" → ColorHealthy (IsIssue=false)
-//
-// Tests T060–T066:
-//   T060 — system_status=impaired → Fields["system_status"]=="impaired", Color==ColorBroken
-//   T061 — instance_status=impaired → Fields["instance_status"]=="impaired", Color==ColorBroken
-//   T062 — instance_status=initializing → Fields["instance_status"]=="initializing", Color==ColorWarning
-//   T063 — both ok → Resource.Status remains "" (no dual-write)
-//   T064 — state=stopped, sys=impaired → Resource.Status stays "" (stopped handled by Findings)
-//   T065 — ctrl+z behavioral: impaired/initializing rows visible after toggle
-//   T066 — menu badge: impaired + initializing + stopped all counted as issues
+// Lifecycle state is surfaced via r.Findings (wave1: stopped/terminated/
+// pending) and r.Fields["system_status"] / r.Fields["instance_status"]
+// (wave2 enrichment). colorEC2 is colorFromAnyFinding-only, so a degraded
+// instance colours from the Wave-2 Finding EnrichEC2InstanceStatus attaches:
+// impaired → ColorBroken, initializing → ColorWarning.
 
 import (
 	"context"
@@ -39,10 +26,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stub: EC2DescribeInstancesAPI for status-promotion tests
-// ─────────────────────────────────────────────────────────────────────────────
 
 // stubEC2WithStatusChecks returns a fixed DescribeInstances result and allows
 // controlling DescribeInstanceStatus output independently.
@@ -99,20 +82,11 @@ func instanceStatus(id, sysStatus, instStatus string) ec2types.InstanceStatus {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T060 — system_status=impaired → Resource.Status promoted to "impaired"
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired verifies that
 // a running instance with SystemStatus="impaired" and InstanceStatus="ok"
 // has Fields["system_status"] set and, once the real Wave-2 enricher
 // (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
 // resource, is classified as ColorBroken.
-//
-// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
-// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-// (no raw-field fallback) — Color classification requires the Wave-2
-// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T) {
 	const id = "i-sys-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -134,9 +108,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 
 	r := resources[0]
 
-	// Post-cleanup: Resource.Status is never written by the fetcher.
-
-	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["system_status"] != "impaired" {
 		t.Errorf("expected Fields[\"system_status\"] == %q, got %q", "impaired", r.Fields["system_status"])
 	}
@@ -160,7 +131,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 		r.Findings = append(r.Findings, f...)
 	}
 
-	// Color func derives from the merged Wave-2 Finding → ColorBroken → IsIssue=true.
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td != nil && ec2td.Color != nil {
 		got := ec2td.Color(r)
@@ -173,20 +143,11 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T061 — instance_status=impaired → Resource.Status promoted to "impaired"
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired verifies that
 // a running instance with SystemStatus="ok" and InstanceStatus="impaired"
 // has Fields["instance_status"] set and, once the real Wave-2 enricher
 // (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
 // resource, is classified as ColorBroken.
-//
-// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
-// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-// (no raw-field fallback) — Color classification requires the Wave-2
-// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.T) {
 	const id = "i-inst-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -208,9 +169,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 
 	r := resources[0]
 
-	// Post-cleanup: Resource.Status is never written by the fetcher.
-
-	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["instance_status"] != "impaired" {
 		t.Errorf("expected Fields[\"instance_status\"] == %q, got %q", "impaired", r.Fields["instance_status"])
 	}
@@ -233,7 +191,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 		r.Findings = append(r.Findings, f...)
 	}
 
-	// Color func derives from the merged Wave-2 Finding → ColorBroken.
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td != nil && ec2td.Color != nil {
 		got := ec2td.Color(r)
@@ -243,20 +200,11 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T062 — instance_status=initializing → Resource.Status promoted to "initializing"
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing verifies
 // that a running instance with SystemStatus="ok" and InstanceStatus="initializing"
 // has Fields["instance_status"] set and, once the real Wave-2 enricher
 // (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
 // resource, is classified as ColorWarning.
-//
-// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
-// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-// (no raw-field fallback) — Color classification requires the Wave-2
-// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *testing.T) {
 	const id = "i-initializing-001"
 	stub := &stubEC2WithStatusChecks{
@@ -278,9 +226,6 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 
 	r := resources[0]
 
-	// Post-cleanup: Resource.Status is never written by the fetcher.
-
-	// The wave2 enrichment field must carry the initializing signal.
 	if r.Fields["instance_status"] != "initializing" {
 		t.Errorf("expected Fields[\"instance_status\"] == %q, got %q", "initializing", r.Fields["instance_status"])
 	}
@@ -300,7 +245,6 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 		r.Findings = append(r.Findings, f...)
 	}
 
-	// Color func derives from the merged Wave-2 Finding → ColorWarning → IsIssue=true.
 	ec2tdInit := resource.FindResourceType("ec2")
 	if ec2tdInit != nil && ec2tdInit.Color != nil {
 		got := ec2tdInit.Color(r)
@@ -313,14 +257,9 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T063 — both ok → Resource.Status stays "running"
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestFetchEC2_LeavesStatusAsRunningWhenBothOk verifies that a running instance
 // with SystemStatus="ok" and InstanceStatus="ok" emits no Findings and has its
-// state surfaced via Fields["state"]. PR-03b: fetcher no longer writes Resource.Status;
-// the list-view falls back to Fields[LifecycleKey] for healthy instances.
+// state surfaced via Fields["state"].
 func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 	const id = "i-both-ok-001"
 	stub := &stubEC2WithStatusChecks{
@@ -341,7 +280,6 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 	}
 
 	r := resources[0]
-	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for healthy running instance, got %d", len(r.Findings))
 	}
@@ -350,19 +288,11 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T064 — state=stopped with sys=impaired → Status stays "stopped"
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestFetchEC2_DoesNotPromoteStoppedInstance verifies that a stopped instance
-// whose DescribeInstanceStatus defensively reports system_status=impaired is
-// handled correctly: the fetcher must emit a stopped-state Finding (not an
-// impaired-promotion Finding) and must never write Resource.Status.
-//
-// PR-03b: Resource.Status is always empty; stopped instances emit
-// CodeEC2StateStopped/SevWarn (no Server.* state reason in fixture →
-// user-initiated stop, not server fault). The impaired status-check data
-// must not override the lifecycle-state Finding.
+// whose DescribeInstanceStatus defensively reports system_status=impaired
+// emits the stopped-state Finding CodeEC2StateStopped/SevWarn (no Server.*
+// state reason in the fixture → user-initiated stop), not an impaired
+// Finding.
 func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 	const id = "i-stopped-sys-impaired"
 	stoppedInst := ec2types.Instance{
@@ -389,7 +319,6 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 	}
 
 	r := resources[0]
-	// PR-03b: fetcher no longer writes Resource.Status; state is surfaced via Findings.
 	// Stopped instance with no Server.* state reason → CodeEC2StateStopped / SevWarn.
 	if len(r.Findings) != 1 {
 		t.Fatalf("expected 1 Finding for stopped instance, got %d", len(r.Findings))
@@ -402,32 +331,17 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T065 — ctrl+z: impaired/initializing rows remain visible after toggle
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion verifies the behavioral
-// end-to-end: when resources have Status "impaired" or "initializing" (simulating
-// the post-promotion state), pressing ctrl+z (attention filter) must NOT hide them.
-// These are issue-colored rows and must pass the IsIssueRowColor gate.
-//
-// Pre-fix: because the fetcher leaves Status=="running", ctrl+z hides them since
-// "running" is not an issue status. This test uses pre-promoted resources directly,
-// bypassing the fetcher, to isolate the ctrl+z visibility behavior.
-// The test will PASS once both the fetcher promotion (Bug 1) and the attention
-// filter logic both work correctly. Pre-fix it fails because the test is explicitly
-// verifying that "impaired"/"initializing" rows survive the filter.
-//
-// We load promoted resources directly into the list model to test the ctrl+z path.
+// TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion verifies that impaired and
+// initializing rows stay visible under the ctrl+z attention filter. The
+// resources carry the Wave-2 Findings directly, bypassing the fetcher, to
+// isolate the ctrl+z visibility behaviour.
 func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
-	// Post-cleanup: fetcher emits Status=="" and encodes degraded state in
-	// Fields. Since the color-findings-conformance wave, colorEC2 is
-	// colorFromAnyFinding-only (no raw-field fallback) — each degraded
-	// resource must carry the Wave-2 Finding the real enricher would attach.
+	// Each degraded resource carries the Wave-2 Finding the real enricher
+	// attaches; colorEC2 is colorFromAnyFinding-only.
 	promotedResources := []resource.Resource{
 		{ID: "i-impaired-001", Name: "web-server-impaired", Fields: map[string]string{
 			"state":         "running",
@@ -451,13 +365,10 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 		}},
 	}
 
-	// Load the resources into the active ResourceListModel.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    promotedResources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
-
-	// Verify both rows are visible before toggling ctrl+z.
 
 	plainBefore := stripANSI(rootViewContent(m))
 	if !strings.Contains(plainBefore, "web-server-impaired") {
@@ -467,13 +378,9 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 		t.Error("initializing row should be visible before ctrl+z")
 	}
 
-	// Press ctrl+z to enable attention filter (hide non-issue rows).
 	ctrlZMsg := rootKeyPress("\x1a") // Ctrl+Z = ASCII 26 = \x1a
 	m, _ = rootApplyMsg(m, ctrlZMsg)
 
-	// ASSERTION: both impaired and initializing rows must remain visible
-	// because IsIssueRowColor returns true for both statuses.
-	// Pre-fix (if Status were "running"): rows would be hidden by the filter.
 	plainAfter := stripANSI(rootViewContent(m))
 	if !strings.Contains(plainAfter, "web-server-impaired") {
 		t.Error("impaired row must remain visible after ctrl+z attention filter: " +
@@ -485,36 +392,20 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// T066 — menu badge counts impaired + initializing + stopped as issues
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestMenuBadge_EC2_CountsImpairedRows verifies that a ResourceListModel loaded
-// with "running", "impaired", "initializing", and "stopped" resources reports
-// issueCount == 3 (impaired + initializing + stopped), because all three are in
-// issueStatusSet and IsIssueRowColor returns true for them.
-//
-// This test verifies the downstream impact of status promotion: once the fetcher
-// correctly sets Resource.Status to "impaired" or "initializing", the badge count
-// must reflect those instances. Pre-fix: badge shows 1 (only stopped) because the
-// fetcher leaves impaired/initializing instances with Status=="running".
-//
-// The test is framed around the view output: the ResourceListModel's frame title
-// must contain "issues:3" (or the badge count) after loading the resources.
+// TestMenuBadge_EC2_CountsImpairedRows verifies the frame-title issue badge
+// for an EC2 list loaded with running, impaired, initializing and stopped
+// instances.
 func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to EC2 list and set showIssueBadge=true (top-level list from main menu).
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Post-cleanup: fetcher emits Status=="" for all EC2 instances. Since the
-	// color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-	// (no raw-field fallback) — each degraded resource must carry the Finding
-	// the real fetcher/Wave-2 enricher would attach for its Fields.
+	// Each degraded resource carries the Finding the real fetcher or Wave-2
+	// enricher attaches; colorEC2 is colorFromAnyFinding-only.
 	mixedResources := []resource.Resource{
 		{ID: "i-running-001", Name: "healthy-server", Fields: map[string]string{"state": "running", "name": "healthy-server"}},
 		{
@@ -551,11 +442,11 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		Resources:    mixedResources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Spec §4 + S1 contract (docs/attention-signals.md): "issues:N" is the MENU
-	// badge, and "~" (SevWarn) findings do NOT bump it. i-impaired-001 (Wave-2
-	// "!" broken) counts; i-stopped-001 (Wave-1 "~" warn — Wave-1 issue-colored
-	// rows count) counts; i-initializing-001 (Wave-2 "~" warn) does NOT. So the
-	// badge reads "issues:2".
+	// docs/attention-signals.md: "issues:N" is the menu badge, and "~" (SevWarn)
+	// Wave-2 findings do not bump it. i-impaired-001 (Wave-2 "!" broken) counts;
+	// i-stopped-001 (Wave-1 "~" warn — Wave-1 issue-colored rows count) counts;
+	// i-initializing-001 (Wave-2 "~" warn) does not. So the badge reads
+	// "issues:2".
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))

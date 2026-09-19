@@ -1,6 +1,6 @@
 package unit
 
-// qa_sfn_uses_arn_from_fields_test.go — EnrichStepFunctionsStatus must call
+// EnrichStepFunctionsStatus must call
 // ListExecutions with the state-machine ARN from r.Fields["arn"], NOT the
 // bare name in r.ID.
 //
@@ -8,9 +8,6 @@ package unit
 // full ARN in Fields["arn"]; ListExecutions rejects the bare name with
 // InvalidArn ("Invalid ARN prefix: <name>").
 //
-// Contract:
-//   - The enricher must call ListExecutions with r.Fields["arn"], not r.ID.
-//   - A strict fake that rejects non-ARN inputs proves it.
 
 import (
 	"context"
@@ -56,10 +53,8 @@ func (f *strictSFNFake) ListExecutions(
 	return &sfn.ListExecutionsOutput{}, nil
 }
 
-// DescribeStateMachine rejects a bare name exactly as ListExecutions does.
-// This fake exists to catch the enricher handing AWS r.ID instead of the ARN
-// in Fields["arn"]; the enricher now makes a second ARN-taking call, and a
-// permissive stub would leave that one uncovered.
+// DescribeStateMachine rejects a bare name exactly as ListExecutions does, so
+// the enricher's second ARN-taking call is covered too.
 func (f *strictSFNFake) DescribeStateMachine(
 	_ context.Context,
 	input *sfn.DescribeStateMachineInput,

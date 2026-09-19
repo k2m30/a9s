@@ -1,40 +1,15 @@
-// tui_startup_seed_test.go — RED pin for the startup disk seed, D10 (C1 + goal 4 of
-// docs/design/cache-requirements.md; observed live: the TUI main menu renders
-// empty at startup until the AWS connect completes).
+// The startup disk seed
+// (docs/design/cache-requirements.md): a disk-cache-warm start renders cached
+// counts on the first frame, before the AWS connect completes.
 //
-// Root cause: tui.Model.Init (internal/tui/app.go) fired ONLY the connect cmd
-// on the live (non-pre-supplied-clients) path; the disk seed
-// (TaskKindLoadAvailCache / m.loadAvailabilityCache()) was dispatched from
-// handleClientsReadySuccess AFTER ClientsReady — so a cold, disk-cache-warm
-// start still showed a blank menu until the live AWS handshake finished, even
-// though C1 requires "anything cached renders instantly" with no AWS needed.
+// When session.Region is "" (no -r flag), the seed resolves the profile's
+// default region synchronously from the local AWS config file via
+// awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile) — the
+// call handleClientsReadySuccess uses post-connect.
 //
-// Secondary hole (both TUI and web lanes): when session.Region is "" (no -r
-// flag), EnsureCacheStore refuses to load (profile/region pair unresolved),
-// even though the profile's default region is resolvable synchronously from
-// the local AWS config file via awsclient.GetDefaultRegion(
-// awsclient.DefaultConfigPath(), profile) — the exact call
-// handleClientsReadySuccess already uses post-connect.
-//
-// Test 1 (TUIInit_SeedsMenuFromDisk_BeforeClientsReady) pins the TUI-level
-// contract directly against tui.Model.Init/Update/View: a disk-cache-warm
-// start must render cached counts on the FIRST frame, driven purely by
-// Init()'s returned cmd tree, without ever delivering a ClientsReady message.
-//
-// Test 2 (TUIInit_EmptyRegion_ResolvesConfigDefaultForSeed) pins the same
-// contract when session.Region == "" (no -r flag): the seed must resolve the
-// profile's config-file default region and load THAT pair's disk cache.
-//
-// Test 3 (TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault)
-// pins the shared runtime.Core.LoadAvailabilityCache seam
-// (core/runtime/probes.go) that both the TUI Init seed and
-// core/web/construct.go's newSession rely on: an empty-region session
-// must still resolve the config-file default and seed from that pair's disk
-// cache. core/web/construct.go's newSession is unexported and
-// unreachable from tests/unit, so this test pins the shared Core-level seam
-// it delegates to (LoadAvailabilityCache), which is the same seam
-// TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu in
-// app_web_live_cold_boot_test.go exercises for the resolved-region case.
+// core/web/construct.go's newSession is unexported and unreachable from
+// tests/unit, so the web lane is pinned at the Core seam it delegates to
+// (runtime.Core.LoadAvailabilityCache, core/runtime/probes.go).
 package unit
 
 import (
@@ -54,8 +29,7 @@ import (
 )
 
 // seedTypeFile writes a minimal, realistic per-type disk cache file for
-// shortName under profile/region, mirroring the app_web_live_cold_boot_test.go
-// / tui_savecache_routing_test.go Put+SaveType precedent. HasResources must
+// shortName under profile/region via Put+SaveType. HasResources must
 // be true (or Count/IssuesKnown/Rows non-zero) or
 // runtime.cacheStoreToEvent's zero-value TypeFile guard drops the entry.
 func seedTypeFile(t *testing.T, profile, region, shortName string, count int) {
@@ -74,11 +48,6 @@ func seedTypeFile(t *testing.T, profile, region, shortName string, count int) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 1 — cold start with a resolved profile+region must seed the menu from
-// disk on the very first Init()-driven frame, without any ClientsReady.
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady pins the startup disk seed: a
 // disk-cache-warm TUI start must render cached availability counts on the
 // menu before the live AWS connect completes. The model is constructed with
@@ -92,10 +61,6 @@ func seedTypeFile(t *testing.T, profile, region, shortName string, count int) {
 // NON-InitConnect message (the seed leg) and those are the only ones applied.
 // This isolates "what does the disk-seed leg alone, reachable before
 // ClientsReady, do to the rendered menu".
-//
-// RED today: Init() returns ONLY connectCmd on the live-connect path — no
-// seed leg exists — so after dropping the one InitConnect message there is
-// nothing left to apply, and the rendered menu shows no cached count.
 func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -127,17 +92,12 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 // top-level message to m via Update, EXCEPT messages.InitConnect, which is
 // intentionally dropped so the live AWS handshake is never triggered.
 //
-// Deliberately does NOT chase the tea.Cmd a delivered message's Update call
-// returns beyond this first level: Init()'s cmd tree is exactly
-// tea.Batch(connectCmd, seedCmd) (plus an optional flash cmd) — applying the
-// seed leg's resulting messages.AvailabilityCacheLoaded to Update is enough
-// to observe the startup disk seed's "does the disk seed reach the menu on the very first
-// frame" contract. Recursively draining every FOLLOW-ON cmd (as
-// tui_savecache_routing_test.go's runCmdTree does for a full sweep-completion
-// scenario) would additionally execute the real background availability
-// sweep this seed kicks off, including its scheduled tea.Tick-based
-// auto-clear-flash commands — which block on a real timer channel and are
-// unrelated to what this test pins.
+// Only this first level is applied: Init()'s cmd tree is
+// tea.Batch(connectCmd, seedCmd) (plus an optional flash cmd), and applying
+// the seed leg's messages.AvailabilityCacheLoaded is enough to observe the
+// first frame. Draining every follow-on cmd (as runCmdTree does) would run the
+// background availability sweep the seed kicks off, including tea.Tick
+// auto-clear-flash commands that block on a real timer channel.
 func applyNonConnectLeg(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	t.Helper()
 	if cmd == nil {
@@ -170,32 +130,15 @@ func applyNonConnectLeg(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 2 — an unresolved region (no -r flag) must still seed from the
-// profile's config-file default region.
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed pins the secondary
-// startup-disk-seed hole: session.Region == "" (as it is with no -r flag until the AWS
-// connect settles it) must not block the disk seed entirely. The profile's
-// default region is resolvable synchronously from a local AWS config file
-// via awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile) —
-// the exact call handleClientsReadySuccess (core/runtime/handlers.go)
-// already makes post-connect — so the seed should resolve and use that same
-// region.
+// TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed: with
+// session.Region == "" (no -r flag, until the AWS connect settles it) the disk
+// seed resolves the profile's default region from a local AWS config file via
+// awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile).
 //
 // A real AWS config file is written to a temp dir and AWS_CONFIG_FILE is
-// redirected to it (awsclient.DefaultConfigPath honors this env var; see
-// awsclient.GetDefaultRegion's own tests in aws_profile_test.go for the same
-// fixture pattern). The disk cache pair dir is seeded under
-// "<profile>--<configDefaultRegion>" — the pair the seed must resolve to.
-//
-// RED today: tui.New(profile, "") leaves session.Region == "", and
-// loadAvailabilityCache -> Core.LoadAvailabilityCache -> EnsureCacheStore
-// returns nil outright for an empty region (session.EnsureCacheStore's
-// `profile == "" || region == ""` guard), with no config-file fallback
-// anywhere in that path — so even reaching the (still-unwired, per Test 1)
-// seed leg would find nothing to seed from.
+// redirected to it (awsclient.DefaultConfigPath honors this env var). The
+// disk cache pair dir is seeded under "<profile>--<configDefaultRegion>" —
+// the pair the seed must resolve to.
 func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -231,28 +174,11 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 3 — the shared runtime.Core.LoadAvailabilityCache seam (used by both
-// the TUI Init seed and core/web/construct.go's newSession) must resolve
-// an empty region from the config-file default.
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault pins the
-// shared runtime-level seam directly: core/web/construct.go's newSession
-// is unexported and unreachable from tests/unit (confirmed: only
-// core/web itself can construct it), so this test pins the exact Core
-// method newSession's live (no-pre-supplied-clients) branch delegates to —
-// runtime.Core.LoadAvailabilityCache (core/runtime/probes.go) — which is
-// also the same method tui.Model's probe_adapter.go loadAvailabilityCache
-// wraps for Test 1/2 above. A green result here is a green result for both
-// callers' empty-region behavior; it does not exercise
-// core/web/construct.go's newSession wiring itself (that plumbing is a
-// two-line direct call with no branching left to pin once this seam is
-// fixed).
-//
-// RED today: Core.LoadAvailabilityCache calls EnsureCacheStore, which is a
-// zero-arg method reading session.Profile/session.Region directly — an empty
-// session.Region returns nil unconditionally, with no config-file fallback.
+// TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault pins
+// runtime.Core.LoadAvailabilityCache (core/runtime/probes.go), the method
+// core/web/construct.go's unexported newSession delegates to and
+// tui.Model's probe_adapter.go loadAvailabilityCache wraps: an empty
+// session.Region resolves from the config-file default.
 func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -275,8 +201,8 @@ func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.
 	if store == nil {
 		t.Fatal("Core.LoadAvailabilityCache() returned nil for an empty session.Region — D10: an unresolved region must still resolve the profile's config-file default and load that pair's disk cache")
 	}
-	// "rds" is an alias of "dbi"; cachegen row 11 canonicalizes a type file's
-	// key at load, so the file seeded as rds.yaml reads back under "dbi".
+	// "rds" is an alias of "dbi"; the cache canonicalizes a type file's key at
+	// load, so the file seeded as rds.yaml reads back under "dbi".
 	tf, ok := store.Type("dbi")
 	if !ok {
 		t.Fatalf(`store.Type("dbi") missing — LoadAvailabilityCache did not resolve to the config-default-region pair %q--%q`, profile, configDefaultRegion)
@@ -294,10 +220,7 @@ func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.
 	}
 }
 
-// writeFileOrFatal writes a minimal AWS config file fixture, matching the
-// writeAWSConfig precedent in app_handlers_theme_profile_test.go (kept
-// file-local per this package's existing convention of not sharing test
-// helpers across files).
+// writeFileOrFatal writes a minimal AWS config file fixture.
 func writeFileOrFatal(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

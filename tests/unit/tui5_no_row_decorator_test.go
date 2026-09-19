@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_no_row_decorator_test.go — the row decorator is gone, and stays gone.
+// List rows carry no row decorator.
 //
 // A list row's colour is the worst finding over both waves, so a row carrying
 // a finding is never green for a glyph to annotate: docs/attention-signals.md
-// (§Visualization Surfaces, S3) and docs/architecture.md both say the "!"/"~"
-// glyph is the per-entry marker inside the detail-view Attention section and
-// not a list-row surface. Nothing ever produced a ListRow decorator; the type,
-// the field and the two renderers that consumed it were plumbing waiting for a
-// producer that the contract says will never exist.
+// and docs/architecture.md both place the "!"/"~" glyph as the per-entry
+// marker inside the detail-view Attention section, not on a list row.
 package unit_test
 
 import (
@@ -20,9 +17,8 @@ import (
 )
 
 // rowDecoratorNames are the spellings a row-decorator plumbing would go by.
-// The surviving CellDecorators — a per-column cell-value transform, a
-// different mechanism with live registrations — is deliberately not among
-// them.
+// CellDecorators — a per-column cell-value transform with live
+// registrations — is a different mechanism.
 var rowDecoratorNames = []string{"RowDecorator", "DecoratorNormal", ".Decorator"}
 
 // TestNoRowDecoratorPlumbing walks every production file and asserts none of

@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// EFS File System fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &fakeEFSDescribeFileSystems{
@@ -74,7 +70,6 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first file system
 	r0 := resources[0]
 	if r0.ID != "fs-12345678" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "fs-12345678", r0.ID)
@@ -82,12 +77,11 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	if r0.Name != "shared-data" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "shared-data", r0.Name)
 	}
-	// Healthy FS (LifeCycleState=available, NumberOfMountTargets=3) — blank Status per spec §4.
+	// Healthy FS (LifeCycleState=available, NumberOfMountTargets=3) — blank Status.
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected empty for healthy FS, got %v", r0.Findings)
 	}
 
-	// Verify required fields — derived `status` key replaced the AWS-raw `life_cycle_state` key.
 	requiredFields := []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -111,7 +105,7 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	}
 
 	// Verify second file system (LifeCycleState=creating + NumberOfMountTargets=0):
-	// three coexisting W1 signals: the fixture is creating, has no mount
+	// three coexisting wave-1 signals: the fixture is creating, has no mount
 	// targets, and is unencrypted. Broken ("no mount targets") wins precedence
 	// and the other two ride along in the suffix.
 	r1 := resources[1]

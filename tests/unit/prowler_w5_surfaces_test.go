@@ -1,13 +1,13 @@
 package unit_test
 
-// prowler_w5_surfaces_test.go — the rendered-surface half of batch w5.
+// Rendered-surface checks for the messaging, streaming and application
+// posture types.
 //
-// The per-row tests assert an enricher emits the right finding for the input
+// The per-type tests assert an enricher emits the right finding for the input
 // it is handed. Nothing there proves the demo account contains such an
 // input, that the row an operator reads says anything the phrase did not
 // already say, or that the colour and the status cell agree about which
-// finding is worst. Those are the checks here, and they are the ones a
-// screenshot of the signal actually depends on.
+// finding is worst. Those are the checks here.
 
 import (
 	"go/ast"
@@ -25,14 +25,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// w5BatchTypes are the eight short names batch w5 touches.
+// w5BatchTypes are the short names these surface checks cover.
 var w5BatchTypes = []string{"sqs", "sns", "sns-sub", "msk", "kinesis", "sfn", "ses", "eb"} //nolint:gochecknoglobals // test-only list
 
-// w5BenchWitnesses names each new finding code and the demo fixture constant
-// that names the ONE row expected to carry it. Referencing the constant
-// rather than repeating its value is what makes the constant part of the
-// contract: renaming the fixture row without updating the witness breaks the
-// build instead of quietly emptying the bench.
+// w5BenchWitnesses names each posture finding code and the demo fixture
+// constant that names the ONE row expected to carry it. Referencing the
+// constant rather than repeating its value makes renaming the fixture row
+// break the build instead of quietly emptying the bench.
 var w5BenchWitnesses = []struct { //nolint:gochecknoglobals // test-only table
 	shortName string
 	code      string
@@ -62,8 +61,8 @@ var w5BenchWitnesses = []struct { //nolint:gochecknoglobals // test-only table
 	{"eb", "eb.cloudwatch-logs-off", fixtures.EBCWLogsOff},
 }
 
-// w5Bench fetches and enriches the demo rows for every type in the batch,
-// the way the running app does.
+// w5Bench fetches and enriches the demo rows for every type in
+// w5BatchTypes, the way the running app does.
 func w5Bench(t *testing.T) map[string][]resource.Resource {
 	t.Helper()
 	clients := demo.NewServiceClients()
@@ -84,10 +83,10 @@ func w5Bench(t *testing.T) map[string][]resource.Resource {
 	return out
 }
 
-// Exactly one demo row carries each new code, and it is the row the witness
-// constant names. Zero means the signal is invisible in the demo account and
-// every screenshot of it is empty; more than one means a row that was meant
-// to be healthy for this condition is not, which turns the bench into noise.
+// Exactly one demo row carries each posture code, and it is the row the
+// fixture constant names. Zero means the signal is invisible in the demo
+// account; more than one means a row that was meant to be healthy for this
+// condition is not.
 func TestW5DemoBenchWitnessPerFinding(t *testing.T) {
 	bench := w5Bench(t)
 
@@ -132,11 +131,11 @@ func w5Normalize(s string) string {
 	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
 }
 
-// U11, per finding: a supporting row must add something its OWN phrase does
-// not already say. The row and the phrase are rendered one line apart, so a
-// row that normalises to the phrase is the detail block printing one fact
-// twice. Only this comparison catches it — the per-row tests assert a row
-// exists, never that it is worth reading.
+// Per finding: a supporting row must add something its OWN phrase does not
+// already say. The row and the phrase are rendered one line apart, so a row
+// that normalises to the phrase is the detail block printing one fact twice.
+// Only this comparison catches it — the per-type tests assert a row exists,
+// never that it is worth reading.
 func TestW5DetailAttentionNeverRepeatsItself(t *testing.T) {
 	for shortName, rows := range w5Bench(t) {
 		for _, res := range rows {
@@ -239,8 +238,7 @@ func w5ColorOfSeverity(s domain.Severity) resource.Color {
 // A classifier that returned the first finding instead of the worst would
 // read this row as a warning. Order is deliberate: the milder finding comes
 // first, so first-wins and worst-wins give different answers. Every type in
-// the batch is checked, not a sample — the ruling that the seven raw-field
-// classifiers convert is only closed when each one is pinned.
+// w5BatchTypes is checked, not a sample.
 func TestW5WarnThenBrokenReadsAsBroken(t *testing.T) {
 	for _, short := range w5BatchTypes {
 		t.Run(short, func(t *testing.T) {
@@ -261,10 +259,6 @@ func TestW5WarnThenBrokenReadsAsBroken(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Row 11 — the ses Type column
-// ---------------------------------------------------------------------------
 
 // The Type column renders Fields["identity_type"] verbatim, so whatever the
 // fetcher stores there is what an operator reads. DOMAIN and EMAIL_ADDRESS
@@ -291,11 +285,10 @@ func TestW5SESTypeColumnRendersWordsNotEnums(t *testing.T) {
 	}
 }
 
-// The rename above is a class change, not a cell change: ses_related.go
-// branches on the same field to decide whether an identity is a domain or a
-// single address. A comparison left against the old enum text keeps
-// compiling and silently stops matching, which is how the related panel
-// would go empty without a single test failing.
+// ses_related.go branches on Fields["identity_type"] to decide whether an
+// identity is a domain or a single address. A comparison against the SDK
+// enum text keeps compiling and silently stops matching, which empties the
+// related panel without a single test failing.
 //
 // Scanning string literals rather than the file text is deliberate: the
 // prose in those files legitimately names the enum when explaining the AWS
@@ -347,9 +340,9 @@ var w5EBStatusWitnesses = map[string]string{ //nolint:gochecknoglobals // test-o
 }
 
 // A finding an operator never reads is not a finding. Each of the three
-// Elastic Beanstalk configuration phrases has to reach a Status cell, which
-// means its witness must not be sharing that cell with an equal-severity
-// health finding — StatusPhrase breaks a severity tie by order, so the
+// Elastic Beanstalk configuration phrases has to reach a Status cell, so its
+// demo environment must not share that cell with an equal-severity health
+// finding — StatusPhrase breaks a severity tie by order, so the
 // configuration phrase loses silently and the row reads about something
 // else.
 func TestW5EBConfigurationPhrasesReachTheStatusCell(t *testing.T) {

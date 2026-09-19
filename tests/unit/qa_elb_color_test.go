@@ -1,8 +1,7 @@
 package unit
 
-// qa_elb_color_test.go — Regression tests for Load Balancer Color mapping.
-//
-// ELB Color reads the "state" field. Tests pin each branch so regressions are caught.
+// Load Balancer Color mapping; ELB Color reads the
+// "state" field.
 
 import (
 	"testing"

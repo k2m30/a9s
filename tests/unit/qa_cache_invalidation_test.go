@@ -1,6 +1,6 @@
 package unit
 
-// qa_cache_invalidation_test.go — resource cache invalidation.
+// Resource cache invalidation.
 //
 // The resource cache is cleared on profile/region switch, selectively
 // cleared on refresh, and correctly updated when additional pages are loaded
@@ -17,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ---------------------------------------------------------------------------
-// TestQA_CacheInvalidation_ProfileSwitchClearsAll
-// ---------------------------------------------------------------------------
-
 // TestQA_CacheInvalidation_ProfileSwitchClearsAll verifies that sending a
 // ProfileSelectedMsg clears the entire resource cache synchronously.
 // After the profile switch, navigating to a previously-loaded resource type
@@ -29,7 +25,6 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: navigate to ct-events and load data so the cache is populated.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -45,21 +40,15 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Confirm the data is present before Esc.
-
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(50") {
 		t.Fatalf("precondition: expected 'ct-events(50...)' before profile switch, got:\n%s", plain)
 	}
 
-	// Step 2: press Esc back to main menu.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: switch profile — this must clear the cache.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
 
-	// Step 4: navigate to ct-events again.
-	// KEY ASSERTION: a fresh fetch must be issued because the cache was cleared.
 	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -70,10 +59,6 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_CacheInvalidation_RegionSwitchClearsAll
-// ---------------------------------------------------------------------------
-
 // TestQA_CacheInvalidation_RegionSwitchClearsAll verifies that sending a
 // RegionSelectedMsg clears the entire resource cache synchronously.
 // After the region switch, navigating to a previously-loaded resource type
@@ -82,7 +67,6 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: navigate to ct-events and load data.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -98,21 +82,15 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Confirm data is present.
-
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(50") {
 		t.Fatalf("precondition: expected 'ct-events(50...)' before region switch, got:\n%s", plain)
 	}
 
-	// Step 2: press Esc back to main menu.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: switch region — this must clear the cache.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
-	// Step 4: navigate to ct-events again.
-	// KEY ASSERTION: a fresh fetch must be issued because the cache was cleared.
 	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -123,10 +101,6 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly
-// ---------------------------------------------------------------------------
-
 // TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly verifies that pressing
 // Ctrl+R while viewing a resource list clears only that resource type's cache
 // slot and issues a fresh fetch for it, while other resource types' caches
@@ -135,7 +109,6 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: Load ct-events (50 items), press Esc.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -152,7 +125,6 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 2: Load ec2 (30 items), press Esc.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -169,27 +141,22 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: Re-enter ct-events — must be a cache hit (cmd == nil).
 	m, ctCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if ctCmd == nil {
 		t.Fatalf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
 
-	// Step 4: Press Ctrl+R (code 0x12) to refresh ct-events.
-	// This must clear ct-events from the cache and issue a fresh fetch.
 	_, refreshCmd := rootApplyMsg(m, rootSpecialKey(0x12))
 	if refreshCmd == nil {
 		t.Errorf("Ctrl+R on ct-events should issue a fresh fetch (non-nil cmd), but got nil")
 	}
 
-	// Step 5: Press Esc back to main menu, then re-enter ec2.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	_, ec2Cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -198,17 +165,11 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
-	// KEY ASSERTION: ec2's retained rows are still there to seed from.
+	// fetch; a list is never fresh forever.
 	if ec2Cmd == nil {
 		t.Errorf("after refreshing ct-events only, re-entering ec2 should still re-verify its retained rows")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage
-// ---------------------------------------------------------------------------
 
 // TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage verifies that after
 // loading page 2 via the M key, pressing Esc and re-entering the same resource
@@ -218,7 +179,6 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: Navigate to ct-events, load page 1 (50 items, truncated).
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -235,25 +195,20 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Confirm truncated indicator is shown.
-
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "50+") {
 		t.Fatalf("precondition: expected '50+' after page 1, got:\n%s", plain)
 	}
 
-	// Step 2: Press Esc — cache stores 50 items, truncated.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: Re-enter ct-events — must be a cache hit (cmd == nil) with 50 items.
 	m, ctCmd1 := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if ctCmd1 == nil {
 		t.Fatalf("re-entering ct-events (page 1) should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -262,7 +217,6 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		t.Fatalf("precondition: expected '50+' after cache hit, got:\n%s", plain)
 	}
 
-	// Step 4: Press M to load more, then deliver page 2 (50 more items, final).
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
@@ -276,17 +230,13 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Confirm 100 items are shown.
-
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("precondition: expected 'ct-events(100...)' after page 2, got:\n%s", plain)
 	}
 
-	// Step 5: Press Esc — cache must now store 100 combined items.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 6: Re-enter ct-events — cache hit must show 100 items.
 	m, ctCmd2 := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -294,20 +244,17 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if ctCmd2 == nil {
 		t.Errorf("re-entering ct-events after loading page 2 should seed both pages and re-verify them, but issued no command")
 	}
 
 	plain = stripANSI(rootViewContent(m))
 
-	// KEY ASSERTION: must show 100 combined items, not just 50.
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Errorf("after re-entering ct-events, expected 'ct-events(100...)' (both pages cached), got:\n%s", plain)
 	}
 
-	// Verify first-page items are still present after the cache update.
 	// We check for "usr-0000" which is the _ct.actor value rendered in the ACTOR column
 	// for the first ctEventsResources() entry (the ID "evt-0000" is not rendered in any column).
 	if !strings.Contains(plain, "usr-0000") {

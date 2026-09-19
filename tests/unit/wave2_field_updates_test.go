@@ -1,14 +1,5 @@
 package unit
 
-// wave2_field_updates_test.go — contracts for Wave-2 enricher FieldUpdates and
-// Wave-1 fetcher-computed field additions.
-//
-// Groups:
-//   Group 1  (#1–14)  Wave-2 enricher FieldUpdates
-//   Group 2  (#15–16) Pure Wave-1 column-source checks (EC2 status, Redshift path)
-//   Group 3  (#17–22) Fetcher-computed Wave-1 field additions
-//   Group 4  (#23–24) Cosmetic format fields (ACM days_left, AMI deprecated)
-
 import (
 	"context"
 	"net/url"
@@ -50,12 +41,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group 1: Wave-2 enricher FieldUpdates
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Test #1 — tg: health_summary FieldUpdates
 
 // tgHealthFakeW2 implements ELBv2API for target-group health testing.
 // It embeds the interface and overrides only DescribeTargetHealth.
@@ -103,7 +88,6 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 					},
 				},
 			},
-			// tgARN2 has no targets → "no targets"
 			tgARN2: {},
 		},
 	}
@@ -120,7 +104,7 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// tgName1: "1/2 healthy" pattern (FieldUpdates is keyed by r.ID, which is the bare name)
+	// FieldUpdates is keyed by r.ID, the bare target-group name.
 	fu1, ok := result.FieldUpdates[tgName1]
 	if !ok {
 		t.Errorf("FieldUpdates missing entry for %q", tgName1)
@@ -132,7 +116,6 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		}
 	}
 
-	// tgName2: "no targets"
 	fu2, ok := result.FieldUpdates[tgName2]
 	if !ok {
 		t.Errorf("FieldUpdates missing entry for %q", tgName2)
@@ -142,8 +125,6 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		}
 	}
 }
-
-// Test #2 — vpc: flow_logs FieldUpdates
 
 // vpcFlowLogFakeW is a local helper for vpc FieldUpdates test.
 // (Cannot reuse vpcFlowLogFake from aws_vpc_enricher_test.go without conflict.)
@@ -199,8 +180,6 @@ func TestEnrichVPCFlowLogs_WritesFlowLogsField(t *testing.T) {
 	}
 }
 
-// Test #3 — tgw: att_status FieldUpdates
-
 // TestEnrichTGWAttachments_WritesAttStatus verifies that EnrichTGWAttachments
 // populates FieldUpdates[tgwID]["att_status"] with a non-empty value when
 // at least one attachment is in a failed state.
@@ -235,8 +214,6 @@ func TestEnrichTGWAttachments_WritesAttStatus(t *testing.T) {
 	}
 }
 
-// Test #4 — sqs: dlq FieldUpdates
-
 // TestEnrichSQSAttributes_WritesDLQField verifies that EnrichSQSAttributes
 // sets FieldUpdates[queueID]["dlq"] == "yes" when RedrivePolicy is present,
 // and "no" when absent.
@@ -262,7 +239,6 @@ func TestEnrichSQSAttributes_WritesDLQField(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Queue with DLQ → "yes"
 	fu1, ok := result.FieldUpdates[nameWithDLQ]
 	if !ok {
 		t.Fatalf("FieldUpdates missing for queue %q", nameWithDLQ)
@@ -271,7 +247,6 @@ func TestEnrichSQSAttributes_WritesDLQField(t *testing.T) {
 		t.Errorf("dlq for %q = %q, want %q", nameWithDLQ, fu1["dlq"], "yes")
 	}
 
-	// Queue without DLQ → "no"
 	fu2, ok := result.FieldUpdates[nameWithoutDLQ]
 	if !ok {
 		t.Fatalf("FieldUpdates missing for queue %q", nameWithoutDLQ)
@@ -280,8 +255,6 @@ func TestEnrichSQSAttributes_WritesDLQField(t *testing.T) {
 		t.Errorf("dlq for %q = %q, want %q", nameWithoutDLQ, fu2["dlq"], "no")
 	}
 }
-
-// Test #5 — sns: subs_count FieldUpdates
 
 // snsFakeW is a local minimal fake for the subs_count test; avoids conflict with
 // snsListSubscriptionsByTopicFake from aws_sns_enricher_test.go.
@@ -339,8 +312,6 @@ func TestEnrichSNSSubscriptions_WritesSubsCount(t *testing.T) {
 		t.Errorf("subs_count = %q, want %q", fu["subs_count"], "3")
 	}
 }
-
-// Test #6 — sfn: last_run FieldUpdates
 
 // sfnFakeW implements SFNAPI for the last_run FieldUpdates test.
 type sfnFakeW struct {
@@ -405,8 +376,6 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 	}
 }
 
-// Test #7 — policy: risk FieldUpdates
-
 // TestEnrichIAMPolicy_WritesRiskField verifies that EnrichIAMPolicy populates
 // FieldUpdates[policyID]["risk"] == "admin policy" for a policy with Effect:Allow Action:* Resource:*.
 func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
@@ -464,8 +433,6 @@ func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 	}
 }
 
-// Test #8 — waf: rules_summary FieldUpdates
-
 // TestEnrichWAF_WritesRulesSummary verifies that EnrichWAFLogging populates
 // FieldUpdates[wafARN]["rules_summary"] containing "0 rules" for a WebACL
 // with no rules configured.
@@ -497,8 +464,6 @@ func TestEnrichWAF_WritesRulesSummary(t *testing.T) {
 		t.Errorf("waf rules_summary = %q, want value containing %q", rulesSummary, "0 rules")
 	}
 }
-
-// Test #9 — apigw: stages_count FieldUpdates
 
 // TestEnrichAPIGatewayStage_WritesStagesCount verifies that EnrichAPIGatewayStage
 // populates FieldUpdates[apiID]["stages_count"] with the number of stages.
@@ -534,7 +499,6 @@ func TestEnrichAPIGatewayStage_WritesStagesCount(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// apiID1: 2 stages
 	fu1, ok := result.FieldUpdates[apiID1]
 	if !ok {
 		t.Fatalf("FieldUpdates missing for api %q — coder must add stages_count FieldUpdates to EnrichAPIGatewayStage", apiID1)
@@ -543,7 +507,6 @@ func TestEnrichAPIGatewayStage_WritesStagesCount(t *testing.T) {
 		t.Errorf("api %q stages_count = %q, want %q", apiID1, fu1["stages_count"], "2")
 	}
 
-	// apiID2: 0 stages
 	fu2, ok := result.FieldUpdates[apiID2]
 	if !ok {
 		t.Fatalf("FieldUpdates missing for api %q — coder must add stages_count FieldUpdates to EnrichAPIGatewayStage", apiID2)
@@ -552,8 +515,6 @@ func TestEnrichAPIGatewayStage_WritesStagesCount(t *testing.T) {
 		t.Errorf("api %q stages_count = %q, want %q", apiID2, fu2["stages_count"], "0")
 	}
 }
-
-// Test #10 — pipeline: last_status FieldUpdates
 
 // cpGetPipelineStateFake implements CodePipelineAPI for last_status test.
 type cpGetPipelineStateFake struct {
@@ -618,8 +579,6 @@ func TestEnrichCodePipelineStatus_WritesLastStatus(t *testing.T) {
 		t.Errorf("pipeline last_status = %q, want value containing \"FAILED\" or stage name \"Build\"", lastStatus)
 	}
 }
-
-// Test #11 — cb: last_build FieldUpdates
 
 // cbFakeW implements CodeBuildAPI for the last_build test.
 type cbFakeW struct {
@@ -699,8 +658,6 @@ func TestEnrichCodeBuildStatus_WritesLastBuild(t *testing.T) {
 	}
 }
 
-// Test #12 — codeartifact: package_count FieldUpdates
-
 // codeArtifactPackageFake implements CodeArtifactAPI for package_count FieldUpdates test.
 // It overrides ListPackages to return a controlled set of packages per domain/repository.
 type codeArtifactPackageFake struct {
@@ -774,8 +731,6 @@ func TestEnrichCodeArtifactRepository_WritesPackageCount(t *testing.T) {
 	}
 }
 
-// Test #13 — glue: last_run FieldUpdates
-
 // glueFakeW implements GlueAPI for the last_run test.
 type glueFakeW struct {
 	awsclient.GlueAPI
@@ -834,17 +789,6 @@ func TestEnrichGlueJobStatus_WritesLastRun(t *testing.T) {
 		t.Errorf("glue last_run = %q, want value containing \"ERROR\" or \"FAILED\"", lastRun)
 	}
 }
-
-// Test #14 — retired. The backup resource no longer has a `last_status` field;
-// spec §4 (docs/resources/backup.md) routes job-state Wave-2 findings through
-// the unified Status column via `status` FieldUpdates + EnrichmentFinding.
-// The authoritative coverage lives in tests/unit/aws_backup_issue_enrichment_test.go.
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group 2: Pure Wave-1 column-source tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Test #15 — EC2 instance_status field from fetcher
 
 // ec2FetchFakeW implements EC2FetchInstancesAPI for instance_status test.
 // It overrides both DescribeInstances and DescribeInstanceStatus.
@@ -916,20 +860,12 @@ func TestEC2_HealthColumnReadsInstanceStatus(t *testing.T) {
 	}
 }
 
-// Test #16 — Redshift PendingModifiedValues column path
-
 // TestRedshift_PendingColumnPath verifies that the Redshift default view definition
 // contains a column whose Path points to PendingModifiedValues (or the Key matches
 // "pending_modified_values") as the attention column for pending changes.
 func TestRedshift_PendingColumnPath(t *testing.T) {
 	t.Skip("waiting on coder to add PendingModifiedValues column to Redshift list view — update assertion once path is known")
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group 3: Fetcher-computed Wave-1 field additions
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Test #17 — rtb: blackhole_count field
 
 // rtbFake implements EC2DescribeRouteTablesAPI for blackhole test.
 type rtbFake struct {
@@ -980,7 +916,6 @@ func TestFetchRTB_WritesBlackholeCount(t *testing.T) {
 	}
 
 	r := result.Resources[0]
-	// Try both possible field key names.
 	count := r.Fields["blackhole_routes_count"]
 	if count == "" {
 		count = r.Fields["blackhole_count"]
@@ -989,8 +924,6 @@ func TestFetchRTB_WritesBlackholeCount(t *testing.T) {
 		t.Errorf("blackhole count field = %q (checked blackhole_routes_count and blackhole_count), want %q", count, "1")
 	}
 }
-
-// Test #18 — eip: status field
 
 // eipFake implements EC2DescribeAddressesAPI for eip status test.
 type eipFake struct {
@@ -1015,7 +948,6 @@ func TestFetchEIP_WritesStatus(t *testing.T) {
 				AllocationId: aws.String("eipalloc-00aa11bb22"),
 				PublicIp:     aws.String("198.51.100.42"),
 				Domain:       ec2types.DomainTypeVpc,
-				// No AssociationId, InstanceId, NetworkInterfaceId → UNATTACHED
 			},
 		},
 	}
@@ -1036,8 +968,6 @@ func TestFetchEIP_WritesStatus(t *testing.T) {
 	}
 }
 
-// Test #20 — dbc: multi-warning §4 status phrase
-
 // docdbFake implements DocDBDescribeDBClustersAPI for dbc tests.
 type docdbFake struct {
 	awsclient.DocDBDescribeDBClustersAPI
@@ -1053,10 +983,8 @@ func (f *docdbFake) DescribeDBClusters(
 }
 
 // TestFetchDBC_MultiWarningStatusPhrase verifies that FetchDocDBClustersPage
-// collapses a cluster with multiple Wave-1 warnings into a single §4 status
-// phrase with a (+N) suffix — the post-refactor replacement for the legacy
-// `cis_flags` column (removed per universal rule U10, no jargon columns).
-// See docs/resources/dbc.md §4.
+// collapses a cluster with multiple Wave-1 warnings into a single status
+// phrase with a (+N) suffix. See docs/resources/dbc.md.
 func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 	clusterID := "docdb-multi-warn-cluster"
 	fake := &docdbFake{
@@ -1085,22 +1013,19 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 
 	r := result.Resources[0]
 
-	// Jargon column gone — no cis_flags anywhere.
 	if _, ok := r.Fields["cis_flags"]; ok {
 		t.Error("Fields[\"cis_flags\"] unexpectedly present — universal rule U10 requires its removal")
 	}
 
-	// §4 top phrase for delete-protection off + unencrypted + no backups:
-	// precedence order = delete-protection first, then not-encrypted, then
-	// no-automated-backups — so the top is "delete-protection off" with (+2).
+	// Precedence: delete-protection off, then not encrypted, then no automated
+	// backups.
 	const want = "delete-protection off (+2)"
-	// Per Phase-03 PR-03e: fetcher no longer writes Resource.Status; the
-	// display phrase lives in Fields["status"], findings carry severity.
+	// The display phrase lives in Fields["status"]; findings carry severity.
 	if r.Fields["status"] != want {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
 	}
 
-	// Findings enumerate every active warning (rule 7 — detail view renders each individually).
+	// Findings enumerate every active warning; the detail view renders each one.
 	wantFindings := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
 	if len(r.Findings) != len(wantFindings) {
 		t.Fatalf("Findings count = %d, want %d (%v)", len(r.Findings), len(wantFindings), r.Findings)
@@ -1114,8 +1039,6 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 		}
 	}
 }
-
-// Test #21 — secrets: status=OVERDUE field
 
 // secretsFake implements SecretsManagerListSecretsAPI for status test.
 type secretsFake struct {
@@ -1163,8 +1086,6 @@ func TestFetchSecrets_WritesStatus(t *testing.T) {
 	}
 }
 
-// Test #22 — ssm: risk=STALE field
-
 // ssmFake implements SSMDescribeParametersAPI for risk test.
 type ssmFake struct {
 	awsclient.SSMDescribeParametersAPI
@@ -1209,12 +1130,6 @@ func TestFetchSSM_WritesRisk(t *testing.T) {
 		t.Errorf("ssm risk = %q, want %q — coder must compute a stale risk for SecureString parameters not modified in >365 days", risk, "stale")
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Group 4: Cosmetic format fields
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Test #23 — acm: days_left field
 
 // acmListFake implements ACMListCertificatesAPI for the days_left test.
 type acmListFake struct {
@@ -1268,8 +1183,6 @@ func TestFetchACM_WritesDaysLeft(t *testing.T) {
 	}
 }
 
-// Test #24 — ami: deprecated field
-
 // amiListFake implements EC2DescribeImagesAPI for the deprecated test.
 type amiListFake struct {
 	awsclient.EC2DescribeImagesAPI
@@ -1317,16 +1230,11 @@ func TestFetchAMI_WritesDeprecated(t *testing.T) {
 	}
 }
 
-// DescribeStateMachine is the stub half of a partial test double: this fake
-// embeds SFNAPI as a nil interface and implements only ListExecutions, which
-// was the enricher's only call when it was written. The enricher now also
-// reads logging, encryption and definition posture.
-//
-// The body returned is a HEALTHY one, not an empty one. An empty
-// DescribeStateMachineOutput is not neutral — nil LoggingConfiguration means
-// logging is off and nil EncryptionConfiguration means the AWS-owned key, so
-// an empty stub would add two findings to every scenario in this file and
-// change what its assertions are measuring.
+// DescribeStateMachine returns a HEALTHY configuration, not an empty one. An
+// empty DescribeStateMachineOutput is not neutral — nil LoggingConfiguration
+// means logging is off and nil EncryptionConfiguration means the AWS-owned
+// key — so an empty stub would add two findings to every scenario in this
+// file and change what its assertions measure.
 func (f *sfnFakeW) DescribeStateMachine(_ context.Context, in *sfn.DescribeStateMachineInput, _ ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
 	return sfnFakeWHealthyDescribe(in.StateMachineArn), nil
 }
@@ -1342,15 +1250,11 @@ func sfnFakeWHealthyDescribe(arn *string) *sfn.DescribeStateMachineOutput {
 	}
 }
 
-// GetTopicAttributes is the stub half of a partial test double: this fake
-// embeds SNSAPI as a nil interface and implements only the subscription
-// listing, which was the enricher's only call when it was written.
-//
-// The attributes returned are a HEALTHY set, not an empty one. An empty
-// attribute map is not neutral — a missing KmsMasterKeyId means the topic is
-// unencrypted and a missing Policy is read as unknown — so an empty stub
-// would add an encryption finding to every scenario in this file and change
-// what its assertions are measuring.
+// GetTopicAttributes returns a HEALTHY attribute set, not an empty one. An
+// empty attribute map is not neutral — a missing KmsMasterKeyId means the
+// topic is unencrypted and a missing Policy is read as unknown — so an empty
+// stub would add an encryption finding to every scenario in this file and
+// change what its assertions measure.
 func (f *snsFakeW) GetTopicAttributes(_ context.Context, in *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
 	arn := ""
 	if in != nil && in.TopicArn != nil {

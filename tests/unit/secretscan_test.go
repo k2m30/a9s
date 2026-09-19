@@ -9,8 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/secretscan"
 )
 
-// --- ScanKV ---
-
 func TestScanKV_KeywordHit(t *testing.T) {
 	hits := secretscan.ScanKV(map[string]string{"DB_PASSWORD": "hunter2hunter2"})
 	want := []secretscan.Hit{{Kind: "keyword", Where: "DB_PASSWORD"}}
@@ -98,8 +96,6 @@ func TestScanKV_MultipleHitsSortedByWhere(t *testing.T) {
 	}
 }
 
-// --- ScanText ---
-
 func TestScanText_KeywordHit_LineNumber(t *testing.T) {
 	hits := secretscan.ScanText("#!/bin/bash\nexport DB_PASSWORD=hunter2hunter2\n")
 	want := []secretscan.Hit{{Kind: "keyword", Where: "line 2"}}
@@ -181,8 +177,6 @@ func TestScanText_CRLF_AWSAccessKeyOnSecondLine(t *testing.T) {
 	}
 }
 
-// --- Redact ---
-
 func TestRedact(t *testing.T) {
 	tests := []struct {
 		value string
@@ -200,8 +194,6 @@ func TestRedact(t *testing.T) {
 		})
 	}
 }
-
-// --- verify round: adversarial attacks against the landed engine ---
 
 func TestScanKV_ARNValueWithTrailingWhitespace_NoHit(t *testing.T) {
 	hits := secretscan.ScanKV(map[string]string{"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:x   "})

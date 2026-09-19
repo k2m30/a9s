@@ -1,24 +1,19 @@
-// tui_viewstate_purity_list_test.go — the TUI list renderer is a pure consumer
+// The TUI list renderer is a pure consumer
 // of app.ListBody.
 //
 // Contract under test: internal/tui/views/resourcelist.go's RenderList(body)
 // derives every presentation decision from the ListBody fields it is given,
-// and never re-derives one from body.EnrichmentFindings or any other side
-// channel. Two decisions were re-derived when this file was written, and
-// neither is any more:
+// not from body.EnrichmentFindings or any other side channel:
 //
-//  1. The "!"/"~" glyph on the identity cell. There is no glyph: a row's
-//     colour is the worst finding over both waves, so a row with anything to
-//     say is already off-green and nothing annotates it
-//     (docs/attention-signals.md §Visualization Surfaces). Case 2 below is
-//     what keeps a re-derivation from growing back in its place.
-//  2. The status cell. buildListBody bakes any status-column override into
+//  1. The identity cell carries no "!"/"~" glyph: a row's colour is the
+//     worst finding over both waves, so a row with anything to say is
+//     already off-green (docs/attention-signals.md).
+//  2. The status cell: buildListBody bakes any status-column override into
 //     row.Cells, and RenderList consumes body.StatusCol rather than
 //     re-resolving the index from the type definition.
 //
 // Each test constructs a SYNTHETIC ListBody whose pre-resolved Cells
-// deliberately DISAGREE with what a re-derivation from EnrichmentFindings
-// would produce, so a renderer that went back to re-deriving fails here.
+// disagree with what a re-derivation from EnrichmentFindings would produce.
 //
 // Harness: construct a views.ResourceListModel via views.NewResourceList(td,
 // nil, k), SetSize, then call m.RenderList(body) directly with a hand-built
@@ -38,9 +33,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// purityTypeDef builds a minimal ResourceTypeDef: column 0 = "Name" (marker
-// column via Step 2 key=="name"), column 1 = "Status" (status/lifecycle
-// column). Mirrors minimalTypeDef in phase03_view_reads_test.go.
+// purityTypeDef builds a minimal ResourceTypeDef: column 0 = "Name" (the
+// identity column by key=="name"), column 1 = "Status" (status/lifecycle
+// column).
 func purityTypeDef(shortName string) resource.ResourceTypeDef {
 	return resource.ResourceTypeDef{
 		Name:      shortName,
@@ -73,12 +68,9 @@ func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Case 2 — the findings map DOES carry an issue finding for the row, and the
-// row still renders with no glyph on any cell. A row's colour is the worst
-// finding over both waves, so there is nothing for a marker to add; a renderer
-// that re-derived one from EnrichmentFindings would be inventing a surface.
-// ---------------------------------------------------------------------------
+// The findings map carries an issue finding for the row, and the row renders
+// with no glyph on any cell: a row's colour is the worst finding over both
+// waves, so there is nothing for a marker to add.
 
 func TestViewStatePurity_List_NoGlyphIsDerivedFromFindings(t *testing.T) {
 	ensureNoColor(t)
@@ -121,12 +113,9 @@ func TestViewStatePurity_List_NoGlyphIsDerivedFromFindings(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Case 3 — Cells already carry the S4-baked phrase; findings map carries a
-// DIFFERENT phrase for the same row. A pure renderer must show the Cells
-// value verbatim. Today's renderer overrides the status cell with the
-// findings phrase whenever i==statusColIdx and an issue finding exists.
-// ---------------------------------------------------------------------------
+// Cells already carry the baked phrase and the findings map carries a
+// DIFFERENT phrase for the same row; the renderer shows the Cells value
+// verbatim.
 
 func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing.T) {
 	ensureNoColor(t)
@@ -140,19 +129,14 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 	const findingsPhrase = "DECOY: should never render"
 
 	row := app.ListRow{
-		// Cells[1] is the "status" column — already carries the baked S4 phrase.
+		// Cells[1] is the "status" column — already carries the baked phrase.
 		Cells:      []string{"demo-instance-3", bakedPhrase},
 		ResourceID: "res-3",
 		Color:      "healthy",
 	}
-	// The status column is declared wide enough for the baked phrase here.
-	// tui6 row 5 moved the "widen the status column to its widest cell"
-	// decision out of the renderer and into the body build, so the width a
-	// hand-assembled body publishes is the width the painter fills, exactly
-	// like every other column's. A narrower declaration truncates the phrase,
-	// which is the new contract holding rather than the override returning:
-	// this case is about WHICH string reaches the cell, and the decoy
-	// assertion below is what pins that.
+	// The status column is declared wide enough for the baked phrase: the width
+	// a hand-assembled body publishes is the width the painter fills, like every
+	// other column's.
 	columns := purityColumns()
 	// Wide enough for the DECOY, not just the baked phrase: a column that
 	// truncates the decoy would take the string this case is looking for off
@@ -186,10 +170,3 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 			bakedPhrase, out)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// app.ListBody.StatusCol exists, and is what RenderList consumes instead of
-// re-resolving the status-column index from the type definition. This started
-// as a deliberately non-compiling marker asking for the field; it compiles
-// now, and stays as the pin that the field is not quietly removed.
-// ---------------------------------------------------------------------------

@@ -1,29 +1,17 @@
 package unit
 
-// qa_partial_success_probe_test.go — Regression pins for partial-success
-// handling in probeResourceAvailability and probeEnrichment (Groups A and C).
+// Partial-success handling in probeResourceAvailability and probeEnrichment.
 //
-// Group A — probeResourceAvailability partial success
-//   File: internal/tui/app_fetchers.go:373-425
-//   Contract (fixed at HEAD): when the registered fetcher returns
-//   (FetchResult{Resources:[...]}, err), probeResourceAvailability returns
-//   AvailabilityCheckedMsg with BOTH Err set AND HasResources=true/Count populated.
+// When a fetcher returns (FetchResult{Resources:[...]}, err), the caller
+// receives both. probeResourceAvailability is an unexported method on
+// *tui.Model, so its output is verified through the registered fetcher and the
+// handler.
 //
-//   Note: probeResourceAvailability is an unexported method on *tui.Model.
-//   It cannot be invoked directly from tests/unit/. The probe output is verified
-//   indirectly by (a) injecting AvailabilityCheckedMsg with Err+Resources and
-//   asserting handleAvailabilityChecked applies state, and (b) verifying the
-//   registered fetcher returns the expected shape when called directly.
-//
-// Group C — probeEnrichment partial success
-//   File: internal/tui/app_fetchers.go:607-650
-//   Contract (fixed at HEAD): when the enricher returns (IssueEnricherResult{...}, err),
-//   probeEnrichment returns EnrichmentCheckedMsg with BOTH Err set AND
-//   Findings/FieldUpdates/TruncatedIDs/Issues/Truncated populated from the result.
-//
-//   probeEnrichment CAN be exercised indirectly: deliver AvailabilityCheckedMsg
-//   to seed probeResources, which triggers startEnrichment returning a cmd that
-//   executes the enricher immediately. No real AWS call is needed.
+// When an enricher returns (IssueEnricherResult{...}, err), probeEnrichment
+// returns EnrichmentCheckedMsg with Err set and Findings/FieldUpdates/
+// TruncatedIDs/Issues/Truncated populated from the result. Delivering
+// AvailabilityCheckedMsg seeds probeResources and starts enrichment, which
+// runs the enricher without an AWS call.
 
 import (
 	"context"
@@ -39,11 +27,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Group A: probeResourceAvailability partial success
-// Tested via registered fetcher output + handler integration.
-// ─────────────────────────────────────────────────────────────────────────────
-
 // partialProbeResources returns a small slice of synthetic resources used in
 // probeResourceAvailability partial-success tests.
 func partialProbeResources() []resource.Resource {
@@ -53,13 +36,9 @@ func partialProbeResources() []resource.Resource {
 	}
 }
 
-// TestProbeAvailability_FetcherReturnsPartialResults verifies that the
-// registered paginated fetcher contract is honoured: when a fetcher returns
-// (FetchResult{Resources:[...]}, err), the caller receives both.
-//
-// This test pins the fetcher half of the partial-success contract independently
-// of the probe dispatch path (which requires real STS credentials in tests).
-// The model-level integration is covered by TestHandleAvailabilityChecked_PartialErrAppliesState.
+// (FetchResult{Resources:[...]}, err) reaches the caller as both values. The
+// probe dispatch path needs real STS credentials, so the fetcher half is
+// pinned on its own.
 func TestProbeAvailability_FetcherReturnsPartialResults(t *testing.T) {
 	const shortName = "test-pa-partial-fetcher"
 	partialErr := errors.New("partial: one ID failed to fetch")
@@ -77,7 +56,6 @@ func TestProbeAvailability_FetcherReturnsPartialResults(t *testing.T) {
 
 	result, err := pf(context.Background(), nil, "")
 
-	// Contract: partial success returns both resources AND error.
 	if err == nil {
 		t.Fatal("partial fetcher: expected err, got nil")
 	}
@@ -90,8 +68,6 @@ func TestProbeAvailability_FetcherReturnsPartialResults(t *testing.T) {
 	}
 }
 
-// TestProbeAvailability_HardFailure_FetcherReturnsNoResources verifies that the
-// hard-failure contract is: (FetchResult{}, err) — no resources, error set.
 func TestProbeAvailability_HardFailure_FetcherReturnsNoResources(t *testing.T) {
 	const shortName = "test-pa-hardfail-fetcher"
 	hardErr := errors.New("hard: service unreachable")
@@ -115,19 +91,10 @@ func TestProbeAvailability_HardFailure_FetcherReturnsNoResources(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Group C: probeEnrichment partial success
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestProbeEnrichment_PartialSuccess verifies that when the registered enricher
-// returns (IssueEnricherResult{Findings: {...}, ...}, err), probeEnrichment
-// returns EnrichmentCheckedMsg with BOTH Err set AND Findings/FieldUpdates/
-// TruncatedIDs/Truncated populated from the result.
-//
-// This test CAN be run without real AWS credentials because it drives the model
-// via AvailabilityCheckedMsg (Gen=0 bypass) which seeds probeResources and
-// triggers startEnrichment → probeEnrichment in a goroutine that only calls
-// the registered enricher function (no STS, no real AWS).
+// A partial enricher result with an error reaches EnrichmentCheckedMsg with Err
+// set and the result fields populated. AvailabilityCheckedMsg seeds
+// probeResources and starts probeEnrichment, which calls only the registered
+// enricher (no STS, no AWS).
 func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	tui.Version = "test"
 
@@ -147,9 +114,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		},
 	}
 
-	// Register a synthetic enricher (sentinel name not in catalog) that returns
-	// a partial result AND an error. SetWave2EnricherForTest restores state
-	// automatically via t.Cleanup.
+	// Sentinel name not in the catalog; SetWave2EnricherForTest resets the
+	// registry via t.Cleanup.
 	awsclient.SetWave2EnricherForTest(t, shortName, awsclient.IssueEnricher{
 		Priority: 100,
 		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
@@ -157,24 +123,19 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		},
 	})
 
-	// Seed probeResources[shortName] so buildEnrichQueue includes it.
-	// Use WithNoCache(true) so that delivering ClientsReadyMsg sets m.clients without
-	// triggering fetchIdentity (STS). probeEnrichment guards on m.clients != nil;
-	// without this, it returns an early "clients not initialized" error instead of
-	// calling our enricher.
+	// WithNoCache(true) makes ClientsReadyMsg set m.clients without triggering
+	// fetchIdentity (STS); probeEnrichment returns "clients not initialized"
+	// while m.clients is nil.
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	// Pre-supply clients so probeEnrichment's nil-clients guard passes.
-	// noCache=true means handleClientsReady skips fetchIdentity and goes through
-	// demoPrefetchCounts instead. We discard that cmd (no real AWS data needed).
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	// The returned demoPrefetchCounts cmd is discarded.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 
 	probeRes := []resource.Resource{
 		{ID: "res-pe-001", Name: "res-pe-001"},
 		{ID: "res-pe-002", Name: "res-pe-002"},
 	}
-	// Deliver AvailabilityCheckedMsg to seed probeResources[shortName].
 	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	// availTotal=0 → availChecked(1) >= 0 → finalize → startEnrichment.
@@ -190,7 +151,6 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		t.Skip("startEnrichment returned nil cmd — shortName not in enricher dispatch queue")
 	}
 
-	// Walk the cmd tree for EnrichmentCheckedMsg for shortName.
 	allMsgs := drainAllMessages(enrichCmd)
 	var gotMsg *messages.EnrichmentChecked
 	for _, msg := range allMsgs {
@@ -205,7 +165,6 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		t.Skipf("EnrichmentCheckedMsg for %q not in cmd tree — enricher not dispatched (check buildEnrichQueue order)", shortName)
 	}
 
-	// CONTRACT ASSERTIONS — fail today if probeEnrichment drops results on error.
 	if gotMsg.Err == nil {
 		t.Fatalf("probeEnrichment partial success: Err must be set, got nil")
 	}

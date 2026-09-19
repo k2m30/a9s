@@ -1,13 +1,8 @@
 package unit
 
-// qa_child_pagination_test.go — pagination tests for all 19 child fetchers.
-//
-// After migration each child fetcher returns a SINGLE page per call with proper
-// IsTruncated/NextToken metadata. 4 test cases per fetcher:
-//   1. FirstPage    — API returns items + next cursor → IsTruncated=true
-//   2. Continuation — non-empty continuationToken passed, no next cursor → IsTruncated=false
-//   3. Empty        — API returns no items → IsTruncated=false, len==0
-//   4. Error        — API returns error → error propagated
+// Pagination for every child fetcher: each
+// returns a single page per call with IsTruncated/NextToken metadata, covered
+// by four cases (first page with a next cursor, continuation, empty, error).
 
 import (
 	"context"
@@ -50,10 +45,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Shared assertion helpers
-// ---------------------------------------------------------------------------
 
 // assertFirstPage verifies a successful first-page fetch.
 func assertFirstPage(t *testing.T, result resource.FetchResult, err error, wantToken string, wantIDs []string) {
@@ -136,13 +127,6 @@ func assertErrorPropagated(t *testing.T, err error, want error) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Mock: S3 ListObjectsV2
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_s3_test.go
-// (fakeS3ListObjectsV2) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestQA_ChildPagination_FetchS3Objects_FirstPage(t *testing.T) {
 	truncated := true
 	mock := &fakeS3ListObjectsV2{
@@ -193,10 +177,6 @@ func TestQA_ChildPagination_FetchS3Objects_Error(t *testing.T) {
 	_, err := awsclient.FetchS3Objects(context.Background(), mock, "my-app-bucket", "", "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: CloudWatchLogs DescribeLogStreams
-// ---------------------------------------------------------------------------
 
 type mockCWLogsDescribeLogStreamsAPIChildPaginated struct {
 	PageFunc func(call int) (*cloudwatchlogs.DescribeLogStreamsOutput, error)
@@ -254,10 +234,6 @@ func TestQA_ChildPagination_FetchLogStreams_Error(t *testing.T) {
 	_, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: CloudFormation DescribeStackEvents
-// ---------------------------------------------------------------------------
 
 type mockCFNDescribeStackEventsAPIChildPaginated struct {
 	PageFunc func(call int) (*cloudformation.DescribeStackEventsOutput, error)
@@ -322,13 +298,6 @@ func TestQA_ChildPagination_FetchCfnEvents_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: CloudFormation ListStackResources
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_cloudformation_test.go
-// (fakeCFNListStackResources) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestQA_ChildPagination_FetchCfnResources_FirstPage(t *testing.T) {
 	ts := time.Date(2025, 2, 15, 9, 0, 0, 0, time.UTC)
 	mock := &fakeCFNListStackResources{
@@ -391,10 +360,6 @@ func TestQA_ChildPagination_FetchCfnResources_Error(t *testing.T) {
 	_, err := awsclient.FetchCfnResources(context.Background(), mock, "my-stack", "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: Route53 ListResourceRecordSets
-// ---------------------------------------------------------------------------
 
 type mockRoute53ListResourceRecordSetsAPIChildPaginated struct {
 	PageFunc func(call int) (*route53.ListResourceRecordSetsOutput, error)
@@ -464,10 +429,6 @@ func TestQA_ChildPagination_FetchR53Records_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: ECR DescribeImages
-// ---------------------------------------------------------------------------
-
 type mockECRDescribeImagesAPIChildPaginated struct {
 	PageFunc func(call int) (*ecr.DescribeImagesOutput, error)
 	calls    int
@@ -535,10 +496,6 @@ func TestQA_ChildPagination_FetchECRImages_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: IAM ListAttachedRolePolicies + ListRolePolicies (role_policies — two APIs)
-// ---------------------------------------------------------------------------
-
 type mockIAMListAttachedRolePoliciesAPIChildPaginated struct {
 	PageFunc func(call int) (*iam.ListAttachedRolePoliciesOutput, error)
 	calls    int
@@ -583,9 +540,6 @@ func TestQA_ChildPagination_FetchRolePolicies_FirstPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	// After migration: first page returns items with IsTruncated based on pagination state.
-	// Currently loops all — after migration returns single page. Test the contract:
-	// result must have Pagination set.
 	if result.Pagination == nil {
 		t.Fatal("expected Pagination, got nil")
 	}
@@ -601,7 +555,6 @@ func TestQA_ChildPagination_FetchRolePolicies_FirstPage(t *testing.T) {
 }
 
 func TestQA_ChildPagination_FetchRolePolicies_Continuation(t *testing.T) {
-	// Continuation: pass a non-empty token; mock returns items + no more pages.
 	attachedMock := &mockIAMListAttachedRolePoliciesAPIChildPaginated{
 		PageFunc: func(_ int) (*iam.ListAttachedRolePoliciesOutput, error) {
 			return &iam.ListAttachedRolePoliciesOutput{
@@ -662,10 +615,6 @@ func TestQA_ChildPagination_FetchRolePolicies_Error(t *testing.T) {
 	_, err := awsclient.FetchRolePolicies(context.Background(), attachedMock, inlineMock, parentCtx, "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: CodeBuild ListBuildsForProject + BatchGetBuilds (cb_builds — two APIs)
-// ---------------------------------------------------------------------------
 
 type mockCodeBuildListBuildsForProjectAPIChildPaginated struct {
 	PageFunc func(call int) (*codebuild.ListBuildsForProjectOutput, error)
@@ -784,10 +733,6 @@ func TestQA_ChildPagination_FetchCBBuilds_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: CloudWatch DescribeAlarmHistory
-// ---------------------------------------------------------------------------
-
 type mockCloudWatchDescribeAlarmHistoryAPIChildPaginated struct {
 	PageFunc func(call int) (*cloudwatch.DescribeAlarmHistoryOutput, error)
 	calls    int
@@ -855,10 +800,6 @@ func TestQA_ChildPagination_FetchAlarmHistory_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: RDS DescribeEvents
-// ---------------------------------------------------------------------------
-
 type mockRDSDescribeEventsAPIChildPaginated struct {
 	PageFunc func(call int) (*rds.DescribeEventsOutput, error)
 	calls    int
@@ -921,10 +862,6 @@ func TestQA_ChildPagination_FetchRDSEvents_Error(t *testing.T) {
 	_, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: SNS ListSubscriptionsByTopic
-// ---------------------------------------------------------------------------
 
 type mockSNSListSubscriptionsByTopicAPIChildPaginated struct {
 	PageFunc func(call int) (*sns.ListSubscriptionsByTopicOutput, error)
@@ -1004,10 +941,6 @@ func TestQA_ChildPagination_FetchSNSTopicSubscriptions_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: AutoScaling DescribeScalingActivities
-// ---------------------------------------------------------------------------
-
 type mockASGDescribeScalingActivitiesAPIChildPaginated struct {
 	PageFunc func(call int) (*autoscaling.DescribeScalingActivitiesOutput, error)
 	calls    int
@@ -1074,10 +1007,6 @@ func TestQA_ChildPagination_FetchAsgActivities_Error(t *testing.T) {
 	_, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: SFN ListExecutions
-// ---------------------------------------------------------------------------
 
 type mockSFNListExecutionsAPIChildPaginated struct {
 	PageFunc func(call int) (*sfn.ListExecutionsOutput, error)
@@ -1146,10 +1075,6 @@ func TestQA_ChildPagination_FetchSFNExecutions_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: SFN GetExecutionHistory
-// ---------------------------------------------------------------------------
-
 type mockSFNGetExecutionHistoryAPIChildPaginated struct {
 	PageFunc func(call int) (*sfn.GetExecutionHistoryOutput, error)
 	calls    int
@@ -1217,10 +1142,6 @@ func TestQA_ChildPagination_FetchSFNExecutionHistory_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: Glue GetJobRuns
-// ---------------------------------------------------------------------------
-
 type mockGlueGetJobRunsAPIChildPaginated struct {
 	PageFunc func(call int) (*glue.GetJobRunsOutput, error)
 	calls    int
@@ -1284,10 +1205,6 @@ func TestQA_ChildPagination_FetchGlueJobRuns_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: IAM GetGroup
-// ---------------------------------------------------------------------------
-
 type mockIAMGetGroupAPIChildPaginated struct {
 	PageFunc func(call int) (*iam.GetGroupOutput, error)
 	calls    int
@@ -1320,7 +1237,6 @@ func TestQA_ChildPagination_FetchIAMGroupMembers_FirstPage(t *testing.T) {
 	if result.Pagination == nil {
 		t.Fatal("expected Pagination, got nil")
 	}
-	// After migration: IsTruncated=true when more pages exist.
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
@@ -1374,10 +1290,6 @@ func TestQA_ChildPagination_FetchIAMGroupMembers_Error(t *testing.T) {
 	_, err := awsclient.FetchIAMGroupMembers(context.Background(), mock, parentCtx, "")
 	assertErrorPropagated(t, err, wantErr)
 }
-
-// ---------------------------------------------------------------------------
-// Mock: ELBv2 DescribeListeners
-// ---------------------------------------------------------------------------
 
 type mockELBv2DescribeListenersAPIChildPaginated struct {
 	PageFunc func(call int) (*elbv2.DescribeListenersOutput, error)
@@ -1446,10 +1358,6 @@ func TestQA_ChildPagination_FetchELBListeners_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: ELBv2 DescribeRules
-// ---------------------------------------------------------------------------
-
 type mockELBv2DescribeRulesAPIChildPaginated struct {
 	PageFunc func(call int) (*elbv2.DescribeRulesOutput, error)
 	calls    int
@@ -1492,13 +1400,10 @@ func TestQA_ChildPagination_FetchELBListenerRules_FirstPage(t *testing.T) {
 }
 
 func TestQA_ChildPagination_FetchELBListenerRules_Continuation(t *testing.T) {
-	// DescribeRules DOES paginate server-side via Marker/NextMarker (unlike
-	// the other 18 child fetchers here that just forward an opaque token),
-	// so continuationToken must be a resumable cursor this fetcher itself
-	// produced — an arbitrary string like the other fetchers accept is
-	// rejected as a foreign cursor rather than silently restarting at page 1.
-	// Round-trip through a real truncated first page instead of a hand-rolled
-	// token.
+	// DescribeRules paginates server-side via Marker/NextMarker, so
+	// continuationToken must be a resumable cursor this fetcher produced; an
+	// arbitrary string is rejected as a foreign cursor rather than silently
+	// restarting at page 1. Round-trip through a real truncated first page.
 	isDefault := true
 	parentCtx := map[string]string{"listener_arn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/my-alb/abc/def"}
 	firstMock := &mockELBv2DescribeRulesAPIChildPaginated{
@@ -1555,10 +1460,6 @@ func TestQA_ChildPagination_FetchELBListenerRules_Error(t *testing.T) {
 	assertErrorPropagated(t, err, wantErr)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: ECS ListTasks + DescribeTasks (ecs_svc_tasks — two APIs)
-// ---------------------------------------------------------------------------
-
 type mockECSListTasksAPIChildPaginated struct {
 	PageFunc func(call int) (*ecs.ListTasksOutput, error)
 	calls    int
@@ -1579,18 +1480,9 @@ func (m *mockECSDescribeTasksAPIChildPaginated) DescribeTasks(_ context.Context,
 	return m.PageFunc(m.calls)
 }
 
-// TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage previously asserted
-// Pagination.NextToken == "" whenever IsTruncated, commented "ECS tasks
-// fetch two statuses (RUNNING + STOPPED) in one call, so per-page
-// continuation isn't supported" — that comment stated the defect as the
-// intended contract: a page could be truncated with NO way to ever fetch
-// the rest. That was the bug this file's production fix removes. This test
-// now asserts the fix instead: NextToken is a real, working compound cursor,
-// and feeding it back resumes the RUNNING axis rather than re-fetching page
-// 1 — page 2 returns a DIFFERENT task, not a dedup-collapsed repeat of page
-// 1 (the "task 101 is unreachable by any keystroke" bug). Do NOT restore the
-// old NextToken == "" assertion when reading this test — that was the bug,
-// not the contract.
+// TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage: NextToken on a truncated
+// page is a working compound cursor, and feeding it back resumes the RUNNING
+// axis — page 2 returns a different task, not a repeat of page 1.
 func TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage(t *testing.T) {
 	startedAt1 := time.Date(2025, 3, 1, 8, 0, 0, 0, time.UTC)
 	startedAt2 := time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)
@@ -1665,19 +1557,11 @@ func TestQA_ChildPagination_FetchEcsSvcTasks_FirstPage(t *testing.T) {
 	}
 }
 
-// TestQA_ChildPagination_FetchEcsSvcTasks_Continuation previously fed a
-// hand-written, non-JSON string ("ecs-next-token-2") as the continuation
-// token. decodeEcsSvcTasksCursor now rejects any non-empty token that fails
-// to parse as JSON, so that literal would return a decode error — the old
-// assertion "continuation resumes and returns taskid002" passed only because
-// the REMOVED leniency (Unmarshal failure -> silently reset to the zero
-// cursor, i.e. re-fetch page 1) made the malformed token behave exactly like
-// "". It never exercised resumption at all. This now round-trips a REAL
-// cursor obtained from an actual FetchEcsSvcTasks call (the only legitimate
-// source of this token) through a second call, resuming the STOPPED axis
-// (FirstPage, above, already covers resuming RUNNING) while RUNNING — already
-// done on page 1 — is correctly skipped rather than re-fetched. Do NOT
-// restore the hand-written string token; that was the bug, not the contract.
+// TestQA_ChildPagination_FetchEcsSvcTasks_Continuation round-trips a real
+// cursor from a FetchEcsSvcTasks call (the only legitimate source of this
+// token; decodeEcsSvcTasksCursor rejects any non-JSON token) through a second
+// call, resuming the STOPPED axis while the already-drained RUNNING axis is
+// skipped rather than re-fetched.
 func TestQA_ChildPagination_FetchEcsSvcTasks_Continuation(t *testing.T) {
 	startedAt := time.Date(2025, 3, 2, 8, 0, 0, 0, time.UTC)
 

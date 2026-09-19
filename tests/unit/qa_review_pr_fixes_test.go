@@ -17,7 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// P2.1 — ACM cert expired less than 24h ago must show "expired", not "0 days".
+// An ACM cert expired less than 24h ago shows "expired", not "0 days".
 type acmExpiredFake struct{}
 
 func (acmExpiredFake) ListCertificates(_ context.Context, _ *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
@@ -50,15 +50,7 @@ func TestACM_DaysLeft_RecentlyExpired(t *testing.T) {
 	}
 }
 
-// P2.2 was a regression pin for the retired `last_status` field on backup. The
-// backup spec (docs/resources/backup.md §4) collapsed last_status into the
-// unified Status column as part of the 2026-04-23 rewrite — no column, no
-// field, no test. Removed rather than updated because there is no equivalent
-// invariant to preserve: last_status always surfaced the newest job regardless
-// of the 24h cutoff, but the new Status column carries only the in-window
-// Wave-2 finding phrase and is blank for healthy plans.
-
-// P3.1 — CodeArtifact ListPackages pagination: count must include all pages.
+// CodeArtifact ListPackages pagination: the count includes all pages.
 type codeArtifactPagedFake struct {
 	awsclient.CodeArtifactAPI
 	calls int
@@ -107,7 +99,7 @@ func TestCodeArtifact_PackageCount_FollowsAllPages(t *testing.T) {
 	}
 }
 
-// P3.2 — SNS subs_count pagination: must include all pages.
+// SNS subs_count pagination: the count includes all pages.
 type snsPagedFake struct {
 	awsclient.SNSAPI
 	calls int
@@ -153,9 +145,9 @@ func TestSNS_SubsCount_FollowsAllPages(t *testing.T) {
 	}
 }
 
-// GetTopicAttributes is the stub half of a partial test double: this fake
-// embeds SNSAPI as a nil interface and implements only the subscription
-// listing, which was the enricher's only call when it was written.
+// GetTopicAttributes completes this partial test double: the fake embeds
+// SNSAPI as a nil interface and implements the subscription listing plus this
+// call.
 //
 // The attributes returned are a HEALTHY set, not an empty one. An empty
 // attribute map is not neutral — a missing KmsMasterKeyId means the topic is

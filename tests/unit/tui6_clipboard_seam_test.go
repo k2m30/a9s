@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_clipboard_seam_test.go — the reveal screen's two answers, read off the
+// The reveal screen's two answers, read off the
 // seam rather than off the operator's clipboard.
 //
 // A secret is the one value on any screen the operator takes away to use as it

@@ -1,31 +1,14 @@
-// qa_title_warning_findings_test.go — RED regression test for the S1
-// aggregation bug in Controller.listIssueCount (core/app/list_body.go).
+// The list frame title's issue count in
+// Controller.listIssueCount (core/app/list_body.go).
 //
-// Per docs/attention-signals.md §Visualization Surfaces (S1) and §S1 — list
-// frame title issue count: "N uses the same aggregation as the menu badge:
-// Wave 1 issue-colored rows plus Wave 2 `!`-severity findings for the
+// Per docs/attention-signals.md: "N uses the same aggregation as the menu
+// badge: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings for the
 // resources in the list. `~` findings do not bump." "~" findings are
 // domain.SevWarn, as their catalog.FindingDef declares; "!" findings are
-// domain.SevBroken
-// (core/aws/issue_enrichment.go setWave2Finding docstring).
-//
-// Root cause: listIssueCount's Wave-2 fallback branch only checks map
-// membership —
-//
-//	} else if _, hasFinding := findings[r.ID]; hasFinding {
-//	    ic++
-//	}
-//
-// — with no severity gate. It counts ANY Wave-2 finding (SevWarn "~" included)
-// as an issue, inflating both the list frame title's " !N" suffix and
-// Controller.GetListIssueCount(). This file pins the correct behavior: only
-// SevBroken ("!") Wave-2 findings on an otherwise-Healthy, no-Wave-1-finding
-// resource should count.
-//
-// Harness style follows qa_controller_frame_title_issue_badge_test.go: drives
-// the Controller directly via newListController + ApplyResourcesLoaded +
-// ApplyEnrichmentState (the Wave-2 enrichment seam), asserting on
-// Controller.ListFrameTitle() and Controller.GetListIssueCount().
+// domain.SevBroken (core/aws/issue_enrichment.go setWave2Finding). Only
+// SevBroken Wave-2 findings on an otherwise-Healthy, no-Wave-1-finding
+// resource count toward the title's " !N" suffix and
+// Controller.GetListIssueCount().
 package unit_test
 
 import (
@@ -50,15 +33,9 @@ func warnOnlyFindings(ids []string) map[string][]domain.Finding {
 	return findings
 }
 
-// TestController_ListIssueCount_TildeOnlyFindings_NoSuffix is the RED test for
-// case (a): a list whose rows are all Healthy (state="running", no Wave-1
-// Findings) with ONLY "~"-severity (SevWarn) Wave-2 findings applied to every
-// row. Per S1, "~" findings do not bump the count — the title must carry NO
-// " !" suffix at all, and GetListIssueCount() must be 0.
-//
-// Currently RED: listIssueCount's Wave-2 fallback branch counts any map
-// membership regardless of severity, so all 5 rows are (wrongly) counted as
-// issues, producing " !5".
+// Healthy rows (state="running", no Wave-1 Findings) carrying only "~"
+// (SevWarn) Wave-2 findings: the title has no " !" suffix and
+// GetListIssueCount() is 0.
 func TestController_ListIssueCount_TildeOnlyFindings_NoSuffix(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -82,11 +59,8 @@ func TestController_ListIssueCount_TildeOnlyFindings_NoSuffix(t *testing.T) {
 	}
 }
 
-// TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly is the
-// RED test for case (b): 2 rows carry a "!"-severity (SevBroken) Wave-2
-// finding, 3 rows carry a "~"-severity (SevWarn) Wave-2 finding. All 5 rows
-// are otherwise Healthy (state="running", no Wave-1 Findings). Only the 2
-// "!"-finding rows should count — the suffix must be exactly " !2", not " !5".
+// Two "!" (SevBroken) and three "~" (SevWarn) Wave-2 findings on otherwise
+// Healthy rows: the suffix is exactly " !2".
 func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -124,15 +98,9 @@ func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testi
 	}
 }
 
-// TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation pins
-// case (c): the title's " !N" suffix uses the SAME aggregation as
-// Controller.GetListIssueCount() — the documented single source of truth for
-// both the menu badge and the list-title suffix (see the S1 contract comment
-// at core/app/list_body.go above buildListFrameTitle, and listIssueCount's
-// own docstring referencing the menu sync-back). This guards against a future
-// fix that repairs the title's inline computation but leaves
-// GetListIssueCount (and therefore the menu badge) on the old, wrong
-// aggregation, or vice versa.
+// The title's " !N" suffix and Controller.GetListIssueCount() — the single
+// source for both the menu badge and the list-title suffix — use the same
+// aggregation (buildListFrameTitle and listIssueCount in core/app/list_body.go).
 func TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation(t *testing.T) {
 	c := newListController(t, "ec2")
 

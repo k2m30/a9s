@@ -1,32 +1,13 @@
-// tui_detail_parity_test.go — parity pins for the Wave-2 convergence of the
-// two remaining TUI-side detail-lane mirrors onto the headless controller:
+// The TUI and headless lanes agree on detail
+// PatchDetail intents (Controller.applyIntents, core/app/intents.go) and on
+// the related-cache replay on detail open, which short-circuits the
+// KindRelatedCheck fan-out on a cache hit.
 //
-//  1. app_dispatch.go's local PatchDetail case (ClearDetailFindingsForType +
-//     ApplyDetailFindingForResource loop over EnrichmentFindings/
-//     EnrichmentAttentionDetails) moves into Controller.applyIntents
-//     (core/app/intents.go), which today documents PatchDetail as an
-//     intentional no-op (the TUI-local case being deleted was carrying it).
-//  2. The related-cache replay embedded in the TUI's NavigateKindPushDetail
-//     case (runtime_adapter_navigate.go ~L224-245: iterate cached
-//     RelatedCacheResult entries, call
-//     ctrl.ApplyDetailRelatedResultForResource) moves into the controller's
-//     own detail-open path (core/app/controller.go's
-//     openSelectedListDetail, which already replays the cache for the
-//     select-from-list flow — core/app/navigate.go's applyNavResult,
-//     NavigateKindPushDetail case, currently has NO such replay). After the
-//     collapse both lanes must replay identically and short-circuit the
-//     KindRelatedCheck fan-out on a cache hit.
-//
-// Harness: mirrors tui_intent_parity_test.go — a sized tui.Model driven via
-// rootApplyMsg is the TUI lane; a directly-constructed *app.Controller +
-// *runtime.Core pair (matching newIntentParityHeadlessController /
-// newTestController's construction shape) is the headless lane. Both lanes
-// are driven through the SAME entry-point shape their respective production
+// Harness: a sized tui.Model driven via rootApplyMsg is the TUI lane; a
+// directly-constructed *app.Controller + *runtime.Core pair is the headless
+// lane. Both lanes are driven through the entry-point shape their production
 // code uses (messages.Navigate for the TUI lane; app.Action{Kind:
-// ActionSelect} for the headless lane), not a synthetic hand-built intent
-// slice, except where a test needs to isolate the PatchDetail intent
-// specifically (test 1 also drives ctrl.ApplyIntents directly to pin the
-// controller-side contract in isolation).
+// ActionSelect} for the headless lane).
 package unit
 
 import (
@@ -79,10 +60,6 @@ func newDetailParityTUIModel(t *testing.T) tui.Model {
 	return m
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 1. DetailParity_PatchDetail_TUIEqualsHeadless
-// ─────────────────────────────────────────────────────────────────────────
-
 // detailParityEnrichmentCheckedEvent builds the real production message
 // (messages.EnrichmentChecked) that HandleEnrichmentChecked
 // (core/runtime/handlers_availability.go) folds into a runtime.PatchDetail
@@ -127,8 +104,7 @@ func detailParityEnrichmentCheckedEvent() messages.EnrichmentChecked {
 // detailParityClearEnrichmentCheckedEvent mirrors what HandleEnrichmentChecked
 // receives when a subsequent enrichment pass finds no issues for the type at
 // all (all resources recovered): nil Findings, which folds into a PatchDetail
-// intent with a nil EnrichmentFindings map — the ClearDetailFindingsForType
-// half of the case being moved.
+// intent with a nil EnrichmentFindings map.
 func detailParityClearEnrichmentCheckedEvent() messages.EnrichmentChecked {
 	return messages.EnrichmentChecked{ResourceType: "ec2"}
 }
@@ -161,35 +137,13 @@ func attentionFieldRows(body *app.DetailBody) []app.FieldRow {
 }
 
 // TestDetailParity_PatchDetail_TUIEqualsHeadless drives the SAME
-// EnrichmentChecked event — which HandleEnrichmentChecked folds into an
-// identical PatchDetail intent — through the TUI lane (rootApplyMsg ->
-// Model.Update -> m.coreUpdate -> m.applyIntents, the exact function the
-// Wave-2 collapse rewrites) and the headless lane (ctrl.Handle, which calls
-// Controller.applyIntents with the same intent batch), then asserts both
-// converge on an identical DetailBody Attention section — and,
-// critically, that neither lane double-applies the finding: a double-apply
-// would either duplicate the Attention row (if the strip-then-append merge
-// in applyFindingToState somehow missed the dedup) or leave AttentionDetails
-// row counts inflated. The load-bearing pin is an EXACT row count (== N),
-// not just non-zero, because a leftover TUI-local case running ALONGSIDE the
-// controller-forwarded case would apply the same finding twice via two
-// different code paths (m.applyIntents' local switch AND
-// Controller.applyIntents), and — unlike the additive PatchRelatedCache
-// intent in tui_intent_parity_test.go — a naive re-run of
-// ClearDetailFindingsForType + ApplyDetailFindingForResource is idempotent
-// per lane in isolation, so the double-apply hazard here is specifically
-// "TWO call sites individually applying once", which the single-count
-// AttentionDetail row assertion still catches: ad.Rows has exactly 1 entry
-// only when applyFindingToState ran its strip-then-append exactly once with
-// this AttentionDetail; a stray extra application of the SAME finding value
-// is idempotent on Findings (strip removes the prior wave2 entry before
-// appending) but the row-content assertion below also pins the exact single
-// DetailRow value, which a corrupted double-strip/append sequence could drop
-// or duplicate.
+// EnrichmentChecked event through the TUI lane (rootApplyMsg -> Model.Update
+// -> m.coreUpdate -> m.applyIntents) and the headless lane (ctrl.Handle ->
+// Controller.applyIntents), and asserts both converge on an identical
+// DetailBody Attention section with the finding applied exactly once.
 func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 	res := pushDetailResource()
 
-	// --- TUI lane ---
 	tm := newDetailParityTUIModel(t)
 	tm, _ = rootApplyMsg(tm, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -199,7 +153,6 @@ func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 	tm, _ = rootApplyMsg(tm, detailParityEnrichmentCheckedEvent())
 	tuiPlain := stripANSI(rootViewContent(tm))
 
-	// --- Headless lane ---
 	ctrl, _ := newDetailParityHeadlessController(t)
 	ctrl.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -220,21 +173,12 @@ func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 		t.Fatal("headless lane: Attention section absent from Fields after Handle(EnrichmentChecked) — PatchDetail is a no-op on the controller (intents.go default case)")
 	}
 
-	// --- Single-application pin: exactly ONE attention entry, not two. ---
 	// buildAttentionSectionDetail emits, for a single issue-severity finding
 	// with no Detail text and exactly 1 AttentionDetail row: 1 section-header
 	// row ("Attention (N)"), 1 phrase row, 1 AttentionDetail row, and (unless
-	// the entry is "bare") 1 trailing spacer — 4 Path=="Attention" rows total
-	// for ONE applied finding (pinned empirically against the real renderer
-	// output, not assumed). The section header itself is decisive: its Key is
-	// "Attention (%d)" where %d == len(entries) — a double-apply via TWO
-	// independent call sites (TUI-local case AND controller-forwarded case)
-	// applying the SAME finding twice would either still read "Attention (1)"
-	// (if strip-then-append correctly de-duped by Code, in which case this
-	// test cannot distinguish single- from double-apply by count alone) OR
-	// "Attention (2)" (if either side's strip step raced/skipped) — the
-	// second case is exactly the hazard this test must catch, so the header
-	// count is asserted explicitly alongside the total row count.
+	// the entry is "bare") 1 trailing spacer — 4 Path=="Attention" rows for ONE
+	// applied finding. The header's Key is "Attention (%d)" with
+	// %d == len(entries), so it is asserted alongside the total row count.
 	if len(attn) != 4 {
 		t.Fatalf("headless lane: len(attentionFieldRows) = %d, want exactly 4 (header + phrase + AttentionDetail row + spacer) — a different count means the finding applied zero, partial, or duplicate times: %+v", len(attn), attn)
 	}
@@ -257,7 +201,6 @@ func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 		t.Errorf("headless lane: attention rows %+v do not contain the AttentionDetail row %q", attn, "SystemStatusCheck")
 	}
 
-	// --- TUI/headless parity via rendered text. ---
 	if !strings.Contains(tuiPlain, "status check failed") {
 		t.Errorf("TUI lane: rendered detail should contain the finding phrase %q after PatchDetail, got:\n%s", "status check failed", tuiPlain)
 	}
@@ -266,15 +209,12 @@ func TestDetailParity_PatchDetail_TUIEqualsHeadless(t *testing.T) {
 	}
 }
 
-// TestDetailParity_PatchDetail_ClearOnEmptyFindings_TUIEqualsHeadless pins
-// the companion clear-path: a SECOND PatchDetail with a nil/empty
-// EnrichmentFindings map (all resources of the type recovered) must strip
-// the Attention section on BOTH lanes — this is the
-// ClearDetailFindingsForType half of the case being moved.
+// TestDetailParity_PatchDetail_ClearOnEmptyFindings_TUIEqualsHeadless: a
+// SECOND PatchDetail with a nil/empty EnrichmentFindings map (all resources
+// of the type recovered) strips the Attention section on BOTH lanes.
 func TestDetailParity_PatchDetail_ClearOnEmptyFindings_TUIEqualsHeadless(t *testing.T) {
 	res := pushDetailResource()
 
-	// --- TUI lane: apply the finding, then clear it. ---
 	tm := newDetailParityTUIModel(t)
 	tm, _ = rootApplyMsg(tm, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -285,7 +225,6 @@ func TestDetailParity_PatchDetail_ClearOnEmptyFindings_TUIEqualsHeadless(t *test
 	tm, _ = rootApplyMsg(tm, detailParityClearEnrichmentCheckedEvent())
 	tuiPlain := stripANSI(rootViewContent(tm))
 
-	// --- Headless lane: apply, then clear. ---
 	ctrl, _ := newDetailParityHeadlessController(t)
 	ctrl.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -308,10 +247,6 @@ func TestDetailParity_PatchDetail_ClearOnEmptyFindings_TUIEqualsHeadless(t *test
 		t.Errorf("TUI lane: rendered detail still contains the cleared finding phrase %q:\n%s", "status check failed", tuiPlain)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// 2. DetailParity_RelatedReplay_NoRefanout
-// ─────────────────────────────────────────────────────────────────────────
 
 // seedRelatedCache populates core's RelatedCache with 2 results for
 // (resourceType, resourceID), mirroring what a completed RelatedCheckBatch
@@ -343,12 +278,10 @@ func relatedReplayDefs() []resource.RelatedDef {
 
 // findRelatedCheckResultCmd walks cmd (including nested tea.BatchMsg, one
 // level of batch-of-batch as findNavigateMsg does) and reports whether a
-// messages.RelatedCheckResult is present anywhere in the produced commands —
-// the fan-out's own per-def leaf message now that the fan-out dispatches
-// directly (no separate trigger message) off the DetailOperation the
-// navigation began. A nil cmd never contains one. This must NOT recurse into
-// arbitrary non-batch cmds (e.g. tea.Tick) — only tea.BatchMsg is unwrapped,
-// mirroring findNavigateMsg/extractMsg's existing walk depth in this package.
+// messages.RelatedCheckResult — the fan-out's per-def leaf message — is
+// present anywhere in the produced commands. Only tea.BatchMsg is unwrapped
+// (never e.g. tea.Tick), mirroring findNavigateMsg/extractMsg's walk depth in
+// this package.
 func findRelatedCheckResultCmd(cmd tea.Cmd) bool {
 	if cmd == nil {
 		return false
@@ -420,14 +353,9 @@ func TestDetailParity_RelatedReplay_NoRefanout_TUILane(t *testing.T) {
 
 // TestDetailParity_RelatedReplay_NoRefanout_HeadlessLane mirrors the TUI-lane
 // test through the headless controller's detail-open path (app.Action{Kind:
-// ActionSelect} against a list-selected row — openSelectedListDetail, the
-// same path TestOpenSelectedListDetail_SecondOpen_CacheHit_NoRelatedCheckTask
-// in app_patch_cache_intents_test.go pins, extended here with an ASSERTED
-// rendered replay content, not just the absence of the task). Seeding the
-// related cache BEFORE the first open (rather than after, as that sibling
-// test does) exercises the immediate cache-hit branch on the very first
-// open, proving the replay applies without requiring a prior miss+fill
-// round-trip.
+// ActionSelect} against a list-selected row — openSelectedListDetail).
+// Seeding the related cache before the first open exercises the immediate
+// cache-hit branch on the very first open.
 func TestDetailParity_RelatedReplay_NoRefanout_HeadlessLane(t *testing.T) {
 	replaceEC2Related(t, relatedReplayDefs())
 
@@ -483,16 +411,12 @@ func TestDetailParity_RelatedReplay_NoRefanout_HeadlessLane(t *testing.T) {
 	}
 }
 
-// TestDetailParity_RelatedReplay_CacheMiss_StillDispatchesFanout is the
-// non-regression companion: when the related cache has NO entry for the
-// resource, both lanes must still dispatch the fan-out (a cache miss must
-// not silently drop the related-check dispatch — the replay short-circuit
-// in test 2 above must be conditioned on an actual cache hit, not applied
-// unconditionally).
+// TestDetailParity_RelatedReplay_CacheMiss_StillDispatchesFanout: when the
+// related cache has no entry for the resource, both lanes dispatch the
+// fan-out; the replay short-circuit applies only on an actual cache hit.
 func TestDetailParity_RelatedReplay_CacheMiss_StillDispatchesFanout(t *testing.T) {
 	replaceEC2Related(t, relatedReplayDefs())
 
-	// --- TUI lane: no seeding — genuine cache miss. ---
 	res := pushDetailResource()
 	tm := newDetailParityTUIModel(t)
 	_, navCmd := rootApplyMsg(tm, messages.Navigate{
@@ -504,7 +428,6 @@ func TestDetailParity_RelatedReplay_CacheMiss_StillDispatchesFanout(t *testing.T
 		t.Error("TUI lane: opening a detail with NO related-cache entry did not dispatch a RelatedCheckResult fan-out — a cache miss must still fan out")
 	}
 
-	// --- Headless lane: no seeding — genuine cache miss. ---
 	ctrl, _ := newDetailParityHeadlessController(t)
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	ctrl.ApplyResourcesLoaded("ec2", []resource.Resource{res}, nil, false)

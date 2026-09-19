@@ -1,26 +1,15 @@
 package unit_test
 
-// qa_s3_related_review_findings_test.go — reveal tests for three external
-// review findings on the s3 related-panel enrichment landed with commit
-// e6dfbc9. Each test pins the spec-correct join and MUST pass against
-// well-formed AWS-realistic fixture data.
-//
-// P1 r53 — spec §2: "record name matches this bucket's Name (website-
-//   endpoint convention requires bucket name == FQDN)" AND "AliasTarget.
-//   DNSName matches s3-website-<region>.amazonaws.com.". Current checker
-//   substring-matches the DNSName (bucket.s3) — an unrealistic join that
-//   silently fails in real AWS.
-//
-// P2 role — spec §2: "parse the JSON policy document for Statement[].
-//   Principal.AWS entries matching IAM role ARNs" from s3:GetBucketPolicy.
-//   Current checker walks the role's own policies (inverse direction) —
-//   false positives on unrelated roles, false negatives on roles granted
-//   access only by the bucket policy.
-//
-// P3 backup — Fields["resources"] is a comma-joined ARN list; the current
-//   strings.Contains check over-matches when a bucket name is a prefix of
-//   another bucket's name (prod vs prod-logs). Must match on token
-//   boundaries.
+// s3 related-panel joins over
+// AWS-realistic fixture data (docs/resources/s3.md):
+//   - r53: the record name matches the bucket's Name (the website-endpoint
+//     convention requires bucket name == FQDN) and AliasTarget.DNSName is the
+//     s3-website-<region> endpoint.
+//   - role: role ARNs come from Statement[].Principal.AWS of
+//     s3:GetBucketPolicy; a role's own policies that mention the bucket do not
+//     relate it.
+//   - backup: Fields["resources"] is a comma-joined ARN list, matched on token
+//     boundaries so "prod" does not match "prod-logs".
 
 import (
 	"context"
@@ -30,14 +19,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestS3_Related_R53_RealisticAliasResolves pins the spec contract:
-// a hosted zone containing a record whose NAME equals the bucket's FQDN
-// AND whose AliasTarget.DNSName is the regional s3-website endpoint
-// (bucket-name NOT present in DNSName) must resolve Count≥1. This is the
-// only shape AWS actually emits.
+// TestS3_Related_R53_RealisticAliasResolves: a hosted zone with a record whose
+// NAME equals the bucket's FQDN and whose AliasTarget.DNSName is the regional
+// s3-website endpoint (no bucket segment) resolves Count≥1. This is the only
+// shape AWS emits.
 func TestS3_Related_R53_RealisticAliasResolves(t *testing.T) {
 	bucket := "acme-website.example.com" // bucket-name == FQDN per AWS
-	// Zone with one realistic S3-website alias.
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -45,8 +32,8 @@ func TestS3_Related_R53_RealisticAliasResolves(t *testing.T) {
 					ID:   "/hostedzone/Z9999999999ABCDEFGHIJ",
 					Name: "example.com.",
 					Fields: map[string]string{
-						// Realistic: record name is the FQDN/bucket; DNSName is the
-						// regional endpoint with NO bucket segment.
+						// Record name is the FQDN/bucket; DNSName is the regional endpoint with no
+						// bucket segment.
 						"s3website_alias_names": bucket,
 						"alias_targets":         "s3-website-us-east-1.amazonaws.com.",
 					},
@@ -62,11 +49,8 @@ func TestS3_Related_R53_RealisticAliasResolves(t *testing.T) {
 	}
 }
 
-// TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch pins the inverse:
-// a record whose DNSName happens to contain "bucket.s3" but whose NAME
-// is unrelated must NOT match. (The old implementation matched this —
-// producing false positives from any docs-site-or-ELB record that
-// happened to mention the bucket's name anywhere in the DNS value.)
+// A record whose DNSName contains "bucket.s3" but whose NAME is unrelated does
+// not match.
 func TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
@@ -94,16 +78,12 @@ func TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Role_UsesBucketPolicyPrincipals pins the spec: the
-// join is keyed off bucket policy Statement[].Principal.AWS role ARNs,
-// NOT off role's own inline/attached policies that happen to mention
-// the bucket. This test fails until checkS3Role is rewritten to call
-// s3:GetBucketPolicy and parse the principals.
+// The role join is keyed off bucket policy Statement[].Principal.AWS role
+// ARNs, not off the role's own inline/attached policies that mention the
+// bucket.
 func TestS3_Related_Role_UsesBucketPolicyPrincipals(t *testing.T) {
-	// The role in cache has NO reference to the bucket in its own
-	// policy documents (policy_resources empty). Under the spec-correct
-	// direction, the join comes from the BUCKET POLICY naming this role
-	// as a principal — so the pivot must still resolve.
+	// The cached role's own policy documents do not reference the bucket
+	// (policy_resources empty); the bucket policy names the role as a principal.
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -127,10 +107,8 @@ func TestS3_Related_Role_UsesBucketPolicyPrincipals(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch
-// pins the inverse: a role whose own policy mentions the bucket but is
-// NOT a principal in the bucket policy must NOT be reported as related.
-// This catches the false-positive class the reviewer called out.
+// A role whose own policy mentions the bucket but that is not a principal in
+// the bucket policy is not related.
 func TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch(t *testing.T) {
 	// We use a bucket that has NO bucket policy in the fixture, so no
 	// role can be a principal. Any role mentioning the bucket in its own
@@ -152,8 +130,8 @@ func TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch(t *tes
 		},
 	}
 	checker := s3CheckerByTarget(t, "role")
-	// Use a bucket WITHOUT a bucket policy in fixtures (fake returns
-	// NoSuchBucketPolicy) so the spec-correct implementation emits 0.
+	// This bucket has no bucket policy in the fixtures (the fake returns
+	// NoSuchBucketPolicy), so the result is 0.
 	src := emptyBucketResource("test-only-no-bucket-policy-" + t.Name())
 	result := checker(context.Background(), s3FakeClients(), src, cache)
 	if result.Count() != 0 {
@@ -162,10 +140,8 @@ func TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch(t *tes
 	}
 }
 
-// TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch pins the token-
-// boundary fix. Current strings.Contains against the comma-joined
-// resources field over-matches when the bucket name is a prefix of
-// another ARN's bucket segment.
+// The comma-joined resources field matches on token boundaries, so a bucket
+// name that is a prefix of another ARN's bucket segment does not match.
 func TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch(t *testing.T) {
 	// The plan covers "prod-logs" but NOT "prod". A substring-based match
 	// would incorrectly report this plan as protecting the "prod" bucket.
@@ -192,9 +168,7 @@ func TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Backup_ExactMatchStillResolves guards that the fix
-// doesn't break the canonical case — an exact ARN match must still
-// resolve.
+// An exact ARN match resolves.
 func TestS3_Related_Backup_ExactMatchStillResolves(t *testing.T) {
 	bucket := "prod"
 	cache := resource.ResourceCache{

@@ -2,7 +2,7 @@
 
 package integration
 
-// scenario_lambda_role_navigable_field_test.go — end-to-end pin for the
+// End-to-end pin for the
 // Lambda detail view's "Role:" navigable field.
 //
 // The field carries the execution-role ARN, which may include an IAM path
@@ -30,9 +30,7 @@ import (
 // TestScenario_LambdaRoleNavigableField_ColdCache_LandsOnExecutionRole drives
 // the full nav pipeline (dispatch → resolution → landing) from a lambda
 // detail view's "Role:" field to the IAM role it points at, on a cold "role"
-// cache. It MUST currently fail because the "role" resource type has no
-// registered FetchByIDs: the landing is a wrong resource (empirically, an
-// IAM policy in the demo fixture set), never "acme-lambda-execution".
+// cache.
 func TestScenario_LambdaRoleNavigableField_ColdCache_LandsOnExecutionRole(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	scenario := fullIntegrationNewDemoScenario(t)
@@ -58,8 +56,7 @@ mis-resolves to an unrelated resource instead of the one actually referenced.`,
 			got.ID, got.Name, wantRoleName, wantRoleName)
 	}
 
-	// The landed resource must be a role, not a policy (the other
-	// mis-resolution mode called out in the bug report for the demo path).
+	// The landed resource must be a role, not a policy.
 	if strings.Contains(strings.ToLower(got.Name), "policy") || strings.Contains(strings.ToLower(got.ID), "policy") {
 		t.Errorf(`FollowNavigableField("Role") landed on a policy-shaped resource (ID: %q, Name: %q) instead of the IAM role %q — this is the exact demo-mode mis-resolution described in BUG 5.`,
 			got.ID, got.Name, wantRoleName)

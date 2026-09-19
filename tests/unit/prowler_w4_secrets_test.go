@@ -1,8 +1,7 @@
 package unit
 
-// prowler_w4_secrets_test.go — behavioural tests for the batch-w4 secrets
-// rows: a secret whose resource policy is open to anyone, and one that hands
-// read access to another AWS account.
+// secrets posture: a secret whose resource policy is open to anyone, and one
+// that hands read access to another AWS account.
 
 import (
 	"context"

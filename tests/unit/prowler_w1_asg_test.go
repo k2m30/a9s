@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w1_asg_test.go — behavioural pins for the asg signals of batch w1.
+// Behavioural pins for the asg posture signals.
 //
 // Wave 1 (launch-config.legacy, single-az, no-elb-health-check) is asserted
 // through FetchAutoScalingGroupsPage. Wave 2 (launch-config.imdsv1,
@@ -160,7 +160,7 @@ func pw1EnrichASG(t *testing.T, fake *pw1ASGEnrichFake, groups ...asgtypes.AutoS
 	return res
 }
 
-// ─── row 15: asg.launch-config.legacy ───────────────────────────────────────
+// ─── asg.launch-config.legacy ───────────────────────────────────────
 
 // TestASG_LegacyLaunchConfig_Present pins the warning: launch configurations
 // are frozen by AWS and cannot express IMDSv2-only, instance metadata tags or
@@ -178,7 +178,7 @@ func TestASG_LegacyLaunchConfig_LaunchTemplateIsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, "acme-modern-asg").Findings, pw1ASGCodeLegacyLC)
 }
 
-// ─── row 16: asg.single-az ──────────────────────────────────────────────────
+// ─── asg.single-az ──────────────────────────────────────────────────
 
 // TestASG_SingleAZ_OneZone pins the warning and the row naming the zone.
 func TestASG_SingleAZ_OneZone(t *testing.T) {
@@ -207,7 +207,7 @@ func TestASG_SingleAZ_NoZonesIsStillSingle(t *testing.T) {
 		pw1ASGCodeSingleAZ, "single availability zone", domain.SevWarn, "wave1")
 }
 
-// ─── row 17: asg.no-elb-health-check ────────────────────────────────────────
+// ─── asg.no-elb-health-check ────────────────────────────────────────
 
 // TestASG_NoELBHealthCheck_BehindTargetGroup pins the warning: a group behind
 // a load balancer that only checks EC2 status replaces a machine that failed
@@ -218,8 +218,7 @@ func TestASG_NoELBHealthCheck_BehindTargetGroup(t *testing.T) {
 	rs := pw1FetchASGs(t, g)
 	r := pw1ResourceByID(t, rs, "acme-tg-ec2-health")
 	pw1RequireFinding(t, r.Findings, pw1ASGCodeNoELBHealth, "no load balancer health check", domain.SevWarn, "wave1")
-	// d4 row 20: the value is a word, not the SDK field's shape. Do not
-	// restore "EC2" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	// The value is a word, not the SDK field's shape.
 	pw1RequireRow(t, r.AttentionDetails[pw1ASGCodeNoELBHealth].Rows, "Health check type", "ec2")
 }
 
@@ -264,7 +263,7 @@ func TestASG_WaveOneConditionsAreIndependent(t *testing.T) {
 	}
 }
 
-// ─── row 18: asg.launch-config.imdsv1 ───────────────────────────────────────
+// ─── asg.launch-config.imdsv1 ───────────────────────────────────────
 
 // TestASG_LaunchConfigIMDSv1_Optional pins the warning for a launch
 // configuration that still accepts unauthenticated metadata requests.
@@ -280,8 +279,8 @@ func TestASG_LaunchConfigIMDSv1_Optional(t *testing.T) {
 	pw1RequireRow(t, pw1Rows(res, "acme-imdsv1-asg", pw1ASGCodeLCIMDSv1), "Metadata tokens", "optional")
 }
 
-// TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset pins the one rule in
-// this batch where an absent block does trigger: a launch configuration with
+// TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset pins the one asg rule
+// where an absent block does trigger: a launch configuration with
 // no MetadataOptions runs with tokens optional, so the machines it launches
 // really do accept IMDSv1. The row says "unset" rather than "optional" so the
 // operator knows nothing was configured.
@@ -307,7 +306,7 @@ func TestASG_LaunchConfigIMDSv1_RequiredIsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, res.Findings["acme-hardened-asg"], pw1ASGCodeLCIMDSv1)
 }
 
-// ─── row 19: asg.launch-config.public-ip ────────────────────────────────────
+// ─── asg.launch-config.public-ip ────────────────────────────────────
 
 // TestASG_LaunchConfigPublicIP_Enabled pins the warning: every instance the
 // group launches gets a routable address.
@@ -320,8 +319,7 @@ func TestASG_LaunchConfigPublicIP_Enabled(t *testing.T) {
 	res := pw1EnrichASG(t, fake, pw1ASGWithLaunchConfig("acme-public-asg", lcName))
 	pw1RequireFinding(t, res.Findings["acme-public-asg"], pw1ASGCodeLCPublicIP,
 		"launch configuration assigns public IPs", domain.SevWarn, "wave2")
-	// d4 row 20: the value is a word, not the SDK field's shape. Do not
-	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	// The value is a word, not the SDK field's shape.
 	pw1RequireRow(t, pw1Rows(res, "acme-public-asg", pw1ASGCodeLCPublicIP), "Public address assignment", "enabled")
 }
 
@@ -346,7 +344,7 @@ func TestASG_LaunchConfigPublicIP_NilIsNotEnabled(t *testing.T) {
 	pw1RequireNoFinding(t, res.Findings["acme-nilpub-asg"], pw1ASGCodeLCPublicIP)
 }
 
-// ─── row 20: asg.launch-config.secret ───────────────────────────────────────
+// ─── asg.launch-config.secret ───────────────────────────────────────
 
 // TestASG_LaunchConfigSecret_PlaintextUserData pins the Broken finding, the
 // Where:Kind row, and that the credential never reaches the finding text.
@@ -508,8 +506,8 @@ func TestASG_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	}
 }
 
-// TestASG_PostureSignalsSilentOnDeletingGroup pins common contract rule 4 on
-// asg: a group AWS is deleting launches nothing more, so neither its shape nor
+// TestASG_PostureSignalsSilentOnDeletingGroup pins that a group AWS is
+// deleting launches nothing more, so neither its shape nor
 // its launch configuration is an open posture item.
 func TestASG_PostureSignalsSilentOnDeletingGroup(t *testing.T) {
 	const lcName = "acme-deleting-lc"

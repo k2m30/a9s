@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w1_catalog_defs_test.go — pins the catalog row every batch-w1
+// Pins the catalog declaration every
 // compute finding needs.
 //
 // A FindingDef is what lets the findings overview, the machine registry and
@@ -24,7 +24,7 @@ type pw1DefExpectation struct {
 	source    string
 }
 
-// pw1ComputeDefs is the batch-w1 row table, transcribed. Phrases with a
+// pw1ComputeDefs is the expected compute FindingDef table. Phrases with a
 // variable part are written with the catalog's placeholder convention.
 var pw1ComputeDefs = []pw1DefExpectation{
 	{"ec2", "ec2.imdsv1-allowed", "IMDSv1 allowed", domain.SevWarn, "wave1"},

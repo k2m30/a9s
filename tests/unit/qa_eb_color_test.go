@@ -1,9 +1,9 @@
 package unit
 
-// qa_eb_color_test.go — Regression tests for Elastic Beanstalk Color mapping.
+// Elastic Beanstalk Color mapping.
 //
 // EB Color uses "health" field first (Red/Yellow/Grey/Green), falling back to
-// "status" field. Tests pin each branch so regressions are caught.
+// "status" field.
 
 import (
 	"testing"

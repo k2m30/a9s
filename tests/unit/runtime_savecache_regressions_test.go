@@ -1,28 +1,10 @@
-// runtime_savecache_regressions_test.go — core/runtime save-path pins:
-//
-//  1. Depth-loop zero-progress guard (executor.go KindFetchResources): a
-//     fetcher whose follow-up page never advances (0 new resources,
-//     IsTruncated:true, NextToken repeats) must not spin forever — the loop
-//     must terminate and return what it already has.
-//  2. Save-path canonicalization: SaveResourceListCache/saveProbeResourcesToTypeFiles
-//     must persist under the CANONICAL short name, not whatever alias the
-//     caller happened to use, so CachedListDepth is queryable by either name
-//     and the on-disk file is named after the canonical type.
-//  3. Exact-shrink consistency: SaveAvailabilityCache's counts-only path
-//     (writeAvailability in probes.go) must never leave a persisted TypeFile
-//     with len(Rows) != Count when a smaller EXACT observation supersedes a
-//     larger stale Rows carry-forward.
-//  4. Snapshot Fields isolation: snapshotProbeResourcesForSave's
-//     *SaveCachePayload must be immune to later in-place mutation of the
-//     ORIGINAL ProbeResources rows' Fields maps.
-//  5. rowsFromCacheRows store isolation: seeding session.ProbeResources from
-//     a disk-loaded TypeFile's Rows must not alias the Store's own Rows
-//     slice/maps — later in-memory mutation of the seeded rows must not
-//     write through to the Store.
-//  6. tf.Issues double-write ordering: within one TaskKindSaveCache
-//     execution, an exact issueCounts observation from
-//     availabilityFromResourceCache must survive saveProbeResourcesToTypeFiles's
-//     own row-derived recomputation when the swept rows carry no findings.
+// Core/runtime save-path pins: the
+// depth loop terminates on a follow-up page that makes no progress; saves
+// persist under the canonical short name; a counts-only save never rewrites
+// Rows to match Count; the dispatch-time save payload and disk-seeded rows are
+// isolated from later mutation; an exact issue count survives the row-derived
+// recomputation in the same save; unchanged type files are not rewritten; and
+// the save's narrowed lock is race-free.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
 // credentials, no network. Fake profile/region/resource IDs only.
@@ -43,11 +25,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// ────────────────────────────────────────────────────────────────────────────
-// shared helpers (file-local per this package's existing convention of not
-// sharing test helpers across files — mirrors runtime_executor_depth_refetch_test.go)
-// ────────────────────────────────────────────────────────────────────────────
 
 const (
 	saveRegProfile = "savecache-prof"
@@ -84,10 +61,6 @@ func saveRegID(prefix string, i int) string {
 	}
 	return prefix + "-" + s
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Test 1 — depth-loop zero-progress guard
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestExecuteTask_FetchResources_ZeroProgressFollowUp_Terminates pins the
 // depth-loop's must-terminate guard: a cached depth of 55 combined with a
@@ -181,14 +154,10 @@ func TestExecuteTask_FetchResources_ZeroProgressFollowUp_Terminates(t *testing.T
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 2 — save-path canonicalization
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical
 // pins the save-path half of alias canonicalization: a sweep that retained
-// rows under the alias "rds" (as ProbeResources happens to be keyed, e.g.
-// from an older/aliased caller) must persist under the CANONICAL short name
+// rows under the alias "rds" (e.g. from an aliased caller) must persist
+// under the CANONICAL short name
 // "dbi" — CachedListDepth must report the same depth whether queried by
 // "rds" or "dbi", and the on-disk file must be named dbi.yaml, never
 // rds.yaml. "rds" is a registered alias of "dbi" (see
@@ -236,12 +205,8 @@ func TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical(
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 3 — exact-shrink consistency (SaveAvailabilityCache counts-only path)
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched pins the
-// C6a reconciler contract for the counts-only availability-save path
+// reconciler contract for the counts-only availability-save path
 // (reconcileTypeFile rule 2, called from SaveAvailabilityCache): a TypeFile
 // that already carries {Count:50, Exact:true, Rows: 50 rows} followed by a
 // NEW exact observation of count 48 must advance Count to 48 while leaving
@@ -249,7 +214,7 @@ func TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical(
 // reconstructable Count/Rows pair (Count is the authoritative total, Rows is
 // the last-known page). A counts-only write must never shrink, truncate, or
 // drop Rows merely to make len(Rows)==Count — see
-// docs/design/cache-requirements.md C6a.
+// docs/design/cache-requirements.md.
 func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "exactshrink"
@@ -294,10 +259,6 @@ func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing
 		}
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Test 4 — snapshot Fields isolation
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation pins
 // Fields isolation on the dispatch-time payload freeze: seeding
@@ -376,10 +337,6 @@ func TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation(t *testin
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 5 — rowsFromCacheRows store isolation
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestAvailabilityCacheLoaded_SeededRowMutation_DoesNotWriteThroughToStore
 // pins store isolation for the cold-boot row-seeding path
 // (handleAvailabilityCacheLoaded -> rowsFromCacheRows): disk-seeded rows
@@ -456,12 +413,8 @@ func TestAvailabilityCacheLoaded_SeededRowMutation_DoesNotWriteThroughToStore(t 
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 6 — tf.Issues double-write ordering within one TaskKindSaveCache
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation
-// pins the tf.Issues double-write ordering bug: within one TaskKindSaveCache
+// pins the tf.Issues double-write ordering: within one TaskKindSaveCache
 // execution, availabilityFromResourceCache computes an exact issueCounts
 // observation from c.session.ResourceCache (issueKnown=true), which
 // SaveAvailabilityCache persists correctly. But the SAME execution also
@@ -496,12 +449,11 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 	}
 	c.SetResourceCache(shortName, &domain.ListViewCacheEntry{Resources: issueRows})
 
-	// ec2 has a registered Wave-2 enricher, and both save lanes now write
+	// ec2 has a registered Wave-2 enricher, and both save lanes write
 	// IssuesKnown only for a type whose enricher has actually answered (a
-	// badge-carrying type is not the same as a probed one). Without this
-	// latch neither lane records a count at all, and the double-write
-	// ordering this test exists for is never exercised. Do not drop it back
-	// to an unprobed type to "simplify" the setup.
+	// badge-carrying type is not the same as a probed one). Without this latch
+	// neither lane records a count at all, and the double-write ordering this
+	// test exists for is never exercised.
 	c.Session().EnrichmentRanSet(shortName)
 
 	// The SaveCachePayload's swept rows carry NO findings at all (mirrors a
@@ -541,10 +493,6 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 7 — counts-only save must skip an unchanged type file (no rewrite)
-// ────────────────────────────────────────────────────────────────────────────
-
 // statFile stats path and returns its os.FileInfo, for a later os.SameFile
 // comparison. SaveType always writes via a temp file + rename (cache.go
 // SaveType), so a physical rewrite always produces a distinct underlying
@@ -568,13 +516,9 @@ func statFile(t *testing.T, path string) os.FileInfo {
 	return fi
 }
 
-// TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles pins the
-// upcoming fix: a second SaveAvailabilityCache call carrying IDENTICAL
-// entries/truncated data for a type must not physically rewrite that type's
-// on-disk file. Today (core/runtime/probes.go SaveAvailabilityCache,
-// ~L308-351) every type present in the entries map is unconditionally
-// Put+SaveType'd on every call, so each type file's inode changes even when
-// nothing about that type's availability state changed since the prior save.
+// TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles: a second
+// SaveAvailabilityCache call carrying IDENTICAL entries/truncated data for a
+// type does not physically rewrite that type's on-disk file.
 func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	c := newSaveCacheRegressionCore(t, false)
@@ -609,8 +553,7 @@ func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testi
 // TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten is the
 // positive counterpart: when ONE type's Count actually changes between two
 // SaveAvailabilityCache calls, that type's file MUST still be rewritten —
-// the untouched sibling type's file must keep its original inode. Guards
-// against an over-eager "never rewrite" fix.
+// the untouched sibling type's file must keep its original inode.
 func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	c := newSaveCacheRegressionCore(t, false)
@@ -642,24 +585,13 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 7 — concurrency safety net for the narrowed pairMu critical section:
-// WithCacheStoreSave snapshots, copies and marshals under the lock and does
-// the file write+rename outside it (see its doc comment).
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock is a
-// SAFETY NET, not a red test: it is written to pass identically BEFORE and
-// AFTER the critical-section-narrowing fix, because a single non-reentrant
-// sync.Mutex cannot deadlock on its own and a coarse lock trivially satisfies
-// "no -race report" too (nothing runs outside it to race against). What it
-// DOES catch is a regression the narrowing refactor could plausibly
-// introduce: if the fix's snapshot/copy step going into the marshal-outside-
-// the-lock stage is insufficiently deep (e.g. still aliases a store row
-// slice/map instead of copying it), a concurrent pairMu-guarded reader
-// observing that same store data races against the now-unlocked marshal
-// goroutine under `go test -race`. Run in isolation to make the -race
-// requirement explicit:
+// TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock:
+// WithCacheStoreSave snapshots, copies and marshals under pairMu and does the
+// file write+rename outside it. If the copy going into the
+// marshal-outside-the-lock stage aliases a store row slice/map instead of
+// copying it, a concurrent pairMu-guarded reader observing that store data
+// races the unlocked marshal under `go test -race`. Run in isolation to make
+// the -race requirement explicit:
 //
 //	go test -race -run TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock ./tests/unit/
 func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *testing.T) {
@@ -674,8 +606,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 
 	// Seed every type with a realistically large row set on disk first, so
 	// the save below performs a genuine per-type read-modify-write (not a
-	// bootstrap from an empty store) — matching the "large account" shape
-	// the review finding describes.
+	// bootstrap from an empty store), the shape of a large account.
 	seedStore := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	for _, name := range shortNames {
 		rows := make([]cache.Row, rowsPerType)

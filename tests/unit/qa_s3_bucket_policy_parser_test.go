@@ -1,6 +1,6 @@
 package unit_test
 
-// qa_s3_bucket_policy_parser_test.go — edge-case coverage for
+// Edge-case coverage for
 // extractBucketPolicyAWSPrincipals and the checkS3Role error paths.
 //
 // Covers the JSON-shape variation that real bucket policies exhibit:
@@ -12,9 +12,6 @@ package unit_test
 //   - Principal.AWS as []string with wildcards and non-ARN strings
 //   - role ARN with service-role path (arn:.../role/service-role/Name)
 //     resolves to the bare role name
-//
-// These directly exercise the branches the coverage analyzer flagged
-// as missing: JSON-decode error return and Principal-shape handling.
 
 import (
 	"context"
@@ -30,19 +27,16 @@ import (
 // BucketPolicies overridden with the per-test map. Enables exercising
 // the bucket-policy parser branches without mutating shared fixtures.
 //
-// Builds a fresh, minimal *S3Fixtures rather than reusing the shared
-// sync.OnceValue singleton — mutating that singleton (via the prior
-// `fix := NewS3Fixtures(); fix.BucketPolicies = policies` pattern)
-// poisoned later tests that rely on the production BucketPolicies map.
+// Builds a fresh *S3Fixtures: mutating the shared sync.OnceValue singleton
+// would leak into later tests that read the production BucketPolicies map.
 func s3FakeClientsWithPolicies(policies map[string]string) *awsclient.ServiceClients {
 	fix := &fixtures.S3Fixtures{BucketPolicies: policies}
 	return &awsclient.ServiceClients{S3: fakes.NewS3FromFixturesForTest(fix)}
 }
 
 // TestS3_Role_MalformedPolicyJSON_Count0 pins the error branch in
-// extractBucketPolicyAWSPrincipals: a policy that isn't valid JSON
-// must surface as Count=0, not a crash and not -1 (the call itself
-// succeeded; the parse didn't).
+// extractBucketPolicyAWSPrincipals: a policy that isn't valid JSON surfaces as
+// Count=0, not a crash (the call itself succeeded; the parse didn't).
 func TestS3_Role_MalformedPolicyJSON_Count0(t *testing.T) {
 	bucket := "mal-json-" + t.Name()
 	clients := s3FakeClientsWithPolicies(map[string]string{

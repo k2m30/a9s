@@ -1,12 +1,9 @@
 package unit
 
-// qa_tg_finding_keyed_by_id_test.go — Regression: EnrichTargetGroupHealth keys findings by r.ID
-// (the bare TG name set by the tg fetcher) and calls DescribeTargetHealth with
-// r.Fields["target_group_arn"] (the full ARN, which is what AWS requires).
-//
-// This regression exists because an earlier version passed r.ID directly to
-// DescribeTargetHealth — which produced "target group not found" against both real AWS
-// and the demo fake, since r.ID is the bare name and AWS requires the ARN.
+// EnrichTargetGroupHealth keys findings by
+// r.ID (the bare TG name the tg fetcher sets) and calls DescribeTargetHealth
+// with r.Fields["target_group_arn"]: AWS requires the ARN and answers the bare
+// name with "target group not found".
 
 import (
 	"context"
@@ -52,8 +49,8 @@ func TestEnrichTargetGroupHealth_UsesARNFromFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Finding must be keyed by r.ID (the bare name), so downstream consumers
-	// (S2/S3/S4 row resolution) can join against the resource list.
+	// Findings are keyed by r.ID (the bare name) so row resolution can join
+	// against the resource list.
 	if _, ok := result.Findings[tgName]; !ok {
 		t.Errorf("finding must be keyed by r.ID=%q (bare TG name)", tgName)
 	}

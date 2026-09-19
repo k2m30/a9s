@@ -2,7 +2,7 @@
 
 package unit_test
 
-// on_demand_row_branches_test.go — the branches of the on-demand row lane an
+// The branches of the on-demand row lane an
 // operator reaches but no other test drives: the op identity a host dedups
 // on, the terminal's route for the answer, a task whose rows left the live
 // set between dispatch and execution, an answer that failed, an answer that
@@ -80,7 +80,7 @@ func runEnrichRow(t *testing.T, c *app.Controller, core *runtime.Core, row resou
 	return intents, tasks
 }
 
-// Row 1 — a host that admits detail work by operation identity reads the id
+// A host that admits detail work by operation identity reads the id
 // off the task's payload. Two opens of the same capped row must be
 // distinguishable there, or the newer open cannot supersede the older.
 func TestEnrichRowTask_CarriesItsDetailOperationID(t *testing.T) {
@@ -100,7 +100,7 @@ func TestEnrichRowTask_CarriesItsDetailOperationID(t *testing.T) {
 	}
 }
 
-// Row 2 — the terminal's own message switch. An on-demand answer that the
+// The terminal's own message switch. An on-demand answer that the
 // TUI does not route reaches no screen: the detail keeps reading "not
 // inspected" for as long as it is open.
 func TestTUI_RowEnrichedReachesTheOpenDetail(t *testing.T) {
@@ -175,7 +175,7 @@ func findRowEnriched(t *testing.T, cmd tea.Cmd) messages.RowEnriched {
 	return found[0]
 }
 
-// Row 3 — a task dispatched while the rows were live, executed after a pair
+// A task dispatched while the rows were live, executed after a pair
 // switch left the type holding the disk copy. A disk row carries no
 // RawStruct, so a rule that needs one would skip silently and read as a clean
 // answer; the task must answer at the cap instead, without asking the
@@ -205,7 +205,7 @@ func TestEnrichRowTask_RowsNoLongerLiveAnswerAtTheCap(t *testing.T) {
 	}
 }
 
-// Row 4a — an on-demand check that came back with an error and nothing else
+// An on-demand check that came back with an error and nothing else
 // answered for nobody: the row keeps the mark it had and the operator hears
 // why, and nothing is written to disk.
 func TestOnDemandAnswer_ErrorAloneKeepsTheMarkAndFlashes(t *testing.T) {
@@ -232,7 +232,7 @@ func TestOnDemandAnswer_ErrorAloneKeepsTheMarkAndFlashes(t *testing.T) {
 	}
 }
 
-// Row 4b — the same failure, but the check read a field before it failed.
+// The same failure, but the check read a field before it failed.
 // That much it did answer, so the field lands.
 func TestOnDemandAnswer_ErrorWithAFieldLandsTheField(t *testing.T) {
 	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
@@ -255,7 +255,7 @@ func TestOnDemandAnswer_ErrorWithAFieldLandsTheField(t *testing.T) {
 	}
 }
 
-// Row 5 — a sweep dispatched before the on-demand answer landed reports the
+// A sweep dispatched before the on-demand answer landed reports the
 // row at its cap. It never looked at the row, so the answer stands whole: the
 // phrase and the rows that support it.
 func TestOnDemandAnswer_KeepsItsAttentionDetailsThroughAStaleSweep(t *testing.T) {
@@ -293,7 +293,7 @@ func TestOnDemandAnswer_KeepsItsAttentionDetailsThroughAStaleSweep(t *testing.T)
 	}
 }
 
-// Row 5 — a clean on-demand answer is as much an answer as a finding is. A
+// A clean on-demand answer is as much an answer as a finding is. A
 // sweep dispatched before it reports the row at its cap; the row carries
 // nothing for the fold to restore, and must still come out answered rather
 // than back under the cap the operator already cleared by opening it.
@@ -327,7 +327,7 @@ func TestOnDemandAnswer_CleanAnswerSurvivesAStaleSweep(t *testing.T) {
 	}
 }
 
-// Row 5 — the row an on-demand check answered for can be gone from the
+// The row an on-demand check answered for can be gone from the
 // account by the time the sweep that was dispatched before it lands. There is
 // no row left to restore the answer from, and the fold must neither resurrect
 // it under the cap nor fail on its absence.
@@ -373,7 +373,7 @@ func TestOnDemandAnswer_AnsweredRowGoneBeforeTheStaleSweepLands(t *testing.T) {
 	}
 }
 
-// Row 6 — the web host runs against the clients its bootstrap handed it, so
+// The web host runs against the clients its bootstrap handed it, so
 // the region it was started with is the only one it has. `:region` says so
 // rather than opening a selector that cannot switch anything.
 func TestWebHost_RegionCommandInDemoModeIsRefused(t *testing.T) {
@@ -391,7 +391,7 @@ func TestWebHost_RegionCommandInDemoModeIsRefused(t *testing.T) {
 	}
 }
 
-// Row 7 — a clean on-demand answer is an answer: the findings an earlier
+// A clean on-demand answer is an answer: the findings an earlier
 // sweep left on the row go, and its supporting rows go with them. Every other
 // row's stay — the check ran for one row.
 func TestOnDemandAnswer_CleanAnswerClearsOnlyThatRowsFindings(t *testing.T) {
@@ -440,7 +440,7 @@ func TestOnDemandAnswer_CleanAnswerClearsOnlyThatRowsFindings(t *testing.T) {
 	}
 }
 
-// Row 8 — the answer patches the menu badge from the rows this session holds.
+// The answer patches the menu badge from the rows this session holds.
 // A page the fetcher truncated holds fewer rows than the account has, so the
 // count it produces is a floor even once no row is left at the check cap.
 func TestOnDemandAnswer_TruncatedPageKeepsTheBadgeALowerBound(t *testing.T) {

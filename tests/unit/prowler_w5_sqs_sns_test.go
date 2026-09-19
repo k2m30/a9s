@@ -1,13 +1,11 @@
 package unit
 
-// prowler_w5_sqs_sns_test.go — batch w5 rows 1-4: the queue and topic
-// posture signals, plus the plain-HTTP subscription.
+// Queue and topic posture signals, plus the plain-HTTP subscription.
 //
 // Assertions are on literal code and phrase strings rather than on the
 // production constants, so a rename is caught rather than followed. The
 // Code/Phrase/Severity/Source quadruple and the non-empty Detail sentence go
-// through the shared w2 helpers (prowler_w2_common_test.go); only what is
-// specific to these four rows lives here.
+// through the shared w2 helpers (prowler_w2_common_test.go).
 
 import (
 	"context"
@@ -28,10 +26,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Policy documents, in the shapes GetQueueAttributes / GetTopicAttributes
-// actually return them: a JSON string, not a struct.
-// ---------------------------------------------------------------------------
+// GetQueueAttributes / GetTopicAttributes return policy documents as a JSON
+// string, not a struct.
 
 // w5PublicPolicy grants the given actions to every principal with no
 // condition — the shape iampolicy.Evaluate reports as Public.
@@ -77,8 +73,8 @@ func w5OwnAccountPolicy(resourceARN string, actions ...string) string {
 }
 
 // w5ConditionedPublicPolicy is a wildcard principal scoped by a source-VPCE
-// condition. Rule 6 of the batch contract: Exposure.Conditioned is NOT a
-// finding — a scoped grant is how a queue is legitimately shared.
+// condition. Exposure.Conditioned is NOT a finding — a scoped grant is how a
+// queue is legitimately shared.
 func w5ConditionedPublicPolicy(resourceARN string) string {
 	return fmt.Sprintf(`{
   "Version": "2012-10-17",
@@ -93,10 +89,6 @@ func w5ConditionedPublicPolicy(resourceARN string) string {
   ]
 }`, resourceARN)
 }
-
-// ---------------------------------------------------------------------------
-// Row 1 — sqs.public-policy
-// ---------------------------------------------------------------------------
 
 // w5SQSFake serves GetQueueAttributes per queue URL and records the
 // AttributeNames each call asked for. The recorded names are the subject of
@@ -274,7 +266,6 @@ func TestW5_SQSPublicPolicy_NoPolicyAttributeIsHealthy(t *testing.T) {
 }
 
 // A wildcard principal scoped by a condition is a deliberate, bounded grant.
-// Rule 6: Conditioned is not a finding.
 func TestW5_SQSPublicPolicy_ConditionedWildcardIsHealthy(t *testing.T) {
 	name := "acme-orders-vpce"
 	f := newW5SQSFake()
@@ -296,7 +287,7 @@ func TestW5_SQSPublicPolicy_ConditionedWildcardIsHealthy(t *testing.T) {
 }
 
 // A missing dead-letter queue and a missing KMS key are two independent
-// conditions (rule 4): a queue missing only encryption must not report the
+// conditions: a queue missing only encryption must not report the
 // dead-letter-queue code, and a queue missing only the dead-letter queue
 // must not report the encryption one.
 func TestW5_SQSOneCodePerCondition(t *testing.T) {
@@ -408,12 +399,8 @@ func TestW5_SQSPublicPolicy_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Rows 2, 3 — sns.public-policy, sns.no-kms
-// ---------------------------------------------------------------------------
-
 // w5SNSFake serves both calls EnrichSNSSubscriptions makes: the subscription
-// listing it already walked, and the topic attributes rows 2 and 3 read.
+// listing and the topic attributes.
 type w5SNSFake struct {
 	awsclient.SNSAPI
 	topicAttrs map[string]map[string]string
@@ -469,8 +456,8 @@ func w5TopicRes(name string) resource.Resource {
 }
 
 // w5HealthySub is one confirmed subscriber, so the topic does not also trip
-// the pre-existing no-subscribers / all-pending findings and the assertions
-// below are about rows 2 and 3 alone.
+// the no-subscribers / all-pending findings and the assertions below are
+// about the topic policy and encryption alone.
 func w5HealthySub(topic string) []snstypes.Subscription {
 	return []snstypes.Subscription{{
 		SubscriptionArn: aws.String(w5TopicARN(topic) + ":11111111-2222-3333-4444-555555555555"),
@@ -623,8 +610,8 @@ func TestW5_SNSNoKMS_EncryptedTopicIsHealthy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[arn], "sns.no-kms")
 }
 
-// Rule 4: two independent conditions on one topic produce two findings, each
-// with its own code and its own supporting rows.
+// Two independent conditions on one topic produce two findings, each with
+// its own code and its own supporting rows.
 func TestW5_SNSPublicAndUnencrypted_AreTwoFindings(t *testing.T) {
 	name := "acme-alerts-both"
 	arn := w5TopicARN(name)
@@ -653,8 +640,9 @@ func TestW5_SNSPublicAndUnencrypted_AreTwoFindings(t *testing.T) {
 	}
 }
 
-// A topic whose GetTopicAttributes call fails is unknown for rows 2 and 3.
-// It must not be reported healthy, and it must not stop the other topics.
+// A topic whose GetTopicAttributes call fails is unknown for the policy and
+// encryption checks. It must not be reported healthy, and it must not stop
+// the other topics.
 func TestW5_SNSTopicAttributes_APIErrorTruncatesOnlyThatTopic(t *testing.T) {
 	broken, healthy := "acme-broken", "acme-alerts-public"
 	brokenARN, healthyARN := w5TopicARN(broken), w5TopicARN(healthy)
@@ -737,10 +725,6 @@ func TestW5_SNSTopicAttributes_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 4 — sns-sub.plain-http (wave 1, three call sites)
-// ---------------------------------------------------------------------------
-
 // w5SNSSubListFake serves the top-level subscription listing.
 type w5SNSSubListFake struct {
 	subs []snstypes.Subscription
@@ -815,7 +799,7 @@ func TestW5_SNSSubPlainHTTP_ByProtocol(t *testing.T) {
 
 // The endpoint row names where the traffic goes, with the path stripped: a
 // webhook path is frequently the shared secret that authenticates the
-// caller, and rule 7 keeps secrets out of rendered rows.
+// caller, and secrets stay out of rendered rows.
 func TestW5_SNSSubPlainHTTP_EndpointRowDropsThePath(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -915,8 +899,8 @@ func TestW5_SNSSubPlainHTTP_ColourFallbackAgreesWithTheFetcher(t *testing.T) {
 	}
 }
 
-// A subscription AWS reports as Deleted is gone; rule 4 says a deleted
-// resource emits no posture finding, whatever its protocol was.
+// A subscription AWS reports as Deleted is gone and emits no posture
+// finding, whatever its protocol was.
 func TestW5_SNSSubPlainHTTP_DeletedSubscriptionEmitsNoPostureFinding(t *testing.T) {
 	sub := w5Sub("http", "http://hooks.acme-corp.com/sns/orders")
 	sub.SubscriptionArn = aws.String("Deleted")

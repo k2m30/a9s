@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Command execution: :root and :main
-// ═══════════════════════════════════════════════════════════════════════════
-
 // TestQA_RootCommand_EmitsNavigateToMainMenu verifies that typing `:root` and
 // pressing Enter emits NavigateMsg{Target: TargetMainMenu}.
 func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
@@ -66,10 +62,6 @@ func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Tab completion for :root and :main
-// ═══════════════════════════════════════════════════════════════════════════
-
 // TestQA_RootCommand_TabCompletion verifies that typing `:ro` + Tab completes
 // to "root" in the command input buffer (visible in header).
 func TestQA_RootCommand_TabCompletion(t *testing.T) {
@@ -103,10 +95,6 @@ func TestQA_MainCommand_TabCompletion(t *testing.T) {
 		t.Errorf("tab after ':ma' should complete to ':main' in header, got:\n%s", plain)
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Navigate-to-root handling: stack truncation
-// ═══════════════════════════════════════════════════════════════════════════
 
 // TestQA_RootCommand_PopsToMainMenu_FromResourceList verifies that sending
 // NavigateMsg{Target: TargetMainMenu} from the resource list returns to the
@@ -169,10 +157,6 @@ func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Help COMMANDS section — via full app (main menu and resource list)
-// ═══════════════════════════════════════════════════════════════════════════
-
 // TestQA_HelpContext_MainMenu_ShowsCommandsSection verifies that the COMMANDS
 // section title appears in help opened from the main menu.
 func TestQA_HelpContext_MainMenu_ShowsCommandsSection(t *testing.T) {
@@ -221,10 +205,6 @@ func TestQA_HelpContext_ResourceList_ShowsCommandsSection(t *testing.T) {
 		t.Errorf("resource list help should contain 'COMMANDS' section, got:\n%s", plain)
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Help COMMANDS section — direct HelpModel tests (all remaining contexts)
-// ═══════════════════════════════════════════════════════════════════════════
 
 // TestQA_HelpContext_Detail_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the detail view.

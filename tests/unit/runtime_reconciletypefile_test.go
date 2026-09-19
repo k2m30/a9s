@@ -1,18 +1,9 @@
-// runtime_reconciletypefile_test.go — pins for reconcileTypeFile
+// Pins for reconcileTypeFile
 // (core/runtime/probes.go), the single chokepoint every type-file write goes
-// through (C6a, docs/design/cache-requirements.md):
-//
-//  1. TestSaveAvailabilityCache_CountsOnly_NeverDropsRows — the counts-only
-//     rows-drop shape (D16):
-//     a counts-only exact write must never nuke existing Rows to zero, even
-//     when its Count differs from len(Rows).
-//  2. TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows — a
-//     rows-carrying write whose IDs are a subset of a deeper existing list
-//     must keep the fuller existing Rows.
-//  3. TestSaveResourceListCache_DeeperRowsWrite_Wins — a rows-carrying write
-//     with strictly more rows than existing always wins.
-//  4. TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins — same-depth
-//     but non-subset (genuinely different) rows win by recency.
+// through (docs/design/cache-requirements.md): a counts-only exact write never
+// drops existing Rows; a rows-carrying write that is a subset of a deeper
+// stored list keeps the fuller Rows; a deeper write always wins; a same-depth,
+// non-subset write wins by recency.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
 // credentials, no network. Fake profile/region/resource IDs only.
@@ -59,8 +50,8 @@ func reconcileRows(prefix string, n int) []cache.Row {
 	return rows
 }
 
-// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins D16
-// directly against SaveAvailabilityCache (the counts-only write lane): an
+// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins
+// SaveAvailabilityCache (the counts-only write lane): an
 // existing TypeFile with 50 rows, followed by a counts-only exact
 // observation of count 55 (rowsProvided=false in reconcileTypeFile terms),
 // must keep the 50 existing rows verbatim and advance Count to 55 — never drop
@@ -109,7 +100,7 @@ func TestSaveAvailabilityCache_CountsOnly_NeverDropsRows(t *testing.T) {
 // rule 1: a rows-carrying write whose IDs are a subset of the existing,
 // deeper list (a shallower page of the same list — e.g. a truncated
 // first-page refetch over an already-fuller stored list) must keep the
-// existing fuller Rows in full; Count/Exact still advance per C5.
+// existing fuller Rows in full; Count/Exact still advance.
 func TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "subsetwrite"
@@ -148,7 +139,7 @@ func TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows(t *testing.T) {
 			t.Errorf("tf.Rows[%d].ID = %q, want %q — existing fuller row identity must survive a subset write", i, tf.Rows[i].ID, want.ID)
 		}
 	}
-	// C5: exactness only ever advances — the already-exact stored Count (55)
+	// Exactness only ever advances — the already-exact stored Count (55)
 	// must not regress even though this write's own page was truncated.
 	if tf.Count != 55 {
 		t.Errorf("TypeFile.Count = %d, want 55 (C5: an already-exact stored total is not regressed by a truncated subset write)", tf.Count)
@@ -246,32 +237,10 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Counts-only rows-drop (D16) end-to-end pin — the live evidence chain across three real save
-// call sites sharing one on-disk TypeFile, in order:
-//
-//  1. A list screen opens and pages to 55 exact rows (ApplyResourcesLoaded
-//     page 1 + append page 2) — its own maybeSaveResourceListCache save
-//     lands 55 rows on disk.
-//  2. A background sweep lane (mirrors saveProbeResourcesToTypeFiles's
-//     shape — a rows-carrying SaveResourceListCache call) saves 50 probe
-//     rows, a genuine SUBSET of the 55 on disk (rule 1) — the file must
-//     keep 55.
-//  3. A counts-only menu-sync (SaveAvailabilityCache) observes an exact
-//     count of 55 — the file must STILL have 55 rows AND count 55.
-//
-// This exact 3-stage sequence (with the counts-only stage's count already
-// matching len(existing.Rows)) passes at HEAD 9244f1b4 too — the pre-
-// reconciler count-comparison guards happen to produce the same outcome when
-// the observed counts agree. It is pinned anyway as an end-to-end regression
-// guard for the reconciler chokepoint (reconcileTypeFile) across all three
-// real call sites in sequence, not as a standalone RED-at-HEAD repro; the
-// standalone counts-only MISMATCH shape that reproduces the rows-drop bug at
-// HEAD (Count disagreeing with len(existing.Rows)) is pinned separately by
-// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows and
-// TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched, both RED
-// at HEAD 9244f1b4 (Rows nuked to 0).
-// ────────────────────────────────────────────────────────────────────────────
+// Counts-only rows-drop end-to-end: a list screen pages to 55 exact rows, a
+// sweep lane saves a 50-row subset, and a counts-only menu-sync observes an
+// exact 55 — three real save call sites sharing one on-disk TypeFile, which
+// keeps 55 rows and count 55 throughout.
 
 func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

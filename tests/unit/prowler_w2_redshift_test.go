@@ -1,16 +1,7 @@
 package unit
 
-// prowler_w2_redshift_test.go — redshift rows 25–26 of the w2 Prowler batch:
-// audit logging off and SSL not required.
-//
-// Both are driven through EnrichRedshiftPosture, the enricher the batch adds
-// for redshift. Audit logging is specified as a Wave-1 row on the premise that
-// the fetcher already calls DescribeLoggingStatus — it does not; only the
-// redshift→s3 related checker does (core/aws/redshift_related.go). Placing the
-// row in the enricher is the only implementation that does not add an API call
-// to a fetcher signature every caller shares, so that is what these tests pin.
-// If the round rules the Wave-1 placement in, the Source assertion here is the
-// line to change, and only that line.
+// redshift posture: audit logging off and SSL not required, both emitted by
+// EnrichRedshiftPosture.
 
 import (
 	"context"
@@ -126,10 +117,6 @@ func w2RedshiftRun(t *testing.T, fake *w2RedshiftFake, clusters ...redshifttypes
 	return res, err
 }
 
-// ---------------------------------------------------------------------------
-// row 25 — audit logging
-// ---------------------------------------------------------------------------
-
 func TestW2RedshiftAuditLoggingOff(t *testing.T) {
 	fake := &w2RedshiftFake{loggingOff: map[string]bool{"acme-reporting": true}}
 	res := w2RedshiftEnrich(t, fake,
@@ -142,10 +129,6 @@ func TestW2RedshiftAuditLoggingOff(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-analytics"], w2RedshiftCodeAuditLoggingOff)
 	w2AssertFindingDef(t, "redshift", w2RedshiftCodeAuditLoggingOff, "audit logging off", domain.SevWarn, "wave2")
 }
-
-// ---------------------------------------------------------------------------
-// row 26 — require_ssl
-// ---------------------------------------------------------------------------
 
 func TestW2RedshiftRequireSSLOff(t *testing.T) {
 	fake := &w2RedshiftFake{requireSSL: map[string]string{"acme-params-open": "false"}}
@@ -173,7 +156,7 @@ func TestW2RedshiftRequireSSLNonTrueValues(t *testing.T) {
 }
 
 // Twenty clusters on one parameter group must cost one DescribeClusterParameters
-// call, not twenty — the row is only affordable per distinct group.
+// call, not twenty — the check is only affordable per distinct group.
 func TestW2RedshiftParameterGroupLookupCachedPerGroup(t *testing.T) {
 	var clusters []redshifttypes.Cluster
 	for i := range 20 {
@@ -190,10 +173,6 @@ func TestW2RedshiftParameterGroupLookupCachedPerGroup(t *testing.T) {
 		w2AssertFinding(t, res.Findings[id], w2RedshiftCodeRequireSSLOff, "SSL not required", domain.SevWarn, w2RedshiftSource)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// error handling, independence, caps
-// ---------------------------------------------------------------------------
 
 func TestW2RedshiftBothConditionsOnOneCluster(t *testing.T) {
 	fake := &w2RedshiftFake{

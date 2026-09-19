@@ -1,15 +1,7 @@
 package unit
 
-// qa_26_search_core_test.go — Root-level integration tests for QA-26: Cross-View
-// Search Component (Issue #89). All tests go through the root model via
-// rootApplyMsg so that real key routing is exercised end-to-end.
-//
-// Sections implemented:
-//   A — Activation (detail + YAML; A03-A05 skipped, no such views)
-//   B — Typing a search query
-//   C — Confirming search (Enter) and cancellation (Esc)
-//   F — Match counter display
-//   H — Empty / no-match states
+// Cross-view search, driven through the root model via rootApplyMsg so real
+// key routing is exercised end-to-end.
 
 import (
 	"strings"
@@ -21,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	tui "github.com/k2m30/a9s/v3/internal/tui"
 )
-
-// ---------------------------------------------------------------------------
-// Shared fixtures
-// ---------------------------------------------------------------------------
 
 // qa26Resource returns a resource with "running" in two fields (→ 2 matches),
 // plus an availability zone to support multi-value testing.
@@ -90,19 +78,16 @@ func qa26TypeQuery(m tui.Model, q string) tui.Model {
 	return m
 }
 
-// qa26PressEnter sends the Enter key.
 func qa26PressEnter(m tui.Model) tui.Model {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	return m
 }
 
-// qa26PressEsc sends the Escape key.
 func qa26PressEsc(m tui.Model) tui.Model {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	return m
 }
 
-// qa26PressBackspace sends a single Backspace key.
 func qa26PressBackspace(m tui.Model) tui.Model {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	return m
@@ -113,28 +98,21 @@ func qa26PlainView(m tui.Model) string {
 	return ansiRe.ReplaceAllString(rootViewContent(m), "")
 }
 
-// ---------------------------------------------------------------------------
-// Section A — Activation
-// ---------------------------------------------------------------------------
-
-// 26-A01: "/" in detail view → header changes from "? for help" to "/"
+// "/" in the detail view replaces "? for help" in the header with "/".
 func TestQA26_A01_SlashInDetailActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 	m = qa26NavigateDetail(m, qa26Resource())
 
-	// Precondition: header shows "? for help" in normal mode.
 	beforePlain := qa26PlainView(m)
 	if !strings.Contains(beforePlain, "? for help") {
 		t.Fatalf("precondition: expected '? for help' in header before search; got: %q", beforePlain)
 	}
 
-	// When: press "/".
 	m = qa26ActivateSearch(m)
 
 	afterPlain := qa26PlainView(m)
 
-	// Then: "? for help" is gone and "/" is present in the header.
 	if strings.Contains(afterPlain, "? for help") {
 		t.Error("26-A01: header should not show '? for help' once search input is active")
 	}
@@ -143,24 +121,21 @@ func TestQA26_A01_SlashInDetailActivatesSearch(t *testing.T) {
 	}
 }
 
-// 26-A02: "/" in YAML view → header changes from "? for help" to "/"
+// "/" in the YAML view replaces "? for help" in the header with "/".
 func TestQA26_A02_SlashInYAMLActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 	m = qa26NavigateYAML(m, qa26Resource())
 
-	// Precondition: header shows "? for help".
 	beforePlain := qa26PlainView(m)
 	if !strings.Contains(beforePlain, "? for help") {
 		t.Fatalf("precondition: expected '? for help' in header before search; got: %q", beforePlain)
 	}
 
-	// When: press "/".
 	m = qa26ActivateSearch(m)
 
 	afterPlain := qa26PlainView(m)
 
-	// Then: "? for help" is replaced by "/".
 	if strings.Contains(afterPlain, "? for help") {
 		t.Error("26-A02: YAML header should not show '? for help' when search is active")
 	}
@@ -169,12 +144,7 @@ func TestQA26_A02_SlashInYAMLActivatesSearch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section B — Typing
-// ---------------------------------------------------------------------------
-
-// 26-B01: Characters typed appear in the header search input.
-// Type "running" → header shows "/running".
+// Typed characters appear in the header search input.
 func TestQA26_B01_TypedCharsAppearInHeader(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -189,7 +159,7 @@ func TestQA26_B01_TypedCharsAppearInHeader(t *testing.T) {
 	}
 }
 
-// 26-B01 (YAML variant): same behavior in the YAML view.
+// Typed characters appear in the header search input of the YAML view.
 func TestQA26_B01_TypedCharsAppearInHeader_YAML(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -204,9 +174,7 @@ func TestQA26_B01_TypedCharsAppearInHeader_YAML(t *testing.T) {
 	}
 }
 
-// 26-B02: Backspace removes the last character.
-// "/running" → Backspace → "/runnin"
-// "/runnin" + 5× Backspace → "/"
+// Backspace removes the last character, down to an empty "/".
 func TestQA26_B02_BackspaceRemovesLastChar(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -214,23 +182,19 @@ func TestQA26_B02_BackspaceRemovesLastChar(t *testing.T) {
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "running")
 
-	// One Backspace: "running" → "runnin".
 	m = qa26PressBackspace(m)
 	plain := qa26PlainView(m)
 	if !strings.Contains(plain, "/runnin") {
 		t.Errorf("26-B02: after 1 Backspace header should show '/runnin'; got: %q", plain)
 	}
-	// Must not still show the full "/running".
 	if strings.Contains(plain, "/running") {
 		t.Error("26-B02: '/running' should be gone after Backspace removed the trailing 'g'")
 	}
 
-	// Six more Backspaces: "runnin" → "".
 	for range 6 {
 		m = qa26PressBackspace(m)
 	}
 	plain = qa26PlainView(m)
-	// The header should show only "/" (empty query, not "/runnin" or "/running").
 	if strings.Contains(plain, "/runnin") {
 		t.Errorf("26-B02: after 7 Backspaces header should be empty '/'; still shows '/runnin': %q", plain)
 	}
@@ -239,10 +203,8 @@ func TestQA26_B02_BackspaceRemovesLastChar(t *testing.T) {
 	}
 }
 
-// 26-B03: Matches highlight incrementally while typing (our impl highlights
-// during typing, not only after Enter).
-// After typing "running" the rendered output must contain ANSI escape sequences,
-// confirming that highlights are produced.
+// Matches highlight while typing, not only after Enter: after typing
+// "running" the rendered output carries ANSI escape sequences.
 func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -256,7 +218,6 @@ func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 		if !strings.Contains(raw, "\x1b[") {
 			t.Error("26-B03 detail: expected ANSI highlight sequences after typing 'running'")
 		}
-		// Visible text must still contain "running" unmodified.
 		plain := ansiRe.ReplaceAllString(raw, "")
 		if !strings.Contains(plain, "running") {
 			t.Errorf("26-B03 detail: plain content missing 'running' after typing; got: %q", plain)
@@ -280,8 +241,7 @@ func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 	})
 }
 
-// 26-B04: Special chars — colon in query is treated as a literal character.
-// Type "s3:Get" → header shows "/s3:Get".
+// A colon in the query is a literal character.
 func TestQA26_B04_SpecialCharsColonTreatedLiteral(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -301,8 +261,7 @@ func TestQA26_B04_SpecialCharsColonTreatedLiteral(t *testing.T) {
 	}
 }
 
-// 26-B05: Dots, dashes, underscores in query — treated as literals.
-// Type "us-east-1a" → header shows "/us-east-1a".
+// Dots, dashes and underscores in the query are literal characters.
 func TestQA26_B05_DotsAndDashesTreatedLiteral(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -331,12 +290,8 @@ func TestQA26_B05_DotsAndDashesTreatedLiteral(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Section C — Confirming search (Enter) and cancellation (Esc)
-// ---------------------------------------------------------------------------
-
-// 26-C01: Enter confirms search → header shows match count "N/M matches",
-// content has ANSI highlights.
+// Enter confirms the search: the header shows "N/M matches" and the content
+// carries ANSI highlights.
 func TestQA26_C01_EnterConfirmsSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -350,11 +305,9 @@ func TestQA26_C01_EnterConfirmsSearch(t *testing.T) {
 		raw := rootViewContent(m)
 		plain := ansiRe.ReplaceAllString(raw, "")
 
-		// Header must show a match count indicator.
 		if !strings.Contains(plain, "matches") {
 			t.Errorf("26-C01 detail: header should contain 'matches' after confirming search; got: %q", plain)
 		}
-		// Confirmed search must produce ANSI highlights in the content.
 		if !strings.Contains(raw, "\x1b[") {
 			t.Error("26-C01 detail: expected ANSI highlight sequences after confirming search")
 		}
@@ -379,7 +332,7 @@ func TestQA26_C01_EnterConfirmsSearch(t *testing.T) {
 	})
 }
 
-// 26-C02: Enter on empty query → no search activated, header shows "? for help".
+// Enter on an empty query activates nothing; the header shows "? for help".
 func TestQA26_C02_EnterOnEmptyQueryDoesNothing(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -387,16 +340,13 @@ func TestQA26_C02_EnterOnEmptyQueryDoesNothing(t *testing.T) {
 		m := newRootSizedModel()
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
-		// Do NOT type anything — press Enter immediately on empty query.
 		m = qa26PressEnter(m)
 
 		plain := qa26PlainView(m)
 
-		// Normal mode must be restored: header shows "? for help".
 		if !strings.Contains(plain, "? for help") {
 			t.Errorf("26-C02 detail: empty-query Enter should restore '? for help'; got: %q", plain)
 		}
-		// No match counter must appear.
 		if strings.Contains(plain, "matches") {
 			t.Error("26-C02 detail: empty-query Enter must not show a match count")
 		}
@@ -419,7 +369,7 @@ func TestQA26_C02_EnterOnEmptyQueryDoesNothing(t *testing.T) {
 	})
 }
 
-// 26-C03: Esc cancels input → header reverts to "? for help", no highlights.
+// Esc cancels input: the header reverts to "? for help" with no highlights.
 func TestQA26_C03_EscCancelsInput(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -432,15 +382,12 @@ func TestQA26_C03_EscCancelsInput(t *testing.T) {
 
 		plain := qa26PlainView(m)
 
-		// Header must revert to normal mode.
 		if !strings.Contains(plain, "? for help") {
 			t.Errorf("26-C03 detail: Esc should restore '? for help'; got: %q", plain)
 		}
-		// No match counter must remain.
 		if strings.Contains(plain, "matches") {
 			t.Error("26-C03 detail: Esc should remove the match count indicator")
 		}
-		// No search input visible.
 		if strings.Contains(plain, "/running") {
 			t.Error("26-C03 detail: '/running' must be gone after Esc")
 		}
@@ -467,12 +414,8 @@ func TestQA26_C03_EscCancelsInput(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Section F — Match counter display
-// ---------------------------------------------------------------------------
-
-// 26-F01: Match counter shows "1/N matches" on first confirm.
-// qa26Resource has "running" in two fields → N = 2.
+// The match counter shows "1/N matches" on first confirm. qa26Resource has
+// "running" in two fields, so N = 2.
 func TestQA26_F01_MatchCounterOnFirstConfirm(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -505,8 +448,7 @@ func TestQA26_F01_MatchCounterOnFirstConfirm(t *testing.T) {
 	})
 }
 
-// 26-F02: Counter updates on "n" navigation.
-// After confirming "running" (1/2 matches), press n → must show "2/2 matches".
+// The counter follows n navigation: 1/2 → 2/2.
 func TestQA26_F02_CounterUpdatesOnNav(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -517,13 +459,11 @@ func TestQA26_F02_CounterUpdatesOnNav(t *testing.T) {
 		m = qa26TypeQuery(m, "running")
 		m = qa26PressEnter(m)
 
-		// Confirm we're at 1/2.
 		before := qa26PlainView(m)
 		if !strings.Contains(before, "1/2 matches") {
 			t.Fatalf("26-F02 detail precondition: expected '1/2 matches', got: %q", before)
 		}
 
-		// Press n.
 		m, _ = rootApplyMsg(m, rootKeyPress("n"))
 		after := qa26PlainView(m)
 		if !strings.Contains(after, "2/2 matches") {
@@ -551,7 +491,7 @@ func TestQA26_F02_CounterUpdatesOnNav(t *testing.T) {
 	})
 }
 
-// 26-F03: Zero matches → header shows "0/0 matches".
+// Zero matches show "0/0 matches".
 func TestQA26_F03_ZeroMatchesCounter(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -582,9 +522,8 @@ func TestQA26_F03_ZeroMatchesCounter(t *testing.T) {
 	})
 }
 
-// 26-F04: Match counter appears in the header (our impl puts it in the header
-// right side, not the bottom of the frame). After confirming "running" the
-// counter must be on a line before the first frame border character ("┌").
+// The match counter sits in the header, on a line before the first frame
+// border ("┌").
 func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -598,7 +537,6 @@ func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 		content := rootViewContent(m)
 		lines := strings.Split(content, "\n")
 
-		// Find the line containing the match indicator and the top frame border.
 		matchLine := -1
 		frameBorderLine := -1
 		for i, line := range lines {
@@ -658,12 +596,7 @@ func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Section H — Empty / no-match states
-// ---------------------------------------------------------------------------
-
-// 26-H01: Search in view with few fields for nonexistent text → "0/0 matches",
-// no crash.
+// Searching a view with few fields for nonexistent text shows "0/0 matches".
 func TestQA26_H01_SearchFewFieldsNoMatch(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -674,22 +607,19 @@ func TestQA26_H01_SearchFewFieldsNoMatch(t *testing.T) {
 
 	plain := qa26PlainView(m)
 
-	// Must show zero-match indicator.
 	if !strings.Contains(plain, "0/0 matches") {
 		t.Errorf("26-H01: expected '0/0 matches'; got: %q", plain)
 	}
-	// View must still be non-empty (no crash).
 	if plain == "" {
 		t.Fatal("26-H01: View() returned empty string (crash or blank)")
 	}
 }
 
-// 26-H02: Search 100+ line YAML for nonexistent term → no highlights,
-// "0/0 matches".
+// Searching a 100+ line YAML for a nonexistent term shows "0/0 matches" and
+// no highlights.
 func TestQA26_H02_SearchLargeYAMLNoMatch(t *testing.T) {
 	tui.Version = "0.6.0"
 
-	// Build a resource with many fields to produce a multi-line YAML document.
 	fields := map[string]string{
 		"state":             "running",
 		"instance_type":     "t3.large",
@@ -715,17 +645,15 @@ func TestQA26_H02_SearchLargeYAMLNoMatch(t *testing.T) {
 	raw := rootViewContent(m)
 	plain := ansiRe.ReplaceAllString(raw, "")
 
-	// Must show 0/0 matches.
 	if !strings.Contains(plain, "0/0 matches") {
 		t.Errorf("26-H02: expected '0/0 matches'; got: %q", plain)
 	}
-	// View must be non-empty.
 	if plain == "" {
 		t.Fatal("26-H02: View() returned empty string")
 	}
 }
 
-// 26-H03: n/N pressed with zero matches → nothing happens, no crash.
+// n/N with zero matches do nothing.
 func TestQA26_H03_NWithZeroMatchesNoOp(t *testing.T) {
 	tui.Version = "0.6.0"
 
@@ -741,21 +669,18 @@ func TestQA26_H03_NWithZeroMatchesNoOp(t *testing.T) {
 			t.Fatalf("26-H03 detail precondition: expected '0/0 matches', got: %q", before)
 		}
 
-		// Press n — must not crash and counter must stay "0/0 matches".
 		m, _ = rootApplyMsg(m, rootKeyPress("n"))
 		afterN := qa26PlainView(m)
 		if !strings.Contains(afterN, "0/0 matches") {
 			t.Errorf("26-H03 detail: after 'n' with zero matches expected '0/0 matches'; got: %q", afterN)
 		}
 
-		// Press N — same.
 		m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "N"})
 		afterShiftN := qa26PlainView(m)
 		if !strings.Contains(afterShiftN, "0/0 matches") {
 			t.Errorf("26-H03 detail: after 'N' with zero matches expected '0/0 matches'; got: %q", afterShiftN)
 		}
 
-		// View must still render.
 		if afterShiftN == "" {
 			t.Fatal("26-H03 detail: View() returned empty string after N with zero matches")
 		}

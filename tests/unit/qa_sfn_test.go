@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Step Functions (SFN) fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &fakeSFNListStateMachines{
@@ -50,7 +46,6 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first state machine
 	r0 := resources[0]
 	if r0.ID != "order-processing" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "order-processing", r0.ID)
@@ -59,7 +54,6 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "order-processing", r0.Name)
 	}
 
-	// Verify required fields
 	requiredFields := []string{"name", "arn", "type", "creation_date"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -76,7 +70,6 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"arn\"]: expected ARN, got %q", r0.Fields["arn"])
 	}
 
-	// Verify second state machine (express type)
 	r1 := resources[1]
 	if r1.Fields["type"] != "EXPRESS" {
 		t.Errorf("resource[1].Fields[\"type\"]: expected %q, got %q", "EXPRESS", r1.Fields["type"])

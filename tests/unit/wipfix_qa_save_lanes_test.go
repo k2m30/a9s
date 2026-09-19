@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_save_lanes_test.go pins that the two lanes writing one type file
+// Pins that the two lanes writing one type file
 // — the save that carries the rows and the counts-only availability save —
 // answer the same way about the one fact they both record. Nothing orders
 // them, which is survivable only while they agree.
@@ -67,20 +67,17 @@ func wipfixWatchTypeFile(t *testing.T, cfgFolder, shortName string) []string {
 	}
 }
 
-// TestTruncatedRefetchThenCountsSave_AgreeOnExactness pins the disagreement
-// row 35's identity half uncovered. Two lanes write one type file — the save
-// that carries the rows and the counts-only availability save — and nothing
-// orders them. That is survivable only while both answer the same way about
-// the same fact, and after a refetch that came back truncated they do not:
-// one preserves the stored exactness, the other self-heals it away, so the
-// file says whichever landed last. Every version of the file a restart could
-// read has to give the same answer and keep the rows.
+// TestTruncatedRefetchThenCountsSave_AgreeOnExactness: two lanes write one
+// type file — the save that carries the rows and the counts-only availability
+// save — and nothing orders them. After a refetch that came back truncated
+// both must answer the same way about exactness, or the file says whichever
+// landed last. Every version of the file a restart could read has to give the
+// same answer and keep the rows.
 func TestTruncatedRefetchThenCountsSave_AgreeOnExactness(t *testing.T) {
 	c := newTestController(t)
 	cfg := os.Getenv("A9S_CONFIG_FOLDER")
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
-	// A complete fetch first: the file records a confirmed population.
 	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(55),

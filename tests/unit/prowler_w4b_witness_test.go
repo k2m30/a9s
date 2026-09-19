@@ -1,14 +1,12 @@
 package unit
 
-// prowler_w4b_witness_test.go — verification of the two demo witnesses added
-// for batch w4: the healthy counterpart of the wildcard-trust rule, and a
-// carrier of the second admin-equivalent managed policy.
+// Demo rows for the role and iam-group posture findings: the healthy
+// counterpart of the wildcard-trust rule, and a carrier of the second
+// admin-equivalent managed policy.
 //
 // The wave-1 supporting rows on role (confused-deputy Services, inline
 // privilege-escalation Policy and Combo) are asserted on the fetcher's own
-// output. The runtime currently drops wave-1 AttentionDetails on the way to
-// the rendered surface, so asserting them there would pin a defect that is
-// not this batch's.
+// output.
 
 import (
 	"context"
@@ -89,9 +87,8 @@ func TestW4bScopedWildcardTrustWitnessIsClean(t *testing.T) {
 	}
 }
 
-// TestW4bWildcardTrustWitnessesUnchanged pins that adding the healthy
-// counterpart did not disturb the positive ones: the same two demo roles are
-// flagged as before, and the new row is not among them.
+// TestW4bWildcardTrustWitnessesUnchanged pins that exactly the two positive
+// demo roles are flagged, and the scoped-wildcard role is not among them.
 func TestW4bWildcardTrustWitnessesUnchanged(t *testing.T) {
 	rows, _ := w4bBench(t, "role")
 	var flagged []string
@@ -113,8 +110,7 @@ func TestW4bWildcardTrustWitnessesUnchanged(t *testing.T) {
 // AWS's PowerUserAccess allows every action EXCEPT IAM, Organizations and
 // Account, so its holder can neither grant itself permissions nor touch the
 // account; flagging it would report every developer group as an
-// administrator. Whether PowerUserAccess deserves a warn-tier finding of its
-// own is a separate product question.
+// administrator.
 func TestW4bPowerUserGroupIsNotAdminAttached(t *testing.T) {
 	rows, _ := w4bBench(t, "iam-group")
 	r := w4bRow(t, rows, fixtures.IAMGroupPowerUser)
@@ -155,8 +151,8 @@ func TestW4bAdminAttachedWitnessIsTheOneAdminGroup(t *testing.T) {
 }
 
 // TestW4bPowerUserResolvesThroughGroupPolicyPivot pins that the policy the
-// new witness names is reachable from its row: the group→policy pivot lists
-// it, and the by-id fetch behind the pivot resolves it to a real policy
+// PowerUser group names is reachable from its row: the group→policy pivot
+// lists it, and the by-id fetch behind the pivot resolves it to a real policy
 // resource. A pivot that names a policy nothing can open is a dead end.
 func TestW4bPowerUserResolvesThroughGroupPolicyPivot(t *testing.T) {
 	clients := demo.NewServiceClients()
@@ -194,8 +190,8 @@ func TestW4bPowerUserResolvesThroughGroupPolicyPivot(t *testing.T) {
 // w4bSDKFieldNames are AWS SDK request/response field names. They are how the
 // API spells a thing, not how an operator does, so they may not appear in any
 // text the views render. IAM action names and condition keys (iam:PassRole,
-// sts:ExternalId) are operator vocabulary and are allowed by ruling — they
-// carry a colon and never collide with this list.
+// sts:ExternalId) are operator vocabulary and are allowed — they carry a
+// colon and never collide with this list.
 //
 // Ceiling: hand-picked, so it catches a regression only in a name already
 // listed. It is not derived from the SDK on purpose — core/config/
@@ -211,7 +207,7 @@ var w4bSDKFieldNames = []string{
 }
 
 // TestW4bNoSDKFieldNamesInRenderedText sweeps every phrase, detail sentence
-// and attention row the batch's types put on screen in demo mode.
+// and attention row the w4WitnessTypes put on screen in demo mode.
 func TestW4bNoSDKFieldNamesInRenderedText(t *testing.T) {
 	for _, shortName := range []string{"role", "policy", "iam-user", "iam-group", "waf", "secrets", "kms"} {
 		t.Run(shortName, func(t *testing.T) {
@@ -243,9 +239,7 @@ func w4bAssertOperatorText(t *testing.T, id, where, text string) {
 
 // TestW4bRoleWave1SupportingRowsSurviveTheFetcher pins the confused-deputy
 // and inline-privilege-escalation supporting rows at the point the fetcher
-// emits them. They are asserted here rather than on the rendered surface
-// because the runtime drops wave-1 AttentionDetails today; that gap belongs
-// to another batch, and pinning it here would hide these rows regressing.
+// emits them.
 func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
 	clients := demo.NewServiceClients()
 	rows := DrainPages(t, "role", func(token string) (resource.FetchResult, error) {
@@ -269,18 +263,14 @@ func TestW4bRoleWave1SupportingRowsSurviveTheFetcher(t *testing.T) {
 	}
 }
 
-// w4WitnessTypes are the batch's seven types.
+// w4WitnessTypes are the security and secrets posture types.
 var w4WitnessTypes = []string{"role", "policy", "iam-user", "iam-group", "waf", "secrets", "kms"}
 
-// TestW4EveryWave2CodeHasExactlyOneWitness generalises the exactly-one rule
-// that was proved for two witnesses by hand.
-//
-// A demo bench earns its keep only when each signal is demonstrated by one
-// row: zero rows means the signal is undemonstrated and no surface test can
-// see it, and two rows mean neither is the witness, so changing the rule moves
-// a count nobody can attribute. Deriving the set from what the bench actually
-// emits means a new wave-2 finding is covered the day it ships, without a hand
-// list to forget to extend.
+// TestW4EveryWave2CodeHasExactlyOneWitness pins that each wave-2 code on the
+// demo bench is carried by exactly one row. Zero rows means the signal is
+// undemonstrated and no surface test can see it; two rows mean a changed rule
+// moves a count nobody can attribute. The set is derived from what the bench
+// emits, so a new wave-2 finding is covered without a hand list to extend.
 func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 	carriers := map[domain.FindingCode][]string{}
 	for _, shortName := range w4WitnessTypes {
@@ -322,15 +312,6 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 		}
 	}
 
-	// 16, not 15: waf.orphan joined the bench with its own witness
-	// (acme-unattached-waf) when the web-ACL orphan condition was split out
-	// of waf.no-logging. The count moves with the witness, which is what this
-	// pin exists to force.
-	//
-	// 17, not 16: iam-group.admin-attached left w4MultiCarrierCodes when
-	// codex2 row 6 took PowerUserAccess out of the admin-equivalent set. It
-	// now fires on the one group holding AdministratorAccess, so it is a
-	// witness like any other.
 	const wantWitnessed = 17
 	if singles != wantWitnessed {
 		t.Errorf("%d witness-backed wave-2 codes on the bench, want %d — a witness was added or lost "+
@@ -338,9 +319,9 @@ func TestW4EveryWave2CodeHasExactlyOneWitness(t *testing.T) {
 	}
 }
 
-// w4MultiCarrierCodes are the batch's wave-2 codes that describe a fleet-wide
-// posture rather than one planted fixture, so more than one demo row carries
-// them by design. Everything else is a witness and must fire exactly once.
+// w4MultiCarrierCodes are the wave-2 codes that describe a fleet-wide posture
+// rather than one planted fixture, so more than one demo row carries them by
+// design. Every other code must fire exactly once.
 var w4MultiCarrierCodes = map[domain.FindingCode]string{
 	"iam-role.dormant":         "every unused demo role is dormant; the signal is the account's shape, not one row",
 	"kms.rotation-disabled":    "rotation is off on most demo keys, as it is on most real ones",

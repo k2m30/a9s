@@ -12,10 +12,10 @@ import (
 
 // TestDbiColor tests the Color function for DB Instances (dbi).
 //
-// The production Color func reads "status" (the canonical fetcher key; the
-// legacy "db_instance_status" fallback was removed in #284) and delegates to
-// rdsInstanceColor. It also honors backup_retention_period, publicly_accessible,
-// storage_encrypted, and deletion_protection — all tested below.
+// The production Color func reads "status" (the canonical fetcher key) and
+// delegates to rdsInstanceColor. It also honors backup_retention_period,
+// publicly_accessible, storage_encrypted, and deletion_protection — all
+// tested below.
 func TestDbiColor(t *testing.T) {
 	// Each case feeds the status to the dbi fetcher, which runs the type's own
 	// findings predicate, and the expected colour is computed from the severity
@@ -29,8 +29,8 @@ func TestDbiColor(t *testing.T) {
 		{name: "available", status: "available", want: resource.ColorHealthy},
 
 		{name: "failed", status: "failed", want: resource.ColorBroken},
-		// An instance you must restart before it can serve traffic is broken,
-		// not paused; this row moved here from the field-key table.
+		// An instance you must restart before it can serve traffic is broken, not
+		// paused.
 		{name: "stopped", status: "stopped", want: resource.ColorBroken},
 		{name: "storage_full", status: "storage-full", want: resource.ColorBroken},
 		{name: "incompatible_parameters", status: "incompatible-parameters", want: resource.ColorBroken},

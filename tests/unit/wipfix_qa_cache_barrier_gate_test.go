@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_cache_barrier_gate_test.go enforces one rule across the suite: a
+// Enforces one rule across the suite: a
 // test that drives a save through the controller and then reads the file back
 // off disk waits on the write barrier in between.
 //
 // The saves are queued and land on a writer goroutine, so without the wait
-// the test is racing the queue. Two replay round-trip tests failed that way
-// about once in three full-suite runs, and they had looked safe only because
-// the seam they used happened to wait internally — until it stopped. A test
-// that states its own barrier cannot be broken by a seam's internals again.
+// the test is racing the queue. A test that states its own barrier does not
+// depend on whether the seam it uses happens to wait internally.
 package unit
 
 import (

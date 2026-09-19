@@ -1,21 +1,9 @@
-// session_rowstore_truncated_count_shrink_test.go pins a live cross-surface
-// defect: the eni menu badge shows "58" while the eni list's own title
-// suffix shows "36+" after a truncated page-1 fetch lands over a wider
-// already-known TotalCount.
-//
-// Root cause: RowStore.Observe (core/session/rowstore.go) unconditionally
-// sets `next.TotalCount = len(newRows)` on every accepted rows-carrying
-// write, regardless of the existing entry's TotalCount. C6a already
-// documents "a counts-only observation updates TotalCount without touching
-// Rows" and C5 documents "exact only ever advances" for the Pagination-based
-// stale-replace guard, but neither rule is applied to TotalCount itself
-// inside Observe: a wider TotalCount seeded by ObserveCount (or by an
-// earlier, fuller Observe) is silently overwritten the moment ANY later
-// rows-carrying Observe lands — even a truncated page that is explicitly NOT
-// claiming to be the whole list. This is the same "never shrink a known
-// count on a non-exact result" principle already enforced for the root menu
-// badge in Controller.syncExactTotalToMenu (core/app/handle.go) and for
-// the MenuState.Availability guard, just missing at the RowStore layer.
+// RowStore.Observe never
+// shrinks a known TotalCount on a non-exact result, the principle
+// Controller.syncExactTotalToMenu (core/app/handle.go) and the
+// MenuState.Availability guard apply to the root menu badge. Otherwise the eni
+// menu badge shows "58" while the eni list's title suffix shows "36+" after a
+// truncated page-1 fetch lands over a wider already-known TotalCount.
 package unit_test
 
 import (
@@ -25,12 +13,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// TestRowStore_Observe_TruncatedPageDoesNotShrinkWiderKnownTotalCount pins
-// Pin B: a truncated incoming page (36 rows, IsTruncated=true) must not
-// shrink an existing, wider known TotalCount (58) seeded by an earlier
-// ObserveCount — a truncated fetch page explicitly does not claim to be the
-// complete list, so it must never be treated as authoritative proof the
-// total shrank.
+// TestRowStore_Observe_TruncatedPageDoesNotShrinkWiderKnownTotalCount: a
+// truncated incoming page (36 rows, IsTruncated=true) leaves a wider known
+// TotalCount (58) seeded by an earlier ObserveCount in place — a truncated
+// page does not claim to be the complete list.
 func TestRowStore_Observe_TruncatedPageDoesNotShrinkWiderKnownTotalCount(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -61,8 +47,8 @@ func TestRowStore_Observe_TruncatedPageDoesNotShrinkWiderKnownTotalCount(t *test
 	}
 }
 
-// TestRowStore_Observe_ExactPageIsAllowedToShrinkTotalCount is the companion
-// non-regression: an EXACT (untruncated) fetch page is allowed to shrink
+// TestRowStore_Observe_ExactPageIsAllowedToShrinkTotalCount: an EXACT
+// (untruncated) fetch page is allowed to shrink
 // TotalCount below a prior wider known count — resources can genuinely be
 // deleted between observations, and an exact result IS authoritative proof
 // of the new total, unlike a truncated page.

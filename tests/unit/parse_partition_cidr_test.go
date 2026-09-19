@@ -1,6 +1,6 @@
 package unit
 
-// parse_partition_cidr_test.go — a partition, a region and an address range
+// A partition, a region and an address range
 // are read out of the value, never guessed from its spelling.
 //
 // Three facts share one shape: a string AWS returned carries the answer, and
@@ -65,7 +65,7 @@ func parseClients(region string) *awsclient.ServiceClients {
 	return c
 }
 
-// ── Row 1: a /0 prefix is everyone, in either family ──────────────────────
+// ── a /0 prefix is everyone, in either family ──────────────────────
 
 // TestCIDROpenToEveryone_ZeroLengthPrefixInEitherFamily pins the rule the
 // helper owns: reachability is a property of the prefix length, not of the
@@ -272,7 +272,7 @@ func TestSGInternetFacing_AnyZeroLengthPrefixIsTheInternet(t *testing.T) {
 	}
 }
 
-// ── Row 2: the S3 origin bucket is the whole prefix ───────────────────────
+// ── the S3 origin bucket is the whole prefix ───────────────────────
 
 // TestS3OriginBucket_BucketIsEveryLabelBeforeTheEndpointMarker pins what an S3
 // origin domain names. A bucket name may contain dots, so the name is not the
@@ -384,10 +384,9 @@ func TestCloudFrontS3Origin_DottedAndChinaOriginsReachBothChecks(t *testing.T) {
 					},
 				},
 			}}
-			// Row 7 of this spec made HeadBucket the authority for "gone",
-			// so the session needs one; here every bucket outside the cache
-			// is genuinely absent, which is what the table's
-			// does-not-exist rows mean.
+			// HeadBucket is the authority for "gone", so the session needs
+			// one; here every bucket outside the cache is genuinely absent,
+			// which is what the table's does-not-exist rows mean.
 			head := &w6aHeadBucketFake{exists: map[string]bool{}}
 			for _, b := range buckets {
 				head.exists[b.ID] = true
@@ -415,7 +414,7 @@ func TestCloudFrontS3Origin_DottedAndChinaOriginsReachBothChecks(t *testing.T) {
 	}
 }
 
-// ── Row 3: the partition comes from the region ────────────────────────────
+// ── the partition comes from the region ────────────────────────────
 
 // TestPartitionForRegion_EveryRegionNamesItsPartition pins the one place the
 // package decides a partition. An ARN built with the wrong one is not

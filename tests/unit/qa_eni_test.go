@@ -55,7 +55,7 @@ func TestQA_ENI_FetchSuccess(t *testing.T) {
 	if r.Name != "my-eni" {
 		t.Errorf("expected Name 'my-eni', got %q", r.Name)
 	}
-	// Post-fold contract: in-use state is healthy → no Status, no Finding.
+	// An in-use state is healthy → no Status, no Finding.
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for in-use ENI, got %d", len(r.Findings))
 	}

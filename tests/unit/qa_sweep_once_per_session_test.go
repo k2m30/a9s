@@ -1,25 +1,24 @@
-// qa_sweep_once_per_session_test.go — the availability sweep's per-pair memo.
+// The availability sweep's per-pair memo.
 //
 // Session holds SweptPairs map[string]bool keyed profile+"--"+region, plus
 // MarkPairSwept()/PairSwept() bool operating on the CURRENT pair under
-// pairMu. Session-lifetime: Rotate() does NOT clear it; New() initializes
+// pairMu. It lives for the session: New() initializes it and Rotate() keeps
 // it.
 //
 // handleAvailabilityCacheLoaded (core/runtime/handlers_availability.go): a
-// pair re-entry sweeps again (C1: everything cached is re-verified on
-// sight), and the sweep start clears the pair's memo. The memo only stops a
-// duplicate probe result from re-running one sweep's completion. Disk-cache
-// seeding of rows/counts/issue badges is unaffected either way.
+// pair re-entry sweeps again, since everything cached is re-verified on sight,
+// and the sweep start clears the pair's memo. The memo only stops a duplicate
+// probe result from re-running one sweep's completion. Disk-cache seeding of
+// rows/counts/issue badges is unaffected either way.
 //
 // handleAvailabilityChecked: on sweep completion (AvailChecked reaches
-// AvailTotal for a non-empty sweep) it must call MarkPairSwept().
+// AvailTotal for a non-empty sweep) it calls MarkPairSwept().
 //
 // internal/tui's Model.handleRefresh (Ctrl+R on the main menu,
-// runtime_adapter_navigate.go) is the one manual full-menu refresh gesture
-// (the headless Controller.handleActionRefresh in core/app/actions_list.go
-// has no menu-level branch — it is a no-op on the menu screen). It must
-// clear the current pair's memo before re-triggering the availability-cache
-// reload.
+// runtime_adapter_navigate.go) is the manual full-menu refresh gesture; the
+// headless Controller.handleActionRefresh (core/app/actions_list.go) is a
+// no-op on the menu screen. handleRefresh clears the current pair's memo
+// before re-triggering the availability-cache reload.
 package unit_test
 
 import (
@@ -47,22 +46,15 @@ func countProbeTasks(tasks []runtime.TaskRequest) int {
 	return n
 }
 
-// fireAvailabilitySweep drives the real two-message sequence a live
-// cache-seeded sweep needs to actually dispatch probes rather than merely
-// latch AvailSweepPending. handleAvailabilityCacheLoaded dispatches
-// TaskKindProbeAvailability tasks ONLY when c.session.Clients != nil; a
-// controller built without pre-supplied clients (as newRowStoreControllerPin
-// builds — pinned by TestProbeResourceAvailability_NilClients, which this
-// helper must not relax) instead latches AvailSweepPending and dispatches
-// nothing until a follow-up messages.ClientsReady drains it
-// (fireNextAvailabilityProbes(4) inside handleClientsReadySuccess runs
-// unconditionally off the latch, independent of whether real
-// *ServiceClients ever land — see
-// TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete in
-// tests/unit/app_web_live_cold_boot_test.go for the same two-call sequence
-// against the same nil-clients construction). Gen must match the CURRENT
-// ConnectGen (bumped by every Rotate()) or Core.HandleClientsReady's own
-// equality guard drops the event silently.
+// fireAvailabilitySweep drives the two-message sequence a cache-seeded sweep
+// needs to dispatch probes. handleAvailabilityCacheLoaded dispatches
+// TaskKindProbeAvailability tasks only when c.session.Clients != nil; a
+// controller built without clients (as newRowStoreControllerPin builds)
+// latches AvailSweepPending until a messages.ClientsReady drains it
+// (fireNextAvailabilityProbes(4) in handleClientsReadySuccess runs off the
+// latch whether or not real *ServiceClients land). Gen must match the CURRENT
+// ConnectGen (bumped by every Rotate()) or Core.HandleClientsReady's equality
+// guard drops the event silently.
 func fireAvailabilitySweep(c *app.Controller, s *session.Session, entries map[string]int, truncated map[string]bool) []runtime.TaskRequest {
 	_, tasks := c.Handle(messages.AvailabilityCacheLoaded{
 		Entries:   entries,
@@ -113,10 +105,7 @@ func switchPair(c *app.Controller, s *session.Session, profile, region string) {
 	c.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 }
 
-// -----------------------------------------------------------------------
-// 1 — First visit: fresh session pair fires probe tasks (existing
-// first-visit behavior must be preserved by the fix).
-// -----------------------------------------------------------------------
+// A fresh session pair fires probe tasks on first visit.
 
 func TestSweepOnce_FreshPair_FirstVisit_FiresProbes(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -134,14 +123,11 @@ func TestSweepOnce_FreshPair_FirstVisit_FiresProbes(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// 1b — Mid-sweep double delivery: a second AvailabilityCacheLoaded landing
-// before the first sweep completes must not rebuild the queue or re-fire
-// probes (handlers_availability.go's handleAvailabilityCacheLoaded: both the
-// pre-connect disk-cache seed and handleClientsReadySuccess's own
-// TaskKindLoadAvailCache dispatch land for the same pair before PairSwept
-// goes true, since messages.AvailabilityCacheLoaded carries no Gen).
-// -----------------------------------------------------------------------
+// A second AvailabilityCacheLoaded landing before the first sweep completes
+// does not rebuild the queue or re-fire probes: the pre-connect disk-cache
+// seed and handleClientsReadySuccess's own TaskKindLoadAvailCache dispatch
+// both land for the same pair before PairSwept goes true, since
+// messages.AvailabilityCacheLoaded carries no Gen.
 
 func TestSweepOnce_MidSweepDuplicateCacheLoaded_DoesNotRebuildQueueOrReprobe(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -181,14 +167,11 @@ func TestSweepOnce_MidSweepDuplicateCacheLoaded_DoesNotRebuildQueueOrReprobe(t *
 	}
 }
 
-// -----------------------------------------------------------------------
-// 1c — Duplicate post-completion delivery: once a sweep has completed
-// (PairSwept() true), a further AvailabilityChecked for an already-checked
-// type must not re-run completion — no second TaskKindSaveCache dispatch, no
-// second startEnrichment (would rebuild EnrichQueue and bump EnrichmentGen,
-// discarding whatever Wave-2 probes the first completion already
-// dispatched).
-// -----------------------------------------------------------------------
+// Once a sweep has completed (PairSwept() true), a further AvailabilityChecked
+// for an already-checked type does not re-run completion — no second
+// TaskKindSaveCache dispatch, no second startEnrichment (which would rebuild
+// EnrichQueue and bump EnrichmentGen, discarding the Wave-2 probes the first
+// completion dispatched).
 
 func TestSweepOnce_DuplicateAvailabilityCheckedAfterCompletion_DoesNotRerunCompletion(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -226,10 +209,7 @@ func TestSweepOnce_DuplicateAvailabilityCheckedAfterCompletion_DoesNotRerunCompl
 	}
 }
 
-// -----------------------------------------------------------------------
-// 2 — Completion memo: driving AvailChecked to AvailTotal marks the pair
-// swept.
-// -----------------------------------------------------------------------
+// Driving AvailChecked to AvailTotal marks the pair swept.
 
 func TestSweepOnce_CompletionMarksPairSwept(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -249,14 +229,11 @@ func TestSweepOnce_CompletionMarksPairSwept(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// 3 — A (fully swept) -> B -> A. The revisit must sweep AGAIN (C1:
-// everything cached is re-verified on sight): the account moves on while the
-// operator is looking at the other pair, so disk values would look verified
-// when nothing had verified them this visit. The swept memo is a completion
-// latch only (it stops a duplicate probe result from re-running one sweep's
-// completion); it is not permission to skip.
-// -----------------------------------------------------------------------
+// A (fully swept) -> B -> A: the revisit sweeps again, since everything cached
+// is re-verified on sight — the account moves on while the operator looks at
+// the other pair. The swept memo is a completion latch only (it stops a
+// duplicate probe result from re-running one sweep's completion), not
+// permission to skip.
 
 func TestSweepOnce_RevisitSweptPair_SweepsAgain_UnsweptPairAlsoProbes(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -296,10 +273,8 @@ func TestSweepOnce_RevisitSweptPair_SweepsAgain_UnsweptPairAlsoProbes(t *testing
 	}
 }
 
-// -----------------------------------------------------------------------
-// 4 — Interrupted sweep: partial progress, then switch away and back must
-// NOT skip — the memo is only set on genuine completion.
-// -----------------------------------------------------------------------
+// After partial progress, switching away and back sweeps again: the memo is
+// set only on completion.
 
 func TestSweepOnce_InterruptedSweep_DoesNotMarkSwept_ProbesAgainOnRevisit(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
@@ -341,10 +316,8 @@ func TestSweepOnce_InterruptedSweep_DoesNotMarkSwept_ProbesAgainOnRevisit(t *tes
 	}
 }
 
-// -----------------------------------------------------------------------
-// 5 — Rotate survival: Session.Rotate() must not clear SweptPairs (it is a
-// session-lifetime memo, unlike every other Rotate-cleared queue/counter).
-// -----------------------------------------------------------------------
+// Session.Rotate() keeps SweptPairs: it is a session-lifetime memo, unlike
+// every other Rotate-cleared queue/counter.
 
 func TestSweepOnce_RotatePreservesSweptPairs(t *testing.T) {
 	s := session.New()
@@ -375,14 +348,10 @@ func TestSweepOnce_RotatePreservesSweptPairs(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// 6 — Manual full-menu refresh (Ctrl+R on the main menu, the ONE existing
-// gesture found at internal/tui/runtime_adapter_navigate.go:591
-// Model.handleRefresh's rsKindMenu branch) must clear the current pair's
-// memo before re-sweeping. core/app's headless
-// Controller.handleActionRefresh (actions_list.go) has no menu-level branch
-// at all, so this contract is TUI-only.
-// -----------------------------------------------------------------------
+// Ctrl+R on the main menu (Model.handleRefresh's rsKindMenu branch in
+// internal/tui/runtime_adapter_navigate.go) clears the current pair's memo
+// before re-sweeping. core/app's headless Controller.handleActionRefresh has
+// no menu-level branch, so this contract is TUI-only.
 
 // newRootSizedModel builds an 80x40 tui.Model the same disciplined way
 // tests/unit/tui_root_test.go's helper of the same name does (t.TempDir()

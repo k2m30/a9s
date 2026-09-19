@@ -1,17 +1,5 @@
 package unit_test
 
-// w29_end_state_test.go — what is only true once the task is finished.
-//
-// The burn-down pin that lived here is gone with the list it read: every
-// classifier decides through the shared fallback, so
-// TestClassifiersDecideThroughTheSharedFallback says that outright instead of
-// counting down to it.
-//
-// Row 5 has no pin of its own: `grep 'range .*Findings' core/aws/catalog_*.go`
-// already returns nothing on this base, and a first-match loop reintroduced
-// later returns a colour that is neither the findings guard's nor a shared
-// fallback call, which is exactly what the burn-down gate below rejects.
-
 import (
 	"os"
 	"path/filepath"
@@ -20,10 +8,9 @@ import (
 	"testing"
 )
 
-// TestW29_CloudFormationPhraseParserIsGone is row 2. Colouring a stack meant
-// rendering its status into a phrase and reading the phrase back, so the
-// classifier could disagree with the finding that produced the words. The
-// parser goes rather than moving.
+// TestW29_CloudFormationPhraseParserIsGone: colouring a stack by rendering
+// its status into a phrase and reading the phrase back lets the classifier
+// disagree with the finding that produced the words.
 func TestW29_CloudFormationPhraseParserIsGone(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

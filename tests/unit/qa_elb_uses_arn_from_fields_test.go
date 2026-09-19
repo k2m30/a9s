@@ -1,13 +1,12 @@
 package unit
 
-// qa_elb_uses_arn_from_fields_test.go — Regression: EnrichELBAttributes must
-// call DescribeLoadBalancerAttributes with the load balancer ARN from
+// EnrichELBAttributes calls
+// DescribeLoadBalancerAttributes with the load balancer ARN from
 // r.Fields["load_balancer_arn"], NOT the bare name in r.ID.
 //
-// Same shape as the tg and sfn bugs: the elb fetcher (elb.go:111) sets
-// `ID: lbName` and stores the ARN in Fields["load_balancer_arn"]. The
-// enricher passing r.ID directly to LoadBalancerArn produces a ValidationError
-// against real AWS exactly like tg did.
+// The elb fetcher sets ID to the load balancer name and stores the ARN in
+// Fields["load_balancer_arn"]; real AWS rejects a bare name as
+// LoadBalancerArn with a ValidationError.
 
 import (
 	"context"

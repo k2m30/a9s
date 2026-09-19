@@ -15,11 +15,11 @@
 //   - Back navigation: full stack unwind
 //   - Isolated sessions: two clients share server but have independent state
 //   - Child views: wired via ActionCommand
-//   - Harness-has-teeth: asserts a property the fix introduced; documents regression
+//   - Harness-has-teeth: the ec2 list carries rows after ActionCommand
 //
-// open-detail, open-yaml, open-json, child-view, and load-more are now wired
-// through the controller (no longer stubs); the keyboard-driven navigation for
-// those flows is exercised by the Playwright suite in tests/e2e.
+// open-detail, open-yaml, open-json, child-view, and load-more are wired
+// through the controller; the keyboard-driven navigation for those flows is
+// exercised by the Playwright suite in tests/e2e.
 package webintegration
 
 import (
@@ -359,7 +359,7 @@ func TestWebStartup_Header_HasDemoProfileAndRegion(t *testing.T) {
 // richDemoTypes lists short names known to have populated demo fixtures.
 // These types MUST assert len(Rows) > 0 in the list coverage test.
 // Types not listed here may legitimately have zero rows (e.g. child-only types,
-// ct-events without a filter, types with no demo fixtures seeded yet).
+// ct-events without a filter, types with no demo fixtures).
 var richDemoTypes = map[string]bool{
 	"ec2":        true,
 	"s3":         true,
@@ -405,20 +405,14 @@ var richDemoTypes = map[string]bool{
 // TestWebAllResourceTypes_List_NavigatesAndShowsColumns verifies that for every
 // resource type: ActionCommand navigates to a list screen, and the list has
 // columns defined. For rich types (those with demo fixtures), asserts rows > 0.
-//
-// This test guards the PR-D regression: before the cached-nav applyResourcesLoaded
-// fix, navigating via ActionCommand after a cached navigate would return a list
-// screen with Body.List.Rows == nil even for richly-seeded demo types.
 func TestWebAllResourceTypes_List_NavigatesAndShowsColumns(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) == 0 {
 		t.Fatal("AllResourceTypes() returned empty — catalog not installed")
 	}
 
-	// Guard against stale richDemoTypes keys: every key MUST be a registered short
-	// name, else the Rows>0 assertion below is silently skipped and a regression in
-	// that list passes unnoticed (the cwlogs/cloudwatch/cloudfront/rds drift this
-	// guard catches).
+	// Every richDemoTypes key must be a registered short name, else the Rows>0
+	// assertion below is silently skipped for it.
 	registered := make(map[string]bool, len(allTypes))
 	for _, rt := range allTypes {
 		registered[rt.ShortName] = true
@@ -431,14 +425,13 @@ func TestWebAllResourceTypes_List_NavigatesAndShowsColumns(t *testing.T) {
 	}
 
 	for _, rt := range allTypes {
-		rt := rt // capture
+		rt := rt
 		t.Run(rt.ShortName, func(t *testing.T) {
 			// Each sub-test uses its own isolated server + session so resource
 			// types do not interfere with each other's navigation state.
 			c, cleanup := startServer(t)
 			defer cleanup()
 
-			// Navigate to the resource list.
 			c.action(t, app.ActionCommand, rt.ShortName)
 
 			vs := c.state(t)
@@ -459,7 +452,6 @@ func TestWebAllResourceTypes_List_NavigatesAndShowsColumns(t *testing.T) {
 					t.Errorf("Body.List.Rows is empty for %q — demo fixtures must populate rows "+
 						"(this catches the cached-nav applyResourcesLoaded regression)", rt.ShortName)
 				} else {
-					// Verify the first row has a populated ResourceID and cells.
 					first := vs.Body.List.Rows[0]
 					if first.ResourceID == "" {
 						t.Errorf("Rows[0].ResourceID is empty for %q — rows must carry an ID", rt.ShortName)
@@ -481,22 +473,11 @@ func TestWebAllResourceTypes_List_NavigatesAndShowsColumns(t *testing.T) {
 // 4. HARNESS-HAS-TEETH TEST
 // =============================================================================
 
-// TestWebHarnessTeeth_EC2ListHasRows_Regression is the "harness has teeth" test
-// required by the PR-E plan. It asserts a property the current code satisfies —
-// len(Body.List.Rows) > 0 for ec2 — and documents that before the PR-D fix this
-// assertion would fail.
-//
-// Regression story:
-//   - Pre-fix: ActionCommand pushed a list screen via the controller's Apply path.
-//     DrainSync executed the fetch task and called Handle with the ResourcesLoaded
-//     event. But Handle's result lane dispatched only the original 6 events; the
-//     ResourcesLoaded case was missing. The event was a no-op: rows were never
-//     written to the controller screen stack. Snapshot().Body.List.Rows was nil.
-//   - Post-fix (PR-D): the Handle method routes ResourcesLoaded through
-//     applyResourcesLoaded, which finds the topmost matching list screen on the
-//     stack and sets its Rows. Snapshot().Body.List.Rows is populated.
-//   - Therefore: len > 0 passes now; it would have returned 0 before — the
-//     harness catches the exact regression that PR-D fixed.
+// TestWebHarnessTeeth_EC2ListHasRows_Regression asserts len(Body.List.Rows) > 0
+// for ec2 after ActionCommand. DrainSync runs the fetch task and calls Handle
+// with the ResourcesLoaded event; Handle routes it through
+// applyResourcesLoaded, which finds the topmost matching list screen on the
+// stack and sets its Rows.
 func TestWebHarnessTeeth_EC2ListHasRows_Regression(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
@@ -512,10 +493,6 @@ func TestWebHarnessTeeth_EC2ListHasRows_Regression(t *testing.T) {
 		t.Fatal("Body.List is nil")
 	}
 
-	// ASSERTION WITH TEETH: passes post-PR-D-fix; would have been 0 before.
-	// Before the fix: DrainSync ran the fetch task, but ResourcesLoaded was not
-	// dispatched on the Handle result lane — list screen stayed empty.
-	// After the fix: applyResourcesLoaded populates the rows on Handle.
 	if len(vs.Body.List.Rows) == 0 {
 		t.Errorf("Body.List.Rows is empty for ec2 — " +
 			"pre-PR-D-fix this was always 0 because ResourcesLoaded was not wired " +
@@ -523,7 +500,6 @@ func TestWebHarnessTeeth_EC2ListHasRows_Regression(t *testing.T) {
 			"is broken or was reverted")
 	}
 
-	// Secondary: first row must carry an instance ID.
 	if len(vs.Body.List.Rows) > 0 {
 		row := vs.Body.List.Rows[0]
 		if row.ResourceID == "" {
@@ -605,7 +581,6 @@ func TestWebCursorNavigation_MoveTop_ResetsToZero(t *testing.T) {
 		t.Skip("ec2 list has fewer than 3 rows — move-top test not meaningful")
 	}
 
-	// Move down twice then move to top.
 	c.action(t, app.ActionMoveDown, "")
 	c.action(t, app.ActionMoveDown, "")
 	c.action(t, app.ActionMoveTop, "")
@@ -715,7 +690,7 @@ func TestWebFilter_SetFilter_ClearWithEmpty_ResetsFilter(t *testing.T) {
 	}
 
 	c.action(t, app.ActionSetFilter, needle)
-	c.action(t, app.ActionSetFilter, "") // clear
+	c.action(t, app.ActionSetFilter, "")
 	vs := c.state(t)
 
 	if vs.Body.List.Filter != "" {
@@ -807,7 +782,6 @@ func TestWebIsolatedSessions_TwoClientsAreIndependent(t *testing.T) {
 		token:   c1.token,
 		http:    &http.Client{Jar: jar2},
 	}
-	// Handshake for c2.
 	req2, err := http.NewRequestWithContext(bgctx, http.MethodGet, c2.baseURL+"/", nil)
 	if err != nil {
 		t.Fatalf("c2 NewRequestWithContext: %v", err)
@@ -818,7 +792,6 @@ func TestWebIsolatedSessions_TwoClientsAreIndependent(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	// Navigate c1 to ec2 list.
 	c1.action(t, app.ActionCommand, "ec2")
 
 	// c2 must still be on the menu.
@@ -897,7 +870,6 @@ func TestWebMultipleTypes_SwitchBetweenTypes(t *testing.T) {
 			t.Logf("ec2 and lambda share the same first column key %q — may be expected for short names", vsEC2.Body.List.Columns[0].Key)
 		}
 	}
-	// Primarily assert both lists have rows.
 	if len(vsEC2.Body.List.Rows) == 0 {
 		t.Error("ec2 list rows empty")
 	}
@@ -1024,16 +996,14 @@ func TestWebDetail_BackFromDetail_ReturnsToList(t *testing.T) {
 }
 
 // =============================================================================
-// 12. DETAIL → YAML / JSON — text-body flows (PR-E new)
+// 12. DETAIL → YAML / JSON — text-body flows
 // =============================================================================
 
 // TestWebYAML_OpenYAML_ShowsTextBodyWithLines verifies that ActionOpenYAML from
-// a detail screen pushes a text body with real YAML content. Empty Lines is the
-// regression: the headless resourceYAMLLines builder must produce at least one
-// line for any real resource.
+// a detail screen pushes a text body with real YAML content: the headless
+// resourceYAMLLines builder produces at least one line for any real resource.
 func TestWebYAML_OpenYAML_ShowsTextBodyWithLines(t *testing.T) {
-	// ec2 is known to produce ~40 YAML lines in demo mode (verified over HTTP).
-	// Test a spread to catch per-type projector gaps.
+	// A spread of types catches per-type projector gaps.
 	types := []string{"ec2", "dbi", "lambda", "s3"}
 
 	for _, shortName := range types {
@@ -1054,8 +1024,8 @@ func TestWebYAML_OpenYAML_ShowsTextBodyWithLines(t *testing.T) {
 			if vs.Body.Text == nil {
 				t.Fatalf("[%s] Body.Text is nil after open-yaml", shortName)
 			}
-			// ASSERTION WITH TEETH: empty Lines == regression in the headless
-			// resourceYAMLLines builder (serialises nothing).
+			// Empty Lines means the headless resourceYAMLLines builder serialised
+			// nothing.
 			if len(vs.Body.Text.Lines) == 0 {
 				t.Errorf("[%s] Body.Text.Lines is empty after open-yaml — "+
 					"the headless YAML builder must produce content; "+
@@ -1158,7 +1128,7 @@ func TestWebYAML_OpenYAML_DirectFromList(t *testing.T) {
 }
 
 // =============================================================================
-// 13. CHILD VIEWS — ActionChildView with trigger keys (PR-E new)
+// 13. CHILD VIEWS — ActionChildView with trigger keys
 // =============================================================================
 
 // childViewCase describes one child-view scenario to drive via HTTP.
@@ -1168,7 +1138,6 @@ type childViewCase struct {
 	// triggerKey is the Key field from the ChildViewDef (e.g. "enter", "e", "L").
 	triggerKey string
 	// expectedChildType is the ChildType value expected after navigation.
-	// We do not assert on it directly but document for reviewer clarity.
 	expectedChildType string
 }
 
@@ -1189,19 +1158,13 @@ type childViewCase struct {
 //	sfn:     "enter"→sfn_executions
 func TestWebChildView_ActionChildView_NavigatesToChildList(t *testing.T) {
 	cases := []childViewCase{
-		// ecs-svc has three children with three distinct trigger keys.
 		{parentType: "ecs-svc", triggerKey: "enter", expectedChildType: "ecs_tasks"},
 		{parentType: "ecs-svc", triggerKey: "e", expectedChildType: "ecs_svc_events"},
 		{parentType: "ecs-svc", triggerKey: "L", expectedChildType: "ecs_svc_logs"},
-		// lambda: single child with "enter".
 		{parentType: "lambda", triggerKey: "enter", expectedChildType: "lambda_invocations"},
-		// asg: single child with "enter".
 		{parentType: "asg", triggerKey: "enter", expectedChildType: "asg_activities"},
-		// dbi: single child with "enter".
 		{parentType: "dbi", triggerKey: "enter", expectedChildType: "dbi_events"},
-		// s3: single child with "enter".
 		{parentType: "s3", triggerKey: "enter", expectedChildType: "s3_objects"},
-		// sfn: single child with "enter".
 		{parentType: "sfn", triggerKey: "enter", expectedChildType: "sfn_executions"},
 	}
 
@@ -1212,10 +1175,8 @@ func TestWebChildView_ActionChildView_NavigatesToChildList(t *testing.T) {
 			c, cleanup := startServer(t)
 			defer cleanup()
 
-			// Navigate to the parent list and verify it has rows.
 			navigateToListWithRows(t, c, tc.parentType)
 
-			// Dispatch the child-view action with the trigger key as Arg.
 			c.action(t, app.ActionChildView, tc.triggerKey)
 			vs := c.state(t)
 
@@ -1281,7 +1242,7 @@ func TestWebChildView_FromDetail_ActionChildView_NavigatesToChildList(t *testing
 }
 
 // =============================================================================
-// 14. RELATED PANEL NAVIGATION (PR-E new)
+// 14. RELATED PANEL NAVIGATION
 // =============================================================================
 
 // TestWebRelated_ToggleFocus_SetsRelatedFocused verifies that ActionToggleFocus
@@ -1354,7 +1315,6 @@ func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
 		t.Skip("dbi detail: RelatedVisible=false — cannot test related-navigate")
 	}
 
-	// Focus the related panel.
 	c.action(t, app.ActionToggleFocus, "")
 	vs := c.state(t)
 	if vs.Body.Detail == nil || !vs.Body.Detail.RelatedFocused {
@@ -1374,12 +1334,11 @@ func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
 			"must populate counts via DrainSync so the panel is navigable; a regression there would surface here")
 	}
 
-	// Select the focused row (RelatedCursor=0 by default).
+	// RelatedCursor is 0 by default.
 	c.action(t, app.ActionSelect, "")
 	vs = c.state(t)
 
-	// The stack must have changed — the detail screen is no longer on top.
-	// (Either a list or a detail for the related resource was pushed.)
+	// Either a list or a detail for the related resource is pushed on top.
 	if vs.Body.Kind == app.BodyKindDetail && vs.Body.Detail != nil && vs.Body.Detail.RelatedFocused {
 		// Still on the same detail screen with focus still on related panel
 		// means navigation was a no-op — that is the broken state.
@@ -1389,14 +1348,13 @@ func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
 	// The resulting Kind should be list or detail (never menu/text/help).
 	switch vs.Body.Kind {
 	case app.BodyKindList, app.BodyKindDetail:
-		// Correct: stack was mutated by applyRelatedNavResult.
 	default:
 		t.Errorf("after related-panel select: unexpected Body.Kind=%q — expected list or detail", vs.Body.Kind)
 	}
 }
 
 // =============================================================================
-// 15. REVEAL STAYS BLOCKED (PR-E confirm)
+// 15. REVEAL STAYS BLOCKED
 // =============================================================================
 
 // TestWebReveal_ActionReveal_BlockedOver HTTP confirms that ActionReveal is
@@ -1433,12 +1391,12 @@ func TestWebReveal_ActionReveal_BlockedFromDetailContext(t *testing.T) {
 }
 
 // =============================================================================
-// 16. BACK UNWINDS DEEP STACK (PR-E new)
+// 16. BACK UNWINDS DEEP STACK
 // =============================================================================
 
 // TestWebBack_DeepStack_UnwindsCorrectly exercises the full menu→list→detail→
 // yaml→back→back→back→back unwind sequence and verifies each transition is
-// correct. This catches stack-corruption bugs introduced by the new Apply lanes.
+// correct.
 func TestWebBack_DeepStack_UnwindsCorrectly(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
@@ -1530,7 +1488,7 @@ func TestWebBack_ChildViewStack_UnwindsCorrectly(t *testing.T) {
 }
 
 // =============================================================================
-// REGRESSION: Fix 2 — GET /body is token-gated, read-only, and non-mutating
+// 17. GET /body is token-gated, read-only, and non-mutating
 // =============================================================================
 
 // bodyRaw performs GET /body with the given token header value and returns
@@ -1555,11 +1513,9 @@ func (c *client) bodyRaw(t *testing.T, token string) (int, string) {
 
 // TestWebBody_WithValidToken_Returns200WithHTML verifies that GET /body with a
 // valid X-A9S-Token header returns 200 and non-empty HTML after navigating to a
-// resource list.
-//
-// Pre-fix failure: /body did not exist; the SSE update handler called GET /action
-// with an empty form body to refresh the fragment, which applied a no-op action
-// and triggered notifySubscribers, creating an infinite SSE→GET /action→SSE loop.
+// resource list. The SSE update handler refreshes the fragment through /body;
+// refreshing through /action would apply a no-op action and notify
+// subscribers, looping SSE→/action→SSE.
 func TestWebBody_WithValidToken_Returns200WithHTML(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
@@ -1584,9 +1540,6 @@ func TestWebBody_WithValidToken_Returns200WithHTML(t *testing.T) {
 
 // TestWebBody_WithNoToken_Returns403 verifies that GET /body without a token is
 // rejected with 403 — /body is an authenticated endpoint.
-//
-// Pre-fix failure: /body did not exist. Without the endpoint the implicit
-// fallback was a 404, which the SSE client silently ignored rather than failing.
 func TestWebBody_WithNoToken_Returns403(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
@@ -1600,10 +1553,6 @@ func TestWebBody_WithNoToken_Returns403(t *testing.T) {
 // TestWebBody_IsReadOnly verifies that calling GET /body does not mutate state:
 // the Body.Kind observed after two successive /body calls is the same, and a
 // subsequent GET /state shows the same Body.Kind (proving /body has no Apply).
-//
-// Pre-fix failure: /body did not exist. Without the endpoint the SSE refresh
-// path routed to POST /action with an empty body, which mutated LastApplied and
-// triggered spurious notifySubscribers calls.
 func TestWebBody_IsReadOnly(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
@@ -1611,11 +1560,9 @@ func TestWebBody_IsReadOnly(t *testing.T) {
 	// Navigate to a list so we have a non-menu state to inspect.
 	c.action(t, app.ActionCommand, "ec2")
 
-	// Capture kind before /body calls.
 	vsBefore := c.state(t)
 	kindBefore := vsBefore.Body.Kind
 
-	// Call /body twice.
 	status1, _ := c.bodyRaw(t, c.token)
 	if status1 != http.StatusOK {
 		t.Fatalf("first GET /body: status=%d", status1)

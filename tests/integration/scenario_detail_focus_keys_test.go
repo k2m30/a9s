@@ -2,7 +2,7 @@
 
 package integration
 
-// scenario_detail_focus_keys_test.go — y (YAML), J (JSON) and t (CloudTrail)
+// Y (YAML), J (JSON) and t (CloudTrail)
 // stay live while the related column holds the cursor: handleDetailKeyMsg
 // routes unowned keys to the detail screen's own cases whenever the filter
 // input is not active, instead of feeding them to the right-column widget as
@@ -23,7 +23,6 @@ func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {
 	scenario.OpenList("transfer")
 	root := fullIntegrationMustFindResourceByID(t, scenario.clients, "transfer", demofixtures.ProdAS2GatewayID)
 
-	// y: YAML opens with the related column focused.
 	scenario.OpenDetailResource("transfer", root)
 	scenario.ExpectNoAPIError()
 	scenario.Press("l")
@@ -33,7 +32,6 @@ func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {
 	}
 	scenario.Back()
 
-	// J: JSON opens with the related column focused.
 	scenario.OpenDetailResource("transfer", root)
 	scenario.Press("l")
 	scenario.Press("J")
@@ -42,7 +40,6 @@ func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {
 	}
 	scenario.Back()
 
-	// t: CloudTrail drill navigates with the related column focused.
 	scenario.OpenDetailResource("transfer", root)
 	scenario.Press("l")
 	scenario.Press("t")
@@ -51,8 +48,8 @@ func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {
 	}
 	scenario.Back()
 
-	// '/' while focused still starts the related filter (the one key the
-	// widget owns outside filter-input mode) — guard against over-fixing.
+	// '/' while focused still starts the related filter: the one key the
+	// widget owns outside filter-input mode.
 	scenario.OpenDetailResource("transfer", root)
 	scenario.Press("l")
 

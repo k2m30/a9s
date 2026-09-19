@@ -1,19 +1,8 @@
 package unit
 
-// qa_yaml_unique_test.go — preserved unique assertions from qa_yaml_v220_test.go
-// that go beyond the generic table-driven sweep in qa_yaml_all_test.go.
-//
-// Preserved tests:
-//   - TestQA_YAML_CloudTrailEvent_JSONFieldRenderedAsNestedYAML
-//       Source: qa_yaml_v220_test.go
-//       Reason: verifies that the CloudTrailEvent JSON string field is expanded
-//               into nested YAML keys rather than emitted as a raw JSON blob —
-//               a specific rendering contract not covered by any other test.
-//
-//   - TestQA_YAML_CloudTrailEvent_NullValuesInJSON
-//       Source: qa_yaml_v220_test.go
-//       Reason: regression guard — null JSON values in the CT event blob must
-//               not panic or produce invalid output; non-null keys must be present.
+// CloudTrail event YAML: the CloudTrailEvent JSON
+// string field expands into nested YAML keys rather than a raw JSON blob, and
+// null JSON values in the blob neither panic nor produce invalid output.
 
 import (
 	"strings"
@@ -47,7 +36,6 @@ func TestQA_YAML_CloudTrailEvent_JSONFieldRenderedAsNestedYAML(t *testing.T) {
 
 	out := yamlView(t, res, 120, 40)
 
-	// CloudTrailEvent JSON must be rendered as nested YAML keys, not a raw JSON blob.
 	for _, want := range []string{
 		"eventVersion",
 		"userIdentity",
@@ -58,7 +46,6 @@ func TestQA_YAML_CloudTrailEvent_JSONFieldRenderedAsNestedYAML(t *testing.T) {
 		}
 	}
 
-	// Must NOT contain the raw JSON blob starting with {"eventVersion"
 	if strings.Contains(out, `{"eventVersion"`) {
 		t.Errorf("CloudTrail Event YAML JSON field: output contains raw JSON blob, expected nested YAML:\n%s", out)
 	}
@@ -83,11 +70,7 @@ func TestQA_YAML_CloudTrailEvent_NullValuesInJSON(t *testing.T) {
 
 	out := yamlView(t, res, 120, 40)
 
-	// requestParameters must appear as a YAML key.
 	if !strings.Contains(out, "requestParameters") {
 		t.Errorf("CloudTrail Event YAML null values: expected 'requestParameters' in output, got:\n%s", out)
 	}
-
-	// responseElements with null is acceptable as null, empty, or omitted — no strict assertion.
-	// The test verifies it doesn't crash and that non-null content is present.
 }

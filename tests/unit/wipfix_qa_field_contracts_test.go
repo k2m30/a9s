@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_field_contracts_test.go pins four facts a fetcher or a cache path
-// owns and today answers twice, ambiguously, or not at all:
+// Facts a fetcher or a cache path owns, each answered once:
 //
-//   - the per-profile cost cache file name must distinguish two profiles that
-//     differ only by a character the old sanitiser folded away;
-//   - an ECS task row must carry the short task id under the key its list
-//     column reads, so the column does not fall back to the whole ARN;
-//   - a Lambda invocation row must describe "memory used" once, under the key
-//     the column's SortKey names;
+//   - the per-profile cost cache file name distinguishes two profiles that
+//     differ only by a character a sanitiser would fold away;
+//   - an ECS task row carries the short task id under the key its list column
+//     reads, so the column does not fall back to the whole ARN;
+//   - a Lambda invocation row describes "memory used" once, under the key the
+//     column's SortKey names;
 //   - a Lambda function that has been deleted is a race the enricher must
 //     record, not a function that happens to have no resource policy.
 package unit_test
@@ -32,13 +31,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- row 15: the per-profile cost cache file name --------------------------
-
 // TestCostsCachePath_DistinguishesProfilesThatDifferByOneCharacter pins that
 // two configured profiles which differ only by a space or a slash never share
-// one costs file. The pair-directory layout already encodes injectively; the
-// costs file is the one path element left folding "team a" and "team_a"
-// together, which silently serves one account's spend under the other's name.
+// one costs file. Folding "team a" and "team_a" together would serve one
+// account's spend under the other's name.
 func TestCostsCachePath_DistinguishesProfilesThatDifferByOneCharacter(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -76,8 +72,6 @@ func TestCostsCachePath_IsStableForOneProfile(t *testing.T) {
 	}
 }
 
-// --- row 17: the ECS task id column ----------------------------------------
-
 // ecsSvcTasksFake serves one running task for a service and nothing else.
 type ecsSvcTasksFake struct {
 	awsclient.ECSAPI
@@ -110,7 +104,7 @@ const (
 	wipfixECSTaskARN = "arn:aws:ecs:us-east-1:123456789012:task/example-cluster/" + wipfixECSTaskID
 )
 
-// TestFetchEcsSvcTasks_TaskIDColumnKeyCarriesTheShortID pins row 17: the
+// TestFetchEcsSvcTasks_TaskIDColumnKeyCarriesTheShortID: the
 // ecs-task list column is keyed "task_id". A row that does not carry that key
 // falls through to the reflected TaskArn path and renders the whole ARN in a
 // 38-column cell, on live and on replay alike.
@@ -155,8 +149,6 @@ func TestFetchEcsSvcTasks_TaskIDColumnKeyCarriesTheShortID(t *testing.T) {
 	}
 }
 
-// --- row 20: memory used, once ---------------------------------------------
-
 type cwlogsReportFake struct {
 	awsclient.CWLogsFilterLogEventsAPI
 }
@@ -173,7 +165,7 @@ func (f *cwlogsReportFake) FilterLogEvents(
 	}}}, nil
 }
 
-// TestFetchLambdaInvocations_MemoryUsedIsOneField pins row 20: "memory used
+// TestFetchLambdaInvocations_MemoryUsedIsOneField: "memory used
 // in MB" is one fact. Writing it under two keys leaves the list column's
 // SortKey pointing at whichever copy survives the next edit, and a SortKey
 // naming a key no row carries sorts every row equal.
@@ -214,8 +206,6 @@ func TestFetchLambdaInvocations_MemoryUsedIsOneField(t *testing.T) {
 			got, "137/512 MB")
 	}
 }
-
-// --- row 25: a deleted function is not a policy-less one -------------------
 
 // lambdaDeletedFunctionFake answers ResourceNotFoundException to every call,
 // the way Lambda answers for a function that has been deleted since the list
@@ -278,11 +268,11 @@ func wipfixLambdaRow() []resource.Resource {
 	}}
 }
 
-// TestEnrichLambdaPosture_DeletedFunctionIsRecordedAsUninspected pins row 25:
-// Lambda answers ResourceNotFoundException both for "this function has no
-// resource policy" (healthy, a fact) and for "this function no longer exists"
-// (a race, nothing was inspected). Reading the code alone cannot tell them
-// apart, so a deleted function is silently reported as posture-clean.
+// TestEnrichLambdaPosture_DeletedFunctionIsRecordedAsUninspected: Lambda
+// answers ResourceNotFoundException both for "this function has no resource
+// policy" (healthy, a fact) and for "this function no longer exists" (a race,
+// nothing was inspected). The code alone cannot tell them apart, so the
+// enricher has to check which one it got.
 func TestEnrichLambdaPosture_DeletedFunctionIsRecordedAsUninspected(t *testing.T) {
 	clients := &awsclient.ServiceClients{Lambda: &lambdaDeletedFunctionFake{}}
 	res, err := awsclient.EnrichLambdaPosture(context.Background(), clients, wipfixLambdaRow(), nil)

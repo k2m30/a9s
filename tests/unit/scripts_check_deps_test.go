@@ -248,7 +248,7 @@ const depsModulesCurrent = ""
 // then an unsorted version list including release candidates.
 const depsGoVersionsCurrent = "go 1.9.2rc2 1.2.2 1.25.0 1.25.1 1.26rc1 1.26rc2 1.26.0 1.26.4 1.26.5"
 
-// (a) Nothing outdated: the gate stays silent and lets the push through.
+// Nothing outdated: the gate stays silent and lets the push through.
 func TestCheckDepsCurrent_AllCurrentExitsZero(t *testing.T) {
 	f := newDepsFixture(t, "1.26.5")
 	f.workflow(t, "ci.yml", depsWorkflowCurrent)
@@ -260,7 +260,7 @@ func TestCheckDepsCurrent_AllCurrentExitsZero(t *testing.T) {
 	res.requireNoLine(t, "->")
 }
 
-// (b) One outdated direct module, a newer toolchain patch, and one outdated
+// One outdated direct module, a newer toolchain patch, and one outdated
 // action pin: all three sections report and the gate fails the push. Only the
 // action that actually moved is named; a pin already at the latest release
 // must stay out of the report or the gate cries wolf every push.
@@ -305,7 +305,7 @@ func TestCheckDepsCurrent_ToolchainIgnoresPrereleasesAndOtherMinors(t *testing.T
 	res.requireNoLine(t, "toolchain", "->")
 }
 
-// (c) The check could not run. A gate that cannot answer must not answer
+// The check could not run. A gate that cannot answer must not answer
 // "fine": the section is reported as skipped and the exit code is 2, distinct
 // from both 0 and 1, so the Makefile fails the push. DEPS_CHECK_OFFLINE_OK=1
 // is the explicit opt-out for working offline.
@@ -360,7 +360,7 @@ func TestCheckDepsCurrent_UnreachableSectionExitsTwo(t *testing.T) {
 	})
 }
 
-// (d) Every action in this repo is SHA-pinned, so the trailing `# vX.Y.Z`
+// Every action in this repo is SHA-pinned, so the trailing `# vX.Y.Z`
 // comment is the only readable current version. It must drive the comparison
 // in both directions, and a SHA with no comment must be surfaced rather than
 // silently passing.
@@ -436,7 +436,7 @@ jobs:
 	}
 }
 
-// (e) Local and container actions have no GitHub release to compare against;
+// Local and container actions have no GitHub release to compare against;
 // querying them would burn API calls and report a phantom upgrade.
 func TestCheckDepsCurrent_IgnoresLocalAndDockerUses(t *testing.T) {
 	f := newDepsFixture(t, "1.26.5")

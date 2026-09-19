@@ -1,6 +1,6 @@
 package unit_test
 
-// w27_related_fetch_partial_failure_test.go — FetchRelatedTarget
+// FetchRelatedTarget
 // (core/aws/related_fetch.go) keeps the rows a fetcher returned when it
 // also carries a per-item error: rows beside an error are a truncated
 // answer, not a dropped one, so one denied node group does not corrupt the
@@ -18,9 +18,9 @@ import (
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
-// TestFetchRelatedTarget_RowsBesideError_YieldsTruncatedRows pins the fix
-// directly: a paginated fetcher returning rows AND an error must hand back
-// those rows with the truncation flag set and no error, not nil-with-error.
+// TestFetchRelatedTarget_RowsBesideError_YieldsTruncatedRows: a paginated
+// fetcher returning rows AND an error must hand back those rows with the
+// truncation flag set and no error, not nil-with-error.
 func TestFetchRelatedTarget_RowsBesideError_YieldsTruncatedRows(t *testing.T) {
 	const target = "test-partial-failure-target"
 	partialErr := context.DeadlineExceeded

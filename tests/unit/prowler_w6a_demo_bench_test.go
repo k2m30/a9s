@@ -1,13 +1,13 @@
 package unit_test
 
-// prowler_w6a_demo_bench_test.go — the two pins that apply to batch w6a as a
-// whole rather than to one row: colour derives from findings for every type
-// in the batch, and no supporting row restates the phrase it sits under.
+// Two pins over the audit, DNS, CDN, ACM and API Gateway types as a whole:
+// colour derives from findings for every type, and no supporting row
+// restates the phrase it sits under.
 //
 // Both run over the demo fixtures through the same path the app uses, so they
-// catch what a per-row test cannot: a row that is individually correct but
-// says nothing new, and a classifier that still decides the colour from a raw
-// field once real fixture data reaches it.
+// catch what a per-type test cannot: a row that is individually correct but
+// says nothing new, and a classifier that decides the colour from a raw field
+// once real fixture data reaches it.
 
 import (
 	"strings"
@@ -19,13 +19,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// w6aBatchTypes are the seven resource types this batch touches.
 var w6aBatchTypes = []string{"trail", "logs", "alarm", "r53", "cf", "acm", "apigw"} //nolint:gochecknoglobals // test-only list
 
-// TestW6AColorDerivesFromFindings pins the classifier ruling for the batch:
-// a type's colour is whatever its findings say, and nothing else. The
-// warn-then-broken probe catches a classifier that stops at the first finding
-// rather than the worst.
+// TestW6AColorDerivesFromFindings pins that a type's colour is whatever its
+// findings say, and nothing else. The warn-then-broken probe catches a
+// classifier that stops at the first finding rather than the worst.
 //
 // A row with unhealthy-looking fields and no findings is not asserted
 // Healthy: cf, logs, r53 and acm feed those fields to the type's own
@@ -59,11 +57,11 @@ func TestW6AColorDerivesFromFindings(t *testing.T) {
 	}
 }
 
-// TestW6ADetailAttentionNeverRepeatsItself pins U11 for the batch: a
-// supporting row must add something its own finding's phrase does not already
-// say. The row and the phrase render one line apart, so "Query logging: off"
-// under "query logging off" prints one fact twice. Per-row tests assert a row
-// exists; only this one catches a row that merely restates its phrase.
+// TestW6ADetailAttentionNeverRepeatsItself pins that a supporting row adds
+// something its own finding's phrase does not already say. The row and the
+// phrase render one line apart, so "Query logging: off" under "query logging
+// off" prints one fact twice. Per-type tests assert a row exists; only this
+// one catches a row that merely restates its phrase.
 func TestW6ADetailAttentionNeverRepeatsItself(t *testing.T) {
 	batch := make(map[string]bool, len(w6aBatchTypes))
 	for _, s := range w6aBatchTypes {
@@ -101,9 +99,8 @@ func TestW6ADetailAttentionNeverRepeatsItself(t *testing.T) {
 	}
 }
 
-// w6aWitness maps every code the batch emits to the fixture constant naming
-// the one demo resource that must show it. Contract rule 8: the constant's
-// value is the witness, so this table is the batch's bench contract.
+// w6aWitness maps every code to the fixture constant naming the one demo
+// resource that must show it.
 var w6aWitness = map[string]struct {
 	short   string
 	witness string
@@ -131,18 +128,11 @@ var w6aWitness = map[string]struct {
 	"apigw.stage-variable-secret":        {"apigw", fixtures.APIGWRESTStageSecret},
 }
 
-// TestW6AEveryFindingFiresOnItsNamedWitnessOnly is the batch's bench gate,
-// keyed by witness name rather than by code.
-//
-// The code-fires-somewhere gate it replaces asks only whether a finding
-// appears on any demo row, which four of this batch's constants passed while
-// naming a resource no fixture built: the finding rode on a pre-existing row
-// and the constant pointed at nothing. It is also silent when a row fires on a
-// third of a list — a bench where 35 of 40 log groups carry the same warning
-// cannot show an operator which row the signal was built for.
-//
-// So this asserts both halves of contract rule 8 at once: exactly one demo row
-// carries the code, and that row is the one the constant names.
+// TestW6AEveryFindingFiresOnItsNamedWitnessOnly pins that exactly one demo
+// row carries each code, and that row is the one the constant names. A
+// code-fires-somewhere check passes a constant that names a resource no
+// fixture builds, and a bench where 35 of 40 log groups carry the same
+// warning cannot show an operator which row the signal was built for.
 func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
@@ -159,11 +149,10 @@ func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
 					if string(f.Code) != code {
 						continue
 					}
-					// The witness usually names the row itself. r53's dangling record
-					// is the exception: the finding lands on the zone that holds the
-					// record, which is the only shape a per-zone row allows, so the
-					// record name is matched where it actually renders — the finding's
-					// own supporting rows.
+					// The constant usually names the row itself. r53's dangling record is the
+					// exception: the finding lands on the zone that holds the record, which is
+					// the only shape a per-zone row allows, so the record name is matched where
+					// it actually renders — the finding's own supporting rows.
 					named := res.ID + " / " + res.Name
 					for _, row := range res.AttentionDetails[f.Code].Rows {
 						named += " / " + row.Value
@@ -184,12 +173,10 @@ func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
 	}
 }
 
-// TestW6ADemoRowsRenderTheMappedWords pins rows 22 and 23 where they are read
-// rather than where they are computed: on the demo row the renderer consumes.
-//
-// The per-row tests drive enrichers over hand-built input, so they pass on a
-// value the demo never produces. These two rows exist because an SDK enum and
-// an empty field each reached a rendered surface once already.
+// TestW6ADemoRowsRenderTheMappedWords pins the cf minimum-TLS and apigw
+// endpoint rows where they are read rather than where they are computed: on
+// the demo row the renderer consumes. The per-type tests drive enrichers over
+// hand-built input, so they pass on a value the demo never produces.
 func TestW6ADemoRowsRenderTheMappedWords(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)

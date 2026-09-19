@@ -1,16 +1,13 @@
 package unit
 
-// wipfix_cap_independence_test.go — a page cap on ONE walk must never suppress
+// A page cap on ONE walk must never suppress
 // a check that did not depend on that walk.
 //
-// Rows 5, 6 and the apigw site of row 6's sweep. The shared shape: an
-// enricher counts something by walking pages, the walk hits PerParentPageCap,
-// and the enricher then records the whole resource in TruncatedIDs.
-// FoldWave2Rows (core/runtime/helpers.go) skips every id in that map, so the
-// findings the enricher DID determine — from a separate API call that has
-// nothing to do with the capped walk — never reach the row and a resolved one
-// can never clear. The count itself already says it is a lower bound: the "+"
-// resource.FormatTruncated puts on it.
+// FoldWave2Rows (core/runtime/helpers.go) skips every id in TruncatedIDs, so
+// an enricher that records a whole resource there because one page walk hit
+// PerParentPageCap drops the findings it DID determine from separate API
+// calls, and a resolved one can never clear. The count itself already says it
+// is a lower bound: the "+" resource.FormatTruncated puts on it.
 
 import (
 	"context"
@@ -49,10 +46,6 @@ func hasFindingCode(findings []domain.Finding, code string) bool {
 	}
 	return false
 }
-
-// ---------------------------------------------------------------------------
-// Row 6 — sns: a capped subscription walk must not stop the topic posture read
-// ---------------------------------------------------------------------------
 
 // snsCappedSubsFake always answers ListSubscriptionsByTopic with a NextToken,
 // so the walk runs into PerParentPageCap, and reports the topic as
@@ -107,7 +100,7 @@ func (f *snsCappedSubsFake) GetTopicAttributes(
 	}}, nil
 }
 
-// TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture pins row 6: a topic
+// TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture: a topic
 // with more subscription pages than PerParentPageCap is still read for its own
 // posture — encryption and access policy come from GetTopicAttributes, which
 // the subscription walk's completeness has no bearing on.
@@ -146,10 +139,6 @@ func TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 5 — codeartifact: a package-count cap must not suppress the policy verdict
-// ---------------------------------------------------------------------------
-
 // caCappedPackagesFake always answers ListPackages with a NextToken (the count
 // walk runs into the cap) and returns a repository policy open to everyone.
 type caCappedPackagesFake struct {
@@ -187,7 +176,7 @@ func (f *caCappedPackagesFake) GetRepositoryPermissionsPolicy(
 
 var _ awsclient.CodeArtifactListPackagesAPI = (*caCappedPackagesFake)(nil)
 
-// TestEnrichCodeArtifact_CappedPackageCountKeepsPolicyVerdict pins row 5: the
+// TestEnrichCodeArtifact_CappedPackageCountKeepsPolicyVerdict: the
 // package count is informational and its cap is reported by the "+" on the
 // count; the permissions-policy verdict is a separate call that completed and
 // must reach the row.
@@ -224,10 +213,6 @@ func TestEnrichCodeArtifact_CappedPackageCountKeepsPolicyVerdict(t *testing.T) {
 		t.Errorf("package_count = %q, want a %q-suffixed lower bound — the count is where the cap is reported", got, "+")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Row 6's sweep — apigw: a capped stage walk must not suppress the authorizer check
-// ---------------------------------------------------------------------------
 
 // apigwCappedStagesFake always answers GetStages with a NextToken and reports
 // an HTTP API with no authorizers at all — a fact GetAuthorizers alone decides.
@@ -273,8 +258,8 @@ func (f *apigwCappedStagesFake) GetAuthorizers(
 	return &apigatewayv2.GetAuthorizersOutput{}, nil
 }
 
-// TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding pins row 6's
-// sweep at the apigw site: the stage count cap is informational and reported
+// TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding: the stage count
+// cap is informational and reported
 // by the "+" on stages_count; the no-authorizer verdict came from
 // GetAuthorizers and must reach the row.
 func TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding(t *testing.T) {

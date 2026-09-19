@@ -98,7 +98,7 @@ func TestSort_HeaderArrowSurvivesATerminalTooNarrowForTheTitle(t *testing.T) {
 }
 
 // TestSort_UnsortedHeaderIsUnchangedByTheArrowFit pins the other half: a list
-// with no sort renders exactly the header it always did, arrow logic or not.
+// with no sort renders a header the arrow fit leaves untouched.
 func TestSort_UnsortedHeaderIsUnchangedByTheArrowFit(t *testing.T) {
 	cols := []app.ColumnDef{
 		{Key: "alpha", Title: "Alpha", Width: 8},

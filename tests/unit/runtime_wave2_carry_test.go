@@ -1,43 +1,16 @@
-// runtime_wave2_carry_test.go — pins for C6b (docs/design/cache-requirements.md
-// clause C6b, defect row D17): Wave-2 carry at every row-replacing write.
+// Wave-2 carry at every row-replacing write
+// (docs/design/cache-requirements.md).
 //
-// D17 (glyphs/Status blink, on restart AND mid-session): every Wave-1
-// sweep-completion save wrote pre-enrichment rows, and reconcileTypeFile's
-// "refreshed rows win" rule (rules 3/4, core/runtime/probes.go:162) let
-// those bare rows strip Findings and enricher Fields (e.g. "status") from
-// the type file; the analogous in-memory write into session.ProbeResources
-// (handleAvailabilityChecked, core/runtime/handlers_availability.go:278)
-// blanked the visible list the same way until re-enrichment.
-//
-// C6b's fix: when an accepted rows-carrying observation lacks Wave-2 data
-// that the rows it replaces have, the write carries forward — per row ID —
-// the replaced rows' wave2:-sourced Findings and the type's registered
-// enricher Fields (IssueEnricherFieldKeys). A Wave-2-sourced observation for
-// the type supersedes carried data (healed/resolved issues still clear).
-// Wave-1 findings never carry (their absence in a fresh fetch means
-// resolved).
-//
-// Covers, in order:
-//
-//  1. TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2 — disk
-//     chokepoint (reconcileTypeFile via the same seam
-//     runtime_reconciletypefile_test.go uses): a bare rows-carrying refresh
-//     must carry forward row X's wave2 finding + Fields["status"], and drop
-//     row Y's wave1 finding.
-//  2. TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData — a
-//     Wave-2-sourced observation for the type (healed row X, no findings)
-//     must NOT carry forward the old wave2 finding/status — carried data
-//     clears, it is not immortal.
-//  3. TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus —
-//     in-memory probe-store carry (handleAvailabilityChecked): a fresh bare
-//     Wave-1 probe result must not blank ProbeResources' carried wave2
-//     finding + status; a subsequent enrichment-completion for the type
-//     replaces them.
-//  4. TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender — restart
-//     end-to-end: a type file on disk with wave2 findings + status seeds the
-//     FIRST rendered list state (glyph + status) via the disk-store fallback
-//     HandleNavigate/list-open already exercises, with no enrichment probe
-//     run this session.
+// When an accepted rows-carrying observation lacks Wave-2 data that the rows
+// it replaces have, the write carries forward — per row ID — the replaced
+// rows' wave2:-sourced Findings and the type's registered enricher Fields
+// (IssueEnricherFieldKeys), both into the type file (reconcileTypeFile,
+// core/runtime/probes.go) and into the in-memory RowStore
+// (handleAvailabilityChecked). Without it a Wave-1 sweep-completion save of
+// pre-enrichment rows would strip glyphs and Status on restart and
+// mid-session. A Wave-2-sourced observation for the type supersedes carried
+// data (healed/resolved issues still clear). Wave-1 findings never carry
+// (their absence in a fresh fetch means resolved).
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
 // credentials, no network. Fake profile/region/resource IDs only.
@@ -55,13 +28,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 1 — disk chokepoint: reconcileTypeFile is unexported, so it is
-// exercised the same way runtime_reconciletypefile_test.go does: through the
-// exported Core.SaveResourceListCache seam, which is documented (probes.go:
-// 438-440) to route every rows-carrying write through reconcileTypeFile's
-// rules 1/3/4.
-// ────────────────────────────────────────────────────────────────────────────
+// reconcileTypeFile is unexported, so it is exercised the same way
+// runtime_reconciletypefile_test.go does: through the exported
+// Core.SaveResourceListCache seam, which routes every rows-carrying write
+// through reconcileTypeFile's rules 1/3/4.
 
 const (
 	wave2CarryProfile = "wave2-carry-prof"
@@ -117,7 +87,7 @@ func TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2(t *testing.T) 
 	c := newSaveCacheRegressionCore(t, false)
 	// Same-depth, non-subset refresh shape (rule 4): same IDs, but bare rows
 	// with NO Findings and NO status — the accepted "refreshed rows win"
-	// shape a fresh Wave-1 sweep-completion save produces at HEAD.
+	// shape a fresh Wave-1 sweep-completion save produces.
 	freshRows := []cache.Row{
 		{ID: "s3-bucket-x", Name: "s3-bucket-x"},
 		{ID: "s3-bucket-y", Name: "s3-bucket-y"},
@@ -169,20 +139,15 @@ func TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2(t *testing.T) 
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 2 — a Wave-2-sourced observation for the type supersedes carried data:
-// driven through the REAL Wave-2-completion path (messages.EnrichmentChecked
-// with the enrichment queue already drained, mirroring
-// TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen in
-// app_pilot_defects_test.go), a healed observation (no findings for
-// s3-bucket-x this time) must clear the previously carried wave2 finding +
-// status on disk, not re-carry it forever. This exercises the real
+// A Wave-2-sourced observation for the type supersedes carried data: driven
+// through the real Wave-2-completion path (messages.EnrichmentChecked with the
+// enrichment queue already drained), a healed observation (no findings for
+// s3-bucket-x) clears the previously carried wave2 finding + status on disk
+// rather than re-carrying it forever. This exercises the
 // wave2Authoritative=true call site (handleEnrichmentChecked's "all done"
 // branch -> snapshotProbeResourcesForSave(true) ->
-// saveResourceListCacheWave2Complete via the TaskKindSaveCache executor
-// case), executed with core.ExecuteTask exactly as DrainSync would — no
-// hand-built flag needed since the real event path reaches it.
-// ────────────────────────────────────────────────────────────────────────────
+// saveResourceListCacheWave2Complete via the TaskKindSaveCache executor case),
+// executed with core.ExecuteTask as DrainSync would.
 
 func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.T) {
 	const wave2ClearProfile = "wave2-clear-prof"
@@ -235,7 +200,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 
 	// Enrichment queue already drained (EnrichChecked reaches EnrichTotal once
 	// this single result lands) so handleEnrichmentChecked's "all done" branch
-	// fires immediately — mirrors the dispatch-time payload-freeze precedent's single-type shape.
+	// fires immediately.
 	core.Session().EnrichTotal = 1
 	core.Session().EnrichChecked = 0
 	core.Session().EnrichQueue = nil
@@ -282,14 +247,12 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 3 — in-memory probe-store carry: handleAvailabilityChecked
+// In-memory probe-store carry: handleAvailabilityChecked
 // (core/runtime/handlers_availability.go) calls ObserveRows(canon,
-// msg.Resources, ...) after carryWave2ForResources folds the previous
-// RowStore rows' Wave-2 data into the fresh probe result. A fresh bare
-// Wave-1 probe result (same IDs, no findings) must not blank the carried
-// wave2 finding + status that a prior enrichment pass wrote into RowStore.
-// ────────────────────────────────────────────────────────────────────────────
+// msg.Resources, ...) after carryWave2ForResources folds the previous RowStore
+// rows' Wave-2 data into the fresh probe result. A fresh bare Wave-1 probe
+// result (same IDs, no findings) must not blank the carried wave2 finding +
+// status that a prior enrichment pass wrote into RowStore.
 
 func TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -346,17 +309,11 @@ func TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 4 — restart seed end-to-end: a type file on disk whose rows carry
-// wave2 findings + status must seed the FIRST rendered list state (glyph +
-// status) with no enrichment run this session. Mirrors
-// TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore's
-// disk-store fallback pattern (app_cache_first_seeding_test.go) — a fresh
-// session (no ProbeResources observed for s3) opening the s3 list must seed
+// Restart seed end-to-end: a type file on disk whose rows carry wave2
+// findings + status seeds the first rendered list state (glyph + status) with
+// no enrichment run this session — a fresh session opening the s3 list seeds
 // from the on-disk Store via HandleNavigate's rowsFromCacheRows fallback,
-// which is documented (handlers_availability.go:562) to copy Fields/Findings
-// verbatim onto the seeded resource.Resource rows.
-// ────────────────────────────────────────────────────────────────────────────
+// which copies Fields/Findings verbatim onto the seeded resource.Resource rows.
 
 func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

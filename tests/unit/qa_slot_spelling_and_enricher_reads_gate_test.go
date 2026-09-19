@@ -1,9 +1,9 @@
 package unit
 
-// qa_slot_spelling_and_enricher_reads_gate_test.go — two standing rules the
+// Two standing rules the
 // catalog's declarations have to hold.
 //
-// RULE 4 (one placeholder spelling). A phrase's "<…>" slot is read by a person
+// One placeholder spelling. A phrase's "<…>" slot is read by a person
 // in the generated signal tables, where the token is printed verbatim because
 // there is no resource to substitute into it. A slot spelled as an SDK field
 // name or in capitals is the same fact in a second spelling: the reader has to
@@ -13,16 +13,15 @@ package unit
 // tokens fillSlot itself reads — N, M and LIST — which are machinery, not
 // wording, and are declared here rather than discovered.
 //
-// RULE 5 (an enricher declares the caches it reads). A Wave 2 enricher that
-// scans another type's ResourceCache produces nothing when that cache is not
-// loaded, and produces it silently: no error, no skip, just an absent finding.
-// Anything that has to arrange those caches — the demo bench below, a future
-// prefetch — needs to know which they are, and the only place that knowledge
-// can live without going stale is beside the enricher's own registration.
-// This gate does not read that declaration to decide what is true; it runs the
-// enricher against the full cache and against a cache holding only what it
-// declares, and fails when the two disagree. The set of scanners is therefore
-// derived from the code every time, not from a list somebody has to maintain.
+// An enricher declares the caches it reads. A Wave 2 enricher that scans
+// another type's ResourceCache produces nothing when that cache is not loaded,
+// and produces it silently: no error, no skip, just an absent finding.
+// Anything that arranges those caches — the demo bench below, a prefetch —
+// needs to know which they are, and the only place that knowledge can live
+// without going stale is beside the enricher's own registration. The gate runs
+// the enricher against the full cache and against a cache holding only what it
+// declares, and fails when the two disagree, so the set of scanners is derived
+// from the code every run.
 
 import (
 	"context"
@@ -47,10 +46,9 @@ var phraseSlot = regexp.MustCompile(`<([^<>]*)>`)
 // a slot may hold.
 var slotMachineryTokens = map[string]bool{"LIST": true, "N": true, "M": true}
 
-// slotWord splits a slot's content into the words the case rule judges. Whole
-// words, not substrings: stripping the machinery tokens as substrings let a
-// slot spelled "NM" strip itself to nothing and pass, and would have let
-// "MONTH" through as "OTH" had that not still read as capitals by luck.
+// slotWord splits a slot's content into the whole words the case rule judges;
+// stripping the machinery tokens as substrings would let "NM" strip itself to
+// nothing and pass.
 var slotWord = regexp.MustCompile(`[A-Za-z]+`)
 
 func TestEveryPhraseSlotIsLowercaseProse(t *testing.T) {

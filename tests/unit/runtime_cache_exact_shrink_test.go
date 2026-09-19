@@ -1,58 +1,18 @@
-// runtime_cache_exact_shrink_test.go — reconcileTypeFile
-// (core/runtime/probes.go) shrinks stored Rows when the incoming
-// rows-carrying observation is EXACT and a strict subset of the stored rows
-// (an exact 22-row save over a 23-row stored file drops the deleted
-// resource's row, so a deleted resource's row does not outlive its deletion
-// and the on-disk Count and len(Rows) agree); and a type whose live
-// population genuinely went to zero this session persists its emptiness
-// (rowStoreResourcesAndTruncated, core/runtime/handlers_availability.go).
-//
-//  1. TestReconcileTypeFile_ExactSubset_ShrinksStoredRows — an EXACT
-//     rows-carrying observation whose row set is a strict subset of the
-//     stored rows REPLACES the stored rows wholesale; Count and Rows agree
-//     afterward.
-//  2. TestReconcileTypeFile_ExactSubset_Wave2CarrySurvivesShrink — the C6b
-//     Wave-2 carry (carryWave2ForRows) still applies to the SURVIVING rows
-//     of an exact shrink; only the dropped row's data disappears.
-//  3. TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink — the
-//     per-finding FirstSeen stamp on a surviving row is untouched by an
-//     exact shrink that drops a sibling row.
-//  4. TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShrinkRule —
-//     the exact-shrink rule applies ONLY to the rows-carrying lane
-//     (reconcileTypeFile rule 1), never to the counts-only lane (rule 2),
-//     which never touches Rows regardless of exactness.
-//  5. TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness — a type
-//     observed live this session with ZERO rows and exact pagination
-//     (population genuinely went to zero) must persist that emptiness on
-//     disk (stored rows emptied, count 0), driven end-to-end through the
-//     real sweep-completion save seam (HandleEvent -> ExecuteTask), the
-//     same seam TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation
-//     in runtime_savecache_regressions_test.go exercises.
-//
-// The rule-1 non-exact (truncated) subset case is pinned by
-// runtime_reconciletypefile_test.go
-// (TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows, exact=false).
-//
-// A stored exact-zero pair ({Count:0, Exact:true, Rows:[]}, a normal,
-// reachable steady state under item 5) must self-heal:
-//
-//  6. TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals —
-//     rule 0 (core/runtime/probes.go) must not require existing.Count > 0,
-//     or a stored exact-zero pair can never self-heal even when a later
-//     TRUNCATED rows-carrying observation proves the population came back,
-//     and the pair {Count:0, Exact:true, Rows:N} would stick forever.
-//     Rows-carrying lane, via SaveResourceListCache.
-//  7. TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact —
-//     the same rule-0 case from the counts-only lane
-//     (SaveAvailabilityCache): Exact drops, Count advances, Rows stays
-//     untouched (rule 2).
+// ReconcileTypeFile
+// (core/runtime/probes.go) shrinks stored Rows when the incoming rows-carrying
+// observation is EXACT and a strict subset of the stored rows (an exact 22-row
+// save over a 23-row stored file drops the deleted resource's row, so the
+// on-disk Count and len(Rows) agree); a type whose live population went to
+// zero this session persists its emptiness (rowStoreResourcesAndTruncated,
+// core/runtime/handlers_availability.go); and a stored exact-zero pair
+// ({Count:0, Exact:true, Rows:[]}) self-heals on a later truncated nonzero
+// observation. The counts-only lane never touches Rows.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
-// credentials, no network. Fake profile/region/resource IDs only. Reuses
-// newSaveCacheRegressionCore, saveRegProfile, saveRegRegion, and
-// reconcileRows/reconcileRowID (same package, defined in
-// runtime_savecache_regressions_test.go and runtime_reconciletypefile_test.go
-// respectively).
+// credentials, no network. Fake profile/region/resource IDs only.
+// newSaveCacheRegressionCore, saveRegProfile, saveRegRegion and
+// reconcileRows/reconcileRowID come from runtime_savecache_regressions_test.go
+// and runtime_reconciletypefile_test.go.
 package unit_test
 
 import (
@@ -115,7 +75,7 @@ func TestReconcileTypeFile_ExactSubset_ShrinksStoredRows(t *testing.T) {
 	}
 }
 
-// TestReconcileTypeFile_ExactSubset_Wave2CarrySurvivesShrink pins that C6b
+// TestReconcileTypeFile_ExactSubset_Wave2CarrySurvivesShrink pins that
 // Wave-2 carry (carryWave2ForRows) still runs for the surviving rows of an
 // exact shrink — a naive "tf.Rows = incoming.Rows wholesale" would silently
 // drop a surviving row's Wave-2 Findings/Fields, not just the deleted
@@ -203,8 +163,8 @@ func TestReconcileTypeFile_ExactSubset_Wave2CarrySurvivesShrink(t *testing.T) {
 	}
 }
 
-// TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink pins issue
-// #463's FindingFirstSeen interplay with the new exact-shrink rule: a
+// TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink pins
+// FindingFirstSeen under the exact-shrink rule: a
 // surviving row's FirstSeen stamp must be unchanged by the shrink, and the
 // dropped row's disappearance must not corrupt it. Mirrors
 // TestCacheFirstSeen_PersistsAcrossSaves (cache_first_seen_test.go): two
@@ -276,16 +236,12 @@ func TestReconcileTypeFile_ExactSubset_FirstSeenSurvivesShrink(t *testing.T) {
 }
 
 // TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShrinkRule
-// is a regression safety net, not a new-contract pin: the new exact-shrink
-// rule (item 1) must apply ONLY within reconcileTypeFile's rows-carrying
-// lane (RowsProvided=true), never to the counts-only lane (RowsProvided=
-// false, rule 2), which must keep ignoring Rows entirely regardless of
-// whether the new Count is smaller and "exact". Expected GREEN both before
-// and after the item-1 fix — this pins the boundary of the fix, mirroring
+// pins the boundary of the exact-shrink rule: it applies only within
+// reconcileTypeFile's rows-carrying lane (RowsProvided=true), never to the
+// counts-only lane (RowsProvided=false, rule 2), which ignores Rows entirely
+// regardless of whether the new Count is smaller and exact. Mirrors
 // TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched
-// (runtime_savecache_regressions_test.go) but framed explicitly against the
-// new rule so an implementation that over-generalizes exact-shrink into
-// rule 2 is caught here.
+// (runtime_savecache_regressions_test.go).
 func TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShrinkRule(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "countsonlyexactshrink"
@@ -299,7 +255,7 @@ func TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShr
 
 	c := newSaveCacheRegressionCore(t, false)
 	// A counts-only exact observation reporting a SMALLER count (1) — the
-	// exact shape that would trigger the new rows-carrying exact-shrink rule
+	// exact shape that would trigger the rows-carrying exact-shrink rule
 	// if this were a rows-carrying write. It must not: rule 2 never inspects
 	// Rows at all, regardless of exactness.
 	if err := c.SaveAvailabilityCache(c.Pair(),
@@ -323,24 +279,18 @@ func TestSaveAvailabilityCache_CountsOnlyExactShrink_NeverAppliesRowsCarryingShr
 	}
 }
 
-// TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness pins the
-// second #457 defect: rowStoreResourcesAndTruncated
-// (core/runtime/handlers_availability.go) skips any RowStore entry with
-// len(Rows)==0, so a type whose live population genuinely went to zero this
-// session never reaches the disk save at all — the stale on-disk rows
-// survive forever. Driven end-to-end through the real sweep-completion save
-// seam: a single AvailabilityChecked with the queue already drained
-// (session.New() leaves AvailQueue nil, AvailChecked 0, AvailTotal 0) fires
-// the "all checks done" branch, exactly as
+// TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness: a type whose
+// live population went to zero this session reaches the disk save, so stale
+// on-disk rows do not survive. Driven end-to-end through the real
+// sweep-completion save seam: a single AvailabilityChecked with the queue
+// already drained (session.New() leaves AvailQueue nil, AvailChecked 0,
+// AvailTotal 0) fires the "all checks done" branch, as
 // TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation
-// (runtime_savecache_regressions_test.go) drives it. Err is nil and
-// Resources is empty: a genuine live observation that the type's
-// population is now zero, with exact (untruncated) pagination — not an
-// unobserved/failed-probe type, which must NOT wipe stored rows (that
-// safety net is already covered by every rule-2 counts-only pin above: a
-// type never mentioned in a SaveAvailabilityCache/SaveResourceListCache
-// call is never touched, by construction of those functions only writing
-// entries they're actually given).
+// (runtime_savecache_regressions_test.go) drives it. Err is nil and Resources
+// is empty: a live observation that the population is zero, with exact
+// pagination — not an unobserved/failed-probe type, which must not wipe stored
+// rows (a type never passed to SaveAvailabilityCache/SaveResourceListCache is
+// never touched).
 func TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "s3"
@@ -396,19 +346,13 @@ func TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness(t *testing.T) {
 }
 
 // TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals
-// pins rule-0 self-heal: a stored exact-zero pair — a normal, reachable
-// steady state now that
-// TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness above pins
-// observed-empty-exact persistence — heals on a later TRUNCATED
-// rows-carrying save whose raw count is nonzero (the type's population came
-// back, e.g. a 50-row first page), which is proof the stored {Count:0,
-// Exact:true} is stale. With rule 0 (core/runtime/probes.go) blocked by an
-// existing.Count > 0 requirement, the caller-side C5 stickiness in
-// saveResourceListCache would re-force Exact=true and Count=0 onto the
-// incoming observation while the 50 rows win under rules 3/4 (their own
-// len is not < existing's 0), producing a permanently poisoned pair
-// {Count:0, Exact:true, Rows:50} that no future truncated observation could
-// repair.
+// pins rule-0 self-heal: a stored exact-zero pair heals on a later TRUNCATED
+// rows-carrying save whose raw count is nonzero (the population came back,
+// e.g. a 50-row first page), which proves the stored {Count:0, Exact:true}
+// stale. Rule 0 (core/runtime/probes.go) must not require existing.Count > 0:
+// otherwise saveResourceListCache's caller-side stickiness re-forces
+// Exact=true and Count=0 while the 50 rows win under rules 3/4, leaving
+// {Count:0, Exact:true, Rows:50} that no truncated observation repairs.
 func TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "exactzeroselfheal"
@@ -452,14 +396,11 @@ func TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals(t 
 }
 
 // TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact
-// pins the same rule-0 gap from the counts-only lane (SaveAvailabilityCache):
-// a truncated counts-only observation with a nonzero count must drop the
-// stored exact-zero pair's Exact flag. Count already advances correctly
-// today in this lane (SaveAvailabilityCache's own stickiness sub-block only
-// preserves existing.Count when existing.Count > count, which is never true
-// against a stored Count of 0) — Exact is the only field this lane's rule-0
-// gap leaves wrong. Rows stays untouched either way: rule 2 never inspects
-// Rows regardless of rule 0's outcome.
+// pins the same rule-0 case from the counts-only lane (SaveAvailabilityCache):
+// a truncated counts-only observation with a nonzero count drops the stored
+// exact-zero pair's Exact flag and advances Count (the lane's stickiness only
+// preserves existing.Count when existing.Count > count). Rows stays untouched:
+// rule 2 never inspects Rows.
 func TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "exactzeroselfhealcounts"

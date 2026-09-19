@@ -1,6 +1,6 @@
 package unit_test
 
-// wave2_clear_preserves_wave1_attention_test.go — the wave-2 CLEAR paths, the
+// The wave-2 CLEAR paths, the
 // sibling class of the wave-2 FOLD.
 //
 // ApplyWave2ToRow drops only the entries keyed by outgoing wave-2 findings.

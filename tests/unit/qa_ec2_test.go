@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ===========================================================================
-// Helpers: navigate to EC2 list, load fixture data, wide terminal
-// ===========================================================================
-
 // newEC2ListModel creates a root model navigated to the EC2 list with
 // fixtureEC2Instances loaded. Terminal size is 160x40 to show all columns.
 //
@@ -26,12 +22,10 @@ import (
 // cannot bridge the space-vs-underscore difference.
 func newEC2ListModel(t *testing.T) tui.Model {
 	t.Helper()
-	// #17 wave 2 isolation: this constructor calls tui.New directly (not
-	// newRootSizedModel/tuitest.Sized), so it needs its own
-	// A9S_CONFIG_FOLDER redirect — otherwise every call in this file shares
-	// the same on-disk testprofile--us-east-1/ec2.yaml once a top-level list
-	// open genuinely persists to disk (#17 wave 1), and an earlier
-	// test's loaded EC2 rows leak into a later test's "fresh list" precondition.
+	// This constructor calls tui.New directly (not newRootSizedModel/
+	// tuitest.Sized), so it needs its own A9S_CONFIG_FOLDER redirect: a
+	// top-level list open persists to disk, and without it an earlier test's
+	// EC2 rows leak into a later test's fresh list.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
@@ -47,12 +41,6 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	})
 	return m
 }
-
-// ===========================================================================
-// A. EC2 Instance List View
-// ===========================================================================
-
-// A.1 Column Layout
 
 func TestQA_EC2_A1_1_ListColumns_AllSixPresent(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -122,8 +110,6 @@ func TestQA_EC2_A1_12_NoPipeSeparators(t *testing.T) {
 	}
 }
 
-// A.2 Frame and Title
-
 func TestQA_EC2_A2_1_FrameTitleShowsResourceTypeAndCount(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
@@ -147,8 +133,6 @@ func TestQA_EC2_A2_3_FrameUsesBoxDrawingCharacters(t *testing.T) {
 		t.Error("A.2.3: frame should contain side border")
 	}
 }
-
-// A.3 Header Bar
 
 func TestQA_EC2_A3_1_HeaderShowsAppIdentityAndContext(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -174,8 +158,6 @@ func TestQA_EC2_A3_2_HeaderShowsHelpHint(t *testing.T) {
 	}
 }
 
-// A.4 Status Coloring
-
 func TestQA_EC2_A4_StatusColoring_RunningRowHasANSI(t *testing.T) {
 	m := newEC2ListModel(t)
 	content := rootViewContent(m)
@@ -194,14 +176,13 @@ func TestQA_EC2_A4_StatusColoring_RunningRowHasANSI(t *testing.T) {
 		t.Fatal("A.4.1: could not find VPN instance row")
 	}
 
-	// Running rows should have ANSI coloring (green)
 	if !strings.Contains(vpnLine, "\x1b[") {
 		t.Error("A.4.1: running instance row should have ANSI color codes")
 	}
 }
 
 func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
@@ -258,19 +239,15 @@ func TestQA_EC2_A4_StatusColoring_TerminatedRowHasANSI(t *testing.T) {
 	}
 }
 
-// A.5 Row Selection
-
 func TestQA_EC2_A5_5_FirstRowSelected(t *testing.T) {
 	m := newEC2ListModel(t)
 	content := rootViewContent(m)
 	lines := strings.SplitSeq(content, "\n")
 
-	// First data row should have the selected row style (blue background).
 	// Find a line containing "g4dn.xlarge" (first instance's type)
 	for line := range lines {
 		plain := stripANSI(line)
 		if strings.Contains(plain, "g4dn.xlarge") {
-			// This line should have ANSI styling for selection
 			if !strings.Contains(line, "\x1b[") {
 				t.Error("A.5.5: first row should have ANSI styling for selection")
 			}
@@ -280,17 +257,13 @@ func TestQA_EC2_A5_5_FirstRowSelected(t *testing.T) {
 	t.Error("A.5.5: could not find first instance (g4dn.xlarge) in output")
 }
 
-// A.6 Navigation
-
 func TestQA_EC2_A6_1_DownMovesSelectionDown(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press j (down)
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	// After moving down, second instance (VPN) data should still be visible
 	if !strings.Contains(plain, "VPN") {
 		t.Error("A.6.1: after pressing j, VPN instance should be visible")
 	}
@@ -299,17 +272,14 @@ func TestQA_EC2_A6_1_DownMovesSelectionDown(t *testing.T) {
 func TestQA_EC2_A6_3_TopJumpsToFirstRow(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Move down a few times
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
-	// Press g (go to top)
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	// First instance (g4dn.xlarge) should be visible
 	if !strings.Contains(plain, "g4dn.xlarge") {
 		t.Error("A.6.3: after pressing g, first instance should be visible")
 	}
@@ -318,18 +288,14 @@ func TestQA_EC2_A6_3_TopJumpsToFirstRow(t *testing.T) {
 func TestQA_EC2_A6_4_BottomJumpsToLastRow(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press G (go to bottom)
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Last instance (terminated "apps") should be visible
 	if !strings.Contains(plain, "terminated") {
 		t.Error("A.6.4: after pressing G, last instance (terminated) should be visible")
 	}
 }
-
-// A.7 Sort
 
 func TestQA_EC2_A7_1_SortByNameAscending(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -417,12 +383,9 @@ func TestQA_EC2_A7_7_SortIndicatorExactlyOneColumn(t *testing.T) {
 	}
 }
 
-// A.8 Filter
-
 func TestQA_EC2_A8_1_FilterModeActivates(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Press / to enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -435,7 +398,6 @@ func TestQA_EC2_A8_1_FilterModeActivates(t *testing.T) {
 func TestQA_EC2_A8_2_FilterNarrowsResults(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Filter by "VPN"
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "VPN" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -443,11 +405,9 @@ func TestQA_EC2_A8_2_FilterNarrowsResults(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Filter should narrow to 1 result; check the frame title
 	if !strings.Contains(plain, "ec2(1/6)") {
 		t.Errorf("A.8.2: filter by VPN should narrow to 1/6, got: %s", plain[:min(300, len(plain))])
 	}
-	// VPN name should be visible in the filtered row
 	if !strings.Contains(plain, "VPN") {
 		t.Error("A.8.2: filter should show VPN instance name")
 	}
@@ -478,7 +438,6 @@ func TestQA_EC2_A8_5_FilterByState(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should narrow to 1 terminated instance
 	if !strings.Contains(plain, "ec2(1/6)") {
 		t.Errorf("A.8.5: filter by 'terminated' should narrow to 1/6, got: %s", plain[:min(300, len(plain))])
 	}
@@ -494,7 +453,6 @@ func TestQA_EC2_A8_6_FilterByInstanceType(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should find 1 instance (apps-on-demand)
 	if !strings.Contains(plain, "ec2(1/6)") {
 		t.Errorf("A.8.6: filter by 't3.xlarge' should narrow to 1/6, got: %s", plain[:min(300, len(plain))])
 	}
@@ -553,13 +511,11 @@ func TestQA_EC2_A8_9_FilterNoMatchesEmptyTable(t *testing.T) {
 func TestQA_EC2_A8_11_EscClearsFilter(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Enter filter and type something
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "VPN" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Press Escape to clear filter
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain := stripANSI(rootViewContent(m))
@@ -571,8 +527,6 @@ func TestQA_EC2_A8_11_EscClearsFilter(t *testing.T) {
 		t.Error("A.8.11: after Esc, header should revert to '? for help'")
 	}
 }
-
-// A.9 Command Mode
 
 func TestQA_EC2_A9_1_CommandModeActivates(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -603,8 +557,6 @@ func TestQA_EC2_A9_5_EscCancelsCommandMode(t *testing.T) {
 		t.Error("A.9.5: after canceling command mode, header should show '? for help'")
 	}
 }
-
-// A.10 Actions from List
 
 func TestQA_EC2_A10_1_EnterOpensDetailView(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -670,8 +622,6 @@ func TestQA_EC2_A10_6_EscReturnsToMainMenu(t *testing.T) {
 	}
 }
 
-// A.11 Edge Cases: Missing Data
-
 func TestQA_EC2_A11_1_InstanceWithNoPublicIP(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
@@ -701,10 +651,8 @@ func TestQA_EC2_A11_3_TerminatedInstancesAppearInList(t *testing.T) {
 	}
 }
 
-// A.12 Empty and Error States
-
 func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
@@ -725,10 +673,8 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 	}
 }
 
-// A.13 Loading State
-
 func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
@@ -745,10 +691,8 @@ func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 	}
 }
 
-// A.14 Responsive Behavior
-
 func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
@@ -761,7 +705,7 @@ func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
 }
 
 func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
@@ -773,13 +717,9 @@ func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// B. EC2 Detail View
-// ===========================================================================
-
 func newEC2DetailModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Helper()
-	// #17 wave 2 isolation: see newEC2ListModel's comment above.
+	// Isolated config folder: see newEC2ListModel.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
@@ -867,14 +807,12 @@ func TestQA_EC2_B8_1_YKeyFromDetailOpensYAML(t *testing.T) {
 func TestQA_EC2_B8_3_EscFromDetailReturnsToList(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Enter detail view
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Esc back
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain := stripANSI(rootViewContent(m))
@@ -896,7 +834,7 @@ func TestQA_EC2_B9_1_DetailWithNoPublicIP(t *testing.T) {
 }
 
 func TestQA_EC2_Detail_AllFieldsFromFixture(t *testing.T) {
-	// Representative sample of 3 fixtures — full sweep in CI slow suite
+	// Representative sample of 3 fixtures.
 	instances := fixtureEC2Instances()[:3]
 	for _, inst := range instances {
 		t.Run(inst.ID, func(t *testing.T) {
@@ -921,13 +859,9 @@ func TestQA_EC2_Detail_AllFieldsFromFixture(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// C. EC2 YAML View
-// ===========================================================================
-
 func newEC2YAMLModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Helper()
-	// #17 wave 2 isolation: see newEC2ListModel's comment above.
+	// Isolated config folder: see newEC2ListModel.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
@@ -1000,7 +934,6 @@ func TestQA_EC2_C3_SyntaxColoring_HasANSI(t *testing.T) {
 		t.Error("C.3: YAML content should have ANSI color codes for syntax coloring")
 	}
 
-	// Count lines with ANSI to confirm coloring is widespread
 	lines := strings.Split(content, "\n")
 	ansiCount := 0
 	for _, line := range lines {
@@ -1074,7 +1007,7 @@ func TestQA_EC2_C7_2_YAMLWithNoPublicIP(t *testing.T) {
 }
 
 func TestQA_EC2_YAML_AllFixtureInstances(t *testing.T) {
-	// Representative sample of 3 fixtures — full sweep in CI slow suite
+	// Representative sample of 3 fixtures.
 	instances := fixtureEC2Instances()[:3]
 	for _, inst := range instances {
 		t.Run(inst.ID, func(t *testing.T) {
@@ -1113,24 +1046,18 @@ func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// D. Cross-View Navigation Flows
-// ===========================================================================
-
 func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 
-	// Start at main menu
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Fatal("D.1: should start at main menu")
 	}
 
-	// Navigate to EC2 list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -1144,19 +1071,16 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 		t.Fatal("D.1: should be at EC2 list")
 	}
 
-	// Enter detail view
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 	plain = stripANSI(rootViewContent(m))
-	// Detail view should show fields
 	if strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: should have left the list view")
 	}
 
-	// Enter YAML view from detail
 	m, cmd = rootApplyMsg(m, rootKeyPress("y"))
 	if cmd != nil {
 		msg := cmd()
@@ -1167,21 +1091,18 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 		t.Fatal("D.1: should be at YAML view")
 	}
 
-	// Esc back to detail
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "yaml") {
 		t.Fatal("D.1: Esc from YAML should return to detail")
 	}
 
-	// Esc back to list
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ec2(6") {
 		t.Fatal("D.1: Esc from detail should return to EC2 list")
 	}
 
-	// Esc back to main menu
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -1192,7 +1113,6 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 func TestQA_EC2_D2_ListToYAMLAndBack(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// y from list goes to YAML
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd != nil {
 		msg := cmd()
@@ -1204,7 +1124,6 @@ func TestQA_EC2_D2_ListToYAMLAndBack(t *testing.T) {
 		t.Fatal("D.2: y from list should go to YAML view")
 	}
 
-	// Esc should return to list, not detail
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ec2(6") {
@@ -1215,7 +1134,6 @@ func TestQA_EC2_D2_ListToYAMLAndBack(t *testing.T) {
 func TestQA_EC2_D4_SelectDifferentInstancesThenDetail(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Open detail for first instance
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		msg := cmd()
@@ -1228,13 +1146,10 @@ func TestQA_EC2_D4_SelectDifferentInstancesThenDetail(t *testing.T) {
 		t.Fatal("D.4: detail should show first instance")
 	}
 
-	// Go back to list
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Move to second instance (VPN)
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
-	// Open detail
 	m, cmd = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		msg := cmd()
@@ -1250,14 +1165,12 @@ func TestQA_EC2_D4_SelectDifferentInstancesThenDetail(t *testing.T) {
 func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	// Enter detail view
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Go to YAML from detail
 	m, cmd = rootApplyMsg(m, rootKeyPress("y"))
 	if cmd != nil {
 		msg := cmd()
@@ -1269,7 +1182,6 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 		t.Fatal("D.8: should be in YAML view")
 	}
 
-	// Esc should return to detail, not list
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 
@@ -1280,22 +1192,6 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 		t.Error("D.8: Esc from YAML should not stay on YAML")
 	}
 }
-
-// ===========================================================================
-// E. FilterResources — legacy views.FilterResources pins removed
-// (022-codebase-cleanup wave 3). Fields-value / Findings-phrase / ID / Name /
-// no-match / empty-query branches are now pinned on the live
-// app.Controller+ActionSetFilter seam: see
-// TestWave3ListFilter_MatchesFieldsValue_{PrivateIP,PublicIP,InstanceType},
-// TestListFilter_MatchesFindingsPhrase_CaseInsensitive
-// (tests/unit/list_ports_test.go), and TestListFilter_MatchingRowsOnly,
-// TestListFilter_NoMatchProducesZeroRows, TestListFilter_EmptyFilterShowsAll,
-// TestListFilter_S3_MatchesBucketName (core/app/list_test.go).
-// ===========================================================================
-
-// ===========================================================================
-// Flash message
-// ===========================================================================
 
 func TestQA_EC2_FlashMsgAfterCopy(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -1308,10 +1204,6 @@ func TestQA_EC2_FlashMsgAfterCopy(t *testing.T) {
 		t.Error("flash message 'Copied!' should appear in header after copy")
 	}
 }
-
-// ===========================================================================
-// Lifecycle field tests (Spot vs On-Demand)
-// ===========================================================================
 
 func TestQA_EC2_LifecycleColumnHeader(t *testing.T) {
 	m := newEC2ListModel(t)
@@ -1334,18 +1226,12 @@ func TestQA_EC2_LifecycleColumnData(t *testing.T) {
 	}
 }
 
-// TestQA_EC2_FilterByLifecycle (views.FilterResources("spot", ...)) removed —
-// same Fields-value substring-match branch already pinned generically by
-// TestListFilter_MatchesFieldsValue_InstanceType (list_ports_test.go)
-// on the live app.Controller+ActionSetFilter seam.
-
 func TestQA_EC2_DetailShowsLifecycle(t *testing.T) {
 	instances := fixtureEC2Instances()
 	m := newEC2DetailModel(t, instances[0]) // spot instance
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Detail view renders Fields map keys/values; should show lifecycle field
 	if !strings.Contains(plain, "lifecycle") && !strings.Contains(plain, "InstanceLifecycle") {
 		t.Error("detail view for spot instance should display lifecycle field")
 	}
@@ -1360,7 +1246,6 @@ func TestQA_EC2_YAMLShowsLifecycle(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// YAML view renders from Fields map or RawStruct; should contain lifecycle
 	if !strings.Contains(plain, "lifecycle") && !strings.Contains(plain, "InstanceLifecycle") {
 		t.Error("YAML view for spot instance should contain lifecycle or InstanceLifecycle key")
 	}

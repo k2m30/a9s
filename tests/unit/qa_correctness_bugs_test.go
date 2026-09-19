@@ -1,12 +1,8 @@
 package unit
 
-// qa_correctness_bugs_test.go — Tests for correctness bugs #191–#194.
-// These tests are written before the fixes so they fail red first (TDD).
-//
-// Bug #191: LoadFromDirs replaces instead of field-merging per-resource ViewDefs
-// Bug #192: Availability probes declare "done" when queue empty but probes still in-flight
-// Bug #193: Profile/region switch commits state before session is validated
-// Bug #194: connectAWS bypasses AWS_REGION / AWS_DEFAULT_REGION env vars
+// View-config overlay merging, availability
+// probe completion, profile/region switch rollback, and region resolution
+// from AWS_REGION / AWS_DEFAULT_REGION.
 
 import (
 	"fmt"
@@ -23,10 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ════════════════════════════════════════════════════════════════════════════
-// Bug #191: LoadFromDirs partial overlay must field-merge, not replace
-// ════════════════════════════════════════════════════════════════════════════
-
 // writeYAML is a local helper that writes content to name.yaml inside dir.
 func writeYAML(t *testing.T, dir, name, content string) {
 	t.Helper()
@@ -41,7 +33,6 @@ func TestBug191_LoadFromDirs_PartialOverlay_PreservesGlobalList(t *testing.T) {
 	globalDir := t.TempDir()
 	projectDir := t.TempDir()
 
-	// Global has both list (width=20) and detail
 	writeYAML(t, globalDir, "ec2", `list:
   Instance ID:
     path: instanceId
@@ -51,7 +42,6 @@ detail:
   - state
 `)
 
-	// Project has ONLY detail (different paths), NO list
 	writeYAML(t, projectDir, "ec2", `detail:
   - instanceId
   - state
@@ -72,7 +62,6 @@ detail:
 		t.Fatal("missing ec2 view")
 	}
 
-	// List must come from global (width=20 preserved)
 	if len(ec2.List) == 0 {
 		t.Fatal("ec2.List should be preserved from global when project has no list")
 	}
@@ -80,7 +69,6 @@ detail:
 		t.Errorf("ec2.List[0].Width: want 20 (from global), got %d", ec2.List[0].Width)
 	}
 
-	// Detail must come from project (4 paths)
 	if len(ec2.Detail) != 4 {
 		t.Errorf("ec2.Detail: want 4 paths (from project), got %d", len(ec2.Detail))
 	}
@@ -92,7 +80,6 @@ func TestBug191_LoadFromDirs_PartialOverlay_PreservesGlobalDetail(t *testing.T) 
 	globalDir := t.TempDir()
 	projectDir := t.TempDir()
 
-	// Global has both list and detail
 	writeYAML(t, globalDir, "ec2", `list:
   Instance ID:
     path: instanceId
@@ -103,7 +90,6 @@ detail:
   - type
 `)
 
-	// Project has ONLY list (width=99), NO detail
 	writeYAML(t, projectDir, "ec2", `list:
   Instance ID:
     path: instanceId
@@ -123,7 +109,6 @@ detail:
 		t.Fatal("missing ec2 view")
 	}
 
-	// List must come from project (width=99)
 	if len(ec2.List) == 0 {
 		t.Fatal("ec2.List should come from project")
 	}
@@ -131,7 +116,6 @@ detail:
 		t.Errorf("ec2.List[0].Width: want 99 (from project), got %d", ec2.List[0].Width)
 	}
 
-	// Detail must come from global (3 paths)
 	if len(ec2.Detail) != 3 {
 		t.Errorf("ec2.Detail: want 3 paths (from global), got %d", len(ec2.Detail))
 	}
@@ -173,7 +157,6 @@ detail:
 
 	ec2 := cfg.Views["ec2"]
 
-	// List must come from project (width=50)
 	if len(ec2.List) == 0 {
 		t.Fatal("ec2.List should come from project")
 	}
@@ -184,7 +167,6 @@ detail:
 		t.Errorf("ec2.List[0].Title: want %q (from project), got %q", "ID", ec2.List[0].Title)
 	}
 
-	// Detail must come from project (4 paths)
 	if len(ec2.Detail) != 4 {
 		t.Errorf("ec2.Detail: want 4 paths (from project), got %d", len(ec2.Detail))
 	}
@@ -198,14 +180,12 @@ func TestBug191_LoadFromDirs_ThreeLayerMerge(t *testing.T) {
 	dir2 := t.TempDir()
 	dir3 := t.TempDir()
 
-	// dir1: list only (width=77)
 	writeYAML(t, dir1, "s3", `list:
   Bucket:
     path: name
     width: 77
 `)
 
-	// dir2: detail only
 	writeYAML(t, dir2, "s3", `detail:
   - name
   - region
@@ -227,7 +207,6 @@ func TestBug191_LoadFromDirs_ThreeLayerMerge(t *testing.T) {
 		t.Fatal("missing s3 view")
 	}
 
-	// List must come from dir1 (width=77)
 	if len(s3.List) == 0 {
 		t.Fatal("s3.List should come from dir1")
 	}
@@ -235,15 +214,10 @@ func TestBug191_LoadFromDirs_ThreeLayerMerge(t *testing.T) {
 		t.Errorf("s3.List[0].Width: want 77 (from dir1), got %d", s3.List[0].Width)
 	}
 
-	// Detail must come from dir2 (3 paths)
 	if len(s3.Detail) != 3 {
 		t.Errorf("s3.Detail: want 3 paths (from dir2), got %d", len(s3.Detail))
 	}
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// Bug #192: Availability probes must not declare "done" while probes in-flight
-// ════════════════════════════════════════════════════════════════════════════
 
 // The initial availability probe generation is 1 (seeded in session.New so
 // AvailabilityPrefetched/Checked cannot smuggle a
@@ -272,14 +246,12 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 		t.Skip("need at least 4 resource types")
 	}
 
-	// Start probes
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 	})
 
 	half := len(allNames) / 2
 
-	// Send results for only the first half
 	for i := range half {
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: allNames[i],
@@ -307,18 +279,14 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 }
 
 // TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone verifies that the
-// "done" path (saveCache + clear progress) fires only after availChecked==availTotal.
+// "done" path (saveCache + clear progress) fires only after
+// availChecked==availTotal. With N types and an initial batch of 3
+// concurrent probes the queue drains after N-3 results, while 3 probes are
+// still in flight, so an empty queue is not completion.
 //
-// The bug: with N types and initial batch of 3 concurrent probes, the queue
-// drains after N-3 results arrive (each result schedules the next). When the
-// queue hits 0 at result #(N-3), the current code sees len(queue)==0 and
-// fires saveCache — but 3 probes are still in-flight. The fix: gate on
-// availChecked == availTotal instead.
-//
-// Test strategy: inject probe results using Gen=0 (the model's actual gen
-// after AvailabilityCacheLoadedMsg). Send N results with HasResources=true
-// so the menu accumulates availability data. The saveCache cmd should only
-// fire on the Nth result (not earlier).
+// Probe results are injected with Gen=0 and HasResources=true so the menu
+// accumulates availability data; the saveCache cmd fires only on the Nth
+// result.
 func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithNoCache(false))
@@ -330,23 +298,14 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 		t.Skip("need at least 4 resource types to test in-flight concurrency")
 	}
 
-	// Start probes (gen stays at 0 after this)
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 	})
 
-	// Pre-populate the menu with availability data so saveCache doesn't return nil.
-	// We do this by first sending a CacheLoaded message with pre-populated entries
-	// to a fresh model, then switching to probe injection.
-	// Actually, the simplest approach: use HasResources=true so SetAvailability
-	// is called. BUT the probes return "AWS clients not initialized" errors
-	// (Err != nil), so SetAvailability is NOT called from real probes.
-	// We must inject Err=nil results to populate the menu.
-	//
-	// The probes already stored the real msgs above — we're injecting synthetic
-	// AvailabilityCheckedMsg with Err=nil and HasResources=true.
+	// Real probes fail with "AWS clients not initialized" (Err != nil), which
+	// never calls SetAvailability, so synthetic Err=nil, HasResources=true
+	// results populate the menu.
 
-	// Send all-but-last results (gen=0, no error, count=1)
 	for i := range total - 1 {
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: allNames[i],
@@ -357,13 +316,6 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 		})
 	}
 
-	// At this point availQueue is empty (drained long before result total-1).
-	// The BUG: the "done" path already fired when the queue first emptied
-	// (around result #(total-initial_batch_size)). So the last result
-	// should see the model in a terminal state.
-	//
-	// After the FIX: the model waits for availChecked == availTotal.
-	// The last result triggers the "done" path and returns the saveCache cmd.
 	_, lastCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: allNames[total-1],
 		HasResources: true,
@@ -372,16 +324,11 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 		Gen:          bug192InitialGen,
 	})
 
-	// After the last result, a cmd should be returned (the saveCache command).
 	if lastCmd == nil {
 		t.Error("after the last AvailabilityCheckedMsg, a saveCache cmd should be returned; " +
 			"the 'done' path fired prematurely when the queue emptied (bug #192)")
 	}
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// Bug #193: Profile/region switch must not commit state until session validated
-// ════════════════════════════════════════════════════════════════════════════
 
 // TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile verifies that when
 // ClientsReadyMsg carries an error, the header still shows the original profile.
@@ -390,16 +337,13 @@ func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 	m := newBlessedModel(t, "original-profile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Verify initial profile visible
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "original-profile") {
 		t.Fatal("header should show original-profile initially")
 	}
 
-	// Switch profile
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
 
-	// Connection fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: no such profile"),
 		Gen: 2, // ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2
@@ -407,7 +351,6 @@ func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 
 	plain = stripANSI(rootViewContent(m))
 
-	// After failed connect, header must show original profile, NOT broken-profile
 	if strings.Contains(plain, "broken-profile") {
 		t.Errorf("after failed connect, header must NOT show 'broken-profile'; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -428,10 +371,8 @@ func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 		t.Fatal("header should show us-west-2 initially")
 	}
 
-	// Switch region
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
 
-	// Connection fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: invalid region"),
 		Gen: 2, // ConnectGen seeds at 1 (session.New()); one RegionSelected Rotate()s it to 2
@@ -439,7 +380,6 @@ func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 
 	plain = stripANSI(rootViewContent(m))
 
-	// After failed connect, header must show original region
 	if strings.Contains(plain, "ap-southeast-1") {
 		t.Errorf("after failed region switch, header must NOT show 'ap-southeast-1'; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -494,21 +434,17 @@ func TestBug193_EmptyProfile_FailedConnect_RollsBack(t *testing.T) {
 	m := newBlessedModel(t, "", "us-west-2") // empty profile = default credentials
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Attempt switch to a broken profile
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
 
-	// Connect fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection refused"),
 		Gen: 2, // ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2
 	})
 
 	plain := stripANSI(rootViewContent(m))
-	// Must NOT show "broken-profile" in header after rollback
 	if strings.Contains(plain, "broken-profile") {
 		t.Errorf("after failed connect from empty profile, 'broken-profile' must not appear; got:\n%s", plain[:min(300, len(plain))])
 	}
-	// Region must be restored to us-west-2
 	if !strings.Contains(plain, "us-west-2") {
 		t.Errorf("after failed connect from empty profile, region must roll back to 'us-west-2'; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -530,7 +466,6 @@ func TestBug193_ProfileSwitch_FailedConnect_ShowsErrorFlash(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// The error text must be visible somewhere in the rendered output
 	if !strings.Contains(plain, "NoCredentialProviders") && !strings.Contains(plain, "no valid providers") {
 		t.Errorf("after failed connect, header must show error text; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -554,7 +489,6 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	plain := stripANSI(rootViewContent(m))
-	// Header should still show profile-C (the latest switch), not profile-B
 	if !strings.Contains(plain, "profile-C") {
 		t.Errorf("stale response from B should be ignored, header must show 'profile-C'; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -590,7 +524,6 @@ func TestBug193_RapidSwitch_FailedFinalConnect_RollsBackToOriginal(t *testing.T)
 	})
 
 	plain := stripANSI(rootViewContent(m))
-	// Must roll back to A, not B
 	if !strings.Contains(plain, "profile-A") {
 		t.Errorf("after rapid A→B→C where C fails, must roll back to A; got:\n%s", plain[:min(300, len(plain))])
 	}
@@ -622,16 +555,11 @@ func TestBug193_FailedSwitch_RestoresIdentityAndAvailability(t *testing.T) {
 		t.Fatal("failed connect rollback must return commands (flash clear + recovery)")
 	}
 
-	// Profile/region must be restored
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "original") {
 		t.Errorf("profile must be rolled back to 'original'; got:\n%s", plain[:min(300, len(plain))])
 	}
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// Bug #194: connectAWS must respect AWS_REGION / AWS_DEFAULT_REGION env vars
-// ════════════════════════════════════════════════════════════════════════════
 
 // executeConnectCmd fires an InitConnectMsg and executes the returned cmd,
 // returning the ClientsReadyMsg. Returns nil if the cmd doesn't produce one.
@@ -687,7 +615,6 @@ func TestBug194_ConnectAWS_RespectsAWSRegionEnvVar(t *testing.T) {
 		t.Logf("Non-region error (acceptable in isolated env): %v", cr.Err)
 	}
 
-	// ClientsReadyMsg.Region carries the resolved region.
 	if cr.Region != "" && cr.Region != "eu-central-1" {
 		t.Errorf("ClientsReadyMsg.Region: want %q, got %q", "eu-central-1", cr.Region)
 	}
@@ -719,7 +646,6 @@ func TestBug194_ConnectAWS_RespectsAWSDefaultRegionEnvVar(t *testing.T) {
 		t.Logf("Non-region error (acceptable in isolated env): %v", cr.Err)
 	}
 
-	// After the fix: ClientsReadyMsg.Region should be "ap-northeast-1"
 	if cr.Region != "" && cr.Region != "ap-northeast-1" {
 		t.Errorf("ClientsReadyMsg.Region: want %q, got %q", "ap-northeast-1", cr.Region)
 	}
@@ -772,7 +698,6 @@ func TestBug194_ClientsReadyMsg_CarriesResolvedRegion(t *testing.T) {
 		t.Fatal("InitConnectMsg should produce a ClientsReadyMsg")
 	}
 
-	// Region is always populated in ClientsReadyMsg.
 	if cr.Region == "" {
 		t.Error("ClientsReadyMsg.Region must be non-empty after the fix — connectAWS must report the resolved region")
 	}

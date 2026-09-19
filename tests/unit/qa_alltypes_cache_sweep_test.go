@@ -1,55 +1,17 @@
-// qa_alltypes_cache_sweep_test.go — docs/design/cache-requirements.md §5:
-// "an automated all-types sweep asserting: cached render marked stale,
-// silent swap, a save of one type leaves sibling files untouched." Driven
-// entirely by the type registry (resource.AllResourceTypes()) — no per-type
-// code, one shared drive loop with a subtest per type.
+// For every registered type
+// (resource.AllResourceTypes()): a cached render is marked stale, the fresh
+// fetch swaps in silently, and a save of one type leaves sibling files
+// untouched (docs/design/cache-requirements.md).
 //
-// Harness precedents:
-//   - tui_post_sweep_seed_test.go: seedDiskStoreWithS3Rows pattern
-//     (cache.LoadDirForTest/Store.Put/Store.SaveType) for pre-seeding a real
-//     on-disk per-type cache file before a controller ever touches it.
-//   - app_web_live_cold_boot_test.go: newLiveWebStyleController
-//     (runtime.Bootstrap + app.New + SetUIMode("web")), and
-//     TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact's
-//     byte-exact sibling-file audit (perTypeCacheDir/readFileForAudit).
-//   - app_pilot_defects_test.go: Controller.Apply(Action{Kind:
-//     ActionCommand, Arg: shortName}) as the real navigation entry point,
-//     and ctrl.Snapshot().Body.List for the resulting ListBody.
+// A fresh Controller/Core has never observed the type this session, so
+// HandleNavigate falls back to the on-disk store when len(tf.Rows) > 0 and
+// seeds NavigateResult.CachedEntry; applyNavResult then sets
+// List.Loading=false and Refreshing=true before the dispatched fetch runs.
+// A messages.ResourcesLoaded with Gen 0 is always accepted and replaces the
+// rows wholesale, clearing Refreshing.
 //
-// Per-assertion mechanism (traced against core/runtime/handlers_navigate.go
-// HandleNavigate's NavigateTargetResourceList branch and
-// core/app/navigate.go's applyNavResult):
-//
-//  1. CachedRenderMarkedStale: a fresh Controller/Core has never observed the
-//     type this session (session.ProbeResources[canon] absent), so
-//     HandleNavigate falls back to the on-disk store
-//     (EnsureCacheStore().Type(canon)) when len(tf.Rows) > 0, seeding
-//     NavigateResult.CachedEntry. applyNavResult's
-//     NavigateKindPushResourceList + CachedEntry!=nil branch then sets
-//     top.State.List.Loading=false and Refreshing=true — the C3 staleness
-//     marker — BEFORE the dispatched KindFetchResources task is ever run
-//     (this test never runs it for assertion 1).
-//
-//  2. SilentSwap: feeding a real messages.ResourcesLoaded through
-//     Controller.Handle (Gen:0, always accepted per AcceptZeroGen) routes to
-//     handleResourcesLoadedEvent -> applyResourcesLoaded, which replaces
-//     ls.Rows wholesale, clears ls.Refreshing (the cache-first seeding
-//     contract) and ls.Loading
-//     (already false from step 1, so it never flips true in between).
-//
-//  3. SaveIsolation: cache.Store.SaveType writes ONLY the touched type's
-//     file (C7); every sibling type's on-disk bytes must be byte-identical
-//     before/after, exactly as TestPerTypeSave_TouchingOneType_
-//     LeavesSiblingFilesByteExact already pins for a single hand-picked pair.
-//
-// Structural-class sampling (§5's list) is layered on top of the same drive:
-// paginated (Exact:false Row-count mismatch => IsTruncated), zero-resource
-// (HasResources:false, Count:0, Rows:nil => "empty not stale":
-// CachedEntry stays nil, Loading:true, Refreshing:false, no phantom rows),
-// issue-badge-excluded (td.ExcludeFromIssueBadge — persists issuesKnown via
-// TypeFile.IssuesKnown round-trip), child-list (len(td.Children) > 0), and
-// related-heavy (len(resource.GetRelated(td.ShortName)) > 0) types are
-// located dynamically from the registry, not hardcoded by name.
+// The structural classes (paginated, zero-resource, issue-badge-excluded,
+// child-list, related-heavy) are located from the registry, not by name.
 package unit
 
 import (
@@ -68,10 +30,8 @@ import (
 )
 
 // alltypesSweepPair builds a fresh, hermetic Controller/Core pair backed by
-// a per-test temp cache directory, mirroring newLiveWebStyleController
-// (app_web_live_cold_boot_test.go) but parameterized per subtest so every
-// resource type gets its own isolated profile+region pair and no cross-type
-// bleed is possible even without an explicit teardown.
+// a per-test temp cache directory, with its own profile+region pair per
+// resource type so no cross-type bleed is possible.
 func alltypesSweepPair(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
@@ -82,7 +42,7 @@ func alltypesSweepPair(t *testing.T, profile, region string) (*runtime.Core, *ap
 }
 
 // alltypesSeedTwoRows seeds a real on-disk TypeFile for shortName carrying 2
-// realistic rows, exactly as seedDiskStoreWithS3Rows does for s3.
+// realistic rows.
 func alltypesSeedTwoRows(t *testing.T, profile, region, shortName string) {
 	t.Helper()
 	store := cache.LoadDirForTest(profile, region)
@@ -115,10 +75,6 @@ func fileSHA256(t *testing.T, path string) string {
 	sum := sha256.Sum256(data)
 	return fmt.Sprintf("%x", sum)
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// Assertion 1 — CachedRenderMarkedStale
-// ─────────────────────────────────────────────────────────────────────────
 
 func TestAllTypes_CachedRenderMarkedStale(t *testing.T) {
 	types := resource.AllResourceTypes()
@@ -183,10 +139,6 @@ func TestAllTypes_CachedRenderMarkedStale(t *testing.T) {
 		t.Logf("CachedRenderMarkedStale skipped %d/%d types (no Wave-1 Fetcher): %v", len(skipped), len(types), skipped)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// Assertion 2 — SilentSwap
-// ─────────────────────────────────────────────────────────────────────────
 
 func TestAllTypes_SilentSwap(t *testing.T) {
 	types := resource.AllResourceTypes()
@@ -257,16 +209,10 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Assertion 3 — SaveIsolation
-// ─────────────────────────────────────────────────────────────────────────
-
-// TestAllTypes_SaveIsolation pins C7 per type: for each type T, saving T's
-// TypeFile must leave every OTHER registered type's on-disk file
-// byte-identical. Byte-comparing all 65 siblings per type (66*65 file
-// touches) stays unit-fast since every file is a few hundred bytes of YAML
-// on a tmpfs-backed t.TempDir(); this satisfies "byte-compare ALL siblings
-// if cheap" from the dispatch.
+// TestAllTypes_SaveIsolation: for each type T, saving T's TypeFile must leave
+// every other registered type's on-disk file byte-identical. Byte-comparing
+// all siblings per type stays unit-fast since every file is a few hundred
+// bytes of YAML on a t.TempDir().
 func TestAllTypes_SaveIsolation(t *testing.T) {
 	types := resource.AllResourceTypes()
 	allNames := resource.AllShortNames()
@@ -308,8 +254,6 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 				before[sibling] = fileSHA256(t, filepath.Join(dir, sibling+".yaml"))
 			}
 
-			// Reload (mirrors a fresh session for this pair) and save ONLY the
-			// type under test with different content.
 			store2 := cache.LoadDirForTest(profile, region)
 			store2.Put(td.ShortName, cache.TypeFile{
 				HasResources: true,
@@ -343,11 +287,6 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 		})
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// Structural-class sampling (§5's five classes), located dynamically from
-// the registry rather than hardcoded by name.
-// ─────────────────────────────────────────────────────────────────────────
 
 // TestAllTypes_StructuralClass_Paginated finds a type and drives it with a
 // TRUNCATED seed (Exact:false, Count > len(Rows)) — the "paginated: s3-style
@@ -500,9 +439,8 @@ func TestAllTypes_StructuralClass_IssueBadgeExcluded(t *testing.T) {
 // TestAllTypes_StructuralClass_ChildList finds a type with at least one
 // registered Children entry and drives the same cached-render assertion as
 // TestAllTypes_CachedRenderMarkedStale against its TOP-LEVEL list — child
-// views are session-scoped per C6 ("child lists... are never written to
-// disk"), so this asserts the parent type's own top-level cache seed still
-// works normally for a type that also happens to have children.
+// lists are session-scoped and never written to disk, so the parent type's
+// own top-level cache seed must still work for a type that has children.
 func TestAllTypes_StructuralClass_ChildList(t *testing.T) {
 	types := resource.AllResourceTypes()
 	var td *resource.ResourceTypeDef
@@ -538,9 +476,8 @@ func TestAllTypes_StructuralClass_ChildList(t *testing.T) {
 
 // TestAllTypes_StructuralClass_RelatedHeavy finds the type with the most
 // registered RelatedDef entries and asserts its top-level cached render still
-// carries the C3 staleness marker — the related-heavy panel is detail-scoped
-// (session-only per C6), so it must not interfere with the list-level cache
-// contract this sweep otherwise verifies for every type.
+// carries the staleness marker — the related panel is detail-scoped and
+// session-only, so it must not interfere with the list-level cache contract.
 func TestAllTypes_StructuralClass_RelatedHeavy(t *testing.T) {
 	types := resource.AllResourceTypes()
 	var td *resource.ResourceTypeDef
@@ -579,14 +516,9 @@ func TestAllTypes_StructuralClass_RelatedHeavy(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Registry coverage sanity — a distinct signal from the per-assertion
-// subtests: the number of types actually eligible for the generic drive
-// must not silently shrink to a handful. §5 requires "nothing per-type",
-// so a large skip count here means the generic drive mechanism itself
-// (not any one type) needs investigation.
-// ─────────────────────────────────────────────────────────────────────────
-
+// TestAllTypes_RegistryDriveEligibility_SkipCountReported: the number of
+// types eligible for the generic drive must not shrink to a handful — a large
+// skip count means the generic drive itself, not any one type, is broken.
 func TestAllTypes_RegistryDriveEligibility_SkipCountReported(t *testing.T) {
 	types := resource.AllResourceTypes()
 	if len(types) == 0 {

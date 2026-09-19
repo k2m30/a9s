@@ -2,14 +2,13 @@
 
 //go:build integration
 
-// scenario_cached_menu_badge_test.go — the badge the two writers agree on.
+// The badge the two writers agree on.
 //
 // A type's main-menu issue badge has two writers: the list-open lane, which
 // records what the list the operator just read showed, and the probe lane,
 // which records what the background sweep found without any list being opened.
-// They write the same fact, and nothing rendered them side by side, because
-// every scenario until now ran with the cache off — which also switches the
-// probe lane off. These drive the app as an installation runs it, with the
+// They write the same fact. Running with the cache off also switches the
+// probe lane off, so these drive the app as an installation runs it, with the
 // cache on in a home of the test's own, and read the badge off the rendered
 // menu.
 package integration
@@ -40,8 +39,8 @@ func cachedEC2IssueCount(t *testing.T) int {
 	return n
 }
 
-// TestCachedScenario_MenuBadgeFollowsTheProbeLane pins the other writer, and
-// it is the one that had no witness. The operator refreshes the main menu,
+// TestCachedScenario_MenuBadgeFollowsTheProbeLane pins the probe-lane writer.
+// The operator refreshes the main menu,
 // which restarts the availability sweep; the sweep inspects every type without
 // any list being opened, and the badge it writes is the same fact the list
 // would have shown. A menu that renders no badge at all after the sweep is the

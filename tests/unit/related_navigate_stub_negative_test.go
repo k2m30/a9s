@@ -1,23 +1,14 @@
 package unit_test
 
-// related_navigate_stub_negative_test.go — live-path port of
-// tests/unit/resourcelist_ami_stub_test.go's T017 (nil StubCreator -> no
-// auto-open navigation).
+// A type without a StubCreator never
+// auto-opens a synthetic detail: handleResourcesLoaded's
+// `td.StubCreator != nil` guard, driven through the real dispatch chain (root
+// Model.Update -> handleRelatedNavigate -> handleResourcesLoaded).
 //
-// internal/tui/related_navigate_stub_whitebox_test.go only ports T016
-// (StubCreator present -> auto-open synthetic detail); it has no negative
-// counterpart. T017 pins a real branch — handleResourcesLoaded's
-// `td.StubCreator != nil` guard (internal/tui/runtime_adapter_resources.go:119)
-// — but the only prior test for it (T016's sibling) drove
-// ResourceListModel.Update directly, which production never calls (see
-// wave3-status.md "OPEN INVESTIGATION"). This file closes that gap through
-// the real dispatch chain instead: root Model.Update -> handleRelatedNavigate
-// -> handleResourcesLoaded.
-//
-// "asg" is deliberately not "ami": it registers neither FetchByIDs nor a
-// StubCreator (only "ami" registers one — core/aws/catalog_compute.go),
-// so a TargetID cache-miss followed by an empty ResourcesLoaded must leave
-// the operator on the related list/flash, never synthesize a detail.
+// "asg" registers neither FetchByIDs nor a StubCreator (only "ami" registers
+// one — core/aws/catalog_compute.go), so a TargetID cache-miss followed by an
+// empty ResourcesLoaded must leave the operator on the related list/flash,
+// never synthesize a detail.
 
 import (
 	"strings"

@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_failure_and_provenance_test.go — two seams that phrased something in
-// their own words. The profile selector flashed a Go error chain verbatim
-// when the local AWS config could not be read; the detail controller stamped
-// a Wave-2 finding with a provenance shaped exactly like the
-// "wave2:<short-name>" the registry stamps, for a short name no registry
-// entry has. The sentinel's own shape is pinned in-package
-// (core/app/tui5_wave2_sentinel_test.go); this file holds the flash and the
-// gate over every production file.
+// The profile selector phrases a
+// local AWS config failure as a local-file cause, and only two production
+// seams spell a "wave2:<short-name>" provenance out. The sentinel's own shape
+// is pinned in-package (core/app/tui5_wave2_sentinel_test.go).
 package unit_test
 
 import (

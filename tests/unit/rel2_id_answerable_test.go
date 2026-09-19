@@ -1,16 +1,9 @@
 package unit_test
 
-// rel2_id_answerable_test.go — the other half of the warm-cache rule: a
-// checker that can still answer from the row's own ID or Fields must not
-// throw that answer away just because the row carries no RawStruct.
-//
-// The answer-side rule (unreadZero) is right, but six checkers never reach it:
-// they return early on res.RawStruct == nil, before the filter they would have
-// used is even computed. For these the filter does not come from the struct.
-// ec2Identity sets instanceID = res.ID before it looks at the struct at all,
-// and secretIdentifiers falls back to Fields["arn"] and res.Name. So the row
-// carries everything the scan needs and the panel is shown "?" for a count
-// that was fully determined.
+// A checker that can answer from the row's own ID
+// or Fields answers the same whether or not the row carries a RawStruct:
+// ec2Identity takes instanceID from res.ID, and secretIdentifiers falls back to
+// Fields["arn"] and res.Name, so a warm row carries everything the scan needs.
 
 import (
 	"context"
@@ -113,13 +106,11 @@ func TestRel2IDAnswerableCheckersDoNotDiscardTheirCount(t *testing.T) {
 	}
 }
 
-// TestRel2AnswerableCheckersProveTheirZero is the other half of the pair
-// above. Answering without a nil guard is only right if the zero it would
-// hide is itself honest, so each of the six is handed a warm row and a
-// target list that was read and holds nothing. The filter came from the
-// row's own ID or Fields, the list was read, nothing matched — that is a
-// zero the row backs, and turning it into "?" would be the same information
-// loss one return lower down.
+// TestRel2AnswerableCheckersProveTheirZero checks that the zero those checkers
+// answer is honest: each is handed a warm row and a target list that was read
+// and holds nothing. The filter came from the row's own ID or Fields, the list
+// was read, nothing matched — that is a zero the row backs, and "?" would lose
+// information.
 func TestRel2AnswerableCheckersProveTheirZero(t *testing.T) {
 	clients := demo.NewServiceClients()
 	pairs := []struct{ source, target, rowID string }{
@@ -158,11 +149,11 @@ func TestRel2AnswerableCheckersProveTheirZero(t *testing.T) {
 	}
 }
 
-// TestRel2StructDependentCheckersStayUnknown pins the three guards that stay.
-// Each filter lives only in the struct — an instance's CloudFormation tag, its
-// EKS tags, a service's task definition — so a warm row cannot produce it, and
-// the count these checkers reach with the struct is exactly what they must not
-// claim to have ruled out without it.
+// TestRel2StructDependentCheckersStayUnknown pins the three checkers that answer
+// unknown without a struct. Each filter lives only in the struct — an instance's
+// CloudFormation tag, its EKS tags, a service's task definition — so a warm row
+// cannot produce it, and the count these checkers reach with the struct is
+// exactly what they must not claim to have ruled out without it.
 func TestRel2StructDependentCheckersStayUnknown(t *testing.T) {
 	clients := demo.NewServiceClients()
 	cache := rel2DemoCacheFor(t, "ec2", "cfn", "ng", "ecs-svc", "sfn")

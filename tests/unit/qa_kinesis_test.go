@@ -14,7 +14,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T-KIN-001 - Test Kinesis Streams response parsing
+// Kinesis Streams response parsing
 // ---------------------------------------------------------------------------
 
 func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
@@ -49,7 +49,6 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first stream
 	r := resources[0]
 	if r.Name != "my-stream-1" {
 		t.Errorf("expected Name 'my-stream-1', got %q", r.Name)
@@ -74,7 +73,6 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 		t.Errorf("expected Fields[status] %q for CREATING stream, got %q", "creating", r2.Fields["status"])
 	}
 
-	// Verify RawStruct is set
 	if r.RawStruct == nil {
 		t.Error("expected RawStruct to be set")
 	}

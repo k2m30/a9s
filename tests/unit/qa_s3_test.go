@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ===========================================================================
-// QA S3 helpers
-// ===========================================================================
-
 // s3BucketTypeDef returns the S3 bucket type definition (matches resource.FindResourceType("s3")).
 func s3BucketTypeDef() resource.ResourceTypeDef {
 	return resource.ResourceTypeDef{
@@ -54,14 +50,12 @@ func s3LoadedBucketModel() tui.Model {
 // s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
 func s3LoadedObjectModel() tui.Model {
 	m := s3LoadedBucketModel()
-	// Press Enter to drill into first bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	// Load objects (child list type is s3_objects)
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild,
 		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
@@ -111,12 +105,6 @@ func s3KeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
 }
 
-// ===========================================================================
-// A. S3 Bucket List View
-// ===========================================================================
-
-// A.8 Enter Key (Drill Into Bucket)
-
 func TestQA_S3_A8_1_EnterOnBucket_SendsEnterChildViewMsg(t *testing.T) {
 	m := s3RLBucketModel(t)
 
@@ -154,19 +142,15 @@ func TestQA_S3_A8_2_EnterOnBucket_DoesNotSendTargetDetail(t *testing.T) {
 			t.Error("Enter on S3 bucket must NOT send TargetDetail NavigateMsg (it should drill into objects)")
 		}
 	}
-	// Verify it's EnterChildViewMsg
 	if _, ok := msg.(messages.EnterChildView); !ok {
 		t.Errorf("Enter on S3 bucket should produce EnterChildViewMsg, got %T", msg)
 	}
 }
 
-// A.13 Escape returns to main menu
-
 func TestQA_S3_A13_Escape_ReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Press Escape to go back to main menu
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	plain := stripANSI(rootViewContent(m))
@@ -175,21 +159,13 @@ func TestQA_S3_A13_Escape_ReturnsToMainMenu(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// B. S3 Object List View
-// ===========================================================================
-
-// B.14 Escape (Back to Bucket List)
-
 func TestQA_S3_B14_1_Escape_FromObjectsReturnsToBuckets(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedObjectModel()
 
-	// Press Escape to go back to bucket list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	plain := stripANSI(rootViewContent(m))
-	// Should be back at bucket list, showing s3(5)
 	if !strings.Contains(plain, "s3(5)") {
 		t.Errorf("Escape from object list should return to bucket list with s3(5), got: %s", plain[:min(300, len(plain))])
 	}
@@ -199,7 +175,6 @@ func TestQA_S3_B14_1_Escape_FromObjects_DoesNotReturnToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedObjectModel()
 
-	// Press Escape once -- should go to bucket list, not main menu
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	plain := stripANSI(rootViewContent(m))
@@ -207,12 +182,6 @@ func TestQA_S3_B14_1_Escape_FromObjects_DoesNotReturnToMainMenu(t *testing.T) {
 		t.Error("single Escape from object list should NOT go to main menu; should go to bucket list")
 	}
 }
-
-// ===========================================================================
-// C. S3 Detail View
-// ===========================================================================
-
-// C.1 Bucket Detail (via d from bucket list — d always opens detail view)
 
 func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
 	m := s3RLBucketModel(t)
@@ -232,8 +201,6 @@ func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
 		t.Errorf("d on S3 bucket should navigate to detail, got target: %d", nav.Target)
 	}
 }
-
-// C.2 Object Detail (via Enter or d from object list)
 
 func TestQA_S3_C2_ObjectDetail_EnterSendsDetail(t *testing.T) {
 	m := s3RLObjectModel(t, "test-app-state")
@@ -260,13 +227,10 @@ func TestQA_S3_C2_ObjectDetail_EnterSendsDetail(t *testing.T) {
 	}
 }
 
-// C.3 Detail View Navigation -- tested via root model
-
 func TestQA_S3_C3_ObjectDetail_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedObjectModel()
 
-	// Press Enter to go to detail of the first object
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -275,7 +239,6 @@ func TestQA_S3_C3_ObjectDetail_FrameTitle(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// The detail view frame title should show the object key/name
 	if !strings.Contains(plain, "terraform") {
 		t.Errorf("detail view should show object name in frame title, got: %s", plain[:min(300, len(plain))])
 	}
@@ -285,7 +248,6 @@ func TestQA_S3_C3_DetailView_EscapeReturnsToObjectList(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedObjectModel()
 
-	// Go to detail
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -293,33 +255,23 @@ func TestQA_S3_C3_DetailView_EscapeReturnsToObjectList(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Escape from detail
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	plain := stripANSI(rootViewContent(m))
-	// Should be back at object list with the bucket name visible
 	if !strings.Contains(plain, "test-app-state") {
 		t.Errorf("Escape from detail should return to object list, got: %s", plain[:min(300, len(plain))])
 	}
 }
 
-// ===========================================================================
-// D. Cross-Cutting / Full Flow Tests
-// ===========================================================================
-
-// D.2 View Stack: Main Menu -> S3 Bucket List -> Object List -> Detail -> Escape chain
-
 func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// 1. Verify we start at main menu
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Fatalf("should start at main menu, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// 2. Navigate to S3 bucket list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -334,7 +286,6 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 		t.Fatalf("should be at S3 bucket list with s3(5), got: %s", plain[:min(200, len(plain))])
 	}
 
-	// 3. Enter bucket -> object list
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -351,7 +302,6 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 		t.Fatalf("should be at object list for test-app-state, got: %s", plain[:min(300, len(plain))])
 	}
 
-	// 4. Enter object -> detail view
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
@@ -363,29 +313,24 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 		t.Fatalf("should be at detail view for terraform.tfstate, got: %s", plain[:min(300, len(plain))])
 	}
 
-	// 5. Escape from detail -> back to object list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "test-app-state") {
 		t.Errorf("after escape from detail, should be at object list, got: %s", plain[:min(300, len(plain))])
 	}
 
-	// 6. Escape from object list -> back to bucket list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "s3(5)") {
 		t.Errorf("after escape from objects, should be at bucket list s3(5), got: %s", plain[:min(300, len(plain))])
 	}
 
-	// 7. Escape from bucket list -> back to main menu
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("after escape from bucket list, should be at main menu, got: %s", plain[:min(300, len(plain))])
 	}
 }
-
-// Test the main menu -> S3 entry point
 
 func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -411,29 +356,22 @@ func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	}
 }
 
-// Test filter mode works on S3 bucket list via root model
-
 func TestQA_S3_FilterMode_ViaRootModel(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Enter filter mode with "/"
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
-	// Type "cdn"
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
 	m, _ = rootApplyMsg(m, rootKeyPress("d"))
 	m, _ = rootApplyMsg(m, rootKeyPress("n"))
 
 	plain := stripANSI(rootViewContent(m))
-	// Header should show filter text
 	if !strings.Contains(plain, "/cdn") {
 		t.Errorf("header should show active filter '/cdn', got: %s", plain[:min(200, len(plain))])
 	}
-	// Should show filtered buckets (cdn-cloudfront and cdn-test)
 	if !strings.Contains(plain, "cdn") {
 		t.Error("filter 'cdn' should show cdn buckets")
 	}
-	// Frame title should show filtered count
 	if !strings.Contains(plain, "2/5") {
 		t.Errorf("frame title should show 2/5 for cdn filter, got: %s", plain[:min(200, len(plain))])
 	}
@@ -443,47 +381,36 @@ func TestQA_S3_FilterMode_EscapeClearsFilter(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
 	m, _ = rootApplyMsg(m, rootKeyPress("d"))
 	m, _ = rootApplyMsg(m, rootKeyPress("n"))
 
-	// Escape from filter mode
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	plain := stripANSI(rootViewContent(m))
-	// Should show all 5 buckets again
 	if !strings.Contains(plain, "s3(5)") {
 		t.Errorf("escape from filter should restore all buckets, got: %s", plain[:min(200, len(plain))])
 	}
-	// Header should revert to "? for help"
 	if !strings.Contains(plain, "? for help") {
 		t.Errorf("header should revert to '? for help', got: %s", plain[:min(200, len(plain))])
 	}
 }
 
-// Test command mode from S3 bucket list
-
 func TestQA_S3_CommandMode_NavigateToEC2(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Enter command mode with ":"
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
-	// Type "ec2"
 	m, _ = rootApplyMsg(m, rootKeyPress("e"))
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
 	m, _ = rootApplyMsg(m, rootKeyPress("2"))
-	// Press Enter to execute
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
 	if cmd == nil {
 		t.Fatal("command 'ec2' should produce a command")
 	}
 }
-
-// Test YAML view from S3 object list
 
 func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 	m := s3RLObjectModel(t, "test-app-state")
@@ -506,27 +433,10 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 	}
 }
 
-// Test copy returns the selected resource ID (clipboard not tested, just the data)
-
-// Test that S3 object list has the expected columns
-
-// Test that S3 bucket list ResourceType() returns "s3"
-
-// Test that S3 object list ResourceType() returns "s3_objects"
-
-// Test that horizontal scroll works in object list
-
-// Test no separator line below column headers
-
-// Test S3 bucket list view includes all fixture buckets in rendered output
-
-// Test full flow: main menu -> S3 -> YAML view -> escape chain
-
 func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Open YAML view for first bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, rootKeyPress("y"))
 	if cmd != nil {
@@ -539,7 +449,6 @@ func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 		t.Errorf("should be in YAML view, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Escape from YAML -> back to bucket list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "s3(5)") {
@@ -547,13 +456,10 @@ func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 	}
 }
 
-// Test the EnterChildViewMsg for S3 is processed correctly by root model
-
 func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := s3LoadedBucketModel()
 
-	// Simulate EnterChildViewMsg for S3 objects
 	m, _ = rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "s3_objects",
 		ParentContext: map[string]string{"bucket": "test-app-state"},
@@ -561,18 +467,14 @@ func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 	})
 
 	plain := stripANSI(rootViewContent(m))
-	// Should show loading state for the bucket or the bucket name in the frame
 	if !strings.Contains(plain, "test-app-state") {
 		t.Errorf("EnterChildViewMsg should create object list view with bucket name, got: %s", plain[:min(300, len(plain))])
 	}
 }
 
-// Test header consistency across S3 views
-
 func TestQA_S3_D1_HeaderConsistency(t *testing.T) {
 	tui.Version = "0.6.0"
 
-	// Test header in bucket list
 	m := s3LoadedBucketModel()
 	plain := stripANSI(rootViewContent(m))
 

@@ -1,4 +1,4 @@
-// qa_status_column_uniformity_test.go — the gate: every
+// The gate: every
 // registered top-level list view must present exactly ONE status column,
 // uniformly titled "Status", whose cell the shared pipeline in
 // core/app/list_columns.go (listExtractCellValue's isStatusCol cascade)
@@ -9,15 +9,12 @@
 // cell and, in full, in the detail Attention block, not in a second
 // standing column.
 //
-// RATCHET semantics (identical contract to knownVisibilityGaps /
-// knownStateCoverageGaps / knownDisconnectedPivots in the sibling gates):
-//   - A violation NOT in knownStatusColumnDebt is a NEW regression — always
-//     fails, unconditionally.
-//   - An allowlisted violation that NOW conforms (single Status-titled
-//     status column, no duplicate cause column) fails with a "remove from
-//     allowlist" message — the burn-down signal.
-//   - An allowlisted violation still violating is skipped (logged),
-//     known debt this gate exists to track down.
+// Allowlist semantics (as knownVisibilityGaps / knownStateCoverageGaps /
+// knownDisconnectedPivots in the sibling gates):
+//   - A violation not in knownStatusColumnDebt fails.
+//   - An allowlisted entry that conforms fails with a "remove from allowlist"
+//     message.
+//   - An allowlisted entry still violating is skipped (logged).
 //
 // Two independent rules are checked per type, each with its own allowlist
 // key suffix so a type can be pinned for one violation without masking the
@@ -51,26 +48,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// knownStatusColumnDebt is the inventory of (shortName, ruleKey) violations
-// found by this gate. Key shape: "<shortName>:<status-title|duplicate-cause>".
-// Same burn-down semantics as knownVisibilityGaps in
-// qa_issue_visibility_gate_test.go:
-//   - present + still violating today   -> skip (logged), expected
-//     pre-existing debt.
-//   - present + now conformant           -> FAIL ("remove from allowlist").
-//   - a violation NOT present here       -> FAIL unconditionally, a new
-//     regression the allowlist was never told about.
+// knownStatusColumnDebt allowlists (shortName, ruleKey) violations under
+// "<shortName>:<status-title|duplicate-cause>", with the semantics in the file
+// header. It is empty.
 //
-// The gate drives the REAL production column-resolution path
-// (app.ResolveListColumns, which mirrors resolveColumns in table_render.go)
-// against every registered top-level type's default view. The single-Status
-// column (list_columns.go's listExtractCellValue / resolveListStatusCol
-// title-based cascade, applied regardless of Key) routes State→Status
-// column-title renames and keyed columns like cb's "Last Status" to the
-// shared Status cell by Title, and folds duplicate causes (eks/ng's
-// "Issues", elb's "State Reason", sg's/ssm's "Risk") into the Status cell's
-// finding phrase. The allowlist is empty: any violation below is a NEW
-// regression.
+// The gate drives app.ResolveListColumns (which mirrors resolveColumns in
+// table_render.go) against every registered top-level type's default view.
+// listExtractCellValue / resolveListStatusCol in list_columns.go match the
+// status column by Title regardless of Key, so State→Status renames and keyed
+// columns like cb's "Last Status" render the shared Status cell, and cause
+// text (eks/ng "Issues", elb "State Reason", sg/ssm "Risk") belongs in the
+// Status cell's finding phrase.
 var knownStatusColumnDebt = map[string]bool{}
 
 // statusColumnUniformityRuleKeys enumerates the two independent violation
@@ -90,10 +78,10 @@ var duplicateCausePattern = regexp.MustCompile(`(?i)^(issues|health_issues|risk|
 // isStatusQualifyingColumn mirrors listExtractCellValue's isStatusCol
 // predicate in core/app/list_columns.go byte-for-byte (Key=="status" OR
 // Key==lifecycleKey OR Title case-insensitively "status" or "state",
-// REGARDLESS of Key — the OWNER CONTRACT lets a keyed column like
-// {Key:"last_status", Title:"Status"} qualify too), operating on the
-// exported app.ColumnDef + the type's LifecycleKey (default "state" when
-// unset, matching production's own fallback).
+// regardless of Key, so a keyed column like {Key:"last_status",
+// Title:"Status"} qualifies too), operating on the exported app.ColumnDef +
+// the type's LifecycleKey (default "state" when unset, matching production's
+// own fallback).
 func isStatusQualifyingColumn(col app.ColumnDef, lifecycleKey string) bool {
 	if lifecycleKey == "" {
 		lifecycleKey = "state"

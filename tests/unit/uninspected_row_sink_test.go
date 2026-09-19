@@ -1,6 +1,6 @@
 package unit_test
 
-// uninspected_row_sink_test.go — the sink for "a9s could not inspect this row".
+// The sink for "a9s could not inspect this row".
 //
 // A Wave-2 enricher that fails on one row records that row in
 // IssueEnricherResult.TruncatedIDs (core/aws/issue_enrichment.go's MarkSkipped
@@ -145,9 +145,9 @@ func TestUninspectedRow_ListStatusCellSaysNotInspected(t *testing.T) {
 	}
 }
 
-// TestUninspectedRow_FindingPhraseWinsOverNotInspected pins the precedence the
-// spec fixes: a row that carries a finding phrase keeps it. "not inspected"
-// only fills a cell that would otherwise say nothing about the check.
+// TestUninspectedRow_FindingPhraseWinsOverNotInspected pins the precedence: a
+// row that carries a finding phrase keeps it. "not inspected" only fills a
+// cell that would otherwise say nothing about the check.
 func TestUninspectedRow_FindingPhraseWinsOverNotInspected(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -287,9 +287,8 @@ func TestUninspectedRow_InspectedNeighbourGetsNoNotInspectedEntry(t *testing.T) 
 	}
 }
 
-// TestFindingsOverview_IsGone: Controller.FindingsOverview aggregated
-// findings per rule for a cross-type cockpit that was never built, so
-// nothing in this repo called it. A caller-less public API is not "wired".
+// TestFindingsOverview_IsGone: Controller.FindingsOverview has no caller, and
+// a caller-less public API is not "wired".
 func TestFindingsOverview_IsGone(t *testing.T) {
 	root, err := filepath.Abs("../../core")
 	if err != nil {
@@ -322,10 +321,6 @@ func TestFindingsOverview_IsGone(t *testing.T) {
 		t.Errorf("FindingsOverview is back with no caller:\n%s", strings.Join(offenders, "\n"))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// The tail past EnrichmentCap
-// ---------------------------------------------------------------------------
 
 // kmsRotationFake answers GetKeyRotationStatus for every key, so the only
 // reason a key can end up uninspected is the cap itself.
@@ -360,10 +355,9 @@ func cappedKMSKeys(n int) []resource.Resource {
 	return out
 }
 
-// TestEnrichmentCap_TailIsMarkedUninspected pins the cap half: a real enricher
-// asked for more rows than EnrichmentCap inspects the first EnrichmentCap and
-// records every row past them as uninspected. Before capAtEnrichmentCap owned
-// every cap site, the tail carried no per-row mark at all — it rendered as
+// TestEnrichmentCap_TailIsMarkedUninspected: a real enricher asked for more
+// rows than EnrichmentCap inspects the first EnrichmentCap and records every
+// row past them as uninspected, so the tail never renders as
 // inspected-and-healthy.
 func TestEnrichmentCap_TailIsMarkedUninspected(t *testing.T) {
 	const total = awsclient.EnrichmentCap + 1
@@ -390,10 +384,9 @@ func TestEnrichmentCap_TailIsMarkedUninspected(t *testing.T) {
 	}
 }
 
-// TestEnrichmentCap_FiftyFirstRowRendersNotInspected joins the two halves the
-// spec asks for: a REAL capped enricher result, driven through the production
-// event path, makes the 51st row of a capped type say "not inspected" on the
-// list.
+// TestEnrichmentCap_FiftyFirstRowRendersNotInspected drives a REAL capped
+// enricher result through the production event path: the 51st row of a
+// capped type says "not inspected" on the list.
 func TestEnrichmentCap_FiftyFirstRowRendersNotInspected(t *testing.T) {
 	const total = awsclient.EnrichmentCap + 1
 	keys := cappedKMSKeys(total)
@@ -474,10 +467,10 @@ var capBypass = []struct {
 	},
 }
 
-// TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper is the standing gate for
-// the sweep. A new enricher that writes any of the bounds above out by hand
-// fails here rather than shipping answered rows beside an unbounded number of
-// rows that quietly claim to be clean.
+// TestEnrichmentCap_EveryCapSiteRoutesThroughTheHelper: an enricher that
+// writes any of the bounds above out by hand fails here rather than shipping
+// answered rows beside an unbounded number of rows that quietly claim to be
+// clean.
 //
 // issue_enrichment.go is where all three owners live, so it is the one file
 // the scan does not read.

@@ -1,9 +1,7 @@
 package unit
 
-// qa_search_component_test.go — TDD tests for SearchModel (T014).
-//
-// These tests define the expected API and behavior of the SearchModel type that
-// lives in internal/tui/views/search.go.
+// SearchModel (internal/tui/views/search.go):
+// match discovery, highlighting, navigation and match info.
 
 import (
 	"strings"
@@ -11,10 +9,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ---------------------------------------------------------------------------
-// T014-1: SetContent + SetQuery discovers matches
-// ---------------------------------------------------------------------------
 
 // TestSearch_SetContentAndQuery_FindsMatches verifies that after setting plain
 // text content and a query, MatchCount() reflects the correct number of hits.
@@ -26,10 +20,6 @@ func TestSearch_SetContentAndQuery_FindsMatches(t *testing.T) {
 		t.Errorf("expected 2 matches for 'one', got %d", s.MatchCount())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T014-2: Apply returns highlighted content and match line number
-// ---------------------------------------------------------------------------
 
 // TestSearch_Apply_ReturnsHighlightedContent verifies that Apply() inserts
 // additional ANSI escape sequences around matched text and returns the line
@@ -43,7 +33,6 @@ func TestSearch_Apply_ReturnsHighlightedContent(t *testing.T) {
 
 	highlighted, matchLine := s.Apply(styled)
 
-	// Must contain more ANSI sequences than the original (highlighting was added).
 	originalAnsiCount := strings.Count(styled, "\x1b[")
 	highlightedAnsiCount := strings.Count(highlighted, "\x1b[")
 	if highlightedAnsiCount <= originalAnsiCount {
@@ -51,23 +40,17 @@ func TestSearch_Apply_ReturnsHighlightedContent(t *testing.T) {
 			originalAnsiCount, highlightedAnsiCount)
 	}
 
-	// matchLine must be a valid line index (0-based) within the content.
 	lineCount := strings.Count(plain, "\n") + 1
 	if matchLine < 0 || matchLine >= lineCount {
 		t.Errorf("Apply() returned out-of-range matchLine=%d (content has %d lines)",
 			matchLine, lineCount)
 	}
 
-	// The visible (ANSI-stripped) content must still contain the original text.
 	plain2 := ansiRe.ReplaceAllString(highlighted, "")
 	if !strings.Contains(plain2, "line one") {
 		t.Errorf("Apply() stripped visible content; got: %q", plain2)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T014-3: Apply on ANSI-styled content searches visible text only
-// ---------------------------------------------------------------------------
 
 // TestSearch_ANSIContent_MatchesVisibleTextOnly verifies that SetContent takes
 // plain text for indexing while Apply operates on a separately ANSI-styled
@@ -86,22 +69,15 @@ func TestSearch_ANSIContent_MatchesVisibleTextOnly(t *testing.T) {
 
 	highlighted, _ := s.Apply(styled)
 
-	// The result must still contain the reset sequence from the original styling,
-	// confirming that existing ANSI was not stripped wholesale.
 	if !strings.Contains(highlighted, "\x1b[0m") {
 		t.Errorf("Apply() removed existing ANSI reset sequence; result: %q", highlighted)
 	}
 
-	// Visible text must still contain "hello world".
 	plain2 := ansiRe.ReplaceAllString(highlighted, "")
 	if !strings.Contains(plain2, "hello world") {
 		t.Errorf("Apply() corrupted visible content; got: %q", plain2)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T014-4: NextMatch cycles through matches
-// ---------------------------------------------------------------------------
 
 // TestSearch_NextMatch_CyclesThroughMatches verifies that calling NextMatch()
 // advances CurrentMatch() and wraps around after the last match.
@@ -114,7 +90,6 @@ func TestSearch_NextMatch_CyclesThroughMatches(t *testing.T) {
 		t.Fatalf("expected 3 matches, got %d", s.MatchCount())
 	}
 
-	// Initial state: match 0.
 	if s.CurrentMatch() != 0 {
 		t.Errorf("expected initial CurrentMatch()=0, got %d", s.CurrentMatch())
 	}
@@ -129,16 +104,11 @@ func TestSearch_NextMatch_CyclesThroughMatches(t *testing.T) {
 		t.Errorf("after 2nd NextMatch(): expected 2, got %d", s.CurrentMatch())
 	}
 
-	// Wrap-around: next after last → first.
 	s.NextMatch()
 	if s.CurrentMatch() != 0 {
 		t.Errorf("after wrap NextMatch(): expected 0, got %d", s.CurrentMatch())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T014-5: PrevMatch cycles backward
-// ---------------------------------------------------------------------------
 
 // TestSearch_PrevMatch_CyclesBackward verifies that PrevMatch() decrements
 // CurrentMatch() and wraps from 0 to the last match.
@@ -151,7 +121,6 @@ func TestSearch_PrevMatch_CyclesBackward(t *testing.T) {
 		t.Fatalf("expected 3 matches, got %d", s.MatchCount())
 	}
 
-	// From index 0, PrevMatch wraps to last (index 2).
 	s.PrevMatch()
 	if s.CurrentMatch() != 2 {
 		t.Errorf("after PrevMatch() from 0: expected 2, got %d", s.CurrentMatch())
@@ -168,10 +137,6 @@ func TestSearch_PrevMatch_CyclesBackward(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T014-6: Zero matches — MatchInfo and navigation no-ops
-// ---------------------------------------------------------------------------
-
 // TestSearch_ZeroMatches_MatchInfoShowsZero verifies that when no matches exist,
 // MatchCount() == 0, MatchInfo() == "0/0 matches", and NextMatch()/PrevMatch()
 // are no-ops (CurrentMatch() stays 0).
@@ -187,7 +152,6 @@ func TestSearch_ZeroMatches_MatchInfoShowsZero(t *testing.T) {
 		t.Errorf("expected MatchInfo()='0/0 matches', got %q", s.MatchInfo())
 	}
 
-	// NextMatch and PrevMatch are no-ops when there are zero matches.
 	s.NextMatch()
 	if s.CurrentMatch() != 0 {
 		t.Errorf("NextMatch() on zero matches changed CurrentMatch() to %d", s.CurrentMatch())
@@ -197,10 +161,6 @@ func TestSearch_ZeroMatches_MatchInfoShowsZero(t *testing.T) {
 		t.Errorf("PrevMatch() on zero matches changed CurrentMatch() to %d", s.CurrentMatch())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T014-7: Empty query — no matches, Apply returns content unchanged
-// ---------------------------------------------------------------------------
 
 // TestSearch_EmptyQuery_NoMatches verifies that an empty query results in zero
 // matches and Apply() returns the styled content unchanged.
@@ -220,10 +180,6 @@ func TestSearch_EmptyQuery_NoMatches(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T014-8: Case-insensitive matching
-// ---------------------------------------------------------------------------
-
 // TestSearch_CaseInsensitive verifies that matching is case-insensitive.
 func TestSearch_CaseInsensitive(t *testing.T) {
 	s := views.SearchModel{}
@@ -235,16 +191,11 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T014-9: Activate / Deactivate transitions
-// ---------------------------------------------------------------------------
-
 // TestSearch_Activate_Deactivate verifies IsActive(), IsInputMode(), and that
 // Deactivate() clears the query.
 func TestSearch_Activate_Deactivate(t *testing.T) {
 	s := views.SearchModel{}
 
-	// Initially inactive.
 	if s.IsActive() {
 		t.Error("expected IsActive()=false before Activate()")
 	}
@@ -268,10 +219,6 @@ func TestSearch_Activate_Deactivate(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T014-10: MatchInfo format with navigation
-// ---------------------------------------------------------------------------
-
 // TestSearch_MatchInfo_Format verifies the MatchInfo() format is "N/M matches"
 // where N is the 1-based current match number and M is the total count.
 func TestSearch_MatchInfo_Format(t *testing.T) {
@@ -283,7 +230,6 @@ func TestSearch_MatchInfo_Format(t *testing.T) {
 		t.Fatalf("expected 5 matches, got %d", s.MatchCount())
 	}
 
-	// Advance to the 3rd match (index 2 → displayed as "3").
 	s.NextMatch() // index 1
 	s.NextMatch() // index 2
 

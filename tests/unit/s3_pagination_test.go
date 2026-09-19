@@ -12,9 +12,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// BUG: FetchS3Buckets must paginate ListBuckets.
-// AWS returns partial results with ContinuationToken when there are many buckets.
-// Without pagination, count is wrong and some buckets are missing.
+// FetchS3Buckets paginates ListBuckets: AWS returns partial results with a
+// ContinuationToken when there are many buckets.
 
 func TestFetchS3Buckets_Paginated(t *testing.T) {
 	mock := &fakeS3ListBuckets{
@@ -50,7 +49,6 @@ func TestFetchS3Buckets_Paginated(t *testing.T) {
 		t.Errorf("expected 2 API calls (2 pages), got %d", mock.Calls)
 	}
 
-	// Verify all bucket names
 	names := map[string]bool{}
 	for _, r := range resources {
 		names[r.ID] = true

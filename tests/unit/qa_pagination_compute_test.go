@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_compute_test.go — pagination tests for compute/storage fetchers:
+// Pagination tests for compute/storage fetchers:
 // ec2, lambda, s3, ebs, ebs-snap, ami
 
 import (
@@ -42,10 +42,6 @@ func (m *mockEC2DescribeInstancesAPIPaginated) DescribeInstanceStatus(
 ) (*ec2.DescribeInstanceStatusOutput, error) {
 	return &ec2.DescribeInstanceStatusOutput{}, nil
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEC2InstancesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEC2InstancesPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeInstancesAPIPaginated{
@@ -189,10 +185,6 @@ func (m *mockLambdaListFunctionsAPIPaginated) ListFunctions(_ context.Context, i
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchLambdaFunctionsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchLambdaFunctionsPage_FirstPage(t *testing.T) {
 	mock := &mockLambdaListFunctionsAPIPaginated{
 		PageFunc: func(_ int) (*lambda.ListFunctionsOutput, error) {
@@ -306,10 +298,6 @@ func TestQA_Pagination_FetchLambdaFunctionsPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchS3BucketsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchS3BucketsPage_FirstPage(t *testing.T) {
 	mock := &fakeS3ListBuckets{
@@ -430,10 +418,6 @@ func (m *mockEC2DescribeVolumesAPIPaginated) DescribeVolumes(_ context.Context, 
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEBSVolumesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEBSVolumesPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeVolumesAPIPaginated{
@@ -564,10 +548,6 @@ func (m *mockEC2DescribeSnapshotsAPIPaginated) DescribeSnapshots(_ context.Conte
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEBSSnapshotsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEBSSnapshotsPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeSnapshotsAPIPaginated{
@@ -701,10 +681,6 @@ func (m *mockEC2DescribeImagesAPIPaginated) DescribeImages(_ context.Context, in
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchAMIsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchAMIsPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeImagesAPIPaginated{

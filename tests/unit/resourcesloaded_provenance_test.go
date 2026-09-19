@@ -1,25 +1,22 @@
-// resourcesloaded_provenance_test.go — behavior pins for
-// messages.ResourcesLoaded.Provenance (FetchProvenance), the fix for the
-// defect where a filtered/by-ID/child fetch result was indistinguishable
-// from a canonical top-level list fetch, so the RowStore write accepted
-// EVERY one into the shared per-type RowStore as a canonical full replace.
-// Reproduced: an EC2 list paged to 200 exact rows, then a filtered related
-// drill returning 3 rows replaced the entry — 3 rows, TotalCount 200→3 —
-// surviving to disk and restart.
+// Behavior pins for
+// messages.ResourcesLoaded.Provenance (FetchProvenance): a filtered, by-ID or
+// child fetch result is distinguishable from a canonical top-level list fetch,
+// so only a canonical result replaces the shared per-type RowStore entry. An
+// EC2 list paged to 200 exact rows, followed by a filtered related drill
+// returning 3 rows, keeps 200 rows and TotalCount 200 in memory and on disk.
 //
-// Every non-canonical-provenance pin here drives the REAL Controller.Handle
-// -> handleResourcesLoadedEvent -> RowStore path (never pokes the
-// provenance gate or the RowStore directly), and reads back
-// BOTH the in-memory RowStore snapshot AND the persisted on-disk TypeFile —
-// this is the regression that reached disk and survived restart, so a
-// unit-level stub on the gate function would have passed happily while the
-// bug was live.
-// NOTE on delivery: a page reaches the screen whose instance it names, at any
-// depth in the stack. Most deliveries here are for the screen on top and use
-// handlePage, which stamps that instance; the two aimed at a screen further
-// down name it explicitly, captured when that screen was opened. Neither is a
-// by-type shortcut — the identity is what the routing reads, and a test that
-// left it off would be asserting about a page nothing dispatched.
+// Every non-canonical-provenance pin here drives the real Controller.Handle
+// -> handleResourcesLoadedEvent -> RowStore path (never the provenance gate or
+// the RowStore directly) and reads back both the in-memory RowStore snapshot
+// and the persisted on-disk TypeFile, because the on-disk entry is what
+// survives a restart.
+//
+// A page reaches the screen whose instance it names, at any depth in the
+// stack. Most deliveries here are for the screen on top and use handlePage,
+// which stamps that instance; the two aimed at a screen further down name it
+// explicitly, captured when that screen was opened. The identity is what the
+// routing reads, so a test that left it off would be asserting about a page
+// nothing dispatched.
 package unit
 
 import (
@@ -36,10 +33,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// ────────────────────────────────────────────────────────────────────────────
-// helpers
-// ────────────────────────────────────────────────────────────────────────────
 
 const provenancePinType = "ec2"
 
@@ -117,7 +110,7 @@ func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, pr
 
 // assertStillCanonical200 re-reads both the RowStore snapshot and the disk
 // TypeFile and fails if either has moved away from the 200-row canonical
-// seed — the exact shape of the regression that reached disk.
+// seed.
 func assertStillCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, profile, region, label string) {
 	t.Helper()
 	snap := core.Session().RowStore.Snapshot(provenancePinType)
@@ -130,18 +123,13 @@ func assertStillCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.C
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Real 200-then-3 repro: FilteredList does not replace the canonical entry
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanonical
-// drives the ACTUAL bug repro end to end: a top-level ec2 list loads 200
-// exact rows, then a real stacked related-filtered ec2 list is pushed via
-// the production ActionRelatedSelect -> dispatchRelatedNavigate ->
-// applyRelatedNavResult seam (mirrors rowstore_stage4_pins_test.go's
-// pushStackedRelatedFilteredS3List), and a 3-row filtered result lands
-// through the real Controller.Handle path. Before the fix this collapsed
-// the shared "ec2" RowStore entry (and its disk persistence) from 200 to 3.
+// TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanonical:
+// a top-level ec2 list loads 200 exact rows, then a stacked related-filtered
+// ec2 list is pushed via the production ActionRelatedSelect ->
+// dispatchRelatedNavigate -> applyRelatedNavResult seam (mirrors
+// rowstore_stage4_pins_test.go's pushStackedRelatedFilteredS3List), and a
+// 3-row filtered result lands through the real Controller.Handle path. The
+// shared "ec2" RowStore entry and its disk persistence keep 200 rows.
 func TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanonical(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
 	seedCanonical200(t, ctrl, core, profile, region)
@@ -174,12 +162,6 @@ func TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanoni
 
 	assertStillCanonical200(t, ctrl, core, profile, region, "filtered-drill 3-row result")
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// The pin that distinguishes `continue` from `return` at handle.go:298: a
-// non-canonical result whose real target screen is BURIED UNDER a fresh
-// canonical screen of the SAME type must still reach it.
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_StillReceivesResult
 // builds a THREE-deep same-type stack — [screen1: canonical ec2 200 rows]
@@ -301,8 +283,7 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 	assertStillCanonical200(t, ctrl, core, profile, region, "after a buried-screen FilteredList delivery two levels down")
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// The SYMMETRIC direction: a genuine CanonicalList result must not overwrite
+// The symmetric direction: a genuine CanonicalList result must not overwrite
 // a topmost filtered/child screen, and must fall through to the canonical
 // screen beneath it instead. handle.go's gate is symmetric
 // (topLevelCanonical != msg.Provenance.CanonicalList()), not a
@@ -311,7 +292,6 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 // must not match the topmost (filtered) screen — the first same-type screen
 // the top-down scan finds — and overwrite the drill with the unrelated
 // canonical population.
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsThroughToCanonicalBeneath
 // pushes a stacked related-filtered ec2 drill (same production seam as the
@@ -359,7 +339,6 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsT
 		ScreenID:     screen1,
 	})
 
-	// The drill (still topmost) must be completely untouched.
 	afterSnap := ctrl.Snapshot()
 	if afterSnap.Body.List == nil || len(afterSnap.Body.List.Rows) != 3 {
 		got := 0
@@ -435,32 +414,19 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_DoesNo
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// ByID and Child provenance: same property, but the isolation is DIFFERENT
-// from the filtered-drill case above and that difference is deliberate, not
-// an oversight — see the comment on popTopScreenForProvenancePin.
-// ────────────────────────────────────────────────────────────────────────────
-
 // popTopScreenForProvenancePin pops the top-level ec2 list screen (back to
-// the main menu) via the real ActionBack seam. This is required for the
-// ByID/Child/Unknown-provenance pins below because applyResourcesLoaded
-// (list_body.go) is a SECOND, independent writer into the same shared
-// RowStore: whenever handleResourcesLoadedEvent finds an OPEN
-// ScreenResourceList/ScreenChildList screen matching msg.ResourceType, it
-// routes accepted rows through Core.ObserveRows gated by topLevelCanonical
-// (isTopLevelCanonicalList — EscPops/ParentContext on THAT screen), a
-// pre-existing gate this fix does not touch and msg.Provenance does not
-// reach. Leaving the canonical ec2 list open while delivering a by-ID/child
-// result would exercise THAT gate, not the one under test here
-// (the Provenance gate in handleResourcesLoadedEvent). A real
-// by-ID or child continuation legitimately lands while its originating
-// screen is no longer on top (handle.go's own comment: "a late fetch ...
-// lands on X's screen even when it is not currently on top" — or, as here,
-// not present at all, e.g. the user backed out before a background
-// continuation resolved) — so popping the screen first is not a shortcut
-// around the real scenario, it is what makes the scenario the one this fix
-// actually protects: a non-canonical result for a type that has NO open
-// list screen to (mis)apply itself to except through the shared RowStore.
+// the main menu) via the real ActionBack seam. The ByID/Child/Unknown-provenance
+// pins below need it because applyResourcesLoaded (list_body.go) is a second,
+// independent writer into the same shared RowStore: whenever
+// handleResourcesLoadedEvent finds an open ScreenResourceList/ScreenChildList
+// screen matching msg.ResourceType, it routes accepted rows through
+// Core.ObserveRows gated by topLevelCanonical (isTopLevelCanonicalList —
+// EscPops/ParentContext on that screen), which msg.Provenance does not reach.
+// Leaving the canonical ec2 list open would exercise that gate, not the
+// Provenance gate in handleResourcesLoadedEvent. A real by-ID or child
+// continuation can land after the user backed out of its originating screen,
+// so a non-canonical result for a type with no open list screen is a real
+// scenario.
 func popTopScreenForProvenancePin(t *testing.T, ctrl *app.Controller) {
 	t.Helper()
 	ctrl.Apply(app.Action{Kind: app.ActionBack})
@@ -502,10 +468,7 @@ func TestObserveResourcesLoadedRows_ChildFetch_DoesNotReplaceCanonical(t *testin
 	assertStillCanonical200(t, ctrl, core, profile, region, "child-fetch result")
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Positive control: a genuine CanonicalList result DOES replace — the fix
-// gates the write, it does not disable it.
-// ────────────────────────────────────────────────────────────────────────────
+// Positive control: a genuine CanonicalList result replaces the entry.
 
 func TestObserveResourcesLoadedRows_CanonicalList_DoesReplace(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
@@ -528,18 +491,14 @@ func TestObserveResourcesLoadedRows_CanonicalList_DoesReplace(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Fail-safe: the zero-value Provenance (a construction site that never
-// declared it — the exact shape of a future fifth fetch kind whose author
-// forgets to set Provenance) must NOT be treated as canonical.
-// ────────────────────────────────────────────────────────────────────────────
+// Fail-safe: the zero-value Provenance is never treated as canonical.
 
 func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCanonical(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
 	seedCanonical200(t, ctrl, core, profile, region)
 	popTopScreenForProvenancePin(t, ctrl)
 
-	// Provenance intentionally omitted — the zero value, FetchProvenanceUnknown.
+	// The zero value, FetchProvenanceUnknown, stated explicitly.
 	// Deliberately unstamped: popTopScreenForProvenancePin left no list screen
 	// open, so this page names none and reaches none. It is still observed
 	// into the row store — what the assertion below is about is the shared
@@ -552,13 +511,10 @@ func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCan
 	assertStillCanonical200(t, ctrl, core, profile, region, "zero-value (undeclared) Provenance result")
 }
 
-// ────────────────────────────────────────────────────────────────────────────
 // Web/headless lane: a filtered-drill push sets EscPops so
-// isTopLevelCanonicalList is false, AND FilteredRowsSet (the C6 seed) fires
-// for real.
-// ────────────────────────────────────────────────────────────────────────────
+// isTopLevelCanonicalList is false, and FilteredRowsSet fires.
 
-// TestWebLane_FilteredDrill_SetsEscPops_AndFiltersRowsSetFires drives a
+// TestWebLane_FilteredDrill_SetsEscPops_AndFilteredRowsSetFires drives a
 // FetchFilter-carrying related drill (not the RelatedIDs-based one above):
 // FilteredRowsSet (handle.go) only fires when ls.FetchFilter is non-empty,
 // which only the FetchFilter sub-case of applyRelatedNavResult populates.
@@ -601,14 +557,9 @@ func TestWebLane_FilteredDrill_SetsEscPops_AndFilteredRowsSetFires(t *testing.T)
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// ProvenanceForContinuation: the shared classifier, pinned directly, PLUS
-// both lanes that call it for a real KindFetchMore/LoadMore continuation —
-// the whole point of sharing it is that the two lanes cannot drift apart,
-// so a pin that only exercises one lane leaves the actual failure mode
-// (the two lanes computing different provenance for the same continuation)
-// uncovered.
-// ────────────────────────────────────────────────────────────────────────────
+// ProvenanceForContinuation: the shared classifier, pinned directly and through
+// both lanes that call it for a real KindFetchMore/LoadMore continuation, so the
+// two lanes cannot compute different provenance for the same continuation.
 
 func TestProvenanceForContinuation_ClassifiesChildFilteredCanonical(t *testing.T) {
 	cases := []struct {

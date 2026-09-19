@@ -1,6 +1,6 @@
 package unit
 
-// runtime_refresh_list_enrichment_test.go — coverage for
+// Coverage for
 // Core.RefreshListEnrichment (core/runtime/handlers_resources.go): the
 // neutral list-refresh enrichment-rerun bundle handleActionRefresh's list
 // branch (core/app/actions_list.go) calls — canonicalize the resource
@@ -30,11 +30,6 @@ import (
 // Core.HandleEvent(messages.EnrichmentChecked), not a raw field poke), and
 // wave2-sourced findings are stripped from the type's cached rows while a
 // wave1 finding on the same resource survives.
-//
-// EnrichmentRan has no exported reader anywhere in core/runtime, core/app,
-// or internal/tui (it is write-only: set true in handleEnrichmentChecked,
-// otherwise only ever deleted or wholesale-reset) — dropping that sub-check
-// per the ses-rule-set-store precedent from the prior round.
 func TestRefreshListEnrichment_EnricherRegisteredType_TokenAdvancesTruncatedClearedWave2Stripped(t *testing.T) {
 	const rt = "test-refresh-enrich-src"
 	awsclient.SetWave2EnricherForTest(t, rt, awsclient.IssueEnricher{Fn: awsclient.InFetcherWave2Sentinel, Priority: 100})
@@ -116,9 +111,8 @@ func TestRefreshListEnrichment_NonEnricherType_ReturnsZeroNoMutation(t *testing.
 // TestRefreshListEnrichment_AliasInput_CanonicalTypeGenBumped covers the
 // alias axis using a real catalog alias ("instances" -> ShortName "ec2",
 // core/aws/catalog_compute.go): RefreshListEnrichment must canonicalize
-// BEFORE bumping — the method's own doc comment flags bumping under the
-// alias key as a real historical hazard (it would never match the
-// canonical-keyed read HandleResourcesLoaded's rerun-match check performs).
+// BEFORE bumping — a bump under the alias key would never match the
+// canonical-keyed read HandleResourcesLoaded's rerun-match check performs.
 func TestRefreshListEnrichment_AliasInput_CanonicalTypeGenBumped(t *testing.T) {
 	awsclient.SetWave2EnricherForTest(t, "ec2", awsclient.IssueEnricher{Fn: awsclient.InFetcherWave2Sentinel, Priority: 100})
 

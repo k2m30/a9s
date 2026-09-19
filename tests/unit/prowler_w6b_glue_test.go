@@ -1,7 +1,6 @@
 package unit
 
-// prowler_w6b_glue_test.go — behavioural pins for the three glue posture
-// signals of batch w6b.
+// The three glue posture signals.
 //
 // All three are wave 1: GetJobs returns SecurityConfiguration and
 // DefaultArguments inline, so the fetcher already holds everything.
@@ -78,8 +77,6 @@ func w6bFetchGlue(t *testing.T, jobs ...gluetypes.Job) []resource.Resource {
 	return out.Resources
 }
 
-// ─── row 12: glue.no-security-configuration ─────────────────────────────────
-
 // Without a security configuration the job writes its S3 output, its
 // CloudWatch logs and its bookmarks unencrypted.
 func TestW6BGlue_NoSecurityConfiguration_Absent(t *testing.T) {
@@ -109,8 +106,6 @@ func TestW6BGlue_SecurityConfigurationNamed_IsHealthy(t *testing.T) {
 	rs := w6bFetchGlue(t, w6bGlueJob(name))
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bGlueCodeNoSecurityConfig)
 }
-
-// ─── row 13: glue.continuous-logging-off ────────────────────────────────────
 
 // Without continuous logging the job's driver and executor output never
 // reaches CloudWatch, so a failed run leaves nothing to read.
@@ -157,8 +152,6 @@ func TestW6BGlue_NilDefaultArguments_LoggingIsOff(t *testing.T) {
 	pw1RequireNoFinding(t, r.Findings, w6bGlueCodeArgumentSecret)
 }
 
-// ─── row 14: glue.argument-secret ───────────────────────────────────────────
-
 // Default arguments are visible to anyone who can call GetJobs and are echoed
 // into the job's own logs.
 func TestW6BGlue_ArgumentSecret_PlaintextPassword(t *testing.T) {
@@ -186,8 +179,6 @@ func TestW6BGlue_ArgumentSecretReference_IsHealthy(t *testing.T) {
 	rs := w6bFetchGlue(t, w6bGlueJob(name))
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bGlueCodeArgumentSecret)
 }
-
-// ─── independence ───────────────────────────────────────────────────────────
 
 func TestW6BGlue_AllThreeConditions_ProduceThreeFindings(t *testing.T) {
 	const name = "acme-worst-job"

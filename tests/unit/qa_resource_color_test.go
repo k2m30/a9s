@@ -1,17 +1,10 @@
 package unit
 
-// qa_resource_color_test.go — color refactor invariants (Stream 4).
-//
-// Invariants tested here:
-//   #1  No presentation-layer code reads resource-type-specific fields.
-//   #3  EC2 impaired/initializing promotion via Color func.
-//   #4  EC2 CellDecorators["state"] parity.
-//   #5  nil CellDecorators map does not panic on map read.
-//   #6  ct-events ExcludeFromIssueBadge is set, and Status=="ct-danger" → ColorBroken.
-//   #7  Every registered type has a non-nil Color function.
-//
-// These tests will fail until Stream 3 (consumer refactor) completes — that is
-// expected TDD behavior. They MUST compile cleanly against Stream 1 + Stream 2 output.
+// Colour invariants: no presentation-layer code
+// reads type-specific fields; EC2 colour comes from findings; EC2
+// CellDecorators["state"]; a nil CellDecorators map reads safely; ct-events is
+// kept out of the issue badge while ct-danger is Broken; every registered type
+// has a Color function.
 
 import (
 	"fmt"
@@ -24,20 +17,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #1 — No presentation-layer code reads EC2-specific field names.
-//
-// Post-refactor, the strings "system_status" and "instance_status" must not
-// appear anywhere in internal/tui/ (excluding *_test.go files). The EC2
-// CellDecorators func lives in core/resource/, which is the correct owner.
-// ─────────────────────────────────────────────────────────────────────────────
+// The strings "system_status" and "instance_status" must not appear in the
+// generic row-rendering files of internal/tui/; the EC2 CellDecorators func
+// lives in core/resource/.
 
 func TestColorRefactor_NoEC2FieldsInPresentationLayer(t *testing.T) {
-	// These files are the generic row-rendering and resource-listing code that must
-	// not contain EC2-specific field names. detail_fields.go is intentionally excluded:
-	// it injects per-type sub-fields for the EC2 status-checks detail section, which
-	// reads system_status/instance_status from r.Fields. Relocating that injection to
-	// a data-driven mechanism is a separate future refactor (not part of this change).
 	targetFiles := []string{
 		filepath.Join(projectRoot(t), "internal", "tui", "views", "table_render.go"),
 		filepath.Join(projectRoot(t), "internal", "tui", "views", "resourcelist.go"),
@@ -51,7 +35,7 @@ func TestColorRefactor_NoEC2FieldsInPresentationLayer(t *testing.T) {
 		data, readErr := os.ReadFile(path)
 		if readErr != nil {
 			if os.IsNotExist(readErr) {
-				continue // file doesn't exist yet — skip
+				continue
 			}
 			t.Fatalf("ReadFile(%q): %v", path, readErr)
 		}
@@ -88,17 +72,11 @@ func projectRoot(t *testing.T) string {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #3 — EC2 Color func: impaired/initializing promotion.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestColorRefactor_EC2Color_ImpairedPromotion pins colorEC2
-// (core/aws/catalog_compute.go), which since the color-findings-conformance
-// wave is colorFromAnyFinding-only with NO raw-field fallback — every
-// non-healthy case must attach a Finding shaped like the real fetcher
-// (core/aws/ec2.go wave1 Findings) or Wave-2 enricher
-// (core/aws/ec2_issue_enrichment.go, Source "wave2"). Fields are kept
-// for realism/context only — they are no longer read by Color.
+// colorEC2 (core/aws/catalog_compute.go) derives colour from findings only
+// (colorFromAnyFinding), so every non-healthy case attaches a Finding shaped
+// like the fetcher's (core/aws/ec2.go) or the Wave-2 enricher's
+// (core/aws/ec2_issue_enrichment.go, Source "wave2"). Fields carry context
+// only.
 func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
@@ -196,8 +174,7 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			want: resource.ColorWarning,
 		},
 		{
-			// Terminated now emits a SevDim Finding (wave #42) — no longer a
-			// silent "no finding" state.
+			// Terminated emits a SevDim Finding.
 			name:   "state=terminated → ColorDim",
 			fields: map[string]string{"state": "terminated"},
 			findings: []domain.Finding{
@@ -231,10 +208,6 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 		})
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #4 — EC2 CellDecorators["state"] parity.
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestColorRefactor_EC2CellDecorator_StateParity(t *testing.T) {
 	td := resource.FindResourceType("ec2")
@@ -321,26 +294,19 @@ func TestColorRefactor_EC2CellDecorator_StateParity(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #5 — nil CellDecorators map does not panic.
-//
-// Go's zero-value map read returns the zero value ("", false) — no explicit nil
-// guard is needed at the dispatch site. This test confirms that for all types
-// that don't declare decorators, accessing td.CellDecorators["any_key"] is safe.
-// ─────────────────────────────────────────────────────────────────────────────
+// Go's nil-map read returns the zero value, so a type without decorators reads
+// td.CellDecorators safely.
 
 func TestColorRefactor_NilCellDecorators_Safe(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
 		td := td
 		t.Run(td.ShortName, func(t *testing.T) {
 			if td.CellDecorators == nil {
-				// Go nil-map read: must not panic, must return nil func.
 				got := td.CellDecorators["any_key"]
 				if got != nil {
 					t.Errorf("%s: nil CellDecorators map returned non-nil for key \"any_key\" — unexpected",
 						td.ShortName)
 				}
-				// Double-check with a realistic column key.
 				got2 := td.CellDecorators["state"]
 				if got2 != nil {
 					t.Errorf("%s: nil CellDecorators map returned non-nil for key \"state\" — unexpected",
@@ -351,22 +317,16 @@ func TestColorRefactor_NilCellDecorators_Safe(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #6 — ct-events ExcludeFromIssueBadge + Color behavior.
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestColorRefactor_CtEvents_ExcludeFromIssueBadge(t *testing.T) {
 	td := resource.FindResourceType("ct-events")
 	if td == nil {
 		t.Fatal("ct-events resource type not found in registry")
 	}
 
-	// ExcludeFromIssueBadge must be true.
 	if !td.ExcludeFromIssueBadge {
 		t.Error("ct-events: ExcludeFromIssueBadge must be true — event severity != resource health")
 	}
 
-	// Color func must be present.
 	if td.Color == nil {
 		t.Fatal("ct-events: Color func is nil — invariant #7 violated")
 	}
@@ -396,18 +356,14 @@ func TestColorRefactor_CtEvents_ExcludeFromIssueBadge(t *testing.T) {
 		})
 	}
 
-	// Specifically: ct-danger → ColorBroken contributes to ctrl+z visibility
-	// (IsIssue == true) but ExcludeFromIssueBadge keeps it out of the badge.
+	// ct-danger → ColorBroken counts for ctrl+z visibility (IsIssue == true), but
+	// ExcludeFromIssueBadge keeps it out of the badge.
 	dangerR := resource.Resource{ID: "evt-0002", Name: "DeleteBucket", Fields: map[string]string{"status": "ct-danger"}}
 	dangerColor := td.Color(dangerR)
 	if !dangerColor.IsIssue() {
 		t.Errorf("ct-events ct-danger row: Color.IsIssue() must be true (visible after ctrl+z); got Color=%v", dangerColor)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Invariant #7 — Every registered type has a non-nil Color function.
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestColorRefactor_AllTypes_NonNilColorFunc(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
@@ -419,10 +375,6 @@ func TestColorRefactor_AllTypes_NonNilColorFunc(t *testing.T) {
 		})
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Additional: IsIssue semantics of Color constants.
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestColor_IsIssue(t *testing.T) {
 	cases := []struct {

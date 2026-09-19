@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_lifecycle_blind_test.go drives list-lifecycle
+// Drives list-lifecycle
 // scenarios from the keys the operator presses, with every message produced by
 // the real executor so the stamping is production's rather than the test's:
 //
@@ -106,7 +106,7 @@ func (b *wipfixBench) list(t *testing.T) *app.ListBody {
 	return body
 }
 
-// TestCtrlRDuringLoadMore_LeavesTheMKeyUsable pins row 3: Ctrl+R while a
+// TestCtrlRDuringLoadMore_LeavesTheMKeyUsable: Ctrl+R while a
 // continuation is outstanding supersedes it, and the continuation's result is
 // discarded when it finally lands. Whatever discards it must retire the flag
 // it raised, because no completion ever will — and a stuck loading-more makes
@@ -121,18 +121,15 @@ func TestCtrlRDuringLoadMore_LeavesTheMKeyUsable(t *testing.T) {
 		t.Fatal("precondition: the s3 list is not truncated after its first page")
 	}
 
-	// "m" — the continuation goes out and is still in flight.
 	_, loadMore := b.c.Apply(app.Action{Kind: app.ActionLoadMore})
 	if len(loadMore) != 1 {
 		t.Fatalf("precondition: load-more produced %d task(s), want 1", len(loadMore))
 	}
 	pending := b.execute(t, loadMore[0])
 
-	// Ctrl+R lands first and its own result is applied.
 	_, refresh := b.c.Apply(app.Action{Kind: app.ActionRefresh})
 	b.pump(t, refresh)
 
-	// The continuation finally arrives, answering a request the refresh replaced.
 	_, more := b.c.Handle(pending)
 	b.pump(t, more)
 
@@ -166,7 +163,7 @@ func TestOrdinaryLoadMore_ClearsItsOwnFlag(t *testing.T) {
 	}
 }
 
-// TestDrillLoadMore_AppendsToTheDrillThatAskedForIt pins row 2: a drill's
+// TestDrillLoadMore_AppendsToTheDrillThatAskedForIt: a drill's
 // continuation belongs to the drill. Deriving its lane from the (empty)
 // context maps instead of from the screen makes it claim to be the type's
 // canonical list, and the delivery gate then refuses it on the very screen
@@ -232,7 +229,7 @@ func wipfixObjTypeDef() resource.ResourceTypeDef {
 	}
 }
 
-// TestTUILoadMoreKey_CarriesTheDrillsLane pins row 28 through the key the
+// TestTUILoadMoreKey_CarriesTheDrillsLane drives the key the
 // terminal actually handles: the "m" press builds its own messages.LoadMore
 // rather than going through the controller's action, and it must stamp the
 // lane the controller's one owner reports for that screen. Left unstamped the
@@ -271,7 +268,7 @@ func TestTUILoadMoreKey_CarriesTheDrillsLane(t *testing.T) {
 	}
 }
 
-// TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows pins row 4: an
+// TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows: an
 // exact-ID drill whose targets are not in the cached page, while that page is
 // itself truncated, opens on a continuation rather than a fresh fetch. The
 // completion must clear the flag its own request raised — clearing
@@ -292,7 +289,6 @@ func TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows(t *testing.T) {
 
 	b := newWipfixBench(t)
 
-	// The ec2 cache holds page one only, and knows there is more.
 	_, tasks := b.c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	b.pump(t, tasks)
 	if !b.list(t).Truncated {

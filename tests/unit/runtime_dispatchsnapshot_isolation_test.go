@@ -1,20 +1,10 @@
-// runtime_dispatchsnapshot_isolation_test.go — pins the upcoming
-// maps.Clone fix for Core.CaptureDispatch's DispatchSnapshot.EnrichmentTypeGen
-// aliasing bug.
+// Core.CaptureDispatch's
+// DispatchSnapshot.EnrichmentTypeGen is a copy, not the session's map.
 //
-// DispatchSnapshot is documented (executor.go:46-47) as capturing "the
-// session state ExecuteTask reads, taken at DISPATCH time (synchronously,
-// before the async command goroutine runs)" — the whole point of a
-// dispatch-time snapshot is immunity to whatever the session does AFTER
-// capture. CaptureDispatch (executor.go:61-72) currently assigns
-// c.session.EnrichmentTypeGen straight into the snapshot's
-// EnrichmentTypeGen field, which is a map — a Go map assignment copies the
-// map HEADER, not its contents, so the snapshot and the live session share
-// the exact same underlying map. Any later write to that map — the inline
-// EnrichmentTypeGen[name]++ bumps in handlers_availability.go (startEnrichment,
-// handleEnrichmentChecked) or the BumpEnrichmentTypeGen accessor
-// (accessors.go:195) — is visible through an already-captured snapshot,
-// defeating the whole purpose of capturing one.
+// A dispatch-time snapshot exists to be immune to whatever the session does
+// after capture. A Go map assignment copies the map header, not its contents,
+// so a snapshot holding the session's map would see every later
+// EnrichmentTypeGen bump.
 package unit
 
 import (
@@ -29,8 +19,7 @@ import (
 // TestCaptureDispatch_EnrichmentTypeGen_SnapshotIsolatedFromLaterBumps is the
 // deterministic, single-goroutine pin: capture a snapshot, bump the live
 // session's per-type generation for the SAME type afterward, and assert the
-// already-captured snapshot's value did not move. This must fail today
-// because CaptureDispatch aliases the map instead of cloning it.
+// captured snapshot's value did not move.
 func TestCaptureDispatch_EnrichmentTypeGen_SnapshotIsolatedFromLaterBumps(t *testing.T) {
 	c := newExecutorCore(t)
 	const shortName = "ec2"
@@ -53,14 +42,10 @@ func TestCaptureDispatch_EnrichmentTypeGen_SnapshotIsolatedFromLaterBumps(t *tes
 }
 
 // TestCaptureDispatch_EnrichmentTypeGen_ConcurrentBumpDoesNotRace hammers
-// CaptureDispatch+ExecuteTaskAt (the reader of snap.EnrichmentTypeGen, see
-// executor.go:124's TaskKindProbeEnrich case) on one goroutine while
-// BumpEnrichmentTypeGen (the writer) runs concurrently on another — a
-// genuine concurrent map read/write across the aliased map once
-// CaptureDispatch stops cloning. `go test -race` is the intended detector
-// for this test; it may still pass without -race (Go's built-in map-misuse
-// detection is best-effort, not guaranteed), which is acceptable — the
-// deterministic isolation test above is the primary TDD failure signal.
+// CaptureDispatch+ExecuteTaskAt (the reader of snap.EnrichmentTypeGen) on one
+// goroutine while BumpEnrichmentTypeGen (the writer) runs on another.
+// `go test -race` is the detector; without -race Go's map-misuse detection is
+// best-effort.
 func TestCaptureDispatch_EnrichmentTypeGen_ConcurrentBumpDoesNotRace(t *testing.T) {
 	c := newExecutorCore(t)
 

@@ -1,8 +1,7 @@
 package unit
 
-// prowler_w2_dbc_test.go — dbc posture row 17 of the w2 Prowler batch:
-// single-AZ, auto minor version upgrade off, IAM database authentication off,
-// default master username.
+// dbc posture: single-AZ, auto minor version upgrade off, IAM database
+// authentication off, default master username.
 //
 // The dbc list is fed by two fetchers — DocumentDB clusters and RDS (Aurora /
 // Multi-AZ) clusters. One resource type must not answer differently depending
@@ -11,9 +10,7 @@ package unit
 //
 // docdbtypes.DBCluster carries MultiAZ and MasterUsername but has no
 // AutoMinorVersionUpgrade or IAMDatabaseAuthenticationEnabled field, so those
-// two conditions are RDS-only. The absence is a property of the DocumentDB
-// API, not a gap in the classifier — asserting them on DocumentDB would
-// demand a value AWS does not return.
+// two conditions are RDS-only.
 
 import (
 	"context"
@@ -121,10 +118,6 @@ func w2ByID(rs []resource.Resource) map[string]resource.Resource {
 	return byID
 }
 
-// ---------------------------------------------------------------------------
-// single-AZ — asserted identically on both cluster fetchers
-// ---------------------------------------------------------------------------
-
 func TestW2DBCSingleAZOnBothFetchers(t *testing.T) {
 	doc := w2DocDBCluster("acme-docs-cluster")
 	doc.MultiAZ = aws.Bool(false)
@@ -143,10 +136,6 @@ func TestW2DBCSingleAZOnBothFetchers(t *testing.T) {
 	w2AssertFindingDef(t, "dbc", w2DBCCodeSingleAZ, "single-AZ", domain.SevWarn, "wave1")
 }
 
-// ---------------------------------------------------------------------------
-// default master username — asserted identically on both cluster fetchers
-// ---------------------------------------------------------------------------
-
 func TestW2DBCDefaultMasterUserOnBothFetchers(t *testing.T) {
 	doc := w2DocDBCluster("acme-docs-cluster")
 	doc.MasterUsername = aws.String("master")
@@ -164,10 +153,6 @@ func TestW2DBCDefaultMasterUserOnBothFetchers(t *testing.T) {
 
 	w2AssertFindingDef(t, "dbc", w2DBCCodeDefaultMaster, "default master username", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// RDS-only conditions
-// ---------------------------------------------------------------------------
 
 func TestW2DBCMinorUpgradeOff(t *testing.T) {
 	off := w2AuroraCluster("acme-orders-cluster")
@@ -199,12 +184,7 @@ func TestW2DBCDocDBDoesNotInventRDSOnlyConditions(t *testing.T) {
 	w2AssertNoCode(t, got["acme-docs-cluster"].Findings, w2DBCCodeIAMAuthOff)
 }
 
-// ---------------------------------------------------------------------------
-// nil pointers and lifecycle
-// ---------------------------------------------------------------------------
-
-// An absent pointer is unknown, not misconfigured — the batch contract's
-// default for every row that does not say otherwise.
+// An absent pointer is unknown, not misconfigured.
 func TestW2DBCNilPointersEmitNothing(t *testing.T) {
 	doc := w2DocDBCluster("acme-docs-nil")
 	doc.MultiAZ = nil

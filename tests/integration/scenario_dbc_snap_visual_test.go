@@ -2,7 +2,7 @@
 
 package integration
 
-// scenario_dbc_snap_visual_test.go — Phase-8 render-gate for dbc-snap.
+// Rendered-surface checks for dbc-snap.
 //
 // Mirrors scenario_dbi_snap_visual_test.go's coverage of the cross-ref Wave-1
 // signals (orphan + past-retention) emitted by the SnapshotCrossRef helper
@@ -19,7 +19,7 @@ import (
 
 // TestScenario_DBCSnapVisual_CrossRefSignals pins the orphan and past-retention
 // phrases emitted by the dbc-snap cross-ref enricher to the rendered Status
-// column. This is the regression pin against silent enricher regressions.
+// column.
 func TestScenario_DBCSnapVisual_CrossRefSignals(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -47,7 +47,7 @@ func TestScenario_DBCSnapVisual_CrossRefSignals(t *testing.T) {
 }
 
 // TestScenario_DBCSnapVisual_DetailSurfacesAttention asserts the Attention
-// section renders the cross-ref finding in the dbc-snap detail view (S5).
+// section renders the cross-ref finding in the dbc-snap detail view.
 func TestScenario_DBCSnapVisual_DetailSurfacesAttention(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -102,10 +102,6 @@ func selectDBCSnapByID(t *testing.T, s *fullIntegrationScenario, id string) reso
 //  2. locate the parent in the dbc cache (rdstypes.DBCluster),
 //  3. extract the cluster ARN via dbcResourceARN,
 //  4. scan the backup plan cache for plans covering that ARN.
-//
-// This test pins the dual-shape dispatch chain that the earlier unit tests
-// cover at the function level — verifying that the wiring holds end-to-end in
-// the full demo fixture graph.
 func TestScenario_DBCSnapVisual_AuroraBackupPivot(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -114,7 +110,6 @@ func TestScenario_DBCSnapVisual_AuroraBackupPivot(t *testing.T) {
 	// Healthy Aurora snapshot must render with blank status (no cross-ref signals).
 	scenario.ExpectRowStatusBlank(demofixtures.ProdDBCSnapAuroraID)
 
-	// Open the detail view for the Aurora cluster snapshot.
 	res := selectDBCSnapByID(t, scenario, demofixtures.ProdDBCSnapAuroraID)
 	scenario.OpenDetailResource("dbc-snap", res)
 	scenario.ExpectNoAPIError()
@@ -152,23 +147,17 @@ func TestScenario_DBCSnapVisual_FailedPlusManualOldStacks(t *testing.T) {
 
 	scenario.ExpectRowStatusEquals(failedMultiID, "failed (+1)")
 
-	// WarnDBCSnapIncompatibleRestoreID: single Broken phrase, no suffix.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBCSnapIncompatibleRestoreID, "incompatible-restore")
 
-	_ = view // used for logging below
+	_ = view
 
-	// -----------------------------------------------------------------
-	// Detail view: Attention section must carry the Broken phrase and the
-	// orphan cross-ref finding. The manual-age Warning is suppressed under
-	// Broken precedence and must NOT appear.
-	// -----------------------------------------------------------------
+	// The manual-age Warning is suppressed under Broken precedence.
 	res := selectDBCSnapByID(t, scenario, failedMultiID)
 	scenario.OpenDetailResource("dbc-snap", res)
 	scenario.ExpectNoAPIError()
 	detailView := scenario.currentView()
 	t.Log("\n" + detailView)
 
-	// "Failed" (Broken) and the orphan cross-ref appear; "manual, unused" does not.
 	expectAttentionSection(t, detailView, []string{
 		"Failed",                         // Broken phrase, capitalized for display
 		"Orphan: source cluster deleted", // cross-ref finding Summary, capitalized for display

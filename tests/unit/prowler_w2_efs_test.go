@@ -1,13 +1,12 @@
 package unit
 
-// prowler_w2_efs_test.go — efs rows 27–29 of the w2 Prowler batch:
-// unencrypted file system (Wave 1), a file system policy open to anyone and
-// automatic backups off (both Wave 2, added to EnrichEFSMountTargets).
+// efs posture: unencrypted file system (Wave 1), a file system policy open to
+// anyone and automatic backups off (both Wave 2, in EnrichEFSMountTargets).
 //
-// The two Wave-2 rows land in the existing mount-target enricher rather than a
-// second one, so the tests keep a healthy mount target on every file system:
-// the mount-target finding must not appear or disappear because a policy or a
-// backup policy was read alongside it.
+// The Wave-2 checks share the mount-target enricher, so the tests keep a
+// healthy mount target on every file system: the mount-target finding must
+// not appear or disappear because a policy or a backup policy was read
+// alongside it.
 
 import (
 	"context"
@@ -30,10 +29,6 @@ const (
 	w2EFSCodeNoBackupPolicy = "efs.no-backup-policy"
 	w2EFSSource             = "wave2"
 )
-
-// ---------------------------------------------------------------------------
-// row 27 — encryption at rest (Wave 1)
-// ---------------------------------------------------------------------------
 
 type w2EFSListFake struct {
 	fileSystems []efstypes.FileSystemDescription
@@ -92,10 +87,6 @@ func TestW2EFSDeletingFileSystemEmitsNoEncryptionFinding(t *testing.T) {
 	got := w2EFSFetch(t, deleting)
 	w2AssertNoCode(t, got["fs-0acme00000000009"].Findings, w2EFSCodeUnencrypted)
 }
-
-// ---------------------------------------------------------------------------
-// rows 28 & 29 — file system policy and backup policy (Wave 2)
-// ---------------------------------------------------------------------------
 
 // w2EFSPolicyFake answers mount targets, the file system policy and the backup
 // policy. Absent map entries are healthy: two available mount targets, no
@@ -230,9 +221,8 @@ func TestW2EFSNoBackupPolicy(t *testing.T) {
 	res := w2EFSEnrich(t, fake, "fs-0acme00000000001", "fs-0acme00000000002", "fs-0acme00000000003")
 
 	w2AssertFinding(t, res.Findings["fs-0acme00000000001"], w2EFSCodeNoBackupPolicy, "automatic backups off", domain.SevWarn, w2EFSSource)
-	// The row does not read the raw EFS enum "DISABLED": an operator never
-	// sees an SDK constant, and the phrase already says backups are off, so
-	// the row has nothing to add.
+	// An operator never sees the raw EFS enum "DISABLED", and the phrase already
+	// says backups are off, so the finding carries no row.
 	w2AssertNoRows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy)
 
 	// No backup policy at all is the same operational fact as a disabled one.
@@ -241,10 +231,6 @@ func TestW2EFSNoBackupPolicy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["fs-0acme00000000003"], w2EFSCodeNoBackupPolicy)
 	w2AssertFindingDef(t, "efs", w2EFSCodeNoBackupPolicy, "automatic backups off", domain.SevWarn, "wave2")
 }
-
-// ---------------------------------------------------------------------------
-// independence and error handling inside the shared enricher
-// ---------------------------------------------------------------------------
 
 func TestW2EFSPolicyAndBackupConditionsAreIndependent(t *testing.T) {
 	fake := &w2EFSPolicyFake{
@@ -260,8 +246,8 @@ func TestW2EFSPolicyAndBackupConditionsAreIndependent(t *testing.T) {
 	w2AssertNoRows(t, res, "fs-0acme00000000001", w2EFSCodeNoBackupPolicy)
 }
 
-// The mount-target signal this enricher already owns must keep working once
-// the two policy calls join it in the same per-file-system body.
+// The mount-target signal must keep working alongside the two policy calls in
+// the same per-file-system body.
 func TestW2EFSMountTargetSignalSurvivesTheNewCalls(t *testing.T) {
 	fake := &w2EFSPolicyFake{
 		policies: map[string]string{"fs-0acme00000000001": w2EFSPublicPolicyDoc},

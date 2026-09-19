@@ -1,24 +1,20 @@
 package unit
 
-// prowler_w6a_monitoring_test.go — batch w6a rows 1-7: the CloudTrail,
-// CloudWatch Logs and CloudWatch alarm posture signals.
+// CloudTrail, CloudWatch Logs and CloudWatch alarm posture signals.
 //
-// Rows 1-3 and 6-7 are Wave-1: everything they need is already in the
-// list/describe payload the fetcher holds, so the tests drive the real
-// fetcher and read the findings off the produced resource. Rows 4-5 are the
-// cache-only trail enricher, driven through the catalog registration so the
+// Most are Wave-1: everything they need is already in the list/describe
+// payload the fetcher holds, so the tests drive the real fetcher and read the
+// findings off the produced resource. The two log-bucket checks come from the
+// trail Wave-2 enricher, driven through the catalog registration so the
 // enricher is proven reachable and not merely defined.
 //
 // Assertions are on literal code and phrase strings, never on the production
 // constants, so a silent rename is caught rather than followed.
 //
-// The resource names here are deliberately NOT the fixture witness constants.
-// These drive the real fetcher over hand-built SDK input to pin the predicate;
-// they say nothing about whether a demo row exists. Naming them after the
-// witnesses is what let four constants point at rows no fixture built while
-// these tests stayed green. The bench half is
-// TestW6AEveryFindingFiresOnItsNamedWitnessOnly, which reads the fixture
-// store.
+// The resource names here are deliberately NOT the fixture constants. These
+// tests pin the predicate over hand-built SDK input and say nothing about
+// whether a demo row exists; TestW6AEveryFindingFiresOnItsNamedWitnessOnly
+// reads the fixture store.
 
 import (
 	"context"
@@ -50,10 +46,6 @@ const (
 	w6aLogsNoKMS           = "logs.no-kms"
 	w6aAlarmActionsOff     = "alarm.actions-disabled"
 )
-
-// ---------------------------------------------------------------------------
-// trail — rows 1-3 (wave 1)
-// ---------------------------------------------------------------------------
 
 // w6aTrailFake answers DescribeTrails with the given list. GetTrailStatus
 // reports a healthy, currently-logging trail so no runtime finding competes
@@ -103,8 +95,9 @@ func w6aFetchTrails(t *testing.T, trails ...cttypes.Trail) map[string]resource.R
 	return byID
 }
 
-// TestW6ATrailNoCloudWatchLogs pins row 2. A trail that writes only to S3 has
-// no live stream to alarm on, so the delivery target is the evidence.
+// TestW6ATrailNoCloudWatchLogs pins a trail without CloudWatch Logs delivery.
+// A trail that writes only to S3 has no live stream to alarm on, so the
+// delivery target is the evidence.
 func TestW6ATrailNoCloudWatchLogs(t *testing.T) {
 	silent := w6aTrail("unit-no-cwlogs-trail")
 	silent.CloudWatchLogsLogGroupArn = nil
@@ -121,7 +114,7 @@ func TestW6ATrailNoCloudWatchLogs(t *testing.T) {
 	w6aAssertRow(t, got["unit-no-cwlogs-trail"], w6aTrailNoCWLogs, "Log group", "none")
 }
 
-// TestW6ATrailNoKMS pins row 3.
+// TestW6ATrailNoKMS pins a trail without KMS encryption.
 func TestW6ATrailNoKMS(t *testing.T) {
 	plain := w6aTrail("unit-no-kms-trail")
 	plain.KmsKeyId = nil
@@ -134,9 +127,9 @@ func TestW6ATrailNoKMS(t *testing.T) {
 	w6aAssertRow(t, got["unit-no-kms-trail"], w6aTrailNoKMS, "KMS key", "none")
 }
 
-// TestW6ATrail_ConditionsAreIndependent pins contract rule 4 on trail: three
-// misconfigurations on one trail produce three findings, not the first one
-// the fetcher happens to evaluate.
+// TestW6ATrail_ConditionsAreIndependent pins that three misconfigurations on
+// one trail produce three findings, not the first one the fetcher happens to
+// evaluate.
 func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 	bad := w6aTrail("acme-neglected-trail")
 	bad.CloudWatchLogsLogGroupArn = nil
@@ -150,10 +143,6 @@ func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// trail — rows 4-5 (wave 2, read from S3 directly)
-// ---------------------------------------------------------------------------
 
 // w6aTrailS3Fake answers the two read-only bucket calls the trail enricher
 // makes. Buckets default to private with access logging on, so each test
@@ -220,9 +209,8 @@ func w6aEnrichTrailErr(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resour
 	return res, err
 }
 
-// TestW6ATrailLogBucketPublic pins row 4. A publicly readable log bucket hands
-// the account's audit trail to anyone, so this is the batch's one Broken trail
-// row.
+// TestW6ATrailLogBucketPublic pins a publicly readable log bucket, which
+// hands the account's audit trail to anyone.
 func TestW6ATrailLogBucketPublic(t *testing.T) {
 	res := w6aEnrichTrail(t,
 		&w6aTrailS3Fake{public: map[string]bool{"acme-public-audit-logs": true}},
@@ -237,7 +225,8 @@ func TestW6ATrailLogBucketPublic(t *testing.T) {
 		"Bucket", "acme-public-audit-logs")
 }
 
-// TestW6ATrailLogBucketNoAccessLogging pins row 5.
+// TestW6ATrailLogBucketNoAccessLogging pins a log bucket without access
+// logging.
 func TestW6ATrailLogBucketNoAccessLogging(t *testing.T) {
 	res := w6aEnrichTrail(t,
 		&w6aTrailS3Fake{unlogged: map[string]bool{"acme-unlogged-audit-logs": true}},
@@ -252,9 +241,9 @@ func TestW6ATrailLogBucketNoAccessLogging(t *testing.T) {
 		"Bucket", "acme-unlogged-audit-logs")
 }
 
-// TestW6ATrailLogBucket_BothConditionsOnOneBucket pins contract rule 4 across
-// the wave-2 pair: one bucket that is both public and unlogged produces both
-// findings on the trail that writes to it.
+// TestW6ATrailLogBucket_BothConditionsOnOneBucket pins that one bucket that
+// is both public and unlogged produces both findings on the trail that writes
+// to it.
 func TestW6ATrailLogBucket_BothConditionsOnOneBucket(t *testing.T) {
 	res := w6aEnrichTrail(t,
 		&w6aTrailS3Fake{
@@ -311,8 +300,8 @@ func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
 		"log bucket is publicly accessible", domain.SevBroken, "wave2")
 }
 
-// TestW6ATrailLogBucket_CapBoundsTheIssueCount pins that the "!" row makes the
-// cap a lower bound on the issue count, so a capped pass says so.
+// TestW6ATrailLogBucket_CapBoundsTheIssueCount pins that the "!" finding makes
+// the cap a lower bound on the issue count, so a capped pass says so.
 func TestW6ATrailLogBucket_CapBoundsTheIssueCount(t *testing.T) {
 	mk := func(n int) []resource.Resource {
 		out := make([]resource.Resource, 0, n)
@@ -329,10 +318,6 @@ func TestW6ATrailLogBucket_CapBoundsTheIssueCount(t *testing.T) {
 		t.Error("EnrichmentCap+1 trails did not report Truncated")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// logs — row 6 (wave 1)
-// ---------------------------------------------------------------------------
 
 type w6aLogsFake struct {
 	groups []cwltypes.LogGroup
@@ -367,8 +352,8 @@ func w6aFetchLogGroups(t *testing.T, groups ...cwltypes.LogGroup) map[string]res
 	return byID
 }
 
-// TestW6ALogsNoKMS pins row 6. A log group with no customer key is readable
-// by anyone holding logs:GetLogEvents, with no second control in the way.
+// TestW6ALogsNoKMS pins a log group with no customer key: it is readable by
+// anyone holding logs:GetLogEvents, with no second control in the way.
 func TestW6ALogsNoKMS(t *testing.T) {
 	plain := w6aLogGroup("/unit/no-kms-group")
 	plain.KmsKeyId = nil
@@ -385,10 +370,6 @@ func TestW6ALogsNoKMS(t *testing.T) {
 	w6aAssertRow(t, got["/unit/no-kms-group"], w6aLogsNoKMS, "KMS key", "none")
 	w2AssertFindingDef(t, "logs", w6aLogsNoKMS, "not encrypted with KMS", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// alarm — row 7 (wave 1)
-// ---------------------------------------------------------------------------
 
 type w6aAlarmFake struct {
 	alarms []cwtypes.MetricAlarm
@@ -433,8 +414,9 @@ func w6aFetchAlarms(t *testing.T, alarms ...cwtypes.MetricAlarm) map[string]reso
 	return byID
 }
 
-// TestW6AAlarmActionsDisabled pins row 7. An alarm with actions configured
-// but execution switched off looks wired up in the console and pages nobody.
+// TestW6AAlarmActionsDisabled pins disabled alarm actions. An alarm with
+// actions configured but execution switched off looks wired up in the console
+// and pages nobody.
 func TestW6AAlarmActionsDisabled(t *testing.T) {
 	off := w6aAlarm("unit-actions-disabled-alarm")
 	off.ActionsEnabled = aws.Bool(false)
@@ -445,7 +427,7 @@ func TestW6AAlarmActionsDisabled(t *testing.T) {
 		"actions disabled", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-healthy-alarm"].Findings, w6aAlarmActionsOff)
 	// The phrase already says the actions are off; the row's job is to say
-	// how much is wired behind the switch (U11).
+	// how much is wired behind the switch.
 	w6aAssertRow(t, got["unit-actions-disabled-alarm"], w6aAlarmActionsOff, "Configured actions", "2")
 	w2AssertFindingDef(t, "alarm", w6aAlarmActionsOff, "actions disabled", domain.SevWarn, "wave1")
 }
@@ -461,8 +443,8 @@ func TestW6AAlarmActionsDisabled_NilIsUnknown(t *testing.T) {
 	w2AssertNoCode(t, got["acme-unknown-actions-alarm"].Findings, w6aAlarmActionsOff)
 }
 
-// TestW6AAlarmActionsDisabled_CoexistsWithNoActions pins that row 7 and the
-// existing alarm.no_actions row are independent: an alarm with no actions AND
+// TestW6AAlarmActionsDisabled_CoexistsWithNoActions pins that disabled
+// actions and alarm.no_actions are independent: an alarm with no actions AND
 // execution disabled carries both, because fixing one leaves the other.
 func TestW6AAlarmActionsDisabled_CoexistsWithNoActions(t *testing.T) {
 	bare := w6aAlarm("acme-inert-alarm")
@@ -479,10 +461,6 @@ func TestW6AAlarmActionsDisabled_CoexistsWithNoActions(t *testing.T) {
 	}
 	w6aAssertRow(t, got["acme-inert-alarm"], w6aAlarmActionsOff, "Configured actions", "0")
 }
-
-// ---------------------------------------------------------------------------
-// shared
-// ---------------------------------------------------------------------------
 
 // w6aAssertRow pins one AttentionDetail row of a wave-1 finding, which the
 // fetcher attaches to the resource rather than to an enricher result.

@@ -10,10 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Related registry unit tests
-// ═══════════════════════════════════════════════════════════════════════════
-
 var testRelatedDefs = []resource.RelatedDef{
 	{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
@@ -185,7 +181,6 @@ func TestRelated_Alarm_Registered(t *testing.T) {
 		}
 	}
 
-	// Verify sns and asg both have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
 		case "sns":
@@ -220,7 +215,6 @@ func TestRelated_AMI_Registered(t *testing.T) {
 		}
 	}
 
-	// ec2, ebs-snap, and asg should all have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
 		case "ec2", "ebs-snap", "asg":
@@ -237,10 +231,6 @@ func TestRelated_APIGW_Registered(t *testing.T) {
 		t.Fatal("no related defs registered for apigw")
 	}
 
-	// waf/r53/sfn/sns/vpce were removed: their checkers (checkApigwWAF/R53/
-	// SFN/SNS/VPCE) were structurally unwitnessable (hardcoded to State: RelatedUnknown / 0, no
-	// AWS API path to resolve a concrete match) and were deleted along with
-	// the registration rather than carried as permanent demo-coverage debt.
 	expected := []string{"lambda", "logs"}
 	for _, exp := range expected {
 		found := false
@@ -388,8 +378,6 @@ func TestRelated_Codeartifact_Registered(t *testing.T) {
 		t.Fatal("no related defs registered for codeartifact")
 	}
 
-	// codeartifact→cb was dropped (Explicitly excluded: unanimous sometimes).
-	// codeartifact→kms remains the active registration.
 	expected := []string{"kms"}
 	for _, exp := range expected {
 		found := false
@@ -1058,7 +1046,6 @@ func TestRelated_KMS_Registered(t *testing.T) {
 		}
 	}
 
-	// All three checkers must be non-nil (no stubs).
 	for _, def := range defs {
 		switch def.TargetType {
 		case "ebs", "dbi", "secrets":
@@ -1089,7 +1076,6 @@ func TestRelated_Lambda_Registered(t *testing.T) {
 		}
 	}
 
-	// role, alarm, sqs, and cfn must all have non-nil checkers
 	for _, def := range defs {
 		switch def.TargetType {
 		case "role", "alarm", "sqs", "cfn":
@@ -1120,7 +1106,6 @@ func TestRelated_Logs_Registered(t *testing.T) {
 		}
 	}
 
-	// lambda and alarm must have non-nil checkers.
 	for _, def := range defs {
 		switch def.TargetType {
 		case "lambda", "alarm":
@@ -1298,7 +1283,6 @@ func TestRelated_DBISnap_Registered(t *testing.T) {
 		}
 	}
 
-	// Both dbi and kms checkers must be non-nil.
 	for _, def := range defs {
 		switch def.TargetType {
 		case "dbi", "kms":
@@ -1440,7 +1424,6 @@ func TestRelated_SES_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for ses")
 	}
-	// ses→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
 	expected := []string{"r53"}
 	for _, exp := range expected {
 		found := false
@@ -1461,7 +1444,6 @@ func TestRelated_SFN_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sfn")
 	}
-	// sfn→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
 	expected := []string{"alarm", "logs", "role"}
 	for _, exp := range expected {
 		found := false
@@ -1482,7 +1464,6 @@ func TestRelated_SNS_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for sns")
 	}
-	// sns→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
 	expected := []string{"alarm"}
 	for _, exp := range expected {
 		found := false
@@ -1603,7 +1584,6 @@ func TestRelated_TGW_Registered(t *testing.T) {
 	if len(defs) == 0 {
 		t.Fatal("no related defs registered for tgw")
 	}
-	// tgw→cfn was dropped (Explicitly excluded: unanimous sometimes — tag-heuristic only).
 	expected := []string{"vpc", "rtb"}
 	for _, exp := range expected {
 		found := false
@@ -1748,9 +1728,7 @@ func TestAppendRelated_NilChecker_Panics(t *testing.T) {
 	resource.CleanupRelatedForTest("unset_checker_test_append")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CleanupRelatedForTest must restore production defs, not destroy them.
-// ═══════════════════════════════════════════════════════════════════════════
+// CleanupRelatedForTest restores production defs rather than destroying them.
 //
 // Register pushes the previous value onto a per-key snapshot stack and
 // Unregister pops it, so a test's Register-then-defer-Unregister leaves the
@@ -1787,8 +1765,7 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 		t.Fatalf("after second Register, expected defsB active, got %v", got)
 	}
 
-	// First Unregister must restore defsA — NOT delete the entry. This is the
-	// regression guard; a destructive delete would return nil.
+	// First Unregister restores defsA rather than deleting the entry.
 	resource.CleanupRelatedForTest(shortName)
 	got = resource.GetRelated(shortName)
 	if len(got) != 1 || got[0].TargetType != "as67-target-a" {
@@ -1797,8 +1774,8 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 
 	// Second Unregister pops the original "no previous registration" snapshot
 	// (a nil sentinel pushed by SetRelatedForTest when the key was empty), so
-	// the active entry is deleted entirely — preserving the historical
-	// destructive semantics for keys that production never registered.
+	// the active entry is deleted entirely — the right semantics for keys that
+	// production never registered.
 	resource.CleanupRelatedForTest(shortName)
 	if got := resource.GetRelated(shortName); got != nil {
 		t.Fatalf("after second Unregister, expected nil (entry deleted), got %v", got)
@@ -1886,8 +1863,7 @@ func TestRegisterRelated_Concurrent(t *testing.T) {
 	wg.Wait()
 }
 
-// ─── compile-time reference to context so the import is used ────────────────
-// RelatedChecker requires context.Context; verify the type is usable.
+// Compile-time reference that keeps the context import in use.
 var _ resource.RelatedChecker = func(
 	_ context.Context,
 	_ any,
@@ -1897,26 +1873,17 @@ var _ resource.RelatedChecker = func(
 	return resource.RelatedCheckResult{}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GetRelated precedence — catalog fallback vs. test-scoped override
-// ═══════════════════════════════════════════════════════════════════════════
+// GetRelated precedence: a SetRelatedForTest override always wins over the
+// catalog for the same short name, CleanupRelatedForTest always restores the
+// catalog view (not just a prior override), and an empty-but-non-nil override
+// slice masks the catalog rather than falling through to it. These tests pin
+// WHICH SOURCE — the runtime override map vs. the catalog — GetRelated reads.
 //
-// Pins the precedence contract of GetRelated (related.go:462-473) BEFORE the
-// registry is made explicitly test-scoped: a SetRelatedForTest override
-// always wins over the catalog for the same short name, CleanupRelatedForTest
-// always restores the catalog view (not just a prior override), and an
-// empty-but-non-nil override slice masks the catalog rather than falling
-// through to it. Unlike the *_Registered tests above (which only check
-// presence of specific TargetTypes), these tests pin WHICH SOURCE — the
-// legacy runtime map vs. the catalog fallback — GetRelated reads from.
-//
-// "sqs" is the anchor type: core/aws has no production writer to the legacy
-// runtime map (only SetRelatedForTest/AppendRelated, both test-only), so any
-// catalog type with no active test override is guaranteed catalog-sourced.
-// All four tests are expected to PASS today — they pin current semantics
-// that must survive the refactor, not a bug.
+// "sqs" is the anchor type: core/aws has no production writer to the runtime
+// override map (only SetRelatedForTest/AppendRelated, both test-only), so any
+// catalog type with no active test override is catalog-sourced.
 
-// TestGetRelated_NoOverride_ReturnsCatalogDefs pins (a): a catalog-registered
+// TestGetRelated_NoOverride_ReturnsCatalogDefs: a catalog-registered
 // type with no SetRelatedForTest override in effect returns exactly the
 // catalog's Related defs.
 func TestGetRelated_NoOverride_ReturnsCatalogDefs(t *testing.T) {
@@ -1940,7 +1907,7 @@ func TestGetRelated_NoOverride_ReturnsCatalogDefs(t *testing.T) {
 	}
 }
 
-// TestGetRelated_SetRelatedForTest_OverridesCatalog pins (b): a
+// TestGetRelated_SetRelatedForTest_OverridesCatalog: a
 // SetRelatedForTest override for a catalog-registered type wins over the
 // catalog's own Related defs for the same short name.
 func TestGetRelated_SetRelatedForTest_OverridesCatalog(t *testing.T) {
@@ -1962,11 +1929,11 @@ func TestGetRelated_SetRelatedForTest_OverridesCatalog(t *testing.T) {
 	}
 }
 
-// TestGetRelated_CleanupRelatedForTest_RestoresCatalogView pins (c): after
+// TestGetRelated_CleanupRelatedForTest_RestoresCatalogView: after
 // SetRelatedForTest followed by CleanupRelatedForTest, GetRelated returns to
 // the catalog's Related defs — the override does not leak past cleanup, and
 // cleanup lands on the CATALOG view (not a deleted/nil entry), since "sqs"
-// had no prior legacy-map registration to restore to.
+// had no prior override-map registration to restore to.
 func TestGetRelated_CleanupRelatedForTest_RestoresCatalogView(t *testing.T) {
 	ct := catalog.FindAny("sqs")
 	if ct == nil || len(ct.Related) == 0 {
@@ -1991,7 +1958,7 @@ func TestGetRelated_CleanupRelatedForTest_RestoresCatalogView(t *testing.T) {
 	}
 }
 
-// TestGetRelated_SetRelatedForTest_EmptyDefsSlice_MasksCatalog pins (d): an
+// TestGetRelated_SetRelatedForTest_EmptyDefsSlice_MasksCatalog: an
 // override registered with an empty-but-non-nil defs slice masks the
 // catalog entirely — GetRelated returns the empty override, not a fallback
 // to the catalog's real (non-empty) defs.

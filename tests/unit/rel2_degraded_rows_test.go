@@ -1,6 +1,6 @@
 package unit_test
 
-// rel2_degraded_rows_test.go — a details-denied/details-unavailable row
+// A details-denied/details-unavailable row
 // never answers a confident zero for a struct-only pivot: a fabricated,
 // assertable struct would let such pivots find their field empty and answer
 // zero for a row nobody could describe. This gate covers every type that
@@ -24,8 +24,7 @@ import (
 //
 // A resolved zero on a row whose RawStruct is nil can only have come from
 // Fields or the target cache: a type assertion against a nil interface
-// always fails, so there is no struct left to have answered from. That is
-// the row-10 fix's own guarantee, and it needs no further proof here.
+// always fails, so there is no struct left to have answered from.
 //
 // A resolved zero on a row whose RawStruct is NOT nil (lt and transfer pass
 // the real, non-fabricated API item) must still not depend on that struct:

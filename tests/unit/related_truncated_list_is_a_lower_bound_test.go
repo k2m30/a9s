@@ -1,6 +1,6 @@
 package unit_test
 
-// related_truncated_list_is_a_lower_bound_test.go — a list that WAS read and
+// A list that WAS read and
 // came back cut short has one answer in this package, and it is not Unknown.
 //
 // The rule has three cases. Nothing fetched (a nil list) is Unknown, because a
@@ -9,13 +9,11 @@ package unit_test
 // "none among the pages read, more unread" is true, and the flag is where the
 // domain type keeps the uncertainty. A failed call is an Error.
 //
-// The second case is the one that keeps coming back. A checker that answers
-// Unknown there throws away a real zero and renders a question mark the user
-// cannot act on, and two hand scans over this package missed the last site
-// twice — once because the grep keyed on one spelling of the condition. So the
-// shape is pinned rather than the sites: every Unknown returned under a
-// condition that mentions truncation must be on the list below, and every entry
-// on that list has to say why its truncated list is not the target list.
+// A checker that answers Unknown in the second case throws away a real zero
+// and renders a question mark the user cannot act on. The shape is pinned
+// rather than the sites: every Unknown returned under a condition that
+// mentions truncation must be on the list below, and every entry on that list
+// has to say why its truncated list is not the target list.
 
 import (
 	"context"
@@ -125,7 +123,7 @@ func TestRelatedTruncatedList_IsALowerBoundNotUnknown(t *testing.T) {
 	}
 }
 
-// TestRelated_EFS_ENI_ColdCacheIsUnknown pins row 16 case 1 where the nil list
+// TestRelated_EFS_ENI_ColdCacheIsUnknown pins case 1 where the nil list
 // IS the target list. The EFS mount-target pivot scans the eni list for
 // interfaces whose description carries the file system id; with no eni cache
 // and nothing to call, that scan never happened. Reporting "(0)" says the file
@@ -149,9 +147,7 @@ func TestRelated_EFS_ENI_ColdCacheIsUnknown(t *testing.T) {
 // nobody read it and the truncation flag beside it is always false.
 //
 // A checker that guards on "nil AND truncated" is therefore guarding on a state
-// the fetch layer cannot produce, and the branch is dead rather than merely
-// wrong. That distinction decides its fix: such a branch is deleted, not
-// converted to Unknown, because the code after it may still have a live lookup.
+// the fetch layer cannot produce, and the branch is dead.
 func TestFetchRelatedTarget_NeverReportsTruncationForAListItDidNotReturn(t *testing.T) {
 	const target = "role"
 	restore := resource.GetPaginatedFetcher(target)

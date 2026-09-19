@@ -1,11 +1,10 @@
 package unit
 
-// session_detail_doc_cache_test.go — coverage for session.Session's
-// DetailDocCache field (core/session/session.go), the session-scoped cache
-// wired into DetailEnrichmentCtx for the sfn/cfn on-demand detail enrichers
-// (#261). Mirrors the existing PolicyDocCache session-lifecycle contract:
-// New() seeds a fresh instance, Rotate() swaps in another fresh instance so
-// documents fetched under a previous profile/region cannot leak into the next.
+// Session.Session's DetailDocCache
+// (core/session/session.go) is the session-scoped cache behind
+// DetailEnrichmentCtx for the sfn/cfn on-demand detail enrichers. New() seeds
+// a fresh instance and Rotate() swaps in another, so documents fetched under
+// one profile/region cannot leak into the next.
 
 import (
 	"testing"
@@ -21,7 +20,6 @@ func TestSession_New_DetailDocCacheInitialized(t *testing.T) {
 		t.Fatal("session.New().DetailDocCache is nil — Session must construct a DetailDocCache")
 	}
 
-	// Freshly constructed cache must be empty and usable.
 	if got := s.DetailDocCache.Get("sfn:arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"); got != nil {
 		t.Errorf("fresh DetailDocCache should be empty, got %v", got)
 	}
@@ -49,5 +47,4 @@ func TestSession_Rotate_ReplacesDetailDocCache(t *testing.T) {
 	}
 }
 
-// Compile-time check that the field type matches the contract exactly.
 var _ *awsclient.DetailDocCache = (&session.Session{}).DetailDocCache

@@ -1,6 +1,6 @@
 package unit
 
-// scan_secretscan_one_hit_test.go — the scanner reports each key once, and
+// The scanner reports each key once, and
 // misses nothing a YAML reader would see.
 //
 // Two properties, both inside the one engine every caller shares:
@@ -152,9 +152,7 @@ func TestW6AAPIGWStageVariableSecret_TwoLeakingVariablesAreOneFinding(t *testing
 	}
 }
 
-// The negative for the same stage: a single leaking variable is still one
-// finding with one hit row, so the pin above cannot pass by emitting
-// everything twice.
+// A single leaking variable is one finding with one hit row.
 func TestW6AAPIGWStageVariableSecret_OneLeakingVariableIsOneRow(t *testing.T) {
 	const apiID = "rst005secret"
 
@@ -188,10 +186,9 @@ func TestW6AAPIGWStageVariableSecret_OneLeakingVariableIsOneRow(t *testing.T) {
 	}
 }
 
-// The four callers that copied the scan-and-emit shape must reach the
-// scanner through the shared helper instead. A caller holding its own
-// secretscan call is free to build the finding its own way, which is how
-// apigw came to emit per hit and cfn came to scan the same outputs twice.
+// The callers that scan and emit reach the scanner through the shared
+// helper; a caller holding its own secretscan call builds the finding its
+// own way.
 func TestSecretScanEmissionLivesInOnePlace(t *testing.T) {
 	for _, path := range []string{
 		"../../core/aws/lambda.go",

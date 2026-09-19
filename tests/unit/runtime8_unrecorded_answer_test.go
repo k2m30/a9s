@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_unrecorded_answer_test.go — a failed call and an answer without the
+// A failed call and an answer without the
 // field are two facts, and `if err != nil || out == nil` is one branch.
 //
 // A call that refused and a call that answered without the field the caller

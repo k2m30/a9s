@@ -1,13 +1,11 @@
 package unit
 
-// prowler_w2_redis_test.go — redis posture rows 7–10 of the w2 Prowler batch:
-// encryption at rest off, encryption in transit off, no authentication token,
-// automatic backups off.
+// redis posture: encryption at rest off, encryption in transit off, no
+// authentication token, automatic backups off.
 //
 // All four are Wave-1 signals derived from the ReplicationGroup the fetcher
-// already holds, so the tests drive FetchRedisPage and read the findings off
-// That also pins that the fetcher passes the whole replication group to the
-// classifier.
+// already holds, so the tests drive FetchRedisPage, which also pins that the
+// fetcher passes the whole replication group to the classifier.
 
 import (
 	"context"
@@ -72,10 +70,6 @@ func w2RedisFetch(t *testing.T, groups ...ectypes.ReplicationGroup) map[string]r
 	return byID
 }
 
-// ---------------------------------------------------------------------------
-// row 7 — encryption at rest
-// ---------------------------------------------------------------------------
-
 func TestW2RedisAtRestEncryptionOff(t *testing.T) {
 	off := w2RedisGroup("acme-cache-atrest-off")
 	off.AtRestEncryptionEnabled = aws.Bool(false)
@@ -93,10 +87,6 @@ func TestW2RedisAtRestEncryptionOff(t *testing.T) {
 	w2AssertNoCode(t, got["acme-cache-healthy"].Findings, w2RedisCodeAtRestOff)
 	w2AssertFindingDef(t, "redis", w2RedisCodeAtRestOff, "encryption at rest off", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// rows 8 & 9 — in-transit encryption and AUTH
-// ---------------------------------------------------------------------------
 
 func TestW2RedisTransitEncryptionOff(t *testing.T) {
 	off := w2RedisGroup("acme-cache-transit-off")
@@ -123,7 +113,7 @@ func TestW2RedisNoAuthToken(t *testing.T) {
 
 // AWS only accepts an AUTH token on a group that has in-transit encryption on.
 // Reporting a missing authentication token on a plaintext group would send
-// the operator to fix a setting AWS refuses; the in-transit row is the one
+// the operator to fix a setting AWS refuses; the in-transit finding is the one
 // actionable signal.
 func TestW2RedisNoAuthSuppressedWhenTransitEncryptionOff(t *testing.T) {
 	plain := w2RedisGroup("acme-cache-plain")
@@ -135,10 +125,6 @@ func TestW2RedisNoAuthSuppressedWhenTransitEncryptionOff(t *testing.T) {
 	w2AssertFinding(t, got["acme-cache-plain"].Findings, w2RedisCodeTransitOff, "encryption in transit off", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-cache-plain"].Findings, w2RedisCodeNoAuth)
 }
-
-// ---------------------------------------------------------------------------
-// row 10 — automatic backups
-// ---------------------------------------------------------------------------
 
 func TestW2RedisNoBackup(t *testing.T) {
 	zero := w2RedisGroup("acme-cache-nobackup")
@@ -155,10 +141,6 @@ func TestW2RedisNoBackup(t *testing.T) {
 	w2AssertNoCode(t, got["acme-cache-healthy"].Findings, w2RedisCodeNoBackup)
 	w2AssertFindingDef(t, "redis", w2RedisCodeNoBackup, "automatic backups off", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// independence
-// ---------------------------------------------------------------------------
 
 // Three independent problems on one group produce three findings. The Status
 // cell shows only the first plus a "(+N)" suffix, so the detail view is the

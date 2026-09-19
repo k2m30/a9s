@@ -69,12 +69,10 @@ func TestPR03d_VPCFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03d_VPCColor_ReadsWave1First pins that the vpc Color func evaluates
-// Findings before the legacy Fields["state"] switch. Pre-migration the Color
-// func does not read Findings at all, so this test will fail until the Color
-// func is updated.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="available"
-// Expect: ColorBroken (Findings wins, not legacy "available"→ColorHealthy)
+// Expect: ColorBroken (Findings wins, not "available"→ColorHealthy)
 func TestPR03d_VPCColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("vpc")
 	if td == nil {
@@ -195,10 +193,10 @@ func TestPR03d_SubnetFetcher_UnavailableEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03d_SubnetColor_ReadsWave1First pins that the subnet Color func
-// evaluates Findings before the legacy Fields["state"] switch.
+// evaluates Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="available"
-// Expect: ColorBroken (Findings wins over legacy "available"→ColorHealthy)
+// Expect: ColorBroken (Findings wins over "available"→ColorHealthy)
 func TestPR03d_SubnetColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("subnet")
 	if td == nil {
@@ -325,10 +323,10 @@ func TestPR03d_ELBFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03d_ELBColor_ReadsWave1First pins that the elb Color func evaluates
-// Findings before the legacy Fields["state"] switch.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="active"
-// Expect: ColorBroken (Findings wins over legacy "active"→ColorHealthy)
+// Expect: ColorBroken (Findings wins over "active"→ColorHealthy)
 func TestPR03d_ELBColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("elb")
 	if td == nil {
@@ -410,10 +408,10 @@ func TestPR03d_IGWFetcher_AttachingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03d_IGWColor_ReadsWave1First pins that the igw Color func evaluates
-// Findings before the legacy Fields["state"] / attachments_count switch.
+// Findings before the Fields["state"] / attachments_count switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["state"]="attached", attachments_count="1"
-// Expect: ColorWarning (Findings wins; without Findings the legacy switch
+// Expect: ColorWarning (Findings wins; without Findings the switch
 // returns ColorHealthy for state=attached + attachments=1).
 func TestPR03d_IGWColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("igw")
@@ -536,10 +534,10 @@ func TestPR03d_NATFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03d_NATColor_ReadsWave1First pins that the nat Color func evaluates
-// Findings before the legacy Fields["state"] switch.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="available"
-// Expect: ColorBroken (Findings wins over legacy "available"→ColorHealthy)
+// Expect: ColorBroken (Findings wins over "available"→ColorHealthy)
 func TestPR03d_NATColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("nat")
 	if td == nil {
@@ -657,10 +655,10 @@ func TestPR03d_VPCEFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03d_VPCEColor_ReadsWave1First pins that the vpce Color func evaluates
-// Findings before the legacy Fields["state"] switch.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="Available"
-// Expect: ColorBroken (Findings wins over legacy "Available"→ColorHealthy)
+// Expect: ColorBroken (Findings wins over "Available"→ColorHealthy)
 func TestPR03d_VPCEColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("vpce")
 	if td == nil {
@@ -781,10 +779,10 @@ func TestPR03d_TGWFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03d_TGWColor_ReadsWave1First pins that the tgw Color func evaluates
-// Findings before the legacy Fields["state"] switch.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["state"]="available"
-// Expect: ColorBroken (Findings wins over legacy "available"→ColorHealthy)
+// Expect: ColorBroken (Findings wins over "available"→ColorHealthy)
 func TestPR03d_TGWColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("tgw")
 	if td == nil {
@@ -820,7 +818,7 @@ func (m *pr03dTGWMock) DescribeTransitGateways(
 }
 
 // =============================================================================
-// RTB (Route Table) — special case: drop Status write, structural Findings
+// RTB (Route Table) — no Status write, structural Findings
 // =============================================================================
 
 // TestPR03d_RTBFetcher_StructuralCasesEmitMatchingFindings asserts that the
@@ -828,8 +826,8 @@ func (m *pr03dTGWMock) DescribeTransitGateways(
 // a health state) and emits a wave1 Finding mirroring colorRTB's own
 // structural precedence: blackhole routes win first, then an unassociated
 // non-main table gets rtbCodeOrphanUnassociated; a main table or a non-main
-// table with an association stays healthy. Fields["is_main"] must still be
-// present in every case.
+// table with an association stays healthy. Fields["is_main"] is present in
+// every case.
 func TestPR03d_RTBFetcher_StructuralCasesEmitMatchingFindings(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -896,7 +894,7 @@ func TestPR03d_RTBFetcher_StructuralCasesEmitMatchingFindings(t *testing.T) {
 			if tc.wantFindings > 0 && r.Findings[0].Code != tc.wantCode {
 				t.Errorf("Findings[0].Code: got %q, want %q", r.Findings[0].Code, tc.wantCode)
 			}
-			// Fields["is_main"] must still be present for Color's structural check.
+			// Color's structural check reads Fields["is_main"].
 			if got := r.Fields["is_main"]; got != expectedIsMain {
 				t.Errorf("Fields[\"is_main\"]: got %q, want %q", got, expectedIsMain)
 			}

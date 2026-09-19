@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_lint_covers_integration_test.go — tests/integration/ is behind the
-// `integration` build tag, and golangci-lint sets no build tags, so every file
-// in that directory was invisible to `make lint`. The gate below pins the
-// second, tagged pass that makes it visible.
+// Tests/integration/ is behind the
+// `integration` build tag, and golangci-lint sets no build tags, so `make lint`
+// needs a second, tagged pass to see that directory.
 package unit_test
 
 import (

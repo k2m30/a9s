@@ -1,12 +1,12 @@
 package unit_test
 
-// scan_demo_bench_no_repeat_test.go — the bench-wide proof that nothing
+// The bench-wide proof that nothing
 // renders one condition twice.
 //
 // The per-caller pins say what one enricher does with one input. This walks
 // every demo row of every registered type through its real Wave-1 fetcher and
 // its real Wave-2 enricher, folded the way the app folds it, and answers the
-// question the per-caller pins cannot: which callers repeat themselves today.
+// question the per-caller pins cannot: which callers repeat themselves.
 //
 // Two shapes count as repetition, and they fail in different places:
 //

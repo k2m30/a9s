@@ -2,9 +2,9 @@
 
 package integration
 
-// scenario_opensearch_visual_test.go — Phase 8 render-gate for the opensearch
-// resource. Verifies the rendered TUI output (not fetcher return values) matches
-// the universal UI rules and the §4 contract in docs/resources/opensearch.md.
+// scenario_opensearch_visual_test.go checks the rendered TUI output (not
+// fetcher return values) for opensearch against the universal UI rules and
+// docs/resources/opensearch.md.
 //
 // Every opensearch signal is Wave 1. DescribeDomains is the fetcher's own call
 // and DomainStatus carries all of them, so there is no second pass and no
@@ -25,8 +25,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// §4 phrases pinned locally — any drift in the fetcher or enricher surfaces
-// here instead of in unit tests that could be rewritten without noticing.
 const (
 	openSearchPhraseDeleting   = "deleting: removal in progress"
 	openSearchPhraseIsolated   = "isolated: quarantined by AWS"
@@ -46,14 +44,13 @@ const (
 )
 
 func TestScenario_OpenSearchVisual(t *testing.T) {
-	// Isolate config from the developer's ~/.a9s/ so the test uses
-	// defaults_databases.go (Status column) rather than a stale user yaml.
+	// A user-dir ~/.a9s/ overlay wins the merge, so config points at an empty
+	// dir and defaults_databases.go applies.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// -----------------------------------------------------------------
-	// S1 menu badge — the count of rows whose colour is an issue. Colour is
+	// Menu badge — the count of rows whose colour is an issue. Colour is
 	// the worst severity among a row's findings, so a Warn finding counts
 	// wherever it came from and a Dim one never does.
 	// Over the 13 opensearch fixtures:
@@ -71,29 +68,19 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//                obsolete-tenant-logs is Dim.
 	// 2 + 8 = 10. The encryption and transport rows are Wave 1 findings, so
 	// they colour their own rows and count here.
-	// -----------------------------------------------------------------
 	scenario.ExpectMenuIssueCount("opensearch", 10)
 
 	scenario.OpenList("opensearch")
 
-	// -----------------------------------------------------------------
-	// Universal column rules — no jargon columns.
-	// The old "Processing" column (key: domain_processing_status) was
-	// folded into Status in phase 7.
-	// -----------------------------------------------------------------
 	for _, jargon := range []string{
 		"CIS", " Flags", " Issues ", "NOBKP", "UNENC", "NOPROT", "PUB",
 	} {
 		scenario.ExpectViewNotContains(jargon)
 	}
-	// "Processing" as a column header is banned — but the word appears
-	// in §4 phrases like "processing: config change in flight", so we
-	// scope the check to the header form.
+	// The word "Processing" appears in phrases like "processing: config change
+	// in flight", so the check is scoped to the header form.
 	scenario.ExpectViewNotContains("Processing    ")
 
-	// -----------------------------------------------------------------
-	// Healthy rows: blank Status.
-	// -----------------------------------------------------------------
 	for _, id := range []string{
 		demofixtures.HealthyBaselineDomain,
 		demofixtures.GraphRootDomain,
@@ -101,32 +88,21 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 		scenario.ExpectRowStatusBlank(id)
 	}
 
-	// -----------------------------------------------------------------
-	// §4 phrases per state bucket.
-	// -----------------------------------------------------------------
 	scenario.ExpectRowStatusEquals(demofixtures.DeletingDomain, openSearchPhraseDeleting)
 	scenario.ExpectRowStatusEquals(demofixtures.IsolatedDomain, openSearchPhraseIsolated)
 	scenario.ExpectRowStatusEquals(demofixtures.ProcessingDomain, openSearchPhraseProcessing)
 	scenario.ExpectRowStatusEquals(demofixtures.UpdateAvailableDomain, openSearchPhraseUpdate)
 	scenario.ExpectRowStatusEquals(demofixtures.EncryptionOffDomain, openSearchPhraseEncryption)
 
-	// Rule 7 — multi-finding suffix.
 	// Processing + UpdateAvailable → hard-state wins, suffix +1.
 	scenario.ExpectRowStatusEquals(demofixtures.ProcessingPlusUpdateDomain, openSearchPhraseProcessingP1)
 	// The multi-background row carries update-forced and encryption-off, both
 	// Wave-1 warnings, so the update leads and the suffix counts the second.
 	scenario.ExpectRowStatusEquals(demofixtures.MultiBackgroundDomain, openSearchPhraseUpdateP1)
 
-	// -----------------------------------------------------------------
-	// Glyph rules.
-	// -----------------------------------------------------------------
 	// colorOpenSearch (catalog_databases.go) resolves color via
-	// colorFromAnyFinding first. opensearchCodeUpdateForced (Severity:
-	// SevBroken) and opensearchCodeEncryptionOff (Severity: SevWarn) both
-	// now promote their row's color directly — UpdateAvailableDomain and
-	// MultiBackgroundDomain render Broken, EncryptionOffDomain renders
-	// Warning. None of them stay Healthy-with-glyph anymore; the glyph is
-	// retired in favor of the row color itself carrying the signal.
+	// colorFromAnyFinding first, so every finding colours its own row and the
+	// row color carries the signal instead of a glyph.
 	for _, id := range []string{
 		demofixtures.DeletingDomain,
 		demofixtures.IsolatedDomain,
@@ -138,7 +114,6 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
-	// Healthy rows with no finding: also glyph-free.
 	for _, id := range []string{
 		demofixtures.HealthyBaselineDomain,
 		demofixtures.GraphRootDomain,
@@ -146,11 +121,6 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// -----------------------------------------------------------------
-	// Related panel — every §2 pivot with `count shown: yes` ≥ 1 on
-	// the graph-root fixture (acme-logs). acm, alarm, cfn, kms, logs,
-	// sg, subnet, vpc — 8 pivots.
-	// -----------------------------------------------------------------
 	root := selectOpenSearchByID(t, scenario, demofixtures.GraphRootDomain)
 	scenario.OpenDetailResource("opensearch", root)
 	scenario.ExpectNoAPIError()
@@ -170,50 +140,34 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// -----------------------------------------------------------------
-	// Rule 7 U7c — the S5 Attention section surfaces every finding on the
-	// multi-background fixture. The list Status rolls them up as
-	// "software update forced soon (+1)"; the detail must enumerate BOTH
-	// conditions as their own Attention entry (#52: each finding is
-	// independent — no more "Additional" cramming), each rendered with its
-	// first letter capitalized.
-	// -----------------------------------------------------------------
+	// The list Status rolls the multi-background findings up as
+	// "software update forced soon (+1)"; the detail lists each as its own
+	// Attention entry.
 	multi := selectOpenSearchByID(t, scenario, demofixtures.MultiBackgroundDomain)
 	scenario.OpenDetailResource("opensearch", multi)
 	scenario.ExpectNoAPIError()
 
-	// 8.4 user-visible sanity render (mandatory).
 	view := scenario.currentView()
 	t.Log("\n" + view)
 
-	// Both findings surface as their own capitalized Attention entry.
 	scenario.ExpectViewContains(openSearchDetailPhraseUpdate)
 	scenario.ExpectViewContains(openSearchDetailPhraseEncOff)
 
 	scenario.Back()
 
-	// -----------------------------------------------------------------
-	// U7e — detail enumerates every Wave-1 phrase on rows where the
-	// fetcher populated Resource.Issues. opensearch has no Wave 1, but
-	// the hard-state phrases are carried in Issues for the detail view
-	// (so Processing/Isolated/Deleted rows enumerate their phrase with
-	// first-letter capitalization).
-	// -----------------------------------------------------------------
+	// Hard-state phrases are carried in Resource.Issues, so the detail view
+	// lists them alongside the other findings.
 	processing := selectOpenSearchByID(t, scenario, demofixtures.ProcessingPlusUpdateDomain)
 	scenario.OpenDetailResource("opensearch", processing)
 	scenario.ExpectNoAPIError()
 
-	// Capitalized Wave-1-carrying hard-state phrase.
 	scenario.ExpectViewContains(openSearchDetailPhraseProcess)
-	// The second finding on the Warning row still surfaces in S5
-	// (rule 7 — "no finding silently disappears").
 	scenario.ExpectViewContains(openSearchDetailPhraseUpdate)
 }
 
-// TestScenario_OpenSearchVisual_HealthyRowsHaveNoAttentionSection asserts spec
-// §4 "Healthy silence": Healthy rows must render with no Attention section
-// and no signal phrase in their detail view. Regression pin for
-// false-positive noise on the showroom instance.
+// TestScenario_OpenSearchVisual_HealthyRowsHaveNoAttentionSection asserts
+// Healthy rows render with no Attention section and no signal phrase in their
+// detail view.
 func TestScenario_OpenSearchVisual_HealthyRowsHaveNoAttentionSection(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	scenario := fullIntegrationNewDemoScenario(t)

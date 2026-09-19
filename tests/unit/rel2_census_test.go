@@ -1,7 +1,7 @@
 package unit_test
 
-// rel2_census_test.go — the census row 4 closed on, as a gate, and the
-// false-match attack on the ARN candidate row 3 added.
+// Every pivot target type has a fetcher, and the secret
+// ARN candidate is not matched by prefix or suffix.
 
 import (
 	"context"
@@ -11,11 +11,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRel2EveryPivotTargetHasAFetcher is the census that closed row 4. The
-// cold-cache Unknown is reachable only when a pivot names a target type
-// nothing can fetch; today none does, which is why the state has no demo
-// witness. Registering such a pivot would reopen that hole silently, so the
-// census is a gate rather than a paragraph.
+// TestRel2EveryPivotTargetHasAFetcher: the cold-cache Unknown is reachable
+// only when a pivot names a target type nothing can fetch, and registering
+// such a pivot would open that state silently.
 func TestRel2EveryPivotTargetHasAFetcher(t *testing.T) {
 	var missing []string
 	for _, td := range resource.AllResourceTypes() {
@@ -67,10 +65,9 @@ func TestRel2SecretARNIsNotMatchedByPrefixOrSuffix(t *testing.T) {
 	}
 }
 
-// TestRel2SecretARNDoesNotOutrankAnExactIDMatch pins the candidate order the
-// row asked for: the ARN is offered last, so a list row whose id the event
-// named directly still wins. Putting the ARN first is what broke the cfn and
-// lambda candidate rules.
+// TestRel2SecretARNDoesNotOutrankAnExactIDMatch pins the candidate order: the
+// ARN is offered last, so a list row whose id the event named directly wins.
+// An ARN-first order breaks the cfn and lambda candidate rules.
 func TestRel2SecretARNDoesNotOutrankAnExactIDMatch(t *testing.T) {
 	const named = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"
 	// One row holds the id the ARN's resource part spells; another holds the

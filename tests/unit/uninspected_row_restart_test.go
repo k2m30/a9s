@@ -2,7 +2,7 @@
 
 package unit_test
 
-// uninspected_row_restart_test.go — the "not inspected" mark outlives the
+// The "not inspected" mark outlives the
 // session that recorded it. The row and its older findings come back from the
 // type file after a restart, so the fact that the last sweep did not verify
 // them comes back with them: a row whose check was refused must not read as

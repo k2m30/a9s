@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_owner_gates_test.go — what the one-owner change leaves behind.
-//
-// Moving the column list onto the catalog closed the drift between two
-// declarations. These gates close the four ways a second truth source grows
-// back: a field nobody reads, a column whose value source is a guess, a
-// derivation that treats a type registered by a test differently from one
-// registered by the catalog, and a command that reads the catalog before it
-// is installed.
+// Gates against a second truth source for columns: a field nobody reads, a
+// column whose value source is a guess, a derivation that treats a type
+// registered by a test differently from one registered by the catalog, and a
+// command that reads the catalog before it is installed.
 package unit
 
 import (
@@ -59,18 +55,12 @@ func views7GoFilesUnder(t *testing.T, dirs ...string) (*token.FileSet, map[strin
 	return fset, files
 }
 
-// TestSortableIsReadOrGone pins row 6's observable.
-//
-// domain.Column.Sortable is set on most catalog columns and read by nothing
-// outside tests: handleActionSort (core/app/actions_list.go) sorts on whatever
-// key the action carries, so a column declared unsortable sorts like any
-// other. A field a declaration carries and no code consults is a second truth
-// source with nobody to contradict it — the tests that assert it are
-// asserting the literal back to itself.
-//
-// Either the field goes, or something refuses a sort on a column that says it
-// does not sort. This gate says nothing about which; it fails only while the
-// field exists with no production reader.
+// TestSortableIsReadOrGone: a field a declaration carries and no code
+// consults is a second truth source with nobody to contradict it, and the
+// tests that assert it are asserting the literal back to itself. Either
+// domain.Column.Sortable has a production reader that refuses a sort on a
+// column that says it does not sort, or the field goes. This gate fails only
+// while the field exists with no production reader.
 func TestSortableIsReadOrGone(t *testing.T) {
 	if _, ok := reflect.TypeOf(domain.Column{}).FieldByName("Sortable"); !ok {
 		return
@@ -97,7 +87,7 @@ func TestSortableIsReadOrGone(t *testing.T) {
 	}
 }
 
-// TestEveryCatalogColumnNamesItsValueSource pins row 8. A column that declares
+// TestEveryCatalogColumnNamesItsValueSource: a column that declares
 // neither a key nor a path has its value looked up by turning its TITLE into a
 // field key, which is a guess that happens to work: it holds while the title
 // and the fetcher's key agree letter for letter after lowercasing and spacing,
@@ -129,16 +119,12 @@ var views7OverrideColumns = []domain.Column{
 	{Key: "widget_size", Title: "Size", Path: "SizeBytes", Width: 12, SortKey: "size_bytes_raw"},
 }
 
-// TestCascadeDerivesEveryTypeTheSameWay pins row 9. The cascade has an arm for
-// a type no view declares, and it builds its columns from the catalog by hand
-// rather than through the derivation the built-in views come from — so it
-// drops the fields that derivation carries. No registered type reaches it now
-// that every one of them derives a view from its own columns; a type
-// registered after the first DefaultConfig does, because that config was built
-// once.
-//
-// Which means the bench and production resolve a column by different rules,
-// and a test can pass on a shape production never renders.
+// TestCascadeDerivesEveryTypeTheSameWay: the cascade's arm for a type no view
+// declares must build its columns through the same derivation the built-in
+// views come from. A type registered after the first DefaultConfig reaches
+// that arm, because that config is built once; an arm that dropped fields
+// would let the bench and production resolve a column by different rules,
+// and a test pass on a shape production never renders.
 func TestCascadeDerivesEveryTypeTheSameWay(t *testing.T) {
 	const overrideName = "views7_widgets"
 	resource.SetChildTypeForTest(resource.ResourceTypeDef{
@@ -154,8 +140,7 @@ func TestCascadeDerivesEveryTypeTheSameWay(t *testing.T) {
 	views7AssertCascadeCarriesTheColumns(t, overrideName, td)
 
 	// The same assertion through the other arm, on a type the catalog
-	// registers: it is the behaviour the override must reach, and a change
-	// that makes both arms wrong the same way is not a fix.
+	// registers, so both arms are held to one rule.
 	registered := resource.FindResourceType("ec2")
 	if registered == nil {
 		t.Fatal("no ec2 resource type registered")
@@ -198,11 +183,10 @@ var views7CatalogBackedPackages = map[string]bool{
 	"github.com/k2m30/a9s/v3/core/catalog":  true,
 }
 
-// TestEveryCommandInstallsTheCatalogFirst pins row 10. The built-in views are
-// the catalog now, so config.DefaultConfig and EnsureViewsDir panic in a
-// binary that has not called aws.Install. Every command that reads them
-// installs it first today; nothing said so, and the next command is written
-// by copying one of these files.
+// TestEveryCommandInstallsTheCatalogFirst: the built-in views are the
+// catalog, so config.DefaultConfig and EnsureViewsDir panic in a binary that
+// has not called aws.Install. Every command that reads them must install it
+// first, and a new command is usually written by copying one of these files.
 func TestEveryCommandInstallsTheCatalogFirst(t *testing.T) {
 	fset, files := views7GoFilesUnder(t, "cmd")
 

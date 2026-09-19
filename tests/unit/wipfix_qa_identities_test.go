@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_identities_test.go pins the four identities that make a deferred
+// Pins the four identities that make a deferred
 // piece of work still know what it was for: which visit to a pair a queued
 // save belongs to, which observation a frozen snapshot froze, which screen a
 // body was built for, and which window an anomaly overlay covers.
@@ -23,9 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// --- row 41: which visit to a pair -----------------------------------------
-
-// TestQueuedSave_ForAnEarlierVisitToTheSamePair pins row 41. A save is
+// TestQueuedSave_ForAnEarlierVisitToTheSamePair: a save is
 // prepared while pair A is current. The operator switches to B, B's rows
 // populate the store, and switches back to A. The pair's name is the same on
 // both visits, so a guard that reads only the name lets B's counts land in
@@ -51,7 +49,6 @@ func TestQueuedSave_ForAnEarlierVisitToTheSamePair(t *testing.T) {
 	}
 	b.c.WaitForCacheWrites()
 
-	// Away to B and back. Both visits answer to the same name.
 	s.SetProfileRegion("example-other", "eu-west-1")
 	s.Rotate()
 	s.RowStore.Observe("ec2", wipfixSaveLaneRows(3),
@@ -60,8 +57,6 @@ func TestQueuedSave_ForAnEarlierVisitToTheSamePair(t *testing.T) {
 	s.SetProfileRegion(firstVisit.Profile, firstVisit.Region)
 	s.Rotate()
 
-	// The save prepared while B was current finally runs, carrying the rows it
-	// froze there and the pair it was prepared for.
 	if err := b.core.SaveTypeRows(
 		runtime.SaveTarget{Pair: firstVisit, ObsGen: bGen, Type: "ec2", ExactPopulation: true},
 		runtime.SaveContent{Resources: wipfixSaveLaneRows(3), Count: 3}); err != nil {
@@ -101,9 +96,7 @@ func TestQueuedSave_ForTheCurrentVisitStillLands(t *testing.T) {
 	}
 }
 
-// --- row 42: which observation was frozen ----------------------------------
-
-// TestFrozenSweepSave_OlderThanTheLatestObservation pins row 42. A sweep
+// TestFrozenSweepSave_OlderThanTheLatestObservation: a sweep
 // freezes an exact 100 rows; before its save runs, a foreground refresh finds
 // the type really holds 90 and saves that. The frozen write is later only
 // because it was queued later, and accepting it leaves an obsolete population
@@ -115,7 +108,6 @@ func TestFrozenSweepSave_OlderThanTheLatestObservation(t *testing.T) {
 	s := b.core.Session()
 	pair := s.CurrentPairValue()
 
-	// The sweep's snapshot, and the generation the store was at when it froze.
 	s.RowStore.Observe("ec2", wipfixSaveLaneRows(100),
 		&domain.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	frozenGen, _ := s.RowStore.SnapshotMeta("ec2")
@@ -124,7 +116,6 @@ func TestFrozenSweepSave_OlderThanTheLatestObservation(t *testing.T) {
 	}
 	frozen := map[string][]resource.Resource{"ec2": wipfixSaveLaneRows(100)}
 
-	// The foreground refresh observes the smaller, current, exact population.
 	s.RowStore.Observe("ec2", wipfixSaveLaneRows(90),
 		&domain.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	newGen, _ := s.RowStore.SnapshotMeta("ec2")
@@ -135,7 +126,6 @@ func TestFrozenSweepSave_OlderThanTheLatestObservation(t *testing.T) {
 	}
 	b.c.WaitForCacheWrites()
 
-	// The sweep's save finally executes, carrying the generation it froze at.
 	if _, err := b.core.ExecuteTaskAt(context.Background(), runtime.TaskRequest{
 		Key: runtime.TaskKey{Kind: runtime.TaskKindSaveCache},
 		Payload: &runtime.SaveCachePayload{
@@ -190,9 +180,7 @@ func TestFrozenSweepSave_AtTheLatestObservationStillLands(t *testing.T) {
 	}
 }
 
-// --- row 48: which screen the body was built for ---------------------------
-
-// TestPoppedScreensBody_DoesNotRenderOnItsSuccessor pins row 48. The list body
+// TestPoppedScreensBody_DoesNotRenderOnItsSuccessor: the list body
 // for a freshly absorbed result is built off the controller lock and swapped in
 // when the lock comes back. If the screen it was built for is popped inside
 // that window, the screen underneath is of the same type and agrees on every
@@ -278,7 +266,7 @@ func wipfixDrillRows(prefix string, n int) []resource.Resource {
 	return rows
 }
 
-// TestAnomalyOverlay_WideWindowPrefersTheOverlayThatCoversIt pins row 49. The
+// TestAnomalyOverlay_WideWindowPrefersTheOverlayThatCoversIt: the
 // authoritative set is complete for twelve months and says nothing about the
 // years before them. Asked about a multi-year window it is not an answer, and
 // preferring it hides both the wider partial marks and the warning that they
@@ -291,7 +279,6 @@ func TestAnomalyOverlay_WideWindowPrefersTheOverlayThatCoversIt(t *testing.T) {
 	recent := wipfixMonths(2025, 12)
 	wide := append(wipfixMonths(2023, 12), append(wipfixMonths(2024, 12), recent...)...)
 
-	// The complete answer for the last twelve months.
 	store.ApplyFetchResult(costs.FetchResult{
 		Query:    costs.Query{Granularity: q.Granularity, GroupBy: q.GroupBy, Range: wipfixSpan(recent)},
 		Coverage: recent,
@@ -301,7 +288,6 @@ func TestAnomalyOverlay_WideWindowPrefersTheOverlayThatCoversIt(t *testing.T) {
 		},
 	}, now)
 
-	// The capped answer for the whole multi-year window.
 	store.ApplyFetchResult(costs.FetchResult{
 		Query:    costs.Query{Granularity: q.Granularity, GroupBy: q.GroupBy, Range: wipfixSpan(wide)},
 		Coverage: wide,
@@ -321,7 +307,6 @@ func TestAnomalyOverlay_WideWindowPrefersTheOverlayThatCoversIt(t *testing.T) {
 			"twelve-month answer is not an answer about four years", len(marks))
 	}
 
-	// The narrow window still gets the complete answer, with no warning.
 	narrowMarks, narrowPartial := store.AnomalyOverlay(recent, now)
 	if narrowPartial {
 		t.Error("the twelve-month overlay is reported partial — it is covered authoritatively")

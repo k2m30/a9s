@@ -1,6 +1,6 @@
 package unit
 
-// qa_wave2_fold_conformance_test.go — a test bench that reads an enricher's
+// A test bench that reads an enricher's
 // result map is not looking at the row the app renders.
 //
 // runtime.ApplyWave2ToRow is what turns an IssueEnricherResult into a row:
@@ -11,8 +11,7 @@ package unit
 // uses, so it can pass while the surface is wrong — and, worse, fail while the
 // surface is right.
 //
-// This gate finds those helpers structurally, so a new bench cannot
-// reintroduce the shape.
+// This gate finds those helpers structurally.
 
 import (
 	"fmt"

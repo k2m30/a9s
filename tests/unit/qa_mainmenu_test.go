@@ -12,7 +12,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// A. Resource Type Listing
+// Resource Type Listing
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
@@ -156,7 +156,7 @@ func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// B. Navigation
+// Navigation
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
@@ -166,7 +166,6 @@ func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 	// Default cursor is on EC2 Instances (index 0). Press j to move to ECS Services (index 1).
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
-	// Now press Enter to confirm which item is selected.
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd == nil {
 		t.Fatal("Enter should produce a navigate command")
@@ -205,7 +204,6 @@ func TestQA_MainMenu_MoveUpWithK(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Move down first, then up
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("k"))
 
@@ -267,7 +265,7 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// B2. Page Up / Page Down
+// Page Up / Page Down
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
@@ -284,7 +282,6 @@ func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	// Cursor should NOT still be on ec2 (index 0)
 	if nav.ResourceType == "ec2" {
 		t.Error("after PageDown, cursor should have moved past ec2")
 	}
@@ -360,7 +357,6 @@ func TestQA_MainMenu_CtrlD_PageDown(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Ctrl+D should work as PageDown
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -379,7 +375,6 @@ func TestQA_MainMenu_CtrlU_PageUp(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Go to bottom, then Ctrl+U should work as PageUp
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 
@@ -398,7 +393,6 @@ func TestQA_MainMenu_CursorStopsAtTop(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Already at top, press k should stay at top
 	m, _ = rootApplyMsg(m, rootKeyPress("k"))
 
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -419,7 +413,6 @@ func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Move down 4 times, then press g
 	for range 4 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
@@ -454,7 +447,7 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// The synthetic "costs" (Cost Explorer) entry is the permanent
 	// bottom-most main-menu row; Enter on it emits Target=TargetCosts with
 	// an empty ResourceType (it is not a resource.ResourceTypeDef list),
 	// so the bottom-of-menu assertion checks Target instead of ResourceType.
@@ -467,7 +460,6 @@ func TestQA_MainMenu_GOnFirstRowIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Already at first row, press g
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
 
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -506,7 +498,6 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 }
 
 func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
-	// Representative sample — full sweep in CI slow suite.
 	// Build an index map so j-navigation count is derived correctly from menu order.
 	allTypes := resource.AllShortNames()
 	indexOf := make(map[string]int, len(allTypes))
@@ -525,12 +516,10 @@ func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 			tui.Version = "1.0.2"
 			m := newRootSizedModel()
 
-			// Navigate to position i
 			for range i {
 				m, _ = rootApplyMsg(m, rootKeyPress("j"))
 			}
 
-			// Press Enter
 			_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 			if cmd == nil {
 				t.Fatal("Enter should produce a navigate command")
@@ -594,7 +583,7 @@ func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// K. Viewport Scrolling (small terminal)
+// Viewport Scrolling (small terminal)
 // ---------------------------------------------------------------------------
 
 func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
@@ -619,7 +608,6 @@ func TestMainMenu_Viewport_BottomKey_LastItemVisible(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Press G to go to bottom
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -635,7 +623,6 @@ func TestMainMenu_Viewport_TopAfterScroll_FirstItemVisible(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Scroll to bottom, then back to top
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
 
@@ -651,7 +638,6 @@ func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Move to last item
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -660,7 +646,7 @@ func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// The synthetic "costs" (Cost Explorer) entry is the permanent
 	// bottom-most main-menu row (after every resource.AllResourceTypes()
 	// entry), so G lands there rather than on the last real resource type.
 	if nav.Target != messages.TargetCosts {
@@ -680,14 +666,12 @@ func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	allTypes := resource.AllResourceTypes()
 
-	// Items 0-5 should be visible (EC2 through ASG)
 	for i := range 6 {
 		if !strings.Contains(plain, allTypes[i].Name) {
 			t.Errorf("item %d (%s) should be visible at scroll offset 0", i, allTypes[i].Name)
 		}
 	}
 
-	// Item 6+ should NOT be visible (they are below the viewport)
 	for i := 7; i < len(allTypes); i++ {
 		if strings.Contains(plain, allTypes[i].Name) {
 			t.Errorf("item %d (%s) should NOT be visible at scroll offset 0 (viewport is 7 render lines)", i, allTypes[i].Name)
@@ -696,7 +680,7 @@ func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// L. Category Headers
+// Category Headers
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_CategoryHeadersVisible(t *testing.T) {
@@ -791,7 +775,6 @@ func TestQA_MainMenu_AllResourceTypesHaveCategory(t *testing.T) {
 func TestQA_MainMenu_CategoryOrderMatchesSpec(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 
-	// Verify the category order matches the spec
 	expectedOrder := []string{
 		"COMPUTE",
 		"CONTAINERS",
@@ -853,11 +836,9 @@ func TestQA_MainMenu_FilterHidesCategoriesWithNoMatches(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// COMPUTE should be visible (EC2 is in COMPUTE)
 	if !strings.Contains(plain, "COMPUTE") {
 		t.Error("COMPUTE category should be visible when EC2 matches filter")
 	}
-	// NETWORKING should NOT be visible (no networking items match "ec2")
 	if strings.Contains(plain, "NETWORKING") {
 		t.Error("NETWORKING category should be hidden when no items match filter 'ec2'")
 	}
@@ -869,12 +850,10 @@ func TestQA_MainMenu_FirstHeaderVisibleAfterScrollDownAndBackUp(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
-	// Scroll down past the first header
 	for range 10 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	}
 
-	// Now scroll all the way back up to the first item
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -899,11 +878,9 @@ func TestQA_MainMenu_ScrollAccountsForHeaders(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// EKS Clusters should be visible
 	if !strings.Contains(plain, "EKS Clusters") {
 		t.Errorf("EKS Clusters should be visible after scrolling, got:\n%s", plain)
 	}
-	// CONTAINERS header should also be visible since it precedes EKS Clusters
 	if !strings.Contains(plain, "CONTAINERS") {
 		t.Errorf("CONTAINERS header should be visible when EKS Clusters is visible, got:\n%s", plain)
 	}

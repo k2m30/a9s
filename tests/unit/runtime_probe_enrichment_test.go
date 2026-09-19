@@ -1,22 +1,9 @@
 package unit
 
-// runtime_probe_enrichment_test.go — live-seam replacement for the retired
-// internal/tui/probe_demo_guard_test.go and internal/tui/probe_enrichment_cache_test.go.
-//
-// Model.probeEnrichment (internal/tui/probe_adapter.go) was a thin tea.Cmd
-// wrapper with zero production callers; the only reachable enrichment
-// dispatch path is Core.ProbeEnrichment (core/runtime/probes.go), which does
-// not branch on demo vs. live mode at all — demo clients are real
-// *awsclient.ServiceClients backed by typed fakes, so there is nothing left
-// to distinguish once the TUI wrapper is gone. These tests pin
-// Core.ProbeEnrichment directly.
-//
-// Assertions target Core.ProbeEnrichment's RETURNED ProbeEnrichmentResult
-// rather than spying on the registered enricher's invocation count or the
-// cache it was handed — the registered test enricher returns a sentinel
-// IssueEnricherResult (conditionally, for the cache-merge test), and the
-// test proves the seam by checking that sentinel surfaces unchanged through
-// ProbeEnrichment's return value.
+// Core.ProbeEnrichment (core/runtime/probes.go)
+// is the enrichment dispatch path. Demo clients are real
+// *awsclient.ServiceClients backed by typed fakes, so one path serves demo
+// and live.
 
 import (
 	"context"

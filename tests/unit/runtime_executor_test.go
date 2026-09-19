@@ -1,29 +1,10 @@
 package unit
 
-// runtime_executor_test.go — behavioral tests for Core.ExecuteTask.
+// Behavioral tests for Core.ExecuteTask.
 //
 // Every test builds a demo-mode Core (fake AWS clients, no real network) and
 // calls ExecuteTask synchronously. Assertions are on the concrete messages.Event
 // type returned and key result fields — not on internal runtime state.
-//
-// TaskKind → expected result table:
-//
-//	TaskKindProbeAvailability  → messages.AvailabilityChecked
-//	TaskKindProbeEnrich        → messages.EnrichmentChecked when HasIssueEnricher(shortName); nil,nil otherwise (isDemo is not a gate — demo clients are real fakes and dispatch identically to live)
-//	TaskKindSaveCache          → nil,nil (NoCache=true); nil,nil (empty cache)
-//	TaskKindConnect            → messages.ClientsReady (error path — no real AWS creds)
-//	TaskKindFetchIdentity      → messages.IdentityError (nil STS client)
-//	TaskKindLoadAvailCache     → messages.AvailabilityCacheLoaded (no cache file → Expired:true)
-//	TaskKindDemoPrefetchCounts → messages.AvailabilityPrefetched
-//	TaskKindFetchChildResources → messages.APIError (nil clients path) / messages.ResourcesLoaded (demo)
-//	KindFetchResources         → messages.ResourcesLoaded (demo, ec2)
-//	KindFetchFiltered          → messages.APIError (no filtered fetcher for ec2)
-//	KindFetchMore              → messages.ResourcesLoaded (demo, ec2)
-//	KindFetchByIDDetail        → messages.Flash (no by-id fetcher registered for "unknown-type")
-//	KindFetchReveal            → messages.ValueRevealed (nil clients → Err set)
-//	KindRelatedCheck           → nil (no related defs for "ec2" in test isolation)
-//	KindEnrichDetail           → error (nil payload)
-//	Adapter-only kinds         → ErrAdapterOnlyTask (6 kinds)
 
 import (
 	"context"
@@ -37,10 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// ────────────────────────────────────────────────────────────────────────────
-// helpers
-// ────────────────────────────────────────────────────────────────────────────
 
 // newExecutorCore builds a Core with demo fake clients installed into
 // session.Clients via HandleClientsReady (the only public path). NoCache is
@@ -89,10 +66,6 @@ func reqP(kind runtime.TaskKind, scope string, payload runtime.TaskPayload) runt
 	return runtime.TaskRequest{Key: runtime.TaskKey{Kind: kind, Scope: scope}, Payload: payload}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindProbeAvailability → messages.AvailabilityChecked
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_ProbeAvailability_ReturnsAvailabilityChecked(t *testing.T) {
 	c := newExecutorCore(t)
 	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindProbeAvailability, "ec2"))
@@ -111,7 +84,6 @@ func TestExecuteTask_ProbeAvailability_ReturnsAvailabilityChecked(t *testing.T) 
 func TestExecuteTask_ProbeAvailability_AllDemoResourceTypes(t *testing.T) {
 	c := newExecutorCore(t)
 	ctx := context.Background()
-	// Probe every registered resource type — all must return AvailabilityChecked.
 	types := catalog.All()
 	if len(types) == 0 {
 		t.Fatal("catalog.All() is empty")
@@ -133,15 +105,10 @@ func TestExecuteTask_ProbeAvailability_AllDemoResourceTypes(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindProbeEnrich — isDemo gating
-// ────────────────────────────────────────────────────────────────────────────
-
 // Demo clients are real *awsclient.ServiceClients backed by typed fakes, so
 // Wave-2 enrichers run against them exactly as they run against live AWS
-// clients — isDemo is no longer a gate on TaskKindProbeEnrich. When the
-// resource type has a registered issue enricher, the executor must return
-// messages.EnrichmentChecked even in demo mode.
+// clients. When the resource type has a registered issue enricher, the
+// executor returns messages.EnrichmentChecked in demo mode too.
 func TestExecuteTask_ProbeEnrich_IsDemo_ReturnsEnrichmentChecked(t *testing.T) {
 	c := newExecutorCore(t) // isDemo=true
 
@@ -213,7 +180,6 @@ func TestExecuteTask_ProbeEnrich_NonDemo_WithEnricher_ReturnsEnrichmentChecked(t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// If an enricher is registered the result must be EnrichmentChecked.
 	got, ok := ev.(messages.EnrichmentChecked)
 	if !ok {
 		t.Fatalf("expected messages.EnrichmentChecked, got %T", ev)
@@ -222,10 +188,6 @@ func TestExecuteTask_ProbeEnrich_NonDemo_WithEnricher_ReturnsEnrichmentChecked(t
 		t.Errorf("ResourceType = %q, want %q", got.ResourceType, enricherType)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindSaveCache — NoCache short-circuit and empty cache
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_SaveCache_NoCache_ReturnsNilNil(t *testing.T) {
 	c := newExecutorCore(t) // NoCache=true
@@ -264,10 +226,6 @@ func TestExecuteTask_SaveCache_EmptyResourceCache_ReturnsNilNil(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindConnect → messages.ClientsReady (error path — no real AWS creds)
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_Connect_ReturnsClientsReady(t *testing.T) {
 	c := newExecutorCore(t)
 	p := runtime.ConnectPayload{Profile: "nonexistent-profile-000000000000", Region: "us-east-1"}
@@ -281,7 +239,6 @@ func TestExecuteTask_Connect_ReturnsClientsReady(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected messages.ClientsReady, got %T", ev)
 	}
-	// Gen must be forwarded from the payload.
 	if got.Gen != p.Gen {
 		t.Errorf("Gen = %v, want %v", got.Gen, p.Gen)
 	}
@@ -295,11 +252,6 @@ func TestExecuteTask_Connect_MissingPayload_ReturnsError(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindFetchIdentity → messages.IdentityError (STS client is a fake that
-// does not implement STS GetCallerIdentity)
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_FetchIdentity_ReturnsIdentityResult(t *testing.T) {
 	c := newExecutorCore(t)
 	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindFetchIdentity, ""))
@@ -310,15 +262,10 @@ func TestExecuteTask_FetchIdentity_ReturnsIdentityResult(t *testing.T) {
 	// must be returned — never nil.
 	switch ev.(type) {
 	case messages.IdentityLoaded, messages.IdentityError:
-		// correct
 	default:
 		t.Fatalf("expected IdentityLoaded or IdentityError, got %T", ev)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindLoadAvailCache → messages.AvailabilityCacheLoaded
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_LoadAvailCache_ReturnsAvailabilityCacheLoaded(t *testing.T) {
 	// Isolate from ~/.a9s/cache/ so no pre-existing file affects the result.
@@ -338,10 +285,6 @@ func TestExecuteTask_LoadAvailCache_ReturnsAvailabilityCacheLoaded(t *testing.T)
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindDemoPrefetchCounts → messages.AvailabilityPrefetched
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_DemoPrefetchCounts_ReturnsAvailabilityPrefetched(t *testing.T) {
 	c := newExecutorCore(t)
 	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindDemoPrefetchCounts, ""))
@@ -359,10 +302,6 @@ func TestExecuteTask_DemoPrefetchCounts_ReturnsAvailabilityPrefetched(t *testing
 		t.Error("Entries must be non-empty after demo prefetch with fake clients")
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// KindFetchResources → messages.ResourcesLoaded (demo ec2, s3, rds, lambda)
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_FetchResources_EC2_ReturnsResourcesLoaded(t *testing.T) {
 	c := newExecutorCore(t)
@@ -413,10 +352,6 @@ func TestExecuteTask_FetchResources_UnknownType_ReturnsAPIError(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// KindFetchFiltered → messages.APIError (ec2 has no filtered fetcher)
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_FetchFiltered_MissingPayload_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
 	_, err := c.ExecuteTask(context.Background(), req(runtime.KindFetchFiltered, "ec2"))
@@ -424,10 +359,6 @@ func TestExecuteTask_FetchFiltered_MissingPayload_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for missing fetchFilteredPayload")
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// KindFetchMore → messages.ResourcesLoaded (demo ec2 with empty token)
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_FetchMore_EC2_ReturnsResourcesLoaded(t *testing.T) {
 	c := newExecutorCore(t)
@@ -443,7 +374,6 @@ func TestExecuteTask_FetchMore_EC2_ReturnsResourcesLoaded(t *testing.T) {
 	if got.ResourceType != "ec2" {
 		t.Errorf("ResourceType = %q, want %q", got.ResourceType, "ec2")
 	}
-	// FetchMore sets Append=true.
 	if !got.Append {
 		t.Error("Append must be true for FetchMore results")
 	}
@@ -456,10 +386,6 @@ func TestExecuteTask_FetchMore_MissingPayload_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for missing FetchMorePayload")
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// TaskKindFetchChildResources
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_FetchChildResources_MissingPayload_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
@@ -484,10 +410,6 @@ func TestExecuteTask_FetchChildResources_UnknownChildType_ReturnsAPIError(t *tes
 		t.Fatalf("expected messages.APIError for unknown child type, got %T", ev)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// KindFetchReveal → messages.ValueRevealed
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_FetchReveal_MissingPayload_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
@@ -517,12 +439,6 @@ func TestExecuteTask_FetchReveal_ReturnsValueRevealed(t *testing.T) {
 	// Err may be set (fake reveal fetcher); that is an acceptable result.
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// KindFetchByIDDetail → messages.ByIDFetchFailed (unknown type has no by-id
-// fetcher) — the typed outcome, not a messages.Flash a separate case has to
-// text-match against the pending target.
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_FetchByIDDetail_NoFetcher_ReturnsByIDFetchFailed(t *testing.T) {
 	c := newExecutorCore(t)
 	p := runtime.FetchByIDDetailPayload{TargetType: "nonexistent-type-000", ID: "some-id-000000000000"}
@@ -549,11 +465,6 @@ func TestExecuteTask_FetchByIDDetail_MissingPayload_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for missing FetchByIDDetailPayload")
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// KindRelatedCheck — no TUI coupling; returns nil (no defs, or defs with
-// nil checkers that are skipped)
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_RelatedCheck_NoTUICoupling_ReturnsNil(t *testing.T) {
 	// Temporarily replace ec2 related defs with a single def whose checker
@@ -591,10 +502,6 @@ func TestExecuteTask_RelatedCheck_NoDefs_ReturnsNil(t *testing.T) {
 		t.Errorf("expected nil event when no related defs, got %T", ev)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// KindEnrichDetail — error paths (missing payload, nil DetailCtx, no enricher)
-// ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_EnrichDetail_MissingPayload_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
@@ -644,10 +551,6 @@ func TestExecuteTask_EnrichDetail_NilDetailCtx_ReturnsError(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Adapter-only kinds — all must return ErrAdapterOnlyTask
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_AdapterOnlyKinds_ReturnErrAdapterOnlyTask(t *testing.T) {
 	adapterOnlyKinds := []runtime.TaskKind{
 		runtime.TaskKindFlashTick,
@@ -673,10 +576,6 @@ func TestExecuteTask_AdapterOnlyKinds_ReturnErrAdapterOnlyTask(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Unknown kind — must return a descriptive error (not ErrAdapterOnlyTask)
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestExecuteTask_UnknownKind_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
 	_, err := c.ExecuteTask(context.Background(), req("unknown-kind-that-does-not-exist", ""))
@@ -688,18 +587,13 @@ func TestExecuteTask_UnknownKind_ReturnsError(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// isDemo gating contrast — same kind, same core, toggled flag
-// ────────────────────────────────────────────────────────────────────────────
-
-// Confirms that isDemo is NO LONGER a deciding variable for
-// TaskKindProbeEnrich: both isDemo=true and isDemo=false produce
-// messages.EnrichmentChecked for the same enricher-bearing type, since demo
-// clients are real *awsclient.ServiceClients backed by typed fakes and Wave-2
-// enrichers dispatch against them exactly as they do against live clients.
-// The only remaining deciding variable is HasIssueEnricher(shortName) — see
-// TestExecuteTask_ProbeEnrich_NonDemo_NoEnricher_ReturnsNilNil, which is
-// unaffected by this change and still pins the true nil,nil path.
+// TestExecuteTask_ProbeEnrich_IsDemoContrast: both isDemo=true and
+// isDemo=false produce messages.EnrichmentChecked for the same
+// enricher-bearing type, since demo clients are real
+// *awsclient.ServiceClients backed by typed fakes. The deciding variable is
+// HasIssueEnricher(shortName) — see
+// TestExecuteTask_ProbeEnrich_NonDemo_NoEnricher_ReturnsNilNil for the
+// nil,nil path.
 func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 	// Find a type with an enricher; skip if none.
 	var enricherType string
@@ -714,7 +608,7 @@ func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 		t.Skip("no enricher registered; cannot contrast isDemo flag")
 	}
 
-	// isDemo=true → EnrichmentChecked (no demo skip anymore).
+	// isDemo=true → EnrichmentChecked.
 	cDemo := newExecutorCore(t) // isDemo=true
 	evDemo, errDemo := cDemo.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, enricherType))
 	if errDemo != nil {
@@ -724,7 +618,7 @@ func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 		t.Errorf("isDemo=true: expected messages.EnrichmentChecked (isDemo is no longer a gate), got %T", evDemo)
 	}
 
-	// isDemo=false → EnrichmentChecked (unchanged contract).
+	// isDemo=false → EnrichmentChecked.
 	evLive, errLive := cProbe.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, enricherType))
 	if errLive != nil {
 		t.Fatalf("isDemo=false: unexpected error: %v", errLive)
@@ -733,10 +627,6 @@ func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 		t.Errorf("isDemo=false: expected messages.EnrichmentChecked, got %T", evLive)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// No TUI coupling — save-cache and related-check read Core/session only
-// ────────────────────────────────────────────────────────────────────────────
 
 // Verifies that KindRelatedCheck executes without any TUI model in scope.
 // The only state it reads is c.session.ResourceCache (via SnapshotCache) and

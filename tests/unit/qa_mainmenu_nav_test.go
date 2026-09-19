@@ -13,7 +13,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// C. Filter Mode (/)
+// Filter Mode (/)
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_SlashEntersFilterMode(t *testing.T) {
@@ -23,7 +23,6 @@ func TestQA_MainMenu_SlashEntersFilterMode(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
 	plain := stripANSI(rootViewContent(m))
-	// Header should show "/" instead of "? for help"
 	if strings.Contains(plain, "? for help") {
 		t.Error("after pressing /, header should not show '? for help'")
 	}
@@ -51,13 +50,11 @@ func TestQA_MainMenu_EscClearsFilterMode(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter filter mode and type something
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "redis" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
 	}
 
-	// Press Esc
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain := stripANSI(rootViewContent(m))
@@ -78,11 +75,9 @@ func TestQA_MainMenu_EnterConfirmsFilterMode(t *testing.T) {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
 	}
 
-	// Press Enter to confirm filter (exits filter input mode)
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
 	plain := stripANSI(rootViewContent(m))
-	// Should no longer be in filter mode (header goes back to normal)
 	if strings.Contains(plain, "/test") {
 		t.Error("after Enter, filter input cursor should be gone from header")
 	}
@@ -97,7 +92,6 @@ func TestQA_MainMenu_BackspaceInFilterRemovesCharacter(t *testing.T) {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
 	}
 
-	// Press Backspace
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyBackspace))
 
 	plain := stripANSI(rootViewContent(m))
@@ -110,7 +104,7 @@ func TestQA_MainMenu_BackspaceInFilterRemovesCharacter(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// D. Command Mode (:)
+// Command Mode (:)
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_ColonEntersCommandMode(t *testing.T) {
@@ -474,13 +468,11 @@ func TestQA_MainMenu_EscCancelsCommandMode(t *testing.T) {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
 	}
 
-	// Verify command text is visible before Esc
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, ":xyzzy") {
 		t.Errorf("before Esc, header should show ':xyzzy', got:\n%s", plain)
 	}
 
-	// Press Esc
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain = stripANSI(rootViewContent(m))
@@ -494,7 +486,7 @@ func TestQA_MainMenu_EscCancelsCommandMode(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// E. Help Overlay (?)
+// Help Overlay (?)
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_HelpOpensOnQuestionMark(t *testing.T) {
@@ -516,7 +508,6 @@ func TestQA_MainMenu_HelpShowsCategories(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
 	plain := stripANSI(rootViewContent(m))
-	// Context-sensitive help from main menu shows NAVIGATION, ACTIONS, OTHER
 	categories := []string{"NAVIGATION", "ACTIONS", "OTHER"}
 	for _, cat := range categories {
 		if !strings.Contains(plain, cat) {
@@ -533,7 +524,6 @@ func TestQA_MainMenu_HelpShowsNavigationKeys(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
-	// Context-sensitive: main menu shows navigation keys with lowercase descriptions
 	navBindings := []string{"up/down", "top", "bottom"}
 	for _, binding := range navBindings {
 		if !strings.Contains(plainLower, binding) {
@@ -550,7 +540,6 @@ func TestQA_MainMenu_HelpShowsGeneralKeys(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
-	// Context-sensitive: main menu shows quit, command, filter actions
 	generalBindings := []string{"quit", "command", "filter"}
 	for _, binding := range generalBindings {
 		if !strings.Contains(plainLower, binding) {
@@ -575,10 +564,8 @@ func TestQA_MainMenu_AnyKeyClosesHelp(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Open help
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
-	// Press any key (e.g., "a") to close
 	m, cmd := rootApplyMsg(m, rootKeyPress("a"))
 	// The help view returns a PopViewMsg via cmd
 	if cmd != nil {
@@ -609,7 +596,7 @@ func TestQA_MainMenu_EscClosesHelp(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// F. Quit
+// Quit
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_QQuits(t *testing.T) {
@@ -636,17 +623,13 @@ func TestQA_MainMenu_QInFilterModeDoesNotQuit(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
-	// Type q
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
 
 	plain := stripANSI(rootViewContent(m))
-	// Should show /q in header, not quit
 	if !strings.Contains(plain, "/q") {
 		t.Error("q in filter mode should be treated as filter text, header should show '/q'")
 	}
-	// All resource types should still be visible
 	if !strings.Contains(plain, "S3 Buckets") {
 		t.Error("app should not have quit; resource types should still be visible")
 	}
@@ -656,13 +639,10 @@ func TestQA_MainMenu_QInCommandModeDoesNotQuit(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
-	// Type q (but don't press Enter)
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
 
 	plain := stripANSI(rootViewContent(m))
-	// Should show :q in header, not quit yet
 	if !strings.Contains(plain, ":q") {
 		t.Error("q in command mode should be treated as command text, header should show ':q'")
 	}
@@ -699,7 +679,7 @@ func TestQA_MainMenu_CtrlCQuitsFromCommandMode(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// G. Header Bar
+// Header Bar
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_HeaderShowsAppName(t *testing.T) {
@@ -809,7 +789,7 @@ func TestQA_MainMenu_HeaderSpansFullWidth(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// H. Frame / Border
+// Frame / Border
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_FrameTitle(t *testing.T) {
@@ -854,7 +834,6 @@ func TestQA_MainMenu_FrameFillsRemainingHeight(t *testing.T) {
 
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Terminal height is 40, should have exactly 40 lines
 	if len(lines) != 40 {
 		t.Errorf("expected 40 lines total, got %d", len(lines))
 	}
@@ -884,7 +863,7 @@ func TestQA_MainMenu_ContentRowsBoundedByVerticalBars(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// I. Terminal Size Constraints
+// Terminal Size Constraints
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_NarrowTerminalShowsError(t *testing.T) {
@@ -938,14 +917,13 @@ func TestQA_MainMenu_ExactMinHeightRendersCorrectly(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// J. Combined / Edge Case Interactions
+// Combined / Edge Case Interactions
 // ---------------------------------------------------------------------------
 
 func TestQA_MainMenu_CommandModeOverridesNormalKeys(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
 	// Press j, k, g, G, q, ? -- all should be treated as text
@@ -963,7 +941,6 @@ func TestQA_MainMenu_FilterModeOverridesNormalKeys(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
 	// Press j, k, g, G, q, ? -- all should be treated as filter text
@@ -994,13 +971,11 @@ func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Normal mode: "? for help"
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "? for help") {
 		t.Error("step 1: normal mode should show '? for help'")
 	}
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "s3" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
@@ -1010,14 +985,12 @@ func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
 		t.Error("step 2: filter mode should show '/s3'")
 	}
 
-	// Esc clears filter
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "? for help") {
 		t.Error("step 3: after Esc, should show '? for help'")
 	}
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "eks" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(ch)))
@@ -1027,7 +1000,6 @@ func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
 		t.Error("step 4: command mode should show ':eks'")
 	}
 
-	// Esc cancels command
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "? for help") {
@@ -1039,7 +1011,6 @@ func TestQA_MainMenu_OnlyOneInputModeActive_FilterBlocksCommand(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	// Type : -- should be added to filter text, not enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -1054,7 +1025,6 @@ func TestQA_MainMenu_OnlyOneInputModeActive_CommandBlocksFilter(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	// Type / -- should be added to command text, not enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
@@ -1069,11 +1039,8 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// G to bottom
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
-	// g to top
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
-	// G to bottom again
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -1082,7 +1049,7 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// The synthetic "costs" (Cost Explorer) entry is the permanent
 	// bottom-most main-menu row; Enter on it emits Target=TargetCosts with
 	// an empty ResourceType (it is not a resource.ResourceTypeDef list),
 	// so the bottom-of-menu assertion checks Target instead of ResourceType.
@@ -1095,16 +1062,13 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Send flash
 	m, cmd := rootApplyMsg(m, messages.Flash{Text: "test flash", IsError: false})
 
-	// Flash should be visible
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "test flash") {
 		t.Error("flash should be visible immediately")
 	}
 
-	// Verify clear cmd was scheduled.
 	if cmd == nil {
 		t.Fatal("expected clear-flash cmd, got nil")
 	}
@@ -1112,7 +1076,6 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 	// Gen=1: fresh model starts at gen=0; FlashMsg increments it once.
 	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
-	// Flash should be cleared
 	plain = stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "test flash") {
 		t.Error("flash should be cleared after ClearFlashMsg")
@@ -1126,14 +1089,11 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Move cursor down a few times
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
-	// Resize
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	// Verify all 10 resources still visible and we can navigate
 	plain := stripANSI(rootViewContent(m))
 	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
 	// not in resource.AllResourceTypes() but always appears in MenuBody.Entries.

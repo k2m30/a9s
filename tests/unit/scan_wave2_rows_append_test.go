@@ -1,12 +1,7 @@
 package unit
 
-// scan_wave2_rows_append_test.go — a Wave-2 finding raised twice for one
+// A Wave-2 finding raised twice for one
 // resource keeps every emission's supporting rows.
-//
-// setWave2Finding assigns AttentionDetails[id][code] where its Wave-1
-// counterpart addWave1Rows appends, so the second emission of a code silently
-// replaces the first's rows. The reader is then told about one offending
-// stage of two, with nothing to say the other was inspected at all.
 //
 // API Gateway is where the shape is reachable: the REST enricher walks the
 // stages of one API and raises the same three per-stage codes once per
@@ -67,8 +62,7 @@ func TestAPIGWTwoOffendingStages_EveryStageKeepsItsRows(t *testing.T) {
 		})
 	}
 
-	// The secret code carries a hit row per stage as well as the Stage row, so
-	// a fix that keeps the Stage rows by dropping everything else is caught.
+	// The secret code carries a hit row per stage as well as the Stage row.
 	rows := w2Rows(t, res, apiID, w6aAPIGWStageSecret)
 	want := []domain.DetailRow{
 		{Label: "Stage", Value: "prod", Tier: "!"},
@@ -86,9 +80,7 @@ func TestAPIGWTwoOffendingStages_EveryStageKeepsItsRows(t *testing.T) {
 	}
 }
 
-// The negative: one offending stage on a two-stage API still names one stage,
-// so the pin above cannot pass by listing every stage whether or not it trips
-// the condition.
+// One offending stage on a two-stage API names one stage.
 func TestAPIGWOneOffendingStageOfTwo_NamesOnlyThatStage(t *testing.T) {
 	const apiID = "rst013onebad"
 
@@ -171,8 +163,8 @@ func TestWave2SameCodeTwice_RowsAccumulateAcrossEnrichers(t *testing.T) {
 	})
 }
 
-// w2AssertFindingRaisedOnce pins the other half of the collapse: one condition
-// found on several parts of a resource is stated once.
+// w2AssertFindingRaisedOnce asserts that one condition found on several
+// parts of a resource is stated once.
 func w2AssertFindingRaisedOnce(t *testing.T, res awsclient.IssueEnricherResult, id, code string) {
 	t.Helper()
 	var raised int

@@ -13,23 +13,17 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TASK-001: Handle APIErrorMsg in root Update
-// ══════════════════════════════════════════════════════════════════════════════
-
 // TestQA_APIError_FlashShown verifies that when an APIErrorMsg arrives,
 // a flash error is displayed in the header.
 func TestQA_APIError_FlashShown(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to EC2 resource list (loading state)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Send APIErrorMsg — simulating a failed AWS call
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          fmt.Errorf("operation error EC2: DescribeInstances, access denied"),
@@ -37,37 +31,32 @@ func TestQA_APIError_FlashShown(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// The flash error should contain something about the error
 	if !strings.Contains(plain, "access denied") && !strings.Contains(plain, "error") && !strings.Contains(plain, "Error") {
 		t.Errorf("after APIErrorMsg, header should show error flash, got: %s", plain[:min(300, len(plain))])
 	}
 }
 
-// TestQA_APIError_ClearsLoading verifies that after APIErrorMsg,
-// the resource list is no longer in loading state (no spinner).
+// TestQA_APIError_ClearsLoading verifies that an APIErrorMsg takes the
+// resource list out of its loading state (no spinner).
 func TestQA_APIError_ClearsLoading(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to RDS resource list (loading state)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
 
-	// Confirm it's loading
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Loading") {
 		t.Errorf("before APIErrorMsg, should show Loading, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Send APIErrorMsg
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "dbi",
 		Err:          fmt.Errorf("connection timeout"),
 	})
 
-	// Should NOT show "Loading..." anymore
 	plain = stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "Loading") {
 		t.Errorf("after APIErrorMsg, should NOT show Loading, got: %s", plain[:min(200, len(plain))])
@@ -85,7 +74,6 @@ func TestQA_APIError_ClassifyAWSError_ExpiredToken(t *testing.T) {
 		ResourceType: "s3",
 	})
 
-	// smithy.APIError for expired token
 	apiErr := &smithy.GenericAPIError{
 		Code:    "ExpiredToken",
 		Message: "The security token included in the request is expired",
@@ -97,7 +85,6 @@ func TestQA_APIError_ClassifyAWSError_ExpiredToken(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should show the classified error code or message
 	if !strings.Contains(plain, "ExpiredToken") && !strings.Contains(plain, "expired") {
 		t.Errorf("expired token error should show classified message, got: %s", plain[:min(300, len(plain))])
 	}
@@ -154,7 +141,6 @@ func TestQA_APIError_NonAWSError(t *testing.T) {
 
 // TestQA_APIError_AllResourceTypes verifies the handler works for all resource types.
 func TestQA_APIError_AllResourceTypes(t *testing.T) {
-	// Representative sample — full sweep in CI slow suite
 	resourceTypes := []string{"ec2", "s3", "secrets", "dbi"}
 
 	for _, rt := range resourceTypes {
@@ -174,7 +160,6 @@ func TestQA_APIError_AllResourceTypes(t *testing.T) {
 
 			plain := stripANSI(rootViewContent(m))
 
-			// Should show error, not loading
 			if strings.Contains(plain, "Loading") {
 				t.Errorf("[%s] after APIErrorMsg, should NOT show Loading", rt)
 			}
@@ -188,7 +173,6 @@ func TestQA_APIError_OnMainMenu(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Send APIErrorMsg while on main menu — should not panic
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          fmt.Errorf("something went wrong"),
@@ -200,21 +184,15 @@ func TestQA_APIError_OnMainMenu(t *testing.T) {
 	}
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TASK-086: API error auto-dismiss (fixes #86)
-// ══════════════════════════════════════════════════════════════════════════════
-
 func TestQA_APIError_ReturnsClearCmd(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to resource list so APIErrorMsg has a target view
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Send APIErrorMsg — handleAPIError should return a cmd that schedules auto-clear
 	_, cmd := rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          fmt.Errorf("access denied"),
@@ -234,19 +212,16 @@ func TestQA_APIError_AutoDismiss(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// Send APIErrorMsg
 	m, cmd := rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          fmt.Errorf("access denied"),
 	})
 
-	// Verify flash is visible
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "access denied") {
 		t.Fatalf("flash error should be visible, got: %s", plain[:min(300, len(plain))])
 	}
 
-	// Verify cmd is returned (auto-dismiss timer was scheduled).
 	if cmd == nil {
 		t.Fatal("expected auto-dismiss cmd, got nil")
 	}
@@ -263,7 +238,6 @@ func TestQA_FlashMsg_ReturnsClearCmd(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// FlashMsg (non-API error) already works — control test
 	_, cmd := rootApplyMsg(m, messages.Flash{Text: "test error", IsError: true})
 
 	if cmd == nil {
@@ -271,17 +245,12 @@ func TestQA_FlashMsg_ReturnsClearCmd(t *testing.T) {
 	}
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TASK-003: Fix S3 object refresh bug
-// ══════════════════════════════════════════════════════════════════════════════
-
 // TestBug_S3Refresh_InsideBucket verifies that Ctrl+R inside a bucket
 // refreshes objects for the same bucket, not the bucket list.
 func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to S3 buckets
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -291,7 +260,6 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
 
-	// Enter bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -299,7 +267,6 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Load objects
 	objects := []resource.Resource{
 		{ID: "file1.txt", Name: "file1.txt", Fields: map[string]string{
 			"key": "file1.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
@@ -307,26 +274,22 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: objects})
 
-	// Verify we're in the objects view
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "my-data-bucket") {
 		t.Fatalf("should be in objects view for my-data-bucket, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Press Ctrl+R to refresh
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("Ctrl+R should return a command to refresh")
 	}
 
-	// Execute the returned command and check the message.
 	msg := cmd()
 	// The refresh command should fetch S3 objects for the bucket using the child
 	// fetcher ("s3_objects" type with parent context). Since we have no real AWS
 	// clients, it returns APIErrorMsg.
 	switch msg := msg.(type) {
 	case messages.APIError:
-		// Must NOT get "unsupported child type: s3_objects" -- that means fetcher was not found
 		if strings.Contains(msg.Err.Error(), "unsupported child type") {
 			t.Errorf("refresh inside bucket should find s3_objects child fetcher; err: %v", msg.Err)
 		}
@@ -341,8 +304,6 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 		t.Logf("refresh returned message type %T", msg)
 	}
 
-	// After refresh, verify that we still see the bucket name in the view
-	// (i.e., we didn't navigate away to the bucket list)
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "my-data-bucket") {
 		t.Errorf("after refresh, should still be in objects view for my-data-bucket, got: %s", plain[:min(200, len(plain))])
@@ -355,7 +316,6 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to S3 buckets
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -365,7 +325,6 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Enter bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -373,13 +332,8 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Load objects including a folder
-	// "kind": "folder" is what marks a prefix row, the same shape the sibling
-	// TestBug_S3_EnterOnFolder_NavigatesIntoPrefix uses; without it the Enter
-	// below opens a detail instead of drilling. It was not needed while this
-	// page reached the bucket list beneath instead of this one — the Enter
-	// never saw an object row at all, so the test was asserting about the
-	// bucket level while claiming the prefix.
+	// "kind": "folder" marks a prefix row; without it the Enter below opens a
+	// detail instead of drilling.
 	objects := []resource.Resource{
 		{ID: "data/", Name: "data/", Fields: map[string]string{
 			"key": "data/", "size": "", "last_modified": "", "storage_class": "", "kind": "folder",
@@ -387,14 +341,12 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Navigate into the prefix
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Load objects inside the prefix
 	prefixObjects := []resource.Resource{
 		{ID: "data/file.csv", Name: "data/file.csv", Fields: map[string]string{
 			"key": "data/file.csv", "size": "2048", "last_modified": "2025-02-01", "storage_class": "STANDARD",
@@ -402,14 +354,11 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: prefixObjects, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Press Ctrl+R to refresh
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("Ctrl+R inside prefix should return a command to refresh")
 	}
 
-	// The refresh should fetch S3 objects for the correct bucket using the child
-	// fetcher ("s3_objects" type with parent context containing bucket+prefix).
 	msg := cmd()
 	switch msg := msg.(type) {
 	case messages.APIError:
@@ -434,7 +383,6 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to S3 buckets
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -444,7 +392,6 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Press Ctrl+R to refresh at bucket level
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("Ctrl+R at bucket list level should return a command")
@@ -462,9 +409,8 @@ func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 }
 
 // TestBug_S3Refresh_NonS3ResourceUnaffected verifies that refresh on
-// non-S3 resource types is not broken by the S3 fix.
+// non-S3 resource types is unaffected by the S3 child-list refresh path.
 func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
-	// Representative sample of non-S3 types — full sweep in CI slow suite
 	for _, rt := range []string{"ec2", "dbi", "secrets"} {
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "test"
@@ -500,17 +446,12 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 	}
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// §A issue-67: A.8, A.9, A.10 — error persistence, retry, isolation
-// ══════════════════════════════════════════════════════════════════════════════
-
 // TestQa67_A8_ErrorFlash_ClearedByNavigation verifies that navigating away
 // from a resource list that had an error does not leave the app in a broken state.
 func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to EC2 and send an error
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -520,17 +461,14 @@ func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
 		Err:          fmt.Errorf("ExpiredToken: token has expired"),
 	})
 
-	// Verify error is shown
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ExpiredToken") && !strings.Contains(plain, "expired") &&
 		!strings.Contains(plain, "Error") {
 		t.Errorf("A.8: error flash should show error indication before nav, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Navigate back to main menu via Esc
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	// View should still render (app is functional after error + nav)
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("A.8: View() should not be empty after navigating away from error state")
@@ -543,7 +481,6 @@ func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to RDS and load, then error
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
@@ -558,13 +495,11 @@ func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
 		Err:          fmt.Errorf("ThrottlingException: rate exceeded"),
 	})
 
-	// ctrl+r should trigger a new fetch
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if cmd == nil {
 		t.Fatal("A.9: ctrl+r after APIErrorMsg should return a fetch command")
 	}
 
-	// The command should produce a fetch-related message (not crash)
 	msg := cmd()
 	switch msg.(type) {
 	case messages.APIError:
@@ -584,7 +519,6 @@ func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to EC2 and get an error
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -594,10 +528,8 @@ func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 		Err:          fmt.Errorf("AccessDenied: not authorized"),
 	})
 
-	// Navigate back to main menu
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	// Navigate to S3 — should load independently (no EC2 error contamination)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -619,17 +551,14 @@ func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 
 // navigateToEC2Detail is a shared helper that drives the model from initial
 // state into the DetailModel for a single EC2 instance.
-// It returns the updated tui.Model after: navigate → load → Enter.
 func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 	t.Helper()
 
-	// Navigate to the EC2 resource list (triggers loading state).
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Deliver a single EC2 resource so the list is non-empty.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
@@ -647,12 +576,10 @@ func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Press Enter to open the detail view.
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	// Execute any cmd returned by Enter so the detail model transitions fully
-	// (matches pattern used in TestBug_S3Refresh_InsideBucket).
 	if cmd != nil {
 		msg := cmd()
 		if msg != nil {
@@ -665,7 +592,7 @@ func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 
 // TestQA_APIError_DetailView_FlashStillShown verifies that when an APIErrorMsg
 // arrives while the active view is a DetailModel, the flash error is still
-// displayed in the header (regression: error must not be silently swallowed).
+// displayed in the header.
 func TestQA_APIError_DetailView_FlashStillShown(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
@@ -686,38 +613,32 @@ func TestQA_APIError_DetailView_FlashStillShown(t *testing.T) {
 	}
 }
 
-// TestQA_APIError_ResourceListPath_StillWorks is a regression guard ensuring
-// that the existing ResourceListModel branch of handleAPIError (ClearLoading)
-// is not broken by the DetailModel branch.
+// TestQA_APIError_ResourceListPath_StillWorks verifies the ResourceListModel
+// branch of handleAPIError clears the loading state.
 func TestQA_APIError_ResourceListPath_StillWorks(t *testing.T) {
 	tui.Version = "test"
 
-	// Representative sample — full sweep in CI slow suite
 	resourceTypes := []string{"ec2", "s3", "secrets"}
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
 			m := newRootSizedModel()
 
-			// Navigate to list — enters loading state.
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
 			})
 
-			// Confirm list shows "Loading" before the error.
 			plain := stripANSI(rootViewContent(m))
 			if !strings.Contains(plain, "Loading") {
 				t.Skipf("[%s] list does not show Loading — skipping loading-clear assertion", rt)
 			}
 
-			// Send APIErrorMsg while active view is ResourceListModel.
 			m, _ = rootApplyMsg(m, messages.APIError{
 				ResourceType: rt,
 				Err:          fmt.Errorf("regression-test error for %s", rt),
 			})
 
-			// Loading spinner must be gone.
 			plain = stripANSI(rootViewContent(m))
 			if strings.Contains(plain, "Loading") {
 				t.Errorf("[%s] after APIErrorMsg on ResourceListModel, Loading must be cleared, got:\n%s", rt, plain[:min(300, len(plain))])

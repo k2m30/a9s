@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_hostile_aws_strings_test.go — an AWS-supplied string cannot steer the
+// An AWS-supplied string cannot steer the
 // terminal.
 //
 // A tag value, a description, a CloudTrail user agent and a resource name are
@@ -41,7 +41,7 @@ import (
 // turns the rest of the row red and costs the cell a column.
 const tui6HostileTag = "web\x1b[31m-prod\x07"
 
-// tui6PrintableOf is what the operator must still be able to read once the
+// tui6PrintableHead is what the operator must still be able to read once the
 // controls are gone, whichever way the boundary removes them.
 const tui6PrintableHead = "web"
 const tui6PrintableTail = "-prod"
@@ -261,10 +261,10 @@ func TestHostileAWSString_CopyIsInert(t *testing.T) {
 	}
 }
 
-// TestHostileAWSString_EnricherPhraseIsInert pins the second writer the row
-// says must pass the boundary: an enricher result. Its phrase becomes the
-// row's Status cell, so a hostile phrase steers the terminal from a lane the
-// loaded page never touches.
+// TestHostileAWSString_EnricherPhraseIsInert pins the second writer that must
+// pass the boundary: an enricher result. Its phrase becomes the row's Status
+// cell, so a hostile phrase steers the terminal from a lane the loaded page
+// never touches.
 func TestHostileAWSString_EnricherPhraseIsInert(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -316,9 +316,8 @@ func TestHostileAWSString_FrameTitleIsInert(t *testing.T) {
 
 // TestPainterKeepsA9sOwnStyling is the counterpart to every pin above: the
 // escape sequences a9s itself writes are how colour reaches the screen, so the
-// painter must go on passing them through and measuring around them. A fix
-// that sanitised the painter's output instead of the incoming data would fail
-// here.
+// painter passes them through and measures around them; sanitising belongs on
+// the incoming data, not on the painter's output.
 func TestPainterKeepsA9sOwnStyling(t *testing.T) {
 	styled := lipgloss.NewStyle().Foreground(lipgloss.Color("#7aa2f7")).Render("running")
 	if !strings.Contains(styled, "\x1b[") {
@@ -405,8 +404,8 @@ func TestHostileAWSString_ErrorHistoryIsInert(t *testing.T) {
 	}
 }
 
-// TestHostileAWSString_C1SequenceIsStrippedWhole pins row 6 beside the ESC
-// pins: a sequence opened by a C1 control loses the control and its payload
+// TestHostileAWSString_C1SequenceIsStrippedWhole: a sequence opened by a C1
+// control loses the control and its payload
 // together. U+009B is the single-character CSI, so "31m" after it is a
 // payload, not text; removing only the introducer would leave "31m" on the
 // screen as a word the operator never wrote.

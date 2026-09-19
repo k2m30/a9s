@@ -1,19 +1,17 @@
 package unit
 
-// qa_wave1_supporting_rows_test.go — the wave-1 supporting rows on dbi, dbc
+// The wave-1 supporting rows on dbi, dbc
 // and efs.
 //
 // These rows are the second line of the detail view's Attention block: the
 // phrase says what is wrong, the row says what the setting actually is. They
 // are built from data only the fetcher holds, so nothing downstream can
 // recompute a row that stops being emitted or starts carrying the wrong value.
-// Until now nothing asserted either, and a row whose value silently became a
-// Go bool literal or an empty string would have rendered exactly as blank as
-// no row at all.
+// A row whose value became a Go bool literal or an empty string would render
+// exactly as blank as no row at all.
 //
 // Asserted on the fetcher's own output, because the runtime drops wave-1
-// AttentionDetails before the rendered surface; pinning them there would hide
-// these rows regressing behind a gap that belongs to another batch.
+// AttentionDetails before the rendered surface.
 
 import (
 	"context"

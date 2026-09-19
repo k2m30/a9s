@@ -131,7 +131,6 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	}
 
-	// First ClientsReadyMsg — should emit NavigateMsg for "s3".
 	var firstCmd tea.Cmd
 	m, firstCmd = rootApplyMsg(m, crm)
 
@@ -140,7 +139,6 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 		return ok
 	})
 
-	// Second ClientsReadyMsg — command should have been cleared; no NavigateMsg.
 	_, secondCmd := rootApplyMsg(m, crm)
 
 	nav := findNavigateMsg(secondCmd)
@@ -185,16 +183,13 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 	}
 }
 
-// TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet
-// verifies the navigation-race half of D11's fix reaches the real TUI Update loop: on the
-// LIVE (non-demo, NoCache=false) path, a ClientsReadyMsg must NOT produce a
+// TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet: on
+// the live (non-demo, NoCache=false) path a ClientsReadyMsg produces no
 // NavigateMsg directly — the one-shot -c navigation is armed
 // (session.CommandArmed/PendingCommand) and deferred to the follow-up
-// AvailabilityCacheLoaded event, so that ProbeResources is seeded before
-// HandleNavigate can ever run. This is the race TestQA_CLICommand_* above
-// never exercised: every existing case in this file uses WithNoCache(true),
-// which stays on the synchronous-prefetch lane where direct emission is
-// still correct and unchanged.
+// AvailabilityCacheLoaded event, so ProbeResources is seeded before
+// HandleNavigate can run. WithNoCache(true) stays on the synchronous-prefetch
+// lane, where direct emission is correct.
 func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	m := newBlessedModel(t,
@@ -276,7 +271,6 @@ func TestQA_CLICommand_SkippedWhenUserNavigatedAway(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Simulate user navigating to help before ClientsReadyMsg arrives.
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Now ClientsReadyMsg arrives — stack depth is 2 (menu + help).

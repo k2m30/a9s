@@ -1,19 +1,18 @@
 package unit_test
 
-// qa_s3_related_cross_region_test.go — the four S3 related-def checkers that
+// The four S3 related-def checkers that
 // issue a per-bucket S3 API call (checkS3CFN → GetBucketTagging, checkS3KMS →
 // GetBucketEncryption, checkS3Logs → GetBucketLogging, checkS3Role →
 // GetBucketPolicy) must NOT bubble PermanentRedirect (301) or
 // IllegalLocationConstraintException (400) up as a State: RelatedError result.
 // Both codes indicate the configured S3 client's region differs from the target
 // bucket's region — a legitimate environmental condition on multi-region
-// accounts, not a bug. The checkers must soft-truncate to TruncatedResult
-// ("0+"), preserving the existing RelatedError (resource.ErrorRelated) contract
-// for genuine failures (e.g. AccessDenied).
+// accounts, not a bug. The checkers soft-truncate to TruncatedResult ("0+");
+// a genuine failure (e.g. AccessDenied) stays a RelatedError
+// (resource.ErrorRelated).
 //
-// Precedent: s3_issue_enrichment.go EnrichS3Posture classifies this exact
-// error pair as operational, not a bug, and marks TruncatedIDs (row "?")
-// rather than spamming the failure log.
+// EnrichS3Posture (s3_issue_enrichment.go) classifies the same error pair as
+// operational and marks TruncatedIDs (row "?") instead of logging a failure.
 
 import (
 	"context"
@@ -27,14 +26,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Fakes — one per affected S3 API. Each embeds s3NoopAPI to inherit the four
-// S3API methods needed to satisfy ServiceClients.S3 (ListBuckets,
-// ListObjectsV2, GetBucketNotificationConfiguration, GetPublicAccessBlock),
-// and overrides the single GetBucket* method the checker calls. The fakes
-// return &smithy.GenericAPIError{Code} regardless of the bucket; classification
-// is by ErrorCode, not by message string.
-// ---------------------------------------------------------------------------
+// Each fake embeds s3NoopAPI and overrides the single GetBucket* method its
+// checker calls, returning &smithy.GenericAPIError{Code} for any bucket;
+// classification is by ErrorCode, not by message string.
 
 // s3NoopAPI provides empty implementations of the four S3API methods, so test
 // fakes can embed it and override only the GetBucket* method under test.
@@ -99,12 +93,6 @@ func (f *s3PolicyErrFake) GetBucketPolicy(
 ) (*s3.GetBucketPolicyOutput, error) {
 	return nil, &smithy.GenericAPIError{Code: f.code, Message: "cross-region or denied: " + f.code}
 }
-
-// ---------------------------------------------------------------------------
-// Cross-region soft-truncate matrix — 4 checkers × 2 error codes = 8 sub-tests.
-// Each asserts the soft-truncated contract:
-//   Count = 0, Truncated = true, Err = nil, TargetType = <expected>.
-// ---------------------------------------------------------------------------
 
 func TestS3Related_CrossRegion_SoftTruncates(t *testing.T) {
 	const xRegionBucket = "ap-south-bucket"
@@ -185,12 +173,8 @@ func TestS3Related_CrossRegion_SoftTruncates(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Contract-preservation guard — a NON cross-region error code (AccessDenied)
-// must still bubble up as Count=-1 with non-nil Err for one of the four
-// affected checkers. Guards against the new branch swallowing real failures.
-// ---------------------------------------------------------------------------
-
+// A non-cross-region error code (AccessDenied) stays State: RelatedError with
+// a non-nil Err.
 func TestS3Related_CrossRegion_PreservesUnknownContract(t *testing.T) {
 	const xRegionBucket = "no-permission-bucket"
 	clients := &awsclient.ServiceClients{S3: &s3TaggingErrFake{code: "AccessDenied"}}

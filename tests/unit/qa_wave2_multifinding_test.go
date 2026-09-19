@@ -1,64 +1,18 @@
-// qa_wave2_multifinding_test.go — pins OWNER CONTRACT #52 (multi-finding).
+// Multi-finding rows.
+// IssueEnricherResult.Findings is map[string][]domain.Finding: an enricher may
+// emit several independently evaluated findings per resource, and all of them
+// fold onto domain.Resource.Findings. The worst severity drives
+// td.ResolveColor (colorFromAnyFinding scans the whole r.Findings slice,
+// order-independent), and the detail Attention block lists each finding as its
+// own entry with its own Phrase and Detail (buildAttentionEntries emits one
+// attentionEntry per issue-severity finding).
 //
-// #52's contract: IssueEnricherResult.Findings is map[string][]domain.Finding.
-// Enrichers may emit N independently-evaluated findings per resource; ALL fold
-// onto domain.Resource.Findings (a plain []domain.Finding slice); the worst
-// severity drives td.ResolveColor (colorFromAnyFinding scans the WHOLE
-// r.Findings slice, order-independent); and the detail-view Attention block
-// lists each finding as its own entry — own Phrase, own Detail — never a
-// demoted row of another finding (buildAttentionEntries iterates ds.Findings,
-// one attentionEntry per issue-severity finding).
-//
-// This suite drives the REAL, exported runtime.ApplyWave2ToRow fold and the
-// real awsclient.EnrichOpenSearchDomains against the landed
-// map[string][]domain.Finding shape, asserting the downstream behavior below.
-//
-// Section map:
-//
-//  1. TestFold_TwoWave2FindingsSameResource_* (4 subtests) — construct the
-//     IssueEnricherResult.Findings entry the way a hypothetical two-finding
-//     ecs-svc enricher WOULD under the new contract (mock-style map value, no
-//     real IssueEnricher invoked, mirroring the existing TestEnrich*
-//     seam-level tests), fold it through the REAL runtime.ApplyWave2ToRow,
-//     and assert the intended downstream shape: both findings land in
-//     r.Findings, the worst severity drives td.ResolveColor, the detail
-//     Attention block lists both phrases, and the list Status cell shows the
-//     worst finding's phrase stacked with "(+1)" — this suffix is NOT
-//     speculative: core/app/list_columns.go's listPhraseFromFindings
-//     already renders "<top phrase> (+N)" for any len(findings)>1 row
-//     (verified by reading its source, and independently exercised GREEN by
-//     this file's own Section 2 carry tests, which seed r.Findings directly
-//     and already observe the same suffix at HEAD).
-//  2. TestReconcileTypeFile_Wave2Carry_MultiFinding* / TestRestartSeed_MultiFinding_*
-//     (2 tests) — mirror runtime_wave2_carry_test.go's Test 1 (disk refresh)
-//     and Test 4 (restart seed) with a row directly seeded with TWO
-//     wave2-sourced domain.Finding entries. VERIFIED EMPIRICALLY (not
-//     assumed from the dispatch): cache.Row.Findings and domain.Resource.
-//     Findings are plain []domain.Finding slices — carryWave2/
-//     carryWave2ForRows/wave2FindingsOf (core/runtime/wave2_carry.go)
-//     iterate and copy the WHOLE slice, with no per-resource cap — so the
-//     C6b carry path (disk reconcile + restart seed) is already
-//     multi-finding-safe and touches NO part of the #52 seam
-//     (IssueEnricherResult.Findings / ApplyWave2ToRow are never referenced by
-//     either test in this section). Kept here as a GREEN regression guard,
-//     not a RED framework-limit pin — it documents the fix boundary so a
-//     future enricher-side change does not need to touch the carry layer,
-//     and would be caught here if it accidentally did. (Collateral: both
-//     tests are swept into this FILE's package-level compile failure by
-//     Section 1/3's intentional seam errors above — that is a build-system
-//     fact about `go test` compiling a package atomically, not a defect in
-//     these two tests' own logic.)
-//  3. TestOpenSearch_Enrich_MultiBackground_BothConditionsSurfaceAsOwnFindings
-//     — the concrete opensearch case: a MultiBackgroundDomain resource (both
-//     forced-update and encryption-off) must produce TWO Finding entries in
-//     result.Findings[id] (as a []domain.Finding under the #52 contract),
-//     each carrying its own Code/Phrase/Detail, and must NOT cram the hidden
-//     condition's phrase into a generic {Label:"Additional"} DetailRow.
-//     Companion note: the prior pin TestOpenSearch_Enrich_MultiBackground_
-//     TopWinsHiddenSurfacesAsRow (aws_opensearch_issue_enrichment_test.go),
-//     which asserted exactly the CURRENT (limited) "! wins, ~ hides in a
-//     row" shape this test says must change, has been RETIRED (deleted, with
-//     a pointer comment back to this file) as part of this same change.
+// The fold tests build a two-finding IssueEnricherResult entry and run it
+// through runtime.ApplyWave2ToRow. The carry tests seed a row with two
+// wave2-sourced findings directly: cache.Row.Findings and
+// domain.Resource.Findings are plain slices that carryWave2/carryWave2ForRows/
+// wave2FindingsOf (core/runtime/wave2_carry.go) copy whole, so a disk refresh
+// and a restart seed keep both.
 package unit_test
 
 import (
@@ -72,17 +26,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// Section 1 — fold: two intended Wave-2 findings for one resource
-// ────────────────────────────────────────────────────────────────────────────
-
 const multiFindingResourceID = "ecs-svc-fold-multi"
 
-// multiFindingBang and multiFindingTilde are the two independent Wave-2
-// findings an ecs-svc enricher WOULD emit for the same resource once #52
-// lifts. Constructed mock-style — no real IssueEnricher invoked — mirroring
-// the existing TestEnrich* seam-level tests (aws_opensearch_issue_enrichment_test.go
-// et al.).
+// multiFindingBang and multiFindingTilde are two independent Wave-2 findings
+// an ecs-svc enricher emits for the same resource.
 var (
 	multiFindingBang = domain.Finding{
 		Code:     domain.FindingCode("ecs-svc.deployment-failed"),
@@ -218,31 +165,19 @@ func TestFold_TwoWave2FindingsSameResource_ListStatusCellShowsWorstPhrase(t *tes
 		t.Fatalf("row %q not found in ecs-svc list body", multiFindingResourceID)
 	}
 
-	// "(+1)" is the REAL render rule, not a guess: listPhraseFromFindings
-	// (core/app/list_columns.go) already renders "<top phrase> (+N)" for
-	// any row whose r.Findings has more than one entry, and picks the FIRST
-	// issue-severity entry as <top phrase> — bang is ordered first in
-	// buildFoldedMultiFindingRow's slice AND is the worse severity, so both
-	// readings of "top" agree here. This exact suffix is independently
-	// exercised GREEN today by Section 2's carry tests, which seed
-	// r.Findings=[]domain.Finding{bang, tilde} directly (bypassing the #52
-	// enricher-map seam entirely) and already observe "<bang phrase> (+1)".
+	// "(+1)" is listPhraseFromFindings's render rule (core/app/list_columns.go):
+	// "<top phrase> (+N)" for a row with more than one finding, top being the
+	// first issue-severity entry. bang is first in the slice and the worse
+	// severity, so both readings of "top" agree.
 	want := multiFindingBang.Phrase + " (+1)"
 	if cell != want {
 		t.Errorf("Status cell = %q, want %q — the worst (SevBroken) finding must lead the stacked phrase once both findings survive the fold; this fails only if ApplyWave2ToRow still drops the tilde finding (#52), since listPhraseFromFindings itself needs no change", cell, want)
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Section 2 — C6b cache carry: does the multi-finding shape survive a
-// row-replacing refresh and a restart seed? cache.Row.Findings and
-// domain.Resource.Findings are plain []domain.Finding slices — UNCHANGED by
-// #52 (only IssueEnricherResult.Findings, the enricher-result type, changes
-// shape) — so these tests seed the multi-finding row directly, never
-// touching IssueEnricherResult or ApplyWave2ToRow: characterization tests
-// of the carry layer, independent of the enricher-result type + fold
-// (Section 1).
-// ────────────────────────────────────────────────────────────────────────────
+// cache.Row.Findings and domain.Resource.Findings are plain []domain.Finding
+// slices, so the carry tests seed the multi-finding row directly, without
+// IssueEnricherResult or ApplyWave2ToRow.
 
 const (
 	wave2CarryMultiShortName  = "wave2carrymulti"
@@ -275,7 +210,7 @@ func TestReconcileTypeFile_Wave2Carry_MultiFindingRowSurvivesRefresh(t *testing.
 
 	c := newSaveCacheRegressionCore(t, false)
 	// Bare same-ID refresh, no Findings/status — the shape a fresh Wave-1
-	// sweep-completion save produces at HEAD.
+	// sweep-completion save produces.
 	freshRows := []cache.Row{
 		{ID: wave2CarryMultiResourceID, Name: wave2CarryMultiResourceID},
 	}
@@ -301,15 +236,10 @@ func TestReconcileTypeFile_Wave2Carry_MultiFindingRowSurvivesRefresh(t *testing.
 }
 
 func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T) {
-	// newTestControllerWithCore constructs via runtime.New(session, nil) —
-	// functionally identical to the runtime.Bootstrap(profile, region, nil)
-	// this test used before (Bootstrap is a thin New(sessionWithPairSet, ...)
-	// wrapper — core/runtime/accessors.go). Neither touches disk at
-	// construction time; EnsureCacheStore's first call is what triggers
-	// cache.LoadDirForTest, and that first call happens below, AFTER the helper's
-	// t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) has already pinned this
-	// test's own isolated config root — so seeding after construction (but
-	// before ctrl.Apply's cache read) is equivalent to seeding before it.
+	// Construction touches no disk; EnsureCacheStore's first call, below, loads
+	// the cache after the helper's t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()), so
+	// seeding after construction and before ctrl.Apply's cache read is equivalent
+	// to seeding before it.
 	core, ctrl := newTestControllerWithCore(t)
 
 	store := core.EnsureCacheStore()
@@ -352,10 +282,7 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 	if row.ResourceID != wave2CarryMultiResourceID {
 		t.Fatalf("Rows[0].ResourceID = %q, want %q", row.ResourceID, wave2CarryMultiResourceID)
 	}
-	// The "no glyph prefix" half of this pin is gone with the row-decorator
-	// plumbing (tui5 row 5) — there is no marker on any row to assert the
-	// absence of. What it was really pinning, whole-row colour from the worst
-	// carried finding, is the Severity assertion below.
+	// Whole-row colour follows the worst carried finding.
 	if row.Severity != "issue" {
 		t.Errorf(`Rows[0].Severity = %q, want "issue" — the FIRST render must already reflect the carried worst finding, no enrichment needed`, row.Severity)
 	}
@@ -368,15 +295,6 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Section 3 — opensearch concrete: both conditions must surface as their own
-// findings, not one Finding plus a hidden condition crammed into a generic
-// "Additional" DetailRow. Retires (see aws_opensearch_issue_enrichment_test.go)
-// TestOpenSearch_Enrich_MultiBackground_TopWinsHiddenSurfacesAsRow, which
-// pinned exactly the "! wins, ~ hides in a row" shape this test says must
-// change.
-// ────────────────────────────────────────────────────────────────────────────
-
 // opensearchMultiUpdateForcedCode and opensearchMultiEncryptionOffCode mirror
 // the unexported opensearchCodeUpdateForced / opensearchCodeEncryptionOff
 // constants in core/aws/opensearch_issue_enrichment.go.
@@ -384,9 +302,3 @@ const (
 	opensearchMultiUpdateForcedCode  domain.FindingCode = "opensearch.update-forced"
 	opensearchMultiEncryptionOffCode domain.FindingCode = "opensearch.encryption-off"
 )
-
-// The opensearch multi-finding pin moved to
-// TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix (aws_opensearch_test.go)
-// when d1 made both conditions wave 1: the contract it guards is unchanged, but
-// the surface that produces them is the fetcher, and the fetcher's mocks live in
-// package unit.

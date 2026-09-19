@@ -1,6 +1,6 @@
 package unit
 
-// qa_failure_discharge_gate_test.go — a recorded failure has to leave the
+// A recorded failure has to leave the
 // function that recorded it.
 //
 // The shape this catches: a function declares its own `var failures []Failure`,
@@ -8,10 +8,6 @@ package unit
 // nil, or an error built from something else. The slice is written and
 // dropped, so a refused AWS call reaches the operator as silence — the row
 // renders "?" with no cause anywhere, or renders clean.
-//
-// Three real instances of it were found by hand (EnrichIAMRoleLastUsed,
-// EnrichIAMGroup, enrichDBIEngineVersions); this gate is what makes the fourth
-// impossible to add quietly.
 //
 // The rule: a function whose body records a failure must ALSO either
 //   - discharge it — call AggregateFailures or Finish, which builds the

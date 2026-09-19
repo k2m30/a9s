@@ -2,15 +2,12 @@
 
 package unit_test
 
-// tui6_boundary_doors_gate_test.go — every door into the controller that
+// Every door into the controller that
 // carries AWS-supplied text reaches the boundary that cleans it.
 //
-// The boundary is not a place in the code, it is a rule about a set of
-// functions, and a rule nothing enumerates is a comment. That is not a
-// hypothetical: three doors shipped past it while seven behavioural pins were
-// green, including the one the terminal actually loads a page through, so no
-// page the real app fetched was ever cleaned. Each of those pins drives a door
-// it knows about; none of them can see a door nobody wrote a pin for.
+// The boundary is a rule about a set of functions, and a rule nothing
+// enumerates is only a comment: a behavioural pin drives the door it knows
+// about and cannot see a door nobody wrote a pin for.
 //
 // So the doors are enumerated from the code. A door is an exported method on
 // the controller whose parameters carry AWS-supplied text: a resource, a page
@@ -46,11 +43,10 @@ const (
 
 // rowBoundaryCalls clean a resource, its findings or its attention rows.
 // domain.Sanitize is deliberately NOT one of them: it cleans a single string,
-// so a door that carries a page and happens to sanitise an error message on
-// one of its branches would otherwise pass with the page untouched. That is
-// not hypothetical — the door the terminal loads every page through reaches
-// ListState.setFetchError two calls down, and a gate that took any cleaning
-// call as proof would have called it compliant while no page was ever cleaned.
+// so a door that carries a page and sanitises an error message on one of its
+// branches would otherwise pass with the page untouched. The door the
+// terminal loads every page through reaches ListState.setFetchError two calls
+// down, so a gate that took any cleaning call as proof would pass it.
 var rowBoundaryCalls = map[string]bool{ //nolint:gochecknoglobals // test-only lookup
 	"Sanitized":                 true, // Resource.Sanitized
 	"SanitizedRows":             true,
@@ -129,7 +125,7 @@ func recvTypeName(e ast.Expr) string {
 // carryingMessages reads core/runtime/messages and returns every message type
 // with a carrier-typed field. A door that takes one of these takes a page of
 // rows, findings or an AWS error by another name — which is what the door the
-// terminal loads every page through does, and why it was missed.
+// terminal loads every page through does.
 func carryingMessages(t *testing.T, repoRoot string) map[int]map[string]map[string]bool {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -505,15 +501,12 @@ func TestBoundaryDoors_EveryDoorReachesTheBoundary(t *testing.T) {
 	}
 }
 
-// TestHostileAWSString_CostsErrorMsgIsInert is the behavioural half of the
-// violation the gate above reports, so the defect is visible as a failure
-// about the screen and not only as a rule about the code.
+// TestHostileAWSString_CostsErrorMsgIsInert pins the costs error lane on the
+// rendered screen.
 //
 // A Cost Explorer refusal quotes what it refused — a dimension value, a tag
-// key — and ApplyCostsLoaded puts that message on the costs body verbatim
-// (core/app/costs_state.go:1038), where buildCostsBody paints it as the
-// screen's error state. It is the same lane as the list's error marker, which
-// already crosses the boundary.
+// key — and ApplyCostsLoaded puts that message on the costs body verbatim,
+// where buildCostsBody paints it as the screen's error state.
 func TestHostileAWSString_CostsErrorMsgIsInert(t *testing.T) {
 	const hostile = "web\u001b[31m-prod\u0007"
 	c := newCostsController(t, fixedCostsNow)

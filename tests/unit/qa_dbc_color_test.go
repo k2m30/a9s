@@ -37,12 +37,6 @@ func d1DbcBaseline() rdstypes.DBCluster {
 // The row colour is the worst severity among the cluster's findings. Each case
 // feeds an SDK DBCluster through the dbc fetcher and compares the colour its
 // findings imply against the colour the row expects.
-//
-// Three families of case from the phrase-matching era are gone with the
-// classifier that needed them: an empty or nil Fields map (no SDK struct
-// produces one), the "(+N)" suffix cases (the suffix is a display artefact of
-// StatusPhrase, never seen by a severity comparison), and the wave-2
-// "maintenance overdue" phrase (the enricher owns it; prowler_w2_dbc covers it).
 func TestDbcColor(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -89,11 +83,9 @@ func TestDbcColor(t *testing.T) {
 		{name: "modifying", status: "modifying", want: resource.ColorWarning},
 		{name: "deleting", status: "deleting", want: resource.ColorWarning},
 
-		// A status a9s does not enumerate is reported, not swallowed: the
-		// fetcher passes the raw keyword through as a warning. The old table
-		// expected Healthy here because the phrase classifier's default arm was
-		// "no match, stay green" — that default made every future AWS status
-		// invisible, which is the opposite of future-proof.
+		// A status a9s does not enumerate is reported, not swallowed: the fetcher
+		// passes the raw keyword through as a warning, so a future AWS status stays
+		// visible.
 		{name: "unknown_status_is_reported", status: "some-future-aws-status", want: resource.ColorWarning},
 
 		{

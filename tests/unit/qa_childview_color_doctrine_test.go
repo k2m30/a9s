@@ -1,36 +1,11 @@
-// qa_childview_color_doctrine_test.go — extends the gate in
-// qa_color_findings_conformance_test.go ("color derives from findings") to
-// CHILD views, which that gate never covers (it only walks
-// resource.AllResourceTypes(), the top-level catalog — resource.AllChildTypes()
-// is a separate registry entirely, see core/resource/accessors.go's
-// GetChildType/AllChildTypes).
+// The "color derives from findings"
+// gate of qa_color_findings_conformance_test.go, applied to CHILD views:
+// resource.AllChildTypes() is a separate registry from
+// resource.AllResourceTypes() (core/resource/accessors.go).
 //
-// OWNER BUG (acme-dev screenshot, tg_health child view): 7 of 8 targets are
-// unhealthy (Reason Target.FailedHealthChecks) and ALL rows render GREEN; the
-// Reason cell shows the raw dotted enum verbatim. Root cause, traced end to
-// end:
-//
-//  1. core/aws/tg_health.go's convertTargetHealth (the tg_health
-//     ChildFetcher's row converter) never populates Resource.Findings and
-//     never sets Fields["status"] (only Fields["health"]).
-//  2. core/aws/catalog_networking.go's tg_health ResourceTypeDef entry
-//     (networkingChildTypes) has no Color func at all.
-//  3. catalog.ResourceTypeDef.ResolveColor (core/catalog/types.go) falls
-//     back to colorFallback(r.Fields["status"]) whenever Color is nil.
-//  4. colorFallback (core/catalog/color_helpers.go) matches "" (the
-//     never-set status field) against none of its known-bad buckets and
-//     falls through every case to `return domain.ColorHealthy` — every
-//     tg_health row renders green regardless of TargetHealth.State.
-//  5. The raw SDK enum "Target.FailedHealthChecks" (elbv2types.
-//     TargetHealthReasonEnumFailedHealthChecks stringified) is copied
-//     verbatim into Fields["reason"], which the tg_health list/detail column
-//     config (core/config/defaults_networking.go) renders directly —
-//     no humanization layer exists for child-view enum fields.
-//
-// This file pins the ARCHITECTURAL CONTRACT (owner doctrine extended to
-// child views): a child-view row carrying issue findings renders with the
-// severity-derived row color, exactly like top-level lists; no raw enum
-// reaches a rendered child-view cell.
+// A child-view row carrying issue findings renders with the severity-derived
+// row color, exactly like top-level lists, and no raw SDK enum reaches a
+// rendered child-view cell.
 package unit_test
 
 import (
@@ -53,8 +28,7 @@ import (
 // (internal/tui/views/resourcelist.go: c.PushChildListScreen +
 // c.RegisterFallbackTypeDef) — the two calls that make buildListBody resolve
 // td to the REAL child ResourceTypeDef (Color func included) instead of
-// falling through to nil. Isolated per test via a temp config dir, mirroring
-// newVisibilityListController in qa_issue_visibility_gate_test.go.
+// falling through to nil. Isolated per test via a temp config dir.
 func newChildColorDoctrineController(t *testing.T, childTD resource.ResourceTypeDef) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -114,11 +88,10 @@ func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 	return result.Resources
 }
 
-// TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding pins
-// item 1 of the doctrine: convertTargetHealth (core/aws/tg_health.go, via
-// the exported FetchTargetHealth) must emit a wave1 Finding for an unhealthy
-// target whose Phrase names the cause (lowercase, e.g. contains 'health
-// check') — not silently drop the signal into Fields only.
+// TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding:
+// convertTargetHealth (core/aws/tg_health.go, via the exported
+// FetchTargetHealth) emits a wave1 Finding for an unhealthy target whose
+// Phrase names the cause (lowercase, e.g. contains 'health check').
 func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *testing.T) {
 	resources := fetchTargetHealthDemoResources(t)
 
@@ -160,22 +133,13 @@ func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *t
 	}
 }
 
-// TestChildViewColorDoctrine_TGHealth_UnhealthyTargetRendersBrokenRow pins
-// item 1's render-side observable: once tg_health is wired into a real
-// ScreenChildList (RegisterFallbackTypeDef + PushChildListScreen, exactly as
-// views.NewChildResourceList does for the live TUI), an unhealthy target row
-// must carry the broken/warning row color via the SAME render seam every
-// top-level list uses — core/app/list_columns.go's
-// resolveListRowSeverity, which is td.ResolveColor(r) fed through
-// colorToTag into ListRow.Color, and IsIssue() fed into ListRow.Severity.
-// A healthy sibling row in the SAME child list must stay default/healthy.
-//
-// RED today: tg_health's ResourceTypeDef.Color is nil (core/aws/
-// catalog_networking.go's networkingChildTypes has no Color: entry for
-// tg_health), so ResolveColor falls back to colorFallback(r.Fields["status"])
-// — and Fields["status"] is never set by convertTargetHealth (only
-// Fields["health"] is), so colorFallback("") falls through every branch to
-// ColorHealthy. Every row, healthy or not, renders "healthy"/"".
+// TestChildViewColorDoctrine_TGHealth_UnhealthyTargetRendersBrokenRow: with
+// tg_health wired into a real ScreenChildList (RegisterFallbackTypeDef +
+// PushChildListScreen, as views.NewChildResourceList does for the live TUI),
+// an unhealthy target row carries the broken/warning row color via the same
+// render seam every top-level list uses — core/app/list_columns.go's
+// resolveListRowSeverity. A healthy sibling row in the same child list stays
+// healthy.
 func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetRendersBrokenRow(t *testing.T) {
 	childTD := resource.GetChildType("tg_health")
 	if childTD == nil {
@@ -241,21 +205,11 @@ func colorFromTag(tag string) domain.Color {
 	}
 }
 
-// TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum pins item 2:
-// the raw dotted SDK enum ("Target.FailedHealthChecks", the stringified
-// elbv2types.TargetHealthReasonEnumFailedHealthChecks) must never reach a
-// rendered child-view cell verbatim — either the Reason cell is humanized, or
-// the Description field carries the human sentence and callers read that
-// instead. This test pins the weaker, owner-specified invariant: no raw
-// dotted token appears in ANY column cell of the row, while the row must
-// still communicate the cause SOMEWHERE in its cells (owner: "the row still
-// communicates the cause somewhere").
-//
-// RED today: convertTargetHealth copies string(thd.TargetHealth.Reason)
-// (the raw enum "Target.FailedHealthChecks") directly into
-// Fields["reason"], and defaults_networking.go's tg_health List column
-// config renders Fields["reason"] as the "Reason" column verbatim — the raw
-// token reaches the rendered cell unchanged.
+// TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum: the raw
+// dotted SDK enum ("Target.FailedHealthChecks", the stringified
+// elbv2types.TargetHealthReasonEnumFailedHealthChecks) never reaches a
+// rendered child-view cell, while the row still communicates the cause in
+// some cell.
 func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.T) {
 	childTD := resource.GetChildType("tg_health")
 	if childTD == nil {
@@ -307,19 +261,10 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 	}
 }
 
-// knownColorlessChildTypes is the burn-down allowlist for the GENERIC census
-// below: every registered child ResourceTypeDef whose catalog Findings table
-// (catalog.FindingDef entries, the declarative source ResolveColor's
-// colorAnyFindingOrHealthy-style classifiers are meant to read) contains at least
-// one issue-severity (SevWarn/SevBroken) entry, yet the type's own Color func
-// does not derive from Findings at all (Color == nil, so ResolveColor uses
-// colorFallback on a structural field instead of ever consulting Findings).
-//
-// This mirrors knownColorDivergence's ratchet contract (qa_color_findings_
-// conformance_test.go) but is seeded, not empty: every entry here is the
-// verified inventory (Findings declared, Color nil) — the worklist, not
-// aspirational debt.
-//
+// knownColorlessChildTypes is the allowlist for the generic census below:
+// registered child types whose catalog Findings table holds at least one
+// issue-severity entry while their Color func is nil, so ResolveColor uses
+// colorFallback on a structural field and never consults Findings.
 // Key: child ResourceTypeDef.ShortName.
 //
 // Census method (static, catalog-driven — see TestChildViewColorDoctrine_
@@ -334,8 +279,7 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 // claim "color derives from findings" (the doctrine) while its Color func
 // is nil and therefore structurally never reads Findings at all.
 var knownColorlessChildTypes = map[string]bool{
-	// Empty: tg_health, the type this inventory was opened for, now declares
-	// its target-health findings and derives its colour from them.
+	// tg_health derives its colour from its target-health findings.
 }
 
 // TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc is
@@ -383,7 +327,6 @@ func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t 
 				readyForBurnDown = append(readyForBurnDown, key)
 				t.Errorf("BURN-DOWN: child type %q now has a Color func but is still pinned in knownColorlessChildTypes — remove %q from the allowlist", key, key)
 			case hasColor:
-				// Color func present — this type CAN derive color from Findings.
 			case allowlisted:
 				stillGapped = append(stillGapped, key)
 				t.Skipf("KNOWN GAP (allowlisted): child type %q declares %d issue-severity Findings but has no Color func — pre-existing debt, see knownColorlessChildTypes", key, len(ct.Findings))
@@ -406,21 +349,11 @@ func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t 
 }
 
 // TestChildViewColorDoctrine_GenericCensus_ColorlessChildTypesNeverEmitFindings
-// is the COMPLEMENT ratchet: today's full census of child types that have
-// NEITHER a Color func NOR any declared Findings at all — the exact
-// structural shape of the tg_health bug (no Color, no
-// Findings, so a raw structural signal like TargetHealth.State has no path
-// to ever influence row color or the Attention block). This is the
-// broader worklist beyond tg_health: any type in this list that starts
-// emitting issue-relevant status information without also wiring Color+
-// Findings will silently repeat this exact bug class.
-//
-// Not a pass/fail correctness gate on its own (a child type with genuinely
-// no issue-relevant state, e.g. a pure audit-log child view, has no bug here)
-// — this is an inventory-only ratchet: shrinking is fine (burn-down),
-// growing is a signal to re-audit whether the new colorless/findingsless
-// child type actually carries a status signal, and MUST be re-justified by
-// updating this list explicitly rather than silently drifting.
+// is the complement ratchet: the census of child types with neither a Color
+// func nor any declared Findings, so a raw structural signal has no path to
+// row color or the Attention block. A child type with no issue-relevant state
+// (e.g. a pure audit-log view) belongs here; growth of the list must be
+// re-justified by updating it explicitly.
 func TestChildViewColorDoctrine_GenericCensus_ColorlessChildTypesNeverEmitFindings(t *testing.T) {
 	want := map[string]bool{
 		"cb_build_logs":         true,

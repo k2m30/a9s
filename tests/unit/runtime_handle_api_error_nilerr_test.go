@@ -1,22 +1,9 @@
 package unit
 
-// runtime_handle_api_error_nilerr_test.go — fresh coverage for
-// Core.HandleAPIError's nil-Err guard (core/runtime/handlers.go): calling
-// ev.Err.Error() on a nil error interface panics (invalid memory address /
-// nil pointer dereference) — the exact call HandleAPIError makes today when
-// ClassifyAWSError(nil) returns an empty, unclassified code. The nil-Err
-// guard must short-circuit that branch to a fixed "unknown API error" flash
-// text instead, so a caller that (mistakenly or not) dispatches
-// TaskKindEmitAPIError / drives HandleAPIError with a nil Err never crashes
-// the session.
-//
-// The other two branches of the same text-selection switch — a classified
-// smithy.APIError producing "[code] message", and an unclassified non-nil
-// error falling back to Err.Error() — are already covered by core/runtime's
-// own white-box handlers_test.go; the table test below re-pins that same
-// selection logic from tests/unit's black-box surface so the three branches
-// are asserted together as one contract instead of scattered across two
-// packages.
+// Core.HandleAPIError's nil-Err
+// guard (core/runtime/handlers.go): ev.Err.Error() on a nil error interface
+// panics, so a nil Err takes a fixed "unknown API error" flash text and a
+// caller that drives HandleAPIError with a nil Err never crashes the session.
 
 import (
 	"errors"

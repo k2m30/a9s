@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Route 53 Hosted Zones fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 	mock := &mockRoute53Client{
 		output: &route53.ListHostedZonesOutput{
@@ -56,7 +52,6 @@ func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first hosted zone
 	r0 := resources[0]
 	if r0.ID != "/hostedzone/Z1234567890ABC" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "/hostedzone/Z1234567890ABC", r0.ID)
@@ -65,7 +60,6 @@ func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "example.com.", r0.Name)
 	}
 
-	// Verify required fields
 	requiredFields := []string{"zone_id", "name", "record_count", "private_zone", "comment"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -85,7 +79,6 @@ func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"private_zone\"]: expected %q, got %q", "false", r0.Fields["private_zone"])
 	}
 
-	// Verify second zone (private)
 	r1 := resources[1]
 	if r1.Fields["private_zone"] != "true" {
 		t.Errorf("resource[1].Fields[\"private_zone\"]: expected %q, got %q", "true", r1.Fields["private_zone"])

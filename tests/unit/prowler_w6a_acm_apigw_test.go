@@ -1,15 +1,12 @@
 package unit
 
-// prowler_w6a_acm_apigw_test.go — batch w6a rows 17-21 (the ACM key
-// algorithm and the four API Gateway stage signals), plus the two pins that
-// apply to the batch as a whole: colour derives from findings for every type
-// in it, and no supporting row restates the phrase it sits under.
+// The ACM key algorithm and the four API Gateway stage signals.
 //
-// Row 18 is two codes, not one severity computed at emit time: an
-// internet-facing REST API with no authorizer is Broken, and every other
-// unauthorized API is Warn. A single code cannot carry two severities,
-// because catalog.FindingDef holds one and the catalog is what the badge and
-// the docs table read.
+// The missing-authorizer signal is two codes, not one severity computed at
+// emit time: an internet-facing REST API with no authorizer is Broken, and
+// every other unauthorized API is Warn. A single code cannot carry two
+// severities, because catalog.FindingDef holds one and the catalog is what
+// the badge and the docs table read.
 
 import (
 	"context"
@@ -39,10 +36,6 @@ const (
 	w6aAPIGWStageSecret  = "apigw.stage-variable-secret"
 )
 
-// ---------------------------------------------------------------------------
-// acm — row 17
-// ---------------------------------------------------------------------------
-
 type w6aACMFake struct {
 	certs []acmtypes.CertificateSummary
 }
@@ -52,7 +45,8 @@ func (f *w6aACMFake) ListCertificates(_ context.Context, _ *acm.ListCertificates
 }
 
 // w6aCert returns an issued, in-use certificate with the given key algorithm
-// and a year left on the clock, so no expiry finding competes with row 17.
+// and a year left on the clock, so no expiry finding competes with the
+// weak-key finding.
 func w6aCert(domainName string, alg acmtypes.KeyAlgorithm) acmtypes.CertificateSummary {
 	return acmtypes.CertificateSummary{
 		CertificateArn: aws.String("arn:aws:acm:eu-central-1:123456789012:certificate/1a2b3c4d-5e6f-7081-92a3-b4c5d6e7f809"),
@@ -79,9 +73,9 @@ func w6aFetchCerts(t *testing.T, certs ...acmtypes.CertificateSummary) map[strin
 	return byName
 }
 
-// TestW6AACMWeakKey pins row 17. An RSA key below 2048 bits is factorable
-// within reach of a funded attacker, so a certificate on one is not the
-// control the operator believes it is.
+// TestW6AACMWeakKey pins the weak-key finding. An RSA key below 2048 bits is
+// factorable within reach of a funded attacker, so a certificate on one is
+// not the control the operator believes it is.
 func TestW6AACMWeakKey(t *testing.T) {
 	got := w6aFetchCerts(t, w6aCert("legacy-weak-key.acme-corp.com", acmtypes.KeyAlgorithmRsa1024))
 	w2AssertFinding(t, got["legacy-weak-key.acme-corp.com"].Findings, w6aACMWeakKey,
@@ -118,10 +112,6 @@ func TestW6AACMWeakKey_UnknownAlgorithmIsNotWeak(t *testing.T) {
 	w2AssertNoCode(t, got["unknown.acme-corp.com"].Findings, w6aACMWeakKey)
 }
 
-// ---------------------------------------------------------------------------
-// apigw — rows 18-21
-// ---------------------------------------------------------------------------
-
 // w6aAPIGWV1Fake answers the three v1 REST calls the enricher makes.
 type w6aAPIGWV1Fake struct {
 	awsclient.APIGatewayV1API
@@ -148,7 +138,7 @@ func (f *w6aAPIGWV1Fake) GetStages(_ context.Context, _ *apigateway.GetStagesInp
 }
 
 // w6aAPIGWV2Fake answers the v2 calls. Its stages are healthy by default so
-// the existing v2 rows do not compete with the ones under test.
+// the other v2 findings do not compete with the ones under test.
 type w6aAPIGWV2Fake struct {
 	awsclient.APIGatewayV2API
 
@@ -181,7 +171,7 @@ func (f *w6aAPIGWV2Fake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesI
 }
 
 // w6aV2HealthyStage is a v2 stage with throttling and access logs configured,
-// so it trips none of the pre-existing v2 findings.
+// so it trips none of the other v2 findings.
 func w6aV2HealthyStage(name string) apigwv2types.Stage {
 	return apigwv2types.Stage{
 		StageName:  aws.String(name),
@@ -255,9 +245,9 @@ func w6aEnrichAPIGW(t *testing.T, v1 *w6aAPIGWV1Fake, v2 *w6aAPIGWV2Fake, rs ...
 	return res
 }
 
-// TestW6AAPIGWRESTNoAuthorizerIsBrokenWhenReachable pins the Broken half of
-// row 18. A REST API with a public endpoint, no authorizer and no resource
-// policy is open to the internet, which is the case Prowler raises loudest.
+// TestW6AAPIGWRESTNoAuthorizerIsBrokenWhenReachable pins the Broken code. A
+// REST API with a public endpoint, no authorizer and no resource policy is
+// open to the internet, which is the case Prowler raises loudest.
 func TestW6AAPIGWRESTNoAuthorizerIsBrokenWhenReachable(t *testing.T) {
 	res := w6aEnrichAPIGW(t,
 		&w6aAPIGWV1Fake{stages: []apigwtypes.Stage{w6aV1Stage("prod")}},
@@ -287,10 +277,10 @@ func TestW6AAPIGWRESTNoAuthorizer_PrivateEndpointIsOnlyAWarning(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["rst005private"], w6aAPIGWNoAuthPublic)
 }
 
-// TestW6AAPIGWRESTNoAuthorizer_ScopedResourcePolicyClosesIt pins contract
-// rule 6 on apigw: a resource policy that grants access under a condition is
-// a real control, so the API is not unauthorized. A policy open to everyone
-// is not, and the finding stands.
+// TestW6AAPIGWRESTNoAuthorizer_ScopedResourcePolicyClosesIt pins that a
+// resource policy that grants access under a condition is a real control, so
+// the API is not unauthorized. A policy open to everyone is not, and the
+// finding stands.
 func TestW6AAPIGWRESTNoAuthorizer_ScopedResourcePolicyClosesIt(t *testing.T) {
 	scoped := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"execute-api:Invoke","Resource":"arn:aws:execute-api:eu-central-1:123456789012:rst006scoped/*","Condition":{"IpAddress":{"aws:SourceIp":["203.0.113.0/24"]}}}]}`
 	open := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"execute-api:Invoke","Resource":"arn:aws:execute-api:eu-central-1:123456789012:rst007open/*"}]}`
@@ -330,8 +320,9 @@ func TestW6AAPIGWRESTNoAuthorizer_AnAuthorizerClosesIt(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["rst008authed"], w6aAPIGWNoAuth)
 }
 
-// TestW6AAPIGWHTTPNoAuthorizer pins the v2 lane of row 18. An HTTP API has no
-// private endpoint type, so an unauthorized one is always the Warn code.
+// TestW6AAPIGWHTTPNoAuthorizer pins the v2 lane of the missing-authorizer
+// signal. An HTTP API has no private endpoint type, so an unauthorized one is
+// always the Warn code.
 func TestW6AAPIGWHTTPNoAuthorizer(t *testing.T) {
 	res := w6aEnrichAPIGW(t, nil,
 		&w6aAPIGWV2Fake{stages: []apigwv2types.Stage{w6aV2HealthyStage("$default")}},
@@ -353,9 +344,9 @@ func TestW6AAPIGWHTTPNoAuthorizer(t *testing.T) {
 	w2AssertNoCode(t, guarded.Findings["htp002authed"], w6aAPIGWNoAuth)
 }
 
-// TestW6AAPIGWRESTNoAccessLogs pins row 19 on the v1 lane, and that the code
-// is the same one the v2 lane already uses — one signal, one code, or the
-// badge counts the same gap twice under two names.
+// TestW6AAPIGWRESTNoAccessLogs pins missing access logs on the v1 lane under
+// the same code the v2 lane uses — one signal, one code, or the badge counts
+// the same gap twice under two names.
 func TestW6AAPIGWRESTNoAccessLogs(t *testing.T) {
 	silent := w6aV1Stage("prod")
 	silent.AccessLogSettings = nil
@@ -384,7 +375,7 @@ func TestW6AAPIGWRESTNoAccessLogs(t *testing.T) {
 	w2AssertNoCode(t, logged.Findings["rst009logged"], w6aAPIGWNoAccessLogs)
 }
 
-// TestW6AAPIGWRESTTracingOff pins row 20.
+// TestW6AAPIGWRESTTracingOff pins tracing off on a REST stage.
 func TestW6AAPIGWRESTTracingOff(t *testing.T) {
 	untraced := w6aV1Stage("prod")
 	untraced.TracingEnabled = false
@@ -413,9 +404,9 @@ func TestW6AAPIGWRESTTracingOff(t *testing.T) {
 	w2AssertNoCode(t, traced.Findings["rst010traced"], w6aAPIGWTracingOff)
 }
 
-// TestW6AAPIGWStageVariableSecret pins row 21. Stage variables are readable
-// by anyone with apigateway:GET, so a credential in one is disclosed to every
-// reader of the account's configuration.
+// TestW6AAPIGWStageVariableSecret pins a credential in a stage variable.
+// Stage variables are readable by anyone with apigateway:GET, so a credential
+// in one is disclosed to every reader of the account's configuration.
 func TestW6AAPIGWStageVariableSecret(t *testing.T) {
 	leaky := w6aV1Stage("prod")
 	leaky.Variables = map[string]string{
@@ -438,8 +429,8 @@ func TestW6AAPIGWStageVariableSecret(t *testing.T) {
 	w2AssertRow(t, rows, "Stage", "prod")
 	w2AssertRow(t, rows, "DB_PASSWORD", "keyword")
 
-	// Contract rule 7: the value never leaves the account. Neither the phrase,
-	// the detail sentence nor any row may carry it.
+	// The value never leaves the account. Neither the phrase, the detail sentence
+	// nor any row may carry it.
 	w6aAssertNoSecretLeak(t, f.Phrase, f.Detail)
 	for _, r := range rows {
 		w6aAssertNoSecretLeak(t, r.Label, r.Value)
@@ -459,8 +450,8 @@ func TestW6AAPIGWStageVariableSecret_OrdinaryVariablesAreClean(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["rst011clean"], w6aAPIGWStageSecret)
 }
 
-// TestW6AAPIGW_ConditionsAreIndependent pins contract rule 4 on the v1 lane:
-// one REST API failing four checks carries four findings.
+// TestW6AAPIGW_ConditionsAreIndependent pins that one REST API failing four
+// checks carries four findings.
 func TestW6AAPIGW_ConditionsAreIndependent(t *testing.T) {
 	bad := w6aV1Stage("prod")
 	bad.AccessLogSettings = nil
@@ -515,10 +506,6 @@ func TestW6AAPIGW_NoV1ClientLeavesTheV2LaneWorking(t *testing.T) {
 		"no authorizer", domain.SevWarn, "wave2")
 }
 
-// ---------------------------------------------------------------------------
-// shared
-// ---------------------------------------------------------------------------
-
 // errNotFoundForTest stands in for the NotFound the API returns for a REST
 // API deleted between the list call and the per-API enrichment.
 type errNotFoundForTest struct{}
@@ -528,7 +515,7 @@ func (errNotFoundForTest) Error() string {
 }
 
 // w6aAssertNoSecretLeak fails when a rendered surface carries the secret
-// value itself. Contract rule 7: rows carry where and what kind, never what.
+// value itself: rows carry where and what kind, never what.
 func w6aAssertNoSecretLeak(t *testing.T, parts ...string) {
 	t.Helper()
 	for _, p := range parts {
@@ -538,11 +525,11 @@ func w6aAssertNoSecretLeak(t *testing.T, parts ...string) {
 	}
 }
 
-// TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer pins the paging
-// the v2 lane gained when it stopped taking a skip-list entry. The row asks
-// whether an API has any authorizer, so one on the first page answers it and
-// every further page is a call nobody needed; an API with none has to be
-// walked to the last page before the finding is honest.
+// TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer pins the v2
+// authorizer paging. The check asks whether an API has any authorizer, so one
+// on the first page answers it and every further page is a call nobody
+// needed; an API with none has to be walked to the last page before the
+// finding is honest.
 func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
 	guarded := &w6aAPIGWV2Fake{
 		authPages:   5,
@@ -564,11 +551,11 @@ func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
 		"no authorizer", domain.SevWarn, "wave2")
 }
 
-// TestW6AAPIGWRESTEndpointType pins row 22, one case per branch.
+// TestW6AAPIGWRESTEndpointType pins the endpoint type, one case per branch.
 //
-// The endpoint type decides row 18's severity. The value is on the RestApi
-// the fetcher already keeps, and unknown is not misconfigured: with the
-// field empty every value would fall through to the broken branch, a
+// The endpoint type decides the missing-authorizer severity. The value is on
+// the RestApi the fetcher already keeps, and unknown is not misconfigured:
+// with the field empty every value would fall through to the broken branch, a
 // genuinely private REST API would render red, and the supporting row that
 // exists to name the endpoint would name nothing.
 func TestW6AAPIGWRESTEndpointType(t *testing.T) {
@@ -595,9 +582,9 @@ func TestW6AAPIGWRESTEndpointType(t *testing.T) {
 		})
 	}
 
-	// No endpoint configuration at all is unknown, and the common contract's
-	// nil rule says unknown is not misconfigured: neither code may fire, or
-	// the batch escalates a missing field to a red row.
+	// No endpoint configuration at all is unknown, and unknown is not
+	// misconfigured: neither code may fire, or a missing field escalates to a red
+	// row.
 	t.Run("unknown", func(t *testing.T) {
 		res := w6aEnrichAPIGW(t,
 			&w6aAPIGWV1Fake{stages: []apigwtypes.Stage{w6aV1Stage("prod")}},
@@ -609,11 +596,11 @@ func TestW6AAPIGWRESTEndpointType(t *testing.T) {
 	})
 }
 
-// TestW6AAPIGWRESTFetcherKeepsTheEndpointType pins the other half of row 22:
-// the word has to reach Fields from the RestApi the fetcher already holds.
-// The enricher branches above read Fields, so they pass against a hand-built
-// row whatever the fetcher does — this is the pin that fails when the fetcher
-// hard-codes the field empty and sends every REST API down the broken branch.
+// TestW6AAPIGWRESTFetcherKeepsTheEndpointType pins that the endpoint word
+// reaches Fields from the RestApi the fetcher already holds. The enricher
+// branches above read Fields, so they pass against a hand-built row whatever
+// the fetcher does — this is the pin that fails when the fetcher leaves the
+// field empty and sends every REST API down the broken branch.
 func TestW6AAPIGWRESTFetcherKeepsTheEndpointType(t *testing.T) {
 	mk := func(id string, types ...apigwtypes.EndpointType) apigwtypes.RestApi {
 		api := apigwtypes.RestApi{Id: aws.String(id), Name: aws.String("acme-" + id)}

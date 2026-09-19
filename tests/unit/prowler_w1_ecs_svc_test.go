@@ -1,12 +1,8 @@
 package unit
 
-// prowler_w1_ecs_svc_test.go — behavioural pins for ecs-svc.public-ip
-// (batch w1).
-//
 // A service with AssignPublicIp=ENABLED gives every task it launches a
 // routable address, so the tasks are reachable from the internet as soon as
-// a security group allows it. The signal comes from the DescribeServices
-// response EnrichECSServices already reads — no extra API call.
+// a security group allows it.
 
 import (
 	"context"
@@ -182,8 +178,8 @@ func TestECSSvc_PublicIP_HealthyNeighbourStillEvaluated(t *testing.T) {
 	pw1RequireNoFinding(t, res.Findings["acme-absent"], pw1ECSSvcCodePublicIP)
 }
 
-// TestECSSvc_DemoBench_OnlyWitnessAssignsPublicIPs pins the demo fixture
-// contract for this signal.
+// TestECSSvc_DemoBench_OnlyWitnessAssignsPublicIPs pins that exactly one demo
+// service assigns public IPs.
 func TestECSSvc_DemoBench_OnlyWitnessAssignsPublicIPs(t *testing.T) {
 	fake := fakes.NewECS()
 	out, err := awsclient.FetchECSServicesPage(context.Background(), fake, fake, fake, "")
@@ -204,9 +200,9 @@ func TestECSSvc_DemoBench_OnlyWitnessAssignsPublicIPs(t *testing.T) {
 	pw1RequireOnlyWitness(t, pw1ECSSvcCodePublicIP, fixtures.ECSServicePublicIP, carriers)
 }
 
-// TestECSSvc_PublicIP_InactiveServiceIsSilent pins common contract rule 4 on
-// ecs-svc: a service being drained or already inactive launches no more tasks,
-// so its address assignment is not an open posture item.
+// TestECSSvc_PublicIP_InactiveServiceIsSilent pins that a service being
+// drained or already inactive launches no more tasks, so its address
+// assignment is not an open posture item.
 func TestECSSvc_PublicIP_InactiveServiceIsSilent(t *testing.T) {
 	for _, status := range []string{"INACTIVE", "DRAINING"} {
 		name := "acme-gone-" + strings.ToLower(status)

@@ -1,13 +1,11 @@
 package unit
 
-// prowler_w5_msk_kinesis_test.go — batch w5 rows 5-8: the two MSK exposure
-// signals and the two Kinesis stream signals.
+// MSK exposure signals and Kinesis stream signals.
 //
-// Rows 7 and 8 are wave 2, not wave 1 as the spec table first had them:
 // ListStreams returns kinesistypes.StreamSummary, which carries neither
 // EncryptionType nor RetentionPeriodHours. Both live on
 // StreamDescriptionSummary, which only DescribeStreamSummary returns, so the
-// tests below drive the enricher rather than the fetcher.
+// kinesis checks are wave 2 and the tests drive the enricher.
 
 import (
 	"context"
@@ -25,10 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Rows 5, 6 — msk.public-access, msk.unauthenticated
-// ---------------------------------------------------------------------------
 
 // w5MSKFake serves DescribeClusterV2 per cluster ARN.
 type w5MSKFake struct {
@@ -226,8 +220,8 @@ func TestW5_MSKUnauthenticated_NilIsNotAFinding(t *testing.T) {
 	}
 }
 
-// Rule 4: a cluster that is both published and unauthenticated reports both,
-// each with its own code, rather than the first one the enricher happened to
+// A cluster that is both published and unauthenticated reports both, each
+// with its own code, rather than the first one the enricher happened to
 // evaluate.
 func TestW5_MSKPublicAndUnauthenticated_AreTwoFindings(t *testing.T) {
 	name := "acme-events-wide-open"
@@ -302,10 +296,6 @@ func TestW5_MSK_NilClientReturnsEmptyResult(t *testing.T) {
 		t.Errorf("Findings = %v on a session with no MSK client", res.Findings)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Rows 7, 8 — kinesis.unencrypted, kinesis.min-retention
-// ---------------------------------------------------------------------------
 
 // w5KinesisFake serves DescribeStreamSummary per stream name.
 type w5KinesisFake struct {
@@ -501,7 +491,7 @@ func TestW5_KinesisMinRetention_RowCarriesTheActualHours(t *testing.T) {
 	t.Errorf("no supporting row carrying the stream's own 12-hour retention; got %v", got)
 }
 
-// Rule 4: an unencrypted stream still on the default retention reports both.
+// An unencrypted stream still on the default retention reports both.
 func TestW5_KinesisUnencryptedAndMinRetention_AreTwoFindings(t *testing.T) {
 	stream := "acme-clickstream-bare"
 	f := newW5KinesisFake()
@@ -518,8 +508,7 @@ func TestW5_KinesisUnencryptedAndMinRetention_AreTwoFindings(t *testing.T) {
 		"24h retention", domain.SevWarn, "wave2")
 }
 
-// A stream being torn down is not a posture problem; rule 4 keeps deleting
-// resources out of the findings entirely.
+// A stream being torn down is not a posture problem.
 func TestW5_KinesisDeletingStreamEmitsNoPostureFinding(t *testing.T) {
 	stream := "acme-clickstream-deleting"
 	f := newW5KinesisFake()
@@ -537,7 +526,7 @@ func TestW5_KinesisDeletingStreamEmitsNoPostureFinding(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[stream], "kinesis.min-retention")
 }
 
-// A stream whose own DescribeStreamSummary fails is unknown for both rows.
+// A stream whose own DescribeStreamSummary fails is unknown for both checks.
 func TestW5_Kinesis_APIErrorOnOneStreamTruncatesOnlyThatStream(t *testing.T) {
 	broken, plain := "acme-broken", "acme-clickstream-plain"
 	f := newW5KinesisFake()
@@ -635,11 +624,10 @@ func TestW5_Kinesis_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// Rule 4: a cluster being torn down, or already failed, carries no
-// reachability finding. No demo cluster in either state supplies the
-// connectivity or client-authentication blocks these rows read, so the
-// cluster below is hand-built to trip BOTH at once — otherwise the guard
-// would look proven by a fixture that never reached the code it guards.
+// A cluster being torn down, or already failed, carries no reachability
+// finding. The cluster is hand-built to trip both checks: no demo cluster in
+// either state carries the connectivity or client-authentication blocks they
+// read.
 func TestW5_MSKLifecycleEndedEmitsNoReachabilityFinding(t *testing.T) {
 	for _, state := range []string{"DELETING", "FAILED"} {
 		t.Run(state, func(t *testing.T) {
@@ -660,11 +648,9 @@ func TestW5_MSKLifecycleEndedEmitsNoReachabilityFinding(t *testing.T) {
 	}
 }
 
-// The guard sits BELOW the broker-version and encryption-in-transit checks
-// on purpose: those describe the software the cluster is running, which
-// stays true while it drains, and they predate this batch. A guard hoisted
-// to the top of the loop would silence them too, and nothing else would say
-// so — the demo fixtures do not put a draining cluster on old brokers.
+// The guard sits below the broker-version and encryption-in-transit checks:
+// those describe the software the cluster is running, which stays true while
+// it drains. A guard at the top of the loop would silence them too.
 func TestW5_MSKLifecycleEndedStillReportsSoftwareFindings(t *testing.T) {
 	name := "acme-events-draining"
 	f := newW5MSKFake()
@@ -678,11 +664,8 @@ func TestW5_MSKLifecycleEndedStillReportsSoftwareFindings(t *testing.T) {
 
 	res := w5EnrichMSK(t, f, r)
 
-	// Asserted by code and phrase rather than through w2AssertFinding: these
-	// two codes predate this batch and carry no Detail sentence, and the
-	// shared helper enforces one because that is this batch's contract for
-	// its own fifteen rows. What this test is about is that the guard did
-	// not reach up and silence them.
+	// Asserted by code and phrase rather than through w2AssertFinding, which
+	// requires a Detail sentence these two codes do not carry.
 	for _, want := range []struct{ code, phrase string }{
 		{"msk.broker-outdated", "broker software outdated"},
 		{"msk.encryption-not-tls", "encryption in transit not enforced"},

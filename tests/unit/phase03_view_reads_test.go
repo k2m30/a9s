@@ -1,10 +1,5 @@
-// phase03_view_reads_test.go — TDD red-light tests for PR-03a-views.
-//
-// Strategy: every resource has Findings populated AND Status/Issues set to a
-// different decoy value. Pre-fix views read the legacy field → decoy visible.
-// Post-fix views read Findings/AttentionDetails → canonical visible.
-//
-// Each test MUST fail until PR-03a-views is implemented.
+// Views read Findings/AttentionDetails, the
+// canonical source of a row's phrase and attention detail.
 package unit_test
 
 import (
@@ -21,9 +16,7 @@ import (
 )
 
 // renderDetailPlain builds a DetailBody through the live Controller seam for
-// res/resourceType and renders it via NewTransientDetail+RenderDetail. Used by
-// the 3 detail-family pins below; the other 11 tests in this file drive
-// views.ResourceListModel instead.
+// res/resourceType and renders it via NewTransientDetail+RenderDetail.
 func renderDetailPlain(t *testing.T, res resource.Resource, resourceType string) string {
 	t.Helper()
 	c := newDetailController(t, res, resourceType)
@@ -68,10 +61,8 @@ func minimalTypeDef(shortName string) resource.ResourceTypeDef {
 }
 
 // minimalTypeDefWithLifecycleKey builds a typeDef whose status column key
-// ("status") intentionally does NOT match LifecycleKey ("state").
-// Pre-fix: extractCellValue for Key:"status" finds Fields["status"] = ""
-// (not set) → cell is blank. Post-fix: the view reads Fields[LifecycleKey]
-// = Fields["state"] = "running" and shows it in the status cell.
+// ("status") does NOT match LifecycleKey ("state"); the view reads
+// Fields[LifecycleKey] = Fields["state"] = "running" into the status cell.
 func minimalTypeDefWithLifecycleKey() resource.ResourceTypeDef {
 	return resource.ResourceTypeDef{
 		Name:      "ec2-lifecycle-test",
@@ -91,10 +82,9 @@ func minimalTypeDefWithLifecycleKey() resource.ResourceTypeDef {
 	}
 }
 
-// loadListController builds a Controller (via the blessed newTestController
-// helper) pre-populated with rs under td — the live replacement for
-// loadList/renderList/IssueCount()'s dead ResourceListModel.{View,IssueCount}
-// harness. RegisterFallbackTypeDef + PushChildListScreen mirror exactly what
+// loadListController builds a Controller (via the newTestController
+// helper) pre-populated with rs under td. RegisterFallbackTypeDef +
+// PushChildListScreen mirror exactly what
 // views.NewResourceList itself falls back to for an unregistered typeDef
 // (resourcelist.go's newResourceListCtrl), so a synthetic test-only ShortName
 // (never a real catalog/menu entry) still renders.
@@ -121,8 +111,7 @@ func renderListRaw(t *testing.T, c *app.Controller, td resource.ResourceTypeDef)
 	return m.RenderList(*lb)
 }
 
-// renderListBody is renderListRaw with ANSI stripped, the direct replacement
-// for the old renderList(m) helper's stripAnsi(m.View()).
+// renderListBody is renderListRaw with ANSI stripped.
 func renderListBody(t *testing.T, c *app.Controller, td resource.ResourceTypeDef) string {
 	t.Helper()
 	return stripAnsi(renderListRaw(t, c, td))
@@ -136,12 +125,8 @@ func renderListBody(t *testing.T, c *app.Controller, td resource.ResourceTypeDef
 // carries Findings[0].Phrase = "<canonical>" and Fields["status"] is empty,
 // the list view shows the canonical phrase from Findings.
 //
-// Post-PR-03e priority (CTO-endorsed option (b) — preserves Wave-2 enricher
-// FieldUpdates["status"] overlays): Fields["status"] wins when set, otherwise
-// fall through to Findings[0].Phrase. Fetchers always write Fields["status"]
-// via phraseFromFindings, so the legacy "DECOY in Fields["status"]" scenario
-// is impossible in the migrated world; the test now only sets Findings, and
-// the view reads them via the empty-Fields["status"] fallback.
+// Fields["status"] wins when set, so Wave-2 enricher FieldUpdates["status"]
+// overlays show; otherwise the cell falls through to Findings[0].Phrase.
 func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 	ensureNoColor(t)
 
@@ -196,10 +181,6 @@ func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 
 // TestViews_ListStatusColumn_FallsBackToLifecycleKey verifies that when Findings
 // is nil and Fields[LifecycleKey] ("state") has a value, that value is shown.
-//
-// Pre-fix: view reads Fields["status"] — which is NOT set, so the cell is
-// blank or shows a different value. Post-fix: view reads Fields[LifecycleKey]
-// = Fields["state"] = "running".
 func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 	ensureNoColor(t)
 
@@ -235,12 +216,7 @@ func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 //   - findingsBrokenRow: Findings[0].Severity=SevBroken, status="running"
 //     → td.Color still returns ColorHealthy (status field wins over Findings)
 //
-// Post-fix: both non-cursor rows share the same healthy ANSI prefix because
-// td.Color is authoritative and both have status="running" → PASS.
-// Pre-fix: view reads Findings.Severity for color → findingsBrokenRow gets
-// broken color → ANSI prefix differs from healthyRow → FAIL.
-//
-// Design note: cursor row (position 0) renders with RowSelected style, masking
+// The cursor row (position 0) renders with RowSelected style, masking
 // color differences. We place a "padding" resource at cursor position 0 and put
 // the two resources we care about at positions 1 (healthy) and 2 (findings-broken)
 // so both render without cursor overlay and their base styles are comparable.
@@ -266,8 +242,6 @@ func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 	}
 	// findingsBrokenRow at position 2: Findings[0].Severity=SevBroken but
 	// td.Color reads Fields["status"]="running" → ColorHealthy.
-	// Pre-fix: view reads Findings.Severity → broken color → different from healthyRow.
-	// Post-fix: view reads td.Color → healthy color → same as healthyRow.
 	findingsBrokenRow := resource.Resource{
 		ID:     "i-findings-broken",
 		Name:   "findings-broken-row",
@@ -305,9 +279,8 @@ func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 		t.Fatalf("could not find findings-broken-row in rendered list:\n%s", stripAnsi(rawOut))
 	}
 
-	// Post-fix: both rows must share the same healthy ANSI prefix because
-	// td.Color is authoritative (status="running" → ColorHealthy for both).
-	// Pre-fix: findingsBrokenRow has broken ANSI prefix → differs → FAIL.
+	// Both rows share the same healthy ANSI prefix because td.Color is
+	// authoritative (status="running" → ColorHealthy for both).
 	healthyPrefix := extractANSIPrefix(healthyLine)
 	findingsBrokenPrefix := extractANSIPrefix(brokenFindingsLine)
 
@@ -350,8 +323,7 @@ func extractANSIPrefix(s string) string {
 // ---------------------------------------------------------------------------
 
 // TestViews_DetailAttention_ReadsAttentionDetails verifies that the detail view
-// Attention section renders rows from r.AttentionDetails, NOT from
-// m.enrichmentFinding (which is left nil/unset).
+// Attention section renders rows from r.AttentionDetails.
 //
 // The Attention rows come from r.Findings[i] paired with
 // r.AttentionDetails[code].Rows, so a finding's supporting rows reach the
@@ -443,16 +415,13 @@ func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 
 // TestViews_IssueCount_ReadsFindingsBySeverity verifies that IssueCount() counts
 // resources whose Findings contain an IsIssue()-severity finding, not resources
-// whose legacy Status/Color is broken.
+// whose Status/Color is broken.
 //
 // Setup: 3 resources, all with Fields["status"]="running" (Color = Healthy).
 //
 //	A: Findings[0].Severity = SevBroken → should count
 //	B: Findings[0].Severity = SevWarn   → should count
 //	C: Findings = nil                   → should NOT count
-//
-// Pre-fix: IssueCount reads td.ResolveColor(r).IsIssue() → all Healthy → count=0.
-// Post-fix: IssueCount reads r.Findings → A+B are issues → count=2.
 func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 	ensureNoColor(t)
 
@@ -496,15 +465,12 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 
 // TestViews_AttentionFilter_ReadsFindings verifies that enabling the ctrl+z
 // attention filter shows only resources that have at least one Findings entry
-// with IsIssue() severity, regardless of their legacy Status / Color.
+// with IsIssue() severity, regardless of their Status / Color.
 //
 // Setup: 2 resources, both with Fields["status"]="running" (Healthy color):
 //
 //	A: Findings[0].Severity = SevBroken → must be visible after enabling filter
 //	B: Findings = nil                   → must be hidden after enabling filter
-//
-// Pre-fix: applyFilter reads td.ResolveColor(r).IsIssue() → both Healthy → both hidden.
-// Post-fix: applyFilter reads r.Findings → A visible, B hidden.
 func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 	ensureNoColor(t)
 
@@ -527,7 +493,6 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 
 	c := loadListController(t, td, []resource.Resource{resA, resB})
 
-	// Enable the attention filter.
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
 	out := renderListBody(t, c, td)
@@ -552,11 +517,6 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 // non-empty). Detail is opened and rendered initially (no enrichment finding).
 // Then SetEnrichmentFinding is called with a wave2 finding. The second render
 // must include "pending maintenance" and "reboot" in the Attention section.
-//
-// Pre-fix: SetEnrichmentFinding only stores the finding; it does not re-derive
-// r.Findings/r.AttentionDetails, so AttentionDetails stays as it was after
-// the first load (nil for wave2 data). The new entry does not appear.
-// Post-fix: SetEnrichmentFinding triggers re-derive; wave2 entry is present.
 func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
 	ensureNoColor(t)
 
@@ -620,11 +580,6 @@ func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
 //
 // After DeriveFindings: lifecycle is filtered → Findings[0] = wave2 entry.
 // The list extractCellValue reads Findings[0].Phrase = "pending maintenance".
-//
-// Pre-fix: "running" is emitted as Findings[0] (wave1), or DeriveFindings was
-// never called so extractCellValue falls back to Fields["state"]="running".
-// Either way the column shows "running".
-// Post-fix: lifecycle filtered; wave2 is Findings[0]; column shows "pending maintenance".
 func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
 	ensureNoColor(t)
 
@@ -670,11 +625,6 @@ func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
 //
 // Tested across 6 representative type shorts to ensure the default applies
 // regardless of which type is used.
-//
-// Pre-fix: lifecycleKey = typeDef.LifecycleKey = "" means the condition
-// `if lifecycleKey == "" { lifecycleKey = "state" }` may not exist; the
-// fallback reads Fields[c.key] = Fields["status"] = "" → blank cell.
-// Post-fix: default "state" key is used → Fields["state"] = "running" → visible.
 func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 	ensureNoColor(t)
 
@@ -725,7 +675,7 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 11 — IssueCount respects per-type Color override (CR finding #3)
+// Test 11 — IssueCount respects per-type Color override
 // ---------------------------------------------------------------------------
 
 // TestViews_IssueCount_RespectsTypeColorOverride verifies that when a type's
@@ -739,11 +689,6 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 //
 // Setup: td.Color maps Fields["state"]="terminated" to ColorBroken. A resource
 // with that state and Findings=nil is loaded. IssueCount must return 1.
-//
-// Pre-fix: IssueCount fallback uses FallbackColor("terminated") → ColorDim →
-// IsIssue()=false → count=0 → FAIL.
-// Post-fix: IssueCount fallback uses td.ResolveColor(r) → ColorBroken →
-// IsIssue()=true → count=1 → PASS.
 func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 	ensureNoColor(t)
 
@@ -792,17 +737,14 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 // Findings[0].Severity=SevWarn, so IssueCount()=2.
 //
 // Production paths filter lifecycle findings before populating r.Findings,
-// so a real resource will not carry [SevOK, SevBroken] ordering today. This
-// is a defensive pin for any code path that appends findings without
-// pre-sorting by severity.
+// so a real resource does not carry [SevOK, SevBroken] ordering; this pins
+// any code path that appends findings without pre-sorting by severity.
 func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	ensureNoColor(t)
 
 	td := minimalTypeDef("ec2-mixed-findings")
 
 	// Row A — Findings[0] is non-issue (SevOK), Findings[1] is broken.
-	// Pre-fix: hasIssueFinding checks only Findings[0].Severity == SevOK → not an issue.
-	// Post-fix: scan all; Findings[1].Severity == SevBroken → is an issue.
 	resA := resource.Resource{
 		ID:     "i-mixed-1",
 		Name:   "mixed-findings-1",
@@ -812,7 +754,7 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 			{Code: "ec2.maint", Phrase: "pending maintenance", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 	}
-	// Row B — only Findings[0]; a Wave-1 SevWarn finding counts per the S1
+	// Row B — only Findings[0]; a Wave-1 SevWarn finding counts per the badge
 	// aggregation (docs/attention-signals.md): Wave-1 issue-colored rows bump,
 	// while a Wave-2 ("wave2:"-sourced) warn would NOT — see
 	// qa_title_warning_findings_test.go for that pin.
@@ -840,7 +782,7 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 13 — ECS INACTIVE classifies as broken via td.Color (CR finding #1)
+// Test 13 — ECS INACTIVE classifies as broken via td.Color
 // ---------------------------------------------------------------------------
 
 // TestViews_ListColor_ECSInactiveIsBroken pins that an ECS service with
@@ -851,11 +793,6 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 // The ECS service type def (ShortName "ecs-svc") has an explicit Color func
 // that returns ColorBroken for "INACTIVE" (types_compute.go). IssueCount
 // must respect this via td.ResolveColor(r), not fall back to FallbackColor.
-//
-// Pre-fix: empty-Findings path uses FallbackColor("INACTIVE") → ColorDim →
-// IsIssue()=false → IssueCount()=0 → FAIL.
-// Post-fix: empty-Findings path uses td.ResolveColor(r) → reads
-// Fields["status"]="INACTIVE" → ColorBroken → IsIssue()=true → IssueCount()=1 → PASS.
 func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 	ensureNoColor(t)
 
@@ -900,7 +837,6 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // Test 14 — empty-Findings fallback uses td.ResolveColor, not FallbackColor
-// (CR finding #3)
 // ---------------------------------------------------------------------------
 
 // TestViews_IssueCount_UsesTypeResolveColor pins that IssueCount() derives

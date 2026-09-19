@@ -21,10 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ===========================================================================
-// Helpers for RDS tests
-// ===========================================================================
-
 // rdsTypeDef returns the RDS type definition from the registry.
 func rdsTypeDef() resource.ResourceTypeDef {
 	td := resource.FindResourceType("dbi")
@@ -54,12 +50,7 @@ func rdsKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
 }
 
-// ===========================================================================
-// A.2 Column Layout
-// ===========================================================================
-
 func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
-	// Verify that the resource type definition has the correct column widths per spec.
 	td := rdsTypeDef()
 	expectedWidths := map[string]int{
 		"db_identifier":  28,
@@ -83,13 +74,6 @@ func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// A.4 Status Coloring — uses per-type Color func via styles.ColorStyle
-// ===========================================================================
-
-// rdsColorResource returns a minimal RDS Resource for a given status value.
-// Uses the canonical "status" key (the legacy "db_instance_status" fallback
-// was removed in #284).
 // rdsColorResource builds a probe row for a status. The severity travels with
 // the finding that produced the phrase, so a probe carrying only a Fields entry
 // would describe a row the fetcher cannot produce.
@@ -233,15 +217,10 @@ func TestQA_RDS_StatusColor_AvailableAndCreatingDifferent(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// A.9 Keyboard Navigation
-// ===========================================================================
-
 func TestQA_RDS_Navigation_EnterOpensChildView(t *testing.T) {
 	m := rdsLoadedModel(t)
 
-	// Press Enter — dbi now has a child view (dbi_events), so Enter should
-	// produce EnterChildViewMsg instead of NavigateMsg.
+	// dbi has a child view (dbi_events), so Enter produces EnterChildViewMsg.
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on RDS list should return a command")
@@ -302,17 +281,9 @@ func TestQA_RDS_Navigation_YOpensYAML(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// B. RDS Detail View
-// ===========================================================================
-
-// renderRDSDetail builds a Controller (via the package-unit blessed
-// newDetailControllerUnit helper) for res/"dbi" with the given *ViewsConfig
-// (nil uses the controller's zero-value/default), and renders it via the
-// live NewTransientDetail+RenderDetail seam — the replacement for the retired
-// views.NewDetail(...).SetSize(...).View() chain (DetailModel.View is dead;
-// see specs/022-codebase-cleanup/wave3-map-detail.md). ANSI-stripped: every
-// caller does textual (Contains) assertions, not raw-style comparisons.
+// renderRDSDetail builds a Controller for res/"dbi" with the given
+// *ViewsConfig (nil uses the default), renders it through
+// NewTransientDetail+RenderDetail, and strips ANSI for textual assertions.
 func renderRDSDetail(t *testing.T, res resource.Resource, viewCfg *config.ViewsConfig) string {
 	t.Helper()
 	c := newDetailControllerUnit(t, res, "dbi")
@@ -335,7 +306,6 @@ func TestQA_RDS_Detail_ContainsAllFields(t *testing.T) {
 		t.Fatal("Detail view should not be empty or initializing after SetSize")
 	}
 
-	// Fields map keys should appear in the detail.
 	for fieldKey, fieldVal := range res.Fields {
 		if !strings.Contains(out, fieldKey) {
 			t.Errorf("Detail missing field key %q", fieldKey)
@@ -353,17 +323,14 @@ func TestQA_RDS_Detail_ContainsAllFields(t *testing.T) {
 	}
 }
 
-// TestQA_RDS_Detail_FrameTitle is the live-seam replacement for the retired
-// views.NewDetail(...).FrameTitle() call — drives Snapshot().FrameTitle
-// instead (detailFrameTitleLocked mirrors the legacy Name-else-ID semantics).
 func TestQA_RDS_Detail_FrameTitle(t *testing.T) {
 	res := fixtureRDSInstances()[0]
 	c := newDetailControllerUnit(t, res, "dbi")
 
 	title := c.Snapshot().FrameTitle
-	// This pins that the snapshot's title is the one builder's output, not a
-	// second Name-else-ID answer of the controller's own; what the builder
-	// produces is pinned in tui6_detail_frame_title_test.go.
+	// The snapshot's title is the one builder's output, not a second Name-else-ID
+	// answer of the controller's own; the builder is pinned in
+	// tui6_detail_frame_title_test.go.
 	expected := resource.DetailFrameTitle(res.ID, res.Name, resource.DetailTitleOmitsID("dbi"))
 	if title != expected {
 		t.Errorf("Detail FrameTitle: expected %q, got %q", expected, title)
@@ -422,7 +389,6 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 
 	plain := renderRDSDetail(t, res, viewCfg)
 
-	// Verify all detail fields from config are present.
 	expectedValues := []string{
 		"prod-db-01",
 		"mysql",
@@ -438,7 +404,6 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 		}
 	}
 
-	// Endpoint should show as nested with Address and Port.
 	if !strings.Contains(plain, "prod-db-01.abc123.us-east-1.rds.amazonaws.com") {
 		t.Error("Detail should show Endpoint.Address")
 	}
@@ -477,10 +442,6 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// C. RDS YAML View
-// ===========================================================================
-
 func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
@@ -492,7 +453,6 @@ func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 		t.Fatal("YAML view should not be empty or initializing after SetSize")
 	}
 
-	// Check that field keys from the resource appear in the YAML.
 	for key := range res.Fields {
 		if !strings.Contains(out, key) {
 			t.Errorf("YAML view missing key %q", key)
@@ -516,10 +476,6 @@ func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 		}
 	}
 }
-
-// TestQA_RDS_YAML_FrameTitle retired: YAMLModel.FrameTitle() is DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
-// title-string behavior is not resource-type-specific.
 
 func TestQA_RDS_YAML_RawContentNonEmpty(t *testing.T) {
 	k := keys.Default()
@@ -588,7 +544,6 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 		}
 	}
 
-	// Endpoint should be a nested object with Address and Port.
 	if !strings.Contains(plain, "test-yaml-db.abc123.us-east-1.rds.amazonaws.com") {
 		t.Error("YAML should contain Endpoint Address")
 	}
@@ -634,27 +589,20 @@ func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
 
 	out := strings.Join(m.ContentLines(), "\n")
 
-	// The raw view should contain ANSI sequences (color codes).
 	if out == stripANSI(out) {
 		t.Error("YAML view should have ANSI color codes when NO_COLOR is not set")
 	}
 }
 
-// ===========================================================================
-// D. Cross-View Interactions (integrated with root model)
-// ===========================================================================
-
 func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to RDS list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
 
-	// Load RDS data.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(), Provenance: messages.FetchProvenanceCanonicalList,
@@ -665,7 +613,6 @@ func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 		t.Errorf("expected frame title 'rds(2)', got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Press Enter to go to detail.
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
@@ -677,7 +624,6 @@ func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 		t.Errorf("expected detail view for test-docdb-1, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Press Esc to go back to list.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbi") {
@@ -689,7 +635,6 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to RDS list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
@@ -699,7 +644,6 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 		Resources:    fixtureRDSInstances(),
 	})
 
-	// Press 'y' to go to YAML.
 	m, cmd := rootApplyMsg(m, rootKeyPress("y"))
 	if cmd != nil {
 		msg := cmd()
@@ -711,7 +655,6 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 		t.Errorf("expected YAML view, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// Press Esc to go back to list.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbi") {
@@ -723,7 +666,6 @@ func TestQA_RDS_CrossView_CommandModeNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to RDS via command mode.
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, r := range "dbi" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -739,7 +681,6 @@ func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to RDS list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
@@ -749,7 +690,6 @@ func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 		Resources:    fixtureRDSInstances(),
 	})
 
-	// Press '/' to enter filter mode.
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "dbc" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -765,13 +705,11 @@ func TestQA_RDS_CrossView_EscFromListReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to RDS.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
 
-	// Press Esc.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))
 

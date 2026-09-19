@@ -1,4 +1,4 @@
-// related_check_panic_recovery_test.go — pins relatedCheckCmd's
+// Pins relatedCheckCmd's
 // panic-recovery closure (internal/tui/runtime_adapter_related.go).
 //
 // When a related checker panics, the recover() branch must surface the panic

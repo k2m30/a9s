@@ -1,24 +1,17 @@
 package unit
 
-// qa_invariants_test.go — Structural invariants across the entire resource registry.
+// Structural invariants across the resource registry.
 //
-// These tests are the "missing invariant" guardrails added after Task #20/#21 found that
-// newly added resource types (e.g. dbi) could silently ship without navigable fields or
-// without populating Rows in their enrichment findings.
+// TestResourceTypeDef_AllHaveNavigableFields: every resource type in
+// AllResourceTypes() has at least one NavigableField, except the types on
+// noNavFieldsAllowList.
 //
-// T-INV-1: TestResourceTypeDef_AllHaveNavigableFields
-//   Every resource type in AllResourceTypes() MUST have at least one NavigableField
-//   registered, EXCEPT the types on the explicit allow-list below.  Adding a new type
-//   without registering navigable fields will cause this test to fail, forcing the
-//   engineer to either add the fields or justify the omission by adding to the list.
-//
-// T-INV-2: TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare
-//   Every enricher in the buildEnrichQueue order list MUST give the detail view
-//   something to render past the phrase: a non-empty Finding.Detail OR at least
-//   one row, and every row it does emit carries a non-empty label and value.
-//   Mirrors attentionEntry.bare (core/app/detail_body.go), the codebase's own
-//   definition of the gap. Row count alone is not the test: a finding whose
-//   phrase says the whole fact correctly carries no row.
+// TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare: every enricher in
+// the buildEnrichQueue order list gives the detail view something to render
+// past the phrase — a non-empty Finding.Detail or at least one row — and every
+// row it emits carries a non-empty label and value. Mirrors
+// attentionEntry.bare (core/app/detail_body.go). Row count alone is not the
+// test: a finding whose phrase says the whole fact correctly carries no row.
 
 import (
 	"context"
@@ -48,7 +41,7 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T-INV-1: NavigableFields coverage invariant
+// NavigableFields coverage invariant
 // ─────────────────────────────────────────────────────────────────────────────
 
 // noNavFieldsAllowList contains short names that legitimately have zero navigable
@@ -102,7 +95,7 @@ var noNavFieldsAllowList = map[string]string{
 	// frequently a cross-account VPC absent from the local cache — a
 	// drill-through would land on an empty view. The vpc related-panel pivot
 	// (checkVpcPeerVPC) already applies the honest cache-membership gate
-	// instead (docs/resources/vpc-peer-impl-plan.md §0).
+	// instead.
 	"vpc-peer": "VPC Peering: the only structural ARN fields are Requester/AccepterVpcInfo.VpcId, and the remote side is frequently a cross-account VPC absent from the local cache — a drill-through would land on an empty view; the vpc related-panel pivot applies the honest cache-membership gate instead",
 	// Compute — Elastic Beanstalk environment list entry has no navigable ARN fields
 	"eb": "Elastic Beanstalk environment has no navigable cross-resource ARN fields",
@@ -144,11 +137,10 @@ func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T-INV-2: Enricher Rows population invariant
+// Enricher Rows population invariant
 // ─────────────────────────────────────────────────────────────────────────────
 
-// invRDSFake satisfies awsclient.RDSAPI for the invariant test (renamed to avoid
-// collision with enrichRDSFake defined in enrichment_rds_findings_test.go).
+// invRDSFake satisfies awsclient.RDSAPI for the invariant test.
 type invRDSFake struct {
 	awsclient.RDSAPI
 	actions []rdstypes.ResourcePendingMaintenanceActions
@@ -164,8 +156,7 @@ func (f *invRDSFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// invEC2Fake satisfies awsclient.EC2API for the invariant test (renamed to avoid
-// collision with ebsStatusFake).
+// invEC2Fake satisfies awsclient.EC2API for the invariant test.
 type invEC2Fake struct {
 	awsclient.EC2API
 	volumeOutput *ec2.DescribeVolumeStatusOutput
@@ -314,17 +305,10 @@ type enricherInvariantCase struct {
 	enrich    func(context.Context, *awsclient.ServiceClients, []resource.Resource, resource.ResourceCache) (awsclient.IssueEnricherResult, error)
 }
 
-// TestEnrichmentFinding_AllKeptEnrichersPopulateRows verifies that every enricher in
-// the buildEnrichQueue order list populates at least one FindingRow when it detects
-// a real issue.  An enricher that never produces rows makes the detail view render a
-// finding header with no content — a silent rendering gap.
-//
-// The 7 enrichers tested are those in buildEnrichQueue's hardcoded order list:
-//
-//	["dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"]
-//
-// Note: dbi's live maintenance enricher is EnrichDBIMaintenance (the dead
-// EnrichRDSDocDBMaintenance, wired to no catalog Wave2 field, was deleted).
+// TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare verifies that every
+// enricher in the buildEnrichQueue order list gives a detected issue something
+// to render past the phrase. A bare finding makes the detail view render a
+// finding header with no content.
 func TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare(t *testing.T) {
 	buildDate := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/inv-tg/abc"
@@ -460,10 +444,9 @@ func TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare(t *testing.T) {
 	}
 }
 
-// DescribeStateMachine is the stub half of a partial test double: this fake
-// embeds SFNAPI as a nil interface and implements only ListExecutions, which
-// was the enricher's only call when it was written. The enricher now also
-// reads logging, encryption and definition posture.
+// DescribeStateMachine is the stub half of a partial test double: invSFNFake
+// embeds SFNAPI as a nil interface, and the enricher reads logging, encryption
+// and definition posture from this call.
 //
 // The body returned is a HEALTHY one, not an empty one. An empty
 // DescribeStateMachineOutput is not neutral — nil LoggingConfiguration means

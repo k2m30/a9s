@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_humanize_debt_test.go — the sixteen detail fields that still render an
-// AWS constant.
+// Detail fields whose value is an AWS constant must read as words.
 //
 // Each one is a fact an operator reads off a detail screen in the vocabulary
 // of an SDK enum: ENCRYPT_DECRYPT, GreaterThanOrEqualToThreshold, INELIGIBLE.
-// They were recorded rather than fixed when the sweep that finds them was
-// written, and this file is the worklist turned into pins: one per field, on a
-// named demo row, through the real detail build.
+// One pin per field, on a named demo row, through the real detail build.
 //
 // The wording each one must read is the wording a field declared on its type
 // (ResourceTypeDef.HumanizeFields) renders: the constant split into words and
 // lowercased. It is pinned literally rather than computed, so a change to the
-// conversion that quietly reworded sixteen screens is a failure here.
+// conversion that quietly rewords these screens is a failure here.
 package unit_test
 
 import (
@@ -23,7 +20,7 @@ import (
 )
 
 // views7RawEnumWitness is one demo detail row that must read as words, with
-// the constant it shows today.
+// the raw constant it carries.
 type views7RawEnumWitness struct {
 	shortName  string
 	resourceID string
@@ -34,7 +31,7 @@ type views7RawEnumWitness struct {
 
 // views7HumanizeDebtWitnesses covers every entry of rawEnumDetailDebt, and
 // covers a field with more than one constant on the bench more than once: a
-// single witness cannot tell a conversion from a hardcoded string.
+// single row cannot tell a conversion from a hardcoded string.
 var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 	{"acm", "arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111", "RenewalEligibility", "ELIGIBLE", "eligible"},
 	{"acm", "arn:aws:acm:us-east-1:123456789012:certificate/a7b8c9d0-1234-56ab-cdef-777777777777", "RenewalEligibility", "INELIGIBLE", "ineligible"},
@@ -77,11 +74,6 @@ var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 // and a fact the resource does not carry stays the not-applicable dash rather
 // than becoming a word that looks like an answer.
 var views7UntouchedWitnesses = []views7RawEnumWitness{
-	// Task phrase7 row 2 split this phrase: "deleting" was declared at two
-	// severities across the catalog (Dim here, Warn on twelve other types),
-	// so the same word carried two colours. The pin still proves the
-	// humanizer leaves a declared value alone; it is the declaration that
-	// moved, not the rendering.
 	{"mwaa", "dim-airflow-deleting", "Status", "", "deleting — environment teardown"},
 	{"mwaa", "warn-airflow-maintenance", "Status", "", "maintenance in progress"},
 	{"pipeline", "acme-frontend-deploy", "ExecutionMode", "", "-"},

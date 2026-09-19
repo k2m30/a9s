@@ -1,29 +1,14 @@
-// tui_related_dim_parity_test.go — pins the user-visible defect where an
-// truncated-zero related row (checker resolved Count=0, Truncated=true —
-// e.g. relatedResultTrunc() results like trail/glue/backup on an S3
-// bucket) renders BRIGHT "(0)" in the live TUI detail RELATED panel while an
-// exact-zero row renders dim, even though both are dead-end pivots per
-// resource.IsRelatedActionable (any RelatedResolved zero, truncated or not,
-// is never actionable — related.go:290-306).
-//
-// Root cause: renderDetailRelatedFromBody (internal/tui/views/detail_helpers.go,
-// the LIVE renderer invoked by DetailModel.RenderDetail) carries an inline
-// style switch with its own `case blk.Count == 0 && blk.Truncated` branch
-// that assigns styles.RowNormal (bright), diverging from the controller's
-// already-correct RelatedBlock.Actionable field (set via
-// isActionableDetailRow -> resource.IsRelatedActionable by
-// buildDetailRelatedBlocks, core/app/detail_body.go:435-436). The fix
-// under test makes the renderer derive rowStyle strictly from blk.Actionable
-// and the badge text from blk.CountDisplay, so the two renderers (TUI +
-// web template, which already reads .Actionable/.CountDisplay) cannot drift.
+// The TUI detail RELATED panel derives each
+// row's style from RelatedBlock.Actionable and its badge from
+// RelatedBlock.CountDisplay (renderDetailRelatedFromBody,
+// internal/tui/views/detail_helpers.go), the same fields the web template
+// reads, so the two renderers cannot drift.
 //
 // These tests build a real views.DetailModel, size it to trigger the
 // side-by-side related-panel layout, and call m.RenderDetail(body) with a
-// hand-built app.DetailBody — the exact harness detail_render_parity_test.go
-// uses for RenderDetail-level assertions. NO_COLOR is intentionally left
-// unset so the SGR-wrapped output from styles.DimText / styles.RowNormal can
-// be compared byte-for-byte, which is the only way to distinguish "bright"
-// from "dim" in a rendered string.
+// hand-built app.DetailBody. NO_COLOR is left unset so the SGR-wrapped output
+// from styles.DimText / styles.RowNormal can be compared byte-for-byte, the
+// only way to distinguish "bright" from "dim" in a rendered string.
 package unit_test
 
 import (
@@ -38,10 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ---------------------------------------------------------------------------
-// Shared setup
-// ---------------------------------------------------------------------------
 
 // relatedDimParityTypes returns representative resource types for the sweep.
 // "s3" is the real-world case (trail/glue/backup checkers on a bucket
@@ -95,7 +76,7 @@ func relatedDimParityBody(blocks []app.RelatedBlock) app.DetailBody {
 	}
 }
 
-// relatedColSep is the styled column separator RenderDetail places between
+// relatedColSepGlyph is the column separator RenderDetail places between
 // the left field panel and the right RELATED panel (detail_helpers.go's
 // "│" rendered via styles.ColSepDim/ColSepAccent). The related-panel content
 // for a given line always starts immediately after the LAST such separator
@@ -137,15 +118,10 @@ func extractRelatedLine(t *testing.T, rendered, needle string) string {
 	return rest
 }
 
-// ---------------------------------------------------------------------------
-// Pin 1: truncated-zero renders with the SAME dim style as exact-zero.
-// ---------------------------------------------------------------------------
-
-// TestRelatedDim_TruncatedResult_BrightAndActionable pins the correct contract:
-// an truncated lower bound ("0+", from a truncated target scan where more may
-// exist on later pages) renders BRIGHT and actionable with a "(0+)" badge — the
-// user can drill in — while only a PROVEN exact zero renders dim "(0)" as a
-// dead end. The two must therefore render DIFFERENTLY.
+// TestRelatedDim_TruncatedResult_BrightAndActionable: a truncated lower bound
+// ("0+", from a truncated target scan where more may exist on later pages)
+// renders BRIGHT and actionable with a "(0+)" badge — the user can drill
+// in — while only a PROVEN exact zero renders dim "(0)" as a dead end.
 func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 	for _, tc := range relatedDimParityTypes() {
 		tc := tc
@@ -183,9 +159,7 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 			truncatedLine := extractRelatedLine(t, rendered, "Trail Events")
 			exactLine := extractRelatedLine(t, rendered, "Backup Plans")
 
-			// Truncated row: BRIGHT with a "(0+)" badge.
 			wantTruncatedStyled := styles.RowNormal.Render("  Trail Events (0+)")
-			// Exact zero: DIM with a plain "(0)" badge.
 			wantExactStyled := styles.DimText.Render("  Backup Plans (0)")
 
 			if truncatedLine != wantTruncatedStyled {
@@ -201,10 +175,6 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pin 2: property-style sweep — bright IFF resource.IsRelatedActionable.
-// ---------------------------------------------------------------------------
-
 // relatedDimParityCase is one block-state combination in the sweep.
 type relatedDimParityCase struct {
 	name           string
@@ -212,21 +182,18 @@ type relatedDimParityCase struct {
 	wantActionable bool
 }
 
-// relatedDimParitySweepCases builds one RelatedBlock per state combination
-// named in the dispatch: loading / err / resolved-unknown with+without filter
-// (deferred) / 0 exact / 0 truncated / N>0. Actionable and CountDisplay are
-// computed via the same shared helpers the controller uses, so this table is
-// itself a pin on resource.IsRelatedActionable / resource.FormatRelatedCount
-// wiring, not just the renderer.
+// relatedDimParitySweepCases builds one RelatedBlock per state combination:
+// loading / err / resolved-unknown with+without filter (deferred) / 0 exact /
+// 0 truncated / N>0. Actionable and CountDisplay are computed via the same
+// shared helpers the controller uses, so this table also pins
+// resource.IsRelatedActionable / resource.FormatRelatedCount wiring.
 //
-// mk's (count, hasFilter, loading, hasErr) parameters preserve each sweep
-// case's pre-task-#58 identity; state is derived from them via the migration
-// rule 2/3 mapping (loading->RelatedLoading, hasErr->RelatedError,
+// mk's (count, hasFilter, loading, hasErr) parameters map to a state
+// (loading->RelatedLoading, hasErr->RelatedError,
 // count<0&&hasFilter->RelatedDeferred, count<0->RelatedUnknown,
-// else->RelatedResolved), matching what the real checker constructors
-// (LoadingRelated/ErrorRelated/DeferredRelated/UnknownRelated) now produce.
-// Count is normalized to 0 for every non-Resolved state, mirroring those
-// constructors.
+// else->RelatedResolved), matching the checker constructors
+// (LoadingRelated/ErrorRelated/DeferredRelated/UnknownRelated). Count is 0
+// for every non-Resolved state, as those constructors set it.
 func relatedDimParitySweepCases() []relatedDimParityCase {
 	mk := func(name string, count int, truncated, hasFilter, loading, hasErr bool) relatedDimParityCase {
 		var filter map[string]string
@@ -367,22 +334,13 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pin 3: cursor parity — truncated-zero row is still skipped.
-// ---------------------------------------------------------------------------
-//
-// This extends the existing app_related_cursor_skip_test.go harness
-// (newRelatedSkipController / relatedCursorAndActionable, same package) with
-// one additional case: an truncated-zero row must be skipped by cursor
-// movement exactly like an exact-zero row, so a future fix to the renderer's
-// brightness cannot silently diverge from the cursor's skip predicate (both
-// already delegate to isActionableDetailRow / resource.IsRelatedActionable,
-// so this is a regression guard tying the three surfaces — render style,
-// cursor skip, Enter/click gating — to the single shared predicate).
+// Cursor movement, render style and Enter/click gating all delegate to
+// isActionableDetailRow / resource.IsRelatedActionable. The cases below use
+// app_related_cursor_skip_test.go's harness (newRelatedSkipController /
+// relatedCursorAndActionable, same package) with a truncated-zero row.
 
 // relatedRowTruncated builds a DetailRelatedRow with an explicit Truncated
-// flag, extending relatedRow (which always passes truncated=false) for the
-// one case this suite adds.
+// flag; relatedRow always passes truncated=false.
 func relatedRowTruncated(targetType string, count int, truncated bool) app.DetailRelatedRow {
 	return app.DetailRelatedRow{
 		TargetType:  targetType,
@@ -393,12 +351,9 @@ func relatedRowTruncated(targetType string, count int, truncated bool) app.Detai
 }
 
 // TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow verifies that moving
-// down from an actionable row LANDS ON an truncated-zero row (Count=0,
-// Truncated=true — an TruncatedResult() result), because a "0+" lower bound
-// is drillable (more may exist on later pages). The cursor skip predicate,
-// render brightness, and Enter/click gating all delegate to the single shared
-// resource.IsRelatedActionable, so an truncated-zero row is a valid landing
-// row exactly like any other actionable row.
+// down from an actionable row LANDS ON a truncated-zero row (Count=0,
+// Truncated=true — a TruncatedResult() result), because a "0+" lower bound
+// is drillable (more may exist on later pages).
 func TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow(t *testing.T) {
 	rows := []app.DetailRelatedRow{
 		relatedRow("sg", 3),                       // index 0: actionable, cursor starts here
@@ -416,7 +371,7 @@ func TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow(t *testing.T) {
 	if !actionable {
 		t.Errorf("row at RelatedCursor=%d is dimmed (Actionable=false), want the actionable truncated-zero landing row", cursor)
 	}
-	// Sanity: an truncated-zero row is actionable per the shared predicate.
+	// A truncated-zero row is actionable per the shared predicate.
 	if got := resource.IsRelatedActionable(domain.RelatedResolved, 0, true); !got {
 		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, truncated=true) = %v, want true — a 0+ lower bound must be drillable", got)
 	}

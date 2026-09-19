@@ -7,26 +7,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// w29_classifier_parity_test.go — the net under the twenty-one conversions.
-//
-// Each of these types answers a row's colour twice today: from the findings the
-// fetcher put on it, and from a raw-field switch for rows that carry none. The
-// task deletes the second copy and routes it through the type's own predicate.
-// Nothing about the rendered demo may move while that happens.
-//
-// Two properties hold before the conversion and must still hold after. A
-// fetched row is coloured by its own findings, so the classifier and the
-// fetcher cannot disagree about the same row. And the same row stripped of its
-// findings gets the same colour, so the fallback path answers what the findings
-// path would have.
-//
-// The third property row 1 promises — that the worst finding wins rather than
-// the first — is already pinned for every registered type with no exclusions by
-// TestColorTakesWorstSeverity_EveryType, so it is not repeated here.
+// Two properties hold for every type in w29Types. A fetched row is coloured
+// by its own findings, so the classifier and the fetcher cannot disagree about
+// the same row. And the same row stripped of its findings gets the same
+// colour, so the fallback path answers what the findings path would have.
+// That the worst finding wins is pinned for every registered type by
+// TestColorTakesWorstSeverity_EveryType.
 
-// w29Types are the twenty-one classifiers the burn-down lists, by the short name
-// each is registered under, grouped so a category can be run on its own after
-// dev converts it: -run 'TestW29_.*/compute'.
+// w29Types are the classifiers under test, by the short name each is
+// registered under, grouped so a category runs on its own:
+// -run 'TestW29_.*/compute'.
 var w29Types = map[string][]string{ //nolint:gochecknoglobals // test-only table
 	"compute":    {"ecs-task", "eb", "ebs"},
 	"networking": {"elb", "vpc", "subnet", "nat", "igw", "vpce", "tgw", "eni"},
@@ -73,15 +63,13 @@ func TestW29_FetchedRowColourComesFromItsFindings(t *testing.T) {
 	})
 }
 
-// TestW29_StrippedRowFallsBackToTheSameColour pins the path the conversion
-// rewrites. Removing a row's findings sends the classifier down its fallback,
-// which must reach the same verdict — that is what makes deleting the raw
-// switch a deletion rather than a behaviour change.
+// TestW29_StrippedRowFallsBackToTheSameColour: removing a row's findings
+// sends the classifier down its fallback, which must reach the same verdict.
 //
 // Only rows whose findings are all wave 1 can hold that. A wave-2 finding is a
 // fact the fetcher never wrote into Fields — a disabled key rotation, an open
 // key policy, a zone nobody queries — so no predicate over Fields can recover
-// it and no fallback ever could, before this task or after.
+// it.
 func TestW29_StrippedRowFallsBackToTheSameColour(t *testing.T) {
 	w29EachType(t, func(t *testing.T, short string) {
 		rows, td := w4bBench(t, short)
@@ -107,11 +95,9 @@ func TestW29_StrippedRowFallsBackToTheSameColour(t *testing.T) {
 // findings were derived from, which is the only case where a fallback over
 // Fields can reach the same verdict.
 //
-// Only a wave-2 finding fails that now: it is a fact the fetcher went and
-// looked up, like a disabled key rotation or a zone nobody queries, and no
-// predicate over Fields can recover it. The two wave-1 exceptions this pin
-// carried are gone — the subnet and endpoint fetchers surface auto_public_ip
-// and policy_exposure, so their findings are reachable like every other.
+// A wave-2 finding fails that: it is a fact the fetcher went and looked up,
+// like a disabled key rotation or a zone nobody queries, and no predicate over
+// Fields can recover it.
 func w29FallbackCanAnswer(r resource.Resource) bool {
 	for _, f := range r.Findings {
 		if f.Source != "wave1" {
@@ -121,11 +107,10 @@ func w29FallbackCanAnswer(r resource.Resource) bool {
 	return true
 }
 
-// TestW29_PendingEKSClusterIsAWarning is the ruling folded into row 1. Both
-// docs/resources/eks.md §4 and docs/attention-signals.md promise a queued
-// create or update reads as a warning; nothing emits it, so the row renders
-// green while EKS has not started the work. The code name follows the four
-// siblings in eks_codes.go, which are eks.state.<status> without exception.
+// TestW29_PendingEKSClusterIsAWarning: docs/resources/eks.md and
+// docs/attention-signals.md say a queued create or update reads as a warning
+// while EKS has not started the work. The code name follows the four siblings
+// in eks_codes.go, which are eks.state.<status> without exception.
 func TestW29_PendingEKSClusterIsAWarning(t *testing.T) {
 	rows, _ := w4bBench(t, "eks")
 
@@ -152,10 +137,8 @@ func TestW29_PendingEKSClusterIsAWarning(t *testing.T) {
 	}
 }
 
-// TestW29_TransitGatewayAutoAcceptReachesTheFallback covers the third field the
-// conversion surfaced. subnet's auto_public_ip and vpce's policy_exposure each
-// have a demo row, so the bench pins above already exercise them; no demo
-// gateway accepts shared attachments, so this one has to be built.
+// TestW29_TransitGatewayAutoAcceptReachesTheFallback: no demo gateway accepts
+// shared attachments, so these rows are built here.
 //
 // A gateway that accepts any attachment offered to it is the finding, and a
 // gateway on its way out is not: an attachment setting on a resource being
@@ -196,12 +179,12 @@ func TestW29_TransitGatewayAutoAcceptReachesTheFallback(t *testing.T) {
 	}
 }
 
-// TestW29_KMSKeyStateReachesTheFallback covers the one converted type whose
-// demo rows are all wave-2, so the bench pins above skip it and its fallback is
-// otherwise untested. The predicate is shared with the fetcher, and its default
-// arm reports an unrecognised state as broken — right for a fetched row, where
-// the state is always one AWS returned, and wrong for a row built without one,
-// which is the regression the empty-state arm exists to stop.
+// TestW29_KMSKeyStateReachesTheFallback: every demo kms row carries wave-2
+// findings, so the bench pins above skip the type. The predicate is shared
+// with the fetcher, and its default arm reports an unrecognised state as
+// broken — right for a fetched row, where the state is always one AWS
+// returned, and wrong for a row built without one, which the empty-state arm
+// handles.
 func TestW29_KMSKeyStateReachesTheFallback(t *testing.T) {
 	td := resource.FindResourceType("kms")
 	if td == nil {
@@ -239,8 +222,7 @@ func TestW29_KMSKeyStateReachesTheFallback(t *testing.T) {
 }
 
 // The fetcher is the predicate's other caller, and a real key always has a
-// state, so the arm that made a stateless row healthy must not have made a
-// stateless row possible on the bench.
+// state, so no demo kms row may be stateless.
 func TestW29_EveryDemoKMSRowHasAState(t *testing.T) {
 	rows, _ := w4bBench(t, "kms")
 	for _, r := range rows {
@@ -250,12 +232,11 @@ func TestW29_EveryDemoKMSRowHasAState(t *testing.T) {
 	}
 }
 
-// TestW29_ACMTimedOutCertificateReadsAsWords pins the one user-visible wording
-// change in the late group. The failed-status finding takes its phrase from the
-// status word the fetcher derives, so a certificate whose validation ran out of
-// time says so in words rather than in the SDK's spelling.
-// docs/resources/acm.md:159 promises exactly this text, and nothing else pinned
-// it — the phrase is not a FindingDef literal, it is passed through.
+// TestW29_ACMTimedOutCertificateReadsAsWords: the failed-status finding takes
+// its phrase from the status word the fetcher derives, so a certificate whose
+// validation ran out of time says so in words rather than in the SDK's
+// spelling, as docs/resources/acm.md promises. The phrase is passed through,
+// not a FindingDef literal.
 func TestW29_ACMTimedOutCertificateReadsAsWords(t *testing.T) {
 	rows, _ := w4bBench(t, "acm")
 

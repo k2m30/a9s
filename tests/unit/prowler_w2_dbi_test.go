@@ -1,14 +1,15 @@
 package unit
 
-// prowler_w2_dbi_test.go — dbi posture rows 11–16 of the w2 Prowler batch:
-// single-AZ, auto minor version upgrade off, IAM database authentication off,
-// default master username, CA certificate expiring, deprecated engine version.
+// dbi posture: single-AZ, auto minor version upgrade off, IAM database
+// authentication off, default master username, CA certificate expiring,
+// deprecated engine version.
 //
-// Rows 11–15 are Wave-1 signals off the DBInstance the fetcher already holds.
-// Row 15 needs a clock, so those cases drive the time-injectable fetcher
-// variant rather than wall-clock time — a boundary test that depends on
-// time.Now() is a test that fails on a slow machine at midnight.
-// Row 16 is Wave 2 and reaches the enricher through the catalog registry.
+// All but the engine version are Wave-1 signals off the DBInstance the fetcher
+// already holds. CA expiry needs a clock, so those cases drive the
+// time-injectable fetcher variant rather than wall-clock time — a boundary
+// test that depends on time.Now() is a test that fails on a slow machine at
+// midnight. The engine version is Wave 2 and reaches the enricher through the
+// catalog registry.
 
 import (
 	"context"
@@ -85,10 +86,6 @@ func w2DBIFetch(t *testing.T, now time.Time, instances ...rdstypes.DBInstance) m
 	return byID
 }
 
-// ---------------------------------------------------------------------------
-// row 11 — single-AZ
-// ---------------------------------------------------------------------------
-
 func TestW2DBISingleAZ(t *testing.T) {
 	single := w2DBIInstance("acme-orders-db")
 	single.MultiAZ = aws.Bool(false)
@@ -119,10 +116,6 @@ func TestW2DBISingleAZSkipsReplicasAndAurora(t *testing.T) {
 	w2AssertNoCode(t, got["acme-aurora-writer"].Findings, w2DBICodeSingleAZ)
 }
 
-// ---------------------------------------------------------------------------
-// row 12 — auto minor version upgrade
-// ---------------------------------------------------------------------------
-
 func TestW2DBIMinorUpgradeOff(t *testing.T) {
 	off := w2DBIInstance("acme-legacy-db")
 	off.AutoMinorVersionUpgrade = aws.Bool(false)
@@ -133,10 +126,6 @@ func TestW2DBIMinorUpgradeOff(t *testing.T) {
 	w2AssertNoCode(t, got["acme-billing-db"].Findings, w2DBICodeMinorUpgradeOff)
 	w2AssertFindingDef(t, "dbi", w2DBICodeMinorUpgradeOff, "auto minor version upgrade off", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// row 13 — IAM database authentication
-// ---------------------------------------------------------------------------
 
 func TestW2DBIIAMAuthOff(t *testing.T) {
 	off := w2DBIInstance("acme-orders-db")
@@ -183,10 +172,6 @@ func TestW2DBIIAMAuthCoversEverySupportedEngine(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// row 14 — default master username
-// ---------------------------------------------------------------------------
-
 func TestW2DBIDefaultMasterUser(t *testing.T) {
 	// Case is not significant: RDS stores whatever the operator typed.
 	for _, name := range []string{"admin", "postgres", "root", "mysql", "master", "awsuser", "Admin", "POSTGRES"} {
@@ -196,8 +181,8 @@ func TestW2DBIDefaultMasterUser(t *testing.T) {
 		got := w2DBIFetch(t, w2DBINow, db)
 		f := w2AssertFinding(t, got["acme-db-"+name].Findings, w2DBICodeDefaultMaster, "default master username", domain.SevWarn, "wave1")
 
-		// U11: the phrase is stable and never carries the value, which the
-		// detail row is responsible for.
+		// The phrase is stable and never carries the value, which the detail row is
+		// responsible for.
 		if f.Phrase != "default master username" {
 			t.Errorf("%s: phrase drifted to %q", name, f.Phrase)
 		}
@@ -209,10 +194,6 @@ func TestW2DBINonDefaultMasterUserIsClean(t *testing.T) {
 	w2AssertNoCode(t, got["acme-billing-db"].Findings, w2DBICodeDefaultMaster)
 	w2AssertFindingDef(t, "dbi", w2DBICodeDefaultMaster, "default master username", domain.SevWarn, "wave1")
 }
-
-// ---------------------------------------------------------------------------
-// row 15 — CA certificate expiry
-// ---------------------------------------------------------------------------
 
 func TestW2DBICACertExpiringWarn(t *testing.T) {
 	db := w2DBIInstance("acme-orders-db")
@@ -283,10 +264,6 @@ func TestW2DBICACertNilDetailsEmitsNothing(t *testing.T) {
 	w2AssertNoCode(t, got["acme-db-novalidtill"].Findings, w2DBICodeCACertExpiring)
 }
 
-// ---------------------------------------------------------------------------
-// row 16 — deprecated engine version (Wave 2)
-// ---------------------------------------------------------------------------
-
 // w2RDSEngineVersionsFake answers DescribeDBEngineVersions from a
 // (engine, version) → status map and counts calls so the per-run cache can be
 // checked. Unknown pairs return an empty result, which AWS does for a version
@@ -321,8 +298,8 @@ func (f *w2RDSEngineVersionsFake) DescribeDBEngineVersions(_ context.Context, in
 	}, nil
 }
 
-// The dbi enricher also carries the pre-existing pending-maintenance signal;
-// answering it with an empty list keeps these cases about the engine version.
+// The dbi enricher also reads pending maintenance actions; answering with an
+// empty list keeps these cases about the engine version.
 func (f *w2RDSEngineVersionsFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error) {
 	return &rds.DescribePendingMaintenanceActionsOutput{}, nil
 }
@@ -374,7 +351,7 @@ func TestW2DBIEngineUnpublishedCountsAsDeprecated(t *testing.T) {
 }
 
 // Ten instances on one engine version must cost one call, not ten — the
-// per-run cache is the reason this row is affordable at all.
+// per-run cache is what makes this check affordable at all.
 func TestW2DBIEngineVersionLookupCachedPerPair(t *testing.T) {
 	var instances []rdstypes.DBInstance
 	for i := range 10 {
@@ -434,10 +411,6 @@ func TestW2DBIEngineNilClientIsSafe(t *testing.T) {
 	w2AssertEnricherInvariants(t, res, err)
 	w2AssertNoCode(t, res.Findings["acme-legacy-db"], w2DBICodeEngineDeprecated)
 }
-
-// ---------------------------------------------------------------------------
-// independence and lifecycle
-// ---------------------------------------------------------------------------
 
 func TestW2DBIFourPostureConditionsOnOneInstance(t *testing.T) {
 	bad := w2DBIInstance("acme-worst-db")

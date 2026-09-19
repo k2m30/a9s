@@ -1,6 +1,6 @@
 package unit_test
 
-// wave2_bookkeeping_test.go — what a Wave 2 enricher records when part of its
+// What a Wave 2 enricher records when part of its
 // work fails: the findings it did prove survive, a call that failed proves
 // nothing, a walk that failed names the call rather than the cap, and the cap
 // is spent only on rows the check can apply to.
@@ -80,8 +80,8 @@ func bkEBTypeDef(t *testing.T) resource.ResourceTypeDef {
 	return *td
 }
 
-// bkProvenButTagDenied is the witness result: the target walk proved the
-// rule has no targets, and a second check on the same rule was refused.
+// bkProvenButTagDenied is a result where the target walk proved the rule has
+// no targets, and a second check on the same rule was refused.
 func bkProvenButTagDenied(t *testing.T, rules []resource.Resource, proven string) awsclient.IssueEnricherResult {
 	t.Helper()
 	fake := &bkEBFake{targets: map[string][]eventbridgetypes.Target{proven: {}}}
@@ -96,10 +96,6 @@ func bkProvenButTagDenied(t *testing.T, rules []resource.Resource, proven string
 	awsclient.MarkSkipped(&res, proven, &failures, bkOpErr("EventBridge", "ListTagsForResource", "AccessDeniedException"))
 	return res
 }
-
-// ---------------------------------------------------------------------------
-// a row marked not inspected keeps what the result proved for it
-// ---------------------------------------------------------------------------
 
 // TestFoldWave2Rows_UninspectedRowKeepsTheFindingItsResultProved folds a
 // result into three rows that differ only in what the result says about them:
@@ -163,10 +159,10 @@ func TestFoldWave2Rows_UninspectedRowKeepsTheFindingItsResultProved(t *testing.T
 	}
 }
 
-// TestUninspectedRowWithProvenFinding_ListBadgeAndDetailAgree drives the
-// witness through the running app: the list row, the menu badge and the
-// detail view all read one folded row, and the not-inspected mark still
-// renders beside the finding.
+// TestUninspectedRowWithProvenFinding_ListBadgeAndDetailAgree drives that
+// result through the running app: the list row, the menu badge and the detail
+// view all read one folded row, and the not-inspected mark still renders
+// beside the finding.
 func TestUninspectedRowWithProvenFinding_ListBadgeAndDetailAgree(t *testing.T) {
 	const proven, healthy = "acme-orders-rule", "acme-audit-rule"
 	rules := []resource.Resource{bkEBRule(proven, "ENABLED"), bkEBRule(healthy, "ENABLED")}
@@ -268,10 +264,6 @@ func TestUninspectedRowWithProvenFinding_ListBadgeAndDetailAgree(t *testing.T) {
 		t.Errorf("the phrase %q is stated %d times in the Attention block: %v", phrase, phraseLines, attention)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// a failed call proves nothing
-// ---------------------------------------------------------------------------
 
 // TestEBRuleDeniedTargetCall_RaisesNoNoTargetsFinding: an empty target list
 // is what the enricher holds when ListTargetsByRule was refused, and it is not
@@ -391,10 +383,6 @@ func TestWave2DeniedCalls_NoEnricherRaisesAFindingTheDataRefutes(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// a walk that failed names the call
-// ---------------------------------------------------------------------------
 
 // bkEC2Fake serves DescribeInstanceStatus and DescribeSnapshots from ordered
 // pages; a nil page with an error is a refused call.
@@ -564,10 +552,6 @@ func TestBackupJobWalk_RefusedPageNamesTheCall(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// the cap is spent on rows the check applies to
-// ---------------------------------------------------------------------------
 
 // bkAssertIneligibleUntouched: a row the check can never apply to is neither
 // asked about nor marked — a mark there reads "unknown" for a question that

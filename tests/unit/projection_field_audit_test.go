@@ -1,12 +1,8 @@
 package unit_test
 
-// projection_field_audit_test.go — per-row tests for the FieldItem audit table.
-//
-// Every behavior currently carried by FieldItem must survive on domain.Item (or
-// via the Section structure around it). One focused test per audit row, using one
-// or two canonical fixtures per row.
-//
-// Source of truth: docs/historical/refactor/01-projection-hook.md lines 38–55.
+// Every behavior FieldItem carries also
+// holds on domain.Item (or via the Section structure around it). One focused
+// test per behavior, using one or two canonical fixtures each.
 
 import (
 	"context"
@@ -87,14 +83,12 @@ func allItems(sections []domain.Section) []domain.Item {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 1 — Navigability + TargetType
+// Navigability + TargetType
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_NavigableItem asserts that the Generic projector
 // produces at least one Item with Navigable=true and TargetType="vpc" for an
 // EC2 fixture that has a VpcId.
-//
-// Audit table row: "Navigability flag" and "Target type for navigation".
 func TestProjectionFieldAudit_NavigableItem(t *testing.T) {
 	resources := loadEC2Resources(t)
 	r, ok := firstEC2WithVPC(resources)
@@ -123,14 +117,12 @@ func TestProjectionFieldAudit_NavigableItem(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 2 — ItemKind tagging (Field, Header, Subfield, Spacer)
+// ItemKind tagging (Field, Header, Subfield, Spacer)
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_ItemKindTagging asserts that the Generic projector
 // emits at least one ItemField item and, for resources with struct-typed fields
 // (e.g. placement, tags), at least one ItemHeader item.
-//
-// Audit table row: "Section / sub-section / spacer tagging".
 func TestProjectionFieldAudit_ItemKindTagging(t *testing.T) {
 	resources := loadEC2Resources(t)
 	if len(resources) == 0 {
@@ -165,15 +157,13 @@ func TestProjectionFieldAudit_ItemKindTagging(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 3 — Tag flattening
+// Tag flattening
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_TagFlattening asserts that each tag on an EC2 fixture
 // becomes its own Item row (Key=tag-key, Value=tag-value) rather than a raw
 // struct dump. Specifically: the number of tag Items must equal the number of
 // tags on the first EC2 fixture that has tags.
-//
-// Audit table row: "Tag flattening (each tag becomes its own row)".
 func TestProjectionFieldAudit_TagFlattening(t *testing.T) {
 	resources := loadEC2Resources(t)
 	r, ok := firstEC2WithTags(resources)
@@ -229,21 +219,18 @@ func collectTagItems(sections []domain.Section) []domain.Item {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 4 — Embedded JSON expansion
+// Embedded JSON expansion
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_JSONExpansion asserts that a field whose value is a
 // JSON document expands into multiple sub-items rather than a single flat string.
 //
-// Audit table row: "Embedded JSON expansion (e.g. policy documents)".
-//
 // The IAM policy demo fixture carries an AssumeRolePolicyDocument field that is
 // a JSON string. The projector must detect it and emit an ItemHeader + multiple
 // ItemSubfield rows.
 //
-// Fixture limitation: this test requires that core/demo/fixtures/iam.go
-// includes a RawStruct with AssumeRolePolicyDocument. Currently the fixture
-// omits RawStruct, so the test skips. Add the field to the fixture to enable it.
+// The test skips unless a core/demo/fixtures/iam.go role carries a RawStruct
+// with AssumeRolePolicyDocument.
 func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	clients := demo.NewServiceClients()
 	roles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -305,13 +292,11 @@ func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 5 — List-typed scalar extraction
+// List-typed scalar extraction
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_ListScalarExtraction asserts that list-typed struct
 // fields yield their first scalar element as an Item value, not a raw slice dump.
-//
-// Audit table row: "List-typed scalar extraction (e.g. Subnets.SubnetId first element)".
 //
 // Uses EC2 fixture: the instance is in a subnet; the SubnetId field should appear
 // as a plain string Item rather than as "[subnet-xxxx]".
@@ -350,7 +335,7 @@ func TestProjectionFieldAudit_ListScalarExtraction(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Audit row 6 — Per-type field ordering
+// Per-type field ordering
 // ---------------------------------------------------------------------------
 
 // TestProjectionFieldAudit_FieldOrdering asserts that the order of Items
@@ -367,8 +352,6 @@ func TestProjectionFieldAudit_ListScalarExtraction(t *testing.T) {
 // The test checks that InstanceId appears before State, and State before VpcId.
 // Exact index positions are not asserted (sub-sections expand in place), but
 // relative order is preserved.
-//
-// Audit table row: "Per-type field ordering and inclusion (per ~/.a9s/views/<type>.yaml)".
 func TestProjectionFieldAudit_FieldOrdering(t *testing.T) {
 	resources := loadEC2Resources(t)
 	if len(resources) == 0 {

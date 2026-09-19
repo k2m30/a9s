@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_infra_test.go — pagination tests for infra fetchers:
+// Pagination tests for infra fetchers:
 // ecs, ecs-svc, ecs-task, asg, eb, vpc, subnet, rtb, nat, igw, eni, vpce, tgw, elb, tg
 
 import (
@@ -51,10 +51,6 @@ func (m *mockECSDescribeClustersAPIPaginated) DescribeClusters(_ context.Context
 	m.Calls++
 	return m.DescribeFunc(m.Calls, input.Clusters)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchECSClustersPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchECSClustersPage_FirstPage(t *testing.T) {
 	listMock := &mockECSListClustersAPIPaginated{
@@ -221,10 +217,6 @@ func (m *mockECSDescribeServicesAPIPaginated) DescribeServices(_ context.Context
 	m.Calls++
 	return m.DescribeFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchECSServicesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchECSServicesPage_FirstPage(t *testing.T) {
 	// For FetchECSServicesPage, the list mock returns cluster arns with NextToken
@@ -425,9 +417,8 @@ func (m *mockECSDescribeTasksAPIPaginated) DescribeTasks(_ context.Context, _ *e
 // reads ListClusters/ListTasks/DescribeTasks off a single
 // *ServiceClients.ECS field. DescribeClusters/ListServices/DescribeServices
 // are stubbed since these tests never touch them. DescribeTaskDefinition
-// returns a ClientException ("does not exist"), matching the pre-refactor
-// 4-arg FetchECSTasksPage contract, so Fields["task_def_join_error"] stays
-// unset.
+// returns a ClientException ("does not exist"), which leaves
+// Fields["task_def_join_error"] unset.
 type ecsTaskInfraFullFake struct {
 	*mockECSListClustersAPIPaginated
 	*mockECSListTasksAPIPaginated
@@ -455,10 +446,6 @@ func qaInfraFetchECSTasks(ctx context.Context, listClusters *mockECSListClusters
 	clients := &awsclient.ServiceClients{ECS: &ecsTaskInfraFullFake{listClusters, listTasks, describeTasks}}
 	return fetcher(ctx, clients, token)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchECSTasksPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchECSTasksPage_FirstPage(t *testing.T) {
 	listClustersMock := &mockECSListClustersAPIPaginated{
@@ -642,10 +629,6 @@ func (m *mockASGDescribeAutoScalingGroupsAPIPaginated) DescribeAutoScalingGroups
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchAutoScalingGroupsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchAutoScalingGroupsPage_FirstPage(t *testing.T) {
 	minSize := int32(1)
 	maxSize := int32(10)
@@ -782,10 +765,6 @@ func (m *mockEBDescribeEnvironmentsAPIPaginated) DescribeEnvironments(_ context.
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEBEnvironmentsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchEBEnvironmentsPage_FirstPage(t *testing.T) {
 	mock := &mockEBDescribeEnvironmentsAPIPaginated{
 		PageFunc: func(_ int) (*elasticbeanstalk.DescribeEnvironmentsOutput, error) {
@@ -916,10 +895,6 @@ func (m *mockEC2DescribeVpcsAPIPaginated) DescribeVpcs(_ context.Context, in *ec
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchVPCsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchVPCsPage_FirstPage(t *testing.T) {
 	isDefault := false
 	mock := &mockEC2DescribeVpcsAPIPaginated{
@@ -1048,10 +1023,6 @@ func (m *mockEC2DescribeSubnetsAPIPaginated) DescribeSubnets(_ context.Context, 
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSubnetsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchSubnetsPage_FirstPage(t *testing.T) {
 	availableIPs := int32(251)
@@ -1186,10 +1157,6 @@ func (m *mockEC2DescribeRouteTablesAPIPaginated) DescribeRouteTables(_ context.C
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRouteTablesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchRouteTablesPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeRouteTablesAPIPaginated{
 		PageFunc: func(_ int) (*ec2.DescribeRouteTablesOutput, error) {
@@ -1312,10 +1279,6 @@ func (m *mockEC2DescribeNatGatewaysAPIPaginated) DescribeNatGateways(_ context.C
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchNatGatewaysPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchNatGatewaysPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeNatGatewaysAPIPaginated{
@@ -1445,10 +1408,6 @@ func (m *mockEC2DescribeInternetGatewaysAPIPaginated) DescribeInternetGateways(_
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchInternetGatewaysPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchInternetGatewaysPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeInternetGatewaysAPIPaginated{
 		PageFunc: func(_ int) (*ec2.DescribeInternetGatewaysOutput, error) {
@@ -1576,10 +1535,6 @@ func (m *mockEC2DescribeNetworkInterfacesAPIPaginated) DescribeNetworkInterfaces
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchNetworkInterfacesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchNetworkInterfacesPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeNetworkInterfacesAPIPaginated{
 		PageFunc: func(_ int) (*ec2.DescribeNetworkInterfacesOutput, error) {
@@ -1705,10 +1660,6 @@ func (m *mockEC2DescribeVpcEndpointsAPIPaginated) DescribeVpcEndpoints(_ context
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchVPCEndpointsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchVPCEndpointsPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeVpcEndpointsAPIPaginated{
@@ -1837,10 +1788,6 @@ func (m *mockEC2DescribeTransitGatewaysAPIPaginated) DescribeTransitGateways(_ c
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchTransitGatewaysPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchTransitGatewaysPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeTransitGatewaysAPIPaginated{
 		PageFunc: func(_ int) (*ec2.DescribeTransitGatewaysOutput, error) {
@@ -1965,10 +1912,6 @@ func (m *mockELBv2DescribeLoadBalancersAPIPaginated) DescribeLoadBalancers(_ con
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchLoadBalancersPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchLoadBalancersPage_FirstPage(t *testing.T) {
 	mock := &mockELBv2DescribeLoadBalancersAPIPaginated{
@@ -2098,10 +2041,6 @@ func (m *mockELBv2DescribeTargetGroupsAPIPaginated) DescribeTargetGroups(_ conte
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchTargetGroupsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchTargetGroupsPage_FirstPage(t *testing.T) {
 	port := int32(80)

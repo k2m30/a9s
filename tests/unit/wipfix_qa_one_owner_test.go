@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_one_owner_test.go pins the "one fact, one owner" rows: a failure
-// reaches the operator phrased once, through the one formatter; a result a
-// lane has already discarded schedules no work; and the persisted "we have
-// probed this type for issues" flag comes from a probe, not from the mere
-// presence of rows.
+// Tests for "one fact, one owner": a failure reaches the operator phrased
+// once, through the one formatter; a result a lane has already discarded
+// schedules no work; and the persisted "we have probed this type for issues"
+// flag comes from a probe, not from the mere presence of rows.
 //
-// The three source-shape gates here exist because the duplication they pin is
-// not observable from outside: two call sites computing one string identically
+// The source-shape gates here exist because the duplication they pin is not
+// observable from outside: two call sites computing one string identically
 // look the same from every surface until one of them is edited. Each names the
-// file and the expression, so the green transition is deleting the second
-// copy — no test edit.
+// file and the expression.
 package unit
 
 import (
@@ -45,8 +43,6 @@ func wipfixDeniedErr(op string) error {
 		},
 	}
 }
-
-// --- row 9a: a screen shows the cause, not the chain -----------------------
 
 // TestCostsScreen_FetchFailureShowsTheCauseNotTheChain pins that the costs
 // screen's error line is the phrasing core/aws owns (aws.CauseOf), the same
@@ -86,8 +82,6 @@ func TestCostsScreen_FetchFailureShowsTheCauseNotTheChain(t *testing.T) {
 			"which is the caller's own words repeated back", costsBody.ErrorMsg)
 	}
 }
-
-// --- row 9c: two failures, one sentence ------------------------------------
 
 // TestHandleRelatedCheckResult_TwoFailuresFlashOnce pins that a related
 // result which failed twice (the checker itself AND the by-ID lazy add)
@@ -168,13 +162,11 @@ func TestHandleRelatedCheckResult_SuccessFlashesNothing(t *testing.T) {
 	}
 }
 
-// --- row 11: a discarded result schedules no work --------------------------
-
-// TestHandleResourcesLoaded_SupersededResultDispatchesNoEnrichTask pins row
-// 11: a list result whose sequence a later fetch has already replaced is
-// dropped, and the Wave-2 list-open enrichment it would have triggered must
-// go with it. Enriching rows nobody will render spends the operator's API
-// budget on a screen that no longer exists.
+// TestHandleResourcesLoaded_SupersededResultDispatchesNoEnrichTask: a list
+// result whose sequence a later fetch has already replaced is dropped, and the
+// Wave-2 list-open enrichment it would have triggered must go with it.
+// Enriching rows nobody will render spends the operator's API budget on a
+// screen that no longer exists.
 func TestHandleResourcesLoaded_SupersededResultDispatchesNoEnrichTask(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
@@ -228,9 +220,7 @@ func TestHandleResourcesLoaded_CurrentResultStillDispatchesEnrichTask(t *testing
 	}
 }
 
-// --- row 13: "probed" is a probe's answer, not a row count -----------------
-
-// TestSaveAvailabilityFromRows_UnprobedTypeIsNotRecordedAsProbed pins row 13:
+// TestSaveAvailabilityFromRows_UnprobedTypeIsNotRecordedAsProbed:
 // a type whose rows carry only Wave-1 findings has never had its Wave-2
 // enricher answer for it. Persisting it as "probed, 0 issues" makes the next
 // session start with a confident zero badge for a question nobody asked.
@@ -281,8 +271,6 @@ func wipfixReadTypeFile(t *testing.T, cfgFolder, shortName string) string {
 	return string(b)
 }
 
-// --- source-shape gates ----------------------------------------------------
-
 // wipfixCountOccurrences returns how many of the named files contain expr, and
 // the list of those that do.
 func wipfixCountOccurrences(t *testing.T, expr string, roots ...string) []string {
@@ -324,7 +312,7 @@ func wipfixRepoPath(t *testing.T, rel string) string {
 	return filepath.Join("..", "..", rel)
 }
 
-// TestOneOwner_BulkIntentForwardHasOneSeam pins row 10: the terminal host
+// TestOneOwner_BulkIntentForwardHasOneSeam: the terminal host
 // applies "forward the whole slice minus the banner flashes, then re-emit
 // each banner flash through handleFlash" in two places. Two copies of one
 // rule drift; the seam is dispatchHandlerResult.
@@ -336,7 +324,7 @@ func TestOneOwner_BulkIntentForwardHasOneSeam(t *testing.T) {
 	}
 }
 
-// TestOneOwner_RelatedRowErrorTextHasOneProducer pins row 9's middle part: the
+// TestOneOwner_RelatedRowErrorTextHasOneProducer: the
 // related panel's per-row error text is computed from one fact
 // (RelatedCheckResult.Err) at two sites — the result lane and the cache
 // replay. The panel shows only whether an error exists, so the two copies
@@ -350,10 +338,10 @@ func TestOneOwner_RelatedRowErrorTextHasOneProducer(t *testing.T) {
 	}
 }
 
-// TestOneOwner_CanonicalShortNameHasOneHelper pins row 14: canonShortName is
-// the canonicaliser, and the inline `FindResourceType(x); td != nil` idiom it
-// replaces is still spelled out across four packages. Either every site goes
-// through the helper or the helper goes — one shape, decided once.
+// TestOneOwner_CanonicalShortNameHasOneHelper: canonShortName is the
+// canonicaliser, and the inline `FindResourceType(x); td != nil` idiom
+// duplicates it. Either every site goes through the helper or the helper goes
+// — one shape, decided once.
 func TestOneOwner_CanonicalShortNameHasOneHelper(t *testing.T) {
 	helper := wipfixCountOccurrences(t, "func canonShortName(", "core/runtime")
 	inline := wipfixCountOccurrences(t, "FindResourceType(",
@@ -367,8 +355,8 @@ func TestOneOwner_CanonicalShortNameHasOneHelper(t *testing.T) {
 	}
 	inline = kept
 
-	// Either resolution the row allows is green: every site routes through the
-	// helper, or the helper is gone and the inline idiom is the shape.
+	// Either resolution is green: every site routes through the helper, or the
+	// helper is gone and the inline idiom is the shape.
 	if len(helper) == 0 {
 		return
 	}
@@ -379,7 +367,7 @@ func TestOneOwner_CanonicalShortNameHasOneHelper(t *testing.T) {
 	}
 }
 
-// TestOneOwner_ProfileFetchFailurePhrasedOnce pins row 21: the TUI's profile
+// TestOneOwner_ProfileFetchFailurePhrasedOnce: the TUI's profile
 // fetch must not phrase a failed local config read a second way beside the
 // controller's own flash. Both go through the one extraction.
 func TestOneOwner_ProfileFetchFailurePhrasedOnce(t *testing.T) {
@@ -391,10 +379,9 @@ func TestOneOwner_ProfileFetchFailurePhrasedOnce(t *testing.T) {
 	}
 }
 
-// TestNoStaleFetcherKeysInHandBuiltS3Rows pins row 26: the hand-built s3 rows
-// in core/app/list_test.go describe a fetcher shape that no longer exists.
-// A fixture that lies about the fetcher is the next reader's wrong mental
-// model.
+// TestNoStaleFetcherKeysInHandBuiltS3Rows: the hand-built s3 rows in
+// core/app/list_test.go must carry only keys the s3 fetcher writes. A fixture
+// that lies about the fetcher is the next reader's wrong mental model.
 func TestNoStaleFetcherKeysInHandBuiltS3Rows(t *testing.T) {
 	b, err := os.ReadFile(wipfixRepoPath(t, "core/app/list_test.go"))
 	if err != nil {
@@ -406,7 +393,7 @@ func TestNoStaleFetcherKeysInHandBuiltS3Rows(t *testing.T) {
 	}
 }
 
-// TestCostsAccessDeniedCommentAsksTheClassifier pins row 24: the comment
+// TestCostsAccessDeniedCommentAsksTheClassifier: the comment
 // beside the costs refusal spells an AWS exception name by hand while the
 // code asks the classifier for it, so the two can disagree silently.
 func TestCostsAccessDeniedCommentAsksTheClassifier(t *testing.T) {
@@ -422,9 +409,9 @@ func TestCostsAccessDeniedCommentAsksTheClassifier(t *testing.T) {
 	}
 }
 
-// TestListBodyMarkerColIsNamedForWhatItIs pins row 22: MarkerCol elects the
-// identity column and marks nothing. Nothing reads its serialised name, so
-// the rename costs nothing and the misleading name costs every reader.
+// TestListBodyMarkerColIsNamedForWhatItIs: MarkerCol elects the identity
+// column and marks nothing, so a field named for marking misleads every
+// reader.
 func TestListBodyMarkerColIsNamedForWhatItIs(t *testing.T) {
 	hits := wipfixCountOccurrences(t, "MarkerCol", "core/app", "core/runtime", "internal/tui")
 	if len(hits) > 0 {
@@ -433,7 +420,6 @@ func TestListBodyMarkerColIsNamedForWhatItIs(t *testing.T) {
 	}
 }
 
-// TestRelatedColdFetchRoundtripTestIsGofmtClean pins row 32.
 func TestRelatedColdFetchRoundtripTestIsGofmtClean(t *testing.T) {
 	path := wipfixRepoPath(t, "core/app/related_cold_fetch_roundtrip_test.go")
 	src, err := os.ReadFile(path)
@@ -449,7 +435,7 @@ func TestRelatedColdFetchRoundtripTestIsGofmtClean(t *testing.T) {
 	}
 }
 
-// TestCrossViewCacheSeed_IsListOnly pins row 12: the shared per-type resource
+// TestCrossViewCacheSeed_IsListOnly: the shared per-type resource
 // cache is the type's global population. A filtered or child result carries a
 // narrower set under the same type name, and an unstamped one carries no
 // ordering claim at all — neither may seed it, or every not-yet-visited view
@@ -482,7 +468,7 @@ func TestCrossViewCacheSeed_IsListOnly(t *testing.T) {
 	}
 }
 
-// TestTUILoadMoreStampsTheScreensLane pins row 28: the "m" key builds its own
+// TestTUILoadMoreStampsTheScreensLane: the "m" key builds its own
 // messages.LoadMore rather than going through the controller's action, so it
 // must stamp the lane the controller's own owner reports. Left unstamped it
 // falls back to deriving the lane from the drill's (empty) context maps and
@@ -496,7 +482,7 @@ func TestTUILoadMoreStampsTheScreensLane(t *testing.T) {
 	}
 }
 
-// TestTUIRefreshActiveListReadsTheLaneOwner pins row 29: Ctrl+R on a
+// TestTUIRefreshActiveListReadsTheLaneOwner: Ctrl+R on a
 // client-side related drill goes through refreshActiveList, whose fetch is
 // stamped canonical unconditionally. The refresh is then refused on the
 // drill's own screen and can land on the list beneath it.
@@ -542,8 +528,8 @@ func wipfixFuncBody(t *testing.T, rel, signature string) string {
 	return rest
 }
 
-// TestOneOwner_SupersessionIsCheckedOncePerMessage pins the first half of row
-// 36. The runtime's handler is the owner of re-entry verification: it is the
+// TestOneOwner_SupersessionIsCheckedOncePerMessage: the runtime's handler is
+// the owner of re-entry verification: it is the
 // seam the terminal host and every direct caller go through, so it stamps the
 // canonical short name onto the message and drops a superseded one. The
 // controller then reads what it was handed. Asking the same two questions a
@@ -575,11 +561,10 @@ func TestOneOwner_SupersessionIsCheckedOncePerMessage(t *testing.T) {
 	}
 }
 
-// TestOneOwner_TheFilterChainHasOneCaller pins the second half of row 36: the
-// list body's build filters and sorts the rows once and memoises the result.
-// A title or an accessor that runs the same chain again pays for it on every
-// call and can disagree with what is on screen — the drill-count defect this
-// task already fixed was exactly that disagreement.
+// TestOneOwner_TheFilterChainHasOneCaller: the list body's build filters and
+// sorts the rows once and memoises the result. A title or an accessor that
+// runs the same chain again pays for it on every call and can disagree with
+// what is on screen.
 func TestOneOwner_TheFilterChainHasOneCaller(t *testing.T) {
 	hits := wipfixCountOccurrences(t, "c.applyListFilters(", "core/app")
 	var outside []string
@@ -627,10 +612,10 @@ func wipfixHitsOutsideFunc(t *testing.T, rel, signature, expr string) []string {
 	return hits
 }
 
-// TestOneOwner_IncomingExactnessIsDerivedOnce pins row 37. Two lanes write a
-// type file — the one carrying rows and the counts-only one — and each works
-// out the count and the exactness it is about to hand the reconciler in its
-// own code. They agree today, which is the whole of what stops the file
+// TestOneOwner_IncomingExactnessIsDerivedOnce: two lanes write a type file —
+// the one carrying rows and the counts-only one — and each works out the
+// count and the exactness it is about to hand the reconciler in its own code.
+// Agreement between them is the whole of what stops the file
 // saying two things; a third lane would have to copy the same reasoning a
 // third time to keep agreeing. The derivation belongs in one function both
 // lanes call, leaving reconcileTypeFile as the only other place exactness is
@@ -650,7 +635,7 @@ func TestOneOwner_IncomingExactnessIsDerivedOnce(t *testing.T) {
 	}
 }
 
-// TestOneOwner_OneTypeDefResolverPerScreen pins row 39's shape. The build
+// TestOneOwner_OneTypeDefResolverPerScreen: the build
 // resolves the display typeDef and the filter typeDef through two functions
 // that differ in one rung, so a screen can render columns from one typeDef
 // and filter with another.

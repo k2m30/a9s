@@ -2,7 +2,7 @@
 
 package unit_test
 
-// tui6_display_id_gate_test.go — every painted use of an identifier asks for
+// Every painted use of an identifier asks for
 // its displayed form.
 //
 // Resource.ID is the one string the text boundary leaves alone: the next AWS
@@ -38,7 +38,7 @@ var displayIDPackages = []string{ //nolint:gochecknoglobals // test-only lookup
 	filepath.Join("internal", "tui", "views"),
 }
 
-// paintedBuilders matches the functions whose result is painted: a frame
+// isPaintedBuilder matches the functions whose result is painted: a frame
 // title, a screen title, a label, a heading, a breadcrumb.
 func isPaintedBuilder(name string) bool {
 	lower := strings.ToLower(name)
@@ -61,11 +61,9 @@ var paintedBuildersThatKeepTheRawID = map[string]string{ //nolint:gochecknogloba
 // builds, without that value being wrapped in DisplayID.
 //
 // Two shapes count, because a builder can be handed an identifier as well as
-// read one. A .ID field read is the shape the gate was written for. A STRING
-// PARAMETER is the other, and it is the one the title builder takes: the
-// caller has already read the field, so there is no .ID left to see, and a
-// gate looking only for field reads calls the site that actually paints the
-// title compliant. A parameter reassigned from DisplayID counts as wrapped
+// read one: a .ID field read, and a STRING PARAMETER — the shape the title
+// builder takes, where the caller has already read the field and there is no
+// .ID left to see. A parameter reassigned from DisplayID counts as wrapped
 // from then on — flow-insensitively, which is the whole of what this needs
 // for a builder that cleans its arguments in one line at the top.
 //
@@ -216,9 +214,8 @@ func notATestFile(fi fs.FileInfo) bool {
 	return !strings.HasSuffix(fi.Name(), "_test.go")
 }
 
-// TestDisplayIDGate_EveryPaintedIDGoesThroughIt is the enforcement half of
-// row 16: the painted-identifier sites are read out of the source, not listed
-// in prose.
+// TestDisplayIDGate_EveryPaintedIDGoesThroughIt reads the painted-identifier
+// sites out of the source rather than listing them in prose.
 func TestDisplayIDGate_EveryPaintedIDGoesThroughIt(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

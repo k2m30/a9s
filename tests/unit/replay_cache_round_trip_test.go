@@ -1,4 +1,4 @@
-// replay_cache_round_trip_test.go — a row restored from the disk cache
+// A row restored from the disk cache
 // renders the cells the fetch rendered.
 //
 // Three lanes resolve a type's columns: the render lane, the cache save lane,
@@ -168,14 +168,14 @@ type replayShadowedCell struct {
 // Every id is a fixture with hardcoded values; rows whose fixture dates are
 // computed from time.Now are deliberately not used.
 //
-// A row whose column title is more than one word can pass on a lucky run while
-// the defect is still there: its saved row answers to that title under two
-// spellings at once, and the loser of the coin flip is sometimes the live word.
+// A row whose column title is more than one word can pass on a lucky run: its
+// saved row can answer to that title under two spellings, and Go's map order
+// picks the one that reaches the screen.
 // TestReplay_SavedRowLeavesOneAnswerForAColumnTitle is the deterministic half
 // of that pair, and both have to be green together.
 var replayShadowedCells = []replayShadowedCell{
 	// bool: the cascade's FormatValue says Yes/No, the fetcher wrote the Go
-	// literal. Both polarities, so a fix that hardcodes one is still red.
+	// literal. Both polarities, so a hardcoded answer cannot pass.
 	{"ami", "ami-0public00000000001", "Public", "Yes"},
 	{"ami", "ami-0a1b2c3d4e5f60001", "Public", "No"},
 	{"acm", "arn:aws:acm:us-east-1:123456789012:certificate/os-acme-logs-cert-0001", "In Use", "Yes"},
@@ -390,19 +390,13 @@ func TestReplay_KeyedColumnValueSurvivesTheSave(t *testing.T) {
 	}
 }
 
-// TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord pins the
-// upgrade path. The disk schema version did not change, so the first start
-// after this fix reads type files the PREVIOUS build wrote, and those rows
-// carry both spellings of a multi-word column's title: the spaced one its save
-// lane materialized (holding the value that build's screen showed) and the
-// underscored one the fetcher wrote (holding the raw scalar).
-//
-// The cold-start paint renders those rows before any fetch lands, so the word
-// on screen has to be the one the previous run showed. Whichever spelling the
-// extraction cascade prefers, it has to prefer the one that survives on both
-// shapes of file: a file this build writes carries the underscored key only,
-// so looking for the spaced key first costs nothing there and is the only
-// reading that is right on a file the last build wrote.
+// TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord pins
+// cache files an older build wrote. The disk schema version is the same, so a
+// start can read rows carrying both spellings of a multi-word column's title:
+// the spaced one an older save lane materialized and the underscored one the
+// fetcher wrote. The cold-start paint renders those rows before any fetch
+// lands, and the fetcher's underscored key wins; a file this build writes
+// carries only that key.
 func TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord(t *testing.T) {
 	const shortName = "secrets"
 	td := resource.FindResourceType(shortName)
@@ -418,7 +412,7 @@ func TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord(t *testi
 		Type: shortName,
 		Fields: map[string]string{
 			"secret_name": "prod/app/legacy-cache-row",
-			// What the previous build's save lane left behind.
+			// What an older build's save lane wrote.
 			"last accessed": "2026-04-28 00:00",
 			// What its fetcher left beside it.
 			"last_accessed": "2026-04-28",

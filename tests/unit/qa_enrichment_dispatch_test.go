@@ -1,13 +1,7 @@
 package unit
 
-// qa_enrichment_dispatch_test.go — Tests for enrichment dispatch and handler behavior.
-//
-// Tests verify:
-//   1. Wave 2 catalog completeness — all 8 foundational resource short names resolve via awsclient.Wave2EnricherFor.
-//   2. Session-wide gen guard — EnrichmentCheckedMsg with stale Gen is silently dropped (no panic, no cmd).
-//   3. Per-type gen guard — EnrichmentCheckedMsg with stale TypeGen is silently dropped.
-//   4. Valid EnrichmentCheckedMsg with Err != nil does not crash.
-//   5. EnricherFunc signature conformance — registered functions satisfy the EnricherFunc type.
+// Enrichment dispatch registry and the
+// EnrichmentChecked handler's gen guards and error tolerance.
 
 import (
 	"errors"
@@ -22,15 +16,11 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// originalIssue196Enrichers lists the foundational enrichers.
-// These must remain registered (real, not noop). Broader Wave 2 alignment
-// with docs/attention-signals.md is guarded by `make check-catalogen` and
-// tests/unit/docs_attention_signals_sync_test.go (both track FindingDef
-// declarations against the doc), so this allowlist is not the source of
-// truth — it's a regression pin for the initial enricher set.
-//
-// Registry-shape guard only — catches absence, not completeness.
-// A feature can still be disabled, inert, or half-fed and pass.
+// originalIssue196Enrichers lists the foundational enrichers, which must stay
+// registered with a real (non-noop) function. Wave 2 alignment with
+// docs/attention-signals.md is guarded by `make check-catalogen` and
+// tests/unit/docs_attention_signals_sync_test.go; this list checks
+// registration only.
 var originalIssue196Enrichers = []string{
 	"rds",
 	"dbi",
@@ -42,9 +32,9 @@ var originalIssue196Enrichers = []string{
 	"glue",
 }
 
-// TestIssueEnricherRegistry_OriginalSetStillRegistered pins the original 8
-// enrichers — they must remain discoverable via the Wave 2 accessor
-// regardless of which catalog category file owns them.
+// TestIssueEnricherRegistry_OriginalSetStillRegistered pins the foundational
+// enrichers — they must stay discoverable via the Wave 2 accessor regardless
+// of which catalog category file owns them.
 func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 	for _, shortName := range originalIssue196Enrichers {
 		e, ok := awsclient.Wave2EnricherFor(shortName)
@@ -63,9 +53,6 @@ func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 // The catalog literal IS the registration, so this is trivially true — the
 // test stays as a regression guard for stub test injections that forget to
 // clean up.
-//
-// Registry-shape guard only — proves registration, not feature completeness.
-// Keep behavioral tests for any feature that is claimed as implemented.
 func TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
 	for _, entry := range awsclient.AllWave2() {
 		if resource.FindResourceType(entry.ShortName) == nil {
@@ -143,7 +130,6 @@ func TestEnrichmentCheckedMsg_ErrorDoesNotCrash(t *testing.T) {
 		TypeGen:      0, // matches fresh model's initial per-type gen
 	}
 
-	// Must not panic.
 	m2, _ := m.Update(errMsg)
 	_ = m2.View()
 }
@@ -162,7 +148,6 @@ func TestEnrichmentCheckedMsg_NilFindingsOnError(t *testing.T) {
 		TypeGen:      0,
 	}
 
-	// Handler must not panic or crash when Findings is nil.
 	m2, _ := m.Update(errMsg)
 	_ = m2.View()
 }

@@ -1,6 +1,6 @@
 package unit_test
 
-// phase03_ec2_pr03b_test.go — the EC2 Wave 1 finding contract.
+// The EC2 Wave 1 finding contract.
 //
 //   - Fetcher writes no Status for lifecycle states; keeps Fields["state"].
 //   - Fetcher EMITS canonical Finding entries into Resource.Findings for
@@ -23,15 +23,13 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T03b-1 — Compile-time check: FindingCode constants exist in awsclient
+// FindingCode constants exist in awsclient
 // ---------------------------------------------------------------------------
 
 // TestEC2Codes_ConstantsExist verifies that ec2_codes.go declares the four
-// Wave 1 finding constants as domain.FindingCode typed values. This fails to
-// compile until the constants are introduced.
+// Wave 1 finding constants as domain.FindingCode typed values.
 func TestEC2Codes_ConstantsExist(t *testing.T) {
 	t.Helper()
-	// These will not compile until core/aws/ec2_codes.go is created.
 	var _ domain.FindingCode = awsclient.CodeEC2StatePending
 	var _ domain.FindingCode = awsclient.CodeEC2StateStopping
 	var _ domain.FindingCode = awsclient.CodeEC2StateStopped
@@ -39,12 +37,11 @@ func TestEC2Codes_ConstantsExist(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-2 — running state → no Finding, no Status
+// running state → no Finding, no Status
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_RunningStateEmitsNoFinding asserts that a running instance
-// produces no Finding and an empty Status after the Wave 1 migration.
-// Pre-migration: Status == "running". Post-migration: Status == "".
+// produces no Finding and an empty Status.
 func TestEC2Fetcher_RunningStateEmitsNoFinding(t *testing.T) {
 	mock := newEC2MockForPR03b([]ec2types.Instance{
 		{
@@ -68,21 +65,17 @@ func TestEC2Fetcher_RunningStateEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Post-migration: fetcher no longer writes Status for lifecycle states.
-
-	// No finding for the healthy steady-state.
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d findings, want 0 for running state", len(r.Findings))
 	}
 
-	// state field must still be populated in Fields.
 	if r.Fields["state"] != "running" {
 		t.Errorf("Fields[\"state\"]: got %q, want %q", r.Fields["state"], "running")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// T03b-3 — pending state → SevWarn Finding
+// pending state → SevWarn Finding
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_PendingStateEmitsWarnFinding asserts that a pending instance
@@ -130,7 +123,7 @@ func TestEC2Fetcher_PendingStateEmitsWarnFinding(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-4 — stopped + Server.* reason → SevBroken Finding
+// stopped + Server.* reason → SevBroken Finding
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_StoppedServerEmitsBrokenFinding asserts that a stopped
@@ -177,7 +170,7 @@ func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-5 — stopped + non-Server reason → SevWarn Finding
+// stopped + non-Server reason → SevWarn Finding
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_StoppedUserEmitsWarnFinding asserts that a stopped instance
@@ -223,7 +216,7 @@ func TestEC2Fetcher_StoppedUserEmitsWarnFinding(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-6 — terminated state → no Finding
+// terminated state → SevDim Finding
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_TerminatedEmitsDimFinding: a terminated instance emits
@@ -274,23 +267,18 @@ func TestEC2Fetcher_TerminatedEmitsDimFinding(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-7 — Color reads Findings[0].Severity first
+// Color reads Findings[0].Severity first
 // ---------------------------------------------------------------------------
 
 // TestEC2Color_ReadsFindingsFirst asserts that the EC2 Color func returns
 // ColorBroken when Findings[0].Severity is SevBroken, even if Fields["state"]
 // would ordinarily yield ColorHealthy via the lifecycle path.
-//
-// Pre-fix: ec2.Color ignores Findings → returns ColorHealthy.
-// Post-fix: ec2.Color reads Findings[0].Severity → returns ColorBroken.
 func TestEC2Color_ReadsFindingsFirst(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
 		t.Fatal("ec2 type not registered")
 	}
 
-	// Running state would produce ColorHealthy via the structural path.
-	// Findings override must win.
 	r := resource.Resource{
 		Type: "ec2",
 		Fields: map[string]string{
@@ -315,7 +303,7 @@ func TestEC2Color_ReadsFindingsFirst(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T03b-8 — Color falls back to structural path when Findings is empty
+// Color with no Findings is Healthy
 // ---------------------------------------------------------------------------
 
 // TestEC2Color_HealthyWhenFindingsEmpty: colorEC2 is colorFromAnyFinding-only
@@ -350,13 +338,8 @@ func TestEC2Color_HealthyWhenFindingsEmpty(t *testing.T) {
 // helpers
 // ---------------------------------------------------------------------------
 
-// newEC2MockForPR03b returns a minimal mockEC2Client (defined in mocks_test.go,
-// package unit) populated with the given instances in a single reservation.
-//
-// NOTE: this helper is in package unit_test (external test package) so it
-// cannot directly reference mocks_test.go's unexported type. Instead it builds
-// the same value via the exported FetchEC2Instances path, which accepts any
-// EC2FetchInstancesAPI. We declare a local unexported adapter here.
+// newEC2MockForPR03b returns a minimal EC2 client populated with the given
+// instances in a single reservation.
 type pr03bEC2Mock struct {
 	instances []ec2types.Instance
 }
@@ -386,15 +369,12 @@ func (m *pr03bEC2Mock) DescribeInstanceStatus(
 }
 
 // ---------------------------------------------------------------------------
-// T03b-9 — stopping state → SevWarn Finding (missing coverage)
+// stopping state → SevWarn Finding
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_StoppingStateEmitsWarnFinding asserts that an instance in the
 // "stopping" transient state emits one SevWarn Finding with CodeEC2StateStopping.
 // This state is distinct from "stopped" — the instance is mid-shutdown.
-//
-// Pre-fix: stopping state may fall through with no Finding (gap in switch).
-// Post-fix: CodeEC2StateStopping / SevWarn / Source:"wave1" must be emitted.
 func TestEC2Fetcher_StoppingStateEmitsWarnFinding(t *testing.T) {
 	mock := newEC2MockForPR03b([]ec2types.Instance{
 		{

@@ -2,7 +2,7 @@
 
 package unit_test
 
-// web_selectors_headless_test.go — the profile and region selectors open on
+// The profile and region selectors open on
 // a host with no adapter, and the theme command says why it does not.
 
 import (

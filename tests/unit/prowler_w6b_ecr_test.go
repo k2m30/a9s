@@ -1,13 +1,12 @@
 package unit
 
-// prowler_w6b_ecr_test.go — behavioural pins for the four ecr posture signals
-// of batch w6b.
+// The four ecr posture signals, split by what DescribeRepositories already
+// answers.
 //
-// Two waves, deliberately split by what DescribeRepositories already answers.
 // scan-on-push and tag mutability are on the repository record the fetcher
 // holds, so they are wave 1. The repository policy and the lifecycle policy
 // each need their own call, so they belong to EnrichECRRepository — the type's
-// single enricher, extended rather than duplicated.
+// single enricher.
 
 import (
 	"context"
@@ -41,8 +40,6 @@ const (
 	w6bECRSource              = "wave2"
 )
 
-// ─── wave 1: DescribeRepositories ───────────────────────────────────────────
-
 type w6bECRListFake struct {
 	repos []ecrtypes.Repository
 }
@@ -73,8 +70,6 @@ func w6bFetchECR(t *testing.T, repos ...ecrtypes.Repository) []resource.Resource
 	return out.Resources
 }
 
-// ─── row 8: ecr.scan-on-push-off ────────────────────────────────────────────
-
 // Without scan on push, a vulnerable image is only discovered when someone
 // asks — and nobody asks.
 func TestW6BECR_ScanOnPushOff_Disabled(t *testing.T) {
@@ -90,7 +85,7 @@ func TestW6BECR_ScanOnPushOff_Disabled(t *testing.T) {
 }
 
 // An absent scanning configuration is the same exposure as an explicit false:
-// AWS does not scan. This is the documented exception to "nil never triggers".
+// AWS does not scan.
 func TestW6BECR_ScanOnPushOff_ConfigurationAbsent(t *testing.T) {
 	const name = "acme/legacy-images"
 	repo := w6bECRRepo(name)
@@ -106,8 +101,6 @@ func TestW6BECR_ScanOnPushOn_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bECRCodeScanOnPushOff)
 }
 
-// ─── row 9: ecr.mutable-tags ────────────────────────────────────────────────
-
 // Mutable tags mean the image behind :v1.2.3 can be replaced after review, so
 // what was scanned is not necessarily what runs.
 func TestW6BECR_MutableTags_Mutable(t *testing.T) {
@@ -120,7 +113,7 @@ func TestW6BECR_MutableTags_Mutable(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bECRCodeMutableTags,
 		w6bECRPhraseMutableTags, domain.SevWarn, "wave1")
 	// "Tag mutability: mutable" adds nothing an operator did not read in the
-	// phrase, and the raw MUTABLE the table proposed is a banned enum.
+	// phrase, and the raw MUTABLE is a banned enum.
 	w6bRequireNoRows(t, w6bWave1Rows(r, w6bECRCodeMutableTags))
 }
 
@@ -149,8 +142,6 @@ func TestW6BECR_TagMutabilityUnset_IsHealthy(t *testing.T) {
 	rs := w6bFetchECR(t, repo)
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bECRCodeMutableTags)
 }
-
-// ─── wave 2: the enricher ───────────────────────────────────────────────────
 
 // w6bECRFake answers the three calls EnrichECRRepository makes. Embedding the
 // aggregate keeps the fake honest about which methods the enricher may use:
@@ -228,8 +219,6 @@ func w6bECREnrichOK(t *testing.T, fake *w6bECRFake, names ...string) awsclient.I
 	return res
 }
 
-// ─── row 7: ecr.public-policy ───────────────────────────────────────────────
-
 // A wildcard principal on a repository policy lets anyone in the world pull
 // the images, which for a private registry is the whole build output.
 func TestW6BECR_PublicPolicy_WildcardPrincipal(t *testing.T) {
@@ -272,8 +261,7 @@ func TestW6BECR_ScopedPolicy_IsHealthy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodePublicPolicy))
 }
 
-// A wildcard fenced by a condition is a scoped grant, not an open door —
-// contract rule 6 says Conditioned is not the finding.
+// A wildcard fenced by a condition is a scoped grant, not an open door.
 func TestW6BECR_ConditionedWildcard_IsNotPublic(t *testing.T) {
 	const name = "acme/org-repo"
 	doc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"ecr:BatchGetImage","Condition":{"StringEquals":{"aws:PrincipalOrgID":"o-acme12345"}}}]}`
@@ -284,8 +272,6 @@ func TestW6BECR_ConditionedWildcard_IsNotPublic(t *testing.T) {
 	res := w6bECREnrichOK(t, fake, name)
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodePublicPolicy))
 }
-
-// ─── row 10: ecr.no-lifecycle-policy ────────────────────────────────────────
 
 // Here the NotFound answer IS the finding: no lifecycle policy means untagged
 // layers accumulate until the registry bill notices.
@@ -308,8 +294,6 @@ func TestW6BECR_LifecyclePolicyPresent_IsHealthy(t *testing.T) {
 	res := w6bECREnrichOK(t, fake, name)
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodeNoLifecycle))
 }
-
-// ─── wave-2 discipline ──────────────────────────────────────────────────────
 
 // A repository whose policy read failed is unknown, not clean. The row must go
 // to "?" rather than quietly disappear, and its neighbours must still be
@@ -340,11 +324,9 @@ func TestW6BECR_PolicyReadError_MarksOnlyThatRepoUnknown(t *testing.T) {
 func TestW6BECR_ImagesReadError_DoesNotSinkTheOtherRepos(t *testing.T) {
 	const broken = "acme/cross-region"
 	const neighbour = "acme/frontend"
-	// The neighbour is given no lifecycle policy on purpose. It is the one
-	// still-readable repository in the batch, so the finding it carries is the
-	// proof that the failed read next to it did not sink the whole pass — an
-	// earlier draft handed it a policy and then asserted the no-lifecycle
-	// finding on it, which no repository with a policy can carry.
+	// The neighbour is given no lifecycle policy on purpose: it is the one
+	// still-readable repository in the batch, so the finding it carries proves
+	// the failed read next to it did not sink the whole pass.
 	fake := &w6bECRFake{
 		imagesErr: map[string]error{broken: errors.New("RepositoryNotFoundException: does not exist in the registry")},
 	}
@@ -401,11 +383,8 @@ func TestW6BECR_NilClient_ReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// ─── independence ───────────────────────────────────────────────────────────
-
-// Contract rule 4, across the wave boundary: a repository that is wrong in
-// four ways carries four findings, and the two waves do not overwrite each
-// other's entries.
+// Across the wave boundary: a repository that is wrong in four ways carries
+// four findings, and the two waves do not overwrite each other's entries.
 func TestW6BECR_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	const name = "acme/worst-case"
 	repo := w6bECRRepo(name)
@@ -423,10 +402,8 @@ func TestW6BECR_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeNoLifecycle), w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
 }
 
-// ─── catalog ────────────────────────────────────────────────────────────────
-
-// The enricher reaches GetLifecyclePolicy by type assertion, so a client that
-// predates the call must degrade to "no lifecycle finding" rather than
+// The enricher reaches GetLifecyclePolicy by type assertion, so a client
+// without the call must degrade to "no lifecycle finding" rather than
 // reporting every repository as unpolicied.
 func TestW6BECR_ClientWithoutLifecycleCall_EmitsNoLifecycleFinding(t *testing.T) {
 	const name = "acme/frontend"

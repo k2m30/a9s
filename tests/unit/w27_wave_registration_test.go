@@ -1,11 +1,9 @@
 package unit
 
-// w27_wave_registration_test.go — no docs/resources/<short>.md page claims a
-// wave it does not register: the §S1 badge paragraph ("N uses the same
-// aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2
-// `!`-severity findings)") is false for a type that registers no Wave 2
-// enricher, such as opensearch (docs/resources/opensearch.md says outright
-// "opensearch registers no Wave 2 enricher").
+// No docs/resources/<short>.md page claims a wave it does not register: the
+// badge paragraph ("N uses the same aggregation as the menu badge (Wave 1
+// issue-colored rows + Wave 2 `!`-severity findings)") is false for a type
+// that registers no Wave 2 enricher, such as opensearch.
 
 import (
 	"os"
@@ -16,14 +14,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// wave2BadgeClaim is the exact fragment the copied §S1 paragraph uses to
-// credit Wave 2 findings toward the badge count.
+// wave2BadgeClaim is the exact fragment the badge paragraph uses to credit
+// Wave 2 findings toward the badge count.
 const wave2BadgeClaim = "Wave 2 `!`-severity findings"
 
 // TestDocPage_NoWaveItDoesNotRegister walks every registered type with a
 // docs/resources page and fails when a type with no Wave 2 enricher still
 // has a page claiming Wave 2 findings contribute to its badge count.
-// Red today for opensearch.
 func TestDocPage_NoWaveItDoesNotRegister(t *testing.T) {
 	var falsePages []string
 	for _, td := range resource.AllResourceTypes() {

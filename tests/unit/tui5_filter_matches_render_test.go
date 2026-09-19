@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_filter_matches_render_test.go — the text filter matches what the screen
+// The text filter matches what the screen
 // shows. A humanized column renders a readable cause, so that is what the
 // operator types; the raw AWS constant behind it appears on no surface and
 // must match nothing.

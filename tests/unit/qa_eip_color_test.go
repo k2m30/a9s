@@ -14,12 +14,10 @@ func TestEipColor(t *testing.T) {
 		t.Fatal("eip not registered")
 	}
 
-	// d4 row 23: an idle address is warning because the eip fetcher emits
-	// CodeEIPUnassociated for it, not because the classifier re-reads two of
-	// the three attachment fields. That second derivation called a NAT
-	// gateway's address — attached to an interface, with no association id
-	// and no instance — unattached, which is how every real one looks. Do not
-	// restore a findings-free "idle" case: the fetcher cannot produce one.
+	// An idle address is warning because the eip fetcher emits
+	// CodeEIPUnassociated for it. A NAT gateway's address — attached to an
+	// interface, with no association id and no instance — is attached, and the
+	// fetcher cannot produce a findings-free idle address.
 	cases := []struct {
 		name          string
 		associationID string

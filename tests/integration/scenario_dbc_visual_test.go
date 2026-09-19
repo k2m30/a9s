@@ -2,11 +2,8 @@
 
 package integration
 
-// scenario_dbc_visual_test.go — Phase 8 render-gate for the dbc resource.
-//
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the per-resource §4 contract in docs/resources/dbc.md.
-// Authored by the a9s-implement-resource skill runner.
+// scenario_dbc_visual_test.go checks the rendered TUI output for dbc against
+// the universal UI rules and docs/resources/dbc.md.
 
 import (
 	"strings"
@@ -20,60 +17,44 @@ func TestScenario_DBCVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// -----------------------------------------------------------------
-	// S1 menu badge — assert BEFORE OpenList (menu is the root view).
-	// -----------------------------------------------------------------
+	// The menu badge is read while the menu is the root view.
 	// N = rows whose Wave-1-only colour IsIssue, plus Healthy rows carrying a
-	// Wave-2 `!`. Recount over the 17 dbc fixtures:
+	// Wave-2 `!`. Over the 17 dbc fixtures:
 	//   Wave-1 Broken (4):   broken-dbc-{failed,no-writer,incompat-params,
 	//                        enc-unreachable}
 	//   Wave-1 Warning (10): warn-dbc-{modifying,no-bkp,no-prot,unenc,multi,
-	//                        no-bkp-plus-maint} and the four the databases
-	//                        batch added — warn-dbc-{single-az,
-	//                        minor-upgrade-off,iam-auth-off,default-master-user}
+	//                        no-bkp-plus-maint,single-az,minor-upgrade-off,
+	//                        iam-auth-off,default-master-user}
 	//   Healthy + Wave-2 `!` (1): healthy-dbc-maint-overdue
 	//   Not counted (2): acme-docdb-prod, prod-aurora-cluster — Healthy, no finding
-	// 4 + 10 + 1 = 15. Was 11 before the databases batch: its four new
-	// Wave-1 `~` findings each colour a previously-Healthy row Warning.
+	// 4 + 10 + 1 = 15.
 	scenario.ExpectMenuIssueCount("dbc", 15)
 
 	scenario.OpenList("dbc")
 
-	// -----------------------------------------------------------------
-	// Universal column rules — no jargon columns anywhere in the frame.
-	// -----------------------------------------------------------------
 	for _, jargon := range []string{"CIS", "NOBKP", "UNENC", "NOPROT", "cis_flags"} {
 		scenario.ExpectViewNotContains(jargon)
 	}
-	// The "Writer" column was deleted too — make sure no column header of that
-	// literal name sneaks back in via a future defaults_databases.go edit.
 	scenario.ExpectViewNotContains("Writer ")
 
-	// -----------------------------------------------------------------
-	// Wave 1 §4 phrases per fixture.
-	// -----------------------------------------------------------------
-	// Healthy row: blank Status.
 	scenario.ExpectRowStatusBlank(demofixtures.ProdDbcID)
 
-	// Transitional Warning.
 	scenario.ExpectRowStatusEquals("warn-dbc-modifying", "modifying: in progress")
 
-	// Broken.
 	scenario.ExpectRowStatusEquals("broken-dbc-failed", "failed: cluster operation")
 	scenario.ExpectRowStatusEquals("broken-dbc-enc-unreachable", "encryption key unreachable")
 	scenario.ExpectRowStatusEquals("broken-dbc-incompat-params", "parameter group incompatible")
 	scenario.ExpectRowStatusEquals("broken-dbc-no-writer", "no writer: reads only")
 
-	// Config Warnings (single-phrase).
 	scenario.ExpectRowStatusEquals("warn-dbc-no-prot", "delete-protection off")
 	scenario.ExpectRowStatusEquals("warn-dbc-unenc", "not encrypted at rest")
 	scenario.ExpectRowStatusEquals("warn-dbc-no-bkp", "no automated backups")
 
-	// Rule 7 U7a — multi-W1: 3 warnings → top + (+2). §4 precedence = delete-protection first.
+	// Among Wave-1 warnings, delete-protection takes precedence.
 	scenario.ExpectRowStatusEquals("warn-dbc-multi", "delete-protection off (+2)")
 
-	// Rule 7 U7b — W1 + W2 stack. The cell leads with the WORST finding, not
-	// the Wave-1 one: domain.TopFinding is the single selection the Status
+	// The cell leads with the WORST finding, not the Wave-1 one:
+	// domain.TopFinding is the single selection the Status
 	// phrase and the row colour share, "so a red row can never read as a
 	// warning". Here Wave-2 dbc.maintenance-overdue is `!` and Wave-1
 	// no_automated_backups is `~`, so maintenance overdue tops and the
@@ -81,15 +62,10 @@ func TestScenario_DBCVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbcNoBkpMaintID, "maintenance overdue (+1)")
 
 	// dbcCodeMaintenanceOverdue is Severity: SevBroken (catalog_databases.go),
-	// so colorFromAnyFinding resolves the row color to Broken directly — the
-	// row is no longer Healthy-green-with-glyph, it renders Broken like any
-	// other `!` row. The Status phrase text is unaffected.
+	// so colorFromAnyFinding resolves the row color to Broken directly.
 	scenario.ExpectRowStatusEquals(demofixtures.MaintDbcOverdueID, "maintenance overdue")
 
-	// -----------------------------------------------------------------
-	// Glyph rules.
-	// -----------------------------------------------------------------
-	// Rule 3 — non-green rows must NOT carry a glyph regardless of finding.
+	// Non-green rows carry no glyph regardless of finding.
 	// Every dbc finding here resolves a non-Healthy row colour via
 	// colorFromAnyFinding, so none of these rows carry a glyph.
 	for _, id := range []string{
@@ -104,19 +80,14 @@ func TestScenario_DBCVisual(t *testing.T) {
 		"warn-dbc-multi",
 		demofixtures.WarnDbcNoBkpMaintID,
 		demofixtures.MaintDbcOverdueID,
-		// Plain Healthy rows with no finding also have no glyph.
 		demofixtures.ProdDbcID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// -----------------------------------------------------------------
-	// Related panel — every §2 `count shown: yes` pivot returns ≥ 1 for the
-	// graph-root fixture (`acme-docdb-prod`). The "RDS Instances" pivot is
-	// registered universally for dbc but only meaningful for Aurora clusters
-	// (DocumentDB clusters never have RDS instance members per AWS), so it's
-	// asserted separately below on the Aurora fixture.
-	// -----------------------------------------------------------------
+	// The "RDS Instances" pivot is registered for every dbc but only meaningful
+	// for Aurora clusters (DocumentDB clusters never have RDS instance members),
+	// so it is asserted below on the Aurora fixture.
 	prod := selectDBCByID(t, scenario, demofixtures.ProdDbcID)
 	scenario.OpenDetailResource("dbc", prod)
 	scenario.ExpectNoAPIError()
@@ -127,12 +98,7 @@ func TestScenario_DBCVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// -----------------------------------------------------------------
-	// Aurora cluster — "all pivots non-zero" graph-root for dbc. Every
-	// registered §2 pivot resolves on a single fixture here, including
-	// "RDS Instances" (which DocDB graph-roots can't cover because
-	// DocumentDB clusters don't have RDS instance members).
-	// -----------------------------------------------------------------
+	// The Aurora cluster resolves every registered pivot on a single fixture.
 	scenario.Back()
 	aurora := selectDBCByID(t, scenario, "prod-aurora-cluster")
 	scenario.OpenDetailResource("dbc", aurora)
@@ -145,10 +111,8 @@ func TestScenario_DBCVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// -----------------------------------------------------------------
-	// Rule 7 U7c — S5 shows the Wave-2 finding details even on a row whose
+	// The detail view shows the Wave-2 finding details even on a row whose
 	// Status is a Wave-1 phrase.
-	// -----------------------------------------------------------------
 	scenario.Back()
 	noBkpMaint := selectDBCByID(t, scenario, demofixtures.WarnDbcNoBkpMaintID)
 	scenario.OpenDetailResource("dbc", noBkpMaint)
@@ -158,12 +122,11 @@ func TestScenario_DBCVisual(t *testing.T) {
 	scenario.ExpectViewContains("system-update")
 	scenario.ExpectViewContains("Cluster parameter upgrade")
 
-	// Paste the rendered detail once to the test log — Phase 8.4 visual-sanity.
 	t.Log("\n" + scenario.currentView())
 }
 
-// TestScenario_DBCVisual_DetailSurfacesAllIssues asserts spec rule 7 for the
-// detail view. Multi-warning fixtures must enumerate every Resource.Issues
+// TestScenario_DBCVisual_DetailSurfacesAllIssues asserts that multi-warning
+// fixtures enumerate every Resource.Issues
 // entry, not just the top phrase shown in the Status column.
 func TestScenario_DBCVisual_DetailSurfacesAllIssues(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
@@ -176,27 +139,20 @@ func TestScenario_DBCVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 	// Attention section capitalizes the first letter of each entry.
 	cases := []issueCase{
-		// Healthy baseline — Attention section must be absent.
 		{demofixtures.ProdDbcID, nil},
-		// Transitional + single-warning (Wave-1 single phrase).
 		{"warn-dbc-modifying", []string{"Modifying: in progress"}},
-		// Broken (Wave-1 single phrase).
 		{"broken-dbc-failed", []string{"Failed: cluster operation"}},
 		{"broken-dbc-enc-unreachable", []string{"Encryption key unreachable"}},
 		{"broken-dbc-incompat-params", []string{"Parameter group incompatible"}},
 		{"broken-dbc-no-writer", []string{"No writer: reads only"}},
-		// Single Config Warnings.
 		{"warn-dbc-no-prot", []string{"Delete-protection off"}},
 		{"warn-dbc-unenc", []string{"Not encrypted at rest"}},
 		{"warn-dbc-no-bkp", []string{"No automated backups"}},
-		// U7e — multi Config Warnings: every entry of Resource.Issues must appear
-		// in detail (capitalized), in §4 precedence order.
+		// Multi Config Warnings appear in precedence order.
 		{"warn-dbc-multi", []string{"Delete-protection off", "Not encrypted at rest", "No automated backups"}},
-		// U7c — Wave-1 warning + Wave-2 maintenance — both must appear under Attention.
 		// Wave-2 severity "!" sorts BEFORE the Wave-1 "~" entry, so its rows
 		// (Action: system-update) precede the Wave-1 phrase "No automated backups".
 		{demofixtures.WarnDbcNoBkpMaintID, []string{"system-update", "No automated backups"}},
-		// Wave-2 only on Healthy row — Attention section present with Wave-2 Summary.
 		{demofixtures.MaintDbcOverdueID, []string{"os-upgrade"}},
 	}
 
@@ -220,12 +176,12 @@ func TestScenario_DBCVisual_DetailSurfacesAllIssues(t *testing.T) {
 }
 
 // TestScenario_DBCVisual_AttentionGlyphSurvivesColorCap pins that the `!`
-// glyph is NOT weakened by the color-cap rule introduced alongside this test.
+// glyph survives the color-cap rule.
 //
-// Background: Healthy rows with a Wave-2 `!` finding render the list row
+// Healthy rows with a Wave-2 `!` finding render the list row
 // green and the detail Attention entry with `!` glyph + Warning (yellow)
 // color — the glyph keeps its severity signal, but the color matches the
-// row's S2 bucket so the detail view doesn't contradict the list. The color
+// row's colour bucket so the detail view doesn't contradict the list. The color
 // itself is unit-tested directly (see the Attention colour-cap tests in
 // tests/unit/detail_ports_test.go); the scenario harness
 // strips ANSI so we only assert the glyph-survival half here.
@@ -256,8 +212,8 @@ func TestScenario_DBCVisual_AttentionGlyphSurvivesColorCap(t *testing.T) {
 	}
 }
 
-// TestScenario_DBCVisual_HealthyRowHasNoIssuesPhrases is a dedicated regression
-// pin for "Healthy silence" in the detail view.
+// TestScenario_DBCVisual_HealthyRowHasNoIssuesPhrases pins "Healthy silence"
+// in the detail view.
 func TestScenario_DBCVisual_HealthyRowHasNoIssuesPhrases(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)

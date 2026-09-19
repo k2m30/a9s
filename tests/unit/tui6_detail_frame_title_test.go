@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_detail_frame_title_test.go — one builder for the detail frame title,
+// One builder for the detail frame title,
 // and it cleans both of the strings it is handed.
 //
 // A resource type may name its rows after their identifiers: the S3 object
@@ -57,9 +57,8 @@ func TestDetailFrameTitle_CleansBothStringsItIsHanded(t *testing.T) {
 }
 
 // TestDetailFrameTitle_UnnamedBranchStillCleansTheIdentifier is the
-// counterpart: the branch without a name has one string to clean and still
-// cleans it, so a fix to the named branch cannot be a move rather than an
-// addition.
+// counterpart: the branch without a name has one string to clean and cleans
+// it.
 func TestDetailFrameTitle_UnnamedBranchStillCleansTheIdentifier(t *testing.T) {
 	title := resource.DetailFrameTitle(tui6NamedObjectKey, "", false)
 	if ctrls := tui6Controls(title); len(ctrls) > 0 {
@@ -70,9 +69,9 @@ func TestDetailFrameTitle_UnnamedBranchStillCleansTheIdentifier(t *testing.T) {
 	}
 }
 
-// TestDetailFrameTitle_BothLanesPaintTheBodysTitle pins that the title stayed
-// one fact after row 24: the view state's own title is the body's, and the
-// terminal paints that string rather than composing a second one.
+// TestDetailFrameTitle_BothLanesPaintTheBodysTitle: the view state's own
+// title is the body's, and the terminal paints that string rather than
+// composing a second one.
 func TestDetailFrameTitle_BothLanesPaintTheBodysTitle(t *testing.T) {
 	page, err := awsclient.FetchEC2InstancesPage(context.Background(), demo.NewServiceClients().EC2, "")
 	if err != nil {

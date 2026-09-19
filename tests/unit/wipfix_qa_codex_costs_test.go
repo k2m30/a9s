@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_codex_costs_test.go pins row 50: a closed period whose records
+// A closed period whose records
 // came from a page-capped fetch is a lower bound. A later complete fetch that
 // finds nothing there has to be able to say so, or the lower bound stays on
 // disk and the period is re-fetched every time the screen opens.
@@ -27,15 +27,14 @@ func wipfixCostsQuery() costs.Query {
 	}
 }
 
-// TestCostsStore_CompleteZeroGroupRefetchReplacesTruncatedCoverage pins row
-// 50. The capped fetch left records CE never finished enumerating; the
+// TestCostsStore_CompleteZeroGroupRefetchReplacesTruncatedCoverage: the
+// capped fetch left records CE never finished enumerating; the
 // complete refetch says the period has no spend at all. The complete answer
 // wins, whether or not it carries records.
 func TestCostsStore_CompleteZeroGroupRefetchReplacesTruncatedCoverage(t *testing.T) {
 	store := costs.NewMemoryStore("example-readonly")
 	q := wipfixCostsQuery()
 
-	// A capped fetch: some records, coverage stamped truncated.
 	store.ApplyFetchResult(costs.FetchResult{
 		Query: q,
 		Records: []costs.Record{{

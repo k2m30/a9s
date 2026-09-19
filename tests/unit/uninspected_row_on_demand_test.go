@@ -2,13 +2,12 @@
 
 package unit_test
 
-// uninspected_row_on_demand_test.go — a row the sweep left at its inspection
+// A row the sweep left at its inspection
 // cap gets its Wave-2 checks when the operator opens its detail. Which rows
 // fall inside the cap is the fetcher's page order, so the rows an operator
 // sorted to the top can read "not inspected: stopped at the inspection cap"
 // while off-screen rows were inspected; the row the operator is looking at
-// must not stay there. The list cap is unchanged, and every other row keeps
-// the sweep's answer.
+// must not stay there. Every other row keeps the sweep's answer.
 
 import (
 	"context"

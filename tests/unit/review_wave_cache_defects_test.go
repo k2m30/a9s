@@ -1,22 +1,19 @@
 // review_wave_cache_defects_test.go pins five cache-lane contracts.
 // Fictional data only (account 123456789012).
 //
-// Pin 1 — core/session/rowstore.go Observe: a probe replace must not
-// shrink an existing Fetch-origin row set (append=false, smaller incoming).
-// Pin 2 — core/runtime/handlers_availability.go: a disk seed
-// WITH real rows but a C6a-style larger Count must still land the larger
-// TotalCount, not silently drop it to len(rows).
-// Pin 3 — core/runtime/accessors.go FetchOriginCacheKeys: the
-// related-freshness key set must exclude Disk/Probe-origin entries,
-// matching HasResourceCache's own Origin==OriginFetch gate.
-// Pin 4 — core/runtime/helpers.go ApplyWave2ToRow: the in-place
-// compaction of r.Findings mutates the input row's backing array, so any
-// other domain.Resource value sharing that slice header is corrupted too.
-// Pin 5 — core/aws/related_common.go
-// lambdaEventSourceMappingLambdaCheck: when only SOME ListEventSourceMappings
-// FunctionArns are present in the lambda ResourceCache, the checker must
-// union the cache-matched IDs with ARN-parsed IDs for the cache-missing
-// ones, not silently drop the unmatched ARNs.
+//   - core/session/rowstore.go Observe: a probe replace never shrinks an
+//     existing Fetch-origin row set (append=false, smaller incoming).
+//   - core/runtime/handlers_availability.go: a disk seed with real rows and a
+//     larger Count lands the larger TotalCount rather than len(rows).
+//   - core/runtime/accessors.go FetchOriginCacheKeys: the related-freshness key
+//     set excludes Disk/Probe-origin entries, matching HasResourceCache's
+//     Origin==OriginFetch gate.
+//   - core/runtime/helpers.go ApplyWave2ToRow: compacting r.Findings never
+//     mutates the input row's backing array, which another domain.Resource value
+//     may share.
+//   - core/aws/related_common.go lambdaEventSourceMappingLambdaCheck: when only
+//     some ListEventSourceMappings FunctionArns are in the lambda ResourceCache,
+//     the checker unions the cache-matched IDs with ARN-parsed IDs for the rest.
 package unit_test
 
 import (
@@ -36,18 +33,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// -----------------------------------------------------------------------
-// Pin 1 — probe replace must not shrink fetched rows.
-// -----------------------------------------------------------------------
-
-// TestRowStore_Observe_ProbeReplaceNeverShrinksFetchRows pins the review
-// finding: an existing OriginFetch entry with 4 rows and IsTruncated=true
-// (the user has explicitly loaded more, so this is NOT yet a confirmed exact
-// total) must not be regressed by a later OriginProbe replace (append=false)
-// carrying fewer rows. Observe's existing isStaleReplaceRows guard only
-// fires when existing.Pagination reports IsTruncated=false (exact) — a
-// still-truncated Fetch entry sails past that guard today and gets replaced
-// wholesale by the smaller Probe payload, which is the bug this pins.
+// TestRowStore_Observe_ProbeReplaceNeverShrinksFetchRows: an existing
+// OriginFetch entry with 4 rows and IsTruncated=true (the user loaded more, so
+// the total is not yet exact) is not replaced by a later OriginProbe replace
+// (append=false) carrying fewer rows, even though isStaleReplaceRows only
+// covers an exact (IsTruncated=false) entry.
 func TestRowStore_Observe_ProbeReplaceNeverShrinksFetchRows(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -77,11 +67,10 @@ func TestRowStore_Observe_ProbeReplaceNeverShrinksFetchRows(t *testing.T) {
 	}
 }
 
-// TestRowStore_Observe_ProbeReplacesProbe_NonRegressionStillAllowed is the
-// non-regression companion: a Probe replace over an existing Probe-origin
-// entry must still win (a fresh Wave-1 sweep round legitimately supersedes
-// the prior round's retained first page), even though Pin 1 above blocks a
-// Probe from shrinking a Fetch-origin entry.
+// TestRowStore_Observe_ProbeReplacesProbe_NonRegressionStillAllowed: a Probe
+// replace over an existing Probe-origin entry wins (a fresh Wave-1 sweep round
+// supersedes the prior round's retained first page), even though a Probe
+// cannot shrink a Fetch-origin entry.
 func TestRowStore_Observe_ProbeReplacesProbe_NonRegressionStillAllowed(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -95,9 +84,8 @@ func TestRowStore_Observe_ProbeReplacesProbe_NonRegressionStillAllowed(t *testin
 	}
 }
 
-// TestRowStore_Observe_ProbeReplacesDiskEntry_NonRegressionStillAllowed pins
-// the second non-regression case: a Probe replace over an existing
-// Disk-origin entry must still win, mirroring
+// TestRowStore_Observe_ProbeReplacesDiskEntry_NonRegressionStillAllowed: a
+// Probe replace over an existing Disk-origin entry wins, mirroring
 // TestRowStore_Observe_ProbeReplacesDisk in session_rowstore_test.go.
 func TestRowStore_Observe_ProbeReplacesDiskEntry_NonRegressionStillAllowed(t *testing.T) {
 	store := session.NewRowStore()
@@ -112,12 +100,10 @@ func TestRowStore_Observe_ProbeReplacesDiskEntry_NonRegressionStillAllowed(t *te
 	}
 }
 
-// TestRowStore_Observe_FetchReplacesFetch_CtrlR_ResetSemanticsPreserved pins
-// the Ctrl+R reset non-regression named in the dispatch: a Fetch replace
-// over an existing Fetch entry must stay allowed even when it carries fewer
-// rows than the existing (still-truncated) entry — mirrors
-// TestStoryF1_CtrlR_ResetsPagination's contract, which this pin must not
-// break while fixing Pin 1's Probe-vs-Fetch guard.
+// TestRowStore_Observe_FetchReplacesFetch_CtrlR_ResetSemanticsPreserved: a
+// Fetch replace over an existing Fetch entry is allowed even when it carries
+// fewer rows than the existing (still-truncated) entry — the Ctrl+R reset
+// contract of TestStoryF1_CtrlR_ResetsPagination.
 func TestRowStore_Observe_FetchReplacesFetch_CtrlR_ResetSemanticsPreserved(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -137,20 +123,11 @@ func TestRowStore_Observe_FetchReplacesFetch_CtrlR_ResetSemanticsPreserved(t *te
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 2 — disk seed with real rows must preserve the larger C6a count.
-// -----------------------------------------------------------------------
-
-// TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCount_PreservesCount
-// pins the review finding at handlers_availability.go's disk-seed branch
-// (~line 124): when the on-disk per-type file has SOME real rows (3) but a
-// C6a-style larger authoritative Count (7, count > rows — e.g. a
-// counts-only sync-back landed after the disk file's own row page was
-// written), the seed must still land TotalCount=7 in RowStore, not silently
-// downgrade to len(rows)=3. Today's code feeds ObserveRows with a
-// PaginationMeta built only from Truncated, so RowStore.Observe sets
-// TotalCount=len(newRows)=3 (see Observe's TotalCount: len(newRows) line),
-// discarding the disk-cache-loaded event's own larger Count.
+// TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCount_PreservesCount:
+// when the on-disk per-type file has some real rows (3) but a larger
+// authoritative Count (7 — e.g. a counts-only sync-back landed after the
+// file's row page was written), handlers_availability.go's disk seed lands
+// TotalCount=7 in RowStore rather than len(rows)=3.
 func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCount_PreservesCount(t *testing.T) {
 	s, core, c := newRowStoreControllerPin(t)
 
@@ -186,21 +163,11 @@ func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCou
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 3 — related freshness gating must ignore Disk/Probe-origin entries.
-// -----------------------------------------------------------------------
-
-// TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin pins the review
-// finding: core/runtime/accessors.go's ResourceCacheKeys (backing
-// executor.go's mainCacheKeys, which gates RelatedDef.NeedsTargetCache
-// freshness) filters SnapshotAll(false) only on Partial, never on Origin —
-// so a Disk- or Probe-origin, non-Partial, rows-carrying entry is
-// (incorrectly) treated as "fresh" alongside a genuine OriginFetch entry,
-// unlike HasResourceCache which explicitly requires
-// tr.Origin == session.OriginFetch. This pin names the fix's intended
-// contract as a NEW accessor, FetchOriginCacheKeys, origin-gated identically
-// to HasResourceCache — red because core/runtime.Core has no such method
-// yet (compile-time missing symbol).
+// TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin: FetchOriginCacheKeys,
+// which gates RelatedDef.NeedsTargetCache freshness, is origin-gated
+// identically to HasResourceCache (tr.Origin == session.OriginFetch), so a
+// Disk- or Probe-origin, non-Partial, rows-carrying entry is not treated as
+// fresh.
 func TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin(t *testing.T) {
 	s := session.New()
 	s.Profile = "demo"
@@ -228,7 +195,7 @@ func TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin(t *testing.T) {
 	}
 
 	// Cross-check against HasResourceCache's own per-type verdict so the two
-	// accessors cannot silently drift apart again.
+	// accessors cannot drift apart.
 	if core.HasResourceCache("x-disk-type") != keySet["x-disk-type"] {
 		t.Errorf("FetchOriginCacheKeys membership for x-disk-type (%v) disagrees with HasResourceCache (%v)", keySet["x-disk-type"], core.HasResourceCache("x-disk-type"))
 	}
@@ -237,21 +204,12 @@ func TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 4 — ApplyWave2ToRow must not mutate the input row's Findings backing
-// array (aliasing / shared-snapshot corruption).
-// -----------------------------------------------------------------------
-
-// TestApplyWave2ToRow_DoesNotMutateSharedFindingsBackingArray pins the
-// review finding: ApplyWave2ToRow's in-place compaction
-// (r.Findings[n] = f; ... ; r.Findings = r.Findings[:n]) writes into the
-// caller-owned backing array before re-slicing, so any OTHER
-// domain.Resource value that shares the same Findings slice header (e.g. a
+// TestApplyWave2ToRow_DoesNotMutateSharedFindingsBackingArray: another
+// domain.Resource value sharing the input row's Findings slice header (e.g. a
 // Snapshot taken before the Amend closure ran, which copies the Resource
-// struct but not per-row Findings/Fields — see RowStore.Amend's copy-on-write
-// doc comment: fn is responsible for its own copy-on-write) observes its
-// Findings silently corrupted even though its own value was never passed to
-// ApplyWave2ToRow.
+// struct but not per-row Findings/Fields — RowStore.Amend's fn owns its own
+// copy-on-write) keeps its Findings intact after ApplyWave2ToRow compacts the
+// input row.
 func TestApplyWave2ToRow_DoesNotMutateSharedFindingsBackingArray(t *testing.T) {
 	wave1 := domain.Finding{Code: "wave1.finding", Phrase: "wave1 phrase", Severity: domain.SevBroken, Source: "wave1"}
 	wave2Original := domain.Finding{Code: "wave2.original", Phrase: "original wave2 phrase", Severity: domain.SevBroken, Source: "wave2:ec2"}
@@ -280,11 +238,6 @@ func TestApplyWave2ToRow_DoesNotMutateSharedFindingsBackingArray(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 5 — lambda ESM count must union cache-matched and cache-missing
-// mappings.
-// -----------------------------------------------------------------------
-
 type fakeLambdaListEventSourceMappingsUnionPin struct {
 	awsclient.LambdaAPI
 	byEventSourceArn map[string][]string
@@ -305,14 +258,12 @@ func (f *fakeLambdaListEventSourceMappingsUnionPin) ListEventSourceMappings(_ co
 	return &lambda.ListEventSourceMappingsOutput{EventSourceMappings: mappings}, nil
 }
 
-// TestKinesis_Related_Lambda_PartialCacheMatch_UnionsCachedAndUncachedIDs
-// pins the review finding in lambdaEventSourceMappingLambdaCheck
-// (core/aws/related_common.go): when the API returns TWO distinct
-// FunctionArns and the lambda ResourceCache entry exists (not truncated) but
-// only resolves ONE of them by Fields["arn"], today's code only appends
-// cache-matched IDs (entry.Resources loop) and drops the cache-missing ARN
-// entirely instead of falling back to lambdaFunctionNameFromARN for it —
-// undercounting a real, API-confirmed trigger.
+// TestKinesis_Related_Lambda_PartialCacheMatch_UnionsCachedAndUncachedIDs: when
+// the API returns two distinct FunctionArns and the lambda ResourceCache entry
+// exists (not truncated) but resolves only one of them by Fields["arn"],
+// lambdaEventSourceMappingLambdaCheck (core/aws/related_common.go) falls back
+// to lambdaFunctionNameFromARN for the other, so an API-confirmed trigger is
+// counted.
 func TestKinesis_Related_Lambda_PartialCacheMatch_UnionsCachedAndUncachedIDs(t *testing.T) {
 	streamARN := "arn:aws:kinesis:us-east-1:123456789012:stream/checkout-events"
 	cachedFnArn := "arn:aws:lambda:us-east-1:123456789012:function:fn-cached"

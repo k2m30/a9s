@@ -1,4 +1,4 @@
-// qa_load_more_dedup_test.go — load-more never duplicates a page (D13).
+// Load-more never duplicates a page.
 //
 // A cold `:s3` open (fresh pair) lands on page 1 (50 rows, truncated,
 // NextToken="p2"). Pressing 'm' (load more) must fetch page 2, never append
@@ -6,32 +6,6 @@
 // persisting, and a persisted per-type cache file carrying Count:100 with
 // only 50 distinct rows — a mismatched pair the persisted-pair invariant in
 // Core.SaveResourceListCache, core/runtime/probes.go, forbids).
-//
-// Four seams:
-//
-//  1. LoadMore_TUI_ColdOpen_NoDuplicates — real Bubble Tea Update loop, real
-//     'm' keypress through internal/tui/views/resourcelist.go's
-//     key.Matches(msg, m.keys.LoadMore) branch.
-//  2. LoadMore_TokenPresent_AfterColdOpen — the controller getter the 'm'
-//     path reads (Controller.GetListPaginationCursor) must equal the
-//     fetcher-returned NextToken after a cold open settles.
-//  3. AppendDedup_Backstop — Controller.ApplyResourcesLoaded(append=true)
-//     must not duplicate rows whose IDs already exist on the screen.
-//  4. PersistedPair_NeverMismatched — after driving the poisoning sequence
-//     through the real save wiring, the persisted TypeFile must never leave
-//     Count > len(Rows) via a double-append (the persisted-pair invariant).
-//
-// Harness precedents:
-//   - tests/unit/runtime_executor_depth_refetch_test.go: page1(50,
-//     truncated, "p2") / page2(5, exact) SetPaginatedForTest fixture shape,
-//     reused verbatim here (bucketID/page1Resources/page2Resources are
-//     package-level helpers already defined there — reused directly).
-//   - tests/unit/tui_post_sweep_seed_test.go: newPostSweepApp / rootApplyMsg
-//     / rootViewContent / stripANSI / rootKeyPress / rootSpecialKey TUI-drive
-//     pattern (real tui.Model, on-disk caching enabled).
-//   - tests/unit/app_pilot_defects_test.go: app.New(core) + ctrl.Apply
-//     (app.Action{Kind: app.ActionCommand, Arg: "s3"}) headless colon-command
-//     equivalent, plus ctrl.ApplyResourcesLoaded test seam.
 package unit
 
 import (
@@ -56,8 +30,8 @@ import (
 // total) registered against the REAL "s3" short name (not a synthetic type)
 // so the fixture exercises the exact live-observed code path (`:s3`).
 // SetPaginatedForTest overrides the catalog's real s3 fetcher for the
-// duration of the test (GetPaginatedFetcher is legacy-first); t.Cleanup
-// restores the catalog fallback.
+// duration of the test (GetPaginatedFetcher consults the test registration
+// first); t.Cleanup restores the catalog fallback.
 // ────────────────────────────────────────────────────────────────────────────
 
 func registerDef17S3Fetcher(t *testing.T) {
@@ -122,21 +96,16 @@ func def17Page2Resources(offset, n int) []resource.Resource {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 1 — real TUI Update loop, real 'm' keypress.
+// Real TUI Update loop, real 'm' keypress.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLoadMore_TUI_ColdOpen_NoDuplicates drives the LIVE sequence: a fresh
 // pair, on-disk caching enabled (newPostSweepApp mirrors the real ./a9s
 // wiring, not a NoCache test double), opened via the colon-command lane
-// (":" + "s3" + Enter — the live pilot symptom occurred via `:s3`, not menu
+// (":" + "s3" + Enter), then a real 'm' keypress routed through
 // Enter), then a real 'm' keypress routed through
 // internal/tui/views/resourcelist.go's key.Matches(msg, m.keys.LoadMore)
 // branch and internal/tui/fetch_adapter.go's fetchMoreResources.
-//
-// RED today (per the live observation): pressing 'm' after the cold open
-// re-fetches page 1 instead of page 2 (or double-appends it), so the
-// rendered view shows a duplicate consecutive row ID and the title reflects
-// ~100 rows instead of 55.
 func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	registerDef17S3Fetcher(t)
@@ -152,8 +121,7 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	// scrolling — the assertions below check row-ID occurrences and the
 	// frame title text, both of which must be visible in the rendered
 	// output for the checks to be meaningful (a truncated viewport would
-	// otherwise produce a false RED from scrolled-off rows, not the
-	// load-more duplication defect itself).
+	// fail on scrolled-off rows rather than on duplication).
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 70})
 
 	// Drive Init() so the pre-supplied demo clients actually land on
@@ -224,8 +192,8 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 
 	content = stripANSI(rootViewContent(m))
 
-	// Bug-catching: a naive re-fetch-page-1 or double-append would still
-	// pass a bare substring-presence check, so count row-ID occurrences.
+	// A re-fetch of page 1 or a double-append passes a bare substring check,
+	// so count row-ID occurrences.
 	firstID := def17BucketID(0)
 	occurrences := strings.Count(content, firstID)
 	if occurrences > 1 {
@@ -247,10 +215,8 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 }
 
 // def17DrainOneLevel runs cmd and feeds its resulting tea.Msg back through
-// Update exactly once (per feedback_dont_recurse_past_tea_tick.md: a single
-// level is sufficient here since fetchResources/fetchMoreResources each
-// resolve to one ResourcesLoaded message, not a cascade of tea.Tick-based
-// follow-ups).
+// Update exactly once: fetchResources/fetchMoreResources each resolve to one
+// ResourcesLoaded message, not a cascade of tea.Tick-based follow-ups.
 func def17DrainOneLevel(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	t.Helper()
 	if cmd == nil {
@@ -277,7 +243,7 @@ func def17DrainOneLevel(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 2 — pagination cursor at the controller getter the 'm' path reads.
+// Pagination cursor at the controller getter the 'm' path reads.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLoadMore_TokenPresent_AfterColdOpen pins Controller.GetListPaginationCursor
@@ -285,9 +251,7 @@ func def17DrainOneLevel(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // internal/tui/views/resourcelist.go's LoadMore branch calls
 // (m.ctrl.GetListPaginationCursor()) to build messages.LoadMore.ContinuationToken.
 // After a cold s3 open lands page 1 (NextToken="p2"), the cursor must equal
-// the fetcher-returned token. RED if the token got lost or overwritten
-// (suspected mechanism: the second 'm' press re-requesting token "" instead
-// of "p2" would explain the observed full-page-1 duplicate).
+// the fetcher-returned token.
 func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -319,7 +283,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 3 — headless append-dedup backstop.
+// Headless append-dedup backstop.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLoadMore_AppendDedup_Backstop pins the ID-dedup backstop:
@@ -379,7 +343,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 4 — persisted TypeFile must never end up with a mismatched pair.
+// Persisted TypeFile must never end up with a mismatched pair.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLoadMore_PersistedPair_NeverMismatched drives the full flow (cold open
@@ -388,14 +352,11 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 // maybeSaveResourceListCache -> Core.SaveResourceListCache) and asserts the
 // on-disk TypeFile for s3 stays internally consistent.
 //
-// Note on the persisted-pair invariant cited in the dispatch: Count and Rows
-// are ALWAYS written as len(ls.Rows)/ls.Rows together (maybeSaveResourceListCache,
-// core/app/handle.go), so Count==len(Rows) holds by construction even
-// when ls.Rows itself has been poisoned with duplicate IDs — a bare
-// Count-vs-len(Rows) check can never catch that shape of corruption. The
-// live-observed "count:100 with 50 rows" symptom must instead mean 100
-// PERSISTED rows of which only 50 are distinct IDs — i.e. the persisted
-// Rows slice itself contains duplicate IDs. That is what this pin checks.
+// Count and Rows are always written together as len(ls.Rows)/ls.Rows
+// (maybeSaveResourceListCache, core/app/handle.go), so Count==len(Rows)
+// holds by construction even when ls.Rows holds duplicate IDs; a
+// double-append shows up as duplicate IDs in the persisted Rows slice, which
+// is what this checks.
 func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

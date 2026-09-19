@@ -1,8 +1,8 @@
 package unit
 
-// prowler_w6b_cb_test.go — behavioural pins for the four cb posture signals
-// of batch w6b: public builds, a repo-controlled buildspec, a credential in
-// the source address and a credential in a plaintext environment variable.
+// The four cb posture signals: public builds, a repo-controlled buildspec, a
+// credential in the source address and a credential in a plaintext
+// environment variable.
 //
 // All four are wave 1. FetchCodeBuildProjectsPage calls BatchGetProjects and
 // keeps the whole Project, so every condition reads data the fetcher already
@@ -31,9 +31,8 @@ const (
 	w6bCBCodeEnvSecret          = domain.FindingCode("cb.env-secret")
 )
 
-// Registered phrases. cb.source-url-credential does not read "credential in
-// source URL" as the batch table first wrote it: "URL" is a bare uppercase
-// token the rendered-surface ruling bans from every phrase.
+// Registered phrases. "URL" is a bare uppercase token the rendered-surface
+// check bans from every phrase, so cb.source-url-credential avoids it.
 const (
 	w6bCBPhrasePublicBuilds     = "build results publicly visible"
 	w6bCBPhraseBuildspecFromSrc = "buildspec taken from the source repository"
@@ -100,8 +99,6 @@ func w6bFetchCB(t *testing.T, projects ...cbtypes.Project) []resource.Resource {
 	return out.Resources
 }
 
-// ─── row 3: cb.public-builds ────────────────────────────────────────────────
-
 // A PUBLIC_READ project publishes its build logs and artifacts to anyone with
 // the URL, which is where pipeline environment dumps leak.
 func TestW6BCB_PublicBuilds_PublicRead(t *testing.T) {
@@ -114,8 +111,8 @@ func TestW6BCB_PublicBuilds_PublicRead(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bCBCodePublicBuilds,
 		w6bCBPhrasePublicBuilds, domain.SevBroken, "wave1")
 	// "Build visibility: public" under "build results publicly visible" is the
-	// same fact twice, and the raw PUBLIC_READ the table proposed is a banned
-	// enum on a rendered surface.
+	// same fact twice, and the raw PUBLIC_READ is a banned enum on a rendered
+	// surface.
 	w6bRequireNoRows(t, w6bWave1Rows(r, w6bCBCodePublicBuilds))
 }
 
@@ -134,8 +131,6 @@ func TestW6BCB_VisibilityUnset_IsHealthy(t *testing.T) {
 	rs := w6bFetchCB(t, p)
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bCBCodePublicBuilds)
 }
-
-// ─── row 4: cb.buildspec-from-source ────────────────────────────────────────
 
 // A buildspec path resolves inside the repository, so whoever can open a pull
 // request can rewrite the commands the build runs with the project's role.
@@ -218,8 +213,6 @@ func TestW6BCB_NilSource_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, r.Findings, w6bCBCodeSourceURLCredetial)
 }
 
-// ─── row 5: cb.source-url-credential ────────────────────────────────────────
-
 // A token in the clone address is readable by anyone who can describe the
 // project, and it is usually a long-lived personal access token.
 func TestW6BCB_SourceURLCredential_TokenInUserinfo(t *testing.T) {
@@ -272,8 +265,6 @@ func TestW6BCB_NonURLSourceLocation_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bCBCodeSourceURLCredetial)
 }
 
-// ─── row 6: cb.env-secret ───────────────────────────────────────────────────
-
 // A PLAINTEXT environment variable is stored on the project and printed in
 // build logs, so a password there is a password published to every build.
 func TestW6BCB_EnvSecret_PlaintextVariable(t *testing.T) {
@@ -321,9 +312,6 @@ func TestW6BCB_NilEnvironment_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bCBCodeEnvSecret)
 }
 
-// ─── independence ───────────────────────────────────────────────────────────
-
-// Contract rule 4: four conditions on one project are four findings.
 func TestW6BCB_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	const name = "acme-worst-case"
 	p := w6bCBProject(name)

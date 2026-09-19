@@ -21,9 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ===========================================================================
-// Helpers for DocumentDB tests
-// ===========================================================================
 // multiStatusDocDBFixtures returns DocumentDB clusters with different statuses for color tests.
 func multiStatusDocDBFixtures() []resource.Resource {
 	return []resource.Resource{
@@ -78,17 +75,10 @@ func multiStatusDocDBFixtures() []resource.Resource {
 	}
 }
 
-// ===========================================================================
-// DOCDB-DETAIL-01 / DOCDB-DETAIL-02: DocumentDB detail view
-// ===========================================================================
-
-// TestQA_DocDB_DetailView is the live-seam replacement for the retired
-// views.NewDetail(...).View() call (DetailModel.View is dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md) — drives
-// Controller.EnsureDetailState + NewTransientDetail.RenderDetail instead.
-// Uses a wide viewport to avoid truncation of long endpoint values (right
-// panel auto-shows at width>=60 when related defs are registered, reducing
-// left column).
+// TestQA_DocDB_DetailView drives Controller.EnsureDetailState +
+// NewTransientDetail.RenderDetail with a wide viewport to avoid truncating
+// long endpoint values (the right panel auto-shows at width>=60 when related
+// defs are registered, narrowing the left column).
 func TestQA_DocDB_DetailView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 	res := fixtures[0]
@@ -116,10 +106,8 @@ func TestQA_DocDB_DetailView(t *testing.T) {
 	}
 }
 
-// TestQA_DocDB_DetailFrameTitle is the live-seam replacement for the retired
-// views.NewDetail(...).FrameTitle() call (DetailModel.FrameTitle is dead) —
-// drives Controller.Snapshot().FrameTitle instead (detailFrameTitleLocked
-// mirrors the legacy Name-else-ID semantics exactly).
+// TestQA_DocDB_DetailFrameTitle drives Controller.Snapshot().FrameTitle
+// (detailFrameTitleLocked: Name, else ID).
 func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 	res := fixtures[0]
@@ -135,14 +123,9 @@ func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// DOCDB-DETAIL-05: DocumentDB detail status coloring (per-type Color func)
-// ===========================================================================
-
 func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	// DocumentDB cluster (dbc) Color func reads Fields["status"].
 	td := resource.FindResourceType("dbc")
 	if td == nil {
 		t.Fatal("dbc resource type not found")
@@ -166,9 +149,9 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 		return r
 	}
 
-	// Post-refactor Fields["status"] carries the §4 PHRASE, not the raw AWS
-	// keyword. Healthy = blank; transitional = "<status>: in progress"; Broken
-	// phrases are spelled out per spec §4.
+	// Fields["status"] carries the display phrase, not the raw AWS keyword.
+	// Healthy = blank; transitional = "<status>: in progress"; Broken phrases
+	// are spelled out (docs/resources/dbc.md).
 	availableStyle := styles.ColorStyle(td.Color(dbcRes("", domain.SevOK)))
 	if availableStyle.GetForeground() != styles.ColRunning {
 		t.Errorf("dbc healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
@@ -179,7 +162,7 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 		t.Errorf("dbc 'creating: in progress': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
-	// deleting is not in the transitional set per spec §3.1 — only creating,
+	// deleting is not in the transitional set — only creating,
 	// modifying, backing-up, maintenance, upgrading, starting, stopping,
 	// resetting-master-credentials, renaming are. Use 'modifying' as the
 	// transitional-warning probe.
@@ -188,10 +171,6 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 		t.Errorf("dbc 'modifying: in progress': expected ColPending (Warning per spec), got %v", modifyingStyle.GetForeground())
 	}
 }
-
-// ===========================================================================
-// DOCDB-YAML-01 / DOCDB-YAML-03: DocumentDB YAML view
-// ===========================================================================
 
 func TestQA_DocDB_YAMLView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
@@ -212,7 +191,6 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 			t.Errorf("DocumentDB YAML view missing SDK struct key %q", key)
 		}
 	}
-	// Values from the RawStruct should appear
 	expectedValues := []string{"test-docdb-cluster", "5.0.0", "available"}
 	for _, val := range expectedValues {
 		if !strings.Contains(out, val) {
@@ -220,14 +198,6 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 		}
 	}
 }
-
-// TestQA_DocDB_YAMLFrameTitle retired: YAMLModel.FrameTitle() is DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
-// title-string behavior is not resource-type-specific.
-
-// ===========================================================================
-// DOCDB-YAML-07: DocumentDB YAML raw content for copy
-// ===========================================================================
 
 func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
@@ -248,10 +218,6 @@ func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// DocumentDB integration: full root model navigation
-// ===========================================================================
 
 func TestQA_DocDB_NavigateFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -373,7 +339,6 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 		Resource: &res,
 	})
 
-	// Pop back
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbc") {
@@ -381,23 +346,16 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// DOCDB command mode: :dbc navigates correctly
-// ===========================================================================
-
 func TestQA_DocDB_CommandNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type "dbc"
 	for _, r := range "dbc" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Press enter
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
 	if cmd == nil {
@@ -405,15 +363,10 @@ func TestQA_DocDB_CommandNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CROSS-CMD-01: Switch between Redis and DocumentDB via command
-// ===========================================================================
-
 func TestQA_CrossCommand_SwitchRedisToDocDB(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -424,14 +377,12 @@ func TestQA_CrossCommand_SwitchRedisToDocDB(t *testing.T) {
 		t.Fatalf("should be on Redis view, got: %s", plain)
 	}
 
-	// Enter command mode and type :dbc
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, r := range "dbc" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
-	// Execute the command if returned
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
@@ -447,13 +398,11 @@ func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to DocumentDB
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
 
-	// Enter command mode and type :redis
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, r := range "redis" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -471,17 +420,12 @@ func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// DOCDB-YAML-08: YAML back navigation via root model
-// ===========================================================================
-
 func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate: DocDB list -> YAML -> pop
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
@@ -508,17 +452,12 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// DocDB: Full round-trip list -> detail -> yaml -> pop -> pop -> pop
-// ===========================================================================
-
 func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Main menu -> DocumentDB list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
@@ -528,34 +467,29 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 		Resources:    fixtures,
 	})
 
-	// DocumentDB list -> detail
 	res := fixtures[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
-	// Detail -> YAML
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
 
-	// Pop YAML -> detail
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, res.Name) && !strings.Contains(plain, res.ID) {
 		t.Errorf("pop from YAML should return to detail, got: %s", plain)
 	}
 
-	// Pop detail -> list
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbc") {
 		t.Errorf("pop from detail should return to DocumentDB list, got: %s", plain)
 	}
 
-	// Pop list -> main menu
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -563,15 +497,10 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// DocDB: Filter via root model header display
-// ===========================================================================
-
 func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to DocumentDB
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
@@ -581,7 +510,6 @@ func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 		Resources:    multiStatusDocDBFixtures(),
 	})
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "prod" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -593,10 +521,6 @@ func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CROSS-HELP-01: Help accessible from DocumentDB view
-// ===========================================================================
-
 func TestQA_DocDB_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -606,7 +530,6 @@ func TestQA_DocDB_HelpOverlay(t *testing.T) {
 		ResourceType: "dbc",
 	})
 
-	// Open help
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))

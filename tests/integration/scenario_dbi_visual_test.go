@@ -2,17 +2,13 @@
 
 package integration
 
-// scenario_dbi_visual_test.go — Phase 8 render-gate for the dbi resource.
+// scenario_dbi_visual_test.go checks the rendered TUI output (not fetcher
+// return values) for dbi against the universal UI rules and
+// docs/resources/dbi.md.
 //
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the per-resource §4 contract in docs/resources/dbi.md.
-// Authored by the a9s-implement-resource skill runner (not QA), because these
-// assertions guard rendering pipeline drift independent of unit-test coverage.
-//
-// Demo mode runs Wave 2 enrichment against fixture data (the !m.isDemo guard
-// was removed 2026-04-22 — the skip was wrong; typed fakes implement the
-// enricher APIs). Every assertion below therefore exercises the real Update
-// loop end-to-end, no injection required.
+// Demo mode runs Wave 2 enrichment against fixture data (typed fakes
+// implement the enricher APIs), so every assertion below exercises the real
+// Update loop end-to-end.
 
 import (
 	"strings"
@@ -35,54 +31,37 @@ func TestScenario_DBIVisual(t *testing.T) {
 
 	scenario.OpenList("dbi")
 
-	// -----------------------------------------------------------------
-	// Universal column rules — no jargon columns anywhere in the frame.
-	// -----------------------------------------------------------------
 	for _, jargon := range []string{"CIS", " Flags", "NOBKP", "UNENC", "NOPROT", "cis_flags"} {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// -----------------------------------------------------------------
-	// Wave 1 §4 phrases per fixture.
-	// -----------------------------------------------------------------
-	// Healthy rows: blank Status.
 	scenario.ExpectRowStatusBlank(demofixtures.ProdDbiID)
 	scenario.ExpectRowStatusBlank(demofixtures.ProdDbiAuroraID)
 
-	// Transitional Warnings.
 	scenario.ExpectRowStatusEquals(demofixtures.StagingDbiModifyingID, "modifying: DBInstanceClass")
 	scenario.ExpectRowStatusEquals(demofixtures.StagingDbiRebootingID, "rebooting")
 
-	// Broken.
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenDbiStorageFullID, "storage-full")
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenDbiEncryptionLockedID, "encryption key unavailable")
 
-	// Config Warnings (single-phrase).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiNoBackupsID, "no automated backups")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicID, "public endpoint")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiUnencryptedID, "unencrypted storage")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiUnprotectedID, "deletion protection off")
 
-	// Rule 7 — multi-W1: 3 warnings → top + (+2).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiMultiID, "no automated backups (+2)")
 
-	// Rule 7 — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
+	// The (+1) counts the hidden Wave-2 finding.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicMaintID, "public endpoint (+1)")
 
-	// Rule 3 — Wave 2 finding: S4 = "maintenance scheduled"
-	// (docs/resources/dbi.md §4 signal row "Pending maintenance overdue").
-	// The finding's Severity: SevWarn now also promotes the row itself to
-	// Warning color via colorFromAnyFinding (see glyph rules below).
+	// The finding's Severity: SevWarn also promotes the row itself to
+	// Warning color via colorFromAnyFinding.
 	scenario.ExpectRowStatusEquals(demofixtures.MaintDbiScheduledID, "maintenance scheduled")
 
-	// -----------------------------------------------------------------
-	// Glyph rules.
-	// -----------------------------------------------------------------
 	// colorDBI (catalog_databases.go) resolves color via colorFromAnyFinding
 	// first. dbiCodePendingMaintenance is declared Severity: SevWarn, so
-	// MaintDbiScheduledID now renders Warning row color directly — it no
-	// longer stays Healthy-with-`~`-glyph the way it did before the
-	// findings-only color contract landed.
+	// MaintDbiScheduledID renders Warning row color directly and carries no
+	// glyph.
 	for _, id := range []string{
 		demofixtures.StagingDbiModifyingID,
 		demofixtures.StagingDbiRebootingID,
@@ -95,17 +74,12 @@ func TestScenario_DBIVisual(t *testing.T) {
 		demofixtures.WarnDbiMultiID,
 		demofixtures.WarnDbiPublicMaintID,
 		demofixtures.MaintDbiScheduledID,
-		// Plain Healthy rows with no finding also have no glyph.
 		demofixtures.ProdDbiID,
 		demofixtures.ProdDbiAuroraID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// -----------------------------------------------------------------
-	// Related panel — every §2 pivot with `count shown: yes` ≥ 1 for the
-	// designated graph-root fixture (`prod-dbi-1`).
-	// -----------------------------------------------------------------
 	prod := selectDBIByID(t, scenario, demofixtures.ProdDbiID)
 	scenario.OpenDetailResource("dbi", prod)
 	scenario.ExpectNoAPIError()
@@ -117,13 +91,10 @@ func TestScenario_DBIVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// Aurora member → every §2 `count shown: yes` pivot that applies to
-	// Aurora cluster members must resolve ≥ 1. Aurora cluster instances do
-	// NOT take dbi-snap (DescribeDBSnapshots rejects on Aurora cluster
-	// members — Aurora cluster snapshots live in dbc-snap), so the
-	// "DB Instance Snapshots" pivot is absent from this graph-root and is covered
-	// by the non-Aurora ProdDbiID above instead. ct-events is exempt per
-	// §5 (count shown: unknown for windowed LookupEvents).
+	// Aurora cluster instances take no dbi-snap (DescribeDBSnapshots rejects
+	// on Aurora cluster members — Aurora cluster snapshots live in dbc-snap),
+	// so "DB Instance Snapshots" is asserted on ProdDbiID above. ct-events
+	// shows no count for windowed LookupEvents.
 	scenario.Back()
 	aurora := selectDBIByID(t, scenario, demofixtures.ProdDbiAuroraID)
 	scenario.OpenDetailResource("dbi", aurora)
@@ -136,9 +107,7 @@ func TestScenario_DBIVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// -----------------------------------------------------------------
-	// Rule 7 U7c — S5 shows every finding even on a row whose S4 is Wave 1.
-	// -----------------------------------------------------------------
+	// The detail view shows every finding even on a row whose Status is Wave 1.
 	scenario.Back()
 	publicMaint := selectDBIByID(t, scenario, demofixtures.WarnDbiPublicMaintID)
 	scenario.OpenDetailResource("dbi", publicMaint)
@@ -170,9 +139,8 @@ func attentionSectionHeaderLine(lines []string) int {
 
 // expectAttentionSection asserts that the rendered view contains an
 // "Attention (N)" section header and that every expected phrase appears
-// after that header, in the given order (§4 precedence). Fails with the
-// full rendered frame on any violation so that regressions in the renderer
-// are immediately visible in test output.
+// after that header, in the given order. Fails with the full rendered frame
+// on any violation.
 func expectAttentionSection(t *testing.T, view string, phrases []string) {
 	t.Helper()
 	lines := strings.Split(view, "\n")
@@ -200,8 +168,7 @@ func expectAttentionSection(t *testing.T, view string, phrases []string) {
 }
 
 // expectNoAttentionSection asserts that the rendered view does NOT contain
-// an "Attention" section header — i.e. the row has no active signals at all
-// (spec §4 "Healthy silence" AND no Wave 2 finding).
+// an "Attention" section header — i.e. the row has no active signals at all.
 func expectNoAttentionSection(t *testing.T, view string) {
 	t.Helper()
 	lines := strings.Split(view, "\n")
@@ -210,12 +177,11 @@ func expectNoAttentionSection(t *testing.T, view string) {
 	}
 }
 
-// TestScenario_DBIVisual_DetailSurfacesAllIssues asserts spec rule 7 ("every finding
-// individually visible across S2–S5") for the detail view (S5). The list view
-// already renders warning phrases correctly; this test guards against S5 regressions.
+// TestScenario_DBIVisual_DetailSurfacesAllIssues asserts every finding is
+// individually visible in the detail view.
 //
 // Assertions are tighter than plain ExpectViewContains: phrases must appear AFTER
-// the "Attention (N)" section header and in §4 precedence order.
+// the "Attention (N)" section header and in precedence order.
 func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -229,30 +195,22 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 	// presentation; the underlying data (Resource.Issues, finding Summary) is
 	// unchanged. Expected phrases below reflect the rendered form.
 	cases := []issueCase{
-		// Healthy rows with no Wave 2 finding — Attention section must be absent.
 		{demofixtures.ProdDbiID, nil},
 		{demofixtures.ProdDbiAuroraID, nil},
-		// Transitional (Wave-1 single phrase).
 		{demofixtures.StagingDbiModifyingID, []string{"Modifying: DBInstanceClass"}},
 		{demofixtures.StagingDbiRebootingID, []string{"Rebooting"}},
-		// Broken (Wave-1 single phrase).
 		{demofixtures.BrokenDbiStorageFullID, []string{"Storage-full"}},
 		{demofixtures.BrokenDbiEncryptionLockedID, []string{"Encryption key unavailable"}},
-		// Single Config Warnings.
 		{demofixtures.WarnDbiNoBackupsID, []string{"No automated backups"}},
 		{demofixtures.WarnDbiPublicID, []string{"Public endpoint"}},
 		{demofixtures.WarnDbiUnencryptedID, []string{"Unencrypted storage"}},
 		{demofixtures.WarnDbiUnprotectedID, []string{"Deletion protection off"}},
-		// Multi Config Warnings — first entry capitalized, rest stay lowercase (only
-		// the first rune of each entry line is capitalized; these are separate entries).
+		// Each entry is a separate line, so each one's first rune is capitalized.
 		{demofixtures.WarnDbiMultiID, []string{"No automated backups", "Public endpoint", "Unencrypted storage"}},
-		// Wave-1 warning + Wave-2 maintenance — both must appear under Attention.
 		{demofixtures.WarnDbiPublicMaintID, []string{"Public endpoint", "os-upgrade"}},
-		// Wave-2 only on Healthy row — Attention section present, Wave-2 Summary visible.
 		{demofixtures.MaintDbiScheduledID, []string{"system-update"}},
-		// Legacy fixture: all 4 Wave-1 warnings.
-		// The bulk pool sets DeletionProtection, so warn-dbi-unprotected is the
-		// one witness for that finding (TestD4_DeletionProtectionHasOneWitness).
+		// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
+		// carries the deletion-protection finding.
 		{"db-public-no-encryption", []string{"No automated backups", "Public endpoint", "Unencrypted storage"}},
 	}
 
@@ -275,9 +233,9 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 }
 
-// TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases is a dedicated regression
-// pin for "Healthy silence" (spec §4 rule): Healthy rows must not render any
-// Wave-1 config-warning phrase in the detail view. This is separate from
+// TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases pins "Healthy
+// silence": Healthy rows render no Wave-1 config-warning phrase in the
+// detail view. This is separate from
 // TestScenario_DBIVisual_DetailSurfacesAllIssues so a failure is immediately
 // identifiable as a "false positive" (noise on Healthy row) vs a missing phrase.
 func TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
@@ -304,9 +262,6 @@ func TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 			expectNoAttentionSection(t, view)
 			for _, phrase := range wave1Phrases {
 				for _, line := range strings.Split(view, "\n") {
-					// The phrase must not appear in any line after any Attention-like header.
-					// Since there must be no Attention header (checked above), any occurrence
-					// would be a spurious embedding — flag it.
 					if strings.Contains(line, phrase) {
 						t.Errorf("Healthy row %q unexpectedly contains Wave-1 phrase %q in line: %q\nfull view:\n%s", id, phrase, line, view)
 					}
@@ -328,8 +283,8 @@ func selectDBIByID(t *testing.T, s *fullIntegrationScenario, id string) resource
 // chain so Wave 2 enrichment runs against the demo fixtures. The scripted
 // scenario constructor only applies a synthetic ClientsReadyMsg without
 // draining follow-up commands, which bypasses the enrichment dispatch. This
-// helper restores the full production path so render-gate assertions match
-// what an `./a9s --demo` user actually sees on screen.
+// helper runs the full production path so assertions match what an
+// `./a9s --demo` user sees on screen.
 func runDemoStartup(t *testing.T, s *fullIntegrationScenario) {
 	t.Helper()
 	// Init returns a one-shot command that yields ClientsReadyMsg. Drain it:
@@ -337,10 +292,6 @@ func runDemoStartup(t *testing.T, s *fullIntegrationScenario) {
 	// dispatches Wave 2 enrichment. applyAndDrain walks the full chain.
 	initCmd := s.model.Init()
 	for _, msg := range fullIntegrationCollectCmdMessages(initCmd) {
-		// Skip the ClientsReadyMsg we've already synthesized via the scenario
-		// constructor — re-applying it would reset state. Only process the
-		// messages.AvailabilityPrefetched family when it arrives naturally
-		// from the demoPrefetchCounts command chain.
 		if _, ok := msg.(messages.ClientsReady); ok {
 			s.applyAndDrain(msg)
 			continue

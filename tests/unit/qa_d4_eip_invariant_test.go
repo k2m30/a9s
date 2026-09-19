@@ -1,14 +1,12 @@
 package unit
 
-// qa_d4_eip_invariant_test.go — one owner per Elastic IP allocation, across
+// One owner per Elastic IP allocation, across
 // every fixture that names one.
 //
-// An allocation was a NAT gateway's address, an instance's Elastic IP, and two
-// interface associations advertising two different public addresses, all at
-// once. AWS produces none of those shapes, and each surface reading a different
-// one is how the demo came to state three public addresses for one instance.
-// Pinned as an invariant over the whole set rather than over the allocations
-// that were wrong, because naming them would not stop the fourth.
+// AWS never lets one allocation be a NAT gateway's address and an instance's
+// Elastic IP at once, nor associate it with two interfaces advertising two
+// different public addresses; a fixture that does makes each surface state a
+// different public address for the same instance.
 
 import (
 	"fmt"
@@ -172,13 +170,9 @@ func TestD4Row27_EveryInstanceStatesOnePublicAddress(t *testing.T) {
 	}
 }
 
-// TestD4Row27_EIPCountAndFindingsAreDerived pins the one count row 27 moved and
-// every count it must not have.
-//
-// The list length is derived from the fixture, so it is stated here rather than
-// pinned in a smoke script; the finding counts are the exactly-one-witness rules
-// the batch spent its rounds establishing, and a fixture reshuffle is exactly
-// the change that would move one without anyone noticing.
+// TestD4Row27_EIPCountAndFindingsAreDerived pins the eip list length and the
+// finding counts the fixture derives; a fixture reshuffle is exactly the
+// change that would move one without anyone noticing.
 func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 	eips := d4Rows(t, "eip")
 	if len(eips) != 9 {
@@ -187,9 +181,8 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 
 	want := map[string]map[domain.FindingCode]int{
 		"eip": {"eip.unassociated": 4},
-		// Three: the public-address witness and the two exposure witnesses,
-		// each of which needs a public address to be reachable at all
-		// (misc4 row 1 added the wide-open one).
+		// Three: the public-address row and the two exposure rows, each of
+		// which needs a public address to be reachable at all.
 		"ec2": {"ec2.public-ip": 3},
 	}
 	for short, codes := range want {
@@ -206,7 +199,7 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 		}
 	}
 
-	// Row counts on the sibling lists the reshuffle touched.
+	// Row counts on the sibling lists.
 	for short, n := range map[string]int{"eni": 55, "ec2": 41, "nat": 6} {
 		if got := len(d4Rows(t, short)); got != n {
 			t.Errorf("demo %s list = %d rows, want %d", short, got, n)
@@ -215,11 +208,9 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 }
 
 // TestD4Row27_NATAddressColourComesFromTheFetcher pins that a NAT gateway's
-// Elastic IP is coloured by the finding the fetcher emits, not by a classifier
-// re-deriving attachment from two of the three fields the fetcher uses.
-//
-// That second derivation read an allocation with an interface and no instance
-// as idle, which is exactly what an attached NAT address looks like.
+// Elastic IP is coloured by the finding the fetcher emits: an attached NAT
+// address has an interface and no instance, which a classifier re-deriving
+// attachment from those two fields would read as idle.
 func TestD4Row27_NATAddressColourComesFromTheFetcher(t *testing.T) {
 	td := resource.FindResourceType("eip")
 	if td == nil {

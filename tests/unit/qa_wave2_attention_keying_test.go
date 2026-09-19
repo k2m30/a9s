@@ -1,4 +1,4 @@
-// qa_wave2_attention_keying_test.go — AttentionDetail rows are retrievable
+// AttentionDetail rows are retrievable
 // per FINDING, not per RESOURCE, so two independently-evaluated findings on
 // the same resource can each carry their own supporting rows.
 //
@@ -56,18 +56,9 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 		Source:   "wave2:" + shortName,
 	}
 
-	// ARRANGE: replicate exactly what two setWave2Finding(&result, resourceID,
-	// ...) calls — one per independently-evaluated condition, each with its
-	// OWN non-empty rows — produce under TODAY's IssueEnricherResult shape.
-	// setWave2Finding is unexported (core/aws/issue_enrichment.go:129) so
-	// it cannot be called from tests/unit directly; its documented behavior
-	// (doc comment lines 117-124, and the `if _, ok :=
-	// r.AttentionDetails[resourceID]; !ok` guard at line 152 that enforces
-	// it) means the SECOND call's rows — rowsEncryptionOff — have no
-	// representation anywhere in IssueEnricherResult.AttentionDetails: the
-	// map holds exactly one AttentionDetail per resourceID, so this ARRANGE
-	// step reflects the only value two real setWave2Finding calls could ever
-	// produce here.
+	// setWave2Finding is unexported, so the result is built as two calls
+	// produce it: one per independently-evaluated condition, each with its
+	// own non-empty rows.
 	enricherResult := awsclient.IssueEnricherResult{
 		Findings: map[string][]domain.Finding{
 			resourceID: {findingUpdateForced, findingEncryptionOff},
@@ -80,17 +71,14 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 		},
 	}
 
-	// ACT: fold through the real production seam, exactly as
-	// Core.applyEnrichment (core/runtime/helpers.go:36) does for every
-	// row of a cached resource type.
+	// runtime.ApplyWave2ToRow is the fold Core.applyEnrichment runs for
+	// every row of a cached resource type.
 	row := &domain.Resource{ID: resourceID}
 	td := resource.ResourceTypeDef{ShortName: shortName}
 	runtime.ApplyWave2ToRow(row, td, enricherResult.Findings, enricherResult.AttentionDetails)
 
-	// Sanity: both findings must reach the row's Findings slice — this is
-	// Test A's target bug class (a dropped Finding), not this test's
-	// concern, so a failure here would mean the fixture is wrong, not that
-	// this pin fired for the right reason.
+	// Both findings reaching the row is a precondition: a failure here
+	// means the fixture is wrong.
 	if len(row.Findings) != 2 {
 		t.Fatalf("row.Findings = %+v, want 2 findings (codeUpdateForced and codeEncryptionOff) after ApplyWave2ToRow", row.Findings)
 	}
@@ -115,9 +103,7 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 		)
 	}
 
-	// Sanity: the update-forced finding must not have silently acquired the
-	// OTHER finding's rows (the "merged" failure mode the dispatch also
-	// warns against, distinct from "attached-to-first").
+	// The update-forced finding must not carry the other finding's rows.
 	if hasUpdateForced && len(adUpdateForced.Rows) > 0 && adUpdateForced.Rows[0] == rowsEncryptionOff[0] {
 		t.Errorf("row.AttentionDetails[%q] leaked the OTHER finding's row %+v — rows must never merge across findings", codeUpdateForced, adUpdateForced.Rows[0])
 	}

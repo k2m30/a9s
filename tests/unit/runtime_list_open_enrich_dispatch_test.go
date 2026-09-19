@@ -1,25 +1,20 @@
-// runtime_list_open_enrich_dispatch_test.go — pins for the list-open Wave-2
-// dispatch: a normal list-open (TypeGen==0, the common case) must dispatch
-// TaskKindProbeEnrich for an issue-capable type so row flags and the menu
-// badge populate without waiting for a Ctrl+R rerun.
+// A normal list-open
+// (TypeGen==0, the common case) dispatches TaskKindProbeEnrich for an
+// issue-capable type so row flags and the menu badge populate without waiting
+// for a Ctrl+R rerun.
 //
-// HandleResourcesLoaded (core/runtime/handlers_resources.go) now has a
-// dedicated `else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
-// ev.Provenance.CanonicalList() && ... c.HasIssueEnricher(resType)` branch
-// for exactly this case, alongside the pre-existing TypeGen!=0 rerun branch.
-// Every event literal that wants to exercise this branch (pin 1, pin 4) MUST
-// set Provenance: messages.FetchProvenanceCanonicalList — the zero value
-// (FetchProvenanceUnknown) fails CanonicalList() and the branch never fires,
-// producing 0 tasks with no other signal of why. The negative-control pins
-// (2: no issue enricher, 3: Append/Err) don't need it — those guards block
-// dispatch regardless of provenance.
+// HandleResourcesLoaded (core/runtime/handlers_resources.go) dispatches on
+// `ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
+// ev.Provenance.CanonicalList() && ... c.HasIssueEnricher(resType)`. An event
+// literal meant to reach that branch MUST set Provenance:
+// messages.FetchProvenanceCanonicalList — the zero value
+// (FetchProvenanceUnknown) fails CanonicalList() and produces 0 tasks with no
+// other signal of why. The negative controls (no issue enricher, Append, Err)
+// do not need it: those guards block dispatch regardless of provenance.
 //
-// Harness: mirrors the package-runtime style in handlers_resources_test.go
-// (Core built via runtime.New(session.New(), catalog.All()), findIntent/
-// hasTask-shaped assertions) for pins 1-3, and the tests/unit
-// app.New(core)+ctrl.Handle(messages.ResourcesLoaded{...}) seam used by
-// qa_late_replace_and_false_exact_test.go / qa_cache_lifecycle_test.go for
-// pin 4 — the exact web-lane surface named in the dispatch.
+// The Core-level tests mirror handlers_resources_test.go
+// (runtime.New(session.New(), catalog.All()) with hasTask-shaped assertions);
+// the web-lane test drives app.New(core)+ctrl.Handle(messages.ResourcesLoaded{...}).
 package unit
 
 import (
@@ -74,8 +69,8 @@ func findNoWave2TypeShortName(t *testing.T, core *runtime.Core) string {
 	return ""
 }
 
-// TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich
-// is pin 1: a normal (TypeGen==0, Append==false, Err==nil, Provenance
+// TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich:
+// a normal (TypeGen==0, Append==false, Err==nil, Provenance
 // CanonicalList) list-open result for an issue-enricher-capable type must
 // request TaskKindProbeEnrich so Wave 2 row flags and the menu badge
 // populate on a live/headless/web session that never runs the Ctrl+R rerun
@@ -100,8 +95,8 @@ func TestHandleResourcesLoaded_ListOpen_IssueCapableType_DispatchesProbeEnrich(t
 	}
 }
 
-// TestHandleResourcesLoaded_ListOpen_NoIssueEnricherType_NoProbeEnrich is pin
-// 2 (negative control): a type with NO registered issue enricher must never
+// TestHandleResourcesLoaded_ListOpen_NoIssueEnricherType_NoProbeEnrich: a
+// type with NO registered issue enricher must never
 // request TaskKindProbeEnrich — there would be nothing for the task to run.
 func TestHandleResourcesLoaded_ListOpen_NoIssueEnricherType_NoProbeEnrich(t *testing.T) {
 	sess := session.New()
@@ -120,14 +115,11 @@ func TestHandleResourcesLoaded_ListOpen_NoIssueEnricherType_NoProbeEnrich(t *tes
 	}
 }
 
-// TestHandleResourcesLoaded_AppendPage_NoProbeEnrich is pin 3's Append case.
-// A load-more (Append==true) page must NOT re-trigger TaskKindProbeEnrich:
-// the type was already enriched (or queued for enrichment) when its first
-// page loaded, so re-probing on every subsequent page would be redundant
-// work fanned out per page. This mirrors the pre-existing !ev.Append guard
-// already governing the cross-view PatchResourceCache branch above in the
-// same handler — the list-open Wave-2 dispatch this file pins must respect
-// the same page-1-only semantics, not fire on every LoadMore.
+// TestHandleResourcesLoaded_AppendPage_NoProbeEnrich: a load-more
+// (Append==true) page must NOT re-trigger TaskKindProbeEnrich: the type was
+// already enriched (or queued for enrichment) when its first page loaded, so
+// re-probing on every page would be redundant work, matching the !ev.Append
+// guard on the cross-view PatchResourceCache branch.
 func TestHandleResourcesLoaded_AppendPage_NoProbeEnrich(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -145,13 +137,9 @@ func TestHandleResourcesLoaded_AppendPage_NoProbeEnrich(t *testing.T) {
 	}
 }
 
-// TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich is pin 3's error case.
-// The TUI adapter's only Err-specific behavior is Core's own FlashIntent
-// (handlers_resources.go's `if ev.Err != nil` branch) — there is no
-// Err-conditional skip on the probe dispatch anywhere in the adapter or
-// Core. A failed fetch (Err non-nil, Resources present or not) has nothing
-// new and reliable to enrich, so the fixed contract must NOT request
-// TaskKindProbeEnrich on an errored load.
+// TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich: a failed fetch (Err
+// non-nil, Resources present or not) has nothing new and reliable to enrich,
+// so it must NOT request TaskKindProbeEnrich.
 func TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -170,8 +158,8 @@ func TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich(t *testing.T) {
 	}
 }
 
-// TestControllerHandle_ListOpen_ResourcesLoaded_DispatchesProbeEnrich is pin
-// 4: the exact web-lane surface. A headless Controller in web UI mode
+// TestControllerHandle_ListOpen_ResourcesLoaded_DispatchesProbeEnrich is the
+// web-lane surface. A headless Controller in web UI mode
 // receiving a real messages.ResourcesLoaded (Provenance: CanonicalList)
 // through Controller.Handle (the same entry point DrainSync and the web
 // renderer use) must return a TaskKindProbeEnrich task among the

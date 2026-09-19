@@ -1,22 +1,17 @@
 package unit
 
-// qa_logs_color_test.go — the logs (CloudWatch Log Groups) Color function.
+// The logs (CloudWatch Log Groups) Color function.
 //
 // The classifier runs the type's own predicate over Fields, so the states
 // below are reported from the words the fetcher derives (`retention`,
 // `encryption`) rather than raw keys.
 //
-// The rows naming raw keys therefore want Healthy: a row carrying
-// `retention_days` and no `retention` word says nothing, which is what proves
-// the classifier does not read it. The row naming the word wants the colour
-// the word earns. kms_key_id empty alone is Healthy per
-// docs/attention-signals.md (the KMS issue only triggers when the key is
-// PendingDeletion, a cross-ref check, not "missing").
-//
-// `retention_days` is a key no fetcher writes — the log group's retention is
-// one field, `retention`, carrying words. It stays in this table on purpose:
-// a key colorLogs does not know must still leave the row healthy, and this
-// is the only place that is pinned.
+// A row carrying `retention_days` — a key no fetcher writes; retention is the
+// `retention` field, carrying words — and no `retention` word wants Healthy:
+// a key colorLogs does not know must leave the row healthy. The row naming
+// the word wants the colour the word earns. kms_key_id empty alone is Healthy
+// per docs/attention-signals.md (the KMS issue triggers only when the key is
+// PendingDeletion, a cross-ref check).
 
 import (
 	"testing"
@@ -52,7 +47,7 @@ func TestLogsColor(t *testing.T) {
 		},
 		{
 			// The raw key alone, with no derived word beside it: nothing to
-			// report, which is how this table catches the branch coming back.
+			// report.
 			name: "no_retention_raw_key_only",
 			fields: map[string]string{
 				"retention_days": "",
@@ -62,7 +57,7 @@ func TestLogsColor(t *testing.T) {
 			want: resource.ColorHealthy,
 		},
 		{
-			// The same state in the vocabulary the classifier reads now.
+			// The same state in the vocabulary the classifier reads.
 			name:   "retention_never_expires",
 			fields: map[string]string{"retention": "never expire"},
 			want:   resource.ColorWarning,
@@ -80,9 +75,9 @@ func TestLogsColor(t *testing.T) {
 			want: resource.ColorHealthy,
 		},
 		{
-			// Explicit regression: a log group with retention set, data stored, and
-			// no KMS key must not be flagged as Warning (kms_key_id alone is not an
-			// actionable signal per docs/attention-signals.md).
+			// A log group with retention set, data stored, and no KMS key is
+			// not a Warning: kms_key_id alone is not an actionable signal per
+			// docs/attention-signals.md.
 			name: "kms_alone_should_not_warn",
 			fields: map[string]string{
 				"retention_days": "30",

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_codex_list_test.go pins the list-lifecycle findings: a sequence
-// allocated for a lane that does not use it, an error forgotten by the page
-// after it, a failure that skips the seam every success goes through, and a
-// loading flag cleared by a request that no longer owns it.
+// List-lifecycle ordering and ownership: a sequence per issuing screen, an
+// error the next page must not forget, a failure that goes through the seam
+// every success goes through, and a loading flag only its owning request
+// clears.
 package unit_test
 
 import (
@@ -18,8 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// --- row 44: a canonical sequence for a lane that is not canonical ---------
 
 // TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence: the sequence
 // counter is keyed by the issuing screen, so a drill's sequence orders the
@@ -58,9 +56,9 @@ func TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence(t *testing.T) {
 	}
 }
 
-// TestRelatedFetchDoesNotSupersedeACanonicalRefresh is row 44's scenario:
-// both results have to land. It holds by the key rather than by the lane now —
-// the two fetches are two screens, so neither draws from the other's counter.
+// TestRelatedFetchDoesNotSupersedeACanonicalRefresh: both results have to
+// land. The two fetches are two screens, so neither draws from the other's
+// counter.
 func TestRelatedFetchDoesNotSupersedeACanonicalRefresh(t *testing.T) {
 	b := newWipfixBench(t)
 
@@ -85,9 +83,7 @@ func TestRelatedFetchDoesNotSupersedeACanonicalRefresh(t *testing.T) {
 	}
 }
 
-// --- row 45: an error the next page forgets --------------------------------
-
-// TestPartialPageOneThenExhaustingPageTwo_IsNotSavedAsExact pins row 45. Page
+// TestPartialPageOneThenExhaustingPageTwo_IsNotSavedAsExact: page
 // one came back short with an error; page two finished the pagination but
 // knows nothing about what page one failed to enumerate. The population is
 // still unconfirmed, and a file that calls it exact is a confident wrong
@@ -119,9 +115,9 @@ func TestPartialPageOneThenExhaustingPageTwo_IsNotSavedAsExact(t *testing.T) {
 			"the list and page two only says there are no more pages, which is a different "+
 			"fact\n%s", wipfixTypeFileHead(body[len(body)-1]))
 	}
-	// Row 27's contract owns the title: the "+" means another page exists, and
-	// pagination is exhausted here. The incompleteness is the file's business
-	// and the partial-success flash's, not the count's.
+	// The title's "+" means another page exists, and pagination is exhausted
+	// here. The incompleteness is the file's business and the partial-success
+	// flash's, not the count's.
 	if title := c.Snapshot().FrameTitle; strings.Contains(title, "+") {
 		t.Errorf("the list titles %q — pagination is exhausted, so there is no page to offer", title)
 	}
@@ -159,8 +155,6 @@ func TestCleanPageOneThenExhaustingPageTwo_IsSavedAsExact(t *testing.T) {
 	}
 }
 
-// --- rows 46 and 47: a failure and a stale success -------------------------
-
 // wipfixRefreshSeq issues a refresh through the controller and returns the
 // sequence the runtime stamped on it.
 func wipfixRefreshSeq(t *testing.T, b *wipfixBench) domain.Gen {
@@ -173,15 +167,11 @@ func wipfixRefreshSeq(t *testing.T, b *wipfixBench) domain.Gen {
 	return tasks[0].ListSeq
 }
 
-// TestAliasFailure_ReachesTheCanonicalScreen pins row 46's second half: a
-// failure for a list opened under an alias has to reach that list, or it
-// loads for ever with nothing to show for it.
-//
-// The alias half is trivially true now and cannot fail: routing reads the
-// screen identity the failure carries and never looks at the type name, so
-// "rds" versus "dbi" does not arise. THE PINNED FACT IS THAT A FAILURE CLEARS
-// LOADING AND MARKS THE ERROR ON THE SCREEN THAT OWNS IT. Nobody should read
-// the name above and restore a scan that matches screens by type.
+// TestAliasFailure_ReachesTheCanonicalScreen: a failure for a list opened
+// under an alias has to reach that list, or it loads for ever with nothing to
+// show for it. Routing reads the screen identity the failure carries and never
+// the type name, so the pinned fact is that a failure clears loading and marks
+// the error on the screen that owns it.
 func TestAliasFailure_ReachesTheCanonicalScreen(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "rds"})
@@ -209,10 +199,9 @@ func TestAliasFailure_ReachesTheCanonicalScreen(t *testing.T) {
 	}
 }
 
-// TestSupersededSuccess_LeavesTheNewerRefreshLoading pins row 47. Two
-// refreshes are out. The older returns first and is correctly discarded, then
-// clears the refreshing flag the newer one still owns, so the screen reports
-// that loading is over while a fetch is still in flight.
+// TestSupersededSuccess_LeavesTheNewerRefreshLoading: two refreshes are out
+// and the older returns first. It is discarded, and must not clear the
+// refreshing flag the newer one still owns.
 func TestSupersededSuccess_LeavesTheNewerRefreshLoading(t *testing.T) {
 	wipfixTwoPageFetcher(t, "s3")
 	b := newWipfixBench(t)
@@ -240,19 +229,15 @@ func TestSupersededSuccess_LeavesTheNewerRefreshLoading(t *testing.T) {
 	}
 }
 
-// --- row 43: two lists of one type -----------------------------------------
-
-// TestSameTypeDrills_PageTwoLandsOnTheScreenThatAskedForIt pins row 43. Two
-// drills of one type are stacked and the deeper one's continuation is still
-// out. Routing by lane alone cannot tell them apart, so the page lands on
-// whichever screen is on top.
+// TestSameTypeDrills_PageTwoLandsOnTheScreenThatAskedForIt: two drills of one
+// type are stacked and the deeper one's continuation is still out. Routing by
+// lane alone cannot tell them apart.
 func TestSameTypeDrills_PageTwoLandsOnTheScreenThatAskedForIt(t *testing.T) {
 	td := wipfixObjTypeDef()
 	wipfixTwoPageFetcher(t, td.ShortName)
 	b := newWipfixBench(t)
 	b.c.RegisterFallbackTypeDef(td)
 
-	// Drill A, loaded and truncated, with its continuation in flight.
 	b.c.PushChildListScreen(td.ShortName)
 	_, tasks := b.c.Apply(app.Action{Kind: app.ActionRefresh})
 	b.pump(t, tasks)
@@ -265,7 +250,6 @@ func TestSameTypeDrills_PageTwoLandsOnTheScreenThatAskedForIt(t *testing.T) {
 	}
 	pending := b.execute(t, loadMore[0])
 
-	// Drill B of the same type opens on top while A's page is still out.
 	b.c.PushChildListScreen(td.ShortName)
 	b.c.ApplyResourcesLoaded(td.ShortName,
 		[]resource.Resource{{ID: "b-only", Name: "b-only", Fields: map[string]string{}}}, nil, false)
@@ -273,7 +257,6 @@ func TestSameTypeDrills_PageTwoLandsOnTheScreenThatAskedForIt(t *testing.T) {
 		t.Fatalf("precondition: drill B holds %d rows, want its own 1", got)
 	}
 
-	// A's page two finally lands.
 	_, more := b.c.Handle(pending)
 	b.pump(t, more)
 

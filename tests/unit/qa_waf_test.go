@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-WAF-001 - Test WAF Web ACLs response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchWAFWebACLs_ParsesMultipleACLs(t *testing.T) {
 	mock := &mockWAFv2Client{
 		output: &wafv2.ListWebACLsOutput{

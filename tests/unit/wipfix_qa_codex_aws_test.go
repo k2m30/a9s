@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_codex_aws_test.go pins row 51: the Lambda enricher asks
-// GetFunction only to settle a question the shared error code cannot answer,
-// and reads a failed answer as "the function is there". A denied or throttled
-// GetFunction leaves the row with no finding and no uninspected marker, which
-// on screen is a function reported healthy on the strength of a call that
-// never succeeded.
+// The Lambda enricher asks GetFunction only to settle a question the shared
+// error code cannot answer. A denied or throttled GetFunction settles
+// nothing, so the row must carry the uninspected marker rather than read as a
+// healthy function.
 package unit_test
 
 import (
@@ -44,8 +42,8 @@ func (f *lambdaVerifierFailsFake) GetFunction(
 	return nil, f.verifyErr
 }
 
-// TestEnrichLambdaPosture_FailedVerifierMarksTheRowUninspected pins row 51's
-// third branch. Only a successful GetFunction says the function is present;
+// TestEnrichLambdaPosture_FailedVerifierMarksTheRowUninspected: only a
+// successful GetFunction says the function is present;
 // its own failure says nothing at all, and a row nothing was learned about is
 // uninspected, not clean.
 func TestEnrichLambdaPosture_FailedVerifierMarksTheRowUninspected(t *testing.T) {

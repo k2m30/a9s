@@ -15,14 +15,13 @@ import (
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-01: HELP FROM MAIN MENU
+// HELP FROM MAIN MENU
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_MainMenu_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Press ? to open help from main menu
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -56,7 +55,6 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
 
-	// Should NOT show keys only for other views
 	mustNotContain := []string{
 		"detail",  // d key description
 		"yaml",    // y key description
@@ -64,7 +62,7 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 		"reveal",  // x key description
 		"wrap",    // w key description
 		"refresh", // ctrl+r description
-		// pgup/pgdn are now shown in main menu help
+
 		"sort", // sort keys
 	}
 	for _, text := range mustNotContain {
@@ -75,20 +73,18 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-02: HELP FROM RESOURCE LIST
+// HELP FROM RESOURCE LIST
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_ResourceList_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to ec2 resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Press ? to open help from resource list
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -140,14 +136,13 @@ func TestQA_HelpContext_ResourceList_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-03: HELP FROM SECRETS RESOURCE LIST INCLUDES REVEAL
+// HELP FROM SECRETS RESOURCE LIST INCLUDES REVEAL
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_SecretsResourceList_IncludesReveal(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to secrets resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -165,14 +160,13 @@ func TestQA_HelpContext_SecretsResourceList_IncludesReveal(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-04: HELP FROM NON-SECRETS RESOURCE LIST EXCLUDES REVEAL
+// HELP FROM NON-SECRETS RESOURCE LIST EXCLUDES REVEAL
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_EC2ResourceList_ExcludesReveal(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to ec2 resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -187,7 +181,7 @@ func TestQA_HelpContext_EC2ResourceList_ExcludesReveal(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-05: HELP FROM DETAIL VIEW
+// HELP FROM DETAIL VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_DetailView_ShowsRelevantKeys(t *testing.T) {
@@ -249,7 +243,7 @@ func TestQA_HelpContext_DetailView_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-06: HELP FROM YAML VIEW
+// HELP FROM YAML VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_YAMLView_ShowsRelevantKeys(t *testing.T) {
@@ -312,7 +306,7 @@ func TestQA_HelpContext_YAMLView_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-07: HELP FROM PROFILE/REGION SELECTOR
+// HELP FROM PROFILE/REGION SELECTOR
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_RegionSelector_ShowsRelevantKeys(t *testing.T) {
@@ -368,14 +362,13 @@ func TestQA_HelpContext_RegionSelector_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-08: HELP FROM REVEAL VIEW
+// HELP FROM REVEAL VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_RevealView_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Push reveal view via ValueRevealedMsg
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
 		Value:      "super-secret-value",
@@ -430,7 +423,7 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-09: HELP TEXT MATCHES ACTUAL BEHAVIOR
+// HELP TEXT MATCHES ACTUAL BEHAVIOR
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_DetailView_CopySaysValue(t *testing.T) {
@@ -468,7 +461,7 @@ func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
 
-	// Old mnemonic sort labels must NOT appear — these were replaced by positional keys.
+	// Mnemonic sort labels must not appear.
 	if strings.Contains(plainLower, "sort age") {
 		t.Errorf("HC-09: old 'sort age' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
 	}
@@ -485,14 +478,14 @@ func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 		t.Errorf("HC-09: old 'sort id' label must not appear; positional sort replaced mnemonic sort, got:\n%s", plain)
 	}
 
-	// New positional sort label must be present — keys "1"-"0" sort by column position.
+	// Keys "1"-"0" sort by column position.
 	if !strings.Contains(plainLower, "sort col") {
 		t.Errorf("HC-09: resource list help should contain 'sort col' (positional sort labels), got:\n%s", plain)
 	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-10: FRAME TITLE
+// FRAME TITLE
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_FrameTitle(t *testing.T) {
@@ -508,7 +501,7 @@ func TestQA_HelpContext_FrameTitle(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-11: ANY KEY CLOSES HELP
+// ANY KEY CLOSES HELP
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_AnyKeyCloses(t *testing.T) {
@@ -517,20 +510,17 @@ func TestQA_HelpContext_AnyKeyCloses(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
-	// Verify we're on help
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "help") {
 		t.Fatal("should be on help view")
 	}
 
-	// Press arbitrary key to close
 	m, cmd := rootApplyMsg(m, rootKeyPress("a"))
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Should be back at main menu
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("HC-11: after closing help, should return to main menu, got:\n%s", plain)
@@ -538,7 +528,7 @@ func TestQA_HelpContext_AnyKeyCloses(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-13: NARROW TERMINAL
+// NARROW TERMINAL
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_NarrowTerminal(t *testing.T) {
@@ -549,25 +539,22 @@ func TestQA_HelpContext_NarrowTerminal(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
 
-	// Should still render help without crashing
 	if !strings.Contains(plain, "help") {
 		t.Errorf("HC-13: help should render at 60 cols, got:\n%s", plain)
 	}
-	// Key bindings should still be readable
 	if !strings.Contains(plain, "esc") {
 		t.Errorf("HC-13: key bindings should be readable at 60 cols, got:\n%s", plain)
 	}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-14: ? ON HELP CLOSES HELP (NOT HELP-ON-HELP)
+// ? ON HELP CLOSES HELP (NOT HELP-ON-HELP)
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_QuestionMarkOnHelpClosesHelp(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Open help
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
 	plain := stripANSI(rootViewContent(m))
@@ -589,20 +576,18 @@ func TestQA_HelpContext_QuestionMarkOnHelpClosesHelp(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HC-15: HELP PRESERVES VIEW CONTEXT
+// HELP PRESERVES VIEW CONTEXT
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Open and close help
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	m, cmd := rootApplyMsg(m, rootKeyPress("a"))
 	if cmd != nil {
@@ -610,7 +595,6 @@ func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Should be back at ec2 resource list
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ec2") {
 		t.Errorf("HC-15: after closing help, should return to ec2 list, got:\n%s", plain)
@@ -624,7 +608,6 @@ func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 	tui.Version = "0.6.0"
 
-	// Test 1: Secrets should show reveal
 	m1 := newRootSizedModel()
 	m1, _ = rootApplyMsg(m1, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -637,7 +620,6 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 		t.Errorf("secrets help should contain 'reveal', got:\n%s", secretsHelp)
 	}
 
-	// Test 2: EC2 should NOT show reveal
 	m2 := newRootSizedModel()
 	m2, _ = rootApplyMsg(m2, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -656,7 +638,6 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
-	// Representative sample — full sweep in CI slow suite
 	// "secrets" exercises the reveal branch; "ec2"/"s3"/"dbi" exercise the non-reveal branch.
 	resourceTypes := []string{"ec2", "s3", "secrets", "dbi"}
 
@@ -671,7 +652,6 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 			m, _ = rootApplyMsg(m, rootKeyPress("?"))
 			plain := strings.ToLower(stripANSI(rootViewContent(m)))
 
-			// All resource lists should show these keys
 			for _, key := range []string{"detail", "copy", "sort", "refresh"} {
 				if !strings.Contains(plain, key) {
 					t.Errorf("HC-02: %s resource list help should contain %q", rt, key)
@@ -738,14 +718,3 @@ func TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal(t *testing.T
 		t.Errorf("paginated secrets help must contain 'reveal' (x key), got:\n%s", output)
 	}
 }
-
-// TestQA_HelpContext_ResourceList_GetHelpContext_Paginated verifies that
-// a ResourceListModel with truncated pagination returns the paginated
-// help context variant.
-
-// TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated verifies that
-// a ResourceListModel without truncation returns the standard help context.
-
-// TestQA_HelpContext_SecretsList_GetHelpContext_Paginated verifies that
-// a secrets ResourceListModel with truncated pagination returns the
-// paginated secrets help context variant.

@@ -2,7 +2,7 @@
 
 package integration
 
-// scenario_all_types_wave2_test.go — Blanket scenario guard: for every resource
+// Blanket scenario guard: for every resource
 // type with a registered issue enricher, open the list in demo mode, drain the
 // availability / enrichment message chain, then assert no EnrichmentCheckedMsg
 // carried a non-nil error.
@@ -14,10 +14,6 @@ package integration
 // rejects non-ARN input), every broken enricher fails this test immediately
 // during `make test`, instead of shipping to production where the operator
 // sees it via the `!` key.
-//
-// Five bugs of this exact shape shipped in 2026-04 (tg, sfn, elb, acm, msk)
-// because scenarios didn't drain wave-2 errors and fakes were permissive. This
-// test closes that gap without requiring one hand-written scenario per type.
 
 import (
 	"strings"
@@ -36,11 +32,6 @@ import (
 // enricher rejects its input (e.g. AWS SDK returns ValidationError because
 // the fetcher emitted ID = bare name and the enricher passed r.ID as an ARN
 // param), this test fails with the resource type and error message.
-//
-// Combined with strict demo fakes (core/demo/fakes/*.go reject non-ARN
-// input on *Arn params, mirroring real AWS validation), this test is the
-// end-to-end guard that would have caught tg / sfn / elb / acm / msk before
-// they shipped.
 func TestScenario_AllTypes_NoEnrichmentErrors(t *testing.T) {
 	_ = resource.AllShortNames // referenced for clarity; startup drives all types
 

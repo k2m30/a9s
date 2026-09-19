@@ -2,7 +2,7 @@
 
 package unit_test
 
-// phrase_source_pin_test.go — the source-level counterpart of the demo-bench
+// The source-level counterpart of the demo-bench
 // phrase gate.
 //
 // The bench gate only sees a wording that some demo fixture actually
@@ -38,9 +38,9 @@ import (
 )
 
 // slotValueArgIndex gives, per constructor, the argument position of the
-// finding code and the position its variadic slot values start at. No emitter
-// takes a phrase any more — the wording is the catalog's — so what is left to
-// police is the values that fill the declared phrase's slots.
+// finding code and the position its variadic slot values start at. The
+// wording is the catalog's, so what the pin polices is the values that fill
+// the declared phrase's slots.
 var slotValueArgIndex = map[string]struct{ code, firstValue int }{
 	// setWave2Finding(r, resourceID, code, glyph, shortName, rows, values...)
 	"setWave2Finding": {code: 2, firstValue: 6},
@@ -225,7 +225,7 @@ func TestNoEmitterBuildsItsPhraseFromAnItem(t *testing.T) {
 			pos := fset.Position(call.Pos())
 			site := fmt.Sprintf("%s:%d %s", filepath.Base(path), pos.Line, fn.Name)
 
-			// Only the indexing shape is a defect now. A value IS assembled
+			// Only the indexing shape is a defect. A value IS assembled
 			// at emit time — that is what a slot is for — but a value read out
 			// of the first element of a collection still makes the wording a
 			// property of whichever item happened to come first.
@@ -277,8 +277,7 @@ var findingSeamFiles = map[string]bool{
 // it. The elements of a []domain.Finding{{…}} carry no type of their own, so
 // the enclosing slice is what identifies them.
 // The package qualifier is not checked: core/aws imports core/domain under
-// two different names (domain, domainpkg), and matching on one of them is how
-// a whole file's worth of literals stayed invisible to this gate.
+// two different names (domain, domainpkg).
 func isFindingLiteralType(e ast.Expr) (elided bool, isFinding bool) {
 	named := func(x ast.Expr) bool {
 		sel, ok := x.(*ast.SelectorExpr)
@@ -345,11 +344,10 @@ func TestWave1PhrasesGoThroughTheSeam(t *testing.T) {
 	}
 
 	// A finding's Phrase is also writable by assignment, which no
-	// KeyValueExpr scan sees; and the constructors once took the wording and
-	// the severity as arguments, which is how a hundred hand phrases and a
-	// two-tier code lived outside the catalog. Both are pinned here, the
-	// second against the constructors' own declared parameter names so
-	// re-adding such a parameter re-arms the check instead of escaping it.
+	// KeyValueExpr scan sees; and a constructor parameter for the wording or
+	// the severity would let a call site dictate a fact the catalog owns. Both
+	// are pinned here, the second against the constructors' own declared
+	// parameter names so adding such a parameter arms the check.
 	assigns, dictated := phraseAssignments(t, fset, files), dictatedArguments(t, fset, files)
 
 	sort.Strings(literals)
@@ -419,9 +417,8 @@ var (
 
 // dictatedArguments reports every call site that hands a constructor one of
 // those values, resolving the argument position from the constructor's own
-// parameter list. With no such parameter there is nothing to report and
-// nothing a call site could pass; the check exists so that re-adding one is
-// caught rather than assumed impossible.
+// parameter list. With no such parameter there is nothing to report; the
+// check catches one being added.
 func dictatedArguments(t *testing.T, fset *token.FileSet, files map[string]*ast.File) []string {
 	t.Helper()
 	// fn name -> the lowest argument index that is a dictated value.

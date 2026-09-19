@@ -1,4 +1,4 @@
-// qa_yaml_tag_flatten_test.go — YAML tag flattening in ToSafeValue.
+// YAML tag flattening in ToSafeValue.
 //
 // fieldpath.ToSafeValue detects a slice-of-structs where every element has
 // exactly Key(*string) + Value(*string) fields (two string-pointer fields)
@@ -22,10 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ---------------------------------------------------------------------------
-// TestToSafeValue_FlattensKeyValueTagSlice — unit tests of the ToSafeValue helper.
-// ---------------------------------------------------------------------------
 
 // TestToSafeValue_FlattensKeyValueTagSlice_RDS verifies that a []rdstypes.Tag
 // (which has exactly *string Key + *string Value) is emitted as map[string]any,
@@ -102,11 +98,9 @@ func TestToSafeValue_FlattensKeyValueTagSlice_S3(t *testing.T) {
 	}
 }
 
-// TestToSafeValue_DuplicateKeys_PreservedAsSlice verifies that a tag slice
-// containing duplicate keys is NOT flattened to a map — flattening would drop
-// one of the duplicate values. The spec's "degrade honestly" rule applies:
-// preserving both entries in the []Tag form loses no data. The detail view's
-// `flattenTagItems` handles the resulting struct-form items and renders both.
+// A tag slice with duplicate keys stays a slice: flattening to a map would
+// drop one of the values. The detail view's flattenTagItems renders the
+// struct-form items, both of them.
 func TestToSafeValue_DuplicateKeys_PreservedAsSlice(t *testing.T) {
 	tags := []rdstypes.Tag{
 		{Key: aws.String("Name"), Value: aws.String("first")},
@@ -126,7 +120,6 @@ func TestToSafeValue_DuplicateKeys_PreservedAsSlice(t *testing.T) {
 	if len(arr) != 3 {
 		t.Fatalf("len([]any) = %d, want 3 (all entries preserved)", len(arr))
 	}
-	// Spot-check that both "first" and "second" survive the round-trip.
 	seenFirst, seenSecond := false, false
 	for _, item := range arr {
 		m, isMap := item.(map[string]any)
@@ -169,14 +162,12 @@ func TestToSafeValue_NoFlattenRichTagStruct(t *testing.T) {
 	if _, ok := result.(map[string]any); ok {
 		t.Fatal("ToSafeValue([]richASGTag with 3 fields) must NOT flatten to map — rich tag structs must stay as []any")
 	}
-	// Must be a slice (not nil).
 	if _, ok := result.([]any); !ok {
 		t.Fatalf("ToSafeValue([]richASGTag) = %T, want []any", result)
 	}
 }
 
-// TestToSafeValue_EmptyTagSlice verifies that an empty tag slice returns nil
-// (consistent with current zero-element slice behavior).
+// TestToSafeValue_EmptyTagSlice verifies that an empty tag slice returns nil.
 func TestToSafeValue_EmptyTagSlice(t *testing.T) {
 	tags := []rdstypes.Tag{}
 	val := reflect.ValueOf(tags)
@@ -214,10 +205,6 @@ func TestToSafeValue_NonStructSliceUnchanged(t *testing.T) {
 		t.Errorf("len = %d, want 2", len(slice))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestYAMLView_TagListFlattened — integration test through YAMLModel.ContentLines()
-// ---------------------------------------------------------------------------
 
 // syntheticDBSnapshot is a stand-in for rds.DBSnapshot with a TagList field,
 // demonstrating that the YAML view should flatten the tag slice.
@@ -261,8 +248,6 @@ func TestToSafeValue_NilTagValuePreservedAsNull(t *testing.T) {
 // TestYAMLView_TagListFlattened verifies that when YAMLModel.ContentLines() serializes
 // a resource whose RawStruct has a TagList field of []rdstypes.Tag, the resulting YAML
 // contains "Component: x" (flattened map) and NOT "- Key: Component" (struct slice).
-//
-// This test FAILS on current main because ToSafeValue does not flatten tag slices.
 func TestYAMLView_TagListFlattened(t *testing.T) {
 	snap := syntheticDBSnapshot{
 		DBInstanceIdentifier: aws.String("db-instance-1"),
@@ -288,12 +273,10 @@ func TestYAMLView_TagListFlattened(t *testing.T) {
 		t.Fatal("RawContent() returned empty string — resource has RawStruct set")
 	}
 
-	// The flattened form must be present: TagList as a YAML map.
 	if !strings.Contains(content, "Component: x") {
 		t.Errorf("YAML output must contain 'Component: x' (flattened tag), got:\n%s", content)
 	}
 
-	// The struct-slice form must NOT appear.
 	if strings.Contains(content, "- Key: Component") {
 		t.Errorf("YAML output must NOT contain '- Key: Component' (unflattened tag struct), got:\n%s", content)
 	}

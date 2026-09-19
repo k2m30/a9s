@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w3_vpce_test.go — vpce.policy-open.
+// Vpce.policy-open.
 //
 // An endpoint policy that grants every action to every principal is the AWS
 // default on a gateway endpoint, and it means any principal that can reach the
@@ -158,9 +158,9 @@ func TestW3VPCEPolicyOpen_HealthyPolicies(t *testing.T) {
 	}
 }
 
-// TestW3VPCEPolicyOpen_PublicButNarrowActions pins the batch rule that the
-// public statement must also grant "*": a wildcard principal restricted to a
-// couple of read actions is the pattern operators use deliberately.
+// TestW3VPCEPolicyOpen_PublicButNarrowActions pins that the public statement
+// must also grant "*": a wildcard principal restricted to a couple of read
+// actions is the pattern operators use deliberately.
 func TestW3VPCEPolicyOpen_PublicButNarrowActions(t *testing.T) {
 	const doc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::acme-public/*"}]}`
 	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", doc))

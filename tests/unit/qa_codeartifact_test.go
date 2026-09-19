@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-CA-001 - Test CodeArtifact Repositories response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchCodeArtifactRepos_ParsesMultipleRepos(t *testing.T) {
 	now := time.Now()
 	mock := &mockCodeArtifactClient{
@@ -76,7 +72,6 @@ func TestFetchCodeArtifactRepos_ParsesMultipleRepos(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second repo
 	r2 := resources[1]
 	if r2.Fields["domain_name"] != "shared-domain" {
 		t.Errorf("expected Fields[domain_name] 'shared-domain', got %q", r2.Fields["domain_name"])

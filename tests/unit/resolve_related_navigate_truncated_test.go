@@ -14,10 +14,10 @@ import (
 // detail — even though that one found id is already cached and even when the
 // caller also populated TargetID.
 //
-// Pre-fix failure: the single-RelatedID cache-hit branch (and the TargetID
-// cache-hit / cache-miss branches) ran before the truncated branch, so a "(1+)"
-// pivot opened one detail / a by-ID list and never emitted the population fetch
-// + reapply needed to discover the remaining matches on later pages.
+// The truncated branch outranks the single-RelatedID and TargetID cache
+// branches: a "(1+)" pivot that opened one detail or a by-ID list would never
+// emit the population fetch + reapply that discovers the remaining matches on
+// later pages.
 func TestResolveRelatedNavigate_TruncatedSingleCachedID_StaysScanList(t *testing.T) {
 	cache := map[string][]resource.Resource{"ec2": {{ID: "i-1"}}}
 

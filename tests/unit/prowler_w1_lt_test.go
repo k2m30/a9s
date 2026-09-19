@@ -1,12 +1,10 @@
 package unit
 
-// prowler_w1_lt_test.go — behavioural pins for lt.user-data-secret (batch w1).
-//
-// The launch template's default version is already held by the row (the
-// fetcher describes it), so the check reads LaunchTemplateData.UserData,
-// base64-decodes it and runs the shared secret scanner over the script. The
-// signal is emitted by EnrichLTDeprecatedAMI, the type's single Wave-2
-// enricher.
+// lt.user-data-secret: the launch template's default version is already held
+// by the row (the fetcher describes it), so the check reads
+// LaunchTemplateData.UserData, base64-decodes it and runs the shared secret
+// scanner over the script. The signal is emitted by EnrichLTDeprecatedAMI, the
+// type's single Wave-2 enricher.
 
 import (
 	"context"

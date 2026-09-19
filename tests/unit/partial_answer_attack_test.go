@@ -1,10 +1,8 @@
 package unit
 
-// partial_answer_attack_test.go — the adversarial half of the partial-answer
-// batch. Each test attacks one fix from a direction its own pin does not
-// cover: a sibling row in the same batch, a second condition on one resource,
-// the cap boundary from the other side, the shape the fix newly depends on
-// surviving a disk-cache round trip.
+// Partial-answer edge cases: two failures on
+// one resource, a second condition on one resource, the cap boundary from the
+// other side, and a partial flag surviving a disk-cache round trip.
 
 import (
 	"context"
@@ -29,7 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ── row 1: both reads fail ────────────────────────────────────────────────
+// ── both reads fail ────────────────────────────────────────────────
 
 // TestPartialAttackLambda_BothReadsFailingIsOneFailedRow pins that a function
 // whose two reads both failed is counted once. Each read is marked through the
@@ -56,8 +54,8 @@ func TestPartialAttackLambda_BothReadsFailingIsOneFailedRow(t *testing.T) {
 	}
 }
 
-// TestPartialAttackLambda_BothConditionsOnOneFunction pins that moving the
-// error branch below the emissions did not make them exclusive. A function
+// TestPartialAttackLambda_BothConditionsOnOneFunction pins that the two
+// exposure findings are not exclusive. A function
 // that is both open by policy and open by URL carries both findings.
 func TestPartialAttackLambda_BothConditionsOnOneFunction(t *testing.T) {
 	res := partialEnrichLambda(t, &partialLambdaFake{
@@ -72,10 +70,10 @@ func TestPartialAttackLambda_BothConditionsOnOneFunction(t *testing.T) {
 	partialAssertInspected(t, res, partialLambdaFn)
 }
 
-// ── row 2: the catalogue answered, but with nothing ───────────────────────
+// ── the catalogue answered, but with nothing ───────────────────────
 
-// TestPartialAttackEKS_CatalogueEntryWithNoStatusIsUnknown pins the third way
-// the catalogue can fail to answer: the entry exists but AWS left
+// TestPartialAttackEKS_CatalogueEntryWithNoStatusIsUnknown pins one way the
+// catalogue can fail to answer: the entry exists but AWS left
 // VersionStatus empty. An entry is not an answer, and the empty status is the
 // value a reader gets from the deprecated field AWS never populates — the one
 // shape most likely to be mistaken for a verdict.
@@ -91,7 +89,7 @@ func TestPartialAttackEKS_CatalogueEntryWithNoStatusIsUnknown(t *testing.T) {
 	}
 }
 
-// ── rows 3 and 4: what the shared cap helper marks ────────────────────────
+// ── what the shared cap helper marks ────────────────────────
 
 // TestPartialAttackECSTask_EveryTaskOnADroppedDefinitionIsMarked attacks the
 // grouped side of the cap helper. Definitions are shared by design — a
@@ -160,11 +158,11 @@ func TestPartialAttackEC2_SkippedInstancesAreNotCoverageGaps(t *testing.T) {
 	}
 }
 
-// ── row 5: the flag the coverage join now depends on ──────────────────────
+// ── the flag the coverage join depends on ──────────────────────
 
-// TestPartialAttackBackup_PartialFlagSurvivesACacheReplay is the row-6 defect
-// one level up. The abstention added for row 5 hangs on a field the plans
-// fetcher writes; if the disk cache drops it, a plan whose selections nobody
+// TestPartialAttackBackup_PartialFlagSurvivesACacheReplay pins the partial
+// flag through the disk cache. The coverage join's abstention hangs on a
+// field the plans fetcher writes; if the disk cache drops it, a plan whose selections nobody
 // could finish reading comes back looking complete, and every resource in the
 // account is judged against a selection list that was never fully read.
 func TestPartialAttackBackup_PartialFlagSurvivesACacheReplay(t *testing.T) {
@@ -184,7 +182,7 @@ func TestPartialAttackBackup_PartialFlagSurvivesACacheReplay(t *testing.T) {
 // TestPartialAttackBackup_StringLikeIsAGlob pins that the wildcard shape
 // StringLike exists for is read as one. A plan selecting `prod*` protects the
 // production volume, and matching the pattern literally would report a covered
-// volume as uncovered — the same wrong answer row 5 set out to remove.
+// volume as uncovered.
 func TestPartialAttackBackup_StringLikeIsAGlob(t *testing.T) {
 	volume := w7Volume("in-use")
 	vol := volume.RawStruct.(ec2types.Volume)
@@ -207,8 +205,8 @@ func TestPartialAttackBackup_StringLikeIsAGlob(t *testing.T) {
 	w4AssertNoCode(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)
 }
 
-// TestPartialAttackBackup_SelectionsPastThePageCapAbstain attacks the bound on
-// the new page walk. Running out of pages is the same unknown as a denied
+// TestPartialAttackBackup_SelectionsPastThePageCapAbstain pins the bound on
+// the selection page walk. Running out of pages is the same unknown as a denied
 // call: the selection that takes the volume in may sit on the page nobody
 // read.
 func TestPartialAttackBackup_SelectionsPastThePageCapAbstain(t *testing.T) {
@@ -226,8 +224,8 @@ func TestPartialAttackBackup_SelectionsPastThePageCapAbstain(t *testing.T) {
 }
 
 // TestPartialAttackBackup_PartialPlanAbstainsEveryType pins that the
-// abstention is a property of the shared join, not of the one type its pin was
-// written against. A plan list nobody could finish reading is the same unknown
+// abstention is a property of the shared join, not of one type. A plan list
+// nobody could finish reading is the same unknown
 // for a table, a database and a cluster as it is for a volume.
 func TestPartialAttackBackup_PartialPlanAbstainsEveryType(t *testing.T) {
 	plans := partialBackupCache(t, &partialBackupFake{selectionsErr: partialAccessDenied()})
@@ -250,7 +248,7 @@ func TestPartialAttackBackup_PartialPlanAbstainsEveryType(t *testing.T) {
 	}
 }
 
-// ── row 6: the abstention must stay narrow ────────────────────────────────
+// ── the abstention must stay narrow ────────────────────────────────
 
 // TestPartialAttackEBS_ARNCoverageStillDecidesAReplayedRow pins that unknown
 // tags silence only the question tags answer. A volume a plan names by ARN is
@@ -271,15 +269,15 @@ func TestPartialAttackEBS_ARNCoverageStillDecidesAReplayedRow(t *testing.T) {
 	w4AssertNoCode(t, replayRes.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)
 }
 
-// ── row 7: the error answers for the whole page ───────────────────────────
+// ── the error answers for the whole page ───────────────────────────
 
-// TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch attacks the
-// batch dimension of the kept-findings fix. One account-wide call answers for
+// TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch pins the
+// batch dimension of kept findings. One account-wide call answers for
 // every row on screen, so its failure leaves all of them uninspected — and
 // each keeps whatever the cache-only joins already decided about it.
 func TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch(t *testing.T) {
 	// The backup-coverage join builds a volume ARN from the session's region;
-	// a session with none answers "cannot tell" (aws5 row 2).
+	// a session with none answers "cannot tell".
 	clients := &awsclient.ServiceClients{Region: "us-east-1", EC2: &partialEBSStatusFake{}}
 	store := session.NewIdentityStore()
 	store.Set(w7Account, nil)
@@ -309,10 +307,10 @@ func TestPartialAttackEBS_StatusFailureMarksEveryVolumeInTheBatch(t *testing.T) 
 	}
 }
 
-// ── row 8: the third answer, and a repository with two problems ───────────
+// ── the third answer, and a repository with two problems ───────────
 
 // TestPartialAttackECR_PublicPolicyAndUnreadableLifecycle pins that the two
-// policy reads stay independent after the lifecycle read grew a third answer.
+// policy reads stay independent while the lifecycle read has a third answer.
 // A repository open to anyone whose lifecycle policy nobody could read carries
 // the exposure finding AND the coverage gap; collapsing either into the other
 // loses a fact the operator needs.
@@ -351,10 +349,10 @@ func TestPartialAttackECR_ClientWithoutTheCallSaysNothing(t *testing.T) {
 	partialAssertInspected(t, res, partialECRRepo)
 }
 
-// ── row 9: nothing is cached, so nothing is inherited ─────────────────────
+// ── nothing is cached, so nothing is inherited ─────────────────────
 
-// TestPartialAttackRedshift_CutShortWalkPoisonsNoSiblingCluster attacks the
-// reason row 9 is about a cache at all. Parameter groups are shared across a
+// TestPartialAttackRedshift_CutShortWalkPoisonsNoSiblingCluster pins that a
+// cut-short walk caches nothing. Parameter groups are shared across a
 // fleet, and one group is read once per run; caching the empty value would
 // hand every other cluster on that group the same wrong "SSL not required".
 func TestPartialAttackRedshift_CutShortWalkPoisonsNoSiblingCluster(t *testing.T) {
@@ -437,13 +435,12 @@ func (f *partialECRNoLifecycleAPI) GetRepositoryPolicy(_ context.Context, _ *ecr
 	return nil, &ecrtypes.RepositoryPolicyNotFoundException{Message: aws.String("Repository policy does not exist")}
 }
 
-// ── the surface: the demo bench still shows what it demonstrates ──────────
+// ── the surface: the demo bench shows what it demonstrates ────────────────
 
-// TestPartialAttackEKS_DemoBenchStillPlacesEveryCluster is the surface check
-// for the seed change. Making "unknown" the default is only safe because the
-// catalogue answers; if the demo's version catalogue ever stops being read,
-// every cluster silently slides to unknown, the out-of-support witness stops
-// demonstrating anything, and the demo still looks healthy while showing less.
+// TestPartialAttackEKS_DemoBenchStillPlacesEveryCluster pins the demo's
+// version catalogue. "unknown" is the default, so if the catalogue is not
+// read every cluster slides to unknown, the out-of-support row demonstrates
+// nothing, and the demo looks healthy while showing less.
 func TestPartialAttackEKS_DemoBenchStillPlacesEveryCluster(t *testing.T) {
 	rows := d4Rows(t, "eks")
 	if len(rows) == 0 {

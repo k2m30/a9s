@@ -1,9 +1,8 @@
 package unit
 
-// prowler_w4_iam_user_test.go — behavioural tests for the batch-w4 iam-user
-// rows: an admin-equivalent managed policy attached to a human user, a
-// console password that was never used, an access key nobody has signed a
-// request with, and both key slots active at once.
+// iam-user posture: an admin-equivalent managed policy attached to a human
+// user, a console password that was never used, an access key nobody has
+// signed a request with, and both key slots active at once.
 
 import (
 	"context"
@@ -151,8 +150,6 @@ func w4EnrichUsersErr(t *testing.T, fake *w4UserFake, rs []resource.Resource) (a
 	return awsclient.EnrichIAMUserMFA(context.Background(), clients, rs, nil)
 }
 
-// --- row 6: admin policy attached -------------------------------------------
-
 // TestW4UserAdminAttached pins that a user holding an admin-equivalent
 // managed policy is flagged and a user with a scoped policy is not.
 func TestW4UserAdminAttached(t *testing.T) {
@@ -174,8 +171,6 @@ func TestW4UserAdminAttached(t *testing.T) {
 		[]domain.DetailRow{{Label: "Policy", Value: "AdministratorAccess"}})
 	w4AssertNoCode(t, res.Findings["acme-reports-user"], w4CodeUserAdminAttached)
 }
-
-// --- row 7: console password never used -------------------------------------
 
 // TestW4UserConsoleNeverUsed pins the unguarded sign-in path: a console
 // password created long enough ago to be past the grace period and never used
@@ -222,8 +217,6 @@ func TestW4UserConsoleNeverUsedNegatives(t *testing.T) {
 	}
 }
 
-// --- row 8: access key unused -----------------------------------------------
-
 // TestW4UserAccessKeyNeverUsed pins the live-but-untouched credential: an
 // active key that has never signed a request, counted from its creation. The
 // row shows only the last four characters of the key id.
@@ -247,9 +240,8 @@ func TestW4UserAccessKeyNeverUsed(t *testing.T) {
 	})
 }
 
-// TestW4UserAccessKeyIdleSinceLastUse pins the second half of the row: a key
-// that was used once and then abandoned is measured from that use, not from
-// its creation.
+// TestW4UserAccessKeyIdleSinceLastUse pins that a key that was used once and
+// then abandoned is measured from that use, not from its creation.
 func TestW4UserAccessKeyIdleSinceLastUse(t *testing.T) {
 	lastUsed := time.Now().Add(-120 * 24 * time.Hour)
 	fake := &w4UserFake{
@@ -326,10 +318,8 @@ func TestW4UserKeyIDNeverLeavesThePackage(t *testing.T) {
 	}
 }
 
-// --- row 9: two active keys -------------------------------------------------
-
-// TestW4UserTwoActiveKeys pins the doubled-exposure row: both key slots
-// active at once, which also means a rotation was never finished.
+// TestW4UserTwoActiveKeys pins the doubled exposure: both key slots active at
+// once, which also means a rotation was never finished.
 func TestW4UserTwoActiveKeys(t *testing.T) {
 	fake := &w4UserFake{
 		mfaUsers: map[string]bool{"acme-ci-user": true},
@@ -363,8 +353,6 @@ func TestW4UserTwoActiveKeysNegatives(t *testing.T) {
 	res := w4EnrichUsers(t, fake, []resource.Resource{w4UserResource("acme-ci-user", 400, "Never")})
 	w4AssertNoCode(t, res.Findings["acme-ci-user"], w4CodeUserTwoActiveKeys)
 }
-
-// --- independence and batch resilience --------------------------------------
 
 // TestW4UserIndependentConditionsEachGetAFinding pins that conditions do not
 // mask one another: one user can be an admin, have a never-used console

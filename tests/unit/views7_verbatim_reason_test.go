@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_verbatim_reason_test.go — the ceiling the verbatim list never had.
-//
 // verbatimDetailPaths is the one place a raw AWS constant is allowed to reach
 // a detail screen, and the only thing that makes it different from an
 // allowlist is that every entry is a value a person types back: an access key,
-// a role id, an API operation name. Nothing enforced that. A new constant
-// could be silenced by writing a sentence beside it, and the list had no
-// recorded size, so it could also grow without anyone reading the diff.
+// a role id, an API operation name.
 //
-// Two pins close it: the list's size is written down, and every reason has to
-// name the AWS field whose value is the identifier — in the field's own words,
-// or by spelling the field. A reason that only says what the value is used for
-// does not say which field must not be reworded.
+// Two pins hold it: the list's size is written down, so it cannot grow
+// without anyone reading the diff, and every reason has to name the AWS field
+// whose value is the identifier — in the field's own words, or by spelling the
+// field. A reason that only says what the value is used for does not say which
+// field must not be reworded.
 package unit_test
 
 import (

@@ -42,9 +42,8 @@ func d1RedisShards(state string) []elasticachetypes.NodeGroup {
 // groups. Each case drives an SDK ReplicationGroup through the redis fetcher and
 // compares the colour its findings imply.
 //
-// The "(+N)" rows are gone: the suffix belongs to the rendered phrase, and the
-// severity comparison that decides colour never sees it. The shard rows stay,
-// because a per-shard phrase is a real finding on a real multi-shard group.
+// A per-shard phrase is a real finding on a real multi-shard group, so the
+// shard rows are cases here.
 func TestRedisColor(t *testing.T) {
 	cases := []struct {
 		name   string

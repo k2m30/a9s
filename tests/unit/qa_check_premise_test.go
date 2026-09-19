@@ -1,4 +1,4 @@
-// qa_check_premise_test.go — six conditions whose premise does not match what
+// Six conditions whose premise does not match what
 // AWS documents, each with the healthy case that must stop firing and the
 // genuinely bad case that must keep firing.
 //
@@ -190,9 +190,8 @@ func eksClusterOut(name, version string, enc []ekstypes.EncryptionConfig) *eks.D
 // a different and much smaller thing than "secrets are not encrypted", and the
 // finding as written tells the operator etcd is readable when it is not.
 //
-// If the catalog wants to keep saying something about the absent customer key,
-// that is a separate code at a lower tier. The observable pinned here is that
-// the cluster no longer carries this one.
+// An absent customer key may carry a separate, lower-tier code; this one
+// must not fire.
 func TestEKSDefaultEnvelopeEncryptionIsNotMissingEncryption(t *testing.T) {
 	fake := &eksDescribeFailFake{
 		clusters: []string{"prod-128", "legacy-127"},

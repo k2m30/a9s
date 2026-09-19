@@ -1,15 +1,15 @@
-// qa_related_state_no_sentinel_gate_test.go — no `Count == -1` sentinel on
+// No `Count == -1` sentinel on
 // related-resource results/rows; the state is the RelatedRowState enum.
 //
 // No composite literal of a related result/row type — production OR test,
-// under internal/ or tests/ — may set its Count (RelatedCheckResult /
+// under core/, internal/ or tests/ — may set its Count (RelatedCheckResult /
 // DetailRelatedRow / RelatedBlock) or count (rightColumnRow) field to a
 // NEGATIVE integer literal. Every producer routes through a state
 // constructor (UnknownRelated / ErrorRelated / DeferredRelated /
 // LoadingRelated) that sets the enum and leaves Count at its resolved zero
 // value.
 //
-// Scope: the scan walks BOTH internal/ (every .go file, including
+// Scope: the scan walks core/, internal/ (every .go file, including
 // internal/**_test.go white-box tests) and tests/ (every .go file under
 // tests/unit, tests/integration, tests/stories, tests/testdata). Test-side
 // stub checkers and fake results are exactly as bound by this gate as
@@ -17,9 +17,8 @@
 // `RelatedCheckResult{Count: -1}` to simulate "unknown" reintroduces the
 // sentinel encoding just as surely as a production checker would.
 //
-// No allowlist (mirrors qa_multifinding_no_legacy_gate_test.go): a fresh AST
-// scan every run, an unconditional t.Errorf listing every violation, GREEN
-// only at zero.
+// No allowlist: a fresh AST scan every run, an unconditional t.Errorf listing
+// every violation, GREEN only at zero.
 //
 // AST shape matched: an *ast.CompositeLit whose type names one of the four
 // related types — as a bare Ident (RelatedCheckResult{...}), a qualified
@@ -166,18 +165,14 @@ func rsnsScanFile(fset *token.FileSet, path, rel string) ([]rsnsViolation, error
 	return violations, nil
 }
 
-// rsnsScanRoots are the two trees the gate walks: ALL of internal/ (including
-// internal/**_test.go white-box tests — no "_test.go" exclusion, unlike the
-// original production-only scan) and ALL of tests/ (unit, integration,
-// stories, testdata; tests/e2e has no .go files to match). See this file's
-// header for the Batch 2 scope rationale.
+// rsnsScanRoots are the trees the gate walks: all of core/, internal/
+// (including internal/**_test.go white-box tests) and tests/ (unit,
+// integration, stories, testdata; tests/e2e has no .go files).
 var rsnsScanRoots = []string{"../../core", "../../internal", "../../tests"}
 
 // TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes is the
-// gate: no .go file under internal/ or tests/ — production or test — may
-// construct a related result/row literal with a negative Count sentinel.
-// See this file's header for the exact AST shape matched and the
-// no-allowlist rationale.
+// gate: no .go file under core/, internal/ or tests/ — production or test —
+// may construct a related result/row literal with a negative Count sentinel.
 func TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes(t *testing.T) {
 	fset := token.NewFileSet()
 	var violations []rsnsViolation

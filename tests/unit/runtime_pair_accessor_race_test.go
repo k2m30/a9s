@@ -1,5 +1,5 @@
-// runtime_pair_accessor_race_test.go — race-regression pin for GitHub issue
-// #471: Core.Profile()/Core.Region() must never race a concurrent
+// Core.Profile()/Core.Region() never
+// race a concurrent
 // SetProfile()/SetRegion() (both routed through session.SetProfileRegion,
 // guarded by session.pairMu). Meaningful only under -race; passes vacuously
 // without it.

@@ -1,4 +1,4 @@
-// qa_demo_pivot_coverage_test.go — the standing demo-verification gate.
+// The standing demo-verification gate.
 //
 // Demo mode (./a9s --demo) is the bench humans use to verify every
 // related-resource pivot and issue glyph without live AWS credentials. This
@@ -46,10 +46,9 @@
 //   - An entry NOT in the allowlist with no witness is a NEW regression —
 //     always fails, unconditionally.
 //   - An allowlisted entry that NOW HAS a witness fails with a "remove from
-//     allowlist" message — this forces the fix to be reflected here in the
-//     same PR that lands it, so the backlog only ever shrinks.
+//     allowlist" message, so the backlog only ever shrinks.
 //   - An allowlisted entry that is still disconnected is skipped (logged,
-//     not failed) — known debt.
+//     not failed).
 //
 // s3 must NOT appear in either allowlist below: it is fully connected, and
 // adding it would silently mask a regression.
@@ -68,39 +67,15 @@ import (
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
-// knownDisconnectedPivots pins the exact (type, pivot) inventory captured at
-// ratchet-conversion time, in "type:pivot" form (matching def.TargetType, not
-// DisplayName). This is the burn-down backlog, not a permanent exemption:
-//
-//   - present here + still disconnected today  -> skip (logged), expected debt.
-//   - present here + now has a witness         -> FAIL ("remove from allowlist"),
-//     forcing the fixture fix and this list to land in the same PR.
-//   - a disconnected pivot NOT in this list     -> FAIL unconditionally, a new
-//     regression the allowlist was never told about.
-//
-// s3 is deliberately absent: its 9 originally-disconnected pivots were fixed
-// by a parallel fixture rebuild before this ratchet was written, and must
-// never be re-added here.
-//
-// TERMINAL STATE: the map is empty. Every pivot ever pinned here
-// (apigw:r53/vpce/waf/sfn/sns, athena:glue, eip:logs, elb:r53, kms:s3,
-// tg:backup/dbc/dbi/dbi-snap/logs/sg/subnet, vpce:acm/cf/s3/tg/waf) was
-// structurally unwitnessable per its own checker's documented comment — no
-// fixture graph could ever produce a witness, unlike s3's gap, which was a
-// fixable fixture problem. Rather than carry 20 permanent burn-down entries
-// that could never burn down, each checker and its RegisterRelated entry was
-// deleted outright (see core/aws/catalog_dns_cdn.go, catalog_data.go,
-// catalog_networking.go, catalog_secrets.go). resource.GetRelated no longer
-// returns these TargetTypes for their owning types, so this loop never visits
-// their keys again — do not re-add them; a genuinely new structurally-
-// unwitnessable pivot should not be registered at all, following this
-// precedent, rather than added here.
+// knownDisconnectedPivots is the (type, pivot) allowlist, in "type:pivot"
+// form (matching def.TargetType, not DisplayName). It is empty: a pivot that
+// no fixture graph can ever demonstrate is not registered at all.
 var knownDisconnectedPivots = map[string]bool{}
 
-// knownIssueCoverageGaps pins the exact issue-capable types that had zero
-// flagged demo fixtures at ratchet-conversion time. Same burn-down semantics
-// as knownDisconnectedPivots: still-gapped -> skip (logged); now-flagged ->
-// FAIL ("remove from allowlist"); a gap NOT in this list -> FAIL unconditionally.
+// knownIssueCoverageGaps is the allowlist of issue-capable types with zero
+// flagged demo fixtures. Same semantics as knownDisconnectedPivots:
+// still-gapped -> skip (logged); now-flagged -> FAIL ("remove from
+// allowlist"); a gap NOT in this list -> FAIL unconditionally.
 var knownIssueCoverageGaps = map[string]bool{}
 
 // drainDemoFixtures drains a type's demo rows through its own Wave-1 Fetcher.
@@ -114,9 +89,7 @@ func drainDemoFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awscl
 // buildDemoTypeCache drains every registered type's demo fixtures via its
 // real Wave-1 Fetcher and returns both the per-type resource lists and one
 // shared resource.ResourceCache built from all of them, so that reverse-scan
-// / cross-type RelatedCheckers see sibling data exactly as production does
-// (the same shape TestCtEventsDemoRightColumnCheckers's buildFakeResourceCache
-// establishes for ct-events, generalized to every registered type).
+// / cross-type RelatedCheckers see sibling data exactly as production does.
 func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.ResourceCache) {
 	t.Helper()
 	clients := demo.NewServiceClients()
@@ -146,7 +119,7 @@ func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.
 // (never actionable, even though FetchFilter is still populated for
 // navigation bookkeeping), or RelatedResolved with a real Count (actionable
 // only when Count > 0) — so no single Count-only proxy can distinguish them
-// post-task-#58 (RelatedDeferred and a resolved zero both carry Count==0). A
+// (RelatedDeferred and a resolved zero both carry Count==0). A
 // witness for a non-FetchFilter pivot still requires Count > 0 (matches
 // IsRelatedActionable's RelatedResolved count>0 branch; a resolved zero is
 // genuinely a dead row).
@@ -161,7 +134,7 @@ func isWitnessResult(result resource.RelatedCheckResult) bool {
 // ratchet: for every registered type with RelatedDefs, every pivot must have
 // at least one fixture resource for which the real production checker
 // produces a witness (isWitnessResult) — UNLESS the (type, pivot) pair is
-// pinned in knownDisconnectedPivots as pre-existing debt, in which case it is
+// pinned in knownDisconnectedPivots, in which case it is
 // skipped (logged) instead of failed. An allowlisted pair that now has a
 // witness fails with a "remove from allowlist" message so the burn-down
 // bookkeeping cannot silently drift from reality. One subtest per (type,
@@ -272,8 +245,8 @@ func isIssueCapable(td resource.ResourceTypeDef) bool {
 // one demo fixture resource of that type must carry an issue — either a
 // Wave-1 Finding already on the fixture, or the type's own Wave-2 enricher
 // returning IssueCount > 0 / a non-empty Findings map when run against the
-// type's fixtures — UNLESS the type is pinned in knownIssueCoverageGaps as
-// pre-existing debt, in which case it is skipped (logged) instead of failed.
+// type's fixtures — UNLESS the type is pinned in knownIssueCoverageGaps,
+// in which case it is skipped (logged) instead of failed.
 // An allowlisted type that now has a flagged fixture fails with a "remove
 // from allowlist" message. One subtest per type so gaps are independently
 // enumerable.

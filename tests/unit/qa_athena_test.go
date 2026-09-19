@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-ATH-001 - Test Athena Workgroups response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 	now := time.Now()
 	mock := &fakeAthenaListWorkGroups{
@@ -80,7 +76,6 @@ func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second workgroup
 	r2 := resources[1]
 	if r2.Fields["state"] != "DISABLED" {
 		t.Errorf("expected Fields[state] 'DISABLED', got %q", r2.Fields["state"])

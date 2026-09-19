@@ -1,6 +1,6 @@
 package unit
 
-// qa_coderabbit_pr273_test.go — enrichment and attention-filter pins.
+// Enrichment and attention-filter pins.
 //
 //   - Gen==0 bypass in handleEnrichmentChecked — Gen=0 test-injection
 //     messages are dropped when enrichmentGen>0 after a profile/region
@@ -35,11 +35,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// =============================================================================
-// Item 18: Main-menu ctrl+z — no false positives, no false negatives
-// =============================================================================
-//
-// Expected behavior — ctrl+z on the main menu, after AWS probes return:
+// Main-menu ctrl+z — no false positives, no false negatives.
 //
 // The public boundary of a9s against AWS is the set of messages that land on
 // the root model: AvailabilityCacheLoadedMsg (restored from cache),
@@ -60,11 +56,6 @@ import (
 //     filter.)
 //   * Confirmed-zero (issues=0, truncated=false) from Wave 1 alone is also
 //     authoritative — the probe ran the full page and found nothing.
-//
-// The user saw "Target Groups (4)" under ctrl+z with no issue badge despite
-// every target being healthy — a false positive. The test below reproduces
-// it by driving Wave-1 + Wave-2 through public messages with zero issues
-// for tg and asserting tg is NOT visible under ctrl+z.
 
 // TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes drives the happy path
 // across every registered resource type: Wave 1 reports zero issues not
@@ -98,7 +89,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 		IssueKnown:     issueKnown,
 	})
 
-	// Wave 2 clean for every enricher-backed type.
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
@@ -159,7 +149,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 		IssueKnown:     issueKnown,
 	})
 
-	// Wave 2: authoritative zero for every enricher-backed type.
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
@@ -197,7 +186,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 }
 
 // TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes pins the
-// user's screenshot case across every enricher-backed type: one sub-call
+// partial-error case across every enricher-backed type: one sub-call
 // erred in Wave 2, so the enricher returned Truncated=true with IssueCount=0
 // and empty Findings. The result carries no actual issue — the type must
 // NOT appear under ctrl+z.
@@ -336,10 +325,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 	}
 }
 
-// =============================================================================
-// Item 6: Missing Gen==0 bypass in handleEnrichmentChecked
-// =============================================================================
-
 // TestCR273_Item6_Gen0_BypassesSessionGuard asserts that an EnrichmentCheckedMsg
 // with Gen=0 is accepted even when enrichmentGen>0 (after a profile/region switch).
 //
@@ -347,23 +332,12 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 // session-wide generation guard. Without this bypass, test doubles that send
 // Gen=0 are silently dropped after any profile or region switch, making the
 // enrichment system untestable in realistic multi-switch scenarios.
-//
-// Setup:
-//  1. Create a model with enrichmentGen=0.
-//  2. Switch profile → bumps enrichmentGen to 1.
-//  3. Navigate to EC2 list and load resources.
-//  4. Send EnrichmentCheckedMsg{Gen:0, TypeGen:0, ResourceType:"ec2", Issues:1, Findings:{...}}.
-//  5. Assert that the issue marker "! " appears in the rendered list view —
-//     meaning the message was ACCEPTED, not dropped.
-//
-// Regression pin (fixed): app_handlers_navigate.go must accept Gen=0 as the
-// test-injection sentinel even when enrichmentGen>0.
 func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel() // fresh model: enrichmentGen starts at 0
 
-	// Step 2: bump enrichmentGen by switching profile (→ enrichmentGen=1).
-	// We don't execute the returned cmd (AWS connect) — only the state update matters.
+	// Switching profile bumps enrichmentGen to 1; the returned cmd (AWS connect)
+	// is not executed.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "test-profile-switched"})
 
 	genAfterSwitch := m.EnrichmentGen()
@@ -371,17 +345,13 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 		t.Fatal("pre-condition failed: enrichmentGen must be > 0 after profile switch")
 	}
 
-	// Step 3: navigate to EC2 list.
 	m = navigateToEC2List(m)
 
-	// Load resources so the list has items to mark.
 	resources := rerunEC2Resources()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
-
-	// Step 4: send Gen=0 injection message — must bypass session guard.
 
 	injected := messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -394,15 +364,11 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, injected)
 
-	// Step 5: the finding must have been applied. Since the
-	// color-findings-conformance wave, colorEC2 derives ColorBroken directly
-	// from this Finding (colorFromAnyFinding) — resolveListRowSeverity no
-	// longer emits the "! " glyph prefix for a non-Healthy row (that branch
-	// only fires when ResolveColor()==ColorHealthy; see
-	// core/app/list_columns.go). The stronger, renderer-agnostic contract
-	// is that the row is now a counted issue: it must survive the ctrl+z
-	// attention filter, which only the real Wave-2 Finding could cause here
-	// (the fixture's Fields carry no lifecycle signal of their own).
+	// colorEC2 derives ColorBroken from this Finding (colorFromAnyFinding), and a
+	// non-Healthy row carries no "! " glyph prefix (core/app/list_columns.go), so
+	// the message taking effect is observed as the row surviving the ctrl+z
+	// attention filter — only the Wave-2 Finding can cause that here, since the
+	// fixture's Fields carry no lifecycle signal.
 	m, _ = rootApplyMsg(m, ctrlZ())
 	content := stripANSI(m.View().Content)
 	if !strings.Contains(content, "web-server-1") {
@@ -412,19 +378,12 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// Item 12/13: CodeBuild STOPPED state generates unwanted finding
-// =============================================================================
-
 // TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings asserts that a build
 // with StatusTypeStopped is NOT flagged as an issue.
 //
 // STOPPED = intentionally cancelled by a user or automation (e.g. timeout policy,
 // manual abort). It is not a failure — treating it as one generates noise and
 // inflates the issue badge count.
-//
-// Regression pin (fixed): the switch in EnrichCodeBuildBuilds must skip
-// STOPPED alongside SUCCEEDED and IN_PROGRESS.
 func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -455,8 +414,6 @@ func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 // TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted asserts that
 // when there are both STOPPED and FAILED builds for different projects, only
 // the FAILED project appears in Findings, and IssueCount = 1 (not 2).
-//
-// Regression pin (fixed): STOPPED must not be counted alongside FAILED.
 func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 11, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -498,25 +455,10 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 	}
 }
 
-// Items 16, 17 — refactor-only (typed constants replacing string literals).
-// Behavior is already correct; no failing tests possible without production-code
-// behavior change. Skipped per task specification.
-
-// =============================================================================
-// Item 18: Trivial Color causes ghost entries in ctrl+z filter
-// =============================================================================
-//
-// The ctrl+z attention-only filter in the main menu shows a type when its
-// truncated-zero count is a "lower bound" (may have issues on unseen pages).
-// Per docs/attention-signals.md every registered type has at least a Wave 1
-// or Wave 2 signal, so the AlwaysHealthy escape hatch has been removed.
-//
-// A type whose Color func returns ColorHealthy for every realistic probe is
-// a bug: the type can never flag an issue from Wave 1, so its Wave 1 cell in
-// the doc must be genuinely empty — and if it IS empty in the doc, the type
-// still needs a Wave 2 enricher registered (no-op or real) to make the
-// classification contract explicit. This test flags Color funcs that are
-// silently trivial across the realistic probe set.
+// A type whose Color func returns ColorHealthy for every realistic probe can
+// never flag an issue from Wave 1; per docs/attention-signals.md every
+// registered type has a Wave 1 or Wave 2 signal, so such a type needs a
+// Wave 2 enricher registered to make the classification explicit.
 
 // TestCR273_Item18_TrivialColor_MustClassify iterates registered
 // ResourceTypeDefs that have a statusField in typeContracts and verifies
@@ -560,7 +502,7 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		"EXPIRED", "REVOKED", "VALIDATION_TIMED_OUT",
 		"rebooting cluster nodes",
 		"false", "true", "0", "1", "No",
-		// dbc phrase-based statuses (see docs/resources/dbc.md §4).
+		// dbc phrase-based statuses (see docs/resources/dbc.md).
 		"failed: cluster operation", "encryption key unreachable",
 		"parameter group incompatible", "no writer: reads only",
 		"modifying: in progress", "delete-protection off",
@@ -569,7 +511,7 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		"verification failed", "verify: temp failure", "verification not started",
 		"pending verification", "sending disabled",
 		// redis phrase-based statuses (colorRedis reads Fields["status"] derived
-		// phrase, not the raw ReplicationGroup.Status enum — see docs/resources/redis.md §4).
+		// phrase, not the raw ReplicationGroup.Status enum — see docs/resources/redis.md).
 		"create failed — see events", "creating — new group",
 		"modifying — config change", "snapshotting — backup running",
 		"deleting — teardown", "multi-AZ without auto-failover",
@@ -614,9 +556,7 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 			r := resource.Resource{
 				Fields: fields,
 			}
-			// Colour comes from findings for every type, so the probe carries
-			// one. Without it this asks whether a bare Fields map can be
-			// coloured, which is no longer a question about the type.
+			// Colour comes from findings for every type, so the probe carries one.
 			r.Findings = []domain.Finding{
 				{Code: domain.FindingCode(td.ShortName + ".test.probe"), Phrase: s, Severity: domain.SevBroken, Source: "wave1"},
 			}

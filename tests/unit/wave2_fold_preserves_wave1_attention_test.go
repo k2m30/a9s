@@ -1,6 +1,6 @@
 package unit
 
-// wave2_fold_preserves_wave1_attention_test.go — ApplyWave2ToRow must fold
+// ApplyWave2ToRow must fold
 // wave-2 results onto a row without destroying what wave 1 already put there.
 //
 // The fold owns exactly the wave-2 slice of a row: findings whose Source is

@@ -1,11 +1,10 @@
 package unit_test
 
-// phase03_compute_pr03b_test.go — regression-pin tests for Wave 1 finding migration,
-// covering the 9 remaining compute types in PR-03b:
+// Wave 1 findings for the compute types
 // lambda, eks, asg, eb, ebs, ami, eip, eni, ebs-snap.
 //
-// Migration contract (PR-03b — implemented):
-//   - Fetchers STOP writing Resource.Status for lifecycle states.
+// Contract:
+//   - Fetchers write no Resource.Status for lifecycle states.
 //   - Fetchers EMIT canonical Finding entries (Source: "wave1") for non-healthy,
 //     non-terminal states.
 //   - Each type has a corresponding core/aws/<svc>_codes.go with constants.
@@ -14,24 +13,22 @@ package unit_test
 // Per-type vocabulary (derived from Color func in types_compute.go /
 // types_containers.go / types_networking.go):
 //
-//   lambda: Active→healthy, Pending→SevWarn, Failed→SevBroken, Inactive→SevWarn
-//           (fetcher currently writes Status=runtime or Status="Failed"/"Pending";
-//            post-migration writes Fields["state"] + emits Finding for non-Active)
+//   lambda: Active→healthy, Pending→SevWarn, Failed→SevBroken, Inactive→SevDim
+//           (fetcher writes Fields["state"] + emits Finding for non-Active)
 //   eks:    ACTIVE→healthy, CREATING/UPDATING→SevWarn, FAILED→SevBroken,
 //           DELETING→no Finding (lifecycle terminal)
 //   asg:    ""→healthy, "Delete in progress"→SevWarn (only Status source);
 //           in_service_count<min_size→SevBroken (CodeASGUnderprovisioned),
 //           unhealthy instances→SevWarn, suspended Launch/Terminate/HealthCheck
-//           processes→SevWarn — each of these branches now emits a wave1
+//           processes→SevWarn — each of these branches emits a wave1
 //           Finding mirroring colorASG's own structural read.
 //   eb:     Green→healthy, Yellow→SevWarn, Red→SevBroken, Grey→SevWarn
-//           (fetcher writes Status=health; post-migration emits Finding for non-Green)
+//           (fetcher emits Finding for non-Green)
 //   ebs:    in-use/available→healthy, creating→SevWarn, error→SevBroken,
 //           deleting→no Finding (lifecycle terminal)
 //   ami:    available→healthy, pending/transient→SevWarn, failed/error/invalid→SevBroken,
 //           deregistered/disabled→no Finding (lifecycle terminal)
 //   eip:    association_id!=nil→healthy; no association_id AND no instance_id→SevWarn
-//           (current fetcher writes Status=domain, not an issue state)
 //   eni:    in-use→healthy, available→SevWarn (or Healthy for requester-managed),
 //           attaching/detaching→SevWarn
 //   ebs-snap: completed→healthy, pending→SevWarn, error/recoverable/recovering→SevBroken
@@ -62,8 +59,8 @@ import (
 // =============================================================================
 
 // TestPR03b_LambdaFetcher_ActiveEmitsNoFinding asserts that an Active lambda
-// function with a configured DLQ emits no Finding and no Status after
-// migration — Active state and deprecated-runtime are both healthy here, so
+// function with a configured DLQ emits no Finding and no Status — Active
+// state and deprecated-runtime are both healthy here, so
 // only the no-DLQ fallback branch could otherwise fire; giving the fixture a
 // DeadLetterConfig isolates the Active-state assertion from that unrelated
 // structural check (see TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding for
@@ -194,7 +191,7 @@ func (m *pr03bLambdaMock) ListFunctions(
 // =============================================================================
 
 // TestPR03b_EKSFetcher_ActiveEmitsNoFinding asserts that an ACTIVE EKS cluster
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	listMock := &pr03bEKSListMock{clusters: []string{"prod-cluster"}}
 	describeMock := &pr03bEKSDescribeMock{
@@ -334,7 +331,7 @@ func (f *pr03bEKSFake) DescribeNodegroup(
 // =============================================================================
 
 // TestPR03b_ASGFetcher_HealthyEmitsNoFinding asserts that an ASG with empty
-// status emits no Finding and no Status after migration.
+// status emits no Finding and no Status.
 func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	mock := &pr03bASGMock{
 		asgs: []autoscalingtypes.AutoScalingGroup{
@@ -440,7 +437,7 @@ func (m *pr03bASGMock) DescribeAutoScalingGroups(
 // =============================================================================
 
 // TestPR03b_EBFetcher_GreenEmitsNoFinding asserts that a Green Elastic Beanstalk
-// environment emits no Finding and no Status after migration.
+// environment emits no Finding and no Status.
 func TestPR03b_EBFetcher_GreenEmitsNoFinding(t *testing.T) {
 	mock := &pr03bEBMock{
 		envs: []ebtypes.EnvironmentDescription{
@@ -490,7 +487,7 @@ func (m *pr03bEBMock) DescribeEnvironments(
 // =============================================================================
 
 // TestPR03b_EBSFetcher_InUseEmitsNoFinding asserts that an in-use EBS volume
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03b_EBSFetcher_InUseEmitsNoFinding(t *testing.T) {
 	mock := &pr03bEBSVolMock{
 		vols: []ec2types.Volume{
@@ -581,7 +578,7 @@ func (m *pr03bEBSVolMock) DescribeVolumes(
 // =============================================================================
 
 // TestPR03b_AMIFetcher_AvailableEmitsNoFinding asserts that an available AMI
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03b_AMIFetcher_AvailableEmitsNoFinding(t *testing.T) {
 	mock := &pr03bAMIMock{
 		images: []ec2types.Image{
@@ -678,11 +675,10 @@ func (m *pr03bAMIMock) DescribeImages(
 // =============================================================================
 
 // TestPR03b_EIPFetcher_AssociatedEmitsNoFinding asserts that an EIP that is
-// associated with an instance emits no Finding and no Status after migration.
+// associated with an instance emits no Finding and no Status.
 //
-// NOTE: The current fetcher writes Status=domain (vpc/standard), which is NOT
-// a health state. Post-migration the fetcher writes no Status and emits a
-// CodeEIPUnassociated finding only when the EIP is unattached.
+// The fetcher emits a CodeEIPUnassociated finding only when the EIP is
+// unattached.
 func TestPR03b_EIPFetcher_AssociatedEmitsNoFinding(t *testing.T) {
 	mock := &pr03bEIPMock{
 		addrs: []ec2types.Address{
@@ -714,8 +710,8 @@ func TestPR03b_EIPFetcher_AssociatedEmitsNoFinding(t *testing.T) {
 // no association, no instance, and no ENI emits one SevWarn Finding with
 // CodeEIPUnassociated (cost-waste signal).
 //
-// NOTE: No SevBroken broken test for EIP — unassociated is the worst state,
-// and it maps to SevWarn (cost waste, not service failure).
+// Unassociated is the worst EIP state, and it maps to SevWarn (cost waste,
+// not service failure).
 func TestPR03b_EIPFetcher_UnassociatedEmitsWarnFinding(t *testing.T) {
 	mock := &pr03bEIPMock{
 		addrs: []ec2types.Address{
@@ -773,7 +769,7 @@ func (m *pr03bEIPMock) DescribeAddresses(
 // =============================================================================
 
 // TestPR03b_ENIFetcher_InUseEmitsNoFinding asserts that an in-use ENI
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03b_ENIFetcher_InUseEmitsNoFinding(t *testing.T) {
 	mock := &pr03bENIMock{
 		enis: []ec2types.NetworkInterface{
@@ -864,7 +860,7 @@ func (m *pr03bENIMock) DescribeNetworkInterfaces(
 // =============================================================================
 
 // TestPR03b_EBSSnapFetcher_CompletedEmitsNoFinding asserts that a completed
-// EBS snapshot emits no Finding and no Status after migration.
+// EBS snapshot emits no Finding and no Status.
 func TestPR03b_EBSSnapFetcher_CompletedEmitsNoFinding(t *testing.T) {
 	mock := &pr03bEBSSnapMock{
 		snaps: []ec2types.Snapshot{
@@ -956,24 +952,15 @@ func (m *pr03bEBSSnapMock) DescribeSnapshots(
 // Additional pins
 // =============================================================================
 
-// TestPR03b_LambdaColor_BrokenOverridesWave1 verifies that the structural broken
-// overrides in the Lambda Color func (deprecated runtime, last_update_status=Failed)
-// win even when a wave1 Finding is present. Before the fix, the Color func returned
-// ColorFromSeverity(wave1) early, downgrading these to yellow.
-//
-// Pre-fix: Color returns ColorWarning (wave1 SevWarn early-return).
-// Post-fix: Color evaluates structural broken overrides BEFORE wave1.
 // TestPR03b_LambdaColor_BrokenOverridesWave1 pins that a higher-precedence
 // Broken signal wins over a lower-precedence Warn one.
 //
-// Since the color-findings-conformance wave, colorLambda is
-// colorFromAnyFinding-only (no raw-field fallback) — the real fetcher
+// colorLambda is colorFromAnyFinding-only — the real fetcher
 // (core/aws/lambda.go) enforces precedence itself via a single switch
 // that emits exactly ONE Finding (last-update-failed > deprecated-runtime >
-// lifecycle state > no-DLQ), so "deprecated runtime overrides wave1 SevWarn"
-// is now pinned by attaching the CodeLambdaDeprecatedRuntime /
-// CodeLambdaLastUpdateFailed Finding the real fetcher would have chosen,
-// not by a bare Fields read.
+// lifecycle state > no-DLQ), so the test attaches the
+// CodeLambdaDeprecatedRuntime / CodeLambdaLastUpdateFailed Finding the real
+// fetcher would have chosen.
 func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	td := resource.FindResourceType("lambda")
 	if td == nil {
@@ -1009,11 +996,9 @@ func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 // AWS-managed ENIs flagged via the RequesterManaged *bool field do NOT emit a
 // CodeENIStateAvailable Finding even when Status is "available".
 //
-// Pre-fix: fetcher checks interfaceType != "requester-managed" (a string
-// comparison against InterfaceType), which misses ENIs whose InterfaceType is
-// "interface" or any other non-"requester-managed" string but whose
-// RequesterManaged boolean is true (EFS, VPC endpoints, ELB managed by AWS).
-// Post-fix: fetcher reads eni.RequesterManaged to detect AWS-managed ENIs.
+// AWS-managed ENIs (EFS, VPC endpoints, ELB) can carry InterfaceType
+// "interface" with RequesterManaged true, so InterfaceType alone does not
+// identify them.
 func TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding(t *testing.T) {
 	// ENI with Status=available, RequesterManaged=true, InterfaceType="interface"
 	// — this represents a real AWS-managed ENI (e.g. EFS mount target) that has
@@ -1023,8 +1008,8 @@ func TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding(t *testing.
 			{
 				NetworkInterfaceId: aws.String("eni-0123abcdef456789a"),
 				Status:             ec2types.NetworkInterfaceStatusAvailable,
-				InterfaceType:      ec2types.NetworkInterfaceTypeInterface, // NOT "requester-managed"
-				RequesterManaged:   aws.Bool(true),                         // but IS requester-managed
+				InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+				RequesterManaged:   aws.Bool(true),
 				VpcId:              aws.String("vpc-0abc1234"),
 				PrivateIpAddress:   aws.String("10.0.3.10"),
 			},
@@ -1048,8 +1033,6 @@ func TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding(t *testing.
 
 // TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding pins the inverse:
 // non-requester-managed ENIs in available state DO get the cost-waste warning.
-// This is the baseline case — the test confirms the fix does not suppress
-// legitimate warnings for user-managed idle ENIs.
 func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
 	// ENI with Status=available, RequesterManaged=false — user-owned idle ENI
 	mock := &pr03bENIMock{
@@ -1144,8 +1127,8 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 			if r.Findings[0].Source != "wave1" {
 				t.Errorf("health=%s: Findings[0].Source = %q, want wave1", tc.name, r.Findings[0].Source)
 			}
-			// Fields["health"] must still carry the raw health value (kept for
-			// realism/detail rendering; Color no longer reads it directly).
+			// Fields["health"] carries the raw health value for detail
+			// rendering.
 			if r.Fields["health"] != tc.name {
 				t.Errorf("health=%s: Fields[\"health\"]: got %q, want %q", tc.name, r.Fields["health"], tc.name)
 			}
@@ -1154,7 +1137,7 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 }
 
 // =============================================================================
-// A1 — Lambda Inactive emits NO Finding
+// Lambda Inactive emits a SevDim Finding
 // =============================================================================
 
 // TestPR03b_LambdaFetcher_InactiveEmitsDimFinding pins that Lambda Inactive
@@ -1183,19 +1166,17 @@ func TestPR03b_LambdaFetcher_InactiveEmitsDimFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	// Inactive is lifecycle-class, but is now surfaced as a SevDim wave1
-	// Finding (CodeLambdaInactive) so the list/Attention surfaces can show it.
 	if len(r.Findings) != 1 {
 		t.Errorf("Inactive function: Findings = %d, want 1 (CodeLambdaInactive, SevDim)", len(r.Findings))
 	}
-	// State field must still be written so the Color func can return ColorDim.
+	// The Color func reads the state field to return ColorDim.
 	if r.Fields["state"] != "Inactive" {
 		t.Errorf("Fields[\"state\"] = %q, want \"Inactive\"", r.Fields["state"])
 	}
 }
 
 // =============================================================================
-// A2 — EC2 state_reason_code registered in GetFieldKeys
+// EC2 state_reason_code registered in GetFieldKeys
 // =============================================================================
 
 // TestPR03b_EC2Fields_StateReasonCodeRegistered asserts that "state_reason_code"
@@ -1213,7 +1194,7 @@ func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
 }
 
 // =============================================================================
-// A3 — Lambda state registered in GetFieldKeys
+// Lambda state registered in GetFieldKeys
 // =============================================================================
 
 // TestPR03b_LambdaFields_StateRegistered asserts that "state" is declared in the

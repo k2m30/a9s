@@ -1,17 +1,13 @@
 package unit_test
 
-// prowler_w2_demo_bench_test.go — the demo-bench half of the w2 Prowler batch.
-//
 // The per-type tests assert an enricher emits the right finding for the input
-// it is given. This one asserts the demo account actually contains such an
-// input: every new code is carried by exactly one row after the real fetcher
-// and enricher path, so the finding is visible when someone opens the app and
-// no other row is quietly tripping the same condition.
+// it is given. These assert the demo account contains such an input: every
+// posture code is carried by exactly one row after the real fetcher and
+// enricher path.
 //
-// Exactly one matters in both directions. Zero means the witness fixture never
-// reaches the condition and every screenshot of this signal is empty. More
-// than one means a fixture that was supposed to be healthy for this row is not,
-// which is how a demo bench stops being a bench and starts being noise.
+// Exactly one matters in both directions. Zero means the finding is never
+// visible in the demo. More than one means a fixture meant to be healthy for
+// that code is not.
 
 import (
 	"regexp"
@@ -76,7 +72,7 @@ var w2BenchWitnesses = []struct {
 // row can reach by more than one route. s3.public has two: AWS reporting the
 // bucket policy public, and an access control list granting a public group.
 // The bench shows one bucket for each, so an operator sees both phrasings of
-// the same finding (spec row s3-0916/1).
+// the same finding.
 var w2BenchWitnessCount = map[string]int{
 	"s3.public": 2,
 }
@@ -135,19 +131,14 @@ func normalizeRowText(s string) string {
 	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
 }
 
-// TestW2DetailAttentionNeverRepeatsItself pins U11 per finding: a supporting
-// row must add something its OWN finding's phrase does not already say.
-//
-// Comparing rows only against each other, as this test first did, misses the
-// case that actually shipped — one row under one phrase, saying the same
-// thing. The row and the phrase are rendered one line apart, so "Audit
-// logging: off" under "audit logging off" is the detail block printing one
-// fact twice. The comparison that catches it is row against its own phrase.
+// TestW2DetailAttentionNeverRepeatsItself pins that a supporting row adds
+// something its own finding's phrase does not already say. The row and the
+// phrase render one line apart, so "Audit logging: off" under "audit logging
+// off" prints one fact twice; the comparison is row against its own phrase.
 func TestW2DetailAttentionNeverRepeatsItself(t *testing.T) {
 	batchTypes := map[string]bool{
 		"s3": true, "redis": true, "dbi": true, "dbc": true, "dbi-snap": true,
 		"dbc-snap": true, "ddb": true, "opensearch": true, "redshift": true, "efs": true,
-		// w7 adds backup-coverage rows to ebs; dbi, dbc and ddb are already here.
 		"ebs": true,
 	}
 
@@ -182,16 +173,16 @@ func TestW2DetailAttentionNeverRepeatsItself(t *testing.T) {
 	}
 }
 
-// w2RowlessCodes are the findings whose phrase is the whole fact. Each once
-// carried a supporting row that restated it — "Encrypted transport: not
-// required" under the phrase "HTTPS not enforced" is one sentence printed
-// twice, a paraphrase rather than an exact repeat, which is why the
-// normalized comparison above cannot catch it and this list is explicit.
+// w2RowlessCodes are the findings whose phrase is the whole fact. A supporting
+// row would restate it — "Encrypted transport: not required" under the phrase
+// "HTTPS not enforced" is one sentence printed twice, a paraphrase rather than
+// an exact repeat, which the normalized comparison above cannot catch, so this
+// list is explicit.
 //
 // A code belongs here when an operator reading the phrase already knows
 // everything the row would tell them. It does NOT belong here when the row
 // carries a value the phrase lacks — the master username, the certificate
-// expiry date, the require_ssl setting — so those keep their rows.
+// expiry date, the require_ssl setting.
 var w2RowlessCodes = map[string]string{
 	"redis.encryption-at-rest-off":    "phrase already says encryption at rest is off",
 	"redis.encryption-in-transit-off": "phrase already says encryption in transit is off",

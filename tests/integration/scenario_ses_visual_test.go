@@ -2,20 +2,15 @@
 
 package integration
 
-// scenario_ses_visual_test.go — Phase 8 render-gate for the ses resource.
-//
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the §4 contract in docs/resources/ses.md.
+// scenario_ses_visual_test.go checks the rendered TUI output (not fetcher
+// return values) for ses against the universal UI rules and
+// docs/resources/ses.md.
 //
 // ses has 5 Wave-1 signals (PENDING / FAILED / TEMPORARY_FAILURE /
 // NOT_STARTED / SendingEnabled==false) and 3 Wave-2 signals (PROBATION,
-// SHUTDOWN, quota > 80%). The demo fixture's GetAccountDefault is HEALTHY
-// by design — an always-SHUTDOWN demo fixture would clobber every identity
-// row and destroy Wave-1 readability in the showroom. Wave-2 rendering
-// (U3 / U4 / U7b S4-bump / U6 menu badge) is therefore covered at the
-// unit-test level (aws_ses_issue_enrichment_test.go — 25 tests asserting
-// the exact FieldUpdates map and Summary/Rows shape) rather than in this
-// render gate. See Phase 9 report rationale.
+// SHUTDOWN, quota > 80%). The demo account is HEALTHY because an
+// account-level SHUTDOWN would clobber every identity row, so Wave-2
+// rendering is covered by aws_ses_issue_enrichment_test.go instead.
 
 import (
 	"testing"
@@ -24,8 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// SES list column + §4 phrase + fixture-ID constants pinned locally from
-// docs/resources/ses.md §4 "List text".
 const (
 	sesHealthyDomainID       = "acme-corp.com"
 	sesHealthyEmailID        = "noreply@acme-corp.com"
@@ -53,22 +46,16 @@ func TestScenario_SESVisual(t *testing.T) {
 	// FieldUpdates are merged end-to-end).
 	runDemoStartup(t, scenario)
 
-	// -----------------------------------------------------------------
-	// S1 menu badge — counts distinct identities whose row color is
+	// Menu badge — counts distinct identities whose row color is
 	// Warning / Broken (Wave-1) OR carry a Wave-2 finding. Demo default
 	// is HEALTHY account + low quota, so no Wave-2 contribution; the 6
 	// Wave-1 fixtures (PENDING, FAILED, TEMP_FAILURE, NOT_STARTED,
 	// sending-disabled, multi) each contribute 1 → issues:6.
-	// -----------------------------------------------------------------
 	scenario.ExpectMenuIssueCount("ses", 6)
 
 	scenario.OpenList("ses")
 
-	// -----------------------------------------------------------------
-	// Universal column rules — no jargon columns. The old "Verification"
-	// and "Sending" jargon columns were folded into a single Status
-	// column in phase 7. Only identity + type + status remain.
-	// -----------------------------------------------------------------
+	// Verification and sending state share the single Status column.
 	for _, jargon := range []string{
 		"Verification", "Sending", "CIS", " Flags", " Issues ",
 		"NOBKP", "UNENC", "NOPROT",
@@ -76,28 +63,19 @@ func TestScenario_SESVisual(t *testing.T) {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// -----------------------------------------------------------------
-	// Wave 1 §4 phrases per fixture.
-	// -----------------------------------------------------------------
-	// Healthy rows: blank Status.
 	scenario.ExpectRowStatusBlank(sesHealthyDomainID)
 	scenario.ExpectRowStatusBlank(sesHealthyEmailID)
 
-	// Single-signal Wave 1.
 	scenario.ExpectRowStatusEquals(sesPendingID, sesPhrasePending)
 	scenario.ExpectRowStatusEquals(sesFailedID, sesPhraseFailed)
 	scenario.ExpectRowStatusEquals(sesTempFailureID, sesPhraseTempFailure)
 	scenario.ExpectRowStatusEquals(sesNotStartedID, sesPhraseNotStarted)
 	scenario.ExpectRowStatusEquals(sesSuppressedID, sesPhraseSendingDisabled)
 
-	// Rule 7 U7a — multi-W1: top phrase + (+N-1) suffix.
 	scenario.ExpectRowStatusEquals(sesMultiW1ID, sesPhraseMultiW1)
 
-	// -----------------------------------------------------------------
-	// Glyph rules.
-	// -----------------------------------------------------------------
-	// Rule 3 — Healthy rows with no Wave-2 finding must NOT carry a glyph
-	// (demo default is HEALTHY account + under-quota — no finding fires).
+	// The demo account is HEALTHY and under quota, so no Wave-2 finding fires
+	// and Healthy rows carry no glyph.
 	for _, id := range []string{
 		sesHealthyDomainID,
 		sesHealthyEmailID,
@@ -105,7 +83,7 @@ func TestScenario_SESVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// Rule 3 — non-green rows must NOT carry a glyph regardless of finding.
+	// Non-green rows carry no glyph regardless of finding.
 	for _, id := range []string{
 		sesPendingID,
 		sesFailedID,
@@ -117,17 +95,11 @@ func TestScenario_SESVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// -----------------------------------------------------------------
-	// Related panel — every §2 pivot with `count shown: yes` ≥ 1 for the
-	// designated graph-root fixture (`acme-corp.com`). See user guidance
-	// 2026-04-23: "related resources MUST work. if they don't it's a bug".
-	// -----------------------------------------------------------------
 	root := selectSESByID(t, scenario, sesHealthyDomainID)
 	scenario.OpenDetailResource("ses", root)
 	scenario.ExpectNoAPIError()
 
-	// Kinesis Streams pivot removed: SES ships to Firehose, not Kinesis Data Streams.
-	// A follow-up issue will add a Firehose resource type.
+	// SES event destinations ship to Firehose, not Kinesis Data Streams.
 	for _, displayName := range []string{
 		"Route 53 (DNS)",
 		"Lambda Functions",
@@ -137,36 +109,27 @@ func TestScenario_SESVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// EventBridge Rules: the fixture has multiple rules on the "default" bus, so
-	// the exact count is implementation-detail. Assert at least one rule is returned
-	// and the row is present. Do NOT pin the exact number.
+	// The fixture has several rules on the "default" bus; the exact count is
+	// incidental.
 	scenario.ExpectRelatedRowCountAtLeast("EventBridge Rules", 1)
 
-	// -----------------------------------------------------------------
-	// Rule 7 U7c / U7e — S5 Attention section surfaces every Wave-1
-	// phrase on the multi-W1 fixture. The list shows "verification
-	// failed (+1)" (rolled-up); the detail enumerates both phrases.
-	// -----------------------------------------------------------------
+	// The list shows "verification failed (+1)"; the detail lists both
+	// phrases.
 	scenario.Back()
 	multi := selectSESByID(t, scenario, sesMultiW1ID)
 	scenario.OpenDetailResource("ses", multi)
 	scenario.ExpectNoAPIError()
 
-	// 8.4 user-visible sanity render (mandatory).
 	view := scenario.currentView()
 	t.Log("\n" + view)
 
-	// Both §4 phrases from Resource.Issues must appear in the rendered
-	// Attention section with first letter capitalized, which the unified
-	// renderer does at display time.
 	scenario.ExpectViewContains(sesDetailPhraseFailed)
 	scenario.ExpectViewContains(sesDetailPhraseSDisabled)
 }
 
-// TestScenario_SESVisual_HealthyRowsHaveNoAttentionSection asserts spec §4
-// "Healthy silence": Healthy identity rows must render with no Attention
-// section and no Wave-1 phrase in their detail view. Dedicated regression
-// pin so a failure is immediately identifiable as false-positive noise.
+// TestScenario_SESVisual_HealthyRowsHaveNoAttentionSection asserts Healthy
+// identity rows render with no Attention section and no Wave-1 phrase in
+// their detail view.
 func TestScenario_SESVisual_HealthyRowsHaveNoAttentionSection(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
@@ -205,7 +168,4 @@ func selectSESByID(t *testing.T, s *fullIntegrationScenario, id string) resource
 	return fullIntegrationMustFindResourceByID(t, s.clients, "ses", id)
 }
 
-// The demo fixture exports are referenced through a side-effect of the
-// import — if future refactors drop the import we want the test to still
-// compile. This assignment is a no-op at runtime.
 var _ = demofixtures.SESGraphRootIdentity

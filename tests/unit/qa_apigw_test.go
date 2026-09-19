@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// API Gateway V2 fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &mockAPIGatewayV2Client{
@@ -54,7 +50,6 @@ func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first API
 	r0 := resources[0]
 	if r0.ID != "abc123def4" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "abc123def4", r0.ID)
@@ -63,7 +58,6 @@ func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-http-api", r0.Name)
 	}
 
-	// Verify required fields
 	requiredFields := []string{"api_id", "name", "protocol", "endpoint", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -80,7 +74,6 @@ func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"endpoint\"]: expected endpoint, got %q", r0.Fields["endpoint"])
 	}
 
-	// Verify second API (WebSocket)
 	r1 := resources[1]
 	if r1.Fields["protocol"] != "WEBSOCKET" {
 		t.Errorf("resource[1].Fields[\"protocol\"]: expected %q, got %q", "WEBSOCKET", r1.Fields["protocol"])

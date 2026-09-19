@@ -24,7 +24,7 @@ import (
 // NewTransientDetail.RenderDetail seam — same golden infrastructure as
 // detail_ports_test.go.
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
-	styles.ReinitForTest() // ensure styles are initialized
+	styles.ReinitForTest()
 
 	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
@@ -34,11 +34,10 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 
-	// Perf: test 4 representative resource types to keep this test fast.
-	// Chosen: ec2 (most complex, nested fields), s3 (simple bucket), lambda
-	// (function), redis (ReplicationGroup — pins the post-spec-rewrite RawStruct
-	// shape so a regression back to CacheCluster would surface here).
-	// Full coverage is exercised by individual per-type detail tests in qa_detail_*_test.go.
+	// Perf: 4 representative resource types keep this test fast: ec2 (most
+	// complex, nested fields), s3 (simple bucket), lambda (function), redis
+	// (ReplicationGroup RawStruct). Per-type detail tests live in
+	// qa_detail_*_test.go.
 	allFixtures := map[string]resource.Resource{
 		"ec2":    buildResource("i-0abcdef1234567890", "web-server-prod", realisticEC2Instance()),
 		"s3":     buildResource("my-production-bucket", "my-production-bucket", realisticS3Bucket()),
@@ -59,7 +58,6 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 				t.Skipf("no fixture for %s", shortName)
 			}
 
-			// First: check that configured paths actually resolve against the struct
 			if res.RawStruct != nil {
 				for _, df := range vd.Detail {
 					val := fieldpath.ExtractSubtree(res.RawStruct, df.String())
@@ -67,8 +65,6 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 				}
 			}
 
-			// Build the detail body through the live controller seam and render it
-			// via the same NewTransientDetail+RenderDetail path production uses.
 			c := newDetailController(t, res, shortName)
 			c.SetViewConfig(cfg)
 			body := c.Snapshot().Body.Detail
@@ -80,7 +76,6 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 			m := views.NewTransientDetail(120, 40, vp)
 			plain := stripAnsi(m.RenderDetail(*body))
 
-			// Every configured detail path should appear as a label in the view
 			for _, df := range vd.Detail {
 				// The path name (or a truncated version) should be visible.
 				// PadOrTrunc receives "path:" (len+1), truncates to 22 with ellipsis.

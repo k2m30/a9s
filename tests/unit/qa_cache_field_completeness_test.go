@@ -1,4 +1,4 @@
-// qa_cache_field_completeness_test.go — three cache-file contracts:
+// Three cache-file contracts:
 //
 //  1. PersistedRows_CarryEveryRenderableColumn: a persisted s3 Row must carry
 //     the "region" field whenever the list renders a Region column.
@@ -7,7 +7,7 @@
 //     return r }"). A fresh live fetch always carries a real RawStruct
 //     (Scenario A below). A gap-carrying on-disk row (RawStruct == nil, so
 //     the missing field is not locally reconstructable) heals within ONE
-//     verify cycle per C1 (every screen entry re-verifies immediately): the
+//     verify cycle (every screen entry re-verifies immediately): the
 //     seeded render tolerates the empty cell (stale-marked, no crash), the
 //     verify-refetch lands fresh rows carrying a real RawStruct, and the
 //     save performed on that result persists the now-complete Fields.
@@ -15,7 +15,7 @@
 //
 //  2. PoisonedExact_HealsOnContradiction: an on-disk file carrying
 //     count:50/exact:true must heal once a genuine fetch reaches the SAME
-//     50 rows but is STILL truncated (a real next-page token exists). C5's
+//     50 rows but is STILL truncated (a real next-page token exists). The
 //     one-way ratchet ("exactness only ever advances", probes.go
 //     SaveResourceListCache) yields to a contradicting observation;
 //     otherwise the list keeps rendering a bare "50" (no "+", no "m"
@@ -58,10 +58,9 @@ import (
 // by a per-test temp cache directory. Callers must still open a top-level
 // list screen (openTopLevelList) via the same ActionCommand entry point
 // production code uses (core/app/actions_view.go handleActionCommand) so
-// maybeSaveResourceListCache's C6 scope gate (screen.ID ==
+// maybeSaveResourceListCache's scope gate (screen.ID ==
 // ScreenResourceList, EscPops=false, ParentContext=nil) is satisfied and a
-// subsequent ApplyResourcesLoaded call actually reaches disk. Mirrors
-// alltypesSweepPair in qa_alltypes_cache_sweep_test.go.
+// subsequent ApplyResourcesLoaded call actually reaches disk.
 func fieldCompletenessPair(t *testing.T, profile, region string) *app.Controller {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
@@ -151,7 +150,7 @@ func (n *rawStructNode) buildValue() reflect.Value {
 // genuinely derive-at-render rather than persist-verbatim: the identity
 // column ("@id", never Path-backed in practice) and the status/lifecycle
 // column (whose cell is overridden at render time from Findings, per
-// listExtractCellValue's isStatusCol branch and buildListBody's S4
+// listExtractCellValue's isStatusCol branch and buildListBody's status
 // override — persisting a materialized value for it would be actively
 // wrong, not merely superfluous).
 func pathBackedKeylessColumns(cols []app.ColumnDef, lifecycleKey string) []app.ColumnDef {
@@ -171,10 +170,6 @@ func pathBackedKeylessColumns(cols []app.ColumnDef, lifecycleKey string) []app.C
 	return out
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Pin 1 — PersistedRows_CarryEveryRenderableColumn (ALL-TYPES)
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestPersistedRows_CarryEveryRenderableColumn drives, for every registered
 // resource type, a real list-open + ResourcesLoaded save with a resource
 // whose RawStruct can materialize each Path-backed/Key-less column the
@@ -193,7 +188,7 @@ func pathBackedKeylessColumns(cols []app.ColumnDef, lifecycleKey string) []app.C
 // (e.g. an s3 Row saved by a build that predates that column, or any
 // partial-write gap) is loaded back via rowsFromCacheRows
 // (core/runtime/handlers_availability.go) into a resource.Resource with
-// RawStruct == nil (disk never carries RawStruct, C6). MaterializeListFields's
+// RawStruct == nil (disk never carries RawStruct). MaterializeListFields's
 // very first line ("if r.RawStruct == nil { return r }") cannot rebuild the
 // missing column from a seeded row, so a re-list-open + re-save round trip
 // (a user re-opening a9s and letting the list re-persist) writes the SAME
@@ -274,7 +269,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 
 				// Step 1: seed the disk file with a gap-row — carries every
 				// OTHER target column's key but is missing one
-				// (gapKey/targets[0]). RawStruct is never persisted (C6), so
+				// (gapKey/targets[0]). RawStruct is never persisted, so
 				// this gap is not locally reconstructable — the only way it
 				// can close is a genuine live re-fetch (steps 3-4).
 				gapKey := config.TitleFieldKey(targets[0].Title)
@@ -294,7 +289,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 
 				// Step 2: cold-boot the controller and open the list — the
 				// seeded render. The gap cell must render empty (the
-				// resolved key absent from Fields) WITHOUT crashing; C1
+				// resolved key absent from Fields) WITHOUT crashing; the list
 				// still marks this stale (Refreshing=true) pending the
 				// verify-refetch below.
 				_, ctrl := alltypesSweepPair(t, profile, region)
@@ -402,21 +397,14 @@ func buildMultiColumnRawStruct(cols []app.ColumnDef) (any, map[string]string) {
 			leafByPath[c.Path] = leafValue
 			root.insert(c.Path, leafValue)
 		}
-		// config.TitleFieldKey, not a second copy of the spelling rule:
-		// the spec's row 5 leaves exactly one Fields key per column title,
-		// and the save lane writes it under the spelling the extraction
-		// cascade reads first. Asserting the spaced spelling here pinned the
-		// collision that made a replayed cell depend on map order; do not
-		// restore it.
+		// config.TitleFieldKey, not a second copy of the spelling rule: exactly one
+		// Fields key per column title, written under the spelling the extraction
+		// cascade reads first.
 		key := config.TitleFieldKey(c.Title)
 		want[key] = leafValue
 	}
 	return root.buildValue().Interface(), want
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// Pin 2 — PoisonedExact_HealsOnContradiction
-// ─────────────────────────────────────────────────────────────────────────
 
 // TestPoisonedExact_HealsOnContradiction seeds a disk file with a poisoned
 // count:50/exact:true/rows:50 pair (the shape an old build could have left
@@ -434,7 +422,6 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "poisoned-exact-prof", "us-east-1"
 
-	// Seed the poisoned on-disk pair directly.
 	rows := make([]cache.Row, 50)
 	for i := range rows {
 		rows[i] = cache.Row{ID: "obj-" + strconv.Itoa(i), Name: "obj-" + strconv.Itoa(i)}
@@ -487,13 +474,9 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Pin 3 — SilentSwap_NeverDropsKnownFindings
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestSilentSwap_NeverDropsKnownFindings seeds a top-level list with rows
 // that already carry a persisted WAVE-2 finding (glyph) — the user-visible
-// case that actually motivated this pin: an enrichment-derived issue like
+// case: an enrichment-derived issue like
 // "PITR off" or "public access block disabled" — with the session's Wave-2
 // enrichment store left EMPTY (a genuinely fresh session, no enrichment
 // probe has completed yet this session). A replace then lands with the SAME
@@ -503,8 +486,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 // finding (inherited, since enrichment genuinely has not re-run yet), not
 // silently drop it.
 //
-// Contract (fixed, mirrors qa_cache_lifecycle_test.go's Scenario 3 finding
-// and core/app/list_body.go's applyResourcesLoaded carry-forward): a
+// Contract (core/app/list_body.go's applyResourcesLoaded carry-forward): a
 // fresh fetch result IS the authoritative statement about WAVE-1 state for a
 // row — a row that comes back with zero findings this time means any
 // WAVE-1-sourced issue is RESOLVED, and carrying that old Wave-1 finding

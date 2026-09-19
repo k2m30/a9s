@@ -2,15 +2,14 @@
 
 package unit_test
 
-// phrase_row_never_restates_test.go — the U11 rule, bench-wide.
+// A supporting row never restates its
+// finding's phrase, bench-wide.
 //
 // A supporting row and its finding's phrase render one line apart, so a row
 // that says what the phrase already said prints one fact twice and costs the
-// reader the line that could have said why. TestW6ADetailAttentionNeverRepeats
-// Itself holds this for the seven types of one batch; moving a phrase out of
-// the item and into the code makes it a whole-bench rule, because the danger
-// is exactly the shape the move creates — lifting the row's own text into the
-// declaration and leaving the row behind.
+// reader the line that could have said why. A phrase declared on the code
+// invites exactly this: the row's own text lifted into the declaration with
+// the row left behind.
 //
 // Scope is every registered type, over the app's own fold, so a type gaining
 // its first supporting row is covered without anyone adding it to a list.

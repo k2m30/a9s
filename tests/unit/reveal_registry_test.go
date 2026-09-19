@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_RegisterAndGet
-// ---------------------------------------------------------------------------
-
 // TestRevealRegistry_RegisterAndGet verifies that a registered reveal fetcher
 // can be retrieved with GetRevealFetcher.
 func TestRevealRegistry_RegisterAndGet(t *testing.T) {
@@ -34,7 +30,6 @@ func TestRevealRegistry_RegisterAndGet(t *testing.T) {
 		t.Fatal("GetRevealFetcher returned nil after SetRevealFetcherForTest")
 	}
 
-	// Verify the returned function is callable and returns the expected value.
 	val, err := got(context.Background(), nil, "any-id")
 	if err != nil {
 		t.Errorf("reveal fetcher returned unexpected error: %v", err)
@@ -43,10 +38,6 @@ func TestRevealRegistry_RegisterAndGet(t *testing.T) {
 		t.Errorf("reveal fetcher returned %q, want %q", val, "value")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_GetUnregistered
-// ---------------------------------------------------------------------------
 
 // TestRevealRegistry_GetUnregistered verifies that GetRevealFetcher returns nil
 // for a short name that has never been registered.
@@ -57,10 +48,6 @@ func TestRevealRegistry_GetUnregistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_HasRevealFetcher
-// ---------------------------------------------------------------------------
-
 // TestRevealRegistry_HasRevealFetcher verifies that HasRevealFetcher returns
 // true for registered types and false for unregistered ones.
 func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
@@ -69,7 +56,6 @@ func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 		return "", nil
 	}
 
-	// Before registration, should be false.
 	if resource.HasRevealFetcher(shortName) {
 		t.Fatal("HasRevealFetcher returned true before registration")
 	}
@@ -77,15 +63,10 @@ func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 	resource.SetRevealFetcherForTest(shortName, fetcher)
 	t.Cleanup(func() { resource.CleanupRevealFetcherForTest(shortName) })
 
-	// After registration, should be true.
 	if !resource.HasRevealFetcher(shortName) {
 		t.Fatal("HasRevealFetcher returned false after registration")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_Unregister
-// ---------------------------------------------------------------------------
 
 // TestRevealRegistry_Unregister verifies that CleanupRevealFetcherForTest removes
 // a previously registered fetcher.
@@ -97,14 +78,12 @@ func TestRevealRegistry_Unregister(t *testing.T) {
 
 	resource.SetRevealFetcherForTest(shortName, fetcher)
 
-	// Verify it was registered.
 	if resource.GetRevealFetcher(shortName) == nil {
 		t.Fatal("expected fetcher to be registered before unregister")
 	}
 
 	resource.CleanupRevealFetcherForTest(shortName)
 
-	// After unregister, should be nil.
 	if resource.GetRevealFetcher(shortName) != nil {
 		t.Fatal("GetRevealFetcher should return nil after CleanupRevealFetcherForTest")
 	}
@@ -112,10 +91,6 @@ func TestRevealRegistry_Unregister(t *testing.T) {
 		t.Fatal("HasRevealFetcher should return false after CleanupRevealFetcherForTest")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_SecretsRegistered
-// ---------------------------------------------------------------------------
 
 // TestRevealRegistry_SecretsRegistered verifies that importing core/aws
 // causes the "secrets" type to have a reveal fetcher registered via init().
@@ -128,10 +103,6 @@ func TestRevealRegistry_SecretsRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_SSMRegistered
-// ---------------------------------------------------------------------------
-
 // TestRevealRegistry_SSMRegistered verifies that importing core/aws
 // causes the "ssm" type to have a reveal fetcher registered via init().
 func TestRevealRegistry_SSMRegistered(t *testing.T) {
@@ -142,10 +113,6 @@ func TestRevealRegistry_SSMRegistered(t *testing.T) {
 		t.Fatal("GetRevealFetcher('ssm') returned nil, expected a non-nil fetcher")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRevealRegistry_EC2NotRegistered
-// ---------------------------------------------------------------------------
 
 // TestRevealRegistry_EC2NotRegistered verifies that "ec2" does NOT have a
 // reveal fetcher — it is not a secret-bearing resource type.

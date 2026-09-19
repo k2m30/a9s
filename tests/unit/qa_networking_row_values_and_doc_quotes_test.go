@@ -1,15 +1,16 @@
 package unit_test
 
-// qa_networking_row_values_and_doc_quotes_test.go — three rendering rules.
+// Three rendering rules.
 //
-// J. A rendered row value is a word an operator reads, not a Go bool literal
-//    and not an SDK enum spelling. A setting is enabled/disabled, a property
-//    yes/no.
-// K. sg.ingress.dangerous-ports must actually carry the Detail sentence its
-//    doc row has been promising.
-// L. A §4 Detail cell quotes what the code produces, whole and verbatim.
-//    Quoting a prefix with an invented ending, or quoting a sentence for a
-//    finding that renders none, both put words in the app's mouth.
+//   - A rendered row value is a word an operator reads, not a Go bool literal
+//     and not an SDK enum spelling. A setting is enabled/disabled, a property
+//     yes/no.
+//   - sg.ingress.dangerous-ports carries the Detail sentence its doc row
+//     quotes.
+//   - A Detail cell in a resource page's signals table quotes what the code
+//     produces, whole and verbatim. Quoting a prefix with an invented ending,
+//     or quoting a sentence for a finding that renders none, both put words in
+//     the app's mouth.
 
 import (
 	"fmt"
@@ -27,11 +28,9 @@ import (
 	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// netTypes is every registered type that ships a §4 table. The rulings below
-// are not properties of five networking types; a value that reads as a Go bool
-// or a doc that quotes a sentence the app never says is the same defect
-// wherever it happens, and scoping the sweep to the batch that first hit it
-// left every other type unwatched.
+// netTypes is every registered type whose resource page ships a signals
+// table. A value that reads as a Go bool or a doc that quotes a sentence the
+// app never says is the same defect wherever it happens.
 func netTypes(t *testing.T) []string {
 	t.Helper()
 	var out []string
@@ -52,8 +51,8 @@ func netDocPath(shortName string) string {
 }
 
 // TestNetworkingDocs_EveryRegisteredTypeHasAPage names the types the sweep
-// cannot see. A type with no §4 page is not covered by any assertion here, so
-// the gap has to be visible rather than silently skipped.
+// cannot see. A type with no resource page is not covered by any assertion
+// here, so the gap has to be visible rather than silently skipped.
 func TestNetworkingDocs_EveryRegisteredTypeHasAPage(t *testing.T) {
 	var missing []string
 	for _, td := range resource.AllResourceTypes() {
@@ -126,10 +125,10 @@ func netBench(t *testing.T, shortName string) (rows []netRow, details map[domain
 	return rows, details
 }
 
-// ── J. Values are words ───────────────────────────────────────────────────
+// ── Values are words ───────────────────────────────────────────────────
 
-// netAsidePattern strips a trailing parenthesised aside, which by ruling is
-// where a literal identifier may live ("disabled (BlockPublicAcls)").
+// netAsidePattern strips a trailing parenthesised aside, which is where a
+// literal identifier may live ("disabled (BlockPublicAcls)").
 var netAsidePattern = regexp.MustCompile(`\s*\([^()]*\)\s*$`)
 
 // netAllCapsValue matches a value spelled like an SDK enum constant.
@@ -174,7 +173,8 @@ func netFindRow(t *testing.T, shortName string, code domain.FindingCode, label s
 	return netRow{}, false
 }
 
-// TestSubnetAutoPublicIP_RowValueIsEnabled is the ruling's own worked example.
+// TestSubnetAutoPublicIP_RowValueIsEnabled pins the rule on subnet's
+// "Public address on launch" row.
 func TestSubnetAutoPublicIP_RowValueIsEnabled(t *testing.T) {
 	r, ok := netFindRow(t, "subnet", "subnet.auto-public-ip", "Public address on launch")
 	if !ok {
@@ -197,12 +197,10 @@ func TestELBInvalidHeaders_RowValueIsDisabled(t *testing.T) {
 	}
 }
 
-// ── K. sg.ingress.dangerous-ports carries a Detail ────────────────────────
+// ── sg.ingress.dangerous-ports carries a Detail ────────────────────────
 
-// TestSGDangerousPorts_CarriesDetail pins that the finding renders the S5
-// sentence its doc row promises. Asserted through the rendered finding rather
-// than the constant so this test names no new production symbol; dev may call
-// the constant sgDangerousPortsDetail.
+// TestSGDangerousPorts_CarriesDetail pins that the finding renders the
+// Detail sentence its doc row quotes, asserted through the rendered finding.
 func TestSGDangerousPorts_CarriesDetail(t *testing.T) {
 	_, details := netBench(t, "sg")
 	for _, code := range []domain.FindingCode{"sg.ingress.dangerous-ports", "sg.ingress.wide-open"} {
@@ -212,13 +210,13 @@ func TestSGDangerousPorts_CarriesDetail(t *testing.T) {
 	}
 }
 
-// ── L. Doc quotes equal the constants ─────────────────────────────────────
+// ── Doc quotes equal the constants ─────────────────────────────────────
 
-// netDocQuotePattern matches the backtick-quoted S5 cell at the end of a §4
-// table row.
+// netDocQuotePattern matches the backtick-quoted Detail cell at the end of a
+// signals-table row.
 var netDocQuotePattern = regexp.MustCompile("\\|\\s*`([^`]+)`\\s*\\|?\\s*$")
 
-// netDocQuotes returns every S5 quote in the type's §4 table.
+// netDocQuotes returns every Detail quote in the type's signals table.
 func netDocQuotes(t *testing.T, shortName string) []string {
 	t.Helper()
 	path := netDocPath(shortName)
@@ -259,8 +257,8 @@ func docQuoteMatches(quote, constant string) bool {
 }
 
 // declaredDetails is every Detail sentence the installed catalog declares —
-// the one owner of the S5 sentence, and therefore the oracle a hand-written
-// §4 quote is checked against.
+// the one owner of the Detail sentence, and therefore the oracle a
+// hand-written signals-table quote is checked against.
 func declaredDetails() map[string]bool {
 	out := map[string]bool{}
 	for _, td := range catalog.All() {
@@ -273,7 +271,7 @@ func declaredDetails() map[string]bool {
 	return out
 }
 
-// TestNetworkingDocQuotes_EqualADetailConstant checks every hand-written §4
+// TestNetworkingDocQuotes_EqualADetailConstant checks every hand-written
 // Detail quote on every resource page against the sentences the catalog
 // declares. The generated Findings table carries the declared sentence by
 // construction; a hand-written quote that matches no declaration is either
@@ -303,17 +301,16 @@ func TestNetworkingDocQuotes_EqualADetailConstant(t *testing.T) {
 }
 
 // detailLengthCap matches a doc line capping its own Detail cells, with or
-// without the word "text" — two pages spelled it "Detail ≤ 100 chars" and
-// survived a sweep that required "Detail text".
+// without the word "text" ("Detail ≤ 100 chars", "Detail text ≤ 100 chars").
 //
 // The cap has to sit directly against the word, which is what separates an
-// authoring rule from a §4 cell describing runtime clipping ("clipped to 100
+// authoring rule from a cell describing runtime clipping ("clipped to 100
 // chars") or a citation of the spec skill's own rules.
 var detailLengthCap = regexp.MustCompile(`(?i)detail(\s+text)?\s*(≤|<=)\s*100`)
 
-// TestNetworkingDocs_NoDetailLengthCap pins the removal of the note capping
-// Detail text at 100 characters: it contradicts quoting the constant whole,
-// and a constant longer than the cap cannot satisfy both.
+// TestNetworkingDocs_NoDetailLengthCap: no page caps Detail text at 100
+// characters. A cap contradicts quoting the constant whole, and a constant
+// longer than the cap cannot satisfy both.
 func TestNetworkingDocs_NoDetailLengthCap(t *testing.T) {
 	for _, short := range netTypes(t) {
 		path := netDocPath(short)
@@ -336,7 +333,7 @@ func TestNetworkingDocs_NoDetailLengthCap(t *testing.T) {
 }
 
 // TestDetailLengthCapMatcher_SeesBothSpellings is the matcher's own test: the
-// two spellings that shipped, and the three shapes that are not the defect.
+// two cap spellings, and three shapes that are not a cap.
 func TestDetailLengthCapMatcher_SeesBothSpellings(t *testing.T) {
 	caps := []string{
 		"- Keep both columns short: List ≤ 40 chars, Detail ≤ 100 chars.",

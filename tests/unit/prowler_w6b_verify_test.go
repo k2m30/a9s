@@ -1,8 +1,7 @@
 package unit
 
-// prowler_w6b_verify_test.go — the pins the verify round added, each covering
-// a way the round-1 implementation could regress without any existing test
-// noticing.
+// Regression pins for the ECR aggregate interface, the ecs-task health
+// compare and the cfn lifecycle phrases.
 
 import (
 	"context"
@@ -17,15 +16,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ─── ECRGetRepositoryPolicyAPI is out of the aggregate ──────────────────────
-
 // w6bECRAggregateOnlyFake embeds ECRAPI and implements only DescribeImages.
-// Before GetRepositoryPolicy left the aggregate, embedding ECRAPI handed this
-// fake a nil GetRepositoryPolicy method: the enricher's type assertion
-// SUCCEEDED against the embedded interface and the call segfaulted.
-//
-// The point of narrowing the aggregate is that the assertion now answers
-// honestly, so this fake must come back with no policy finding and no panic.
+// GetRepositoryPolicy is not in ECRAPI, so the enricher's type assertion
+// answers no for this fake and it must come back with no policy finding and
+// no panic. Were the method in the aggregate, the assertion would succeed
+// against the nil embedded interface and the call would segfault.
 type w6bECRAggregateOnlyFake struct {
 	awsclient.ECRAPI
 }
@@ -35,9 +30,8 @@ func (f *w6bECRAggregateOnlyFake) DescribeImages(_ context.Context, _ *ecr.Descr
 }
 
 // A fake that embeds the aggregate without implementing the policy call must
-// not reach that call. A panic here is the regression: it means
-// GetRepositoryPolicy is back in ECRAPI and the assertion is answering yes to
-// a nil method.
+// not reach that call. A panic here means GetRepositoryPolicy is in ECRAPI
+// and the assertion is answering yes to a nil method.
 func TestW6BECR_AggregateFakeWithoutPolicyCall_DoesNotReachIt(t *testing.T) {
 	const name = "acme/frontend"
 	res, err := w2Enricher(t, "ecr")(context.Background(),
@@ -50,13 +44,9 @@ func TestW6BECR_AggregateFakeWithoutPolicyCall_DoesNotReachIt(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodePublicPolicy))
 }
 
-// ─── row 12: the health compare survives the cache ──────────────────────────
-
-// A row rebuilt from the on-disk type cache still holds the SDK's spelling
-// from before the column moved to words. A strict compare would retire its
-// unhealthy finding, so the cell would read "unhealthy" on a row coloured
-// green — the same defect row 12 exists to fix, arriving from the cache
-// instead of from the SDK.
+// A row rebuilt from the on-disk type cache can hold the SDK's uppercase
+// spelling. A strict compare would drop its unhealthy finding, so the cell
+// would read "unhealthy" on a row coloured green.
 func TestW6BECSTask_CachedUppercaseHealth_StillCarriesTheFinding(t *testing.T) {
 	for _, health := range []string{"UNHEALTHY", "unhealthy", "Unhealthy"} {
 		t.Run(health, func(t *testing.T) {
@@ -77,12 +67,9 @@ func TestW6BECSTask_HealthColumnIsLowercaseWhateverTheInputCase(t *testing.T) {
 	}
 }
 
-// ─── cfn list text is words, not the SDK's spelling ─────────────────────────
-
 // Every cfn lifecycle finding draws its Phrase into the list status cell. The
-// SDK spells these UPDATE_ROLLBACK_FAILED; the cell has to read the sentence.
-// This was flagged in the red round as still emitting the lower-cased raw
-// enum, so the pin names the shape rather than one status.
+// SDK spells these UPDATE_ROLLBACK_FAILED; the cell has to read the sentence,
+// so the pin names the shape rather than one status.
 func TestW6BCFN_LifecyclePhrasesAreWordsNotUnderscoredEnums(t *testing.T) {
 	for _, status := range []string{
 		"ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED", "IMPORT_ROLLBACK_COMPLETE",

@@ -1,12 +1,10 @@
 package unit
 
-// prowler_w6a_dns_cdn_test.go — batch w6a rows 8-16: the Route 53 and
-// CloudFront posture signals.
+// Route 53 and CloudFront posture signals, all Wave 2.
 //
-// All nine are Wave 2. Rows 9 and 10 are cache joins that make no AWS call of
-// their own, so they are driven with a populated ResourceCache and an
-// otherwise-idle client; the rest read the distribution config the detail
-// path already fetches.
+// The dangling-record and origin-bucket checks join against the
+// ResourceCache, so they are driven with a populated cache; the rest read
+// only what the enricher fetches.
 //
 // The fakes embed the aggregate client interface and implement only the calls
 // under test. A method the enricher must not reach panics on the nil
@@ -41,10 +39,6 @@ const (
 	w6aCFDefaultCert      = "cf.default-certificate"
 	w6aCFNoGeoRestriction = "cf.no-geo-restriction"
 )
-
-// ---------------------------------------------------------------------------
-// r53 — rows 8-9
-// ---------------------------------------------------------------------------
 
 // w6aR53Fake answers the three calls the zone enricher makes. Zones default to
 // public with one query-logging config and no records, so each test switches
@@ -140,15 +134,15 @@ func w6aEnrichR53(t *testing.T, fake *w6aR53Fake, cache resource.ResourceCache, 
 	return res
 }
 
-// TestW6AR53QueryLoggingOff pins row 8. A public zone with no query-logging
-// config leaves DNS lookups unrecorded, so an exfiltration channel over DNS
-// has no trace to find.
+// TestW6AR53QueryLoggingOff pins query logging off. A public zone with no
+// query-logging config leaves DNS lookups unrecorded, so an exfiltration
+// channel over DNS has no trace to find.
 func TestW6AR53QueryLoggingOff(t *testing.T) {
 	off := w6aEnrichR53(t, &w6aR53Fake{logConfigs: 0}, nil, w6aZoneRes("Z0OFF00000000000000A", "no-query-logging.acme-corp.com."))
 	w2AssertFinding(t, off.Findings["Z0OFF00000000000000A"], w6aR53QueryLoggingOff,
 		"query logging off", domain.SevWarn, "wave2")
 	// The phrase already states that logging is off; the row says why the
-	// check applies to this zone at all (U11).
+	// check applies to this zone at all.
 	w2AssertRow(t, w2Rows(t, off, "Z0OFF00000000000000A", w6aR53QueryLoggingOff), "Zone type", "public")
 
 	on := w6aEnrichR53(t, &w6aR53Fake{logConfigs: 1}, nil, w6aZoneRes("Z0ON000000000000000A", "logged.acme-corp.com."))
@@ -165,10 +159,8 @@ func TestW6AR53QueryLoggingOff_PrivateZoneIsExempt(t *testing.T) {
 }
 
 // w6aAddressCache builds the eip/ec2 caches the dangling-record join reads.
-// Row 6 of the parse spec: the verdict now reads the elastic IP's association
-// state, so an eip fixture carries Fields["status"], and the eni cache is no
-// longer consulted at all — the eni fetcher writes no public_ip, so requiring
-// it voided the verdict without contributing an address.
+// The verdict reads the elastic IP's association state from
+// Fields["status"].
 func w6aAddressCache(truncated bool, unattachedEIPs, attachedEIPs, instanceIPs []string) resource.ResourceCache {
 	mk := func(ips []string, status string) domain.ResourceCacheEntry {
 		e := domain.ResourceCacheEntry{IsTruncated: truncated}
@@ -193,13 +185,12 @@ func w6aAddressCache(truncated bool, unattachedEIPs, attachedEIPs, instanceIPs [
 	}
 }
 
-// TestW6AR53DanglingRecord pins row 9, as rewritten by row 6 of the parse
-// spec. The finding is no longer "the address is absent from my inventory" —
-// nothing read-only proves an absent address was ever this account's, and a
-// name delegated to a CDN is absent for a perfectly good reason. What the
+// TestW6AR53DanglingRecord pins the dangling record. Nothing read-only proves
+// an address absent from the inventory was ever this account's, and a name
+// delegated to a CDN is absent for a perfectly good reason. What the
 // inventory does prove is an elastic IP this account holds with nothing
 // attached to it: every request for the name reaches an address that answers
-// nobody. The old assertion is not to be restored.
+// nobody.
 func TestW6AR53DanglingRecord(t *testing.T) {
 	fake := &w6aR53Fake{
 		logConfigs: 1,
@@ -220,14 +211,11 @@ func TestW6AR53DanglingRecord(t *testing.T) {
 	w2AssertRow(t, rows, "Target", "203.0.113.11")
 }
 
-// TestW6AR53DanglingRecord_AnythingButAnIdleElasticIPIsClean pins the other
-// side of row 6 of the parse spec. Three quite different situations all
-// render clean, and only one of them is "the address is fine": an attached
-// elastic IP and an instance address are reachable, while an address outside
-// the account is simply not something this account can judge. The old
-// version of this test asserted that an ENI address closes the finding; the
-// eni fetcher writes no public_ip, so that leg never held an address and its
-// assertion is not to be restored.
+// TestW6AR53DanglingRecord_AnythingButAnIdleElasticIPIsClean pins that three
+// quite different situations all render clean, and only one of them is "the
+// address is fine": an attached elastic IP and an instance address are
+// reachable, while an address outside the account is simply not something
+// this account can judge.
 func TestW6AR53DanglingRecord_AnythingButAnIdleElasticIPIsClean(t *testing.T) {
 	const addr = "203.0.113.201"
 	for name, cache := range map[string]resource.ResourceCache{
@@ -311,10 +299,6 @@ func TestW6AR53_RecordListingFailureTruncatesTheZone(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["Z0FAIL00000000000000"], w6aR53Dangling)
 }
 
-// ---------------------------------------------------------------------------
-// cf — rows 10-16
-// ---------------------------------------------------------------------------
-
 // w6aCFFake answers GetDistributionConfig with one config per distribution ID.
 type w6aCFFake struct {
 	awsclient.CloudFrontAPI
@@ -381,9 +365,8 @@ func w6aCFConfig(alias, originDomain string) *cftypes.DistributionConfig {
 
 // w6aHeadBucketFake answers HeadBucket the way AWS answers for an account
 // whose bucket list is exactly the s3 cache: a name outside it does not
-// exist. Row 7 of the parse spec made this call the authority for "gone",
-// because a cache listing only this account's buckets cannot speak for a
-// bucket in another one.
+// exist. HeadBucket is the authority for "gone", because a cache listing only
+// this account's buckets cannot speak for a bucket in another one.
 type w6aHeadBucketFake struct {
 	awsclient.S3API
 	exists map[string]bool
@@ -428,9 +411,9 @@ func w6aS3NameCache(truncated bool, names ...string) resource.ResourceCache {
 	return resource.ResourceCache{"s3": e}
 }
 
-// TestW6ACFOriginBucketMissing pins row 10. A distribution pointing at a
-// bucket that no longer exists is a takeover risk: whoever creates that name
-// next serves content from the account's own CDN domain.
+// TestW6ACFOriginBucketMissing pins the missing origin bucket. A distribution
+// pointing at a bucket that does not exist is a takeover risk: whoever
+// creates that name next serves content from the account's own CDN domain.
 func TestW6ACFOriginBucketMissing(t *testing.T) {
 	cfg := w6aCFConfig("shop.acme-corp.com", "acme-deleted-origin.s3.us-east-1.amazonaws.com")
 	res := w6aCFOne(t, "E6F7G8H9I0J1K2", cfg, w6aS3NameCache(false, "acme-live-origin"))
@@ -492,12 +475,13 @@ func TestW6ACFOriginBucketMissing_IncompleteS3CacheEmitsNothing(t *testing.T) {
 	}
 }
 
-// TestW6ACFDeprecatedTLS pins row 11 across every protocol version AWS still
-// accepts but no longer considers safe, and the two that are fine.
+// TestW6ACFDeprecatedTLS pins the deprecated minimum TLS across every
+// protocol version AWS accepts but does not consider safe, and the two that
+// are fine.
 func TestW6ACFDeprecatedTLS(t *testing.T) {
-	// Row 23: the value is the mapped word, never string(<SDK enum>). Two
-	// enums share TLS 1.0, so those carry the policy year to stay distinct;
-	// the acronym map already allows TLS.
+	// The value is the mapped word, never string(<SDK enum>). Two enums share
+	// TLS 1.0, so those carry the policy year to stay distinct; the acronym map
+	// already allows TLS.
 	weak := map[cftypes.MinimumProtocolVersion]string{
 		cftypes.MinimumProtocolVersionSSLv3:      "SSL 3.0",
 		cftypes.MinimumProtocolVersionTLSv1:      "TLS 1.0",
@@ -529,9 +513,9 @@ func TestW6ACFDeprecatedTLS(t *testing.T) {
 	}
 }
 
-// TestW6ACFLoggingOff pins row 12, including the nil case: CloudFront reports
-// no logging block at all when logging was never configured, which is off
-// rather than unknown.
+// TestW6ACFLoggingOff pins access logging off, including the nil case:
+// CloudFront reports no logging block at all when logging was never
+// configured, which is off rather than unknown.
 func TestW6ACFLoggingOff(t *testing.T) {
 	for name, mutate := range map[string]func(*cftypes.DistributionConfig){
 		"disabled": func(c *cftypes.DistributionConfig) { c.Logging.Enabled = aws.Bool(false) },
@@ -544,8 +528,8 @@ func TestW6ACFLoggingOff(t *testing.T) {
 			res := w6aCFOne(t, "E8H9I0J1K2L3M4", cfg, w6aS3NameCache(false, "acme-live-origin"))
 			w2AssertFinding(t, res.Findings["E8H9I0J1K2L3M4"], w6aCFLoggingOff,
 				"access logging off", domain.SevWarn, "wave2")
-			// The phrase says logging is off; the row names the destination
-			// that is missing (U11).
+			// The phrase says logging is off; the row names the destination that is
+			// missing.
 			w2AssertRow(t, w2Rows(t, res, "E8H9I0J1K2L3M4", w6aCFLoggingOff), "Log bucket", "none")
 		})
 	}
@@ -556,8 +540,9 @@ func TestW6ACFLoggingOff(t *testing.T) {
 	w2AssertNoCode(t, on.Findings["E8H9I0J1K2L3M4"], w6aCFLoggingOff)
 }
 
-// TestW6ACFNoDefaultRootObject pins row 13. Without one, a request to the
-// distribution root lists or exposes whatever the origin serves there.
+// TestW6ACFNoDefaultRootObject pins the missing default root object. Without
+// one, a request to the distribution root lists or exposes whatever the
+// origin serves there.
 func TestW6ACFNoDefaultRootObject(t *testing.T) {
 	for name, value := range map[string]*string{"nil": nil, "empty": aws.String("")} {
 		t.Run(name, func(t *testing.T) {
@@ -576,9 +561,10 @@ func TestW6ACFNoDefaultRootObject(t *testing.T) {
 	w2AssertNoCode(t, set.Findings["E9I0J1K2L3M4N5"], w6aCFNoRootObject)
 }
 
-// TestW6ACFS3OriginWithoutOriginAccessControl pins row 14. Without an access
-// control the bucket must be world-readable for the CDN to reach it, so the
-// CDN stops being the only way in.
+// TestW6ACFS3OriginWithoutOriginAccessControl pins an S3 origin without
+// origin access control. Without an access control the bucket must be
+// world-readable for the CDN to reach it, so the CDN stops being the only way
+// in.
 func TestW6ACFS3OriginWithoutOriginAccessControl(t *testing.T) {
 	cfg := w6aCFConfig("shop.acme-corp.com", "acme-live-origin.s3.us-east-1.amazonaws.com")
 	cfg.Origins.Items[0].OriginAccessControlId = aws.String("")
@@ -604,9 +590,10 @@ func TestW6ACFS3OriginNoOAC_LegacyIdentityStillCounts(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["EA0J1K2L3M4N5O"], w6aCFNoOAC)
 }
 
-// TestW6ACFDefaultCertificate pins row 15 and its exception: a distribution
-// with no alias legitimately serves on its cloudfront.net name with the
-// default certificate, and flagging it would be noise on every test stack.
+// TestW6ACFDefaultCertificate pins the default certificate and its exception:
+// a distribution with no alias legitimately serves on its cloudfront.net name
+// with the default certificate, and flagging it would be noise on every test
+// stack.
 func TestW6ACFDefaultCertificate(t *testing.T) {
 	withAlias := w6aCFConfig("shop.acme-corp.com", "acme-live-origin.s3.us-east-1.amazonaws.com")
 	withAlias.ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
@@ -614,7 +601,7 @@ func TestW6ACFDefaultCertificate(t *testing.T) {
 	w2AssertFinding(t, res.Findings["EB1K2L3M4N5O6P"], w6aCFDefaultCert,
 		"uses the default CloudFront certificate", domain.SevWarn, "wave2")
 	// The phrase names the certificate; the row names the custom domain that
-	// makes the default certificate wrong here (U11).
+	// makes the default certificate wrong here.
 	w2AssertRow(t, w2Rows(t, res, "EB1K2L3M4N5O6P", w6aCFDefaultCert), "Alias", "shop.acme-corp.com")
 
 	noAlias := w6aCFConfig("shop.acme-corp.com", "acme-live-origin.s3.us-east-1.amazonaws.com")
@@ -624,7 +611,7 @@ func TestW6ACFDefaultCertificate(t *testing.T) {
 	w2AssertNoCode(t, clean.Findings["EB1K2L3M4N5O6P"], w6aCFDefaultCert)
 }
 
-// TestW6ACFNoGeoRestriction pins row 16.
+// TestW6ACFNoGeoRestriction pins the missing geo restriction.
 func TestW6ACFNoGeoRestriction(t *testing.T) {
 	cfg := w6aCFConfig("shop.acme-corp.com", "acme-live-origin.s3.us-east-1.amazonaws.com")
 	cfg.Restrictions = &cftypes.Restrictions{GeoRestriction: &cftypes.GeoRestriction{
@@ -642,9 +629,9 @@ func TestW6ACFNoGeoRestriction(t *testing.T) {
 	w2AssertNoCode(t, restricted.Findings["EC2L3M4N5O6P7Q"], w6aCFNoGeoRestriction)
 }
 
-// TestW6ACF_ConditionsAreIndependent pins contract rule 4 across the six
-// config-derived cf rows: a distribution that fails all of them carries six
-// findings, each with its own supporting rows.
+// TestW6ACF_ConditionsAreIndependent pins that a distribution failing all six
+// config-derived cf checks carries six findings, each with its own
+// supporting rows.
 func TestW6ACF_ConditionsAreIndependent(t *testing.T) {
 	cfg := w6aCFConfig("shop.acme-corp.com", "acme-deleted-origin.s3.us-east-1.amazonaws.com")
 	cfg.DefaultRootObject = nil
@@ -718,10 +705,10 @@ func TestW6ACF_CapBoundary(t *testing.T) {
 	}
 }
 
-// TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo pins the paging the enricher
-// gained when it stopped taking a skip-list entry: the walk stops at
-// PerParentPageCap rather than running a zone of any size, and a zone it could
-// not finish is marked truncated so the count reads as a lower bound.
+// TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo pins the record paging: the
+// walk stops at PerParentPageCap rather than running a zone of any size, and
+// a zone it could not finish is marked truncated so the count reads as a
+// lower bound.
 //
 // A dangling record seen in the prefix is still reported. More pages may hold
 // more of them, which is what truncation says; none of that makes the one
@@ -749,9 +736,9 @@ func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
 		"record points at an unassociated elastic IP", domain.SevBroken, "wave2")
 }
 
-// TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig pins the other half: the
-// row asks whether a zone has any config, so one on the first page answers it
-// and every further page is a call nobody needed.
+// TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig pins the query-logging
+// paging: the check asks whether a zone has any config, so one on the first
+// page answers it and every further page is a call nobody needed.
 func TestW6AR53_QueryLoggingWalkStopsAtTheFirstConfig(t *testing.T) {
 	found := &w6aR53Fake{logConfigs: 1, logPages: 5}
 	res := w6aEnrichR53(t, found, nil, w6aZoneRes("Z0FIRSTHIT0000000000", "logged.acme-corp.com."))

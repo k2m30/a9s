@@ -1,7 +1,7 @@
 package unit
 
-// prowler_w6b_cfn_test.go — behavioural pins for the two cfn posture signals
-// of batch w6b: cfn.termination-protection-off and cfn.output-secret.
+// The two cfn posture signals: cfn.termination-protection-off and
+// cfn.output-secret.
 //
 // Both are wave 1. FetchCloudFormationStacksPage already holds the whole
 // cloudformation Stack — EnableTerminationProtection, ParentId and Outputs
@@ -59,8 +59,6 @@ func w6bFetchCFN(t *testing.T, stacks ...cfntypes.Stack) []resource.Resource {
 	return out.Resources
 }
 
-// ─── row 1: cfn.termination-protection-off ──────────────────────────────────
-
 // A live top-level stack with protection off can be deleted by a single API
 // call, taking every resource it owns with it.
 func TestW6BCFN_TerminationProtectionOff_Disabled(t *testing.T) {
@@ -71,13 +69,12 @@ func TestW6BCFN_TerminationProtectionOff_Disabled(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bCFNCodeTerminationProtectionOff,
 		"termination protection off", domain.SevWarn, "wave1")
 	// The phrase is the whole fact; a "Termination protection: off" row under
-	// it would print that fact twice (U11).
+	// it would print that fact twice.
 	w6bRequireNoRows(t, w6bWave1Rows(r, w6bCFNCodeTerminationProtectionOff))
 }
 
 // AWS omits the field on stacks that predate the setting. Absent is not
-// "protected", so the finding still fires — this is the row the spec calls out
-// as the exception to "nil never triggers a finding".
+// "protected", so the finding still fires.
 func TestW6BCFN_TerminationProtectionOff_FieldAbsent(t *testing.T) {
 	const name = "acme-ancient-stack"
 	rs := w6bFetchCFN(t, w6bCFNStack(name, "UPDATE_COMPLETE", nil))
@@ -102,7 +99,7 @@ func TestW6BCFN_NestedStack_NotEvaluated(t *testing.T) {
 }
 
 // A stack that is being torn down, or that failed to build, has no posture to
-// fix — contract rule 4.
+// fix.
 func TestW6BCFN_DeletedAndFailedStacks_EmitNoPostureFinding(t *testing.T) {
 	for _, status := range []string{"DELETE_COMPLETE", "DELETE_IN_PROGRESS", "DELETE_FAILED", "CREATE_FAILED", "ROLLBACK_FAILED"} {
 		t.Run(status, func(t *testing.T) {
@@ -112,8 +109,6 @@ func TestW6BCFN_DeletedAndFailedStacks_EmitNoPostureFinding(t *testing.T) {
 		})
 	}
 }
-
-// ─── row 2: cfn.output-secret ───────────────────────────────────────────────
 
 // A stack output is readable by anyone who can call DescribeStacks, so a
 // password pasted into one is a credential handed to every reader of the
@@ -154,10 +149,8 @@ func TestW6BCFN_NoOutputs_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bCFNCodeOutputSecret)
 }
 
-// ─── independence ───────────────────────────────────────────────────────────
-
-// Contract rule 4: two conditions on one stack are two findings, and neither
-// swallows the lifecycle finding the fetcher already emitted.
+// Two conditions on one stack are two findings, and neither swallows the
+// lifecycle finding the fetcher emits.
 func TestW6BCFN_BothConditions_ProduceTwoFindings(t *testing.T) {
 	const name = "acme-double-trouble"
 	stack := w6bCFNStack(name, "UPDATE_IN_PROGRESS", aws.Bool(false))

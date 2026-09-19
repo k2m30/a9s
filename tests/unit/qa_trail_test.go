@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-TRAIL-001 - Test CloudTrail Trails response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudTrailTrails_ParsesMultipleTrails(t *testing.T) {
 	mock := &mockCloudTrailClient{
 		output: &cloudtrail.DescribeTrailsOutput{
@@ -81,7 +77,6 @@ func TestFetchCloudTrailTrails_ParsesMultipleTrails(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second trail
 	r2 := resources[1]
 	if r2.Fields["multi_region"] != "false" {
 		t.Errorf("expected Fields[multi_region] 'false', got %q", r2.Fields["multi_region"])
@@ -180,17 +175,14 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 
 	r := resources[0]
 
-	// The fetcher MUST store the log file validation flag under the key
-	// "log_file_validation_enabled" so the colorer can read it.
-	// Currently the fetcher writes "log_validation" — this assertion will FAIL.
 	got := r.Fields["log_file_validation_enabled"]
 	if got != "false" {
 		t.Errorf("Fields[\"log_file_validation_enabled\"] = %q, want %q — fetcher likely writes wrong key (\"log_validation\")", got, "false")
 	}
 
-	// Also verify the colorer reaches ColorWarning when is_logging=true,
-	// latest_delivery_error="-", and log_file_validation_enabled="false".
-	// This exercises the full type → color path after the field-key fix.
+	// is_logging=true, latest_delivery_error="-" and
+	// log_file_validation_enabled="false" reach ColorWarning through the full
+	// type → color path.
 	td := resource.FindResourceType("trail")
 	if td == nil {
 		t.Fatal("trail type not registered")
@@ -206,8 +198,8 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 	}
 }
 
-// TestFetchCloudTrailTrails_StaleDeliveryIsBroken pins docs/resources/trail.md
-// §3.2: "Signal: LatestDeliveryTime >1h ago on IsLogging==true trail → Broken
+// TestFetchCloudTrailTrails_StaleDeliveryIsBroken pins docs/resources/trail.md:
+// "Signal: LatestDeliveryTime >1h ago on IsLogging==true trail → Broken
 // (silent delivery)." A trail that is actively logging (IsLogging==true) but
 // whose most recent successful S3 delivery is more than an hour old must be
 // classified Broken — CloudTrail is silently failing to ship log files even

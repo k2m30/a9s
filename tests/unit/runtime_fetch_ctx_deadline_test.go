@@ -1,4 +1,4 @@
-// runtime_fetch_ctx_deadline_test.go — the centralized ctx-deadline wrap on
+// The centralized ctx-deadline wrap on
 // Core's interactive fetch entry points.
 //
 // internal/tui/fetch_adapter.go forwards a single cancel-only appCtx
@@ -51,8 +51,7 @@ import (
 )
 
 // fetchDeadlineUpperBound is the sane upper bound pinned for every lane in
-// this file — "the implementation will pick a specific value", so this is
-// deliberately generous rather than exact.
+// this file — deliberately generous rather than the exact chosen duration.
 const fetchDeadlineUpperBound = 120 * time.Second
 
 // assertBoundedDeadline fails the test unless ctx is non-nil, carries a
@@ -77,9 +76,6 @@ func assertBoundedDeadline(t *testing.T, lane string, ctx context.Context) {
 }
 
 // TestFetchResources_WrapsCtxWithBoundedDeadline pins FetchResources.
-//
-// RED today: FetchResources forwards ctx verbatim to the registered
-// PaginatedFetcher with no WithTimeout wrap.
 func TestFetchResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	const shortName = "deadline-test-fetchresources"
 	var captured context.Context
@@ -115,9 +111,6 @@ func TestFetchResourcesFiltered_WrapsCtxWithBoundedDeadline(t *testing.T) {
 
 // TestFetchChildResources_WrapsCtxWithBoundedDeadline pins
 // FetchChildResources.
-//
-// RED today: FetchChildResources forwards ctx verbatim to the registered
-// PaginatedChildFetcher with no WithTimeout wrap.
 func TestFetchChildResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	const shortName = "deadline-test-fetchchildresources"
 	var captured context.Context
@@ -136,9 +129,6 @@ func TestFetchChildResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 
 // TestFetchMoreResources_WrapsCtxWithBoundedDeadline pins FetchMoreResources
 // on its plain-paginated routing branch (no FetchFilter, no ParentCtx).
-//
-// RED today: FetchMoreResources forwards ctx verbatim to whichever fetcher it
-// routes to, with no WithTimeout wrap.
 func TestFetchMoreResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	const shortName = "deadline-test-fetchmoreresources"
 	var captured context.Context
@@ -159,9 +149,6 @@ func TestFetchMoreResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 }
 
 // TestFetchRevealValue_WrapsCtxWithBoundedDeadline pins FetchRevealValue.
-//
-// RED today: FetchRevealValue forwards ctx verbatim to the registered
-// RevealFetcher with no WithTimeout wrap.
 func TestFetchRevealValue_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	const shortName = "deadline-test-fetchrevealvalue"
 	var captured context.Context
@@ -204,10 +191,6 @@ func (c *ctxCaptureHTTPClient) Captured() context.Context {
 
 // TestFetchIdentity_WrapsCtxWithBoundedDeadline pins FetchIdentity all the
 // way to the STS SDK call boundary.
-//
-// RED today: FetchIdentity forwards ctx verbatim into
-// awsclient.FetchCallerIdentity -> stsClient.GetCallerIdentity with no
-// WithTimeout wrap.
 func TestFetchIdentity_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	transport := &ctxCaptureHTTPClient{}
 	stsClient := sts.NewFromConfig(aws.Config{

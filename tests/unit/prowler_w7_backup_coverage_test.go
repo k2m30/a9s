@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w7_backup_coverage_test.go — the backup-plan coverage join.
+// The backup-plan coverage join.
 //
 // The join answers "does any plan select this resource" from the cached backup
 // list alone. That makes the list's completeness part of the contract: a list
@@ -111,8 +111,6 @@ func w7EnrichDBC(t *testing.T, rows []resource.Resource, cache resource.Resource
 	return w7Enrich(t, awsclient.EnrichDBCMaintenance, &awsclient.ServiceClients{}, rows, cache)
 }
 
-// ── the join's three states ───────────────────────────────────────────────
-
 // TestW7Coverage_WholeListWithNoMatchReportsUncovered is the only state that
 // can produce the finding.
 func TestW7Coverage_WholeListWithNoMatchReportsUncovered(t *testing.T) {
@@ -162,8 +160,6 @@ func TestW7Coverage_EmptyWholeListReportsUncovered(t *testing.T) {
 		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
-// ── the three matching modes, plus the exclusion ──────────────────────────
-
 func TestW7Coverage_MatchingModes(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -186,7 +182,7 @@ func TestW7Coverage_MatchingModes(t *testing.T) {
 		},
 		{
 			// NotResources excludes a resource the selection would otherwise
-			// match, so the wildcard no longer covers it.
+			// match, so the wildcard does not cover it.
 			name:          "excluded by NotResources",
 			plan:          w7Plan("arn:aws:dynamodb:*:*:table/*", w7TableARN, ""),
 			wantUncovered: true,
@@ -243,8 +239,6 @@ func TestW7Coverage_SelectionTagsMatchTheVolumesTags(t *testing.T) {
 		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
-// ── the four types ────────────────────────────────────────────────────────
-
 // TestW7Coverage_EveryTypeReportsItsOwnCode pins that each type emits its own
 // code and sentence rather than one shared finding, so a menu badge and a doc
 // row exist per type.
@@ -287,8 +281,6 @@ func TestW7Coverage_ResourceWithNoARNReportsNothing(t *testing.T) {
 	res := w7EnrichDDB(t, []resource.Resource{{ID: "acme-orders", Fields: map[string]string{}}}, w7CacheWith())
 	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
 }
-
-// ── ebs: the ARN it has to build, and the snapshot join ───────────────────
 
 // w7Volume builds an EC2 volume row the way FetchEBSVolumesPage does, tagged
 // so the selection-tag mode has something to match.
@@ -351,7 +343,7 @@ func TestW7EBS_ARNIsBuiltFromTheAccountAndTheRegion(t *testing.T) {
 	}
 }
 
-// TestW7EBS_NoSnapshotJoin pins the second ebs row against the snapshot cache,
+// TestW7EBS_NoSnapshotJoin pins the ebs join against the snapshot cache,
 // including the states where the answer is unknown.
 func TestW7EBS_NoSnapshotJoin(t *testing.T) {
 	snapshotFor := func(volumeID string) resource.Resource {
@@ -441,8 +433,6 @@ func TestW7EBS_BothConditionsOnOneVolume(t *testing.T) {
 		"no snapshot exists", domain.SevWarn, "wave2")
 }
 
-// ── the fetcher's nil-client guard ────────────────────────────────────────
-
 // TestW7FetchBackupPlansPage_NilClientReturnsEmpty pins the guard every sibling
 // fetcher has. A missing client is a session that never wired Backup, not a
 // reason to crash the app; the coverage join then sees no cache entry and
@@ -468,8 +458,6 @@ func TestW7FetchBackupPlansPage_NilClientReturnsEmpty(t *testing.T) {
 		t.Error("nil client reported a truncated page, which reads as a lower bound rather than nothing")
 	}
 }
-
-// ── the tag read ──────────────────────────────────────────────────────────
 
 // w7DDBTagFake answers a table's tags and counts the calls, so the tests can
 // assert both what was read and that nothing was read when it could not change
@@ -618,8 +606,8 @@ func TestW7Tags_TokenThatNeverClearsIsBounded(t *testing.T) {
 }
 
 // TestW7Tags_NoCallWhenTagsCannotChangeTheAnswer pins the read's own guard. A
-// tag call per resource is the batch's only new API traffic, so it is made only
-// where it can change the verdict.
+// tag call per resource is the coverage join's only API traffic, so it is
+// made only where it can change the verdict.
 func TestW7Tags_NoCallWhenTagsCannotChangeTheAnswer(t *testing.T) {
 	tests := []struct {
 		name string
@@ -682,10 +670,8 @@ func TestW7Tags_ClientWithoutTheTagCallJudgesOnARNsAlone(t *testing.T) {
 		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
 
-// ── the demo bench ────────────────────────────────────────────────────────
-
-// TestW7Bench_EachCodeFiresOnItsWitnessAndNoOtherRow is the counts oracle for
-// the batch.
+// TestW7Bench_EachCodeFiresOnItsWitnessAndNoOtherRow pins that each coverage
+// code fires on its named demo row and on no other.
 //
 // The fleet-wide plan covers every fixture of the four types by wildcard and
 // names exactly these five rows in its exclusions, so each code has one carrier
@@ -756,7 +742,7 @@ func TestW7Bench_EachCodeFiresOnItsWitnessAndNoOtherRow(t *testing.T) {
 
 // TestW7Bench_FleetWidePlanExcludesEveryWitness pins the fixture side of the
 // same fact from the other direction: the plan's exclusions are what make each
-// witness uncovered, so a witness dropped from that list stops demonstrating
+// named row uncovered, so a row dropped from that list stops demonstrating
 // anything while the demo still looks healthy.
 func TestW7Bench_FleetWidePlanExcludesEveryWitness(t *testing.T) {
 	var plan *resource.Resource
@@ -790,10 +776,10 @@ func TestW7Bench_FleetWidePlanExcludesEveryWitness(t *testing.T) {
 	}
 }
 
-// TestW7Tags_BeyondTheCapReportsNothing pins the bound on the batch's only new
-// API traffic. Past EnrichmentCap the tags are never read, and a resource whose
-// tags are unknown is left alone — reporting it uncovered would turn the cap
-// into a source of findings.
+// TestW7Tags_BeyondTheCapReportsNothing pins the bound on the tag reads. Past
+// EnrichmentCap the tags are never read, and a resource whose tags are
+// unknown is left alone — reporting it uncovered would turn the cap into a
+// source of findings.
 func TestW7Tags_BeyondTheCapReportsNothing(t *testing.T) {
 	fake := &w7DDBTagFake{tags: map[string]string{"backup": "nightly"}}
 

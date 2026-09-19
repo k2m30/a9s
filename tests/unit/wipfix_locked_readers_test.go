@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_locked_readers_test.go covers the siblings of the two readers row 53
-// named: every method that reads the cost store's shared state, driven against
-// a writer, plus the map one of them hands out. And row 54's other half: the
-// verification is asked for once per row that needs one, and not at all for a
-// row whose read failed outright.
+// Every method that reads the cost store's shared state, driven against a
+// writer, plus the map one of them hands out. And the Lambda verification is
+// asked for once per row that needs one, and not at all for a row whose read
+// failed outright.
 package unit_test
 
 import (
@@ -22,10 +21,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestEveryCostsReader_IsSafeUnderAConcurrentWriter covers what row 53's own
-// pin does not: Lookup, Partial, DataThrough, Revision and Attrs read the same
-// structures the anomaly readers do, from the same render path, and each was
-// unlocked for the same reason. Meaningful only under -race.
+// TestEveryCostsReader_IsSafeUnderAConcurrentWriter: Lookup, Partial,
+// DataThrough, Revision and Attrs read the same structures the anomaly
+// readers do, from the same render path. Meaningful only under -race.
 func TestEveryCostsReader_IsSafeUnderAConcurrentWriter(t *testing.T) {
 	store := costs.NewMemoryStore("example-readonly")
 	now := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
@@ -69,7 +67,7 @@ func TestEveryCostsReader_IsSafeUnderAConcurrentWriter(t *testing.T) {
 	wg.Wait()
 }
 
-// TestAttrs_HandsOutACopy pins the other half of that read. MergeAttrs copies
+// TestAttrs_HandsOutACopy: MergeAttrs copies
 // INTO the stored map, so returning the map itself hands the render path
 // entries a fetch is writing, after the lock this method takes is gone.
 func TestAttrs_HandsOutACopy(t *testing.T) {

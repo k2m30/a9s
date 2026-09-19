@@ -1,15 +1,13 @@
 //go:build integration
 
-// web_cold_session_test.go — the cold-session gate for the real web server.
+// The cold-session gate for the real web server.
 //
-// Every prior web-lane test in this package boots in demo mode where the
+// The other web-lane tests in this package boot in demo mode where the
 // availability sweep is synchronous and instant, and unit-level cold-boot
 // coverage (tests/unit/app_web_live_cold_boot_test.go) exercises the
-// controller directly, never the HTTP surface. Both lanes mask a class of
-// regression where the menu's availability counts and issue badges only ever
-// appear because a warm disk cache seeded them — a session with NO disk cache
-// would show a permanently empty menu (badges never appearing, wave-2 never
-// dispatching) and no existing gate would go red.
+// controller directly, never the HTTP surface. Neither shows whether the
+// menu's availability counts and issue badges come from the session itself
+// or from a warm disk cache that seeded them.
 //
 // This gate boots the real web server with an ISOLATED empty config/cache dir
 // (A9S_CONFIG_FOLDER → fresh t.TempDir(); honored by core/config
@@ -53,19 +51,19 @@ const (
 
 	// coldS3Wave2Phrase is the stable wave-2 status text EnrichS3Posture
 	// writes into the s3 list row's status field (core/aws/s3_issue_enrichment.go,
-	// FieldUpdates["status"]); pinned as the spec §4 phrase in
-	// tests/integration/scenario_s3_visual_test.go (s3S4Phrase).
+	// FieldUpdates["status"]); tests/integration/scenario_s3_visual_test.go
+	// pins the same phrase as s3S4Phrase.
 	coldS3Wave2Phrase = "public access block incomplete"
 
 	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture badge count.
 	// The badge counts rows whose Wave-1-only colour IsIssue, plus Healthy
 	// rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so only the
 	// second clause can fire, and two of the 42 bucket fixtures satisfy it,
-	// one for each route into s3.public (spec row s3-0916/1):
+	// one for each route into s3.public:
 	// acme-public-datasets, whose bucket policy status is public, and
 	// a9s-demo-nopab, whose access control list grants AllUsers read with no
 	// public access block to disregard it. The three remaining PAB fixtures
-	// and the other five s3 witnesses are all Wave-2 `~` and never bump the
+	// and the other five s3 posture fixtures are all Wave-2 `~` and never bump the
 	// badge. Pinned as s3ExpectedIssueBkt=2 in
 	// tests/integration/scenario_s3_visual_test.go.
 	coldS3ExpectedIssueCount = 2
@@ -159,9 +157,7 @@ func TestWebColdSession_MenuPopulatesFromInSessionSweepAlone(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()
 
-	// ---------------------------------------------------------------
 	// Step 1 — core-type availability counts from the sweep alone.
-	// ---------------------------------------------------------------
 	step1 := t.Run("Step1_CoreTypeAvailability_NoListVisit", func(t *testing.T) {
 		vs := coldPollState(t, c, "step 1 (menu availability for s3/ec2/dbi)", func(vs app.ViewState) bool {
 			for _, sn := range coldSessionCoreTypes {
@@ -179,9 +175,7 @@ func TestWebColdSession_MenuPopulatesFromInSessionSweepAlone(t *testing.T) {
 			"see Step1 subtest output for the exact /state evidence; steps 2-3 aborted (same root cause)")
 	}
 
-	// ---------------------------------------------------------------
 	// Step 2 — at least one non-zero issue badge from the sweep alone.
-	// ---------------------------------------------------------------
 	step2 := t.Run("Step2_IssueBadgeFromSweepAlone", func(t *testing.T) {
 		vs := coldPollState(t, c, "step 2 (any non-zero issue badge)", func(vs app.ViewState) bool {
 			if vs.Body.Kind != app.BodyKindMenu || vs.Body.Menu == nil {
@@ -201,10 +195,8 @@ func TestWebColdSession_MenuPopulatesFromInSessionSweepAlone(t *testing.T) {
 			"wave-2 enrichment is not reaching the web menu; see Step2 subtest output; step 3 aborted")
 	}
 
-	// ---------------------------------------------------------------
 	// Step 3 — open s3, see the wave-2 phrase render, go back, and the
 	// s3 badge equals the canonical fixture count.
-	// ---------------------------------------------------------------
 	t.Run("Step3_S3Wave2RowAndExactBadge", func(t *testing.T) {
 		c.action(t, app.ActionCommand, "s3")
 

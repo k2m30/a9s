@@ -485,7 +485,6 @@ func executeBatchCmd(cmd tea.Cmd) []tea.Msg {
 		return nil
 	}
 
-	// Check if it's a batch message (tea.BatchMsg is a []tea.Cmd)
 	if batch, ok := msg.(tea.BatchMsg); ok {
 		var msgs []tea.Msg
 		for _, subCmd := range batch {
@@ -813,7 +812,6 @@ func TestQA_FetchResources_Transfer(t *testing.T) {
 
 func TestQA_FetchResources_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
-	// Do NOT inject clients — they remain nil
 
 	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {

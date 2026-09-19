@@ -1,14 +1,10 @@
 package unit
 
-// qa_enrichment_detail_live_test.go — T049 (live-update tests): US3 handler behavior.
-//
-// Tests verify that when an EnrichmentCheckedMsg arrives while a DetailModel is
-// the active view, the root model's handler correctly:
-//   - calls SetEnrichmentFinding(&f) when a finding exists for the viewed resource
-//   - calls SetEnrichmentFinding(nil) when the resource is no longer in the findings map
-//
-// These tests drive behavior through m.Update(msg) on the root tui.Model,
-// not through internal handlers directly.
+// When an EnrichmentCheckedMsg arrives
+// while a DetailModel is the active view, the root model calls
+// SetEnrichmentFinding(&f) when a finding exists for the viewed resource and
+// SetEnrichmentFinding(nil) when the findings map lacks it. Driven through
+// m.Update(msg) on the root tui.Model.
 
 import (
 	"strings"
@@ -51,21 +47,18 @@ func navigateToDetailWithRDS(t *testing.T, res resource.Resource) tui.Model {
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 
-	// Navigate to RDS resource list.
 	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
-	// Load resources into the list.
 	m2, _ = m.Update(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "rds",
 		Resources:    []resource.Resource{res},
 	})
 	m, _ = m2.(tui.Model)
 
-	// Navigate to detail for the resource.
 	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
@@ -85,7 +78,7 @@ func renderRootModel(m tui.Model) string {
 }
 
 // ---------------------------------------------------------------------------
-// T049-a: Live update adds finding to active detail view
+// Live update adds finding to active detail view
 // ---------------------------------------------------------------------------
 
 // TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent asserts that
@@ -96,7 +89,6 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 	res := rdsLiveResource("db-live-001")
 	m := navigateToDetailWithRDS(t, res)
 
-	// Send a valid EnrichmentCheckedMsg (Gen=0, TypeGen=0 match a fresh model).
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Truncated:    false,
@@ -123,7 +115,7 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 }
 
 // ---------------------------------------------------------------------------
-// T049-b: Live update clears finding from active detail view on recovery
+// Live update clears finding from active detail view on recovery
 // ---------------------------------------------------------------------------
 
 // TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery asserts that when
@@ -134,7 +126,6 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	res := rdsLiveResource("db-live-002")
 	m := navigateToDetailWithRDS(t, res)
 
-	// Step 1: Set a finding via the first EnrichmentCheckedMsg.
 	setFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Findings: map[string][]domain.Finding{
@@ -152,10 +143,8 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 		t.Skip("pre-condition failed: finding was not set; skipping recovery check")
 	}
 
-	// Step 2: For the recovery EnrichmentCheckedMsg, TypeGen must be bumped
-	// to a value that still matches. The first message set TypeGen=0 for a fresh
-	// model. After that message was processed, enrichmentTypeGen["rds"] is still 0
-	// (it's only bumped on rerun start, not on receipt). So TypeGen=0 still matches.
+	// enrichmentTypeGen["rds"] is bumped only on rerun start, not on receipt,
+	// so TypeGen=0 still matches.
 	clearFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Findings:     map[string][]domain.Finding{}, // empty — "db-live-002" recovered
@@ -178,7 +167,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 
 // TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail asserts that when
 // an EnrichmentCheckedMsg arrives with a TypeGen that does NOT match the model's
-// current enrichmentTypeGen["ec2"], the handler drops the message and the detail
+// current enrichmentTypeGen["rds"], the handler drops the message and the detail
 // view is NOT updated with the finding.
 func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 	res := rdsLiveResource("db-live-003")
@@ -215,14 +204,12 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 
-	// Navigate to RDS list (NOT detail).
 	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
-	// Send valid EnrichmentCheckedMsg while a list (not detail) is active.
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Findings: map[string][]domain.Finding{
@@ -232,7 +219,6 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 		TypeGen: 0,
 	}
 
-	// Must not panic.
 	m3, _ := m.Update(findingMsg)
 	_ = m3.View()
 }

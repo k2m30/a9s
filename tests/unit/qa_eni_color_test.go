@@ -21,10 +21,10 @@ func TestEniColor(t *testing.T) {
 	}{
 		{name: "in_use", status: "in-use", typ: "interface", want: resource.ColorHealthy},
 		{name: "orphan_interface", status: "available", typ: "interface", want: resource.ColorWarning},
-		// Post-cleanup: "requester-managed" is NOT a valid NetworkInterfaceType value.
-		// The correct mechanism is the RequesterManaged boolean field (Fields["requester_managed"]="true").
-		// AWS-managed ENIs (VPC endpoints, ELB NICs) that are "available" are exempt from the
-		// cost-waste warning — they are controlled by AWS services, not idle customer resources.
+		// "requester-managed" is not a NetworkInterfaceType value; the
+		// RequesterManaged boolean (Fields["requester_managed"]="true") marks an
+		// AWS-managed ENI (VPC endpoint, ELB NIC). An available one is exempt
+		// from the cost-waste warning — an AWS service controls it.
 		{name: "aws_managed_idle", status: "available", typ: "interface", requesterManaged: "true", want: resource.ColorHealthy},
 		{name: "attaching", status: "attaching", typ: "interface", want: resource.ColorWarning},
 		{name: "detaching", status: "detaching", typ: "interface", want: resource.ColorWarning},

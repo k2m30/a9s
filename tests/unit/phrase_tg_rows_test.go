@@ -2,14 +2,12 @@
 
 package unit
 
-// phrase_tg_rows_test.go — a target group names every failing target, and says
+// A target group names every failing target, and says
 // nothing it cannot say.
 //
-// The ratio belongs to the phrase, so a row repeating it added no line the
-// reader could act on. What the phrase cannot carry is which targets are down
-// and why each one is: those are one row per failing target. The reason in
-// particular was first-item-wins one level below the phrase — whichever
-// unhealthy target came first supplied the only reason any of them got.
+// The ratio belongs to the phrase, so no row repeats it. What the phrase
+// cannot carry is which targets are down and why each one is: those are one
+// row per failing target, each with its own reason.
 //
 // The floor is the case where a target answers with neither an identity nor a
 // reason. There is nothing to print, so no row is invented; the finding stays

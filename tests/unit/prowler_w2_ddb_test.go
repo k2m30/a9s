@@ -1,13 +1,12 @@
 package unit
 
-// prowler_w2_ddb_test.go — ddb rows 20–21 of the w2 Prowler batch:
-// deletion protection off (Wave 1) and a resource policy that grants another
-// account or the world (Wave 2).
+// ddb posture: deletion protection off (Wave 1) and a resource policy that
+// grants another account or the world (Wave 2).
 //
-// Row 21 is the policy-engine row: the verdict comes from iampolicy.Evaluate,
-// not from a substring search, so the cases below include the shapes a regex
-// gets wrong — a single Statement object rather than an array, and a wildcard
-// principal narrowed by a Condition.
+// The policy verdict comes from iampolicy.Evaluate, not from a substring
+// search, so the cases below include the shapes a regex gets wrong — a single
+// Statement object rather than an array, and a wildcard principal narrowed by
+// a Condition.
 
 import (
 	"context"
@@ -29,10 +28,6 @@ const (
 	w2DDBCodeCrossAccountPolicy    = "ddb.cross-account-policy"
 	w2DDBCodePublicPolicy          = "ddb.public-policy"
 )
-
-// ---------------------------------------------------------------------------
-// row 20 — deletion protection (Wave 1)
-// ---------------------------------------------------------------------------
 
 type w2DDBTablesFake struct {
 	tables map[string]*ddbtypes.TableDescription
@@ -101,10 +96,6 @@ func TestW2DDBDeletingTableEmitsNoPostureFinding(t *testing.T) {
 	w2AssertNoCode(t, got["acme-old"].Findings, w2DDBCodeDeletionProtectionOff)
 }
 
-// ---------------------------------------------------------------------------
-// row 21 — resource policy (Wave 2)
-// ---------------------------------------------------------------------------
-
 type w2DDBPolicyFake struct {
 	awsclient.DynamoDBAPI
 
@@ -157,8 +148,8 @@ func w2DDBEnrich(t *testing.T, fake *w2DDBPolicyFake, names ...string) awsclient
 
 // w2DDBClients seeds the resolved account ID the policy engine compares
 // principals against. Without it every AWS principal reads as another
-// account's, which would make the cross-account row fire on tables that only
-// grant their own roles.
+// account's, and the cross-account finding fires on tables that only grant
+// their own roles.
 func w2DDBClients(fake *w2DDBPolicyFake) *awsclient.ServiceClients {
 	c := &awsclient.ServiceClients{DynamoDB: fake}
 	store := session.NewIdentityStore()
@@ -298,9 +289,8 @@ func TestW2DDBPolicyNilClientIsSafe(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-public"], w2DDBCodePublicPolicy)
 }
 
-// Same contract as the redshift case: a denied policy read makes the issue
-// count a lower bound, and the flag saying so must reach the caller — here the
-// mutating call is likewise an operand of the returning statement.
+// A denied policy read makes the issue count a lower bound, and the flag
+// saying so must reach the caller.
 func TestW2DDBFailureAloneRaisesTruncated(t *testing.T) {
 	fake := &w2DDBPolicyFake{
 		policies: map[string]string{"acme-public": w2DDBPublicPolicyDoc},

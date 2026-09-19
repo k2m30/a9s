@@ -1,44 +1,8 @@
 package unit
 
-// qa_related_panel_contract_test.go — per-resource-type related-panel
-// contract enforced against the GOLDEN DOC.
-//
-// The test suite below is the enforcement layer for the contract,
-// independent of any single change.
-//
-// The single source of truth for this contract is:
-//
-//     docs/related-resources.md
-//
-// That document is produced from AWS API references + DevOps workflows,
-// reconciled across six independent blind audits. DO NOT edit it
-// ad-hoc — see the policy section at the top of the doc.
-//
-// This test file parses the golden doc's "Per-type contract" table and
-// enforces it against the registry. Drift in either direction is a
-// failure:
-//
-//   (A) TestRelatedPanel_ContractMatchesGoldenDoc
-//       For every row in the golden table, every expected TargetType
-//       must appear in resource.GetRelated(shortName). Missing
-//       registration is a failure, with the doc row cited in the error.
-//
-//   (B) TestRelatedPanel_RegistrationHasGoldenDocEntry
-//       For every TargetType currently registered via SetRelatedForTest,
-//       either (a) it is listed in the golden table for that shortName,
-//       or (b) it is a documented self-reference pattern (type->same).
-//       Otherwise the registration has drifted and the doc must be
-//       updated (with citation) before the registration is accepted.
-//
-//   (C) TestRelatedPanel_EveryRegisteredTypeHasGoldenRow
-//       Every registered resource type must appear in the golden table.
-//       Adding a new type to the registry without adding a golden row is
-//       a failure — enforces the "new type requires contract row in the
-//       same PR" rule.
-//
-//   (D) TestRelatedPanel_TargetTypesAreRegistered
-//       Every TargetType in the golden doc and in every SetRelatedForTest
-//       call must name a real registered shortName (typo guard).
+// Per-resource-type related-panel
+// contract enforced against the golden doc, docs/related-resources.md.
+// Drift in either direction is a failure.
 //
 // When a test here fails:
 //   - If the AWS API or DevOps workflow justifies the registration and
@@ -336,7 +300,7 @@ func parseExcludedPairs(doc string) map[string]map[string]struct{} {
 	return out
 }
 
-// TestRelatedPanel_NoExcludedPairsRegistered is the T109 regression guard.
+// TestRelatedPanel_NoExcludedPairsRegistered guards the excluded pairs.
 //
 // It parses the "Explicitly excluded" section of docs/related-resources.md and
 // asserts that none of the listed parent→target pairs appear in any
@@ -361,7 +325,6 @@ func TestRelatedPanel_NoExcludedPairsRegistered(t *testing.T) {
 		t.Errorf("Explicitly excluded section has %d entries, want %d — was a pair accidentally added or removed from docs/related-resources.md?", total, wantTotal)
 	}
 
-	// For each excluded (parent, target) pair, assert no registration exists.
 	for parent, targets := range excluded {
 		defs := resource.GetRelated(parent)
 		for _, def := range defs {

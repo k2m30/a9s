@@ -69,11 +69,6 @@ func fieldExtractionChecker(t *testing.T, shortName, targetType string) resource
 	return checker
 }
 
-// =============================================================================
-// VPC checkers
-// =============================================================================
-
-// --- checkEC2VPC ---
 // checkEC2VPC reads from res.Fields["vpc_id"], not from RawStruct.VpcId.
 
 func TestRelatedFieldExtraction_EC2_VPC_ReturnsVpcID(t *testing.T) {
@@ -124,7 +119,6 @@ func TestRelatedFieldExtraction_EC2_VPC_ReturnsZeroWhenNilFields(t *testing.T) {
 	}
 }
 
-// --- checkELBVPC ---
 // checkELBVPC reads from res.Fields["vpc_id"], not from RawStruct.VpcId.
 
 func TestRelatedFieldExtraction_ELB_VPC_ReturnsVpcID(t *testing.T) {
@@ -159,7 +153,6 @@ func TestRelatedFieldExtraction_ELB_VPC_ReturnsZeroWhenFieldMissing(t *testing.T
 	}
 }
 
-// --- checkDbiVPC ---
 // checkDbiVPC reads from inst.DBSubnetGroup.VpcId in RawStruct.
 
 func TestRelatedFieldExtraction_DBI_VPC_ReturnsVpcID(t *testing.T) {
@@ -229,7 +222,6 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsZeroWhenNilRawStruct(t *testing.T
 	}
 }
 
-// --- checkDbcSnapVPC ---
 // checkDbcSnapVPC reads from snap.VpcId in RawStruct.
 
 func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsVpcID(t *testing.T) {
@@ -280,12 +272,6 @@ func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsZeroWhenNilRawStruct(t *testi
 		t.Errorf("Count = %d, want 0 (nil RawStruct)", result.Count())
 	}
 }
-
-// =============================================================================
-// SG checkers
-// =============================================================================
-
-// --- checkEC2SG ---
 
 func TestRelatedFieldExtraction_EC2_SG_ExtractsGroupIDs(t *testing.T) {
 	res := resource.Resource{
@@ -371,8 +357,6 @@ func TestRelatedFieldExtraction_EC2_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	}
 }
 
-// --- checkELBSG ---
-
 func TestRelatedFieldExtraction_ELB_SG_ExtractsSGIDs(t *testing.T) {
 	res := resource.Resource{
 		ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/abc123",
@@ -449,8 +433,6 @@ func TestRelatedFieldExtraction_ELB_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
-
-// --- checkEKSSG ---
 
 func TestRelatedFieldExtraction_EKS_SG_ExtractsClusterSGID(t *testing.T) {
 	res := resource.Resource{
@@ -534,12 +516,6 @@ func TestRelatedFieldExtraction_EKS_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	}
 }
 
-// =============================================================================
-// KMS checkers
-// =============================================================================
-
-// --- checkDbiKMS ---
-
 func TestRelatedFieldExtraction_DBI_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-db-instance",
@@ -590,8 +566,6 @@ func TestRelatedFieldExtraction_DBI_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	}
 }
 
-// --- checkDbcSnapKMS ---
-
 func TestRelatedFieldExtraction_DbcSnap_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "rds:cluster-snapshot:my-snap",
@@ -641,8 +615,6 @@ func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsNegOneOnBadRawStruct(t *testi
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count())
 	}
 }
-
-// --- checkEBSKMS ---
 
 func TestRelatedFieldExtraction_EBS_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	res := resource.Resource{
@@ -708,8 +680,6 @@ func TestRelatedFieldExtraction_EBS_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	}
 }
 
-// --- checkLambdaKMS ---
-
 func TestRelatedFieldExtraction_Lambda_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-lambda-function",
@@ -758,12 +728,6 @@ func TestRelatedFieldExtraction_Lambda_KMS_ReturnsZeroWhenNilRawStruct(t *testin
 		t.Errorf("Count = %d, want 0 (nil RawStruct — type assertion fails, returns 0)", result.Count())
 	}
 }
-
-// =============================================================================
-// Role checkers
-// =============================================================================
-
-// --- checkECSSvcRole ---
 
 func TestRelatedFieldExtraction_ECSSvc_Role_ExtractsRoleNameFromARN(t *testing.T) {
 	res := resource.Resource{
@@ -816,7 +780,6 @@ func TestRelatedFieldExtraction_ECSSvc_Role_ReturnsZeroWhenNilRawStruct(t *testi
 	}
 }
 
-// --- checkECSTaskRole ---
 // The DescribeTasks response does NOT include TaskRoleArn/ExecutionRoleArn
 // (they live on the TaskDefinition). When the fetcher resolves them it
 // populates Fields["task_role"] and Fields["execution_role"] on the task
@@ -855,10 +818,9 @@ func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroForNilRawStruct(t *testi
 	}
 }
 
-// TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole verifies the
-// checker cross-references the already-loaded role cache per
-// ecs-task.md:79 — Fields["task_role"] alone is not sufficient without a
-// matching role cache entry.
+// TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole: the checker
+// cross-references the loaded role cache (docs/resources/ecs-task.md);
+// Fields["task_role"] alone is not enough without a matching role entry.
 func TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole(t *testing.T) {
 	res := resource.Resource{
 		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
@@ -911,10 +873,9 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsBothRoles(t *testing.T) {
 	}
 }
 
-// TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache verifies
-// that a role ARN present in Fields but absent from the loaded role cache
-// is not counted, per ecs-task.md:79 ("cross-reference the already-loaded
-// role list by ARN").
+// A role ARN present in Fields but absent from the loaded role cache is not
+// counted: the checker cross-references the loaded role list by ARN
+// (docs/resources/ecs-task.md).
 func TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache(t *testing.T) {
 	res := resource.Resource{
 		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
@@ -933,8 +894,6 @@ func TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache(t *testing
 		t.Errorf("Count = %d, want 0 (task_role ARN not present in loaded role cache)", result.Count())
 	}
 }
-
-// --- checkTrailRole ---
 
 func TestRelatedFieldExtraction_Trail_Role_ExtractsRoleNameFromARN(t *testing.T) {
 	res := resource.Resource{
@@ -1003,11 +962,9 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenARNHasNoSlash(t *testi
 	}
 }
 
-// =============================================================================
-// Backup checkers — checkEC2Backup matches on selection_tags (a backup-plan
-// field emitted by the backup fetcher's BackupSelection.ListOfTags join) OR
-// the ARN pattern (Fields["resources"]/["not_resources"]), per ec2.md:49.
-// =============================================================================
+// checkEC2Backup matches on selection_tags (the backup fetcher's
+// BackupSelection.ListOfTags join) or the ARN pattern
+// (Fields["resources"]/["not_resources"]), per docs/resources/ec2.md.
 
 // TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag verifies that
 // a backup plan's Fields["selection_tags"] matching the instance's own

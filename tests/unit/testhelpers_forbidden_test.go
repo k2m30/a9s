@@ -19,11 +19,6 @@ import (
 //
 //  3. Lines matching `.Checker(<anything containing nil>)` — direct nil-client
 //     checker invocations bypass the demo transport entirely.
-//
-// T045–T049 (specs/014-demo-transport-mock) rewrote every offender onto the
-// shared demo harness; this test now passes and acts as a regression gate —
-// it fails again if any of the three anti-patterns are reintroduced.
-// Report file paths and line numbers so engineers know exactly what to fix.
 func TestNoForbiddenTestHelpers(t *testing.T) {
 	t.Helper()
 
@@ -34,7 +29,6 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 	//   resource.CheckVPC(ctx, nil, r)
 	nilCheckerCallRE := regexp.MustCompile(`\.Checker\([^)]*nil[^)]*\)`)
 
-	// Forbidden literal substrings (checked per-line for accurate line numbers).
 	type literalCheck struct {
 		substr string
 		label  string
@@ -73,14 +67,12 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 		for lineIdx, line := range lines {
 			lineNo := lineIdx + 1
 
-			// Check literal substrings.
 			for _, lc := range literals {
 				if strings.Contains(line, lc.substr) {
 					t.Errorf("%s:%d: %s\n\t%s", path, lineNo, lc.label, strings.TrimSpace(line))
 				}
 			}
 
-			// Check nil-client checker call pattern.
 			if nilCheckerCallRE.MatchString(line) {
 				t.Errorf("%s:%d: direct nil-client Checker call (use demo harness)\n\t%s",
 					path, lineNo, strings.TrimSpace(line))

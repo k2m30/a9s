@@ -1,15 +1,8 @@
 package unit
 
-// prowler_w1_status_phrase_test.go — the Status cell must name the finding
-// that decided the row's colour, and a witness must be the only reason its
-// own row is coloured.
-//
-// The row colour takes the highest severity in the slice; the Status cell took
-// the first issue-severity finding in slice order. A row whose findings arrive
-// warn-then-broken therefore rendered red while reading as the warning, and a
-// witness that already carried an older finding never showed its own phrase at
-// all. One selector settles both, and these tests pin the selector's rule and
-// then check every batch-w1 witness through it on the demo bench.
+// The Status cell names the finding that decides the row's colour: the highest
+// severity in the slice, ties broken by slice order. A row whose findings arrive
+// warn-then-broken is red, so its cell must read as the broken finding.
 
 import (
 	"context"
@@ -105,8 +98,6 @@ func TestTopFinding_EmptySliceReportsNothing(t *testing.T) {
 	}
 }
 
-// ─── demo bench ─────────────────────────────────────────────────────────────
-
 // pw1BenchRow is one demo row with its wave-2 findings folded on, the shape
 // the list renders from.
 type pw1BenchRow struct {
@@ -114,9 +105,9 @@ type pw1BenchRow struct {
 	res      resource.Resource
 }
 
-// pw1ComputeBench builds every batch-w1 type's demo rows and folds each type's
-// wave-2 enricher output onto them, so a row's Findings hold what the Status
-// cell and the row colour actually read.
+// pw1ComputeBench builds the demo rows of every posture type and folds each
+// type's wave-2 enricher output onto them, so a row's Findings hold what the
+// Status cell and the row colour actually read.
 func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 	t.Helper()
 	ec2Fake, ecsFake, lambdaFake, asgFake := fakes.NewEC2(), fakes.NewECS(), fakes.NewLambda(), fakes.NewASG()
@@ -170,9 +161,8 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 	return rows
 }
 
-// pw1WitnessPhrases maps each batch-w1 witness to the phrase its Status cell
-// must show. Every one of these is a finding this batch added, so the witness
-// exists to display exactly this text.
+// pw1WitnessPhrases maps each posture demo row to the phrase its Status cell
+// must show.
 var pw1WitnessPhrases = []struct {
 	typeName string
 	id       string
@@ -201,11 +191,9 @@ func pw1BenchRowFor(t *testing.T, rows []pw1BenchRow, typeName, id string) resou
 	return resource.Resource{}
 }
 
-// TestProwlerW1_BenchContainsEveryWitness pins the bench's own completeness.
-// Every other test here looks a witness up and fails when it is absent, so a
-// fixture that stops being produced reads as one broken assertion rather than
-// as a bench that can no longer see it. This reports the whole gap at once,
-// and it is the assertion that fails if the drain ever stops short again.
+// TestProwlerW1_BenchContainsEveryWitness pins the bench's own completeness
+// and reports every missing demo row at once, where the other tests fail one
+// lookup at a time.
 func TestProwlerW1_BenchContainsEveryWitness(t *testing.T) {
 	rows := pw1ComputeBench(t)
 	present := map[string]bool{}
@@ -232,9 +220,9 @@ func TestProwlerW1_BenchContainsEveryWitness(t *testing.T) {
 	}
 }
 
-// TestProwlerW1_WitnessPhraseIsTheOneSelected pins that each witness's own
-// phrase is the one the Status cell shows. A witness whose phrase loses the
-// selection is a fixture that demonstrates nothing.
+// TestProwlerW1_WitnessPhraseIsTheOneSelected pins that each demo row's own
+// phrase is the one the Status cell shows. A row whose phrase loses the
+// selection demonstrates nothing.
 func TestProwlerW1_WitnessPhraseIsTheOneSelected(t *testing.T) {
 	rows := pw1ComputeBench(t)
 	for _, w := range pw1WitnessPhrases {
@@ -251,10 +239,10 @@ func TestProwlerW1_WitnessPhraseIsTheOneSelected(t *testing.T) {
 	}
 }
 
-// TestProwlerW1_WitnessCarriesExactlyOneIssue pins the fixture rule on the
-// witness itself: it is coloured by its own finding and nothing else, so the
-// demo bench shows one signal per row. ec2 rows 2 and 3 are excluded by
-// ruling — an internet-exposed instance necessarily has a public address.
+// TestProwlerW1_WitnessCarriesExactlyOneIssue pins that each demo row is
+// coloured by its own finding and nothing else, so the demo bench shows one
+// signal per row. The internet-exposed ec2 rows are excluded: an
+// internet-exposed instance necessarily has a public address.
 func TestProwlerW1_WitnessCarriesExactlyOneIssue(t *testing.T) {
 	rows := pw1ComputeBench(t)
 	for _, w := range pw1WitnessPhrases {
@@ -273,10 +261,9 @@ func TestProwlerW1_WitnessCarriesExactlyOneIssue(t *testing.T) {
 }
 
 // TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned pins the selector on the
-// one demo row where the defect was actually reachable: the internet-exposed
-// instance carries the wave-1 public-address warning first and the wave-2
-// exposure finding second, so slice order and severity disagree. Its row is
-// red; taking findings[0] made the cell read as the warning.
+// internet-exposed demo instance: it carries the wave-1 public-address warning
+// first and the wave-2 exposure finding second, so slice order and severity
+// disagree. Its row is red, and its cell must name the exposure.
 func TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned(t *testing.T) {
 	rows := pw1ComputeBench(t)
 	r := pw1BenchRowFor(t, rows, "ec2", fixtures.EC2InstanceInternetExposed)
@@ -307,11 +294,9 @@ func TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned(t *testing.T) {
 	}
 }
 
-// TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow pins the invariant the
-// whole selection change exists for: the row's colour and the phrase in its
-// Status cell come from the same finding. Deleting the wave-source filter in
-// colorFromAnyFinding widened what the colour considers, so this checks the
-// two did not drift apart on any row of the eight batch types.
+// TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow pins that the row's
+// colour and the phrase in its Status cell come from the same finding on every
+// demo row of the posture types.
 func TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow(t *testing.T) {
 	for _, row := range pw1ComputeBench(t) {
 		td := catalog.FindAny(row.typeName)

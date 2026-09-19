@@ -1,8 +1,6 @@
 package unit
 
-// related_fetch_test.go — Tests for FetchRelatedTarget generic helper.
-//
-// Phase 6 (#214/#212): Generic fallback + bounded cold-cache.
+// Tests for FetchRelatedTarget generic helper.
 // FetchRelatedTarget checks the ResourceCache first, then calls the registered
 // paginated fetcher (first page only). Returns (resources, isTruncated, error).
 
@@ -81,7 +79,6 @@ func TestFetchRelatedTarget_CacheMiss_NoFetcher(t *testing.T) {
 // TestFetchRelatedTarget_CacheMiss_FetcherError verifies that FetchRelatedTarget
 // propagates errors from the registered fetcher.
 func TestFetchRelatedTarget_CacheMiss_FetcherError(t *testing.T) {
-	// Register a temporary fetcher that always fails.
 	fetchErr := errors.New("simulated fetch failure")
 	resource.SetPaginatedForTest("test-fetch-err", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, fetchErr

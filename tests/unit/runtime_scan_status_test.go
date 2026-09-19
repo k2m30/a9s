@@ -1,7 +1,7 @@
 package unit
 
-// runtime_scan_status_test.go — behavioral tests for Core.ScanStatus (#462:
-// per-probe scan status + durations).
+// Behavioral tests for Core.ScanStatus
+// (per-probe scan status + durations).
 //
 // Pinned production contract under test (core/runtime/scan_status.go):
 //
@@ -51,10 +51,6 @@ func scanStatusFor(c *runtime.Core, shortName string) (runtime.ProbeStatus, bool
 	}
 	return runtime.ProbeStatus{}, false
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// 1 — demo sweep
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestScanStatus_DemoSweep_OneEntryPerTypeWithDuration drives a real
 // availability sweep (plus its follow-on Wave-2 enrichment) against demo
@@ -131,10 +127,6 @@ func TestScanStatus_DemoSweep_OneEntryPerTypeWithDuration(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 2 — partial + access-denied classification
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestScanStatus_PartialOutcome_AccessDenied pins the "partial + Err ==
 // access-denied" outcome for a type whose availability probe returns rows
 // alongside a per-item AccessDeniedException, using DynamoDB's real
@@ -148,7 +140,7 @@ func TestScanStatus_DemoSweep_OneEntryPerTypeWithDuration(t *testing.T) {
 // classify as "Unknown", not "access-denied". Constructing the event
 // directly keeps the original smithy.APIError in the error chain, so what's
 // actually under test is classifyProbeErr's access-denied branch, not the
-// DynamoDB fetcher's (separate, pre-existing) error-string flattening.
+// DynamoDB fetcher's (separate) error-string flattening.
 func TestScanStatus_PartialOutcome_AccessDenied(t *testing.T) {
 	c := newExecutorCore(t)
 
@@ -188,10 +180,6 @@ func TestScanStatus_PartialOutcome_AccessDenied(t *testing.T) {
 		t.Errorf("ddb Duration = %v, want 15ms", got.Duration)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// 3 — outcome-mapping table
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestScanStatus_OutcomeMapping_Table exercises availabilityOutcome,
 // classifyProbeErr, and degradeForEnrichment directly against
@@ -337,10 +325,6 @@ func TestScanStatus_OutcomeMapping_Table(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 4 — reset on profile/region rotate
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestScanStatus_ResetOnRotate pins Session.Rotate clearing ScanStatus: a
 // profile/region switch must not leak the previous pair's scan-status
 // records into the next session.
@@ -365,10 +349,6 @@ func TestScanStatus_ResetOnRotate(t *testing.T) {
 		t.Errorf("ScanStatus after Rotate() = %v, want empty — a profile/region switch must clear the prior pair's scan status", got)
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// 5 — enrichment rerun without a fresh availability probe
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestScanStatus_EnrichmentRerun_ReflectsLatestProbe pins the intended
 // contract for a type re-enriched (list re-open, Ctrl+R re-enrich) without

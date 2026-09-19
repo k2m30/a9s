@@ -2,15 +2,14 @@
 
 package unit
 
-// phrase_multi_item_verify_test.go — the multi-item case on three more of the
-// converted emitters.
+// The multi-item case on three more
+// emitters.
 //
-// Moving an item out of the phrase is only half the fix. The other half is
-// that every item the emitter inspected and found wrong reaches a supporting
-// row, so the reader can act on all of them. Each site below is given more
-// than one offending item, which is the input no demo fixture supplies and
-// the one that tells a converted emitter apart from an emitter that merely
-// stopped naming the item it kept.
+// Every item the emitter inspected and found wrong reaches a supporting row,
+// so the reader can act on all of them. Each site below is given more than
+// one offending item, which is the input no demo fixture supplies and the one
+// that tells an emitter that lists every item apart from one that keeps only
+// the first.
 
 import (
 	"context"

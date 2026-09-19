@@ -27,10 +27,8 @@ func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 	t.Cleanup(func() { resource.CleanupRelatedForTest("ec2") })
 }
 
-// newDemoColdCacheApp constructs a tui.Model exactly as cmd/a9s/main.go will
-// after feature 014-demo-transport-mock is fully wired (T036d). It uses
-// demo.NewServiceClients() to supply fake clients and passes them via
-// tui.WithClients so no live AWS calls are made.
+// newDemoColdCacheApp constructs a tui.Model backed by
+// demo.NewServiceClients() via tui.WithClients, so no live AWS calls are made.
 //
 // The model is cold-cache: resourceCache starts empty, no preloading, no nil
 // clients. Callers drive it by sending messages via model.Update().
@@ -55,10 +53,9 @@ const DemoDrainMaxPages = 50
 // and returns every resource across every page.
 //
 // Rows and a composite error arriving together are the designed partial-success
-// outcome — lt's and mwaa's details-denied witnesses are fetched exactly that
+// outcome — lt's and mwaa's details-denied rows are fetched exactly that
 // way — so only a row-less error aborts. A harness that stops at page one
-// instead loses every witness that sorts past the first page without ever
-// failing, which is the failure this helper exists to make impossible.
+// loses every such row that sorts past the first page without ever failing.
 func DrainPages(t *testing.T, label string, fetch func(token string) (resource.FetchResult, error)) []resource.Resource {
 	t.Helper()
 	var all []resource.Resource
@@ -95,9 +92,7 @@ func DrainFixtures(t *testing.T, td resource.ResourceTypeDef, clients *awsclient
 // tests whose subject is the error itself. The page bound still applies.
 //
 // It discards every row on any error, unlike DrainPages/FetchRelatedTarget's
-// "only a row-less error aborts" rule — 100+ call sites rely on that strict
-// stop, so it is not changed here. A demo cache builder needs DrainPages, not
-// this.
+// "only a row-less error aborts" rule; a demo cache builder needs DrainPages.
 func CollectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

@@ -39,11 +39,6 @@ func d1EFSBaseline() efstypes.FileSystemDescription {
 }
 
 // TestEfsColor pins the lifecycle state → colour mapping for EFS file systems.
-//
-// "mount target down" is not here: it is a wave-2 phrase produced by
-// EnrichEFSMountTargets from the mount-target API, which the fetcher never
-// calls. prowler_w2_efs covers it. The "(+N)" rows are gone with the phrase
-// matching that needed them.
 func TestEfsColor(t *testing.T) {
 	cases := []struct {
 		name   string

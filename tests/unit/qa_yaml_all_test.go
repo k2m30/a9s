@@ -1,14 +1,7 @@
 package unit
 
-// qa_yaml_all_test.go — table-driven YAML sweep over every registered resource type.
-// Replaces the boilerplate ViewContainsFields / FrameTitle / RawContentUncolored
-// tests that were duplicated across:
-//   - qa_yaml_ec2_family_test.go
-//   - qa_yaml_services_test.go
-//   - qa_yaml_v220_test.go (boilerplate portion)
-//
-// Unique tests (CloudTrail JSON expansion, scroll, wrap, edge cases) are kept
-// in their original files. CT event JSON uniqueness lives in qa_yaml_unique_test.go.
+// Table-driven YAML sweep over every registered resource
+// type. CloudTrail event JSON expansion is pinned in qa_yaml_unique_test.go.
 
 import (
 	"context"
@@ -30,28 +23,17 @@ import (
 //	(b) the marshaled data is valid YAML (parseable by yaml.v3)
 //	(c) the marshaled data contains no unresolved template markers
 //
-// (b)/(c) marshal directly via fieldpath.ToSafeValue + yaml.Marshal — the
-// exact steps YAMLModel.RawContent() (DEAD, no live caller) used internally
-// — rather than through ContentLines()+stripANSI. This keeps the pin on the
-// marshal step itself, independent of the colorizing pass; the colorized
-// path's re-parseability (including colon-bearing quoted keys like
-// "aws:autoscaling:groupName") is pinned separately by
-// TestPort_ColorizeYAML_ColonInQuotedKey_Regression.
-//
-// (d) FrameTitle() was dropped: DEAD, no live caller (see qa_docdb_test.go's
-// identical retirement note). (e) "no ANSI codes" was dropped: the marshal
-// step tested here never touches colorizeYAML, so ANSI-free is tautological;
-// the real ANSI-free clipboard-copy contract is already pinned end-to-end via
-// handleCopy in text_ports_test.go's
-// TestPort_ErrorLogCopy_UncoloredContent and qa_copy_test.go's
-// TestQA_Copy_YAML_CopiesFullYAML.
+// (b)/(c) marshal via fieldpath.ToSafeValue + yaml.Marshal rather than
+// ContentLines()+stripANSI, so the check covers the marshal step itself,
+// independent of the colorizing pass; the colorized path's re-parseability
+// (including colon-bearing quoted keys like "aws:autoscaling:groupName") is
+// pinned by TestPort_ColorizeYAML_ColonInQuotedKey_Regression.
 func TestQA_YAML_AllTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}
 
 	clients := demo.NewServiceClients()
 	ctx := context.Background()
 
-	// Representative sample — full sweep in CI slow suite
 	sampleYAML := []resource.ResourceTypeDef{
 		*resource.FindResourceType("ec2"),
 		*resource.FindResourceType("s3"),

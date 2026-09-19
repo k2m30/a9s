@@ -1,4 +1,4 @@
-// qa_controller_frame_title_issue_badge_test.go — pins the unconditional
+// Pins the unconditional
 // " !N" issue-suffix contract on the CONTROLLER path (Snapshot().FrameTitle /
 // Controller.ListFrameTitle()), independent of any TUI adapter call.
 //
@@ -22,22 +22,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// controllerIssueResources builds n ec2/ebs-shaped resources where exactly
-// wantIssues of them carry a "stopped" lifecycle state (issue-colored, per
-// the same lifecycle-bucket convention proven in qa_frame_title_issues_test.go)
-// and the rest are "running" (healthy, not an issue).
-//
-// colorEBS (core/aws/catalog_compute.go) still classifies off
-// Fields["state"] via a raw-field fallback. colorEC2, since the
-// color-findings-conformance wave, is colorFromAnyFinding-only (no raw-field
-// fallback at all) — so the ec2 "stopped" issue rows here also carry the
-// wave1 Finding the real fetcher (core/aws/ec2.go) attaches for a
-// user-initiated stop (CodeEC2StateStopped, SevWarn), matching colorEC2's
-// current mechanism. colorEBS has no "stopped" case, falling through to its
-// default branch (ColorHealthy) — so "stopped" only works as the issue-state
-// for ec2. The TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional
-// test below exercises an "ebs" child list, so it must use an ebs-specific
-// issue state ("error", which colorEBS maps to ColorBroken via Fields).
+// controllerIssueResources builds n ec2-shaped resources where exactly
+// wantIssues of them carry a "stopped" lifecycle state and the rest are
+// "running". colorEC2 is colorFromAnyFinding-only, so the "stopped" rows also
+// carry the wave1 Finding the real fetcher (core/aws/ec2.go) attaches for a
+// user-initiated stop (CodeEC2StateStopped, SevWarn). colorEBS
+// (core/aws/catalog_compute.go) classifies off Fields["state"] and has no
+// "stopped" case, so the ebs child-list test uses "error", which colorEBS
+// maps to ColorBroken.
 func controllerIssueResources(n, wantIssues int) []resource.Resource {
 	return controllerIssueResourcesWithState(n, wantIssues, "running", "stopped")
 }
@@ -47,8 +39,8 @@ func controllerIssueResources(n, wantIssues int) []resource.Resource {
 // since the Warning/Broken state vocabulary differs per resource type's Color
 // func (see colorEC2 vs colorEBS in core/aws/catalog_compute.go). When
 // issueState is ec2's "stopped" value, the matching wave1 Finding
-// (CodeEC2StateStopped, SevWarn) is attached too, since colorEC2 no longer
-// reads Fields["state"] directly.
+// (CodeEC2StateStopped, SevWarn) is attached too, since colorEC2 reads
+// findings rather than Fields["state"].
 func controllerIssueResourcesWithState(n, wantIssues int, healthyState, issueState string) []resource.Resource {
 	res := make([]resource.Resource, n)
 	for i := range n {
@@ -85,13 +77,11 @@ func itoaPad(i int) string {
 	return string(digits[i/100]) + string(digits[(i/10)%10]) + string(digits[i%10])
 }
 
-// TestController_ListFrameTitle_IssueBadge_UnconditionalNoAdapterCall is the
-// RED test pinning the previously-dark web/controller path: open an ec2 list
-// with issue rows via the Controller directly (app.New + Apply +
-// ApplyResourcesLoaded), NEVER calling SetShowIssueBadge, PatchListShowIssueBadge,
-// or GetListShowIssueBadge anywhere. Snapshot().FrameTitle must still carry the
-// " !N" suffix — because the contract is unconditional, not gated on a flag only
-// the TUI adapter sets.
+// TestController_ListFrameTitle_IssueBadge_UnconditionalNoAdapterCall opens
+// an ec2 list with issue rows via the Controller directly (app.New + Apply +
+// ApplyResourcesLoaded), without SetShowIssueBadge, PatchListShowIssueBadge
+// or GetListShowIssueBadge. Snapshot().FrameTitle must still carry the " !N"
+// suffix, because the contract is unconditional.
 func TestController_ListFrameTitle_IssueBadge_UnconditionalNoAdapterCall(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -114,12 +104,10 @@ func TestController_ListFrameTitle_IssueBadge_UnconditionalNoAdapterCall(t *test
 	}
 }
 
-// TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional pins the
-// audit finding from the task: the new contract says CHILD lists get the
-// suffix too, not just top-level lists. Uses the real ScreenChildList test
-// seam (Controller.PushChildListScreen) rather than a top-level
-// ActionCommand push, so this genuinely exercises the child-screen code path
-// through buildListFrameTitle — not merely a relabeled top-level list.
+// TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional: CHILD
+// lists carry the suffix too. It uses the real ScreenChildList seam
+// (Controller.PushChildListScreen) rather than a top-level ActionCommand
+// push, so it exercises the child-screen path through buildListFrameTitle.
 func TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional(t *testing.T) {
 	c := newListController(t, "ec2")
 

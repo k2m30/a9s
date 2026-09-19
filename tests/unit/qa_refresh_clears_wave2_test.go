@@ -1,13 +1,8 @@
 package unit
 
-// qa_refresh_clears_wave2_test.go — Regression: Ctrl+R on main menu clears Wave 2 state.
-//
-// Bug: Ctrl+R on the main menu did not clear enrichmentFindings, enrichmentRan,
-// enrichmentTypeGen, and probeResources, leaving stale enrichment state visible.
-// Fix: Ctrl+R on main menu increments enrichmentGen and resets all four maps.
-//
-// Tests verify the observable effect: old-gen EnrichmentCheckedMsg is dropped
-// after Ctrl+R (proving enrichmentGen was bumped and maps were cleared).
+// Ctrl+R on the main menu bumps enrichmentGen and resets enrichmentFindings,
+// enrichmentRan, enrichmentTypeGen and probeResources, so an old-gen
+// EnrichmentCheckedMsg cannot resurrect enrichment state.
 
 import (
 	"testing"
@@ -17,26 +12,16 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestMainMenuCtrlR_ClearsEnrichmentFindings verifies that Ctrl+R on the main menu
-// bumps enrichmentGen and clears Wave 2 state, so previously seeded enrichment
-// findings cannot be spuriously resurrected by re-delivering the old message.
-//
-// Behavioral proof:
-//  1. Seed findings for "ec2" and "ddb" at Gen=0, TypeGen=0.
-//  2. Navigate back to main menu (pop any child views).
-//  3. Press Ctrl+R — should bump enrichmentGen and clear all Wave 2 maps.
-//  4. Deliver old-gen EnrichmentCheckedMsg{Gen=0} — Gen=0 is never stale by
-//     itself (EnrichmentChecked.AcceptZeroGen()==true short-circuits the
-//     generic gen guard, see hasReenrichOrRefetch doc in
-//     qa_enrichment_rerun_overlap_test.go), so it is accepted regardless of
-//     the Ctrl+R gen bump. What must hold: it must not spuriously trigger a
-//     new re-enrichment probe or refetch (a same-call TaskKindSaveCache
-//     background-cache-save cmd is tolerated).
+// Ctrl+R on the main menu bumps enrichmentGen and clears Wave 2 state. Gen=0 is
+// never stale by itself (EnrichmentChecked.AcceptZeroGen()==true short-circuits
+// the gen guard; see hasReenrichOrRefetch in
+// qa_enrichment_rerun_overlap_test.go), so a re-delivered Gen=0 message is
+// accepted; it must not trigger a re-enrichment probe or refetch. A same-call
+// TaskKindSaveCache background-cache-save cmd is tolerated.
 func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: seed findings for ec2 and ddb at Gen=0.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings: map[string][]domain.Finding{
@@ -54,12 +39,9 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 		TypeGen: 0,
 	})
 
-	// Step 2: ensure we are on main menu (fresh model starts there).
-	// Step 3: press Ctrl+R — bumps enrichmentGen and clears Wave 2 state.
+	// A fresh model starts on the main menu.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Step 4: re-deliver old-gen messages — must not spuriously trigger a new
-	// re-enrichment probe or refetch.
 	_, cmd1 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings: map[string][]domain.Finding{
@@ -85,15 +67,12 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	}
 }
 
-// TestMainMenuCtrlR_EnrichmentGenIncremented verifies that after a main-menu
-// Ctrl+R, redelivering multiple types' old-gen messages cannot spuriously
-// resurrect enrichment/refetch work — confirming the session-wide
-// enrichmentGen bump (and map reset) took effect for every seeded type.
+// After a main-menu Ctrl+R, re-delivering several types' old-gen messages
+// triggers no enrichment or refetch work.
 func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Seed findings for several types.
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
@@ -103,12 +82,10 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 		})
 	}
 
-	// Press Ctrl+R on main menu — must bump enrichmentGen.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Redelivering each type's old-gen message must not spuriously trigger a
-	// re-enrichment probe or refetch (Gen=0 is never stale by itself — see
-	// hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go).
+	// Gen=0 is never stale by itself (see hasReenrichOrRefetch in
+	// qa_enrichment_rerun_overlap_test.go).
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
@@ -128,13 +105,9 @@ func TestMainMenuCtrlR_MapsSafeAfterReset(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Press Ctrl+R — resets maps.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Writing to the maps (via a non-stale message after navigating to ec2 list
-	// with the new gen) must not panic. We verify this by delivering a stale message
-	// which exercises the gen-guard path without writing — the important thing is
-	// no panic occurs from a nil map access.
+	// A stale message exercises the gen-guard path; a nil map access would panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {

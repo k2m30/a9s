@@ -8,10 +8,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Pagination types and registry tests
-// ═══════════════════════════════════════════════════════════════════════════
-
 func TestPaginatedRegistry_RegisterAndGet_RoundTrip(t *testing.T) {
 	called := false
 	resource.SetPaginatedForTest("_test_paginated", func(ctx context.Context, clients any, token string) (resource.FetchResult, error) {

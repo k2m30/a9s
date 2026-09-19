@@ -14,8 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchS3Buckets should only call ListBuckets — no GetBucketLocation.
-// It should accept only a ListBuckets API, not a location API.
+// FetchS3Buckets calls ListBuckets only.
 func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
 	buckets := make([]s3types.Bucket, 100)
 	for i := range buckets {

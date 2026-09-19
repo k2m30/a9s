@@ -1,8 +1,7 @@
 package unit_test
 
-// s3_0916_row4_cf_s3_origin_parse_test.go pins all three cf↔s3 sites reading
-// an origin hostname through the one S3 endpoint parser, and requiring the
-// bucket to equal the parsed name.
+// All three cf↔s3 sites read an origin hostname through the one S3 endpoint
+// parser and require the bucket to equal the parsed name.
 //
 // Splitting a hostname on its first ".s3" claims any host that merely carries
 // the token: a proxy at assets.s3-proxy.example.com reads as bucket "assets",
@@ -127,10 +126,9 @@ func row4LoggingClients(host string) *awsclient.ServiceClients {
 	}}
 }
 
-// TestS3_0916_Row4_LoggingBucketIsTheParsedName pins the standard-logging
-// bucket's host reading. The bucket counts under S3 Buckets (cf→logs is
-// unregistered and docs/resources/cf.md § s3 names the logging bucket), read
-// by the same rule as an origin host.
+// TestS3_0916_Row4_LoggingBucketIsTheParsedName: the standard-logging
+// bucket counts under S3 Buckets (docs/resources/cf.md), read by the same rule
+// as an origin host.
 func TestS3_0916_Row4_LoggingBucketIsTheParsedName(t *testing.T) {
 	checker := checkerByTarget(t, "cf", "s3")
 	dist := row4Distribution(row4ProxyHost)

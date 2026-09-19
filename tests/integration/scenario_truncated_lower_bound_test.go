@@ -2,16 +2,14 @@
 
 package integration
 
-// scenario_truncated_lower_bound_test.go — the rendered witness for a list read
-// in part.
+// The rendered surface for a list
+// read in part.
 //
-// The related panel distinguishes three answers, and only two of them had a
-// screen on the demo bench: an exact count, and a question mark for a list
-// nobody read. The third — a resolved lower bound, "what matched is real and a
-// page nobody read may hold more" — had none, because every demo list fitted in
-// its first page. These walks pin it on both sides: a pivot that matched inside
-// the partial list, and one that matched nothing in it. Without both, a
-// regression to a bare count or back to a question mark changes no pixel.
+// The related panel distinguishes three answers: an exact count, a question
+// mark for a list nobody read, and a resolved lower bound — "what matched is
+// real and a page nobody read may hold more". These walks pin the lower bound
+// on both sides: a pivot that matched inside the partial list, and one that
+// matched nothing in it.
 
 import (
 	"testing"

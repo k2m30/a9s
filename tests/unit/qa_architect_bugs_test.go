@@ -15,24 +15,20 @@ import (
 // viewsDirs returns the standard views directory path for tests in tests/unit/.
 var viewsDirs = []string{"../../.a9s/views"}
 
-// --- Bug 1: S3 folders should be navigable, not show detail ---
-
+// S3 folders are navigable; Enter on one drills into the prefix.
 func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	m := newRootSizedModel()
-	// Navigate to S3 buckets
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
-	// Enter bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	// Load objects including a folder (child list type is s3_objects)
 	objects := []resource.Resource{
 		{ID: "enterprise/", Name: "enterprise/", Fields: map[string]string{
 			"key": "enterprise/", "size": "", "last_modified": "", "storage_class": "", "kind": "folder",
@@ -42,13 +38,11 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 		}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceChild, ResourceType: "s3_objects", Resources: objects})
-	// Press Enter on the folder — should navigate into prefix, NOT show detail
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on folder should return a command to navigate into prefix")
 	}
 	msg := cmd()
-	// Should be EnterChildViewMsg (data-driven child nav), not NavigateMsg{TargetDetail}
 	if childMsg, ok := msg.(messages.EnterChildView); ok {
 		if childMsg.ChildType != "s3_objects" {
 			t.Errorf("EnterChildViewMsg.ChildType should be 's3_objects', got %q", childMsg.ChildType)
@@ -60,8 +54,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	}
 }
 
-// --- Bug 2: d key on S3 bucket should show detail, not enter bucket ---
-
+// d on an S3 bucket opens its detail instead of entering the bucket.
 func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
@@ -69,13 +62,11 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
-	// Press d (describe) — should show detail, NOT enter bucket
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
 	if cmd == nil {
 		t.Fatal("d key should return a command")
 	}
 	msg := cmd()
-	// Should be NavigateMsg{TargetDetail}, NOT EnterChildViewMsg
 	if _, ok := msg.(messages.EnterChildView); ok {
 		t.Error("d key on S3 bucket must show detail view, not drill into bucket")
 	}
@@ -86,16 +77,13 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 	}
 }
 
-// --- Bug 3+4: Detail view must use correct ViewDef for the resource type ---
-
+// The detail view uses the ViewDef of the resource's own type.
 func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
-	// Load the FULL config (all resource types) — same as production
 	cfg, err := config.LoadFromDirs(viewsDirs)
 	if err != nil {
 		t.Skipf("views dir not found: %v", err)
 	}
 
-	// Create an EC2-like resource with RawStruct that has Tags
 	type fakeEC2 struct {
 		InstanceId       *string
 		InstanceType     *string
@@ -131,10 +119,8 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	// Navigate to EC2, load resources, then open detail
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
-	// Open detail via d key
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
 	if cmd != nil {
@@ -145,21 +131,17 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	content := rootViewContent(m)
 	plain := stripANSI(content)
 
-	// The detail view should show EC2-specific fields, not random fields from another ViewDef
-	// With the full config, the bug causes it to pick a random ViewDef (e.g., secrets or s3)
-	// which would NOT contain "InstanceId" or "InstanceType"
 	if !strings.Contains(plain, "InstanceId") {
 		t.Errorf("EC2 detail must show InstanceId from EC2 ViewDef, got:\n%s", plain[:min(500, len(plain))])
 	}
 	if !strings.Contains(plain, "InstanceType") {
 		t.Error("EC2 detail must show InstanceType from EC2 ViewDef")
 	}
-	// Must NOT show only Tags
 	if strings.Contains(plain, "Tags") && !strings.Contains(plain, "InstanceId") {
 		t.Error("EC2 detail shows only Tags — wrong ViewDef selected from config")
 	}
 
-	_ = cfg // ensure cfg is used
+	_ = cfg
 }
 
 func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
@@ -168,8 +150,6 @@ func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
 		t.Skipf("views dir not found: %v", err)
 	}
 
-	// views.yaml s3_objects detail has: Key, Size, LastModified, StorageClass, ETag
-	// (or whatever is configured — we check that at least 3 fields show)
 	vd := config.GetViewDef(cfg, "s3_objects")
 	if len(vd.Detail) == 0 {
 		t.Fatal("s3_objects detail config is empty — .a9s/views/s3_objects.yaml must have a detail section")
@@ -177,7 +157,6 @@ func TestBug_S3Object_DetailShowsAllConfiguredFields(t *testing.T) {
 
 	t.Logf("s3_objects detail paths: %v", vd.Detail)
 
-	// Check that the configured paths actually match s3types.Object field names
 	// s3types.Object has: Key, Size, LastModified, StorageClass, ETag, Owner
 	// NOT "Name" — that's a bucket field
 	for _, df := range vd.Detail {

@@ -9,15 +9,12 @@ import (
 	"testing"
 )
 
-// TestWebStatic_AppJS_Served guards the embed-FS rooting regression. The embed
-// roots files at "static/app.js"; serving http.FS(staticFS) with
-// StripPrefix("/static/") turned the request into "app.js" — not in the FS — so
-// GET /static/app.js 404'd, the browser loaded NO JavaScript, and every key was
-// dead. The fix roots the FS at "static/" via fs.Sub. This asserts the asset is
-// actually served with the real app.js content.
-//
-// (curl-only API tests never execute the page's <script>, so they could not
-// catch this — hence this explicit static-asset check.)
+// TestWebStatic_AppJS_Served asserts GET /static/app.js serves the real app.js
+// content. The embed roots files at "static/app.js", so the FS is rooted at
+// "static/" via fs.Sub; StripPrefix("/static/") on an unrooted FS turns the
+// request into "app.js", the page loads no JavaScript and every key is dead.
+// An API test never executes the page's <script>, so only a static-asset
+// check sees it.
 func TestWebStatic_AppJS_Served(t *testing.T) {
 	c, cleanup := startServer(t)
 	defer cleanup()

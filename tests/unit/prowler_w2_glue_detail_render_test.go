@@ -1,14 +1,10 @@
 package unit_test
 
-// prowler_w2_glue_detail_render_test.go — the rendered half of ruling J for
-// glue.
-//
-// T-INV-2 now accepts a Detail sentence in place of rows, which is only safe
-// if the detail view actually renders that sentence. Asserting on the
+// A glue finding may carry a Detail sentence in place of rows, which is only
+// safe if the detail view renders that sentence. Asserting on the
 // IssueEnricherResult would prove the enricher set the field, not that an
-// operator sees anything: the row is folded and the block is built by code
-// this test does not own. So it drives the same path the app does and reads
-// what comes out.
+// operator sees anything, so these tests drive the same path the app does and
+// read what comes out.
 
 import (
 	"context"
@@ -44,11 +40,8 @@ func (f *w2GlueRunFake) GetJobRuns(_ context.Context, in *glue.GetJobRunsInput, 
 
 // TestW2GlueFailedRunDetailReachesTheScreen pins that a failed Glue run gives
 // the operator a line past the phrase whether or not AWS said why it failed.
-//
-// The message-less case is the one that matters: it is exactly the shape that
-// had zero rows once the row restating the phrase was dropped, and the only
-// thing standing between it and a bare entry is the Detail sentence being
-// rendered.
+// The message-less case carries no rows, so the rendered Detail sentence is
+// the only thing standing between it and a bare entry.
 func TestW2GlueFailedRunDetailReachesTheScreen(t *testing.T) {
 	td := catalogTypeFor(t, "glue")
 

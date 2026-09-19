@@ -1,6 +1,6 @@
 package unit_test
 
-// prowler_w2_fake_widening_ext_test.go — the package unit_test half of the
+// The package unit_test half of the
 // posture-neutral stubs described in prowler_w2_fake_widening_test.go.
 //
 // Same rule: every stub answers the healthy value, so the related-checker and
@@ -19,7 +19,7 @@ import (
 	smithy "github.com/aws/smithy-go"
 )
 
-// noResourcePolicy is what DynamoDB answers for a table nobody has shared.
+// w2xNoResourcePolicy is what DynamoDB answers for a table nobody has shared.
 func w2xNoResourcePolicy() error {
 	return &smithy.GenericAPIError{Code: "PolicyNotFoundException", Message: "no resource policy"}
 }
@@ -53,10 +53,6 @@ func w2xHealthyObjectLock() *s3.GetObjectLockConfigurationOutput {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dynamodb
-// ---------------------------------------------------------------------------
-
 func (f *fakeDynamoDBForKinesis) GetResourcePolicy(_ context.Context, _ *dynamodb.GetResourcePolicyInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetResourcePolicyOutput, error) {
 	return nil, w2xNoResourcePolicy()
 }
@@ -65,10 +61,6 @@ func (f fakeDynamoDBBoundaryAccessDenied) GetResourcePolicy(_ context.Context, _
 	return nil, &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "access denied"}
 }
 
-// ---------------------------------------------------------------------------
-// redshift
-// ---------------------------------------------------------------------------
-
 func (f *fakeRedshiftCR) DescribeClusterParameters(_ context.Context, _ *redshift.DescribeClusterParametersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClusterParametersOutput, error) {
 	return &redshift.DescribeClusterParametersOutput{
 		Parameters: []redshifttypes.Parameter{
@@ -76,10 +68,6 @@ func (f *fakeRedshiftCR) DescribeClusterParameters(_ context.Context, _ *redshif
 		},
 	}, nil
 }
-
-// ---------------------------------------------------------------------------
-// s3
-// ---------------------------------------------------------------------------
 
 // The default ACL: the owner's own FULL_CONTROL and no group grant, so no
 // bucket served by a fake embedding s3NoopAPI reads as public by ACL. Declared

@@ -15,7 +15,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T-MSK01 - Test MSK ListClustersV2 fetch
+// MSK ListClustersV2 fetch
 // ---------------------------------------------------------------------------
 
 func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
@@ -55,7 +55,6 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields
 	requiredFields := []string{"cluster_name", "cluster_type", "state", "version"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -65,7 +64,6 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		}
 	}
 
-	// Verify first cluster
 	r0 := resources[0]
 	if r0.ID != "events-cluster" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "events-cluster", r0.ID)
@@ -93,7 +91,6 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"cluster_type\"]: expected %q, got %q", "SERVERLESS", r1.Fields["cluster_type"])
 	}
 
-	// Verify RawStruct is set
 	if r0.RawStruct == nil {
 		t.Error("resource[0].RawStruct should not be nil")
 	}
@@ -135,7 +132,7 @@ func TestFetchMSKClusters_EmptyResponse(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-MSK02 - Resource type definition
+// MSK resource type definition
 // ---------------------------------------------------------------------------
 
 func TestMSK_ResourceTypeDef(t *testing.T) {

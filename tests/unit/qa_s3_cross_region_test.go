@@ -1,6 +1,6 @@
 package unit
 
-// qa_s3_cross_region_test.go — EnrichS3Posture must handle cross-region
+// EnrichS3Posture must handle cross-region
 // buckets without spamming the error log.
 //
 // ListBuckets returns ALL buckets globally regardless of the configured

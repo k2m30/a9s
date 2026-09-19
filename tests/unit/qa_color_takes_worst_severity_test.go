@@ -1,14 +1,12 @@
 package unit_test
 
-// qa_color_takes_worst_severity_test.go — ruling M, widened past the five
-// networking types.
+// Every type that classifies from
+// findings takes the row colour from its worst finding.
 //
-// One selector now decides the row colour for every type that classifies from
-// findings. The networking sweep could not catch a type that switched selector
-// without a fixture mixing severities on one row, and most types have no such
-// fixture, so the row is constructed instead: warn first, broken second. A
-// classifier that takes the head of the slice renders yellow while the row
-// carries a broken finding.
+// Most types have no fixture mixing severities on one row, so the row is
+// constructed instead: warn first, broken second. A classifier that takes
+// the head of the slice renders yellow while the row carries a broken
+// finding.
 
 import (
 	"fmt"

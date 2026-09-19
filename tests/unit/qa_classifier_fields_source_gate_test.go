@@ -1,16 +1,10 @@
 package unit_test
 
-// qa_classifier_fields_source_gate_test.go — one shape for every catalog
+// One shape for every catalog
 // classifier: after the findings lookup it either returns, or decides through
-// the shared fallback helper running the type's own findings predicate. Reading
-// a raw Fields entry a second way is the defect this batch removed from fifteen
-// types, and it is a defect because the classifier and the predicate then hold
-// the same fact twice and can disagree.
-//
-// The classifiers that still read a raw field are listed below by name. The
-// gate errors both ways: an unlisted classifier that decides for itself is a
-// new violation, and a listed one that has stopped is an entry to delete. The
-// list can only shrink.
+// the shared fallback helper running the type's own findings predicate. A
+// classifier that reads a raw Fields entry a second way holds the same fact
+// as the predicate twice, and the two can disagree.
 
 import (
 	"go/ast"
@@ -24,8 +18,6 @@ import (
 	"testing"
 )
 
-// classifiersOffTheSharedFallback lists catalog classifiers that pick a
-// colour of their own after the findings lookup; it is empty.
 // sharedFallbackCalls are the two helpers a classifier is allowed to hand a
 // raw field to. They take the type's own findings predicate, so the field is
 // read once, by the predicate, and the classifier never interprets it. It also

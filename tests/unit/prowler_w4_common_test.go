@@ -1,12 +1,10 @@
 package unit
 
-// prowler_w4_common_test.go — assertion helpers shared by the batch-w4
-// (SECURITY & SECRETS) behavioural tests.
+// Assertion helpers shared by the security and secrets posture tests.
 //
-// Every helper here pins a contract that holds for every finding in the
-// batch: a finding is identified by its exact code string, and its Phrase,
-// Severity and Source are part of the contract rather than incidental text.
-// Findings are looked up by code, never by slice position, because two
+// A finding is identified by its exact code string, and its Phrase, Severity
+// and Source are part of the contract rather than incidental text. Findings
+// are looked up by code, never by slice position, because two
 // independently-evaluated conditions on one resource may be appended in
 // either order.
 
@@ -38,7 +36,7 @@ func w4FindingByCode(t *testing.T, fs []domain.Finding, code domain.FindingCode)
 }
 
 // w4AssertFinding pins the four contract fields of one finding plus the
-// non-empty S5 Detail sentence every batch-w4 finding must stamp.
+// non-empty Detail sentence every finding must stamp.
 func w4AssertFinding(
 	t *testing.T,
 	fs []domain.Finding,

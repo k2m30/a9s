@@ -1,7 +1,6 @@
 package unit
 
-// prowler_w3_elb_test.go — the four load-balancer posture signals added to
-// EnrichELBAttributes.
+// The four load-balancer posture signals of EnrichELBAttributes.
 //
 // Two come from the attributes map already fetched (desync mitigation left in
 // monitor mode, invalid header fields not dropped) and two from a
@@ -194,8 +193,6 @@ func w3RunELBEnrich(t *testing.T, fake *w3ELBv2Fake, resources ...resource.Resou
 	return res
 }
 
-// ── Row 5: desync mitigation left in monitor mode ─────────────────────────
-
 func TestW3ELBDesync_MonitorModeFlagged(t *testing.T) {
 	r := w3ELBRes("acme-public-alb", "application")
 	fake := w3NewELBFake()
@@ -240,8 +237,6 @@ func TestW3ELBDesync_SafeModesHealthy(t *testing.T) {
 		})
 	}
 }
-
-// ── Row 6: invalid header fields not dropped ──────────────────────────────
 
 func TestW3ELBInvalidHeaders_Flagged(t *testing.T) {
 	r := w3ELBRes("acme-public-alb", "application")
@@ -306,9 +301,9 @@ func TestW3ELBAttributeRows_AreALBOnly(t *testing.T) {
 	}
 }
 
-// TestW3ELBAttributes_TwoConditionsTwoFindings pins independence: the
-// existing elb.misconfigured emission must not swallow the new ones, and the
-// two new attribute conditions must not collapse into one.
+// TestW3ELBAttributes_TwoConditionsTwoFindings pins independence:
+// elb.misconfigured must not swallow the attribute findings, and the two
+// attribute conditions must not collapse into one.
 func TestW3ELBAttributes_TwoConditionsTwoFindings(t *testing.T) {
 	r := w3ELBRes("acme-public-alb", "application")
 	fake := w3NewELBFake()
@@ -329,8 +324,6 @@ func TestW3ELBAttributes_TwoConditionsTwoFindings(t *testing.T) {
 		t.Errorf("AttentionDetails = %+v, want one entry per emitted finding code", res.AttentionDetails[r.ID])
 	}
 }
-
-// ── Row 7: listener terminating plaintext ─────────────────────────────────
 
 func TestW3ELBPlainHTTP_ALBHTTPListenerFlagged(t *testing.T) {
 	r := w3ELBRes("acme-public-alb", "application")
@@ -450,8 +443,6 @@ func TestW3ELBPlainHTTP_NLBPlainTCPPortIsHealthy(t *testing.T) {
 	}
 }
 
-// ── Row 8: retired TLS policy ─────────────────────────────────────────────
-
 func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 	for _, policy := range []string{
 		"ELBSecurityPolicy-2015-05",
@@ -492,9 +483,8 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			if f.Detail == "" {
 				t.Error("Detail is empty; every finding carries an operator sentence")
 			}
-			// d3 row 18: one finding now covers every weak listener, so each
-			// row leads with its port — without it three rows would read
-			// identically and name no listener to go and fix.
+			// One finding covers every weak listener, so each row leads with its port;
+			// otherwise the rows read identically and name no listener to go and fix.
 			w3AssertRows(t, res.AttentionDetails[r.ID][w3CodeELBWeakTLS].Rows, [][2]string{
 				{"Security policy", "443: " + policy},
 			})
@@ -551,8 +541,6 @@ func TestW3ELBWeakTLS_AppliesToNLBTLSListener(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
 }
-
-// ── Cross-cutting: independence, partial answers, cap ─────────────────────
 
 // TestW3ELBListeners_TwoBadListenersTwoFindings pins that both listener
 // conditions on one balancer survive as separate findings — a plaintext

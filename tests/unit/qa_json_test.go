@@ -1,16 +1,8 @@
-// qa_json_test.go — JSON view RawContent/colorize correctness.
-//
-// views.NewJSON/View/RawContent/FrameTitle/CopyContent/GetHelpContext/
-// BottomHints/ResourceID/SearchInfo/SetSize-resize are DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (json.go). Most of that
-// surface was accessor-level and is already covered elsewhere on the live
-// path (colorize golden + uncolored-copy: text_ports_test.go's
-// TestPort_JSONCopy_UncoloredContent /
-// TestPort_JSON_ColorizeGolden_LiveContentLines). What survives here —
-// retargeted onto NewJSONWithCtrl + ContentLines() — is JSON-specific
-// marshal-correctness behavior with no YAML equivalent: json.MarshalIndent
-// (unlike YAML's fieldpath.ToSafeValue) does NOT omit zero/false values, and
-// native JSON types (bool/float64) round-trip through json.Unmarshal.
+// JSON view content correctness via NewJSONWithCtrl +
+// ContentLines(). json.MarshalIndent (unlike YAML's fieldpath.ToSafeValue)
+// keeps zero/false values, and native JSON types (bool/float64) round-trip
+// through json.Unmarshal. The colorize golden and uncolored copy are pinned
+// in text_ports_test.go.
 package unit
 
 import (
@@ -39,7 +31,7 @@ func jsonModel(res resource.Resource, w, h int) views.JSONModel {
 }
 
 // jsonRawContent returns the uncolored JSON text via the live ContentLines()
-// seam — the ANSI-stripped equivalent of the dead RawContent() method.
+// seam.
 func jsonRawContent(m views.JSONModel) string {
 	return stripANSI(strings.Join(m.ContentLines(), "\n"))
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_one_humanizer_test.go — one humanizer for every surface a Field value
+// One humanizer for every surface a Field value
 // reaches. A fetcher writes its own spelling into Fields ("true", an RFC3339
 // timestamp); the list cell already renders the settled form ("Yes",
 // "2026-01-02 15:04"). These pins put the detail row and the text filter on
@@ -162,8 +162,7 @@ func detailRowMust(t *testing.T, rows map[string]string, label string) string {
 
 // TestOneHumanizer_DetailRowOffTheStructFollowsTheConventions pins the
 // RawStruct lane at the detail surface. ami's timestamps are strings in the
-// SDK struct, so no formatter downstream recognised them as times and the row
-// showed the wire format.
+// SDK struct, so the row has to recognise the string shape as a time.
 func TestOneHumanizer_DetailRowOffTheStructFollowsTheConventions(t *testing.T) {
 	rows := detailRowsFor(t, resource.Resource{
 		ID: "ami-0abc123def4567890", Name: "acme-base-image", Type: "ami",
@@ -275,9 +274,9 @@ func TestOneHumanizer_DetailBoolStringOffTheStruct(t *testing.T) {
 	}
 }
 
-// TestOneHumanizer_DetailTimeStructLosesTheFakeMidnight pins the shape the
-// secrets detail showed: a time.Time whose time of day is exactly midnight is
-// a day AWS reports at day granularity, and the row says the day.
+// TestOneHumanizer_DetailTimeStructLosesTheFakeMidnight pins the secrets
+// detail's time.Time shape: a time.Time whose time of day is exactly midnight
+// is a day AWS reports at day granularity, and the row says the day.
 func TestOneHumanizer_DetailTimeStructLosesTheFakeMidnight(t *testing.T) {
 	rows := detailRowsFor(t, resource.Resource{
 		ID: "prod/app/slack-webhook", Name: "prod/app/slack-webhook", Type: "secrets",

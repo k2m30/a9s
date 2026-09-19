@@ -1,14 +1,12 @@
 package unit_test
 
-// r53_related_nil_cache_test.go — a hosted zone must not invent the resources
+// A hosted zone must not invent the resources
 // its aliases point at.
 //
-// Found by the live walk against an account with no load balancers: two zones
-// rendered "Load Balancers 2, resolved". The alias records are real, so the
-// checker knows a target should exist; what it does not know is which resource
-// it is, because the target list came back nil. Reporting the alias DNS name
-// as a resolved resource ID turns "I could not look it up" into "here are two
-// of them", and the row is then navigable to rows that do not exist.
+// The alias records are real, so the checker knows a target should exist; with
+// a nil target list it does not know which resource it is. Reporting the alias
+// DNS name as a resolved resource ID turns "could not look it up" into "here
+// are N of them", and the row navigates to rows that do not exist.
 //
 // Nil reaches the checker two ways, and neither means "there are N of these":
 // a cache entry whose Resources slice is nil (the app seeds it straight from a
@@ -162,9 +160,8 @@ func assertNoDNSNameIDs(t *testing.T, target string, result domain.RelatedCheckR
 	}
 }
 
-// TestR53Related_EmptyTargetCache_ResolvesZero is the walk's own case: the
-// account holds zero resources of the target type, so the cache entry is
-// present and empty. That is a complete answer, and the answer is none.
+// An account holding zero resources of the target type leaves the cache entry
+// present and empty: a complete answer, and the answer is none.
 func TestR53Related_EmptyTargetCache_ResolvesZero(t *testing.T) {
 	for _, tc := range nilCacheCases() {
 		t.Run(tc.target, func(t *testing.T) {
@@ -188,8 +185,8 @@ func TestR53Related_EmptyTargetCache_ResolvesZero(t *testing.T) {
 }
 
 // TestR53Related_NoCacheNoFetcher_Unknown is the other producer of a nil list:
-// nothing to read and nothing to call. The checker cannot know, and saying so
-// is the honest answer — the same one acm_related.go already gives.
+// nothing to read and nothing to call. The checker cannot know, and says so,
+// as acm_related.go does.
 func TestR53Related_NoCacheNoFetcher_Unknown(t *testing.T) {
 	for _, tc := range nilCacheCases() {
 		t.Run(tc.target, func(t *testing.T) {
@@ -237,13 +234,11 @@ func TestR53Related_TruncatedTargetPageNoMatch_Truncated(t *testing.T) {
 	}
 }
 
-// TestR53Related_DemoBench_ZoneWithNoMatchingLoadBalancer is the demo-bench
-// witness for the defect the live walk found. acme-corp.com. aliases
-// api.acme-corp.com. at prod-api-alb-1234567890, a name no demo load balancer
-// carries, so its Load Balancers panel must read a resolved zero; before the
-// fix it read 1 with that hostname as the row's ID. staging.acme-corp.com.
-// aliases a load balancer that does exist, and is here so a fix that simply
-// zeroed the panel would fail too.
+// acme-corp.com. aliases api.acme-corp.com. at prod-api-alb-1234567890, a name
+// no demo load balancer carries, so its Load Balancers panel reads a resolved
+// zero, not 1 with that hostname as the row's ID. staging.acme-corp.com.
+// aliases a load balancer that exists, so zeroing the panel wholesale fails
+// too.
 func TestR53Related_DemoBench_ZoneWithNoMatchingLoadBalancer(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	elbRows := byType["elb"]
@@ -254,11 +249,9 @@ func TestR53Related_DemoBench_ZoneWithNoMatchingLoadBalancer(t *testing.T) {
 	clients := demo.NewServiceClients()
 	checker := r53CheckerByTarget(t, "elb")
 
-	// The walk ran against an account holding no load balancers at all, which
-	// is the cache entry the app seeds from a fetcher that found none. That is
-	// the only shape in which the old code reached its guessing branch, so the
-	// witness needs it: with the full demo list present the branch never runs
-	// and the case would pass either way.
+	// A nil elb entry is what the app seeds from a fetcher that found none, and it
+	// is the shape that reaches the DNS-name fallback; with the full demo list
+	// present that branch never runs.
 	emptyELB := resource.ResourceCache{"elb": resource.ResourceCacheEntry{Resources: nil}}
 
 	for _, tc := range []struct {

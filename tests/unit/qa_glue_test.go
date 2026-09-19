@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-GLUE-001 - Test Glue Jobs response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchGlueJobs_ParsesMultipleJobs(t *testing.T) {
 	now := time.Now()
 	mock := &mockGlueClient{

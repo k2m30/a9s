@@ -1,19 +1,9 @@
 package unit
 
-// Tests for the CloudTrail Events legend in the help view.
-//
-// HelpModel carries a ResourceShortName so the legend is gated on
-// "ct-events"; NewHelpWithResource(k, ctx, shortName) lets callers pass the
-// resource short name; the legend block itself lives in help.go per §8a.
-//
-// Bug vectors covered:
-//   - Legend shown on ALL resource lists (not gated on ct-events short name)
-//   - Legend shown from main-menu context (wrong context gate)
-//   - Legend missing required verb glyphs (R/W/D/S/I/N)
-//   - Legend missing severity-tier labels (ct-info / ct-attention / ct-danger)
-//   - "CloudTrail" section header absent from legend
-//   - CELL COLORS section present (ROOT/OK/FAILED per-cell colors do not
-//     exist; the block must NOT appear)
+// Tests for the CloudTrail Events legend in the help view. The legend is
+// gated on the "ct-events" short name and the resource-list help context, it
+// names the verb glyphs (R/W/D/S/I/N) and the severity tiers, and it carries
+// no CELL COLORS block.
 
 import (
 	"strings"
@@ -23,9 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// helpWithCTEvents constructs a HelpModel scoped to ct-events via
-// the to-be-implemented NewHelpWithResource constructor.
-// Signature expected: views.NewHelpWithResource(keys.Map, views.HelpContext, string) views.HelpModel
+// helpWithCTEvents constructs a HelpModel scoped to ct-events.
 func helpWithCTEvents(ctx views.HelpContext) views.HelpModel {
 	return views.NewHelpWithResource(keys.Default(), ctx, "ct-events")
 }
@@ -40,10 +28,6 @@ func renderHelp(m views.HelpModel) string {
 	m.SetSize(120, 40)
 	return m.View()
 }
-
-// ===========================================================================
-// Legend visible from ct-events list (HelpFromResourceList)
-// ===========================================================================
 
 func TestHelpCTEventsLegend_VisibleFromResourceList(t *testing.T) {
 	h := helpWithCTEvents(views.HelpFromResourceList)
@@ -67,7 +51,6 @@ func TestHelpCTEventsLegend_ContainsAllVerbGlyphs(t *testing.T) {
 	h := helpWithCTEvents(views.HelpFromResourceList)
 	out := renderHelp(h)
 
-	// Strip ANSI escapes for content checks — we only care about the text, not styling.
 	plain := stripANSI(out)
 
 	for _, verb := range []string{"R", "W", "D", "S", "I", "N"} {
@@ -82,14 +65,12 @@ func TestHelpCTEventsLegend_ContainsSeverityTierLabels(t *testing.T) {
 	out := renderHelp(h)
 	plain := stripANSI(out)
 
-	// The legend must describe all three severity tiers per §1.1.
-	// Must contain all new severity-tier status names.
+	// The legend must name all three severity tiers.
 	for _, want := range []string{"ct-info", "ct-attention", "ct-danger"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("help legend missing severity tier %q in ct-events legend", want)
 		}
 	}
-	// Must NOT contain the obsolete binary status names.
 	for _, banned := range []string{"ct-write", "ct-read"} {
 		if strings.Contains(plain, banned) {
 			t.Errorf("help legend still contains obsolete status name %q; must use ct-info/ct-attention/ct-danger", banned)
@@ -98,14 +79,10 @@ func TestHelpCTEventsLegend_ContainsSeverityTierLabels(t *testing.T) {
 }
 
 func TestHelpCTEventsLegend_NoCellColorsSection(t *testing.T) {
-	// There is no CELL COLORS block (ROOT actor / OK / FAILED outcome per-cell
-	// colors) in help.go; this test asserts those labels are ABSENT so an
-	// accidental re-addition is caught.
 	h := helpWithCTEvents(views.HelpFromResourceList)
 	out := renderHelp(h)
 	plain := stripANSI(out)
 
-	// "CELL COLORS" section header must not appear.
 	if strings.Contains(plain, "CELL COLORS") {
 		t.Error("help legend must NOT contain 'CELL COLORS' section — obsolete block deleted in P3 tear-down")
 	}
@@ -117,10 +94,6 @@ func TestHelpCTEventsLegend_NoCellColorsSection(t *testing.T) {
 		t.Error("help legend must NOT contain 'cross-acct' — obsolete CELL COLORS entry")
 	}
 }
-
-// ===========================================================================
-// Legend hidden from non-ct-events resource lists
-// ===========================================================================
 
 func TestHelpCTEventsLegend_HiddenForEC2ResourceList(t *testing.T) {
 	h := helpWithOtherResource(views.HelpFromResourceList, "ec2")
@@ -153,8 +126,6 @@ func TestHelpCTEventsLegend_HiddenForEmptyShortName(t *testing.T) {
 }
 
 func TestHelpCTEventsLegend_AllNonCTResourceTypes(t *testing.T) {
-	// Exhaustive check: a representative set of resource short names must NOT
-	// show the CloudTrail legend.
 	nonCTTypes := []string{
 		"ec2", "s3", "rds", "lambda", "eks", "role", "iam-user",
 		"sg", "vpc", "elb", "kms", "secrets", "logs", "alarm",
@@ -168,10 +139,6 @@ func TestHelpCTEventsLegend_AllNonCTResourceTypes(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// Legend hidden when context is not HelpFromResourceList*
-// ===========================================================================
 
 func TestHelpCTEventsLegend_HiddenFromMainMenu(t *testing.T) {
 	// Even if the caller passes "ct-events", the legend must not appear
@@ -214,10 +181,5 @@ func TestHelpCTEventsLegend_HiddenFromSelectorView(t *testing.T) {
 		t.Error("help legend must NOT show 'CloudTrail' section when context=HelpFromSelector")
 	}
 }
-
-// views.NewHelp is DEAD per specs/022-codebase-cleanup/wave3-map-text.md
-// (help.go: "LIVE: NewHelpWithResource ...; DEAD: NewHelp"). The
-// no-resource-name case this pinned is exercised by helpWithCTEvents("")
-// above via the live NewHelpWithResource constructor.
 
 // stripANSI is defined in helpers_test.go (same package).

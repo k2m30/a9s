@@ -1,10 +1,10 @@
 package unit
 
-// parse_rows4to8_test.go — an ARN AWS returned is matched on its parsed
+// An ARN AWS returned is matched on its parsed
 // fields, an ARN a9s builds carries the session's partition, and a finding is
 // raised only from what the evidence proves.
 //
-// The five rows share one failure mode: a value is judged by a shape someone
+// These cases share one failure mode: a value is judged by a shape someone
 // assumed rather than by what it says. A partition string in a prefix match
 // discards every resource outside the commercial partition and renders the
 // pivot as a proven zero. An address missing from an inventory is read as a
@@ -39,7 +39,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ── Row 4: an ARN is matched on its parsed fields ─────────────────────────
+// ── an ARN is matched on its parsed fields ─────────────────────────
 
 // TestARNForService_MatchesOnServiceNotOnPartition pins the predicate the
 // fourteen matching sites share. AWS returns these ARNs; a9s only decides
@@ -227,7 +227,7 @@ func TestAdminAttachedPolicy_IsRecognisedInEveryPartition(t *testing.T) {
 	}
 }
 
-// ── Row 5: the managed-policy ARN a9s builds ──────────────────────────────
+// ── the managed-policy ARN a9s builds ──────────────────────────────
 
 // parseIAMPolicyFake records every ARN GetPolicy is asked about and resolves
 // exactly one of them, so the test can assert both what was tried and that
@@ -301,7 +301,7 @@ func TestManagedPolicyLookup_ARNCarriesTheSessionPartition(t *testing.T) {
 	}
 }
 
-// ── Row 6: only an unassociated elastic IP proves a record dangles ────────
+// ── only an unassociated elastic IP proves a record dangles ────────
 
 // parseR53Fake serves one zone's records.
 type parseR53Fake struct {
@@ -456,7 +456,7 @@ func TestR53DanglingRecord_OnlyAnUnassociatedElasticIPRaisesIt(t *testing.T) {
 	}
 }
 
-// ── Row 7: a bucket is missing only when something authoritative says so ──
+// ── a bucket is missing only when something authoritative says so ──
 
 // parseHeadBucketFake answers HeadBucket per bucket name: nil for a bucket
 // that exists, NotFound for one that does not, and a permissions error for a
@@ -577,7 +577,7 @@ func TestCloudFrontOriginBucket_WithoutAnAuthoritativeCheckNothingIsAsserted(t *
 	w4AssertNoCode(t, res.Findings[distID], awsclient.CodeCFOriginBucketMissing)
 }
 
-// ── Row 8: TCP on 443 is passthrough, not plaintext ───────────────────────
+// ── TCP on 443 is passthrough, not plaintext ───────────────────────
 
 // TestELBListenerIsPlaintext_TheProtocolAndThePortDecide pins the classifier.
 // A network load balancer forwarding TCP does not read what it forwards, so
@@ -698,7 +698,7 @@ func hasCode(fs []domain.Finding, code domain.FindingCode) bool {
 	return false
 }
 
-// ── Row 4, the two sites the first sweep missed ───────────────────────────
+// ── more ARN-matching sites ───────────────────────────────────────────────
 
 // parseBucketPolicyFake serves one bucket policy.
 type parseBucketPolicyFake struct {
@@ -798,8 +798,8 @@ func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 	}
 }
 
-// TestNavIDFromValue_S3BucketARNResolvesInEveryPartition pins the third site
-// the mechanical sweep found, in core/resource rather than core/aws. It turns
+// TestNavIDFromValue_S3BucketARNResolvesInEveryPartition pins the matching
+// site in core/resource. It turns
 // a field value into the id Enter navigates to, and an S3 bucket ARN it fails
 // to recognise is passed through whole — so the drill-in looks for a bucket
 // named by its own ARN and lands nowhere.

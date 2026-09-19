@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_failed_page_routing_test.go — a failure is the other outcome of the
+// A failure is the other outcome of the
 // same request.
 //
 // Every fetch the terminal issues has two endings: a page of rows, or the

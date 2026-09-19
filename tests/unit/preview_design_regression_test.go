@@ -51,10 +51,7 @@ func previewEC2Resource() resource.Resource {
 	}
 }
 
-// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter is the live-seam
-// replacement for the retired views.NewDetail(...).Update(RelatedCheckResult)
-// .Update(KeyTab).Update(KeyEnter) chain (DetailModel.Update is dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md). Drives the real
+// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter drives the real
 // tui.Model root path: Tab focuses the right column (auto-skipping to the
 // first drillable row), Enter dispatches navigation for that row.
 func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
@@ -169,25 +166,12 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 	}
 }
 
-// TestPreview_RightColumnFocus_HLAndTabToggleFocus is live-path coverage for
-// two issue140 stories previously (mis)mapped only to
-// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter, which exercises Tab +
-// Enter alone: "Focus indicator changes with the active detail column" and "H
-// and L switch focus instead of horizontally scrolling the detail view".
-//
-// The design docs also describe a third story, "Tab flips focus between the
-// two visible columns in both directions" (docs/design/qa-user-stories-
-// related-views-ec2.md). keys.Default() (internal/tui/keys/keys.go) binds only
-// "tab", and every production call site (app_input.go:224, app_stack.go:
-// 351,475) matches via key.Matches(msg, m.keys.Tab), which only matches a
-// literal "tab" key string — there is no "shift+tab" binding anywhere in
-// production, and there does not need to be: focus here is a binary toggle
-// between exactly two columns, so Tab alone already flips it in both
-// directions (a second Tab press returns focus to where it started — the
-// same round trip a dedicated Shift-Tab would provide for a two-element
-// cycle). The two-Tab-press assertion below is therefore real, live-path
-// coverage of that story, not a stand-in for a key binding that would be
-// redundant if it existed.
+// TestPreview_RightColumnFocus_HLAndTabToggleFocus pins that the focus
+// indicator changes with the active detail column, that H and L switch focus
+// instead of horizontally scrolling the detail view, and that Tab flips focus
+// between the two visible columns in both directions. Focus is a binary
+// toggle between exactly two columns, so a second Tab press returns focus to
+// where it started.
 //
 // The focus indicator (footer hints) is genuinely textual, not just a style
 // difference: app_stack.go's key-help footer swaps "r Related" for
@@ -261,10 +245,7 @@ func TestPreview_RightColumnFocus_HLAndTabToggleFocus(t *testing.T) {
 	}
 
 	// Tab round trip: Tab focuses right (same visual change as 'l' above);
-	// pressing Tab again flips back to left, exactly like 'h'. This is real
-	// coverage of the Tab binding's own toggle behavior only — see the
-	// doc comment above for why it is NOT a stand-in for Shift-Tab (no such
-	// binding or handler exists in production).
+	// pressing Tab again flips back to left, exactly like 'h'.
 	mAfterTab1, _ := previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	if got := previewView(mAfterTab1); got != focusedRight {
 		t.Errorf("Tab should focus the right column identically to 'l'; got:\n%s\nwant:\n%s", got, focusedRight)

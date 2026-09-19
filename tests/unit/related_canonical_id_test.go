@@ -1,7 +1,7 @@
 package unit
 
-// related_canonical_id_test.go — Tests for the canonical-target-identity
-// contract (#279). ValidateRelatedResultAgainstCacheForTest cross-checks that every
+// The canonical-target-identity contract.
+// ValidateRelatedResultAgainstCacheForTest cross-checks that every
 // ResourceID a checker returns for a given TargetType exists as a
 // Resource.ID in the target type's cache entry. This catches the class of
 // checker bugs where an ARN, adjacent name, or wrong ID kind is returned

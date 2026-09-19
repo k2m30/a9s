@@ -1,13 +1,7 @@
-// qa_r53_checkers_coverage_test.go — Behavioral coverage tests for R53 related-resource checkers.
-//
-// Tests cover: r53AliasDNSNames (helper), canonicalDNS (helper),
-// checkR53APIGW, checkR53S3, checkR53Logs, checkR53VPC.
-//
-// These checkers use r53ListRecordsFirstPage (single ListResourceRecordSets call per zone)
-// and FetchRelatedTarget for cache resolution. r53ListRecordsFirstPage requires
-// *ServiceClients with a non-nil Route53 field implementing Route53API.
-//
-// Tests should PASS against current main — they cover existing, correct code.
+// Behavioural coverage for the R53 related-resource checkers. They read one
+// ListResourceRecordSets page per zone (r53ListRecordsFirstPage), which needs
+// *ServiceClients with a non-nil Route53 field, and resolve targets through
+// FetchRelatedTarget.
 package unit_test
 
 import (
@@ -23,11 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// fakeRoute53Full implements awsclient.Route53API for testing R53 checkers.
-// Route53API = Route53ListHostedZonesAPI + Route53ListResourceRecordSetsAPI + Route53GetHostedZoneAPI.
-// ---------------------------------------------------------------------------
 
 type fakeRoute53Full struct {
 	// listRecordSetsOutput is returned for every ListResourceRecordSets call.
@@ -71,27 +60,13 @@ func (f *fakeRoute53Full) ListHostedZonesByVPC(_ context.Context, _ *route53.Lis
 	return &route53.ListHostedZonesByVPCOutput{}, nil
 }
 
-// Compile-time check: fakeRoute53Full satisfies Route53API.
 var _ awsclient.Route53API = (*fakeRoute53Full)(nil)
-
-// ---------------------------------------------------------------------------
-// canonicalDNS helper tests (pure function, no AWS calls needed).
-// These call the checker through the public API: via r53AliasDNSNames behavior,
-// exercised indirectly by the checker tests below.
-// Direct unit tests use a synthetic record set.
-// ---------------------------------------------------------------------------
-
-// r53CheckerByTargetFull is a copy-compatible accessor for this file's tests
-// (r53CheckerByTarget is already declared in aws_r53_related_test.go in the same package).
 
 // TestR53_CanonicalDNS_TrailingDot verifies that r53AliasDNSNames strips trailing dots
 // and lowercases (exercised via checkR53APIGW's alias processing).
 func TestR53_CanonicalDNS_TrailingDot(t *testing.T) {
-	// We exercise canonicalDNS indirectly through the checker:
-	// a record with AliasTarget.DNSName = "A1B2C3D4.execute-api.us-east-1.amazonaws.com."
-	// (trailing dot, uppercase) should still be matched against the api cache entry "a1b2c3d4".
 	const apiID = "a1b2c3d4"
-	aliasWithDot := "A1B2C3D4.execute-api.us-east-1.amazonaws.com." // uppercase + trailing dot
+	aliasWithDot := "A1B2C3D4.execute-api.us-east-1.amazonaws.com."
 
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
@@ -109,7 +84,6 @@ func TestR53_CanonicalDNS_TrailingDot(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
-	// APIGW cache contains resource with ID matching the API ID extracted from the alias.
 	apigwRes := resource.Resource{ID: apiID, Fields: map[string]string{}}
 	cache := resource.ResourceCache{
 		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{apigwRes}},
@@ -136,7 +110,6 @@ func TestR53_CanonicalDNS_EmptyDNSName(t *testing.T) {
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
 			ResourceRecordSets: []r53types.ResourceRecordSet{
 				{
-					// No AliasTarget — should not contribute to alias names.
 					Name: aws.String("example.com."),
 					Type: r53types.RRTypeA,
 					ResourceRecords: []r53types.ResourceRecord{
@@ -152,15 +125,10 @@ func TestR53_CanonicalDNS_EmptyDNSName(t *testing.T) {
 	source := resource.Resource{ID: "Z1EMPTY", Fields: map[string]string{}}
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	// No alias DNS names → Count:0, not -1.
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no alias records)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkR53APIGW tests
-// ---------------------------------------------------------------------------
 
 // TestRelated_R53_APIGW_Match verifies that an alias record pointing at
 // "<api-id>.execute-api.<region>.amazonaws.com" yields the API Gateway ID from cache.
@@ -263,9 +231,7 @@ func TestRelated_R53_APIGW_EmptyID(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_APIGW_CacheNilList verifies that when the apigw cache entry has a
-// nil resource list (loaded but empty), the extracted API IDs from the alias hostname
-// are used as resource IDs directly.
+// An apigw cache entry that is present with a nil list is a resolved zero.
 func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	const apiID = "directid12345"
 
@@ -285,16 +251,10 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
-	// Cache entry PRESENT but holding nothing. The checker does not fall back
-	// to the API id parsed out of the alias hostname: an alias DNS name is not
-	// an apigw ID, so that would offer a row that navigates to nothing, and an
-	// account with zero APIs would render a resolved count equal to its alias
-	// records.
-	//
-	// A present entry is a complete answer even when empty (FetchRelatedTarget's
-	// cache-hit path), so the answer here is a resolved zero, not Unknown.
-	// Unknown is for a cache MISS with no fetcher, pinned separately in
-	// r53_related_nil_cache_test.go.
+	// An alias DNS name is not an apigw ID, so it never becomes a row. A present
+	// entry is a complete answer even when empty (FetchRelatedTarget's cache-hit
+	// path); Unknown is reserved for a cache miss with no fetcher
+	// (r53_related_nil_cache_test.go).
 	cache := resource.ResourceCache{
 		"apigw": resource.ResourceCacheEntry{Resources: nil},
 	}
@@ -315,16 +275,9 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkR53S3 tests
-// ---------------------------------------------------------------------------
-
-// TestRelated_R53_S3_Match verifies that an alias record pointing at the
-// legacy S3 website endpoint resolves to the bucket named by the RECORD.
-//
-// Spec row s3-0916/3: an S3 website alias target is the bare regional
-// endpoint and never carries the bucket, so the join key is the record name.
-// A bucket-prefixed target is not a shape AWS returns and is not matched.
+// An alias to the dash-style S3 website endpoint resolves to the bucket named
+// by the RECORD. An S3 website alias target is the bare regional endpoint and
+// never carries the bucket, so the join key is the record name.
 func TestRelated_R53_S3_Match(t *testing.T) {
 	const bucketName = "my-website-bucket"
 
@@ -368,9 +321,8 @@ func TestRelated_R53_S3_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_S3_NewStyleEndpoint verifies alias records using the newer
-// "s3-website.<region>" (no hyphen between s3-website and region) style.
-// Spec row s3-0916/3 applies here too: the bucket is the record's own name.
+// The dot-style "s3-website.<region>" endpoint also resolves to the bucket
+// named by the record.
 func TestRelated_R53_S3_NewStyleEndpoint(t *testing.T) {
 	const bucketName = "another-bucket-2024"
 
@@ -381,7 +333,6 @@ func TestRelated_R53_S3_NewStyleEndpoint(t *testing.T) {
 					Name: aws.String(bucketName + "."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
-						// Newer endpoint style: s3-website.<region>.amazonaws.com
 						DNSName:              aws.String("s3-website.us-west-2.amazonaws.com"),
 						EvaluateTargetHealth: false,
 					},
@@ -464,12 +415,7 @@ func TestRelated_R53_S3_EmptyID(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkR53Logs tests
-// ---------------------------------------------------------------------------
-
-// TestRelated_R53_Logs_Unknown verifies that checkR53Logs always returns
-// State: RelatedUnknown for a non-empty zone ID (ListQueryLoggingConfigs not yet wired).
+// checkR53Logs returns State: RelatedUnknown for a non-empty zone ID.
 func TestRelated_R53_Logs_Unknown(t *testing.T) {
 	checker := r53CheckerByTarget(t, "logs")
 	source := resource.Resource{ID: "ZALOGS123", Fields: map[string]string{}}
@@ -492,10 +438,6 @@ func TestRelated_R53_Logs_EmptyID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty zone ID)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkR53VPC tests
-// ---------------------------------------------------------------------------
 
 // TestRelated_R53_VPC_PrivateZone_Match verifies that checkR53VPC calls GetHostedZone
 // and returns the VPCs associated with a private hosted zone.
@@ -542,9 +484,9 @@ func TestRelated_R53_VPC_PrivateZone_Match(t *testing.T) {
 // TestRelated_R53_VPC_PublicZone_ReturnsZero verifies that a public hosted zone
 // (private_zone != "true") immediately returns Count:0 without an API call.
 func TestRelated_R53_VPC_PublicZone_ReturnsZero(t *testing.T) {
-	// If the checker ignores the fake (as expected for public zones), Count:0.
 	fakeR53 := &fakeRoute53Full{
-		// If called unexpectedly, return some VPCs to ensure the test detects the bug.
+		// Returned only if the checker calls GetHostedZone, which fails the Count:0
+		// assertion.
 		getHostedZoneOutput: &route53.GetHostedZoneOutput{
 			VPCs: []r53types.VPC{
 				{VPCId: aws.String("vpc-unexpected")},
@@ -618,10 +560,6 @@ func TestRelated_R53_VPC_DuplicateVPCIDs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Multi-record alias tests — verify that only matching alias types are returned.
-// ---------------------------------------------------------------------------
-
 // TestRelated_R53_APIGW_MultipleRecords_OnlyAPIDNSMatches verifies that a zone
 // with mixed alias records (ELB + APIGW) only returns APIGW entries.
 func TestRelated_R53_APIGW_MultipleRecords_OnlyAPIDNSMatches(t *testing.T) {
@@ -667,10 +605,6 @@ func TestRelated_R53_APIGW_MultipleRecords_OnlyAPIDNSMatches(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), apiID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkR53ELB tests
-// ---------------------------------------------------------------------------
 
 // TestRelated_R53_ELB_Match verifies that alias records pointing at an ELB DNS
 // name (*.elb.amazonaws.com) resolve to the matching ELB ID from cache.
@@ -796,14 +730,9 @@ func TestRelated_R53_ELB_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ELB_NoMatch_TruncatedScan pins the truncation-honesty fix
-// on the DANGEROUS path: when the hosted zone's record scan itself came back
-// truncated (ListResourceRecordSets IsTruncated=true), a "no ELB alias
-// found" result must say so — "(0+)", not "(0)". Before the fix this path
-// always returned resource.KnownRelated(..., false): a confident, false
-// "elb (0)" from a scan that never saw the rest of the zone's records. This
-// is the dangerous case: the user reads "elb (0)" as "nothing points at this
-// ELB" and moves on, a dead end they trust.
+// A truncated record scan (ListResourceRecordSets IsTruncated=true) with no ELB
+// alias found reports "(0+)", not "(0)": a confident "elb (0)" from a partial
+// scan reads as "nothing points at this ELB".
 func TestRelated_R53_ELB_NoMatch_TruncatedScan(t *testing.T) {
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
@@ -839,9 +768,8 @@ func TestRelated_R53_ELB_NoMatch_TruncatedScan(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ELB_Match_TruncatedScan pins the same fix on the
-// found-a-match path: a truncated record scan must report the matches found
-// SO FAR as truncated, not as the exhaustive set.
+// A truncated record scan reports the matches found so far as truncated, not
+// as the exhaustive set.
 func TestRelated_R53_ELB_Match_TruncatedScan(t *testing.T) {
 	const elbDNS = "myalb-123456789.us-east-1.elb.amazonaws.com"
 	const elbID = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/myalb/abc123"
@@ -888,12 +816,6 @@ func TestRelated_R53_ELB_NilClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }
-
-// TestRelated_R53_ELB_CacheNilList verifies that when ELB cache is nil, the
-// alias DNS names are returned directly as IDs (fallback path).
-// ---------------------------------------------------------------------------
-// checkR53CF tests
-// ---------------------------------------------------------------------------
 
 // TestRelated_R53_CF_Match verifies that alias records pointing at a CloudFront
 // distribution domain (*.cloudfront.net) resolve to the CF ID from cache.
@@ -986,12 +908,6 @@ func TestRelated_R53_CF_NilClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count())
 	}
 }
-
-// TestRelated_R53_CF_CacheNilList verifies that when CF cache is unavailable,
-// the CloudFront domain name itself is returned as the fallback ID.
-// ---------------------------------------------------------------------------
-// checkR53ACM tests
-// ---------------------------------------------------------------------------
 
 // r53ACMCache holds one loaded certificate per domain, keyed on its ARN as
 // the acm list keys its rows.

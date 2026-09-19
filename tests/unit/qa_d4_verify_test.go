@@ -1,13 +1,9 @@
 package unit
 
-// qa_d4_verify_test.go — the rendered contracts for the rows that added a
-// demo witness so a phrase, a drill, or a badge could be seen at all.
-//
-// Each of these was previously provable only in a unit test against a
-// hand-built input. A phrase that merges several ports, a role reached by
-// drilling rather than by listing, and a workgroup's two independent settings
-// are all things the fixture set has to demonstrate before any surface test
-// can watch them.
+// Rendered contracts the demo fixture set has to
+// demonstrate: a phrase that merges several ports, a role reached by
+// drilling rather than by listing, and a workgroup's two independent
+// settings.
 
 import (
 	"context"
@@ -73,8 +69,6 @@ func d4FindingByCode(t *testing.T, r resource.Resource, code domain.FindingCode)
 	return domain.Finding{}
 }
 
-// ── Row 18 — the merged listener phrases ──────────────────────────────────
-
 // TestD4Row18_CleartextPhraseMergesPortsInAscendingOrder pins the phrase a
 // balancer with two offending listeners shows.
 //
@@ -99,8 +93,8 @@ func TestD4Row18_CleartextPhraseMergesPortsInAscendingOrder(t *testing.T) {
 		t.Error("the finding renders no Detail sentence")
 	}
 
-	// One finding for both listeners, not one per listener: two rows in the
-	// Attention block saying the same thing is what merging removed.
+	// One finding for both listeners, not one per listener: two Attention rows
+	// saying the same thing are noise.
 	n := 0
 	for _, got := range r.Findings {
 		if got.Code == "elb.plain-http-listener" {
@@ -195,8 +189,6 @@ func TestD4Row18_ELBBadgeCountsEachBalancerOnce(t *testing.T) {
 	}
 }
 
-// ── Row 19 — a role reached by drilling ───────────────────────────────────
-
 // TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole pins both
 // surfaces of the same role.
 //
@@ -273,15 +265,9 @@ func TestD4Row19_SomeDemoResourcePivotsToTheEscalatingRole(t *testing.T) {
 	}
 }
 
-// ── Rows 21 and 22 — the athena workgroup ─────────────────────────────────
-
 // TestD4Row22_AthenaEmitsTwoIndependentFindings pins that the two workgroup
-// settings are two findings.
-//
-// They are independent: a workgroup that enforces its configuration can still
-// write results in the clear. Merged, the phrase named whichever fired first
-// and the other went unsaid, which is how a cell came to read as a row label
-// with a count after it.
+// settings are two findings: they are independent, and a workgroup that
+// enforces its configuration can still write results in the clear.
 func TestD4Row22_AthenaEmitsTwoIndependentFindings(t *testing.T) {
 	rows, td := d4FoldedRows(t, "athena")
 	r := d4RowByID(t, rows, fixtures.AthenaGovernanceMisconfigured)
@@ -316,7 +302,6 @@ func TestD4Row22_AthenaEmitsTwoIndependentFindings(t *testing.T) {
 		t.Errorf("row value = %q, want the S3 location the operator has to go look at", ad.Rows[0].Value)
 	}
 
-	// The retired code must not still be emitted anywhere.
 	for _, row := range rows {
 		for _, f := range row.Findings {
 			if f.Code == "athena.governance-misconfigured" {
@@ -358,7 +343,7 @@ func TestD4Row21_AthenaWitnessIsTheOnlyCarrier(t *testing.T) {
 	}
 }
 
-// TestD4Row22_AthenaDocQuotesTheDetailConstants pins the doc side: the §4
+// TestD4Row22_AthenaDocQuotesTheDetailConstants pins the doc side: the
 // cells quote what the two findings say. The Detail column lives in the
 // generated findings table catalogen writes (five plain cells, no
 // backticks), so this reads that table's row for each code.
@@ -415,11 +400,8 @@ func athenaGeneratedDocDetails(t *testing.T) map[domain.FindingCode]string {
 // Both codes are Warning, so the bucket cell reads Warning. The surfaces cell
 // lists S3 because S3 is the `~` tier of the detail-view Attention section,
 // which internal/tui/views/detail_fields.go renders for every issue-severity
-// finding of either wave, whatever colour the row is. The earlier expectation
-// of "S2, S4, S5" treated S3 as a marker on a green list row; a row carrying a
-// finding is never green (tests/unit/qa_color_findings_conformance_test.go,
-// empty divergence allowlist), so that reading describes a surface no operator
-// reaches and is not to be restored.
+// finding of either wave, whatever colour the row is; a row carrying a
+// finding is never green (qa_color_findings_conformance_test.go).
 func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
 	b, err := os.ReadFile("../../docs/resources/athena.md")
 	if err != nil {
@@ -460,11 +442,8 @@ func TestD4Row25_AthenaDocRowsSitInTheWarningBucket(t *testing.T) {
 }
 
 // TestD4Row26_ListenerPhrasesAgreeInNumber pins that both merged phrases and
-// their Detail sentences count.
-//
-// The phrase pluralised unconditionally, so a balancer with one offending
-// listener read "ports 443 in the clear" while its Detail said "This listener".
-// One is a grammar slip the operator reads as a second port they cannot find.
+// their Detail sentences agree in number with the listener count: "ports 443"
+// for one listener reads as a second port the operator cannot find.
 func TestD4Row26_ListenerPhrasesAgreeInNumber(t *testing.T) {
 	rows, _ := d4FoldedRows(t, "elb")
 

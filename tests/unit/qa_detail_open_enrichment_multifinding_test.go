@@ -1,4 +1,4 @@
-// qa_detail_open_enrichment_multifinding_test.go — an already-open detail
+// An already-open detail
 // view receives every Wave-2 finding for its resource.
 //
 // handleEnrichmentChecked (core/runtime/handlers_availability.go) folds
@@ -20,11 +20,8 @@
 // every independently-evaluated condition in its Attention block, not just
 // the worst one.
 //
-// This mirrors qa_wave2_multifinding_test.go's Section 1 open-detail pattern
-// (PushScreen{ScreenDetail} + EnsureDetailState + read Body.Detail.Fields for
-// Path=="Attention" rows) but drives the REAL handleEnrichmentChecked path via
-// the public Controller.Handle seam instead of hand-folding through
-// runtime.ApplyWave2ToRow, so it pins the PatchDetail plumbing specifically.
+// It drives the real handleEnrichmentChecked path via the public
+// Controller.Handle seam, so it pins the PatchDetail plumbing specifically.
 package unit_test
 
 import (
@@ -82,9 +79,8 @@ func TestHandleEnrichmentChecked_DetailAlreadyOpen_MultiFinding_BothFindingsReac
 	snap, _ := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "ecs-svc",
 		Truncated:    false,
-		// Findings carries every independently-evaluated condition — what a
-		// real enricher's IssueEnricherResult.Findings now holds per-resource
-		// (map[string][]domain.Finding, #52).
+		// Findings carries every independently-evaluated condition per resource
+		// (map[string][]domain.Finding).
 		Findings: map[string][]domain.Finding{
 			detailOpenMultiFindingResourceID: {detailOpenMultiFindingBroken, detailOpenMultiFindingWarn},
 		},

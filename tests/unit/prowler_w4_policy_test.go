@@ -1,8 +1,7 @@
 package unit
 
-// prowler_w4_policy_test.go — behavioural tests for the batch-w4 policy row:
-// a customer-managed policy whose allowed actions add up to a known
-// privilege-escalation path.
+// A customer-managed policy whose allowed actions
+// add up to a known privilege-escalation path.
 
 import (
 	"context"

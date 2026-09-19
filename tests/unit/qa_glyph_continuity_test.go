@@ -1,30 +1,19 @@
-// qa_glyph_continuity_test.go — `!`/`~` row glyphs must not vanish
+// `!`/`~` row findings must not vanish
 // temporarily and come back.
 //
-//  1. RerunStart_KeepsVisibleFindingsUntilReplaced: internal/tui's
-//     handleRefresh (runtime_adapter_navigate.go) deliberately does NOT
-//     clear a list's rendered row findings on Ctrl+R. Wave-2 state is
-//     stale-until-replaced, not blank-until-replaced: the glyphs stay on
-//     screen for the rerun's AWS round-trip and are reconciled per resource
-//     ID when the fresh EnrichmentChecked lands (ApplyWave2ToRow strips-
-//     then-conditionally-reappends against the full fresh findings map).
-//     Pre-clearing via ClearRowFindings would blank every glyph for that
-//     whole round-trip — a real, user-visible flicker (see the handleRefresh
-//     comment). TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment in
-//     qa_enrichment_review_fixes_test.go pins this retain-until-replaced
-//     contract; this pin documents the same intentional behavior.
+//  1. Ctrl+R does not clear a list's rendered row findings: Wave-2 state is
+//     stale-until-replaced, reconciled per resource ID when the fresh
+//     EnrichmentChecked lands (ApplyWave2ToRow strips then conditionally
+//     re-appends against the full fresh findings map). Pre-clearing would
+//     blank every finding for the rerun's whole AWS round-trip.
 //
-//  2. Swap_MergesWave2ForWave1CarryingRows: applyResourcesLoaded's carry-
-//     forward (core/app/list_body.go) re-applies a prior row's Wave-2
-//     findings onto the incoming replacement whether or not the incoming
-//     row itself carries a fresh Wave-1 finding; nothing invalidated the
-//     Wave-2 finding on that swap.
+//  2. applyResourcesLoaded's carry-forward (core/app/list_body.go) re-applies
+//     a prior row's Wave-2 findings onto the incoming replacement whether or
+//     not the incoming row carries a fresh Wave-1 finding.
 //
-//  3. ProfileSwitch_StillClearsFindings (C9 guard): Controller.enrichmentStore
-//     for a resource type is cleared by a profile/region rotation; a stale
-//     enrichmentStore entry surviving a rotation would let a same-ID
-//     collision (or a reopened list of the same type) resurrect a dead
-//     profile's glyphs.
+//  3. A profile/region rotation clears Controller.enrichmentStore for a
+//     resource type; a surviving entry would let a same-ID collision (or a
+//     reopened list of the same type) resurrect a dead profile's findings.
 package unit
 
 import (
@@ -89,11 +78,11 @@ func hasStorePhraseForID(ctrl *app.Controller, id, phrase string) bool {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Pin 1 — rerun-start clearing is deliberate; documents the CURRENT contract
+// Pin 1 — Ctrl+R keeps findings until the fresh result replaces them
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestRerunStart_KeepsVisibleFindingsUntilReplaced pins the STALE-UNTIL-
-// REPLACED contract at the layer where mechanism 1 lives: internal/tui's
+// REPLACED contract at the layer where it lives: internal/tui's
 // handleRefresh (runtime_adapter_navigate.go). A Controller-level pin cannot
 // observe this — an eager clear (m.ctrl.ClearRowFindings +
 // m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)) would run one layer up,
@@ -122,8 +111,6 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 		Resources:    resources, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Populate a finding for i-0abc1111aaa111111 via the live-update path.
-
 	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
 
 	var visible bool
@@ -132,8 +119,6 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 		t.Fatal("pre-condition failed: expected web-server-1 to survive ctrl+z (finding applied) before Ctrl+R")
 	}
 
-	// Half 1: pressing Ctrl+R must not clear the finding before the fresh
-	// enrichment result lands — the fetch/enrichment cmd has not run yet.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	m, visible = isVisibleUnderCtrlZ(m, "web-server-1")
@@ -141,9 +126,6 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 		t.Error("Ctrl+R must NOT clear the active list's findings before the fresh result lands (stale-until-replaced, not blank-until-replaced); web-server-1 no longer survives ctrl+z immediately after keypress")
 	}
 
-	// Half 2: once a fresh EnrichmentCheckedMsg lands with the SAME resource
-	// genuinely recovered (no finding for it in the fresh map), the finding
-	// must be removed — this is real replacement, not merely "never clear".
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Truncated:    false,
@@ -160,7 +142,7 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Pin 2 — carry-forward drops Wave-2 for a Wave-1-carrying incoming row
+// Pin 2 — carry-forward merges Wave-2 onto a Wave-1-carrying incoming row
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestSwap_MergesWave2ForWave1CarryingRows pins applyResourcesLoaded's
@@ -190,9 +172,6 @@ func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("rds", seeded, nil, false)
 
-	// Incoming replace: rowA already carries its OWN fresh Wave-2 finding
-	// (must win, not be clobbered). rowB carries ONLY the Wave-1 finding —
-	// its Wave-2 companion must be inherited from the outgoing row.
 	replacement := []resource.Resource{
 		{ID: "db-rowa", Name: "db-rowa", Type: "rds", Findings: []domain.Finding{wave1Only, freshWave2}},
 		{ID: "db-rowb", Name: "db-rowb", Type: "rds", Findings: []domain.Finding{wave1Only}},
@@ -230,10 +209,10 @@ func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Pin 3 — C9 guard: rotation must still clear stale enrichment state
+// Pin 3 — rotation clears stale enrichment state
 // ─────────────────────────────────────────────────────────────────────────
 
-// TestProfileSwitch_StillClearsFindings pins the C9 guard: a stale
+// TestProfileSwitch_StillClearsFindings: a stale
 // enrichmentStore entry for a resource type must not survive a
 // profile/region rotation on the same long-lived Controller instance
 // (internal/tui constructs exactly one Controller for the process

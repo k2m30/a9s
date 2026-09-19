@@ -15,7 +15,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T-KMS01 - Test KMS multi-step fetch (ListKeys -> DescribeKey, filter CUSTOMER)
+// KMS multi-step fetch (ListKeys -> DescribeKey, filter CUSTOMER)
 // ---------------------------------------------------------------------------
 
 func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
@@ -88,7 +88,6 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		t.Fatalf("expected 2 customer-managed resources, got %d", len(resources))
 	}
 
-	// Verify required fields
 	requiredFields := []string{"key_id", "alias", "status", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -98,7 +97,6 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		}
 	}
 
-	// Verify first key (customer)
 	r0 := resources[0]
 	if r0.ID != "key-111-aaa" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "key-111-aaa", r0.ID)
@@ -110,7 +108,6 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "Enabled", r0.Fields["status"])
 	}
 
-	// Verify second key (also customer)
 	r1 := resources[1]
 	if r1.ID != "key-333-ccc" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "key-333-ccc", r1.ID)
@@ -119,7 +116,6 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"alias\"]: expected %q, got %q", "alias/my-signing-key", r1.Fields["alias"])
 	}
 
-	// Verify RawStruct is set
 	if r0.RawStruct == nil {
 		t.Error("resource[0].RawStruct should not be nil")
 	}
@@ -202,14 +198,13 @@ func TestFetchKMSKeys_NoAliasForKey(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 
-	// Key without alias should have empty alias field
 	if resources[0].Fields["alias"] != "" {
 		t.Errorf("expected empty alias, got %q", resources[0].Fields["alias"])
 	}
 }
 
 // ---------------------------------------------------------------------------
-// T-KMS02 - Resource type definition
+// Resource type definition
 // ---------------------------------------------------------------------------
 
 func TestKMS_ResourceTypeDef(t *testing.T) {
@@ -230,7 +225,6 @@ func TestKMS_ResourceTypeDef(t *testing.T) {
 		{"Alias", "alias", 32},
 		{"Key ID", "key_id", 38},
 		{"Status", "status", 12},
-		// Rotation comes from the view list folded into this one.
 		{"Rotation", "rotation_enabled", 10},
 		{"Description", "description", 36},
 	}
@@ -264,11 +258,10 @@ func TestKMS_Aliases(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-KMS03 - DescribeKey partial failure: skip undescribable keys (fixes #85)
+// DescribeKey partial failure: undescribable keys are skipped and reported
 // ---------------------------------------------------------------------------
 
 func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
-	// ListKeys returns 3 keys, but DescribeKey only succeeds for 2 of them
 	listKeysMock := &mockKMSListKeysClient{
 		output: &kms.ListKeysOutput{
 			Keys: []kmstypes.KeyListEntry{
@@ -279,7 +272,6 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 		},
 	}
 
-	// Only key-ok-1 and key-ok-2 have describe outputs; key-denied is missing -> mock returns error
 	describeKeyMock := &mockKMSDescribeKeyClient{
 		outputs: map[string]*kms.DescribeKeyOutput{
 			"key-ok-1": {
@@ -337,7 +329,6 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 }
 
 func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
-	// ListKeys returns 2 keys, but DescribeKey fails for both
 	listKeysMock := &mockKMSListKeysClient{
 		output: &kms.ListKeysOutput{
 			Keys: []kmstypes.KeyListEntry{
@@ -347,7 +338,6 @@ func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
 		},
 	}
 
-	// Empty outputs map -> all DescribeKey calls will error
 	describeKeyMock := &mockKMSDescribeKeyClient{
 		outputs: map[string]*kms.DescribeKeyOutput{},
 	}

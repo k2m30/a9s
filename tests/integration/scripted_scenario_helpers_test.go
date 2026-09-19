@@ -91,10 +91,9 @@ func fullIntegrationNewDemoScenario(t *testing.T) *fullIntegrationScenario {
 // fullIntegrationNewDemoScenarioWithCache is the demo scenario an
 // installation actually is: the on-disk cache is on, rooted in a temp home of
 // this test's own. Every other demo scenario runs WithNoCache(true), which
-// switches off the availability cache AND its background probes — so the two
-// writers of a type's badge (the list-open lane and the probe lane) have no
-// rendered witness between them, and a disagreement can only be found in
-// production.
+// switches off the availability cache AND its background probes, so only
+// this scenario renders both writers of a type's badge (the list-open lane
+// and the probe lane).
 //
 // The temp home is registered before the model is built, so the model's own
 // cleanup (which flushes the pending cache write) runs first and the writer is
@@ -144,7 +143,7 @@ func fullIntegrationNewLiveScenario(t *testing.T, profile, region string) *fullI
 	m := tui.New(profile, region, tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
 
-	// Init batches the connect kickoff with the C1 availability-cache seed;
+	// Init batches the connect kickoff with the availability-cache seed;
 	// pick the InitConnect message out of the batch rather than assuming a
 	// single-command Init.
 	initMsg := fullIntegrationExtractMsg(t, m.Init(), func(msg tea.Msg) bool {
@@ -259,9 +258,9 @@ func fullIntegrationMustFindResource(t *testing.T, clients *awsclient.ServiceCli
 			result, err = paginatedFetcher(ctx, clients, token)
 		}
 		if err != nil && len(result.Resources) == 0 {
-			// Rows + composite error together are the designed E5 partial-
-			// success outcome (e.g. mwaa's details-denied demo witness);
-			// only a row-less error is a harness failure.
+			// Rows + composite error together are a partial-success outcome
+			// (e.g. mwaa's details-denied demo row); only a row-less error is
+			// a harness failure.
 			t.Fatalf("find resource %s page %d failed: %v", resourceType, page, err)
 		}
 		for _, res := range result.Resources {
@@ -619,7 +618,6 @@ func (s *fullIntegrationScenario) currentView() string {
 // ("│…│") qualify — the header flash banner can quote a resource ID inside an
 // error message (e.g. a composite fetch error naming a denied environment)
 // and must never be mistaken for the row. Returns "" if no such line exists.
-// findRow returns the rendered table line for resourceID.
 //
 // The match is on a whole cell, not a substring: "warn-dbc-no-bkp" is a prefix
 // of "warn-dbc-no-bkp-plus-maint", and a plain Contains returns whichever of
@@ -670,7 +668,7 @@ func isWholeCellMatch(line, resourceID string) bool {
 
 // ExpectRowStatusBlank asserts that the row for resourceID does not contain any
 // of the banned Healthy filler strings (`OK`, `ACTIVE`, `available`, `running`,
-// `healthy`, `-`). Healthy rows must render their Status cell empty per spec §4.
+// `healthy`, `-`). Healthy rows render their Status cell empty.
 func (s *fullIntegrationScenario) ExpectRowStatusBlank(resourceID string) {
 	s.t.Helper()
 	line := s.findRow(resourceID)
@@ -691,7 +689,7 @@ func (s *fullIntegrationScenario) ExpectRowStatusBlank(resourceID string) {
 }
 
 // ExpectRowStatusEquals asserts that the row for resourceID contains the exact
-// Status phrase expected by spec §4 (substring match — the row contains other
+// Status phrase (substring match — the row contains other
 // cells, so exact cell-level equality is not enforced).
 func (s *fullIntegrationScenario) ExpectRowStatusEquals(resourceID, expected string) {
 	s.t.Helper()
@@ -721,7 +719,7 @@ func (s *fullIntegrationScenario) ExpectRowNamePrefix(resourceID, prefix string)
 
 // ExpectRowNoGlyphPrefix asserts that the row for resourceID has neither a
 // `!` nor a `~` glyph prefix. Glyphs are only permitted on Healthy (green)
-// rows per spec §4; Warning / Broken / Dim rows must never render one.
+// rows; Warning / Broken / Dim rows never render one.
 func (s *fullIntegrationScenario) ExpectRowNoGlyphPrefix(resourceID string) {
 	s.t.Helper()
 	line := s.findRow(resourceID)
@@ -843,8 +841,7 @@ func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 	// Wave 1 + Wave 2 enrichment chain: availability → enrichment → field updates.
 	// Without these, demo-mode Wave 2 findings never reach the ResourceList,
 	// and the `~` glyph / `(+N)` suffix / "maintenance scheduled" invariants
-	// cannot be exercised end-to-end. Added 2026-04-22 after the dbi render
-	// gate surfaced the gap.
+	// cannot be exercised end-to-end.
 	// With the cache on, ctrl+r on the menu answers with the cache load
 	// first and dispatches the sweep from ITS handler, so a harness that
 	// stops here never starts the probe lane at all — the menu sits at
@@ -1193,7 +1190,7 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 // This path tests the DISPATCH→RESOLUTION→LANDING pipeline (the same path that Enter
 // on a navigable field follows in production) without requiring cursor manipulation.
 // It catches ID-format mismatches between what the detail view carries and what the
-// target resource type indexes on (e.g., the DDB→KMS full-ARN vs. bare-key-ID bug).
+// target resource type indexes on (e.g. a full KMS key ARN against a bare key ID).
 //
 // Fails the test if:
 //   - No NavigableField is registered for the given field path on the current resource type.

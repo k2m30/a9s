@@ -1,6 +1,6 @@
 package unit_test
 
-// related_validate_test.go — ValidateRelatedResult helper.
+// ValidateRelatedResult helper.
 //
 // ValidateRelatedResult(r resource.RelatedCheckResult) error
 // (core/resource/related.go) enforces invariants on RelatedCheckResult
@@ -33,10 +33,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestValidateRelatedResult_Valid
-// ─────────────────────────────────────────────────────────────────────────────
 
 // TestValidateRelatedResult_Valid verifies that all well-formed RelatedCheckResult
 // values return nil from ValidateRelatedResult.
@@ -78,25 +74,8 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestValidateRelatedResult_Invalid
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestValidateRelatedResult_Invalid verifies that malformed RelatedCheckResult
 // values return a non-nil error from ValidateRelatedResult.
-//
-// Three of the four original cases here ("count > 0 but no IDs", "unknown
-// state with IDs", "truncated with unknown state") hand-built a
-// RelatedCheckResult violating exactly the invariant they meant to prove
-// ValidateRelatedResult rejects. RelatedCheckResult's fields are now
-// unexported, buildable only via KnownRelated/UnknownRelated/ErrorRelated/
-// DeferredRelated — none of which can produce Count>0 without a matching
-// ResourceIDs list (Count is always len(uniqueIDs)), or attach ResourceIDs or
-// Truncated to an Unknown-state result (UnknownRelated takes only a
-// targetType). Those three shapes are no longer constructible from
-// tests/unit, so the corresponding ValidateRelatedResult checks are no longer
-// exercised here — and, since no real checker can produce these shapes either
-// (identical constructor set), they may now be unreachable in production too.
 func TestValidateRelatedResult_Invalid(t *testing.T) {
 	cases := []struct {
 		name string
@@ -119,10 +98,6 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestRegisteredCheckers_ProduceValidResults
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestRegisteredCheckers_ProduceValidResults calls every registered RelatedChecker
 // for each parent type in the scoped list, passing empty cache and nil clients,
 // and asserts that the returned RelatedCheckResult passes ValidateRelatedResult.
@@ -130,8 +105,6 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 // nil clients and empty cache represent the minimal invocation that must not
 // produce an invariant-violating result (e.g., a checker that returns Count=2
 // with no ResourceIDs when it falls back to the nil-clients path).
-//
-// Parent types scoped per ARCH-06 task: asg, ecr, ecs-svc, secrets, ses, kms, eb, eks.
 //
 // Shape/invariant guard only — a checker can still be inert, non-drillable,
 // or fed by incomplete runtime data and pass.
@@ -156,16 +129,12 @@ func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 			for _, def := range defs {
 				def := def
 				if def.Checker == nil {
-					// Nil Checker is not an acceptable steady state for a registered
-					// relation. This legacy skip should become a hard failure once
-					// the remaining allowances are removed.
 					continue
 				}
 
 				t.Run(def.TargetType, func(t *testing.T) {
 					result := def.Checker(context.Background(), nil, dummyRes, emptyCache)
 
-					// TargetType should be echoed from the def.
 					if result.TargetType() == "" {
 						// Tolerate missing TargetType echo — ValidateRelatedResult will catch it.
 					}

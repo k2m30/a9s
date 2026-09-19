@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_costs_completeness_blind_test.go drives two cost-cache
+// Drives two cost-cache
 // scenarios from the screen the operator uses:
 //
 //   - a grid whose CE walk hit its page cap is partial. Leaving the screen and
@@ -80,8 +80,8 @@ func wipfixSaysPartial(s string) bool {
 		strings.Contains(l, "lower bound") || strings.Contains(l, "truncated")
 }
 
-// TestCostsPageCappedGrid_StillWarnsAfterLeavingAndReopening pins row 1's
-// first half: the truncation belongs to the data, not to the frame that
+// TestCostsPageCappedGrid_StillWarnsAfterLeavingAndReopening: the truncation
+// belongs to the data, not to the frame that
 // happened to be on screen when it arrived. Recording it on the frame alone
 // means walking away and back turns a page-capped answer into a confident one.
 func TestCostsPageCappedGrid_StillWarnsAfterLeavingAndReopening(t *testing.T) {
@@ -104,7 +104,6 @@ func TestCostsPageCappedGrid_StillWarnsAfterLeavingAndReopening(t *testing.T) {
 
 	amount := wipfixFirstCostCellText(t, c)
 
-	// Leave the screen and come back — the same operator, the same window.
 	_, _ = c.Apply(app.Action{Kind: app.ActionBack})
 	wipfixOpenCosts(t, c)
 
@@ -120,8 +119,8 @@ func TestCostsPageCappedGrid_StillWarnsAfterLeavingAndReopening(t *testing.T) {
 	}
 }
 
-// TestCostsPageCappedGrid_IsRepairedByACompleteRefresh pins row 1's second
-// half: a settled period written from a page-capped fetch must never be
+// TestCostsPageCappedGrid_IsRepairedByACompleteRefresh: a settled period
+// written from a page-capped fetch must never be
 // promoted to immutable, or the refresh that could repair it is refused.
 func TestCostsPageCappedGrid_IsRepairedByACompleteRefresh(t *testing.T) {
 	c := newTestController(t)
@@ -138,7 +137,6 @@ func TestCostsPageCappedGrid_IsRepairedByACompleteRefresh(t *testing.T) {
 	})
 	partial := wipfixFirstCostCellText(t, c)
 
-	// The repair: the same window, walked to the end this time.
 	for _, task := range c.ForceRefreshCosts() {
 		rp, ok := task.Payload.(runtime.FetchCostsPayload)
 		if !ok {
@@ -175,7 +173,7 @@ func wipfixFirstCostCellText(t *testing.T, c *app.Controller) string {
 	return body.Rows[0].Cells[0].Amount
 }
 
-// TestCostsPageCappedAnomalyWalk_MarksStillRender pins row 7: an anomaly the
+// TestCostsPageCappedAnomalyWalk_MarksStillRender: an anomaly the
 // walk did find is a confirmed anomaly. Dropping every mark because the walk
 // was cut short hides a real cost spike and says nothing about having done so.
 func TestCostsPageCappedAnomalyWalk_MarksStillRender(t *testing.T) {
@@ -223,8 +221,8 @@ func TestCostsPageCappedAnomalyWalk_MarksStillRender(t *testing.T) {
 	}
 }
 
-// TestCostsCompleteGrid_NeverWarns is the negative half for both rows: a walk
-// that finished must not be described as partial.
+// TestCostsCompleteGrid_NeverWarns is the negative half: a walk that finished
+// must not be described as partial.
 func TestCostsCompleteGrid_NeverWarns(t *testing.T) {
 	c := newTestController(t)
 	p := wipfixOpenCosts(t, c)

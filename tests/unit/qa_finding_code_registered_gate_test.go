@@ -12,23 +12,21 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// qa_finding_code_registered_gate_test.go — a code a fetcher puts in a Finding
+// A code a fetcher puts in a Finding
 // has to be a code the catalog declares.
 //
 // An emitter reads its operator sentence back out of the catalog by code, and
 // an unknown code reads as the empty string rather than as an error, so an
 // undeclared code renders a phrase with no reason under it and the generated
-// signals page cannot list the signal at all. That is how three certificate
-// status signals shipped: emitted on six demo rows, declared nowhere, and
-// invisible to every gate. check-catalogen compares the page against the
-// declarations, so a signal with no declaration is exactly what it cannot see.
+// signals page cannot list the signal at all. check-catalogen compares the
+// page against the declarations, so it cannot see a signal with no
+// declaration.
 //
 // The declared side is the whole installed catalog, parents and children. The
 // emitted side is every demo row of every type with a fetcher, wave 2 folded
 // the way the app folds it — so this reads what actually renders, not what the
 // source appears to say. A code no fixture ever produces is outside it; the
-// fixtures are the same ones every other rendered-surface gate stands on, and
-// a signal worth declaring is worth a witness.
+// fixtures are the same ones every other rendered-surface gate stands on.
 func TestFindingCodesAreDeclared(t *testing.T) {
 	declared := map[domain.FindingCode]bool{}
 	for _, td := range append(catalog.All(), catalog.AllChildren()...) {

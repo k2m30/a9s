@@ -1,19 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_detail_key_width_test.go — the detail key column is one decision.
+// The detail key column is one decision.
 //
 // The width of the key column decides where every value on a detail screen
-// starts. It was decided in the terminal renderer, from the renderer's own
-// full width, on every frame — while the body build, which knows the viewport
-// the fields are actually laid out in, published no width at all. Two lanes
-// reading the same body therefore indent it differently, and the lane with no
-// renderer of its own has nothing to read.
-//
-// These pins say the width is a field of the built body, computed once from
-// the viewport the body was built for, measured in terminal columns; that the
-// terminal renderer reads that field rather than recomputing one; and that the
-// serialised body carries the same number, so the second lane is reading the
-// decision instead of guessing at it.
+// starts. It is a field of the built body, computed once from the viewport the
+// body was built for and measured in terminal columns; the terminal renderer
+// reads that field, and the serialised body carries the same number, so both
+// lanes indent the body the same way.
 package unit
 
 import (

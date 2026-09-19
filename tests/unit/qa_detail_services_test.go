@@ -18,15 +18,7 @@ import (
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 var svcTestTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
-
-// ---------------------------------------------------------------------------
-// Realistic SDK struct builders for service types
-// ---------------------------------------------------------------------------
 
 func realisticLambdaFunction() lambdatypes.FunctionConfiguration {
 	return lambdatypes.FunctionConfiguration{
@@ -236,7 +228,3 @@ func realisticSESIdentity() sesv2types.IdentityInfo {
 		VerificationStatus: sesv2types.VerificationStatusSuccess,
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Lambda
-// ---------------------------------------------------------------------------

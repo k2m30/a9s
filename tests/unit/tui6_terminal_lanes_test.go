@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_terminal_lanes_test.go — the terminal's own copies of facts the
-// controller already decided.
-//
-// The adapter keeps a second copy of the flash text and takes it from the
-// intent rather than from the snapshot the controller sanitised, and a resize
-// reaches the renderer without ever reaching the controller, so the body that
-// decided the layout is still the one built for the old width. Both are the
-// same shape: the terminal answering a question the controller has already
-// answered, and answering it differently.
+// The terminal paints facts the controller
+// already decided: the flash text from the snapshot the controller sanitised,
+// and a detail body rebuilt for the width a resize reports to the controller.
 //
 // The sanitiser cases beside them are the one function's own edge cases, where
 // the parser has to agree with what a terminal actually does with the bytes.
@@ -81,7 +75,7 @@ func TestAdapterFlash_DoesNotReadTheIntentsText(t *testing.T) {
 	}
 }
 
-// TestDetailResize_RewrapsForTheNewWidth pins row 3's class finished. The
+// TestDetailResize_RewrapsForTheNewWidth: the
 // attention sentence is wrapped where the layout is decided, against the
 // viewport the controller was told about. A resize that reaches only the
 // renderer leaves the sentence wrapped for the old width, and the narrower

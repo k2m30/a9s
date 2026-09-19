@@ -113,9 +113,8 @@ func TestQA_VPCEndpoints_TypeDef(t *testing.T) {
 		{"service_name", "Service Name"},
 		{"vpce_id", "Endpoint ID"},
 		{"type", "Type"},
-		// The built-in view's list, folded into the type's own: a Status column
-		// resolving through its title and the last error beside it; the status
-		// column names the key its cell reads.
+		// A Status column resolving through its title and the last error beside
+		// it; the status column names the key its cell reads.
 		{"state", "Status"},
 		{"", "Last Error"},
 		{"vpc_id", "VPC ID"},

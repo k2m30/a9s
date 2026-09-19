@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// scan_health_errorlog_test.go — an availability probe that fails or times
+// An availability probe that fails or times
 // out adds exactly one entry per type per sweep to the TUI's "!" error log
 // (core/runtime/scan_status.go promises per-type scan health to hosts). The
 // entry is the one sentence every failed call gets — never the internal
@@ -46,9 +46,7 @@ func failingAvailFetcher(_ context.Context, _ any, _ string) (resource.FetchResu
 // 4-wide window registered — would eventually reach a type with no
 // override and invoke a real production fetcher against the zero-value
 // *awsclient.ServiceClients this harness supplies. Stubbing every type
-// removes that risk; empirically verified (see this file's RED/GREEN
-// report) not to cascade into any Wave-2 enrichment call within the single
-// target-completion drive this file performs.
+// removes that risk.
 func registerFullAvailabilitySweepFakes(t *testing.T, target string, targetFetcher resource.AvailabilityFetcher) {
 	t.Helper()
 	for _, name := range resource.AllShortNames() {
@@ -94,9 +92,7 @@ func deliverProbeWindow(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, []te
 }
 
 // openErrorLog presses "!" and executes any resulting deferred viewer-push
-// cmd — the exact two-step sequence
-// TestErrorHistoryAccumulation_ErrorFlashesAddToHistory
-// (qa_error_log_test.go) uses to observe the error-log surface.
+// cmd.
 func openErrorLog(m tui.Model) tui.Model {
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
 	if cmd != nil {
@@ -113,11 +109,6 @@ func newProbeWindowModel(t *testing.T) tui.Model {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	return m
 }
-
-// -----------------------------------------------------------------------
-// (a) A failed/timed-out probe adds an "availability <type>: <cause>" entry
-// to the error log.
-// -----------------------------------------------------------------------
 
 func TestScanHealthErrorLog_FailedProbe_AddsEntry(t *testing.T) {
 	target := resource.AllShortNames()[0]
@@ -137,10 +128,6 @@ func TestScanHealthErrorLog_FailedProbe_AddsEntry(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// (b) A successful probe adds no scan-health entry.
-// -----------------------------------------------------------------------
-
 func TestScanHealthErrorLog_SuccessfulProbe_AddsNoEntry(t *testing.T) {
 	target := resource.AllShortNames()[0]
 	registerFullAvailabilitySweepFakes(t, target, stubAvailFetcher)
@@ -157,11 +144,6 @@ func TestScanHealthErrorLog_SuccessfulProbe_AddsNoEntry(t *testing.T) {
 		t.Errorf("successful probe must add no scan-health entry, but found one in:\n%s", plain)
 	}
 }
-
-// -----------------------------------------------------------------------
-// (c) The SAME type failing twice in the SAME sweep adds only one entry —
-// not spam.
-// -----------------------------------------------------------------------
 
 func TestScanHealthErrorLog_DuplicateDeliveryInSameSweep_DoesNotDuplicateEntry(t *testing.T) {
 	target := resource.AllShortNames()[0]

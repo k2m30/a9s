@@ -1,33 +1,17 @@
-// tui_toplevel_list_persistence_test.go — a top-level, menu-driven list
+// A top-level, menu-driven list
 // open in internal/tui/runtime_adapter_navigate.go pushes
 // runtime.ScreenResourceList (via app.Controller.ApplyIntents +
 // EnsureListState), not PushChildListScreen's runtime.ScreenChildList.
-// Controller.maybeSaveResourceListCache's C6 disk-cache save gate
-// (core/app/handle.go's syncExactTotalToMenu) only persists when screen.ID
-// == runtime.ScreenResourceList, so a top-level open that pushed
-// ScreenChildList would mean a navigate-and-append session in the running
-// TUI never wrote a per-type cache file to disk.
+// Controller.maybeSaveResourceListCache's disk-cache save gate
+// (core/app/handle.go's syncExactTotalToMenu) persists only when screen.ID
+// == runtime.ScreenResourceList.
 //
-// See core/app/handle.go, core/app/list_body.go,
-// core/app/navigate.go, core/runtime/handlers_navigate.go for the
-// production-side contracts (top-level list save gate, seed-time provisional
-// total, silent-swap findings carry) these tests pin against.
-//
-// SCOPE NOTE on the screen-ID guard: internal/tui.Model.ctrl is
-// unexported and Model exposes no accessor onto app.Controller (only
-// Model.Core() for *runtime.Core, which does not carry ScreenIDs()) — so a
-// tests/unit black-box test cannot directly assert
-// (*app.Controller).ScreenIDs() through the TUI layer. maybeSaveResourceListCache
-// and syncExactTotalToMenu share the exact same single gate
-// (screen.ID == runtime.ScreenResourceList — core/app/handle.go), so
-// TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk below (which CAN only
-// pass if that gate is satisfied) is an indirect but airtight proof that the
-// TUI's pushed screen carries ScreenResourceList, not ScreenChildList.
-// TestScreenIDGuard_TopLevelCommandVsPushChildListScreen additionally pins
-// the underlying invariant directly at the core/app layer (both call
-// paths are reachable from tests/unit), guarding the semantic the TUI
-// depends on even though this package cannot observe *tui.Model's own
-// screen stack.
+// internal/tui.Model exposes no accessor onto app.Controller, so a tests/unit
+// black-box test cannot assert (*app.Controller).ScreenIDs() through the TUI
+// layer. TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk passes only if
+// that gate is satisfied, which proves the TUI's pushed screen carries
+// ScreenResourceList; TestScreenIDGuard_TopLevelCommandVsPushChildListScreen
+// pins the invariant directly at the core/app layer.
 package unit_test
 
 import (
@@ -45,18 +29,12 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// -----------------------------------------------------------------------
-// Pin (a): a top-level TUI list open + append persists rows to disk.
-// -----------------------------------------------------------------------
-
 // TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk drives a genuine
 // navigate-then-append session entirely through the TUI layer
 // (tuitest.Sized -> messages.Navigate -> messages.ResourcesLoaded, exactly
 // the shape internal/tui/app.go's Update dispatches for a real fetch/load-more
 // result) and asserts the per-type disk cache file ends up holding the FULL,
-// accumulated row set — not just the first page, and not nothing at all (the
-// HEAD-effdd465 regression: the gate never fired for this call path, so
-// s3.yaml was never created).
+// accumulated row set — not just the first page.
 func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -84,9 +62,6 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
 		Append:       false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
-
-	// Load-more appends a second page and exhausts pagination (the "open +
-	// append" shape the pin requires).
 
 	secondPage := []resource.Resource{
 		{ID: "bucket-3", Name: "bucket-3", Type: "s3", Fields: map[string]string{"name": "bucket-3"}},
@@ -138,10 +113,6 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin (b): the underlying screen-ID invariant the TUI fix relies on.
-// -----------------------------------------------------------------------
-
 // TestScreenIDGuard_TopLevelCommandVsPushChildListScreen pins, at the
 // core/app layer, the exact invariant the TUI adapter depends on: a
 // top-level command-driven list open (the app.Controller path
@@ -187,23 +158,18 @@ func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 	})
 }
 
-// -----------------------------------------------------------------------
-// Pin (c): a seeded C6a pair (Count > len(Rows)) titles with the authoritative
-// total, and a genuine fetch clears the override.
-// -----------------------------------------------------------------------
-
 // TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch pins the
-// seed-time provisional total end-to-end through the TUI: a disk pair reconstructed with
-// Count=55 but only 50 Rows (the C6a "counts-only write never touches Rows"
-// shape) must seed the s3 list with title "s3(55)", not "s3(50)" — and once
-// a genuine fetch result lands, the title must follow the real row count
+// seed-time provisional total end-to-end through the TUI: a disk pair
+// reconstructed with Count=55 but only 50 Rows (a counts-only write never
+// touches Rows) seeds the s3 list with title "s3(55)", not "s3(50)" — and
+// once a genuine fetch result lands, the title follows the real row count
 // again (TotalCount cleared by applyResourcesLoaded).
 func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "c6a-pair-prof", "us-east-1"
 
-	// Seed the on-disk C6a pair directly: Count=55, only 50 Rows persisted —
+	// Seed the on-disk pair directly: Count=55, only 50 Rows persisted —
 	// this is reachable in production via a counts-only reconciling write
 	// (reconcileTypeFile) that updates Count without touching Rows.
 	s := session.New()
@@ -233,7 +199,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 		ResourceType: "s3",
 	})
 
-	// Exact=false (a truncated/inexact C6a pair) renders with the "+" suffix
+	// Exact=false (a truncated/inexact pair) renders with the "+" suffix
 	// (buildListFrameTitle: totalStr = itoa(total)+"+" when ls.HasPagination),
 	// so the expected title is "s3(55+)", not a bare "s3(55)".
 	seededPlain := stripANSITL(tuitest.Render(m))
@@ -287,8 +253,7 @@ func TestRowStoreSeededPair_CachedEntryCarriesTotalCount(t *testing.T) {
 
 	// Seed RowStore directly: 50 observed rows (Gen bumped to non-zero), then
 	// a counts-only ObserveCount raising TotalCount to 55 without touching
-	// Rows — the same C6a "counts-only write never touches Rows" shape as
-	// the disk-store sibling test, but through RowStore's own API.
+	// Rows.
 	rows := make([]resource.Resource, 50)
 	for i := range rows {
 		rows[i] = resource.Resource{ID: "obj-" + itoaC6a(i), Type: "s3"}
@@ -313,10 +278,6 @@ func TestRowStoreSeededPair_CachedEntryCarriesTotalCount(t *testing.T) {
 		t.Errorf("RowStore-seeded pair: title must not show s3(50...) (len(Rows)) while TotalCount=55 is authoritative, got: %s", plain[:min(200, len(plain))])
 	}
 }
-
-// -----------------------------------------------------------------------
-// Pin (d): the refreshing marker is present on the FIRST rendered frame.
-// -----------------------------------------------------------------------
 
 // TestCacheMissSeed_RefreshingMarkerOnFirstFrame pins that a cache-miss-but-
 // probe-seeded top-level list open (NavigateKindPushResourceList's

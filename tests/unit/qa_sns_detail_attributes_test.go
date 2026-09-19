@@ -1,13 +1,9 @@
 package unit
 
-// qa_sns_detail_attributes_test.go — coverage for the sns Detail view's new
-// {Path: "Attributes"} field (core/config/defaults_messaging.go, mirroring
-// sqs's {Path: "Attributes"}), which surfaces TopicEnriched.Attributes (set
-// by the on-demand sns detail enricher, core/aws/sns_detail_enrichment.go)
-// in the detail BODY — not just the YAML/JSON view. Mirrors the
-// detail-render approach of tests/unit/qa_enrichment_stacked_views_test.go
-// (navigate → load → enter detail → deliver enrichment → assert rendered
-// content) and app_enrich_test.go's TestDetailView_EnrichResult_AcceptsMatchingID.
+// The sns Detail view's
+// {Path: "Attributes"} field surfaces TopicEnriched.Attributes (set by the
+// on-demand sns detail enricher, core/aws/sns_detail_enrichment.go) in the
+// detail body.
 
 import (
 	"context"
@@ -25,12 +21,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestSNSDetail_AttributesPath_RendersAfterEnrichment verifies that once the
-// sns Detail view gained {Path: "Attributes"}, opening a topic's detail view
-// renders TopicArn immediately (negative guard: no panic, no dependency on
-// enrichment having landed yet), and after the on-demand detail enricher's
-// result arrives (messages.EnrichDetailResult carrying a TopicEnriched
-// RawStruct), the detail body renders the Attributes map's contents.
+// TestSNSDetail_AttributesPath_RendersAfterEnrichment: a topic's detail view
+// renders TopicArn before enrichment lands, and the Attributes map's contents
+// once the on-demand detail enricher's result (messages.EnrichDetailResult
+// carrying a TopicEnriched RawStruct) arrives.
 func TestSNSDetail_AttributesPath_RendersAfterEnrichment(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -40,7 +34,6 @@ func TestSNSDetail_AttributesPath_RendersAfterEnrichment(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 220, Height: 50})
 
-	// Open the sns list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "sns",
@@ -59,7 +52,6 @@ func TestSNSDetail_AttributesPath_RendersAfterEnrichment(t *testing.T) {
 		Resources:    snsRes,
 	})
 
-	// Enter detail on the first topic.
 	firstTopic := snsRes[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,

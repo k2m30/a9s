@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 	runtime.SetFlashDurationsForTest(time.Millisecond, time.Millisecond)
 	// Same idea for AWS retry backoff: keep MaxAttempts so retry LOGIC is still
 	// exercised, but shrink the 500ms BaseDelay that throttle/server-error tests
-	// (e.g. TestFetchKMSKeysPage_*) were paying for real.
+	// would otherwise wait out.
 	awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
 		MaxAttempts: 3,
 		BaseDelay:   time.Millisecond,
@@ -41,13 +41,8 @@ func TestMain(m *testing.M) {
 	// t.TempDir()) call would otherwise read/write the developer's REAL
 	// ~/.a9s cache and config — e.g. newRootSizedModel (tuitest.Sized ->
 	// tui.New), newEC2ListModel/newEC2DetailModel/newEC2YAMLModel
-	// (tui.New directly). A live ./a9s pilot run mutating that real
-	// directory mid-suite previously made env-dependent assertions
-	// (loading-state text, flash-message content, detail-view rows) flap
-	// depending on what was left on disk. A per-test A9S_CONFIG_FOLDER
-	// override (via t.Setenv) still wins for that test's duration and is
-	// unaffected by this default — this only closes the gap for
-	// constructors that never redirected it at all.
+	// (tui.New directly). A per-test A9S_CONFIG_FOLDER override (via t.Setenv)
+	// still wins for that test's duration.
 	var cleanupDir string
 	if os.Getenv("A9S_CONFIG_FOLDER") == "" {
 		if dir, err := os.MkdirTemp("", "a9s-testmain-config-*"); err == nil {

@@ -1,9 +1,7 @@
 package unit_test
 
-// s3_0916_codex_round3_test.go pins the three findings the external review
-// raised against the landing range, all of them the same shape: a pivot
-// reporting an exact figure it did not earn, or a sentence claiming more than
-// the data says.
+// A pivot never reports an exact figure it did
+// not earn, and a finding sentence never claims more than the data says.
 
 import (
 	"context"
@@ -19,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// lambda → s3 carries the bucket list's own incompleteness
-// ---------------------------------------------------------------------------
 
 // r3Bucket builds a bucket cache row with the given notification fields.
 func r3Bucket(id string, fields map[string]string) resource.Resource {
@@ -83,10 +77,6 @@ func TestS3_0916_R3_LambdaS3_AllBucketsAnsweredIsExact(t *testing.T) {
 		t.Error("Truncated = true, want false — every bucket answered")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// s3 → r53 carries the zone's unread record pages
-// ---------------------------------------------------------------------------
 
 // r3ZoneFake answers one hosted zone and one page of its records, with the
 // page's truncation flag under the caller's control.
@@ -159,8 +149,7 @@ func r3S3R53(t *testing.T, zone resource.Resource) resource.RelatedCheckResult {
 }
 
 // TestS3_0916_R3_S3R53_UnreadPagesSoftenTheZero pins the reverse pivot reading
-// that flag. r53 → s3 already renders a lower bound in this situation; the two
-// directions of one relationship disagreeing is the defect.
+// that flag, so both directions of the relationship render a lower bound.
 func TestS3_0916_R3_S3R53_UnreadPagesSoftenTheZero(t *testing.T) {
 	got := r3S3R53(t, resource.Resource{
 		ID:     row3ZoneID,
@@ -191,8 +180,8 @@ func TestS3_0916_R3_S3R53_WholeZoneIsAnExactAnswer(t *testing.T) {
 	}
 }
 
-// TestS3_0916_R3_S3R53_MatchStillReportsTheZone guards the match itself
-// against the truncation change.
+// TestS3_0916_R3_S3R53_MatchStillReportsTheZone: a match reports the zone
+// whatever the truncation flag says.
 func TestS3_0916_R3_S3R53_MatchStillReportsTheZone(t *testing.T) {
 	got := r3S3R53(t, resource.Resource{
 		ID:     row3ZoneID,
@@ -219,10 +208,6 @@ func TestS3_0916_R3_CatalogDeclaresRecordsTruncated(t *testing.T) {
 	}
 	t.Errorf("r53 FieldKeys = %v, want it to declare %q", def.FieldKeys, "records_truncated")
 }
-
-// ---------------------------------------------------------------------------
-// the public verdict claims only what the permission grants
-// ---------------------------------------------------------------------------
 
 // TestS3_0916_R3_PublicDetailDoesNotOverclaimObjectAccess pins the wording.
 // An access control list READ permits listing the bucket, and READ_ACP /

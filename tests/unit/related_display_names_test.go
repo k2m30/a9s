@@ -57,19 +57,16 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		shortName  string
 		targetType string
 	}
-	// Golden map: (resourceShortName, targetType) → expected DisplayName.
-	// Derived from core/aws/*_related.go and verified against source.
 	golden := map[key]string{
-		// eb (Elastic Beanstalk) — required minimum
+		// eb (Elastic Beanstalk)
 		{"eb", "cfn"}:  "CloudFormation Stack",
 		{"eb", "logs"}: "Log Groups",
 		{"eb", "asg"}:  "Auto Scaling Groups",
 		{"eb", "ec2"}:  "EC2 Instances",
 
-		// eb-rule (EventBridge Rule) — required minimum
+		// eb-rule (EventBridge Rule)
 		{"eb-rule", "role"}: "IAM Role",
 
-		// ec2
 		{"ec2", "tg"}:        "Target Groups",
 		{"ec2", "asg"}:       "Auto Scaling Groups",
 		{"ec2", "alarm"}:     "CloudWatch Alarms",
@@ -80,7 +77,6 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"ec2", "ebs-snap"}:  "EBS Snapshots",
 		{"ec2", "ct-events"}: "CloudTrail Events",
 
-		// vpc
 		{"vpc", "subnet"}: "Subnets",
 		{"vpc", "sg"}:     "Security Groups",
 		{"vpc", "ec2"}:    "EC2 Instances",
@@ -91,7 +87,6 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"vpc", "vpce"}:   "VPC Endpoints",
 		{"vpc", "cfn"}:    "CloudFormation",
 
-		// sg
 		{"sg", "vpc"}: "VPC",
 		{"sg", "ec2"}: "EC2 Instances",
 		{"sg", "eni"}: "Network Interfaces",
@@ -99,13 +94,10 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"sg", "cfn"}: "CloudFormation",
 		{"sg", "sg"}:  "Referencing SGs",
 
-		// elb (r53 removed along with its registration: checkELBR53 was
-		// hardcoded to State: RelatedUnknown for any real ELB with a dns_name)
 		{"elb", "tg"}:    "Target Groups",
 		{"elb", "alarm"}: "CW Alarms",
 		{"elb", "cfn"}:   "CloudFormation",
 
-		// lambda
 		{"lambda", "role"}:    "IAM Roles",
 		{"lambda", "alarm"}:   "CW Alarms",
 		{"lambda", "sqs"}:     "SQS Queues",
@@ -128,50 +120,40 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"dbc", "secrets"}: "Secrets Manager",
 		{"dbc", "logs"}:    "Log Groups",
 
-		// eks
 		{"eks", "ng"}:    "Node Groups",
 		{"eks", "alarm"}: "CloudWatch Alarms",
 		{"eks", "cfn"}:   "CloudFormation Stacks",
 		{"eks", "logs"}:  "Log Groups",
 
-		// ng (node groups)
 		{"ng", "eks"}:  "EKS Clusters",
 		{"ng", "role"}: "IAM Roles",
 		{"ng", "asg"}:  "Auto Scaling Groups",
 		{"ng", "ec2"}:  "EC2 Instances",
 
-		// asg
 		{"asg", "ec2"}:    "EC2 Instances",
 		{"asg", "tg"}:     "Target Groups",
 		{"asg", "subnet"}: "Subnets",
 		{"asg", "alarm"}:  "CloudWatch Alarms",
 		{"asg", "ng"}:     "EKS Node Groups",
 
-		// kms (s3 removed along with its registration: checkKMSS3 was
-		// hardcoded to State: RelatedUnknown for any real fixture — S3 does not expose
-		// KMS key IDs in Fields or RawStruct)
 		{"kms", "ebs"}:     "EBS Volumes",
 		{"kms", "dbi"}:     "RDS Instances",
 		{"kms", "secrets"}: "Secrets Manager",
 
-		// secrets
 		{"secrets", "kms"}:    "KMS Keys",
 		{"secrets", "lambda"}: "Lambda (rotation)",
 		{"secrets", "dbi"}:    "RDS Instances",
 		{"secrets", "cfn"}:    "CloudFormation",
 
-		// s3
 		{"s3", "trail"}:  "CloudTrail Trails",
 		{"s3", "cf"}:     "CloudFront",
 		{"s3", "lambda"}: "Lambda (notifications)",
 		{"s3", "cfn"}:    "CloudFormation",
 
-		// ebs
 		{"ebs", "ec2"}:      "EC2 Instance",
 		{"ebs", "ebs-snap"}: "EBS Snapshots",
 		{"ebs", "kms"}:      "KMS Key",
 
-		// ebs-snap
 		{"ebs-snap", "ami"}: "AMIs",
 		{"ebs-snap", "ebs"}: "EBS Volume",
 		{"ebs-snap", "ec2"}: "EC2 Instance",
@@ -185,12 +167,10 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"alarm", "sns"}: "SNS Topics",
 		{"alarm", "asg"}: "Auto Scaling Groups",
 
-		// ecs (ECS Clusters)
 		{"ecs", "ecs-svc"}: "ECS Services",
 		{"ecs", "alarm"}:   "CloudWatch Alarms",
 		{"ecs", "cfn"}:     "CloudFormation Stacks",
 
-		// ecs-svc
 		{"ecs-svc", "ecs"}:   "ECS Clusters",
 		{"ecs-svc", "tg"}:    "Target Groups",
 		{"ecs-svc", "alarm"}: "CloudWatch Alarms",
@@ -198,7 +178,6 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"ecs-svc", "elb"}:   "Load Balancers",
 		{"ecs-svc", "logs"}:  "Log Groups",
 
-		// ecs-task
 		{"ecs-task", "ecs-svc"}: "ECS Services",
 		{"ecs-task", "ecs"}:     "ECS Clusters",
 		{"ecs-task", "logs"}:    "Log Groups",
@@ -207,23 +186,18 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"cfn", "role"}: "IAM Roles",
 		{"cfn", "cfn"}:  "Related Stacks",
 
-		// sqs
 		{"sqs", "sns-sub"}: "SNS Subscriptions",
 		{"sqs", "alarm"}:   "CloudWatch Alarms",
 		{"sqs", "lambda"}:  "Lambda Functions",
 		{"sqs", "sqs"}:     "Dead Letter Queues",
 
-		// sns
-		// sns→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"sns", "alarm"}:   "CloudWatch Alarms",
 		{"sns", "sns-sub"}: "Subscriptions",
 
-		// sns-sub
 		{"sns-sub", "sns"}:    "SNS Topic",
 		{"sns-sub", "lambda"}: "Lambda Function",
 		{"sns-sub", "sqs"}:    "SQS Queue",
 
-		// r53
 		{"r53", "elb"}: "Load Balancers",
 		{"r53", "cf"}:  "CloudFront",
 		{"r53", "acm"}: "ACM Certificates",
@@ -235,69 +209,55 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"cf", "acm"}: "ACM Certificates",
 		{"cf", "r53"}: "Route 53 Zones",
 
-		// acm
 		{"acm", "elb"}:   "Load Balancers",
 		{"acm", "cf"}:    "CloudFront Distros",
 		{"acm", "apigw"}: "API Gateways",
 		{"acm", "r53"}:   "Route 53 Zones",
 
-		// apigw (waf removed along with its registration: checkApigwWAF was
-		// hardcoded to State: RelatedUnknown for any real fixture)
 		{"apigw", "lambda"}: "Lambda Functions",
 		{"apigw", "logs"}:   "Log Groups",
 
-		// waf
 		{"waf", "elb"}:   "Load Balancers",
 		{"waf", "apigw"}: "API Gateways",
 		{"waf", "cf"}:    "CloudFront",
 
-		// iam roles
 		{"role", "lambda"}: "Lambda Functions",
 		{"role", "glue"}:   "Glue Jobs",
 		{"role", "ng"}:     "Node Groups",
 		{"role", "policy"}: "IAM Policies",
 		{"role", "ec2"}:    "EC2 Instances",
 
-		// iam policies
 		{"policy", "role"}:      "IAM Roles",
 		{"policy", "iam-user"}:  "IAM Users",
 		{"policy", "iam-group"}: "IAM Groups",
 
-		// iam users
 		{"iam-user", "iam-group"}: "IAM Groups",
 		{"iam-user", "policy"}:    "IAM Policies",
 		{"iam-user", "ct-events"}: "CloudTrail Events",
 
-		// iam groups
 		{"iam-group", "iam-user"}: "IAM Users",
 		{"iam-group", "policy"}:   "IAM Policies",
 
-		// tg (target groups)
 		{"tg", "elb"}:     "Load Balancers",
 		{"tg", "ecs-svc"}: "ECS Services",
 		{"tg", "asg"}:     "Auto Scaling Groups",
 		{"tg", "alarm"}:   "CW Alarms",
 
-		// eni
 		{"eni", "ec2"}: "EC2 Instances",
 		{"eni", "sg"}:  "Security Groups",
 		{"eni", "eip"}: "Elastic IPs",
 
-		// eip
 		{"eip", "ec2"}: "EC2 Instances",
 		{"eip", "eni"}: "Network Interfaces",
 		{"eip", "nat"}: "NAT Gateways",
 
-		// igw
 		{"igw", "vpc"}: "VPCs",
 		{"igw", "rtb"}: "Route Tables",
 
-		// nat
 		{"nat", "vpc"}:    "VPCs",
 		{"nat", "subnet"}: "Subnets",
 		{"nat", "rtb"}:    "Route Tables",
 
-		// subnet
 		{"subnet", "ec2"}: "EC2 Instances",
 		{"subnet", "eni"}: "Network Interfaces",
 		{"subnet", "nat"}: "NAT Gateways",
@@ -305,14 +265,12 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"subnet", "rtb"}: "Route Tables",
 		{"subnet", "cfn"}: "CloudFormation",
 
-		// glue
 		{"glue", "role"}:  "IAM Roles",
 		{"glue", "alarm"}: "CW Alarms",
 		{"glue", "cfn"}:   "CloudFormation Stacks",
 		{"glue", "logs"}:  "Log Groups",
 
 		// sfn (Step Functions)
-		// sfn→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"sfn", "alarm"}:   "CloudWatch Alarms",
 		{"sfn", "logs"}:    "Log Groups",
 		{"sfn", "role"}:    "IAM Role",
@@ -323,12 +281,10 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"ddb", "lambda"}: "Lambda Functions",
 		{"ddb", "alarm"}:  "CloudWatch Alarms",
 
-		// kinesis
 		{"kinesis", "lambda"}: "Lambda Functions",
 		{"kinesis", "alarm"}:  "CW Alarms",
 		{"kinesis", "cfn"}:    "CloudFormation",
 
-		// ecr
 		{"ecr", "lambda"}: "Lambda Functions",
 		{"ecr", "cb"}:     "CodeBuild Projects",
 		{"ecr", "cfn"}:    "CloudFormation Stacks",
@@ -338,55 +294,40 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"cb", "role"}:     "IAM Roles",
 		{"cb", "pipeline"}: "CodePipelines",
 
-		// pipeline (CodePipeline)
 		{"pipeline", "cb"}:   "CodeBuild Projects",
 		{"pipeline", "role"}: "IAM Roles",
 
-		// backup
 		{"backup", "role"}: "IAM Roles",
 
-		// efs
 		{"efs", "kms"}:    "KMS Keys",
 		{"efs", "cfn"}:    "CloudFormation Stacks",
 		{"efs", "lambda"}: "Lambda Functions",
 		{"efs", "sg"}:     "Security Groups",
 		{"efs", "subnet"}: "Subnets",
 
-		// ses
-		// ses→cfn dropped (Explicitly excluded: tag-heuristic only).
 		{"ses", "r53"}: "Route 53 (DNS)",
 
-		// athena
 		{"athena", "s3"}:  "S3 Buckets (results)",
 		{"athena", "kms"}: "KMS Keys",
 
-		// redis
 		{"redis", "alarm"}: "CW Alarms",
 		{"redis", "cfn"}:   "CloudFormation",
 		{"redis", "sg"}:    "Security Groups",
 
-		// ami
 		{"ami", "ec2"}:      "EC2 Instances",
 		{"ami", "ebs-snap"}: "EBS Snapshots",
 		{"ami", "asg"}:      "Auto Scaling Groups",
 
-		// dbi-snap
 		{"dbi-snap", "dbi"}: "DB Instances",
 		{"dbi-snap", "kms"}: "KMS Keys",
 
-		// dbc-snap
 		{"dbc-snap", "dbc"}: "DocumentDB Cluster",
 
-		// ssm
 		{"ssm", "kms"}: "KMS Key",
 
-		// opensearch
 		{"opensearch", "alarm"}: "CW Alarms",
 		{"opensearch", "cfn"}:   "CloudFormation",
 		{"opensearch", "logs"}:  "Log Groups",
-
-		// codeartifact
-		// codeartifact→cb dropped (Explicitly excluded: unanimous sometimes — no first-class AWS field).
 
 		// ct-events (CloudTrail Events)
 		{"ct-events", "role"}:     "IAM Roles",

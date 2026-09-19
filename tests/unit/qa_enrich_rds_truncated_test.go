@@ -1,21 +1,12 @@
 package unit
 
-// qa_enrich_rds_truncated_test.go — Tests that EnrichDBIMaintenance's
-// account-wide DescribePendingMaintenanceActions pagination walk correctly
-// terminates on Marker==nil/empty, and that hitting the EnrichmentCap page
-// limit does NOT flip the aggregate Truncated flag — dbi only ever emits
-// "~" (informational) findings, so a coverage gap in the account-wide walk
-// must never lower-bound the issue badge (cf. issue_enrichment.go
-// IssueEnricherResult.Truncated contract).
-//
-// Originally pinned against the dead EnrichRDSDocDBMaintenance (deleted:
-// wired to no catalog Wave2 field), which set Truncated straight from the
-// last page's Marker. EnrichDBIMaintenance (the live sibling per
-// docs/resources/dbi.md §3.2) uses a different mechanism: it keeps
-// paginating until Marker is nil/empty OR EnrichmentCap pages have been
-// walked — the exact call count (== EnrichmentCap) is what proves the walk
-// was actually cut off, since the aggregate Truncated flag itself stays
-// false either way.
+// EnrichDBIMaintenance's account-wide
+// DescribePendingMaintenanceActions walk stops on Marker==nil/empty or after
+// EnrichmentCap pages, and hitting that cap leaves the aggregate Truncated
+// flag false: dbi emits only "~" (informational) findings, so a coverage gap
+// in the account-wide walk must never lower-bound the issue badge (cf.
+// issue_enrichment.go IssueEnricherResult.Truncated contract). The call
+// count (== EnrichmentCap) is what proves the walk was cut off.
 
 import (
 	"context"
@@ -29,8 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// rdsMaintenanceFake stubs DescribePendingMaintenanceActions and satisfies RDSAPI
-// by embedding the real demo fake for all other methods.
+// rdsMaintenanceFake stubs DescribePendingMaintenanceActions.
 type rdsMaintenanceFake struct {
 	awsclient.RDSAPI // embed the interface to satisfy all other methods (will panic if called)
 	actions          []rdstypes.ResourcePendingMaintenanceActions
@@ -49,7 +39,7 @@ func TestEnrichDBIMaintenance_NotTruncated(t *testing.T) {
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db")},
 		},
-		marker: nil, // no more pages
+		marker: nil,
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
@@ -80,7 +70,7 @@ func (f *rdsUnboundedMaintenanceFake) DescribePendingMaintenanceActions(_ contex
 		PendingMaintenanceActions: []rdstypes.ResourcePendingMaintenanceActions{
 			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db")},
 		},
-		Marker: aws.String("next-page-token"), // never terminates on its own
+		Marker: aws.String("next-page-token"),
 	}, nil
 }
 

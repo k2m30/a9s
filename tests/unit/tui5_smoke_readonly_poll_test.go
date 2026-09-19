@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_smoke_readonly_poll_test.go — the live read-only smoke gave the sweep
-// counter a 30-second window measured from tmux session start, which is before
-// the app has connected to AWS or painted anything. On a slow connect the whole
-// window went to the connect and the smoke failed on a healthy account. The
-// window belongs after the menu has painted.
+// The live read-only smoke times the sweep
+// counter from the painted menu, not from tmux session start: the connect to
+// AWS comes first, and on a slow connect a window measured from session start
+// is spent before the app paints anything.
 package unit_test
 
 import (

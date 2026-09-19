@@ -1,4 +1,4 @@
-// qa_multifinding_no_legacy_gate_test.go — no single-finding compat layer
+// No single-finding compat layer
 // beside the multi-finding work (setWave2Finding as an append-only builder,
 // IssueEnricherResult.Findings as map[string][]domain.Finding).
 //
@@ -43,14 +43,8 @@ import (
 // ---------------------------------------------------------------------------
 
 // mfnlContractFiles is the enrichment-contract surface GATE 1 and GATE 2
-// scan. Every struct declared in each of these four files is examined
-// field-by-field, not just the specific structs the originating dispatch
-// named — PatchDetail (intent.go) and EnrichmentChecked (event.go) are
-// covered generically this way, along with any future struct added to the
-// same files carrying the same anti-pattern. Verified by direct grep before
-// writing this gate: no OTHER struct in any of these four files references
-// domain.Finding or domain.AttentionDetail at all, so scanning whole-file
-// cannot produce a false positive against an unrelated field.
+// scan. Every struct declared in these files is examined field-by-field, so
+// a struct added to them is covered too.
 var mfnlContractFiles = []string{
 	"../../core/runtime/intent.go",
 	"../../core/runtime/state.go",
@@ -79,7 +73,7 @@ func mfnlIsDomainSelector(expr ast.Expr, name string) bool {
 
 // mfnlHasBareLeaf reports whether typ is one or more map[string]-keyed
 // layers whose FINAL value type is the bare "domain.<leafName>" selector —
-// the legacy single-value shape GATE 1 (leafName="Finding") and GATE 2
+// the single-value shape GATE 1 (leafName="Finding") and GATE 2
 // (leafName="AttentionDetail") ban. Recurses through nested map[string]
 // layers (so map[string]map[string]domain.Finding is caught, matching
 // RuntimeState.EnrichmentFindings' actual shape) but returns false the
@@ -188,15 +182,12 @@ func mfnlScanContractFiles(t *testing.T, leafName string) []mfnlFieldViolation {
 // TestMultiFindingNoLegacyGate1_NoSingleFindingCompatFieldInEnrichmentContracts
 // is GATE 1: no struct field in the enrichment-contract surface
 // (mfnlContractFiles) may be typed as a map[string]-keyed chain (flat or
-// nested) whose terminal value is the bare domain.Finding — the single-
-// representative compat shape the v3.47.0 append-only builder work was
-// supposed to retire. The only allowed finding-map shape in these contracts
-// is map[string][]domain.Finding (e.g. ListEnrichmentPatch.AllFindings,
-// PatchDetail.EnrichmentFindings, EnrichmentChecked.AllFindings — all
-// correctly NOT flagged). domain.Resource.Findings ([]domain.Finding, not a
-// map at all) is out of scope entirely — this gate only ever inspects the
-// four files in mfnlContractFiles. See this file's header comment for the
-// verified 4-violation census.
+// nested) whose terminal value is the bare domain.Finding — a
+// single-representative shape. The allowed finding-map shape in these
+// contracts is map[string][]domain.Finding (e.g.
+// ListEnrichmentPatch.AllFindings, PatchDetail.EnrichmentFindings,
+// EnrichmentChecked.AllFindings). domain.Resource.Findings ([]domain.Finding,
+// not a map) lives outside these files.
 func TestMultiFindingNoLegacyGate1_NoSingleFindingCompatFieldInEnrichmentContracts(t *testing.T) {
 	violations := mfnlScanContractFiles(t, "Finding")
 	if len(violations) == 0 {
@@ -230,8 +221,7 @@ func TestMultiFindingNoLegacyGate1_NoSingleFindingCompatFieldInEnrichmentContrac
 // are all correctly NOT flagged, as are the single-resource
 // map[domain.FindingCode]domain.AttentionDetail fields (PatchDetail.
 // Attention, RuntimeState.DetailAttention) which have no outer Resource.ID
-// layer at all. See this file's header comment for the verified
-// 2-violation census.
+// layer at all.
 func TestMultiFindingNoLegacyGate2_NoSingleAttentionDetailCompatFieldInEnrichmentContracts(t *testing.T) {
 	violations := mfnlScanContractFiles(t, "AttentionDetail")
 	if len(violations) == 0 {
@@ -276,12 +266,8 @@ func (v mfnlWriteViolation) String() string {
 // on the selector name (not a resolved static type), the same
 // lexical-matching convention
 // qa_enricher_finding_builder_discipline_test.go's efbdIsFindingsSelector
-// uses. This intentionally only inspects *ast.AssignStmt (a WRITE); it
-// never inspects *ast.RangeStmt or a bare read IndexExpr, so the four
-// benign post-append IssueCount range-aggregation loops
-// qa_enricher_finding_builder_discipline_test.go already allowlists
-// (eb_rule/ec2/ecr/elb) are structurally outside this gate's scan and need
-// no allowlist entry here.
+// uses. Only *ast.AssignStmt (a write) is inspected; reads and range loops
+// belong to that sibling gate.
 func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteViolation, error) {
 	src, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
@@ -322,19 +308,17 @@ func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteVi
 // GATE 3: no core/aws/*_issue_enrichment.go enricher, and no
 // core/aws/snapshot_cross_ref.go cross-ref enricher, may assign
 // directly into a "*.Findings[id]" or "*.AttentionDetails[id]" index
-// expression. setWave2Finding is today's sole append-only builder for both
-// fields; this gate does not require a specific builder name — it only
-// bans a file writing the index expression directly.
+// expression. setWave2Finding is the append-only builder for both fields;
+// the gate bans writing the index expression directly, whatever the builder
+// is named.
 //
-// Glob scope deliberately mirrors
-// qa_enricher_finding_builder_discipline_test.go's: "*_issue_enrichment.go"
-// does not match "issue_enrichment.go" itself (20 characters, shorter than
-// the 21-character "_issue_enrichment.go" suffix required) — setWave2Finding's
-// own legitimate r.Findings[resourceID]/r.AttentionDetails[resourceID]
-// writes (issue_enrichment.go:144/153) are never in this gate's scan scope
-// either. This gate additionally scans snapshot_cross_ref.go explicitly
-// because its filename does not match that glob — the sibling
-// read/range-access gate does not scan it at all.
+// Glob scope mirrors qa_enricher_finding_builder_discipline_test.go's:
+// "*_issue_enrichment.go" does not match "issue_enrichment.go" itself (20
+// characters, shorter than the 21-character "_issue_enrichment.go" suffix
+// required), so setWave2Finding's own r.Findings[resourceID] /
+// r.AttentionDetails[resourceID] writes are outside the scan.
+// snapshot_cross_ref.go is scanned explicitly because its filename does not
+// match that glob.
 func TestMultiFindingNoLegacyGate3_NoDirectResultFieldWriteOutsideBuilder(t *testing.T) {
 	root, err := filepath.Abs("../../core/aws")
 	if err != nil {
@@ -398,11 +382,10 @@ type mfnlDocPattern struct {
 //
 // The second pattern is an unordered co-occurrence check (all three tokens
 // present somewhere in the same comment group) rather than a strict
-// substring, because the one real occurrence at seeding time
-// (internal/tui/app_enrich_fold.go:3, in the phrase "applyEnrichment is the
-// canonical write path for Wave 2 results.") has "path" appearing BEFORE
-// "Wave 2", not after — Go's RE2 regexp engine has no lookaround, so this
-// is three independent Contains checks rather than one ordered regex.
+// substring, because a comment can read "the canonical write path for Wave 2
+// results", with "path" BEFORE "Wave 2" — Go's RE2 regexp engine has no
+// lookaround, so this is three independent Contains checks rather than one
+// ordered regex.
 var mfnlDocPatterns = []mfnlDocPattern{
 	{
 		label: `"at most one wave2 finding"`,
@@ -456,9 +439,6 @@ func (v mfnlDocViolation) String() string {
 // controller_regression_test.go's "first finding still in Attention after
 // second apply" failure message, which asserts the OLD behavior does NOT
 // happen) can never trip this gate.
-//
-// All four patterns stay active whether or not they currently match: the
-// gate exists to catch a regression, not to report today's count.
 func TestMultiFindingNoLegacyGate4_NoStaleSingleFindingDocComments(t *testing.T) {
 	fset := token.NewFileSet()
 	var violations []mfnlDocViolation

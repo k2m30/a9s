@@ -1,11 +1,7 @@
 package unit
 
-// qa_cfn_color_fieldkey_test.go — Regression tests for CFN Color reading "status" field.
-//
-// Bug: CFN Color was reading the wrong field key ("stack_status" instead of "status").
-// Fix: Color now reads r.Fields["status"].
-//
-// Tests fail if the fix is reverted to reading r.Fields["stack_status"].
+// CFN Color reads the stack status from
+// r.Fields["status"].
 
 import (
 	"testing"
@@ -51,13 +47,11 @@ func TestCFNColor_UpdateInProgress_IsColorWarning(t *testing.T) {
 	}
 }
 
-// TestCFNColor_OldWrongKey_DoesNotProduceBroken pins that "stack_status" is NOT
-// the field key — a CREATE_FAILED value under "stack_status" must NOT produce
-// ColorBroken (because the Color func reads "status", not "stack_status").
-// This test regresses if someone reverts to reading "stack_status".
+// TestCFNColor_OldWrongKey_DoesNotProduceBroken pins that "stack_status" is
+// not the field key: a CREATE_FAILED value under "stack_status" must not
+// produce ColorBroken.
 func TestCFNColor_OldWrongKey_DoesNotProduceBroken(t *testing.T) {
 	td := resource.FindResourceType("cfn")
-	// Use the old wrong key; the "status" field is absent → defaults to "".
 	r := cfnResource("stack_status", "CREATE_FAILED")
 	got := td.Color(r)
 	if got == resource.ColorBroken {

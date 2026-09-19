@@ -1,9 +1,9 @@
 package unit_test
 
-// rightcolumn_actionable_test.go — regression test for resource.IsRelatedActionable,
+// Resource.IsRelatedActionable,
 // the single source of truth consumed by isActionableRow (internal/tui/views/rightcolumn.go).
 //
-// Background (contract — only a PROVEN zero is a dead end):
+// Only a PROVEN zero is a dead end:
 //   resource.IsRelatedActionable treats a RESOLVED count==0 as ACTIONABLE when
 //   it is TRUNCATED (a "0+" lower bound from a truncated target scan — more
 //   may exist on later pages, so the user can drill in). Only a proven exact
@@ -15,7 +15,7 @@ package unit_test
 // "(0+)"/"(0)" render contract by related_unknown_badge_test.go and
 // tui_related_dim_parity_test.go.
 //
-// Design spec: docs/design/related-resources.md
+// Related-panel contract: docs/related-resources.md
 
 import (
 	"testing"
@@ -23,21 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Direct resource.IsRelatedActionable table test — the single source of truth
-// consumed by isActionableRow. Covers the full contract from related.go:290.
-//
-// Each case name preserves its pre-task-#58 identity (count/hasFetchFilter/
-// loading/hasErr framing) for traceability; the state column is the mapping
-// migration rule 2/3 assigns: loading->RelatedLoading, hasErr->RelatedError,
-// hasFetchFilter(count<0)->RelatedDeferred, bare count<0->RelatedUnknown,
-// else->RelatedResolved (zero value). hasFetchFilter is no longer a function
-// parameter, so the two "*_WithFetchFilter_NEW_NotActionable" resolved-zero
-// cases now share identical (state,count,truncated) inputs with their
-// no-filter siblings — kept as separate cases rather than deleted, since both
-// still assert the real "resolved zero is never actionable" invariant.
-// ---------------------------------------------------------------------------
 
 func TestIsRelatedActionable_Table(t *testing.T) {
 	cases := []struct {

@@ -1,28 +1,19 @@
 package unit
 
-// qa_partial_success_handlers_test.go — Regression pins for partial-success
-// handling in handleAvailabilityChecked and handleEnrichmentChecked (Groups B and D).
+// Partial-success handling in handleAvailabilityChecked and
+// handleEnrichmentChecked.
 //
-// Group B — handleAvailabilityChecked applies partial state on Err
-//   File: internal/tui/app_handlers_navigate.go:633-692
-//   Bug today: `if msg.Err == nil { ... }` at line ~643 skips the menu update
-//   and probeResources retention block when Err != nil.
-//   Contract:
-//   - When Err != nil AND Resources non-empty: menu count is set,
-//     probeResources is retained, AND the error is recorded in the `!` error
-//     log WITHOUT a blocking flash banner (E5 partial success — the rows are
-//     on screen carrying their findings).
-//   - When Err != nil AND Resources empty: no menu update, error FlashMsg banner.
+// handleAvailabilityChecked:
+//   - Err != nil AND Resources non-empty: menu count is set, probeResources is
+//     retained, and the error is recorded in the `!` error log without a
+//     blocking flash banner — the rows are on screen carrying their findings.
+//   - Err != nil AND Resources empty: no menu update, error FlashMsg banner.
 //
-// Group D — handleEnrichmentChecked applies partial state on Err
-//   File: internal/tui/app_handlers_navigate.go:729-820
-//   Bug today: `if msg.Err == nil { /* apply Findings/FieldUpdates */ }` skips
-//   the entire success block when Err != nil.
-//   Contract after fix:
-//   - When Err != nil AND Findings non-empty: enrichmentFindings[type] is set,
-//     FieldUpdates merge into probeResources/resourceCache, menu badge updates,
-//     AND FlashMsg surfaces Err.
-//   - When Err != nil AND Findings empty: existing behavior (FlashMsg only).
+// handleEnrichmentChecked:
+//   - Err != nil AND Findings non-empty: enrichmentFindings[type] is set,
+//     FieldUpdates merge into probeResources/resourceCache, the menu badge
+//     updates, and FlashMsg surfaces Err.
+//   - Err != nil AND Findings empty: FlashMsg only.
 
 import (
 	"errors"
@@ -37,17 +28,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Group B: handleAvailabilityChecked applies partial state on Err
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestHandleAvailabilityChecked_PartialErrAppliesState verifies that when
-// AvailabilityCheckedMsg carries both Err != nil and non-empty Resources,
-// handleAvailabilityChecked STILL sets the menu count and retains probeResources,
-// while surfacing the error in the `!` error log WITHOUT a blocking flash
-// banner — rows are on screen carrying their (possibly degraded) findings,
-// so a banner would double-shout the E5 partial-success state. A row-less
-// failure still banners (covered elsewhere).
+// With both Err and Resources on AvailabilityCheckedMsg, the menu count is set
+// and probeResources retained; the error goes to the `!` error log without a
+// flash banner, since the rows on screen already carry their findings.
 func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	tui.Version = "test"
 
@@ -58,7 +41,6 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		{ID: "res-b-002", Name: "res-b-002"},
 	}
 
-	// Dispatch the partial-success AvailabilityCheckedMsg.
 	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
@@ -72,9 +54,6 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
 
-	// CONTRACT 1: the composite error lands in the `!` error log, and NO
-	// error flash banner is emitted (partial success renders rows, not a
-	// blocking banner).
 	if cmd != nil {
 		for _, raw := range drainAllMessages(cmd) {
 			if fm, ok := raw.(messages.Flash); ok && fm.IsError {
@@ -93,11 +72,9 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		t.Errorf("handleAvailabilityChecked partial-err: `!` error log must contain the full composite error text %q; got view:\n%s", partialErr.Error(), logView)
 	}
 
-	// CONTRACT 2: probeResources must be seeded so Wave 2 enrichment can run.
-	// We verify indirectly: deliver another AvailabilityCheckedMsg that finalizes
-	// the probe cycle (triggers startEnrichment), then check the returned cmd tree
-	// for an EnrichmentCheckedMsg targeting "ec2". If probeResources["ec2"] was
-	// retained, buildEnrichQueue includes "ec2" → enrichment is dispatched.
+	// probeResources is internal: finalizing the probe cycle starts enrichment,
+	// and buildEnrichQueue includes "ec2" only when probeResources["ec2"] was
+	// retained.
 	finalizeModel, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-for-finalize",
 		Gen:          m.Core().Session().AvailabilityGen,
@@ -105,7 +82,6 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		HasResources: false,
 	})
 
-	// Check if enrichment for "ec2" was dispatched (implies probeResources["ec2"] exists).
 	if enrichCmd != nil {
 		enrichMsgs := collectEnrichmentMsgs(t, finalizeModel, enrichCmd)
 		ec2Dispatched := false
@@ -119,14 +95,12 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 			t.Errorf("handleAvailabilityChecked partial-err: probeResources[\"ec2\"] was NOT retained — Wave 2 enrichment for \"ec2\" not dispatched after partial-success probe; PARTIAL-SUCCESS BUG: state not applied when Err != nil")
 		}
 	}
-	// Note: if enrichCmd == nil, probeResources may not have triggered enrichment
-	// for other reasons (queue ordering, type not in enricher registry). We only
-	// fail conclusively when enrichCmd is non-nil but ec2 is absent.
+	// enrichCmd can be nil for reasons unrelated to probeResources (queue
+	// ordering, enricher registry), so only a non-nil tree without ec2 fails.
 }
 
-// TestHandleAvailabilityChecked_HardErr_NoStateApplied verifies the EXISTING
-// behavior for hard failures (Err != nil, Resources empty): menu is NOT updated
-// and probeResources is NOT seeded. This must be preserved after the fix.
+// A hard failure (Err set, no Resources) leaves the menu and probeResources
+// untouched.
 func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	tui.Version = "test"
 
@@ -142,7 +116,6 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
 
-	// Hard failure: wave 2 must NOT be dispatched for lambda (no probe resources).
 	finalizeModel, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-finalize",
 		Gen:          m.Core().Session().AvailabilityGen,
@@ -160,18 +133,8 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	_ = cmd
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Group D: handleEnrichmentChecked applies partial state on Err
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestHandleEnrichmentChecked_PartialErrAppliesState verifies that when
-// EnrichmentCheckedMsg carries both Err != nil and non-empty Findings,
-// handleEnrichmentChecked applies the findings AND emits a FlashMsg with IsError=true.
-//
-// Fails today: the `if msg.Err == nil { /* apply Findings */ }` guard at line ~766
-// skips the entire findings-application block when Err != nil.
-// Passes after fix: findings are applied (enrichmentFindings[type] is set) AND
-// FlashMsg is emitted.
+// With both Err and Findings on EnrichmentCheckedMsg, the findings are applied
+// and a FlashMsg with IsError=true surfaces the error.
 func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	tui.Version = "test"
 
@@ -197,7 +160,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		},
 	})
 
-	// Deliver a partial-success EnrichmentCheckedMsg.
 	// Gen=0 and TypeGen=0 are the documented test-injection bypasses (always accepted).
 	m, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -210,7 +172,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		TypeGen:      0,
 	})
 
-	// CONTRACT 1: FlashMsg with IsError=true must surface the error.
 	if cmd == nil {
 		t.Fatal("handleEnrichmentChecked partial-err: must emit a cmd (FlashMsg for the error)")
 	}
@@ -229,23 +190,10 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		t.Errorf("handleEnrichmentChecked partial-err: FlashMsg.IsError = false, want true")
 	}
 
-	// CONTRACT 2: Findings must be applied — verify by delivering a follow-up
-	// RelatedCheckStartedMsg for ec2 and checking the detail view renders the badge.
-	// Simpler: navigate to the ec2 list and check enrichment state was set.
-	// Since enrichmentFindings is internal, we verify indirectly by checking that the
-	// next EnrichmentCheckedMsg for ec2 sees non-zero Issues in the view — but that
-	// requires menu state. Instead we check that a subsequent probe dispatch
-	// sees the findings via the menu's issue badge.
-	//
-	// Most direct approach: verify the FlashMsg text contains the error.
 	if !strings.Contains(flash.Text, "partial") {
 		t.Errorf("handleEnrichmentChecked partial-err: FlashMsg.Text = %q, want partial error text", flash.Text)
 	}
 
-	// CONTRACT 3: FieldUpdates must be merged. Verify by navigating to ec2 list
-	// and checking the resource has the updated field.
-	// We drive NavigateMsg+ResourcesLoadedMsg to get into the list view, then
-	// verify the resource has the wave-2 field applied.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -258,8 +206,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		},
 	})
 
-	// Deliver another EnrichmentCheckedMsg with the partial result to apply
-	// FieldUpdates into the now-visible ResourceListModel.
 	m, cmd2 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
@@ -270,9 +216,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	})
 	_ = m
 
-	// After fix: cmd2 still emits FlashMsg (Err path). Without fix: cmd2 might
-	// be nil or not contain FlashMsg for partial-err. The key assertion is above
-	// (CONTRACT 1), but we also verify the second delivery is consistent.
 	if cmd2 != nil {
 		msgs2 := drainAllMessages(cmd2)
 		hasFlash2 := false
@@ -288,16 +231,13 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	}
 }
 
-// TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash verifies the
-// EXISTING behavior: when Err != nil and Findings is empty, only a FlashMsg is
-// emitted, and no findings are applied (preserving the status quo for pure errors).
+// Err with empty Findings emits only a FlashMsg and applies no findings.
 func TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
 	hardErr := errors.New("enricher: network timeout, no data returned")
 
-	// Deliver EnrichmentCheckedMsg with Err set and empty Findings.
 	_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Err:          hardErr,

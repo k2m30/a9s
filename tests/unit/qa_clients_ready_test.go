@@ -46,7 +46,6 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithClients(preSupplied))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Send ClientsReadyMsg with nil Clients — should trigger demo fallback.
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: nil,
@@ -64,14 +63,10 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 	}
 }
 
-// TestQA_ClientsReady_WrongType_EmitsError is the critical regression test.
-// When ClientsReadyMsg.Clients is a non-nil value of the wrong concrete type,
-// the handler MUST surface an error — either via the returned tea.Cmd resolving
-// to a messages.APIError, or via an error flash in the view.
-//
-// On current code (before the fix) this test FAILS because the silent fallback
-// to preSuppliedClients (or no-op) leaves the model in an indeterminate state
-// with no error surfaced.
+// TestQA_ClientsReady_WrongType_EmitsError: when ClientsReadyMsg.Clients is a
+// non-nil value of the wrong concrete type, the handler surfaces an error —
+// either via the returned tea.Cmd resolving to a messages.APIError, or via an
+// error flash in the view.
 func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -83,8 +78,6 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 		Gen:     1,
 	})
 
-	// Primary check: the returned cmd, if non-nil, should resolve to an
-	// APIErrorMsg containing "unexpected" or "internal".
 	if cmd != nil {
 		result := cmd()
 		if errMsg, ok := result.(messages.APIError); ok {
@@ -95,7 +88,6 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 			if !strings.Contains(errStr, "unexpected") && !strings.Contains(errStr, "internal") {
 				t.Errorf("APIErrorMsg.Err should contain 'unexpected' or 'internal', got: %q", errStr)
 			}
-			// Error was properly surfaced via cmd — test passes.
 			return
 		}
 
@@ -107,7 +99,6 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 		}
 	}
 
-	// Secondary check: inspect the view for an error flash.
 	view := stripANSI(rootViewContent(m))
 	if !strings.Contains(view, "internal") && !strings.Contains(view, "unexpected") {
 		t.Errorf(

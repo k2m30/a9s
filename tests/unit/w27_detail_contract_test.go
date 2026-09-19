@@ -1,6 +1,6 @@
 package unit
 
-// w27_detail_contract_test.go — the Detail sentence has one owner:
+// The Detail sentence has one owner:
 // catalog.FindingDef.Detail. Every finding's Detail (domain.Finding.Detail)
 // equals its definition's; no fetcher or enricher carries its own inline
 // sentence.
@@ -46,10 +46,9 @@ func (m detailMismatch) String() string {
 //
 // An empty emitted Detail counts. A code emitted from two places, one of which
 // stamps the sentence and one of which forgets, renders with a reason on some
-// rows and without one on others; skipping the empty side made exactly that
-// row invisible here. A code whose definition declares no sentence still
-// matches an emitter that stamps none, so the check stays quiet for the many
-// findings that carry a phrase alone.
+// rows and without one on others. A code whose definition declares no
+// sentence still matches an emitter that stamps none, so the check stays quiet
+// for the many findings that carry a phrase alone.
 func checkRowsAgainstDefinitions(shortName string, defsByCode map[domain.FindingCode]string, findings []domain.Finding) []detailMismatch {
 	var out []detailMismatch
 	for _, f := range findings {
@@ -63,9 +62,9 @@ func checkRowsAgainstDefinitions(shortName string, defsByCode map[domain.Finding
 
 // detailBenchResult is one full-catalog demo-bench walk's findings: every
 // mismatch between an emitted Detail and its FindingDef, and every
-// (shortName, code) pair that was actually witnessed carrying a non-empty
-// Detail — the coverage half of the contract, since a definition and an
-// emitter that both silently agree on "" are not proof of anything.
+// (shortName, code) pair actually observed carrying a non-empty Detail — the
+// coverage half of the contract, since a definition and an emitter that both
+// silently agree on "" are not proof of anything.
 type detailBenchResult struct {
 	mismatches []detailMismatch
 	witnessed  map[string]bool // "shortName/code"
@@ -163,19 +162,17 @@ func TestDetailContract_FullCatalogDemoBench(t *testing.T) {
 	}
 }
 
-// TestDetailContract_EveryDeclaredDetailHasABenchWitness closes the class
+// TestDetailContract_EveryDeclaredDetailHasABenchWitness covers what
 // TestDetailContract_FullCatalogDemoBench cannot see: a definition that
 // declares a sentence for a code the demo fixtures never produce. There is no
-// row to compare, so only a coverage check finds it. The case where a row does
-// exist and its emitter forgot the stamp belongs to the row walk, which no
-// longer skips an empty Detail.
+// row to compare, so only a coverage check finds it.
 func TestDetailContract_EveryDeclaredDetailHasABenchWitness(t *testing.T) {
 	result := runFullCatalogDetailBench(t)
 
-	// Union in pw1ComputeBench's witnesses too: its real sg/ebs/ami
+	// Union in the codes pw1ComputeBench produces too: its real sg/ebs/ami
 	// cross-ref cache fires Wave-2 findings (e.g. ec2.internet-exposed) the
-	// full-catalog walk's empty cache cannot, and a code witnessed by either
-	// bench is a code a demo user can actually see.
+	// full-catalog walk's empty cache cannot, and a code seen on either bench is
+	// a code a demo user can actually see.
 	for _, row := range pw1ComputeBench(t) {
 		for _, f := range row.res.Findings {
 			if f.Detail != "" {
@@ -187,7 +184,7 @@ func TestDetailContract_EveryDeclaredDetailHasABenchWitness(t *testing.T) {
 	// A code the fixture registry already declares as a coverage gap is not a
 	// forgotten definition: it is a state the demo provably cannot stage
 	// beside healthy rows — SES exposes one account-wide enforcement status,
-	// so its three mutually exclusive codes cannot all be witnessed at once,
+	// so its three mutually exclusive codes cannot all be staged at once,
 	// and OpenSearch's per-item describe is batched, so a denial degrades
 	// every row rather than one. The registry is the single place those gaps
 	// are declared and ratcheted down; reading it here keeps this gate from

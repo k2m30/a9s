@@ -1,24 +1,9 @@
 package unit
 
-// qa_enrichment_switch_test.go — Behavioral tests for US5 (FR-012).
-//
-// Tests verify that profile and region switches clear all enrichment state:
-//   - enrichmentFindings (per-type finding maps)
-//   - enrichmentRan (per-type "Wave 2 ran this session" flags)
-//   - enrichmentTypeGen (per-type generation counters)
-//
-// All assertions are behavioral — state is inferred through the observable
-// effect that EnrichmentCheckedMsg delivery behavior changes after a switch:
-//   - Before switch: messages with old Gen and TypeGen are accepted.
-//   - After switch: those same messages are stale (Gen bumped) and dropped.
-//
-// Additionally: the three maps must be re-initialized as non-nil empty maps
-// (not nil) so subsequent writes don't panic. We verify this by confirming
-// that new EnrichmentCheckedMsg delivery after the switch works without panic.
-//
-// Test coverage:
-//   T062 — TestProfileSwitch_ClearsEnrichmentState
-//   T063 — TestRegionSwitch_ClearsEnrichmentState
+// Profile and region switches clear enrichment
+// state (per-type findings, "ran" flags and generation counters) and leave
+// those maps non-nil, so later EnrichmentChecked deliveries neither revive old
+// work nor panic.
 
 import (
 	"testing"
@@ -32,12 +17,8 @@ import (
 // types so that enrichmentFindings and enrichmentRan are non-empty before
 // the switch. Returns the updated model plus the session-wide enrichmentGen
 // that was active at seeding time (0 for fresh models).
-//
-// Types seeded: "ec2", "rds" — two different types to verify both are cleared.
 func seedEnrichmentFindings(m tui.Model) tui.Model {
-	// ec2: Gen=0 (matches fresh enrichmentGen=0), TypeGen=0 (matches fresh per-type gen=0).
-	// Gen=0 is hardcoded because tui.Model does not expose an EnrichmentGen() accessor.
-	// 0 is the correct value for a freshly constructed model.
+	// tui.Model exposes no EnrichmentGen() accessor; 0 is a fresh model's value.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Truncated:    false,
@@ -47,7 +28,6 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 		Gen:     0,
 		TypeGen: 0,
 	})
-	// rds: same gens
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Truncated:    false,
@@ -61,43 +41,26 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T062 — Profile switch clears all enrichment state
+// Profile switch clears all enrichment state
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestProfileSwitch_ClearsEnrichmentState verifies that handleProfileSelected
 // clears enrichmentFindings, enrichmentRan, and enrichmentTypeGen for all types.
 //
-// Behavioral proof:
-//  1. Seed findings for "ec2" and "rds" at Gen=0, TypeGen=0.
-//  2. Switch profile → handleProfileSelected increments enrichmentGen (0→1+)
-//     AND resets enrichmentTypeGen to empty map.
-//  3. Deliver EnrichmentCheckedMsg{ec2, Gen=0, TypeGen=0} — Gen=0 is never
-//     stale by itself (EnrichmentChecked.AcceptZeroGen()==true short-circuits
-//     the generic gen guard), so this message is accepted regardless of the
-//     switch. What must hold: it must not spuriously trigger a new
-//     re-enrichment probe or refetch (a same-call TaskKindSaveCache
-//     background-cache-save cmd is tolerated — see hasReenrichOrRefetch doc
-//     in qa_enrichment_rerun_overlap_test.go).
-//  4. Deliver EnrichmentCheckedMsg{rds, Gen=0, TypeGen=0} → same check.
-//  5. Deliver EnrichmentCheckedMsg with a high TypeGen → must NOT panic
-//     (maps are non-nil after re-initialization).
+// Gen=0 is never stale by itself (EnrichmentChecked.AcceptZeroGen()), so a
+// redelivered old message is accepted; what must hold is that it triggers no
+// re-enrichment probe or refetch (a same-call TaskKindSaveCache cmd is
+// tolerated — see hasReenrichOrRefetch).
 func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Step 1: seed findings for ec2 and rds.
 	m = seedEnrichmentFindings(m)
 
-	// Step 2: switch profile — handleProfileSelected bumps enrichmentGen,
-	// resets enrichmentTypeGen, enrichmentFindings, enrichmentRan.
 	m, switchCmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
 
-	// switchCmd will contain a connect command and flash — we don't need to
-	// execute it; we only care about the enrichment state reset.
 	_ = switchCmd
 
-	// Step 3: redelivering the old ec2 message must not spuriously trigger a
-	// new re-enrichment probe or refetch.
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings: map[string][]domain.Finding{
@@ -110,7 +73,6 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 		t.Error("after profile switch: redelivering ec2 EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Findings: map[string][]domain.Finding{
@@ -123,26 +85,13 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 		t.Error("after profile switch: redelivering rds EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 5: non-nil map after re-init — new messages with the new session gen
-	// must not panic when handleEnrichmentChecked tries to write to the maps.
-	// After profile switch, enrichmentGen is incremented twice: once by the
-	// two increments in handleProfileSelected. We identify the new gen by
-	// querying what gen value the model holds — but since we can't inspect
-	// it directly, we use a high TypeGen value that will naturally be stale
-	// to ensure we don't accidentally trigger side effects, and just verify
-	// no panic occurs.
-	//
-	// The critical assertion is just "no panic" here: maps are non-nil.
+	// The maps are non-nil after re-initialization: a new message must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("after profile switch, enrichment map write must not panic (maps must be non-nil, got panic: %v)", r)
 			}
 		}()
-		// This will be stale (Gen doesn't match the new enrichmentGen after switch),
-		// but the stale-gen check runs before any map write, so a nil map would
-		// only panic if the maps are nil. Since we expect non-nil maps, a stale
-		// check should return early safely.
 		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Findings:     map[string][]domain.Finding{},
@@ -162,14 +111,8 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	m := newRootSizedModel()
 	m = seedEnrichmentFindings(m)
 
-	// Switch profile.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "dev"})
 
-	// Redelivering the old message for each type must not spuriously trigger
-	// a new re-enrichment probe or refetch (Gen=0 is never stale by itself —
-	// see hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go —
-	// so a same-call TaskKindSaveCache background-cache-save cmd is
-	// tolerated, but real re-enrichment/refetch work is not).
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
@@ -184,7 +127,7 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T063 — Region switch clears all enrichment state
+// Region switch clears all enrichment state
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestRegionSwitch_ClearsEnrichmentState verifies that handleRegionSelected
@@ -194,17 +137,11 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Step 1: seed findings for ec2 and rds.
 	m = seedEnrichmentFindings(m)
 
-	// Step 2: switch region — handleRegionSelected bumps enrichmentGen,
-	// resets enrichmentTypeGen, enrichmentFindings, enrichmentRan.
 	m, switchCmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 	_ = switchCmd
 
-	// Step 3: redelivering the old ec2 message must not spuriously trigger a
-	// new re-enrichment probe or refetch (Gen=0 is never stale by itself —
-	// see hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go).
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings: map[string][]domain.Finding{
@@ -217,7 +154,6 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 		t.Error("after region switch: redelivering ec2 EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Findings: map[string][]domain.Finding{
@@ -230,7 +166,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 		t.Error("after region switch: redelivering rds EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 5: verify non-nil maps — no panic on subsequent message delivery.
+	// The maps are non-nil after re-initialization: a new message must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -256,11 +192,8 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	m := newRootSizedModel()
 	m = seedEnrichmentFindings(m)
 
-	// Switch region.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
 
-	// Redelivering the old message for each type must not spuriously trigger
-	// a re-enrichment probe or refetch.
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
@@ -277,8 +210,6 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 // TestProfileSwitch_TypeGenResetAllowsNewEnrichment verifies that after a
 // profile switch, enrichmentTypeGen is empty (not nil) so a Ctrl+R on a
 // resource list correctly bumps it from 0 (missing key = zero value) to 1.
-//
-// This is the "maps are empty, not nil" safety check for enrichmentTypeGen.
 func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -287,10 +218,8 @@ func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	m = navigateToEC2List(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg()) // enrichmentTypeGen["ec2"] → 1
 
-	// Pop back to main menu.
 	m, _ = rootApplyMsg(m, messages.PopView{})
 
-	// Switch profile — resets enrichmentTypeGen to empty map.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "prod"})
 
 	// Re-navigate to ec2 and Ctrl+R — must not panic (map is empty, not nil).
@@ -312,17 +241,13 @@ func TestRegionSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Seed some per-type gen.
 	m = navigateToEC2List(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg()) // enrichmentTypeGen["ec2"] → 1
 
-	// Pop back to main menu.
 	m, _ = rootApplyMsg(m, messages.PopView{})
 
-	// Switch region — resets enrichmentTypeGen to empty map.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "us-west-2"})
 
-	// Re-navigate to ec2 and Ctrl+R — must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {

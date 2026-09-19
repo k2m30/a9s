@@ -6,21 +6,18 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// w29_absent_word_test.go — the defect that has now bitten the same way three
-// times: a classifier reading a derived word out of Fields treats a missing one
-// as the bad value and reports a posture finding for a row that never said
-// anything. KMS's default arm called a stateless row unavailable; the first cut
-// of the EKS posture predicate called a wordless row unencrypted and out of
-// support.
+// A classifier reading a derived word out of Fields must not treat a missing
+// one as the bad value, or it reports a posture finding for a row that never
+// said anything.
 //
 // A word the fetcher always writes is absent only on a row built outside it, so
 // absent means unknown, never bad. The same is true of a word the fetcher never
 // writes: a stale cache entry or a later spelling is unknown, not bad, so an arm
 // has to match the values it recognises rather than exclude the good one. This
-// pins both for every word a converted classifier reads, and takes another type
-// by adding a row to the table.
+// pins both for every word a classifier in w29PostureWords reads, and takes
+// another type by adding a row to the table.
 
-// w29PostureWords is the derived-word vocabulary each converted classifier
+// w29PostureWords is the derived-word vocabulary each classifier
 // reads back out of Fields: the lifecycle fields that put the row in its
 // healthy state, and the posture words with the value that says "fine".
 var w29PostureWords = []struct { //nolint:gochecknoglobals // test-only table

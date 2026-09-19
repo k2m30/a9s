@@ -1,11 +1,7 @@
-// phase03_finding_model_types_test.go — TDD red-light tests for PR-03a-types.
-//
-// These tests MUST fail to compile until the following are added:
-//   - domain.FindingCode, domain.Finding, domain.AttentionDetail, domain.DetailRow
-//   - Resource.Findings and Resource.AttentionDetails fields
-//   - ResourceTypeDef.LifecycleKey field
-//
-// Spec: docs/historical/refactor/03-finding-model.md
+// The shape of the finding model types:
+// domain.FindingCode, domain.Finding, domain.AttentionDetail,
+// domain.DetailRow, Resource.Findings / AttentionDetails and
+// ResourceTypeDef.LifecycleKey.
 package unit_test
 
 import (

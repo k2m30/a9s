@@ -1,39 +1,23 @@
-// qa_finding_dynamic_witness_test.go — the DYNAMIC witness gate.
+// Every registered FindingDef code fires
+// on at least one demo fixture.
 //
-// The STATIC state-coverage gate
-// (qa_demo_state_coverage_test.go, TestDemoStateCoverage_EveryDocumentedFindingHasAFixture)
-// only proves a (type, code) pair is either witnessed or explicitly
-// allowlisted as a known gap — it never separately reports, in one place,
-// the exact live census of every FindingDef that fires today. Live AWS
-// accounts don't contain every resource type or state; the demo fixtures
-// are the only bench an operator can use to see a finding actually fire.
-// Two failure shapes the static gate cannot see:
-//   - a code that passes the static gate's bookkeeping while never actually
-//     firing in demo mode (e.g. no DescribeLoadBalancerAttributes fake wired,
-//     so the Wave-2 enricher has nothing to classify against);
-//   - rows rendered colored with NO finding behind them at all — a
-//     color/finding divergence the static gate does not check per-code.
+// Live AWS accounts don't contain every resource type or state; the demo
+// fixtures are the only bench an operator can use to see a finding fire. The
+// static state-coverage gate (qa_demo_state_coverage_test.go) checks
+// bookkeeping and cannot see a code that never fires in demo mode (e.g. no
+// DescribeLoadBalancerAttributes fake wired, so the Wave-2 enricher has
+// nothing to classify against).
 //
-// This gate re-derives, from scratch, per (type, code): does at least one
-// demo fixture resource — after the exact same Wave-1-then-Wave-2 fold used
-// by qa_demo_state_coverage_test.go's findingCodesFor / buildDemoStateTypeCache
-// (reused verbatim, not reimplemented) — actually carry a domain.Finding
-// with that Code? That is a DYNAMIC witness: the finding fired, in-process,
-// against real demo fixtures and the real registered Wave-2 enricher. It is
-// strictly narrower than "the code exists in td.Findings" (static) and
-// strictly narrower than "some row somewhere is colored" (visibility gate,
-// qa_issue_visibility_gate_test.go) — it demands the SPECIFIC code.
+// Per (type, code), this gate asks whether at least one demo fixture
+// resource, after qa_demo_state_coverage_test.go's findingCodesFor /
+// buildDemoStateTypeCache Wave-1-then-Wave-2 fold, carries a domain.Finding
+// with that Code.
 //
-// RATCHET semantics (identical contract to knownStateCoverageGaps /
-// knownVisibilityGaps):
-//   - A code NOT in knownUnwitnessedFindings is a NEW regression — always
-//     fails, unconditionally.
-//   - An allowlisted code that NOW fires dynamically fails with a "prune
-//     from allowlist" message — forces the fixture/fake fix and this list
-//     to land in the same PR.
-//   - An allowlisted code still unwitnessed is skipped (logged), known
-//     debt — this IS the burn-down deliverable: it names, per type, exactly
-//     which demo fake or fixture is missing.
+// Ratchet semantics (same as knownStateCoverageGaps / knownVisibilityGaps):
+//   - A code not in knownUnwitnessedFindings that does not fire fails.
+//   - An allowlisted code that fires fails with a "prune from allowlist"
+//     message.
+//   - An allowlisted code that does not fire is skipped (logged).
 package unit_test
 
 import (
@@ -46,44 +30,29 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// knownUnwitnessedFindings pins the exact census, at seeding time, of
-// registered catalog.FindingDef codes that do NOT yet fire dynamically
-// against any demo fixture — neither via Wave-1 res.Findings nor the type's
-// registered Wave-2 IssueEnricher, after the shared buildDemoStateTypeCache
-// fold. Key shape: "<shortName>:<code>", matching knownStateCoverageGaps'
-// finding-gap key convention exactly so the two allowlists stay comparable.
+// knownUnwitnessedFindings lists registered catalog.FindingDef codes that fire
+// on no demo fixture. Key shape: "<shortName>:<code>", matching
+// knownStateCoverageGaps.
 //
-// Same burn-down semantics as knownStateCoverageGaps:
-//   - present + still unwitnessed today -> skip (logged), expected debt.
-//   - present + now witnessed           -> FAIL ("prune from allowlist").
-//   - a code NOT present here           -> FAIL unconditionally, a new
-//     regression the allowlist was never told about.
-//
-// All 52 original entries from the seeding census (apigw, asg, cfn, dbi,
-// ebs, ecs, ecs-task, eks, eni, igw, kinesis, logs, msk, ng, redshift,
-// secrets, sns, subnet, tgw, vpce) have since been pruned — each now fires
-// dynamically against its demo fixtures. Only the three ses codes remain:
-// SES exposes exactly one GetAccount-shaped Wave-2 signal per account (no
-// per-resource dimension to vary), and the canonical demo account is
-// intentionally modeled healthy so the rest of the demo fleet has a
-// non-degraded sending identity to reference. The distress shapes for
-// account-shutdown / account-probation / quota-high are constructed inline
-// in QA tests instead (see core/demo/fixtures/ses.go's own doc comment).
+// SES exposes one GetAccount-shaped Wave-2 signal per account, and the
+// canonical demo account is modeled healthy so the rest of the demo fleet has
+// a non-degraded sending identity to reference. The account-shutdown /
+// account-probation / quota-high shapes are constructed inline in tests
+// instead (see core/demo/fixtures/ses.go).
 var knownUnwitnessedFindings = map[string]bool{
 	"ses:ses.account-shutdown":  true,
 	"ses:ses.account-probation": true,
 	"ses:ses.quota-high":        true,
 	// DescribeDomains is one batched call, so a denial degrades every listed
-	// domain at once and no demo witness can sit beside healthy domains —
+	// domain at once and no demo fixture can sit beside healthy domains —
 	// see knownStateCoverageGaps.
 	"opensearch:opensearch.warn.details_denied": true,
 }
 
-// w6aCodesUnderTheNameKeyedGate are batch w6a's codes, which this gate hands
-// to TestW6AEveryFindingFiresOnItsNamedWitnessOnly. That gate asserts the
-// stronger property — exactly one demo row carries the code and it is the row
-// the witness constant names — so checking "fires somewhere" here as well
-// would only weaken what a green run means.
+// w6aCodesUnderTheNameKeyedGate are codes checked by
+// TestW6AEveryFindingFiresOnItsNamedWitnessOnly, which asserts the stronger
+// property — exactly one demo row carries the code and it is the row the
+// name constant names.
 var w6aCodesUnderTheNameKeyedGate = map[string]bool{ //nolint:gochecknoglobals // test-only lookup
 	"trail.no-cloudwatch-logs": true, "trail.no-kms": true,
 	"trail.log-bucket-public": true, "trail.log-bucket-no-access-logging": true,
@@ -98,15 +67,12 @@ var w6aCodesUnderTheNameKeyedGate = map[string]bool{ //nolint:gochecknoglobals /
 	"apigw.stage-variable-secret": true,
 }
 
-// TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures is the
-// DYNAMIC witness gate: for every registered type and every catalog.FindingDef
-// in td.Findings, at least one demo fixture resource must actually PRODUCE a
-// domain.Finding carrying that exact Code after the shared Wave-1-then-Wave-2
-// fold (buildDemoStateTypeCache + findingCodesFor, reused verbatim from
-// qa_demo_state_coverage_test.go) — UNLESS the (type, code) pair is pinned in
-// knownUnwitnessedFindings as pre-existing debt, in which case it is skipped
-// (logged) instead of failed. One subtest per (type, code) so the full
-// census is enumerable from `go test -v` output.
+// TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures: for every
+// registered type and every catalog.FindingDef in td.Findings, at least one
+// demo fixture resource must produce a domain.Finding carrying that Code after
+// the shared Wave-1-then-Wave-2 fold, unless the (type, code) pair is pinned
+// in knownUnwitnessedFindings. One subtest per (type, code) so the full census
+// is enumerable from `go test -v` output.
 func TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildDemoStateTypeCache(t)
@@ -137,13 +103,8 @@ func TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures(t *testing
 
 			t.Run(testName, func(t *testing.T) {
 				if w6aCodesUnderTheNameKeyedGate[string(fd.Code)] {
-					// Batch w6a is covered by
-					// TestW6AEveryFindingFiresOnItsNamedWitnessOnly instead.
-					// This gate asks only whether a code fires somewhere, which
-					// four of that batch's codes passed while their witness
-					// constant named a resource no fixture built: the finding
-					// rode on a pre-existing row. A census of codes is not a
-					// census of rows.
+					// That gate asserts a code fires on the one row its name
+					// constant names; firing somewhere is a weaker claim.
 					t.Skip("covered by the name-keyed bench gate for batch w6a")
 				}
 				if len(fixtures) == 0 {
@@ -174,7 +135,6 @@ func TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures(t *testing
 						td.ShortName, fd.Code, key,
 					)
 				case witnessed:
-					// Dynamically witnessed and not allowlisted — expected steady state.
 				case allowlisted:
 					stillUnwitnessed = append(stillUnwitnessed, key)
 					t.Skipf(

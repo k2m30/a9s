@@ -15,7 +15,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T-BK01 - Test Backup ListBackupPlans fetch
+// Backup ListBackupPlans fetch
 // ---------------------------------------------------------------------------
 
 func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
@@ -55,7 +55,6 @@ func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields
 	requiredFields := []string{"plan_name", "plan_id", "creation_date", "last_execution"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -65,7 +64,6 @@ func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
 		}
 	}
 
-	// Verify first plan
 	r0 := resources[0]
 	if r0.ID != "plan-111-aaa" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "plan-111-aaa", r0.ID)
@@ -80,7 +78,6 @@ func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"plan_id\"]: expected %q, got %q", "plan-111-aaa", r0.Fields["plan_id"])
 	}
 
-	// Verify last_execution is set for first but empty for second
 	if r0.Fields["last_execution"] == "" {
 		t.Error("resource[0].Fields[\"last_execution\"] should not be empty")
 	}
@@ -90,7 +87,6 @@ func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"last_execution\"] should be empty (no last execution), got %q", r1.Fields["last_execution"])
 	}
 
-	// Verify RawStruct is set
 	if r0.RawStruct == nil {
 		t.Error("resource[0].RawStruct should not be nil")
 	}
@@ -132,7 +128,7 @@ func TestFetchBackupPlans_EmptyResponse(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-BK02 - Resource type definition
+// Resource type definition
 // ---------------------------------------------------------------------------
 
 func TestBackup_ResourceTypeDef(t *testing.T) {

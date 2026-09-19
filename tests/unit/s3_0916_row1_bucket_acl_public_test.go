@@ -127,9 +127,8 @@ func (f *row1S3Fake) GetObjectLockConfiguration(
 	}, nil
 }
 
-// The spec names this interface as the seam GetBucketAcl joins the posture
-// scan through; the assertion keeps the name from drifting to an inline
-// method set.
+// The assertion keeps the posture scan's GetBucketAcl seam a named interface
+// rather than an inline method set.
 var _ awsclient.S3GetBucketAclAPI = (*row1S3Fake)(nil)
 
 func row1GroupGrant(uri string, perm s3types.Permission) s3types.Grant {

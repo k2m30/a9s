@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// EventBridge Rules fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 	mock := &fakeEventBridgeListRules{
 		Output: &eventbridge.ListRulesOutput{
@@ -52,7 +48,6 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first rule
 	r0 := resources[0]
 	if r0.ID != "daily-backup" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "daily-backup", r0.ID)
@@ -64,7 +59,6 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "ENABLED", r0.Fields["state"])
 	}
 
-	// Verify required fields
 	requiredFields := []string{"name", "state", "description", "event_bus", "schedule"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -81,7 +75,6 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"event_bus\"]: expected %q, got %q", "default", r0.Fields["event_bus"])
 	}
 
-	// Verify second rule (disabled, event pattern instead of schedule)
 	r1 := resources[1]
 	if r1.Fields["state"] != "DISABLED" {
 		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "DISABLED", r1.Fields["state"])

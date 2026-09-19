@@ -1,24 +1,17 @@
 package unit
 
-// qa_lazy_only_fast_path_test.go — Regression pins for the lazy-cache
-// fast-path and NeedsTargetCache prefetch logic (Groups F and G).
+// Lazy-cache fast path and NeedsTargetCache
+// prefetch.
 //
-// Group F — NeedsTargetCache prefetch fires when target is lazy-only
-//   File: internal/tui/app_related.go:91-110
-//   Contract: when a checker has NeedsTargetCache=true and the target type
-//   exists ONLY in lazyResourceCache (not in resourceCache), the probe goroutine
-//   must still call the paginated fetcher for the target type before invoking
-//   the checker. The snapshot's IsTruncated=true for lazy-only entries must NOT
-//   suppress prefetch — only mainCacheKeys (resourceCache keys) determines this.
+// A checker with NeedsTargetCache=true whose target type exists only in
+// lazyResourceCache still gets the target's paginated fetcher called first:
+// only mainCacheKeys (resourceCache keys) suppress the prefetch, so the
+// lazy-only snapshot entry cannot.
 //
-// Group G — lazy fast path requires ALL requested IDs
-//   File: internal/tui/app_related.go:331
-//   Contract: when navigating to a related resource list and the lazy cache
-//   contains SOME but not ALL requested IDs, the lazy fast path must NOT fire.
-//   The model must instead fall through to the full-fetch path so the missing
-//   IDs are retrieved from AWS. The condition is:
-//   len(filtered) > 0 && len(filtered) == len(result.RelatedIDs).
-//   Partial coverage means len(filtered) < len(result.RelatedIDs) → full fetch.
+// Drill navigation takes the lazy fast path only when the lazy cache holds
+// every requested ID (len(filtered) > 0 && len(filtered) ==
+// len(result.RelatedIDs)); partial coverage falls through to the full fetch
+// so the missing IDs come from AWS.
 
 import (
 	"context"
@@ -34,7 +27,7 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group F: NeedsTargetCache prefetch fires even when lazy-only entry exists
+// NeedsTargetCache prefetch fires even when lazy-only entry exists
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry verifies that when a
@@ -114,18 +107,15 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 		},
 	})
 
-	// Ctrl+R re-dispatches the related-check fan-out — the real re-dispatch
-	// entry point now that the fan-out has no standalone trigger message. In
-	// the resulting checker call, NeedsTargetCache=true checks mainCacheKeys
-	// (resourceCache keys, NOT snapshot keys). Since targetType is lazy-only,
-	// it must trigger prefetch.
+	// Ctrl+R re-dispatches the related-check fan-out. NeedsTargetCache=true
+	// checks mainCacheKeys (resourceCache keys, not snapshot keys), so the
+	// lazy-only targetType must trigger prefetch.
 	_, relCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
 	if relCmd == nil {
 		t.Skip("Ctrl+R returned nil cmd — no checker dispatched")
 	}
 
-	// Execute the cmd tree to run the checker goroutines.
 	allMsgs := drainAllMessages(relCmd)
 	_ = allMsgs
 
@@ -162,17 +152,11 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group G: lazy fast path requires ALL requested IDs
+// Lazy fast path requires ALL requested IDs
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestLazyFastPath_RequiresAllIDs verifies that the lazy cache fast path
 // for drill navigation only fires when ALL requested IDs are in lazyResourceCache.
-//
-// Pre-fix concern (now fixed): if the condition were `len(filtered) > 0` alone,
-// partial lazy coverage would use the fast path, rendering a list missing the
-// IDs not in cache.
-// Post-fix: condition is `len(filtered) > 0 && len(filtered) == len(result.RelatedIDs)`.
-// Partial coverage falls through to the full-fetch path.
 //
 // This test seeds lazy cache with ID k1 but requests [k1, k2]. It then
 // navigates to the related list and verifies a fetch was initiated for the
@@ -230,7 +214,6 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 		ResourceType: srcType,
 	})
 
-	// Seed lazy cache with ONLY k1 (k2 is missing).
 	// This is the partial-coverage scenario that must NOT use the fast path.
 	k1Res := resource.Resource{ID: "gg-k1", Name: "gg-k1"}
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
@@ -244,7 +227,6 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 		},
 	})
 
-	// Navigate to the related list — this triggers handleRelatedNavigate.
 	// With full coverage (both IDs in lazy), fast path fires → no fetch.
 	// With partial coverage (k2 missing), fast path must NOT fire → fetchResources called.
 	_, drillCmd := rootApplyMsg(m, messages.RelatedNavigate{
@@ -254,7 +236,6 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 		RelatedIDs:     []string{"gg-k1", "gg-k2"},
 	})
 
-	// Drain the cmd tree.
 	if drillCmd != nil {
 		drainAllMessages(drillCmd)
 	}

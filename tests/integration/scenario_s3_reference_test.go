@@ -2,7 +2,7 @@
 
 package integration
 
-// scenario_s3_reference_test.go — standing per-surface gate for s3, the
+// Standing per-surface gate for s3, the
 // project's reference resource. Each subtest names one user-facing surface,
 // so a failure identifies the broken surface directly. Subtests share one
 // scenario walk and run in order; deep per-fixture render assertions live in
@@ -83,10 +83,9 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 	t.Run("issues", func(t *testing.T) {
 		scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3ACLPublicStatus)
 		// colorS3 resolves color via colorFromAnyFinding (catalog_databases.go);
-		// this bucket's s3.public finding is Severity: SevBroken (spec row
-		// s3-0916/1 — it is the access-control-list witness), so the row
-		// renders Broken row color directly instead of staying
-		// Healthy-with-`!`-glyph.
+		// this bucket's s3.public finding (granted through its access-control
+		// list) is Severity: SevBroken, so the row renders Broken row color and
+		// carries no glyph.
 		scenario.ExpectRowNoGlyphPrefix(s3NoPABBucketID)
 	})
 

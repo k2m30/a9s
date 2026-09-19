@@ -1,4 +1,4 @@
-// qa_cache_lifecycle_test.go — full cache lifecycle tests:
+// Full cache lifecycle tests:
 //
 //  1. первая загрузка (кэша нет) — first load, no cache.
 //  2. загрузка с кэшем (данные и ресурсы не менялись) — cache-present load,
@@ -9,61 +9,26 @@
 //     cache-present load across a VIEW-CONFIG change (columns reordered,
 //     removed, added).
 //
-// Each scenario drives a FULL SESSION over one shared temp cache dir
-// (A9S_CONFIG_FOLDER) using the real production seams:
+// Each scenario drives a full session over one shared temp cache dir
+// (A9S_CONFIG_FOLDER) through the production seams, with no sleeps. The real
+// "s3" short name is used so menu/list rendering, column resolution and cache
+// save all go through the production registry; only the fetch is swapped.
 //
-//   - runtime.Bootstrap + app.New + SetUIMode("web")  (newLifecycleController,
-//     mirrors newLiveWebStyleController in app_web_live_cold_boot_test.go).
-//   - resource.SetPaginatedForTest to control the fake AWS world
-//     deterministically (mirrors registerDepthFetcher in
-//     runtime_executor_depth_refetch_test.go). The real "s3" short name is
-//     used (not a synthetic type) so menu/list rendering, column resolution,
-//     and cache save all go through the exact production registry path — the
-//     paginated fetcher registered here is only swapped in for the fetch
-//     itself; the type definition, columns, and cache file naming are s3's
-//     real ones.
-//   - The boot "seed load" step is driven by delivering the real
-//     messages.AvailabilityCacheLoaded event (built from the on-disk store via
-//     runtime.CacheStoreToEvent, exactly what ExecuteTask(TaskKindLoadAvailCache)
-//     produces) through ctrl.Handle — the precedented seam used by
-//     TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu in
-//     app_web_live_cold_boot_test.go.
-//   - The verify-fetch / availability-probe result step is
-//     ctrl.Handle(messages.ResourcesLoaded{...}) (menu-syncing seam —
-//     handleResourcesLoadedEvent + syncExactTotalToMenu, NOT the
-//     ApplyResourcesLoaded test-only seam, which bypasses menu sync).
-//   - Root-menu-state assertions (availability/issue counts) read via
-//     Controller.GetMenuAvailability/GetMenuIssueCounts, NOT
-//     Snapshot().Body.Menu — snapshot() only populates Body.Menu when the
-//     TOP-OF-STACK screen is the menu itself (bodyKindForScreen), which is
-//     never true once a list screen is open; the accessors read
-//     rootMenuState() regardless of the current screen and are what a
-//     real renderer uses to paint the (backgrounded) main menu's badges.
-//   - The wave-2 glyph-render step is Controller.ApplyEnrichmentState, NOT
-//     ctrl.Handle(messages.EnrichmentChecked{...}): that event only mutates
-//     runtime.Core's session-level ResourceCache/ProbeResources
-//     (core/runtime/helpers.go's applyEnrichment) — a distinct cache in
-//     a distinct package. ApplyEnrichmentState is the seam
-//     buildListBody's glyph rendering actually reads
-//     (c.enrichmentStore/listEnrichmentFindings), and is what the TUI's own
-//     ResourceListModel calls after running its own enrichment probe drive
-//     (internal/tui/views/resourcelist.go) — the correct headless/web
-//     equivalent.
-//   - Persistence is asserted by re-reading cache.LoadDirForTest(profile, region)
-//     after each Handle call — saves happen synchronously inside the
-//     production handlers, no task execution required.
+// Root-menu counts are read via Controller.GetMenuAvailability and
+// GetMenuIssueCounts, not Snapshot().Body.Menu: the snapshot populates
+// Body.Menu only when the menu is top of stack, which is never true once a
+// list screen is open.
 //
-// No sleeps: every step is a synchronous Handle/Apply call, deterministic.
+// Wave-2 glyph state is driven through Controller.ApplyEnrichmentState, not
+// messages.EnrichmentChecked: that event mutates runtime.Core's session
+// ResourceCache/ProbeResources, a distinct cache from the c.enrichmentStore
+// that buildListBody's glyphs read.
 //
-// Scenario 3's "issue resolved" case pins that applyResourcesLoaded's
-// silent-swap finding carry (core/app/list_body.go) must not re-attach a
-// Wave-1 finding whose absence on a fresh fetch is exactly how a fetcher
-// expresses "this is no longer true" (e.g. a bucket that is no longer
-// publicly readable simply stops carrying the s3-public-read finding). A
-// carry that treats ANY incoming zero-Findings resource as "not yet
-// re-checked" and re-attaches its FULL prior set lets a genuinely resolved
-// Wave-1 issue's glyph, menu issue count, and persisted cache.Row.Findings
-// all survive the swap.
+// A fetcher reports a resolved Wave-1 issue by omitting its finding from a
+// fresh fetch (a bucket that stops being publicly readable stops carrying the
+// s3-public-read finding), so the silent-swap finding carry
+// (core/app/list_body.go) must not re-attach a Wave-1 finding to an incoming
+// row that carries none.
 package unit
 
 import (
@@ -83,17 +48,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ─────────────────────────────────────────────────────────────────────────
-// Shared plumbing
-// ─────────────────────────────────────────────────────────────────────────
-
 const lifecycleShortName = "s3"
 
 // newLifecycleController builds a fresh Controller/Core pair against the
 // CURRENT contents of A9S_CONFIG_FOLDER (must already be set by the caller —
 // every scenario below reuses the SAME temp dir across successive "boots" to
-// simulate an app restart). Mirrors newLiveWebStyleController
-// (app_web_live_cold_boot_test.go).
+// simulate an app restart).
 func newLifecycleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
@@ -126,17 +86,13 @@ type s3RawFixture struct {
 	CreationDate string
 }
 
-// setNoopS3Fetcher installs a paginated fetcher for "s3" that is never
-// actually invoked by these tests (every fetch result is delivered directly
-// via deliverVerifyFetch/ctrl.Handle, mirroring the ApplyResourcesLoaded-seam
-// precedent in qa_cache_field_completeness_test.go) — it exists only so
-// GetPaginatedFetcher("s3") is non-nil, matching what a real registered type
-// always has, and to guarantee no live AWS call is ever attempted if
-// production code's task dispatch runs the real fetcher. Callers that need
-// an intermediate (pre-final) registration torn down manually before a later
-// boot re-registers it use this directly with resource.CleanupPaginatedForTest;
-// registerNoopS3Fetcher wraps it with t.Cleanup for the final registration in
-// a test.
+// setNoopS3Fetcher installs a paginated fetcher for "s3" that the tests never
+// invoke (every fetch result is delivered via deliverVerifyFetch): it keeps
+// GetPaginatedFetcher("s3") non-nil, as for any registered type, and
+// guarantees no live AWS call if task dispatch runs the fetcher. Callers that
+// tear an intermediate registration down before a later boot re-registers it
+// use this directly with resource.CleanupPaginatedForTest;
+// registerNoopS3Fetcher wraps it with t.Cleanup.
 func setNoopS3Fetcher() {
 	resource.SetPaginatedForTest(lifecycleShortName, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
@@ -197,20 +153,9 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 }
 
 // deliverEnrichment applies wave-2 findings via Controller.ApplyEnrichmentState
-// — the seam buildListBody's glyph rendering actually reads from
-// (c.enrichmentStore, see core/app/list_filter.go's
-// listEnrichmentFindings). This is NOT the same store
-// messages.EnrichmentChecked populates: that event only mutates
-// runtime.Core's session-level ResourceCache/ProbeResources
-// (core/runtime/helpers.go's applyEnrichment) — a distinct cache in a
-// distinct package from app.Controller's own resourceCache/enrichmentStore.
-// In production, ApplyEnrichmentState is called by the TUI's own
-// ResourceListModel (internal/tui/views/resourcelist.go) after it runs its
-// own enrichment probe drive; a headless/web Controller session (this test's
-// shape, and qa_cache_field_completeness_test.go's SilentSwap test) has no
-// other wiring that copies EnrichmentChecked's findings into
-// Controller.enrichmentStore, so this seam is the correct one to drive
-// glyph-visible wave-2 state on a bare app.Controller.
+// — the store buildListBody's glyph rendering reads (c.enrichmentStore, see
+// core/app/list_filter.go's listEnrichmentFindings). messages.EnrichmentChecked
+// mutates runtime.Core's session ResourceCache/ProbeResources instead.
 func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]domain.Finding) {
 	ctrl.ApplyEnrichmentState(lifecycleShortName, issues, false, findings, nil)
 }
@@ -257,10 +202,6 @@ func findListRow(rows []app.ListRow, id string) (app.ListRow, bool) {
 	return app.ListRow{}, false
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scenario 1 — first load, no cache
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestCacheLifecycle_Scenario1_FirstLoad_NoCache pins the cold-start
 // behavior: an empty cache directory means the menu shows NO counts before
 // any probe result lands (placeholder semantics, never a fabricated zero),
@@ -277,7 +218,6 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 
 	_, ctrl := newLifecycleController(t, profile, region)
 
-	// --- Step 1: boot seed load over an EMPTY directory ---
 	vsBoot := bootSeedFromDisk(ctrl, profile, region)
 	if vsBoot.Body.Menu == nil {
 		t.Fatal("Body.Menu is nil after the boot seed load")
@@ -286,7 +226,6 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 		t.Errorf("s3 menu entry AvailKnown=true Availability=%d before any probe has ever run — want unknown (no fabricated zero), an empty cache dir carries no observation", avail.Availability)
 	}
 
-	// --- Step 2: open the list — nothing known, must show genuine Loading ---
 	vsOpen, tasks := openS3List(ctrl)
 	lb := vsOpen.Body.List
 	if lb == nil {
@@ -311,7 +250,6 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 		t.Fatal("no KindFetchResources task dispatched on list-open — test assumption broken")
 	}
 
-	// --- Step 3: deliver the fetch result (fresh RawStruct-bearing resources) ---
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "public read", Severity: domain.SevBroken, Source: "wave1"}
 	fresh := []resource.Resource{
 		newS3Resource("bucket-s1-1", region, "active", finding),
@@ -340,15 +278,8 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 		t.Errorf("bucket-s1-1 Color = %q, want %q (broken row for its finding)", row1.Color, "broken")
 	}
 
-	// --- Step 4: apply wave-2 enrichment state (glyph-render seam;
-	// finding already reached disk via Step 3's fetch result, which already
-	// carried it on the resource — this call additionally guards the
-	// render-time glyph path). ---
 	deliverEnrichment(ctrl, 1, map[string][]domain.Finding{"bucket-s1-1": {finding}})
 
-	// --- Step 5: persisted file must carry every renderable column's field,
-	// findings, and correct count/exact/issues ---
-	//
 	// The keys below are the underscored spelling on purpose: there is exactly
 	// one Fields key per column title, written under the spelling the
 	// extraction cascade reads first; a second, spaced spelling would make a
@@ -391,10 +322,6 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scenario 2 — cache present, world unchanged
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged boots a SECOND
 // controller over scenario 1's on-disk state (world unchanged) and asserts:
 // menu counts+issue badges are present IMMEDIATELY from disk before any
@@ -413,7 +340,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		newS3Resource("bucket-s2-2", region, "active"),
 	}
 
-	// --- First boot: seed the disk state (mirrors scenario 1 end-state) ---
 	setNoopS3Fetcher()
 	func() {
 		_, ctrl1 := newLifecycleController(t, profile, region)
@@ -426,13 +352,10 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 
 	beforeTF := readTypeFile(t, profile, region)
 
-	// --- Second boot: SAME world, fetcher re-registered fresh ---
 	registerNoopS3Fetcher(t)
 
 	_, ctrl2 := newLifecycleController(t, profile, region)
 
-	// Step 1: boot seed load from disk — menu counts+badges present BEFORE
-	// any probe result.
 	vsBoot := bootSeedFromDisk(ctrl2, profile, region)
 	if vsBoot.Body.Menu == nil {
 		t.Fatal("Body.Menu is nil after the second boot's seed load")
@@ -448,7 +371,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		t.Errorf("s3 menu entry IssueBadge.Count = %d, want 1 (from disk) before any probe result", entry.IssueBadge.Count)
 	}
 
-	// Step 2: open the list — seeds the SAME rows instantly, no Loading.
 	vsOpen, _ := openS3List(ctrl2)
 	lb := vsOpen.Body.List
 	if lb == nil {
@@ -473,7 +395,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		t.Errorf("seeded bucket-s2-1 Color = %q, want %q — the persisted finding's row color must show on the seeded (pre-verify) frame", seededRow1.Color, "broken")
 	}
 
-	// Step 3: deliver the verify fetch with the SAME world.
 	vsLoaded := deliverVerifyFetch(ctrl2, world, false)
 	lbLoaded := vsLoaded.Body.List
 	if lbLoaded == nil {
@@ -496,12 +417,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		t.Error("post-verify ListBody.Rows missing bucket-s2-2")
 	}
 
-	// Step 4: re-deliver enrichment (unchanged) and re-check menu counts via
-	// the root-menu-state accessors (GetMenuAvailability/GetMenuIssueCounts),
-	// NOT Snapshot().Body.Menu — the top-of-stack screen is still the s3
-	// list here, so Body.Menu is nil per snapshot()'s
-	// "populated only when top.State.Menu != nil" contract; the accessors
-	// read rootMenuState() regardless of the current screen.
 	deliverEnrichment(ctrl2, 1, map[string][]domain.Finding{"bucket-s2-1": {finding}})
 	availAfter := ctrl2.GetMenuAvailability()
 	if got := availAfter[lifecycleShortName]; got != 2 {
@@ -512,7 +427,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		t.Errorf("GetMenuIssueCounts()[%q] after re-verify = %d, want 1 unchanged", lifecycleShortName, got)
 	}
 
-	// Step 5: the re-persisted file is semantically identical to before.
 	afterTF := readTypeFile(t, profile, region)
 	if afterTF.Count != beforeTF.Count || afterTF.Exact != beforeTF.Exact || afterTF.Issues != beforeTF.Issues {
 		t.Errorf("re-persisted TypeFile header changed: before={Count:%d Exact:%v Issues:%d} after={Count:%d Exact:%v Issues:%d}",
@@ -533,10 +447,6 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scenario 3 — cache present, world CHANGED
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestCacheLifecycle_Scenario3_CachePresent_WorldChanged mutates the fake
 // world before the third boot (one resource removed, one added, one
 // resolved, one newly-broken) and asserts: the seeded frame first shows the
@@ -556,10 +466,8 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 		newS3Resource("bucket-s3-stable", region, "active"),
 	}
 
-	// --- First boot: seed the OLD world onto disk. oldWorld's
-	// bucket-s3-resolved already carries brokenFinding directly (the real
-	// Wave-1 fetcher shape), so deliverVerifyFetch alone is sufficient to
-	// persist it — no separate enrichment call needed. ---
+	// oldWorld's bucket-s3-resolved carries brokenFinding directly (the Wave-1
+	// fetcher shape), so deliverVerifyFetch alone persists it.
 	setNoopS3Fetcher()
 	func() {
 		_, ctrl1 := newLifecycleController(t, profile, region)
@@ -569,7 +477,6 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	}()
 	resource.CleanupPaginatedForTest(lifecycleShortName)
 
-	// --- Mutate the world: remove one, add one, resolve one, break one ---
 	newWorld := []resource.Resource{
 		newS3Resource("bucket-s3-resolved", region, "active"),                 // issue resolved (finding gone)
 		newS3Resource("bucket-s3-stable", region, "active", newBrokenFinding), // newly broken
@@ -577,14 +484,11 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 		// bucket-s3-removed is gone.
 	}
 
-	// --- Third boot: mutated world ---
 	registerNoopS3Fetcher(t)
 
 	_, ctrl3 := newLifecycleController(t, profile, region)
 	bootSeedFromDisk(ctrl3, profile, region)
 
-	// Step 1: seeded frame shows the OLD state (stale-until-verified),
-	// INCLUDING the resource that is about to be removed.
 	vsOpen, _ := openS3List(ctrl3)
 	lb := vsOpen.Body.List
 	if lb == nil {
@@ -652,9 +556,6 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 		t.Errorf("post-verify bucket-s3-stable Color = %q, want %q — the newly-broken finding's row color must show", stableAfter.Color, "broken")
 	}
 
-	// Step 4: menu count/issue badge reflect the new truth. Read via the
-	// root-menu-state accessors (GetMenuAvailability/GetMenuIssueCounts), not
-	// Snapshot().Body.Menu — the top-of-stack screen is still the s3 list.
 	availAfter := ctrl3.GetMenuAvailability()
 	if got := availAfter[lifecycleShortName]; got != 3 {
 		t.Errorf("GetMenuAvailability()[%q] = %d, want 3 (new world size)", lifecycleShortName, got)
@@ -664,7 +565,6 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 		t.Errorf("GetMenuIssueCounts()[%q] = %d, want 1 (one broken resource in the new world)", lifecycleShortName, got)
 	}
 
-	// Step 5: persisted file holds the NEW world.
 	tf := readTypeFile(t, profile, region)
 	if tf.Count != 3 {
 		t.Errorf("persisted TypeFile.Count = %d, want 3", tf.Count)
@@ -704,11 +604,7 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scenario 4 — cache present, view CONFIG changed (columns + order)
-// ─────────────────────────────────────────────────────────────────────────
-
-// TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged pins C6: a view
+// TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged: a view
 // config change (columns reordered, one removed, one added) between boots
 // must NEVER require cache invalidation — the cached rows still seed and
 // render, just projected under the new column set. The config is loaded
@@ -725,7 +621,6 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
 		newS3Resource("bucket-s4-1", region, "active"),
 	}
 
-	// --- First boot: OLD (built-in default) column config ---
 	setNoopS3Fetcher()
 	func() {
 		_, ctrl1 := newLifecycleController(t, profile, region)
@@ -740,8 +635,6 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
 		t.Fatal("fixture assumption broken — 'bucket_owner' must not be a field the OLD config ever materialized")
 	}
 
-	// --- Write a NEW view config: reorder (Status before Bucket Name),
-	// remove Region, add a new path-backed column (Bucket Owner). ---
 	viewsDir := filepath.Join(tmp, "views")
 	if err := os.MkdirAll(viewsDir, 0o755); err != nil {
 		t.Fatalf("creating views dir: %v", err)
@@ -770,7 +663,6 @@ detail:
 		t.Fatal("config.Load() returned nil config after writing views/s3.yaml — production config-load path did not pick up the file")
 	}
 
-	// --- Second boot: apply the new config via the real SetViewConfig seam ---
 	_, ctrl2 := newLifecycleController(t, profile, region)
 	ctrl2.SetViewConfig(vc)
 
@@ -778,8 +670,6 @@ detail:
 
 	bootSeedFromDisk(ctrl2, profile, region)
 
-	// Step 1: seeded (cached) rows still render under the NEW config, no
-	// crash, no Loading regression.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -801,8 +691,6 @@ detail:
 		t.Fatalf("ListBody.Rows = %d under the new config, want 1 (cached row still seeds)", len(lb.Rows))
 	}
 
-	// Column order: Status, Bucket Name, Bucket Owner (no Region, no
-	// Creation Date).
 	wantTitles := []string{"Status", "Bucket Name", "Bucket Owner"}
 	if len(lb.Columns) != len(wantTitles) {
 		t.Fatalf("ListBody.Columns = %d, want %d: %+v", len(lb.Columns), len(wantTitles), lb.Columns)
@@ -823,11 +711,8 @@ detail:
 		t.Errorf("seeded row Cells = %d, want %d (one cell per new-config column)", len(lb.Rows[0].Cells), len(wantTitles))
 	}
 
-	// Step 2: verify fetch lands with fresh RawStruct carrying the new
-	// column's source field (OwnerName) — the new column must fill in and
-	// persist. The old-config gap (no "bucket_owner" key on the seeded row)
-	// heals on this first live re-fetch, exactly like C1's one-cycle-heal
-	// contract for any other Path-backed/Key-less gap.
+	// The seeded row has no "bucket_owner" key; the first live re-fetch carries
+	// OwnerName in a fresh RawStruct, so the new column fills in and persists.
 	freshWithOwner := []resource.Resource{
 		{
 			ID:   "bucket-s4-1",
@@ -860,7 +745,6 @@ detail:
 	// A list row carries no marker, so "no findings" is read off the row's
 	// colour, which the sibling assertions already cover.
 
-	// Step 3: persisted file now carries the new column's field too.
 	afterTF := readTypeFile(t, profile, region)
 	if len(afterTF.Rows) != 1 {
 		t.Fatalf("persisted TypeFile.Rows = %d after the verify+save, want 1", len(afterTF.Rows))
@@ -880,10 +764,6 @@ detail:
 		t.Errorf(`persisted bucket-s4-1.Fields["name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// helpers requiring app package types (kept local, no cross-file coupling)
-// ─────────────────────────────────────────────────────────────────────────
 
 // findMenuEntry returns the MenuEntry for shortName from mb, or (zero, false).
 func findMenuEntry(mb *app.MenuBody, shortName string) (app.MenuEntry, bool) {

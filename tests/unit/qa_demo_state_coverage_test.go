@@ -1,4 +1,4 @@
-// qa_demo_state_coverage_test.go — the standing state-coverage ratchet.
+// The standing state-coverage ratchet.
 //
 // Demo mode (./a9s --demo) is also the bench humans use to see every row
 // color and every documented finding without live AWS credentials. This test
@@ -11,7 +11,7 @@
 // does), then asks two questions per type using only machine-readable sources
 // that GENERATE docs/resources/<type>.md (never parsed markdown):
 //
-//  1. Bucket reachability (catalog.ResourceTypeDef.Color, invariant #7 —
+//  1. Bucket reachability (catalog.ResourceTypeDef.Color —
 //     every registered type has a non-nil Color classifier). The classifier
 //     itself, not a hand-rolled LifecycleKey heuristic, is the single source
 //     of truth for which of the four domain.Color buckets (Healthy / Warning
@@ -51,10 +51,9 @@
 //   - A gap NOT in knownStateCoverageGaps is a NEW regression — always fails,
 //     unconditionally.
 //   - An allowlisted gap that NOW HAS a witness fails with a "remove from
-//     allowlist" message — forces the fixture fix and this list to land in
-//     the same PR.
+//     allowlist" message.
 //   - An allowlisted gap that is still uncovered is skipped (logged, not
-//     failed) — expected, pre-existing debt.
+//     failed).
 //
 // s3 must NOT appear in knownStateCoverageGaps for its documented
 // "public access block incomplete" finding: core/demo/fixtures/s3.go
@@ -209,7 +208,7 @@ func findingCodesFor(
 // TestDemoStateCoverage_EveryReachableBucketHasAFixture is the row-color
 // half of the standing ratchet: for every registered type, every domain.Color
 // bucket that at least one demo fixture resource resolves into (via the
-// type's own td.ResolveColor — the real production classifier, invariant #7)
+// type's own td.ResolveColor — the real production classifier)
 // establishes that bucket as "reachable" for this type. This test's job is
 // narrower than "cover every theoretically reachable bucket" — it enumerates,
 // per type, exactly the set of buckets its fixtures currently produce, and
@@ -303,8 +302,8 @@ func TestDemoStateCoverage_EveryReachableBucketHasAFixture(t *testing.T) {
 // into docs/resources/<type>.md), at least one demo fixture resource of that
 // type must produce a domain.Finding carrying that Code — through Wave-1
 // res.Findings or the type's registered Wave-2 IssueEnricher — UNLESS the
-// (type, code) pair is pinned in knownStateCoverageGaps as pre-existing
-// debt, in which case it is skipped (logged) instead of failed. One subtest
+// (type, code) pair is pinned in knownStateCoverageGaps,
+// in which case it is skipped (logged) instead of failed. One subtest
 // per (type, finding code) so the full backlog is enumerable in -v output.
 func TestDemoStateCoverage_EveryDocumentedFindingHasAFixture(t *testing.T) {
 	clients := demo.NewServiceClients()

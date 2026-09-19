@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_cap_independence_test.go pins the class rule for a per-parent
+// Pins the class rule for a per-parent
 // page cap: hitting the cap on one walk says the count from THAT walk is a
 // lower bound. It does not make the resource uninspected, so it must never
 // suppress a check computed from a different API call, nor discard the
@@ -26,8 +26,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
-
-// --- EFS -------------------------------------------------------------------
 
 // efsEndlessMountTargetsFake always hands back another Marker, so the
 // mount-target walk can only ever end at PerParentPageCap. The two policy
@@ -72,10 +70,10 @@ func (f *efsEndlessMountTargetsFake) DescribeBackupPolicy(
 
 const efsWideOpenPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["elasticfilesystem:ClientMount","elasticfilesystem:ClientWrite"],"Resource":"*"}]}`
 
-// TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding pins row 31's first
-// site: the file-system policy check runs before the mount-target walk
-// precisely so a pagination problem cannot swallow it, and marking the file
-// system uninspected when the walk hits its page cap swallows it anyway.
+// TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding: the file-system
+// policy check runs before the mount-target walk precisely so a pagination
+// problem cannot swallow it; marking the file system uninspected when the
+// walk hits its page cap would swallow it anyway.
 func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 	fake := &efsEndlessMountTargetsFake{policy: efsWideOpenPolicy}
 	clients := &awsclient.ServiceClients{EFS: fake}
@@ -105,7 +103,6 @@ func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 			codesOf(res.Findings["fs-0123456789abcdef0"]))
 	}
 
-	// The user-visible observable: the finding must survive the fold onto the row.
 	td := resource.FindResourceType("efs")
 	if td == nil {
 		t.Fatal("resource type efs is not registered")
@@ -140,8 +137,6 @@ func TestEnrichEFS_HealthyPolicyOnCappedWalkRaisesNothing(t *testing.T) {
 	}
 }
 
-// --- EventBridge rule ------------------------------------------------------
-
 // ebEndlessTargetsFake always returns another NextToken, so the target walk
 // ends at PerParentPageCap. Every target it hands back lacks a
 // DeadLetterConfig, so each arrived page carries a real, already-derived
@@ -164,8 +159,8 @@ func (f *ebEndlessTargetsFake) ListTargetsByRule(
 	}, nil
 }
 
-// TestEnrichEventBridgeRule_CappedTargetWalkKeepsFoundRows pins row 31's
-// second site: the dead-letter verdicts derived from the pages that DID
+// TestEnrichEventBridgeRule_CappedTargetWalkKeepsFoundRows: the dead-letter
+// verdicts derived from the pages that DID
 // arrive are facts about real targets. Capping the walk means the count is a
 // lower bound, not that those verdicts are unknown.
 func TestEnrichEventBridgeRule_CappedTargetWalkKeepsFoundRows(t *testing.T) {
@@ -231,8 +226,6 @@ func TestEnrichEventBridgeRule_CappedWalkNeverClaimsNoTargets(t *testing.T) {
 			"it demonstrably has targets")
 	}
 }
-
-// --- shared assertions -----------------------------------------------------
 
 // wipfixEFSRows returns EFS list rows in the shape the efs fetcher writes.
 func wipfixEFSRows(ids ...string) []resource.Resource {

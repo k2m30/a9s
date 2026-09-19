@@ -1,6 +1,6 @@
 package unit
 
-// qa_ebs_snap_color_test.go — Color contract pin for EBS Snapshots.
+// Color contract pin for EBS Snapshots.
 //
 // colorEBSSnap is colorFromAnyFinding-only (core/aws/catalog_compute.go) —
 // it has NO raw-field fallback at all. Every non-healthy case here attaches a
@@ -13,7 +13,7 @@ package unit
 // not branch on finding Code, only on Severity, Source-prefix ("wave1" or
 // "wave2:"), and worst-severity-wins across multiple Findings. Coverage below
 // pins: the no-finding Healthy anchor, one wave1 case per severity tier, the
-// wave2:ebs-snap Source-prefix acceptance (a bug class where a finding with
+// wave2:ebs-snap Source-prefix handling (a bug class where a finding with
 // the wrong Source string is silently dropped from color resolution), and
 // the multi-finding worst-severity-wins reduction. Per-state wave1-emission
 // mapping (which AWS state produces which code) is pinned at the fetcher

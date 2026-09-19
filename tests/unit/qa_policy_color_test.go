@@ -1,6 +1,6 @@
 package unit
 
-// qa_policy_color_test.go — Wave 1 Color tests for IAM Policies.
+// Wave 1 Color tests for IAM Policies.
 //
 // Contract:
 //   - attachment_count>0 with is_attachable=true → ColorHealthy (in use).

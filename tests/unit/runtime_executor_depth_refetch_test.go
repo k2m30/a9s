@@ -1,15 +1,12 @@
 package unit_test
 
-// runtime_executor_depth_refetch_test.go — RED regression tests for the
-// verify-depth walk (D7).
-//
-// Contract: docs/design/cache-requirements.md C1/C2/C5, Goal 3. A warm list
-// open that previously persisted an exact total (e.g. 55 rows across 2
-// pages) must not have its background verify-refetch (KindFetchResources)
-// silently downgrade that total to a single truncated first page (e.g. 50
-// rows). The executor must keep paginating via FetchMoreResources up to the
-// previously-cached depth (Core.CachedListDepth) before returning
-// messages.ResourcesLoaded.
+// The verify-depth walk
+// (docs/design/cache-requirements.md). A warm list open that persisted an
+// exact total (e.g. 55 rows across 2 pages) must not have its background
+// verify-refetch (KindFetchResources) downgrade that total to a single
+// truncated first page (e.g. 50 rows): the executor keeps paginating via
+// FetchMoreResources up to the cached depth (Core.CachedListDepth) before
+// returning messages.ResourcesLoaded.
 //
 // See core/runtime/executor.go KindFetchResources and
 // core/runtime/probes.go CachedListDepth.
@@ -26,10 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
-
-// ────────────────────────────────────────────────────────────────────────────
-// helpers
-// ────────────────────────────────────────────────────────────────────────────
 
 // depthTestProfile/depthTestRegion are fake, non-real credentials — used only
 // to build a deterministic on-disk cache directory under a temp
@@ -174,12 +167,8 @@ func registerDepthFetcherErrorOnPage2(t *testing.T, shortName string) {
 	})
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 1 — RefetchesToCachedDepth
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestExecuteTask_FetchResources_RefetchesToCachedDepth pins the verify-depth
-// walk (C1 / C2 / C5): when 55 rows were previously persisted for this type, a background
+// walk: when 55 rows were previously persisted for this type, a background
 // verify-refetch (KindFetchResources) must keep paginating past the
 // truncated 50-row first page until it reaches the previously-shown depth
 // (55), and the final Pagination must reflect the LAST page fetched
@@ -232,10 +221,6 @@ func TestExecuteTask_FetchResources_RefetchesToCachedDepth(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 2 — NoCachedDepth_SinglePageUnchanged
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestExecuteTask_FetchResources_NoCachedDepth_SinglePageUnchanged pins the
 // cold-start / no-prior-cache behavior: with no TypeFile persisted for this
 // type, CachedListDepth returns 0 and the depth loop's guard
@@ -246,7 +231,6 @@ func TestExecuteTask_FetchResources_NoCachedDepth_SinglePageUnchanged(t *testing
 	const shortName = "s3pilot"
 
 	registerDepthFetcher(t, shortName)
-	// No seedCachedRows call — cache dir has no file for shortName.
 
 	c := newDepthExecutorCore(t, false)
 	ev, err := c.ExecuteTask(context.Background(), runtime.TaskRequest{
@@ -276,13 +260,9 @@ func TestExecuteTask_FetchResources_NoCachedDepth_SinglePageUnchanged(t *testing
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 3 — FollowUpPageError_PartialWithErr
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestExecuteTask_FetchResources_FollowUpPageError_PartialWithErr pins the
-// partial-success contract (HandleResourcesLoaded, existing behavior at
-// core/runtime/handlers_resources.go:84-89): when the depth-loop's
+// partial-success contract (HandleResourcesLoaded,
+// core/runtime/handlers_resources.go): when the depth-loop's
 // follow-up FetchMoreResources call errors, the executor must still return
 // the resources accumulated so far (page 1's 50) with Err set — never an
 // messages.APIError, since some resources DID make it back.
@@ -311,10 +291,6 @@ func TestExecuteTask_FetchResources_FollowUpPageError_PartialWithErr(t *testing.
 		t.Errorf("len(Resources) = %d, want 50 (page 1's resources accumulated before the failure)", len(got.Resources))
 	}
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Test 4 — CachedListDepth accessor direct pins
-// ────────────────────────────────────────────────────────────────────────────
 
 // TestCachedListDepth_UnknownType_ReturnsZero pins the "type absent from
 // store" branch.

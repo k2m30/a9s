@@ -1,25 +1,9 @@
 package unit
 
-// qa_prefetch_pagination_seed_test.go — regression pin for the prefetch
-// pagination-seed bug (P1 finding).
-//
-// Bug: In demo / --no-cache sessions, the synchronous availability prefetch
-// retains only the first page of each paginated fetcher. Pre-fix, the
-// AvailabilityPrefetchedMsg handler synthesized a PaginationMeta that kept
-// only IsTruncated, discarding the original NextToken. That turned the
-// seeded entry into an apparent full-cache hit on the next OpenList /
-// load-more path, but no further pages could ever be fetched — pagination
-// was dead.
-//
-// Fix: AvailabilityPrefetchedMsg now carries the full per-type
-// PaginationMeta map, and handleAvailabilityPrefetched seeds the
-// ResourceCache with that meta when present. Synthetic IsTruncated-only
-// remains as a fallback for callers (tests / messages) that don't supply
-// the new Pagination field.
-//
-// This test pins both:
-//  1. Full pagination (NextToken etc.) survives the prefetch → cache seed.
-//  2. The legacy fallback still works when Pagination is omitted.
+// In demo / --no-cache sessions the availability prefetch keeps only the first
+// page of each paginated fetcher, so the seeded ResourceCache entry must carry
+// the full PaginationMeta (NextToken etc.) for load-more to advance. Without a
+// Pagination map, the seed takes IsTruncated from the Truncated map.
 
 import (
 	"testing"
@@ -82,11 +66,8 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 	}
 }
 
-// TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted — when an old-style
-// message arrives without the Pagination field, the seed still produces a
-// minimum-viable PaginationMeta with IsTruncated set from the legacy
-// Truncated map. This preserves backward compatibility for any test/message
-// that doesn't construct Pagination.
+// Without the Pagination field, the seed builds a PaginationMeta with
+// IsTruncated taken from the Truncated map.
 func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -100,8 +81,8 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: true},
 		Resources:      map[string][]resource.Resource{targetType: {r}},
-		// Pagination nil. Stamp the live AvailabilityGen so the staleness guard
-		// accepts the message (AcceptZeroGen=false).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the message
+		// (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 

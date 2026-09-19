@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w5_secretscan_json_key_test.go — a credential written as a JSON
+// A credential written as a JSON
 // object key is a hit, and the references that resolve a credential
 // elsewhere still are not. Both rules live in the one engine every caller
 // shares, not at the Step Functions call site, so their blast radius is
@@ -92,8 +92,8 @@ func TestW5SecretScan_ReferenceShapesAreStillNotHits(t *testing.T) {
 }
 
 // ScanKV is the other entry point and the one every environment-variable
-// caller uses. The widening touched a pattern ScanKV reaches through
-// scanValue, so the same reference shapes must stay silent there.
+// caller uses. It reaches the same pattern through scanValue, so the same
+// reference shapes must stay silent there.
 func TestW5SecretScan_ScanKVReferenceShapesAreStillNotHits(t *testing.T) {
 	kv := map[string]string{
 		"DB_PASSWORD_ARN":  "arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/db-AbCdEf",
@@ -127,8 +127,8 @@ func TestW5SecretScan_ScanKVStillReportsARealValue(t *testing.T) {
 
 // An ordinary sentence that happens to contain a credential word followed
 // by punctuation and a long word must not become a hit. Prose reaches the
-// scanner through log lines and description fields, and the widened pattern
-// now accepts a quote between the word and the separator.
+// scanner through log lines and description fields, and the pattern accepts
+// a quote between the word and the separator.
 func TestW5SecretScan_ProseIsNotAHit(t *testing.T) {
 	cases := map[string]string{
 		"quoted word then colon": `The "password": rotate it every ninety days per policy.`,
@@ -156,19 +156,14 @@ func TestW5SecretScan_SecretsManagerARNIsNotALeak(t *testing.T) {
 	}
 }
 
-// A value beginning with "$" is now treated as an environment reference and
-// never reported. That is right for $ACME_API_KEY and wrong for every hash
-// format whose own syntax starts with "$": bcrypt writes $2y$, $2a$, $2b$,
-// and crypt writes $6$ and $argon2id$. Those are credentials, not
-// references, and the plain KEY=value form they arrive in is the shape the
-// scanner's own doc comment names as its primary case.
-//
-// This is a regression, not a gap. All three lines below were reported by
-// the pattern that predates this batch entirely, verified by running the
-// original, the widened and the current pattern side by side with each
-// version's own reference list. A scanner that stops reporting a leak is
-// worse than one that reports a reference: the false positive is argued
-// with, the false negative is never seen.
+// A value beginning with "$" is an environment reference only when an
+// identifier follows and nothing else. Hash formats whose own syntax starts
+// with "$" — bcrypt writes $2y$, $2a$, $2b$, and crypt writes $6$ and
+// $argon2id$ — are credentials, not references, and the plain KEY=value form
+// they arrive in is the shape the scanner's own doc comment names as its
+// primary case. A scanner that stops reporting a leak is worse than one that
+// reports a reference: the false positive is argued with, the false negative
+// is never seen.
 func TestW5SecretScan_DollarLeadingValuesAreStillLeaks(t *testing.T) {
 	cases := map[string]string{
 		"bcrypt hash in an environment variable":  `DB_PASSWORD=$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy`,
@@ -185,8 +180,7 @@ func TestW5SecretScan_DollarLeadingValuesAreStillLeaks(t *testing.T) {
 	}
 }
 
-// The counterpart that must keep working, so the fix above cannot be made by
-// simply reverting the reference rule.
+// The counterpart: a real environment reference stays quiet.
 func TestW5SecretScan_EnvironmentReferencesStayQuiet(t *testing.T) {
 	cases := map[string]string{
 		"bare environment reference":   `{"API_KEY": "$ACME_API_KEY"}`,

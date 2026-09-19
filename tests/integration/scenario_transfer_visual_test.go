@@ -2,9 +2,8 @@
 
 package integration
 
-// scenario_transfer_visual_test.go — Phase 8 render-gate for the transfer
-// resource. Verifies the rendered TUI output (not fetcher return values)
-// matches the universal UI rules and the §4 contract in
+// scenario_transfer_visual_test.go checks the rendered TUI output (not
+// fetcher return values) for transfer against the universal UI rules and
 // docs/resources/transfer.md.
 //
 // transfer uses the in-fetcher N+1 pattern (ListServers + DescribeServer per
@@ -23,8 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// §4 phrases pinned locally — any drift in the fetcher surfaces here instead
-// of in unit tests that could be rewritten without noticing.
 const (
 	transferPhraseOffline       = "offline: not accepting transfers"
 	transferPhraseStarting      = "starting"
@@ -35,7 +32,7 @@ const (
 	transferPhraseNoLogging     = "no activity logging"
 	transferPhraseDetailsDenied = "details denied"
 
-	// Rule-7 rolled-up form: OFFLINE + legacy policy + no logging.
+	// OFFLINE + legacy policy + no logging.
 	transferPhraseMultiP2 = "offline: not accepting transfers (+2)"
 
 	// Child-row phrase (agreements child view).
@@ -53,21 +50,19 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// S1 menu badge — issue-COLORED rows: offline, starting, stopping,
+	// Menu badge — issue-COLORED rows: offline, starting, stopping,
 	// stop-failed, legacy-policy, no-logging, multi, details-denied (8
 	// Warning) + start-failed (1 Broken) = 9.
 	scenario.ExpectMenuIssueCount("transfer", 10)
 
 	scenario.OpenList("transfer")
 
-	// Universal column rules — no jargon columns.
 	for _, jargon := range []string{
 		"CIS", " Flags", " Issues ", "NOBKP", "UNENC", "NOPROT", "PUB ",
 	} {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// Healthy rows: blank Status.
 	for _, id := range []string{
 		demofixtures.ProdAS2GatewayID,
 		demofixtures.SftpUsersProdID,
@@ -76,14 +71,12 @@ func TestScenario_TransferVisual(t *testing.T) {
 		scenario.ExpectRowStatusBlank(id)
 	}
 
-	// §4 phrases per state bucket.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferOfflineID, transferPhraseOffline)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferStartingID, transferPhraseStarting)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferStoppingID, transferPhraseStopping)
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenTransferStartFailedID, transferPhraseStartFailed)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferStopFailedID, transferPhraseStopFailed)
 
-	// Describe-borne config findings (yellow rows, color is the signal).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferLegacyPolicyID, transferPhraseLegacyPolicy)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferNoLoggingID, transferPhraseNoLogging)
 
@@ -91,11 +84,9 @@ func TestScenario_TransferVisual(t *testing.T) {
 	// ONLINE ⇒ no state finding), details-denied is the only phrase.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferDetailsDeniedID, transferPhraseDetailsDenied)
 
-	// Rule 7 — three findings stack: state phrase wins, (+2) suffix.
+	// The state phrase wins over the config findings.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnTransferMultiID, transferPhraseMultiP2)
 
-	// Glyph rules: NO glyph anywhere for transfer — every finding is
-	// color-bearing, so no row stays green while carrying one.
 	for _, id := range []string{
 		demofixtures.ProdAS2GatewayID,
 		demofixtures.SftpUsersProdID,
@@ -113,8 +104,6 @@ func TestScenario_TransferVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// Related panel — every §2 pivot with `count shown: yes` ≥ 1 on the
-	// graph root: role 1, vpc 1, subnet 3, vpce 1, logs 2, acm 1.
 	root := selectTransferByID(t, scenario, demofixtures.ProdAS2GatewayID)
 	scenario.OpenDetailResource("transfer", root)
 	scenario.ExpectNoAPIError()
@@ -141,13 +130,10 @@ func TestScenario_TransferVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// Rule 7 U7c/U7e — the multi fixture's detail enumerates ALL three
-	// findings as their own capitalized Attention entries.
 	multi := selectTransferByID(t, scenario, demofixtures.WarnTransferMultiID)
 	scenario.OpenDetailResource("transfer", multi)
 	scenario.ExpectNoAPIError()
 
-	// 8.4 user-visible sanity render (mandatory).
 	t.Log("\n" + scenario.currentView())
 
 	scenario.ExpectViewContains(transferDetailOffline)
@@ -157,7 +143,7 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario.Back()
 
 	// Rich degraded row in detail: the details-denied entry surfaces with
-	// transfer's own §4 sentence (not the generic name-only wording), and
+	// transfer's own sentence (not the generic name-only wording), and
 	// the list-borne facts stay visible.
 	denied := selectTransferByID(t, scenario, demofixtures.WarnTransferDetailsDeniedID)
 	scenario.OpenDetailResource("transfer", denied)
@@ -170,7 +156,7 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario.Back()
 
 	// Agreements child view (`e` on the graph root): both agreements render;
-	// the INACTIVE one carries its §2.1 phrase.
+	// the INACTIVE one carries its phrase.
 	scenario.ApplyFilter(demofixtures.ProdAS2GatewayID)
 	scenario.Press("e")
 	scenario.ExpectViewContains(demofixtures.AgreementProdPartnerID)
@@ -181,10 +167,10 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario.AssertNoEnrichmentErrors()
 }
 
-// TestScenario_TransferVisual_HealthySilence — spec §4 "Healthy silence": the
-// showroom row renders no Attention section and no finding phrase, and the
-// wave-3 anti-tests hold (UserCount 0 on the AS2 graph root produces no
-// finding; LoggingRole-nil-with-structured-logs never fires no-logging).
+// TestScenario_TransferVisual_HealthySilence — the showroom row renders no
+// Attention section and no finding phrase; UserCount 0 on the AS2 graph root
+// produces no finding and LoggingRole-nil-with-structured-logs never fires
+// no-logging.
 func TestScenario_TransferVisual_HealthySilence(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	scenario := fullIntegrationNewDemoScenario(t)

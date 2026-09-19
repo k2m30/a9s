@@ -177,7 +177,6 @@ func TestResolveRelatedNavigate(t *testing.T) {
 				}
 
 			case runtime.NavigationKindResourceList:
-				// TargetType already asserted above.
 			}
 		})
 	}
@@ -187,9 +186,6 @@ func TestResolveRelatedNavigate(t *testing.T) {
 // a FetchFilter on a type with no registered FilteredPaginatedFetcher (e.g. "vpc")
 // is silently ignored and the resolver falls through to the standard RelatedIDs
 // path instead of returning NavigationKindFilteredList.
-//
-// Regression for: "no filtered fetcher registered for: X" runtime panic caused
-// by a checker that sets FetchFilter on an unsupported target type.
 func TestResolveRelatedNavigate_FetchFilterRequiresRegisteredFetcher(t *testing.T) {
 	// "vpc" does not have a FilteredPaginatedFetcher registered — only "ct-events" does.
 	ev := runtime.RelatedNavigateEvent{

@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_security_test.go — pagination tests for security fetchers:
+// Pagination tests for security fetchers:
 // sg, iam-role, iam-policy, secrets, ssm
 
 import (
@@ -34,10 +34,6 @@ func (m *mockEC2DescribeSecurityGroupsAPIPaginated) DescribeSecurityGroups(_ con
 	m.Calls++
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSecurityGroupsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchSecurityGroupsPage_FirstPage(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsAPIPaginated{
@@ -161,10 +157,6 @@ func (m *mockIAMListRolesAPIPaginated) ListRoles(_ context.Context, _ *iam.ListR
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchIAMRolesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchIAMRolesPage_FirstPage(t *testing.T) {
 	mock := &mockIAMListRolesAPIPaginated{
 		PageFunc: func(_ int) (*iam.ListRolesOutput, error) {
@@ -287,10 +279,6 @@ func (m *mockIAMListPoliciesAPIPaginated) ListPolicies(_ context.Context, _ *iam
 	m.Calls++
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchIAMPoliciesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchIAMPoliciesPage_FirstPage(t *testing.T) {
 	attachCount := int32(3)
@@ -419,10 +407,6 @@ func (m *mockSecretsManagerListSecretsAPIPaginated) ListSecrets(_ context.Contex
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSecretsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchSecretsPage_FirstPage(t *testing.T) {
 	mock := &mockSecretsManagerListSecretsAPIPaginated{
 		PageFunc: func(_ int) (*secretsmanager.ListSecretsOutput, error) {
@@ -544,10 +528,6 @@ func (m *mockSSMDescribeParametersAPIPaginated) DescribeParameters(_ context.Con
 	m.Calls++
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSSMParametersPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchSSMParametersPage_FirstPage(t *testing.T) {
 	mock := &mockSSMDescribeParametersAPIPaginated{

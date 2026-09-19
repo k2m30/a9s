@@ -58,9 +58,8 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	if r.Name != "dbc-snap-auto-001" {
 		t.Errorf("expected Name 'dbc-snap-auto-001', got %q", r.Name)
 	}
-	// Per spec §4 (docs/resources/dbc-snap.md): Healthy snapshots render
-	// blank in the §4 column. The fetcher's computeDBCSnapPhrase maps the
-	// raw AWS keyword "available" → "" so the Status column stays blank.
+	// Healthy snapshots render blank: computeDBCSnapPhrase maps the raw AWS
+	// keyword "available" → "" so the Status column stays blank.
 	if r.Fields["snapshot_id"] != "dbc-snap-auto-001" {
 		t.Errorf("expected snapshot_id 'dbc-snap-auto-001', got %q", r.Fields["snapshot_id"])
 	}
@@ -78,8 +77,7 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	// Per Phase-03 PR-03e: fetcher no longer writes Resource.Status; the
-	// display phrase lives in Fields["status"], findings carry severity.
+	// The display phrase lives in Fields["status"]; findings carry severity.
 	if r2.Fields["status"] != "creating" {
 		t.Errorf("expected Fields[\"status\"] 'creating', got %q", r2.Fields["status"])
 	}

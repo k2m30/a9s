@@ -1,6 +1,6 @@
 package unit
 
-// qa_acm_validation_timed_out_test.go — ACM certificate status does not
+// ACM certificate status does not
 // colour a row on its own.
 //
 // Colour derives from findings only, so a resource carrying no findings is

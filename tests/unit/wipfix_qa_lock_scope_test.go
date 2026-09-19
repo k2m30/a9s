@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_lock_scope_test.go pins two facts about what the controller does
+// Pins two facts about what the controller does
 // on a caller's goroutine:
 //
 //   - reading a warm screen is a read. Two readers of the same session must
@@ -69,13 +69,12 @@ func wipfixSnapshotOverlapRatio(t *testing.T, c *app.Controller, iters int) (rat
 }
 
 // wipfixSnapshotOverlapCeiling is how much slower two concurrent readers may
-// be than one. Measured on this bench with 6000 warm rows: 2.13-2.18, i.e.
-// exactly serialised, because Snapshot takes the write lock. Two readers that
-// genuinely overlap cost about what one costs; 1.5 is the midpoint, far from
-// both the ~1.1 an overlapping pair reaches and the ~2.15 a queue does.
+// be than one. With 6000 warm rows, two readers that queue behind a write
+// lock cost about 2.15x one, and two that overlap about 1.1x; 1.5 sits far
+// from both.
 const wipfixSnapshotOverlapCeiling = 1.5
 
-// TestWarmSnapshot_TwoReadersOverlap pins row 34: building a warm screen reads
+// TestWarmSnapshot_TwoReadersOverlap: building a warm screen reads
 // state it does not change, so two web requests against one session must not
 // take turns.
 func TestWarmSnapshot_TwoReadersOverlap(t *testing.T) {
@@ -94,10 +93,9 @@ func TestWarmSnapshot_TwoReadersOverlap(t *testing.T) {
 // TestColdSnapshot_ConcurrentFirstReadsAreWellFormed is the negative half:
 // whatever lock a warm read takes, the FIRST read of a screen still has to
 // build the memo, which is a mutation. Two goroutines arriving on a cold
-// controller together are the hazard the write lock exists for — a fix that
-// simply demotes Snapshot to a read lock races that build, and under -race
-// this is the probe that says so. Both readers must come back with the whole
-// list.
+// controller together are the hazard the write lock exists for — a read lock
+// alone races that build, and under -race this is the probe that says so.
+// Both readers must come back with the whole list.
 //
 // Correctness, not timing: under the detector a memo build is a small
 // fraction of a snapshot, so "warm is faster than cold" is not measurable
@@ -150,8 +148,8 @@ func wipfixEC2TypeFiles(t *testing.T) []string {
 	return matches
 }
 
-// TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal pins row 35's latency
-// half by asking what has happened when the caller comes back, rather than
+// TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal asks what has happened
+// when the caller comes back, rather than
 // how long it took to come back. The marshal of a 12000-row set is work the
 // save lane owns: the caller returns with it still outstanding, and it lands
 // when the queue drains. A build that marshals on the caller's goroutine has
@@ -191,10 +189,9 @@ func TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal(t *testing.T) {
 	}
 }
 
-// TestLargeFetchAbsorb_StillWritesTheSameFile pins row 35's other half:
-// moving the marshal off the caller's goroutine must leave the file on disk
-// exactly as it is today. The golden was captured from this bench at
-// 8a2dee1c, where the marshal is synchronous.
+// TestLargeFetchAbsorb_StillWritesTheSameFile: the file the save lane writes
+// off the caller's goroutine must match the golden a synchronous marshal of
+// this bench produces.
 func TestLargeFetchAbsorb_StillWritesTheSameFile(t *testing.T) {
 	c := newTestController(t)
 	cfg := os.Getenv("A9S_CONFIG_FOLDER")

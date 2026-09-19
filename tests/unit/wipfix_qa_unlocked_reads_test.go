@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestAnomalyOverlay_ReadsUnderTheSameLockItsWritersHold pins row 53. Every
+// TestAnomalyOverlay_ReadsUnderTheSameLockItsWritersHold: every
 // writer of the anomaly buckets takes the store's mutex; a reader that does
 // not is reading a pointer another goroutine is replacing. The grid's overlay
 // is read on the render path while a fetch result lands from its task, so the
@@ -32,8 +32,6 @@ func TestAnomalyOverlay_ReadsUnderTheSameLockItsWritersHold(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// The writer: a fetch result landing, over and over, replacing both the
-	// authoritative bucket and the capped one.
 	go func() {
 		defer wg.Done()
 		for i := range 300 {
@@ -49,7 +47,6 @@ func TestAnomalyOverlay_ReadsUnderTheSameLockItsWritersHold(t *testing.T) {
 		}
 	}()
 
-	// The reader: the render path asking what to overlay.
 	go func() {
 		defer wg.Done()
 		for range 300 {
@@ -99,8 +96,8 @@ func (f *lambdaSlowVerifierFake) GetFunction(
 	return &lambda.GetFunctionOutput{}, nil
 }
 
-// TestEnrichLambdaPosture_OneSlowVerificationDoesNotStallTheBatch pins row 54.
-// The verification is a network call; the mutex it runs under exists to record
+// TestEnrichLambdaPosture_OneSlowVerificationDoesNotStallTheBatch:
+// the verification is a network call; the mutex it runs under exists to record
 // results. Holding the mutex across the call makes every other function in the
 // batch wait on one function's round trip, and the batch's worker slots fill
 // with goroutines blocked on it, so functions further down are never asked
@@ -129,14 +126,12 @@ func TestEnrichLambdaPosture_OneSlowVerificationDoesNotStallTheBatch(t *testing.
 		done <- res
 	}()
 
-	// The verification is under way and answering nothing.
 	select {
 	case <-fake.verifying:
 	case <-time.After(10 * time.Second):
 		t.Fatal("the verification never started")
 	}
 
-	// Every other function must still be asked about while it blocks.
 	seen := map[string]bool{}
 	deadline := time.After(10 * time.Second)
 	for len(seen) < total {

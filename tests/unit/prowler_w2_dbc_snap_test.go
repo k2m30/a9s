@@ -1,13 +1,11 @@
 package unit
 
-// prowler_w2_dbc_snap_test.go — dbc-snap row 19 of the w2 Prowler batch:
-// a cluster snapshot shared with every AWS account.
+// dbc-snap public sharing: a cluster snapshot shared with every AWS account.
 //
 // The dbc-snap list merges DocumentDB and RDS cluster snapshots, and each row
 // keeps the SDK struct it arrived as. Both clients expose the same
 // DescribeDBClusterSnapshotAttributes shape, so a snapshot shared with `all`
-// must produce the identical finding whichever client answered — the
-// architectural point of this row.
+// must produce the identical finding whichever client answered.
 
 import (
 	"context"

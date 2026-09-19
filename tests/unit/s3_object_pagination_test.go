@@ -11,10 +11,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// TestFetchS3Objects_Paginated verifies the two-call pagination flow for S3
-// objects. FetchS3Objects makes exactly one API call per invocation (single-page
-// pagination contract). Call 1 returns page 0 with IsTruncated=true. Call 2
-// (using NextToken from call 1) returns page 1 with IsTruncated=false.
+// FetchS3Objects makes exactly one API call per invocation; the caller pages
+// with NextToken.
 func TestFetchS3Objects_Paginated(t *testing.T) {
 	page0 := []*s3.ListObjectsV2Output{
 		{
@@ -35,7 +33,6 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 	page1 := []*s3.ListObjectsV2Output{
 		{
 			IsTruncated: aws.Bool(false),
-			// No NextContinuationToken — last page
 			CommonPrefixes: []s3types.CommonPrefix{
 				{Prefix: aws.String("folder2/")},
 			},
@@ -54,14 +51,12 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 		},
 	}
 
-	// Call 1: no continuation token — returns page 0 with IsTruncated=true
 	mock1 := &fakeS3ListObjectsV2{Pages: page0}
 	result1, err := awsclient.FetchS3Objects(context.Background(), mock1, "test-bucket", "", "")
 	if err != nil {
 		t.Fatalf("call 1: unexpected error: %v", err)
 	}
 
-	// Page 0: 1 folder + 1 file = 2 resources
 	if len(result1.Resources) != 2 {
 		t.Errorf("call 1: expected 2 resources (1 folder + 1 file), got %d", len(result1.Resources))
 	}
@@ -78,14 +73,12 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 		t.Error("call 1: expected non-empty NextToken")
 	}
 
-	// Call 2: use NextToken from call 1 — returns page 1 with IsTruncated=false
 	mock2 := &fakeS3ListObjectsV2{Pages: page1}
 	result2, err := awsclient.FetchS3Objects(context.Background(), mock2, "test-bucket", "", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
 	}
 
-	// Page 1: 1 folder + 2 files = 3 resources
 	if len(result2.Resources) != 3 {
 		t.Errorf("call 2: expected 3 resources (1 folder + 2 files), got %d", len(result2.Resources))
 	}
@@ -99,13 +92,11 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 		t.Error("call 2: expected IsTruncated=false")
 	}
 
-	// Verify total resources across both calls = 5
 	total := len(result1.Resources) + len(result2.Resources)
 	if total != 5 {
 		t.Errorf("expected 5 total resources across 2 calls, got %d", total)
 	}
 
-	// Verify all expected resource IDs are present across both pages
 	ids := map[string]bool{}
 	for _, r := range result1.Resources {
 		ids[r.ID] = true

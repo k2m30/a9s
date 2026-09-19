@@ -16,15 +16,6 @@ import (
 // ALL related-resource behavior across ALL resource types — both right-column related
 // entries and left-column navigable fields. It operates in demo mode by default
 // (when A9S_CT_PROFILE is not set) and in live mode when A9S_CT_PROFILE is set.
-//
-// Algorithm:
-//   - For each resource type (skip ct-events, skip child types):
-//   - Try to find any resource; skip the type if none available
-//   - Open detail view
-//   - Right column: snapshot lastRelatedByName once, call checker independently,
-//     compare counts; for actionable defs, follow in a fresh scenario
-//   - Left column: verify TargetType resolves for each navigable field
-//   - Back to list
 func TestFullRelatedViewValidation(t *testing.T) {
 	profile := os.Getenv("A9S_CT_PROFILE")
 	region := os.Getenv("A9S_CT_REGION")
@@ -46,7 +37,6 @@ func TestFullRelatedViewValidation(t *testing.T) {
 	for _, shortName := range resource.AllShortNames() {
 		shortName := shortName // capture for subtest
 
-		// Skip self-referencing and child types.
 		if shortName == "ct-events" {
 			continue
 		}
@@ -102,22 +92,14 @@ func TestFullRelatedViewValidation(t *testing.T) {
 					// OpenDetailResource hits the cache and never re-emits RelatedCheckResultMsg.
 					relatedSnapshot := maps.Clone(sc.lastRelatedByName)
 
-					// RIGHT COLUMN: validate related entries.
 					defs := resource.GetRelated(shortName)
 					for _, def := range defs {
 						def := def // capture
 						t.Run("related/"+def.DisplayName, func(t *testing.T) {
-							// Note: this exercises the same checker the UI uses, not an
-							// independent oracle. A fully independent check would call the
-							// underlying AWS API directly (e.g. ec2:DescribeVolumes to verify
-							// EBS count) and compare against the UI — deliberately out of scope
-							// here. Calling the checker directly with an empty ResourceCache
-							// verifies it runs without panic and returns a structurally valid
-							// result.
-							//
-							// Pass an empty ResourceCache{}. NeedsTargetCache checkers will fetch
-							// the target type from the demo/live clients and return the real count;
-							// field-only checkers return their count from the resource fields alone.
+							// This calls the same checker the UI uses, with an empty
+							// ResourceCache: NeedsTargetCache checkers fetch the target
+							// type from the demo/live clients and return the real count;
+							// field-only checkers count from the resource fields alone.
 							checker := def.Checker
 							if checker == nil {
 								t.Skipf("def %q has nil checker", def.DisplayName)
@@ -158,8 +140,6 @@ func TestFullRelatedViewValidation(t *testing.T) {
 								}
 							}
 
-							// If actionable (count > 0), follow the related entry and verify navigation.
-							// Use a fresh scenario to avoid polluting the main scenario's state.
 							if uiMsg.Result.Count() > 0 || uiMsg.Result.State() == domain.RelatedDeferred {
 								// Fresh scenario for navigation — avoids relatedCache hit problem on re-entry.
 								// Shares root scenario's clients to skip STS AssumeRole per sub-test.
@@ -177,7 +157,6 @@ func TestFullRelatedViewValidation(t *testing.T) {
 						})
 					}
 
-					// LEFT COLUMN: validate navigable fields.
 					navFields := resource.GetNavigableFields(shortName)
 					for _, nf := range navFields {
 						nf := nf // capture
@@ -190,19 +169,14 @@ func TestFullRelatedViewValidation(t *testing.T) {
 								return
 							}
 
-							// Check the field value. Falls back to Fields map.
 							val := res.Fields[nf.FieldPath]
 							if val == "" {
-								// Field may be empty for this particular resource.
 								t.Skipf("field %q is empty on resource %q — cannot test navigation", nf.FieldPath, res.ID)
 								return
 							}
 
-							// Registration check: the TargetType resolves (above) and the
-							// field value is non-empty, which catches navigable-field
-							// registration bugs. The actual cursor-to-field-and-Enter
-							// navigation is exercised by the controller and web field-cursor
-							// tests, not this harness.
+							// The controller and web field-cursor tests drive the
+							// cursor-to-field Enter navigation.
 							_ = val
 						})
 					}

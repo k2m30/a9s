@@ -1,15 +1,8 @@
 package unit
 
-// qa_cf_waf_column_field_test.go — P2.5 verification test.
-//
-// The reviewer claims that the cf WAF column (defaults_dns_cdn.go) uses
-// Path: "WebACLId", but DistributionSummary does not have a WebACLId field —
-// it is only on GetDistributionConfig (not the List API response). This test
-// verifies whether fieldpath.ExtractScalar resolves a non-empty value from
-// DistributionSummary via the "WebACLId" path.
-//
-// If this test PASSES: the reviewer was wrong — the path resolves correctly.
-// If this test FAILS:  the reviewer was right — the WAF column is always blank.
+// The cf WAF column (defaults_dns_cdn.go,
+// Path "WebACLId") resolves from the DistributionSummary list-API shape via
+// fieldpath.ExtractScalar.
 
 import (
 	"context"
@@ -80,16 +73,11 @@ func TestFetchCloudFrontDistributions_WAFColumnResolves(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Find the distribution with WebACLId set.
 	wafDist := resources[0]
 	if wafDist.ID != "EWAF001" {
 		t.Fatalf("expected first resource to be EWAF001, got %q", wafDist.ID)
 	}
 
-	// The WAF column in defaults_dns_cdn.go uses Path: "WebACLId".
-	// fieldpath.ExtractScalar traverses the RawStruct (cftypes.DistributionSummary)
-	// to resolve this path. If DistributionSummary lacks a WebACLId field, this
-	// returns "" and the column is always blank.
 	resolved := fieldpath.ExtractScalar(wafDist.RawStruct, "WebACLId")
 	if resolved == "" {
 		t.Errorf("distribution %q: fieldpath.ExtractScalar(RawStruct, \"WebACLId\") returned empty string "+

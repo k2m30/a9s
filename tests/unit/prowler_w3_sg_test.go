@@ -1,15 +1,15 @@
 package unit
 
-// prowler_w3_sg_test.go — security-group posture signals.
+// Security-group posture signals.
 //
-// Row 1: the sensitive-port set behind sg.ingress.dangerous-ports must cover
-// the plaintext / datastore / admin ports Prowler flags, and must NOT cover
-// the application ports (8080/8443) that are ordinarily internet-facing on
+// The sensitive-port set behind sg.ingress.dangerous-ports must cover the
+// plaintext / datastore / admin ports Prowler flags, and must NOT cover the
+// application ports (8080/8443) that are ordinarily internet-facing on
 // purpose — a finding operators learn to ignore is worse than no finding.
-// Row 2: an AWS-created "default" group is supposed to carry no usable rules;
+// An AWS-created "default" group is supposed to carry no usable rules;
 // anything beyond the create-time allow-all egress means it is in service.
-// Row 3: sg.unused is a cache-only join against the ENI list, so it must
-// refuse to conclude "unused" from an ENI list it knows is incomplete.
+// sg.unused is a cache-only join against the ENI list, so it must refuse to
+// conclude "unused" from an ENI list it knows is incomplete.
 
 import (
 	"context"
@@ -105,10 +105,8 @@ func w3AssertRows(t *testing.T, got []domain.DetailRow, want [][2]string) {
 	}
 }
 
-// ── Row 1: sensitive port set ─────────────────────────────────────────────
-
-// w3SensitivePortCases are the ports both the batch spec and the dispatch
-// agree must produce sg.ingress.dangerous-ports when open to 0.0.0.0/0.
+// w3SensitivePortCases are the ports that must produce
+// sg.ingress.dangerous-ports when open to 0.0.0.0/0.
 var w3SensitivePortCases = []struct {
 	port    int32
 	service string
@@ -124,7 +122,6 @@ var w3SensitivePortCases = []struct {
 	{9092, "Kafka"},
 	{9160, "Cassandra Thrift"},
 	{11211, "Memcached"},
-	// Ports already covered before this batch — they must not regress.
 	{22, "SSH"},
 	{3389, "RDP"},
 	{3306, "MySQL"},
@@ -194,10 +191,8 @@ func TestW3SGDangerousPorts_SkipsApplicationPorts(t *testing.T) {
 	}
 }
 
-// TestW3SGDangerousPorts_SMBAndSMTP covers the two ports where the batch spec
-// (which lists 445 SMB and 25 SMTP among the ports to add) and the dispatch
-// note (which groups them with 8080/8443 as excluded) disagree. Kept separate
-// so a ruling flips exactly one test.
+// TestW3SGDangerousPorts_SMBAndSMTP pins that 445 (SMB) and 25 (SMTP) open to
+// 0.0.0.0/0 produce sg.ingress.dangerous-ports.
 func TestW3SGDangerousPorts_SMBAndSMTP(t *testing.T) {
 	for _, tc := range []struct {
 		port    int32
@@ -258,8 +253,6 @@ func TestW3SGDangerousPorts_RangeEnumeratesEveryNewPort(t *testing.T) {
 		}
 	}
 }
-
-// ── Row 2: default group carrying rules ───────────────────────────────────
 
 func TestW3SGDefaultWithRules_IngressPresent(t *testing.T) {
 	rows := w3FetchSGs(t, ec2types.SecurityGroup{
@@ -369,8 +362,6 @@ func TestW3SGDefaultWithRules_IndependentOfExposure(t *testing.T) {
 		t.Errorf("got %d findings %+v, want exactly 2", len(rows[0].Findings), rows[0].Findings)
 	}
 }
-
-// ── Row 3: unused group (cache-only join against ENIs) ────────────────────
 
 // w3SGRes builds the shape FetchSecurityGroupsPage hands the enricher.
 func w3SGRes(id, name string) resource.Resource {

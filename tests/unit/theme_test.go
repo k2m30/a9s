@@ -16,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ===========================================================================
-// T001 — DefaultTheme returns Theme with all 35 fields set to correct values
-// ===========================================================================
-
 func TestDefaultTheme_AllFieldsMatchPalette(t *testing.T) {
 	th := styles.DefaultTheme()
 
@@ -77,10 +73,6 @@ func TestDefaultTheme_AllFieldsMatchPalette(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T002 — ApplyTheme updates palette vars and rebuilds composed styles
-// ===========================================================================
-
 func TestApplyTheme_UpdatesPaletteAndComposedStyles(t *testing.T) {
 	original := styles.DefaultTheme()
 	defer styles.ApplyTheme(original)
@@ -107,10 +99,6 @@ func TestApplyTheme_UpdatesPaletteAndComposedStyles(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T003 — ActiveTheme returns current theme copy
-// ===========================================================================
-
 func TestActiveTheme_ReturnsCurrentThemeName(t *testing.T) {
 	original := styles.DefaultTheme()
 	defer styles.ApplyTheme(original)
@@ -125,18 +113,12 @@ func TestActiveTheme_ReturnsCurrentThemeName(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T004 — ApplyTheme updates ColorStyle so ColorHealthy uses the new Running color
-// ===========================================================================
-
 func TestApplyTheme_RebuildsRowColorCache(t *testing.T) {
 	original := styles.DefaultTheme()
 	defer styles.ApplyTheme(original)
 
-	// Capture the original ColorHealthy (running/green) foreground.
 	beforeFg := styles.ColorStyle(resource.ColorHealthy).GetForeground()
 
-	// Apply a theme with a different Running color.
 	custom := styles.DefaultTheme()
 	custom.Running = lipgloss.Color("#aabbcc")
 	styles.ApplyTheme(custom)
@@ -150,10 +132,6 @@ func TestApplyTheme_RebuildsRowColorCache(t *testing.T) {
 		t.Errorf("ApplyTheme: ColorStyle(ColorHealthy) expected #aabbcc, got %v", afterFg)
 	}
 }
-
-// ===========================================================================
-// T005 — ThemeFromYAML parses full theme YAML (all 35 colors)
-// ===========================================================================
 
 func TestThemeFromYAML_FullTheme(t *testing.T) {
 	data := []byte(`
@@ -255,10 +233,6 @@ colors:
 	}
 }
 
-// ===========================================================================
-// T006 — ThemeFromYAML with partial theme inherits defaults
-// ===========================================================================
-
 func TestThemeFromYAML_PartialThemeInheritsDefaults(t *testing.T) {
 	data := []byte(`
 name: "Partial Theme"
@@ -277,7 +251,6 @@ colors:
 
 	def := styles.DefaultTheme()
 
-	// All non-overridden fields must match DefaultTheme.
 	nonAccentChecks := []struct {
 		name string
 		got  color.Color
@@ -301,10 +274,6 @@ colors:
 	}
 }
 
-// ===========================================================================
-// T007 — ThemeFromYAML rejects invalid hex values
-// ===========================================================================
-
 func TestThemeFromYAML_InvalidHexReturnsError(t *testing.T) {
 	data := []byte(`
 name: "Bad Theme"
@@ -317,10 +286,6 @@ colors:
 		t.Error("ThemeFromYAML: expected error for invalid hex value, got nil")
 	}
 }
-
-// ===========================================================================
-// T008 — ThemeFromYAML ignores unknown keys
-// ===========================================================================
 
 func TestThemeFromYAML_UnknownKeysIgnored(t *testing.T) {
 	data := []byte(`
@@ -335,16 +300,11 @@ colors:
 		t.Fatalf("ThemeFromYAML unknown keys: unexpected error: %v", err)
 	}
 
-	// Known fields must still fall back to defaults.
 	def := styles.DefaultTheme()
 	if !colorsEqual(th.Accent, def.Accent) {
 		t.Errorf("ThemeFromYAML unknown keys: Accent should be default %v, got %v", def.Accent, th.Accent)
 	}
 }
-
-// ===========================================================================
-// T009 — Search highlight styles use theme colors after ApplyTheme
-// ===========================================================================
 
 func TestApplyTheme_SearchHighlightStylesUpdated(t *testing.T) {
 	original := styles.DefaultTheme()
@@ -355,22 +315,16 @@ func TestApplyTheme_SearchHighlightStylesUpdated(t *testing.T) {
 	custom.SearchHighlightBg = lipgloss.Color("#aabbcc")
 	styles.ApplyTheme(custom)
 
-	// SearchCurrentStyle background must match SearchHighlightBg.
 	currentBg := styles.SearchCurrentStyle.GetBackground()
 	if !colorsEqual(currentBg, lipgloss.Color("#aabbcc")) {
 		t.Errorf("SearchCurrentStyle background: expected #aabbcc, got %v", currentBg)
 	}
 
-	// SearchOtherStyle foreground must match SearchHighlightBg (used as highlight marker).
 	otherFg := styles.SearchOtherStyle.GetForeground()
 	if !colorsEqual(otherFg, lipgloss.Color("#aabbcc")) {
 		t.Errorf("SearchOtherStyle foreground: expected #aabbcc, got %v", otherFg)
 	}
 }
-
-// ===========================================================================
-// T019 — All embedded YAML theme files parse without error, all 35 fields set
-// ===========================================================================
 
 func TestEmbeddedThemes_AllParseWithAllFieldsSet(t *testing.T) {
 	entries, err := themes.FS.ReadDir(".")
@@ -407,8 +361,7 @@ func TestEmbeddedThemes_AllParseWithAllFieldsSet(t *testing.T) {
 				t.Errorf("%s: Name is empty", name)
 			}
 
-			// Verify all 35 color fields are non-zero (differ from zero color.Color).
-			// We compare to the zero value — a color set to "" is the zero lipgloss.Color result.
+			// A color set to "" is the zero lipgloss.Color result.
 			zeroColor := lipgloss.Color("")
 
 			colorFields := []struct {
@@ -454,8 +407,7 @@ func TestEmbeddedThemes_AllParseWithAllFieldsSet(t *testing.T) {
 
 			for _, f := range colorFields {
 				if colorsEqual(f.got, zeroColor) {
-					// Also accept if it matches the default (partial theme that inherits).
-					// For embedded built-in themes, every field should be explicitly set.
+					// Embedded built-in themes set every field explicitly.
 					_ = def
 					t.Errorf("%s: field %s is zero/empty", name, f.fieldName)
 				}
@@ -463,10 +415,6 @@ func TestEmbeddedThemes_AllParseWithAllFieldsSet(t *testing.T) {
 		})
 	}
 }
-
-// ===========================================================================
-// T020 — Applying dracula theme updates key composed styles vs DefaultTheme
-// ===========================================================================
 
 func TestApplyTheme_DraculaUpdatesComposedStyles(t *testing.T) {
 	original := styles.DefaultTheme()
@@ -484,7 +432,6 @@ func TestApplyTheme_DraculaUpdatesComposedStyles(t *testing.T) {
 
 	styles.ApplyTheme(dracula)
 
-	// RowSelected background must differ from DefaultTheme's RowSelectedBg.
 	rowBg := styles.RowSelected.GetBackground()
 	if colorsEqual(rowBg, original.RowSelectedBg) {
 		t.Errorf("RowSelected background unchanged after applying dracula theme")
@@ -493,7 +440,6 @@ func TestApplyTheme_DraculaUpdatesComposedStyles(t *testing.T) {
 		t.Errorf("RowSelected background: expected dracula RowSelectedBg %v, got %v", dracula.RowSelectedBg, rowBg)
 	}
 
-	// TableHeader foreground must differ from DefaultTheme's Accent.
 	headerFg := styles.TableHeader.GetForeground()
 	if colorsEqual(headerFg, original.Accent) {
 		t.Errorf("TableHeader foreground unchanged after applying dracula theme")
@@ -502,7 +448,6 @@ func TestApplyTheme_DraculaUpdatesComposedStyles(t *testing.T) {
 		t.Errorf("TableHeader foreground: expected dracula Accent %v, got %v", dracula.Accent, headerFg)
 	}
 
-	// FlashError foreground must differ from DefaultTheme's Error.
 	errFg := styles.FlashError.GetForeground()
 	if colorsEqual(errFg, original.Error) {
 		t.Errorf("FlashError foreground unchanged after applying dracula theme")
@@ -512,14 +457,9 @@ func TestApplyTheme_DraculaUpdatesComposedStyles(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T021 — EnsureThemesDir writes missing files, skips existing ones
-// ===========================================================================
-
 func TestEnsureThemesDir_WritesMissingSkipsExisting(t *testing.T) {
 	dir := t.TempDir()
 
-	// First call: all files should be written.
 	if err := themes.EnsureThemesDir(dir); err != nil {
 		t.Fatalf("EnsureThemesDir (first call): %v", err)
 	}
@@ -539,7 +479,6 @@ func TestEnsureThemesDir_WritesMissingSkipsExisting(t *testing.T) {
 		}
 	}
 
-	// Modify one file.
 	if len(yamlNames) == 0 {
 		t.Skip("no embedded themes to test")
 	}
@@ -550,7 +489,6 @@ func TestEnsureThemesDir_WritesMissingSkipsExisting(t *testing.T) {
 		t.Fatalf("writing modified content: %v", err)
 	}
 
-	// Second call: modified file must NOT be overwritten.
 	if err := themes.EnsureThemesDir(dir); err != nil {
 		t.Fatalf("EnsureThemesDir (second call): %v", err)
 	}
@@ -564,14 +502,9 @@ func TestEnsureThemesDir_WritesMissingSkipsExisting(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T022 — EnsureThemesDir preserves exact byte contents of existing files
-// ===========================================================================
-
 func TestEnsureThemesDir_PreservesExactBytes(t *testing.T) {
 	dir := t.TempDir()
 
-	// Pre-populate with custom content for every theme file.
 	entries, _ := themes.FS.ReadDir(".")
 	type fileCheck struct {
 		name    string
@@ -589,7 +522,6 @@ func TestEnsureThemesDir_PreservesExactBytes(t *testing.T) {
 		checks = append(checks, fileCheck{e.Name(), custom})
 	}
 
-	// EnsureThemesDir must not touch any pre-existing files.
 	if err := themes.EnsureThemesDir(dir); err != nil {
 		t.Fatalf("EnsureThemesDir: %v", err)
 	}
@@ -605,10 +537,6 @@ func TestEnsureThemesDir_PreservesExactBytes(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// T032 — ApplyTheme with NO_COLOR=1 produces monochrome styles
-// ===========================================================================
 
 func TestApplyTheme_WithNoColorSet_ProducesMonochrome(t *testing.T) {
 	original := styles.DefaultTheme()
@@ -626,7 +554,6 @@ func TestApplyTheme_WithNoColorSet_ProducesMonochrome(t *testing.T) {
 
 	styles.ApplyTheme(nonDefault)
 
-	// In NO_COLOR mode, RowSelected must use reverse video (not a background color).
 	zeroCol := lipgloss.NoColor{}
 	rowBg := styles.RowSelected.GetBackground()
 	if !colorsEqual(rowBg, zeroCol) {
@@ -636,16 +563,11 @@ func TestApplyTheme_WithNoColorSet_ProducesMonochrome(t *testing.T) {
 		t.Errorf("RowSelected.GetReverse(): expected true in NO_COLOR mode, got false")
 	}
 
-	// TableHeader must be zero-value (no foreground).
 	headerFg := styles.TableHeader.GetForeground()
 	if !colorsEqual(headerFg, zeroCol) {
 		t.Errorf("TableHeader.GetForeground(): expected no color in NO_COLOR mode, got %v", headerFg)
 	}
 }
-
-// ===========================================================================
-// T033 — ApplyTheme with NO_COLOR="" (empty) still produces monochrome
-// ===========================================================================
 
 func TestApplyTheme_WithNoColorEmpty_ProducesMonochrome(t *testing.T) {
 	original := styles.DefaultTheme()
@@ -663,7 +585,6 @@ func TestApplyTheme_WithNoColorEmpty_ProducesMonochrome(t *testing.T) {
 
 	styles.ApplyTheme(nonDefault)
 
-	// RowSelected must use reverse video.
 	zeroCol := lipgloss.NoColor{}
 	rowBg := styles.RowSelected.GetBackground()
 	if !colorsEqual(rowBg, zeroCol) {
@@ -673,20 +594,13 @@ func TestApplyTheme_WithNoColorEmpty_ProducesMonochrome(t *testing.T) {
 		t.Errorf("RowSelected.GetReverse(): expected true in NO_COLOR='' mode, got false")
 	}
 
-	// TableHeader must be zero-value.
 	headerFg := styles.TableHeader.GetForeground()
 	if !colorsEqual(headerFg, zeroCol) {
 		t.Errorf("TableHeader.GetForeground(): expected no color in NO_COLOR='' mode, got %v", headerFg)
 	}
 }
 
-// ===========================================================================
-// T057 — defaultActiveTheme: "tokyo-night.yaml" is marked current in selector
-// ===========================================================================
-
 func TestDefaultActiveTheme_TokyoNightMarkedCurrent(t *testing.T) {
-	// views.NewTheme/View are DEAD per specs/022-codebase-cleanup/wave3-map-text.md;
-	// retargeted onto NewTransientSelector + app.SelectorBody + RenderSelector.
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
 	body := app.SelectorBody{
 		Items:      themeFiles,

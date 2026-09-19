@@ -1,13 +1,13 @@
 package unit
 
-// qa_cache_issues_test.go — cache TypeFile round-trip with issue count
+// Cache TypeFile round-trip with issue count
 // fields.
 //
 // cache.TypeFile carries Issues int, IssuesTruncated bool, and IssuesKnown
 // bool fields, and they survive a YAML marshal/unmarshal round-trip —
 // including the tri-state where IssuesKnown=true, Issues=0 distinguishes
 // "probed and found zero issues" from "not yet probed"
-// (docs/design/cache-requirements.md C7).
+// (docs/design/cache-requirements.md).
 
 import (
 	"testing"
@@ -16,10 +16,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/cache"
 )
-
-// ---------------------------------------------------------------------------
-// TestCacheTypeFileIssueFields
-// ---------------------------------------------------------------------------
 
 // TestCacheTypeFileIssueFields verifies that Issues=3, IssuesKnown=true, and
 // IssuesTruncated=false survive a YAML marshal/unmarshal round-trip.
@@ -70,10 +66,6 @@ func TestCacheTypeFileIssueFields(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// TestCacheTypeFileIssueFieldsZeroKnown
-// ---------------------------------------------------------------------------
-
 // TestCacheTypeFileIssueFieldsZeroKnown verifies that Issues=0 with
 // IssuesKnown=true survives a YAML round-trip — this is the critical
 // tri-state case that distinguishes "probed and found zero issues" from
@@ -113,16 +105,11 @@ func TestCacheTypeFileIssueFieldsZeroKnown(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// TestCacheTypeFileIssueFieldsAbsent
-// ---------------------------------------------------------------------------
-
 // TestCacheTypeFileIssueFieldsAbsent verifies that when an old-format
 // per-type YAML file (without issue fields) is unmarshalled, Issues=0 and
 // IssuesKnown=false — meaning "unknown/not probed", not "probed and
 // healthy".
 func TestCacheTypeFileIssueFieldsAbsent(t *testing.T) {
-	// Simulate an old per-type cache file that has no issue fields.
 	oldCacheYAML := `version: 1
 has_resources: true
 count: 7
@@ -162,10 +149,6 @@ count: 7
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// TestCacheTypeFileIssuesTruncatedRoundTrip
-// ---------------------------------------------------------------------------
 
 // TestCacheTypeFileIssuesTruncatedRoundTrip verifies the truncated case
 // where the issue count is a lower bound (from a partial first page).

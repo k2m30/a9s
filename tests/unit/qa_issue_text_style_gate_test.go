@@ -1,4 +1,4 @@
-// qa_issue_text_style_gate_test.go — the machine-style
+// The machine-style
 // gate: no raw AWS enum / UPPER_SNAKE token may appear in a user-facing
 // cause text. AWS SDK enums come back as either UPPER_SNAKE_CASE
 // ("CREATE_FAILED") or PascalCase ("PendingConfirmation"); domain.HumanizeStatusPhrase
@@ -40,9 +40,9 @@
 //     via knownAcronymExemptions (e.g. "ARN", "VPC", "TLS", "WAF", "DNS", "SSL", "IAM", "KMS", "SG", "AMI",
 //     "CIS" — column *titles* and abbreviations that are conventional
 //     industry shorthand, not verbose enum text an operator must decode).
-//     This list is intentionally narrow: it exempts short, universally
-//     recognized acronyms display elsewhere in this codebase (column
-//     titles, spec doc language), not every all-caps word.
+//     This list is narrow: it exempts short, universally recognized
+//     acronyms displayed elsewhere in this codebase (column titles, docs),
+//     not every all-caps word.
 package unit_test
 
 import (
@@ -73,12 +73,11 @@ var rawEnumTokenPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
 // knownAcronymExemptions are short, industry-standard acronyms and service
 // names that legitimately appear in user-facing text uppercase (column
-// titles, spec prose, compliance control IDs, AWS service names embedded in
+// titles, docs prose, compliance control IDs, AWS service names embedded in
 // a sentence) and are not raw AWS enum leakage — an operator reads "ARN",
 // "VPC", or "AWS" the same way regardless of case; there is no "humanized"
-// form to convert them to. Kept intentionally small and reviewed per
-// addition: this is an allowlist of conventional shorthand a human author
-// chose deliberately, not a general escape hatch for verbose enums.
+// form to convert them to. An allowlist of conventional shorthand a human
+// author chose, not a general escape hatch for verbose enums.
 var knownAcronymExemptions = map[string]bool{
 	"ARN": true, "ARNS": true, "VPC": true, "TLS": true, "SSL": true, "DNS": true,
 	"WAF": true, "IAM": true, "KMS": true, "SG": true, "AMI": true,
@@ -116,12 +115,11 @@ var knownAcronymExemptions = map[string]bool{
 // an enum a developer chose to leave un-humanized.
 var awsAccessKeyIDPattern = regexp.MustCompile(`^A(KIA|SIA)[A-Z0-9]{12,}$`)
 
-// styleGateAllowlist lists known style violations — same burn-down contract
-// as knownVisibilityGaps in qa_issue_visibility_gate_test.go:
-//   - present + still violating today            -> skip (logged), pre-existing debt.
-//   - present + no longer violating               -> FAIL ("remove from allowlist").
-//   - a violation NOT present here                -> FAIL unconditionally, a new
-//     regression the allowlist was never told about.
+// styleGateAllowlist lists known style violations — same ratchet as
+// knownVisibilityGaps in qa_issue_visibility_gate_test.go:
+//   - present and still violating -> skip (logged).
+//   - present and not violating   -> FAIL ("remove from allowlist").
+//   - a violation not present here -> FAIL.
 //
 // Key shape for the catalog sweep: "phrase:<shortName>:<FindingCode>".
 // Key shape for the rendered sweep: "rendered:<shortName>:<resourceID>:<surface>"
@@ -225,8 +223,8 @@ func findRawEnumViolations(text, resourceID, resourceName string) []string {
 
 // TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum sweeps every registered
 // FindingDef.Phrase across every resource type and asserts it contains no
-// raw AWS enum token. This is the declarative-literal half of the OWNER
-// RULE: a FindingDef.Phrase is hand-authored, so a violation here is always
+// raw AWS enum token. This is the declarative-literal half of the
+// rule: a FindingDef.Phrase is hand-authored, so a violation here is always
 // a straightforward literal fix (e.g. `Phrase: "ALARM"` -> `Phrase: "alarm
 // triggered"`), never a rendering-pipeline gap.
 func TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum(t *testing.T) {
@@ -426,8 +424,7 @@ func detailAttentionValuesFor(t *testing.T, res resource.Resource, shortName str
 // "EC2LaunchTemplateVersionMismatch,AutoScalingGroupInvalidConfiguration" via
 // Fields["health_issues"] — see core/aws/sg.go computeSGRiskFields and
 // core/aws/ng.go's issueCodes join). Unlike the Status/Attention gates,
-// a plain column has no domain.HumanizeStatusPhrase chokepoint at all today —
-// this is new coverage, not a re-check of an existing conversion point.
+// a plain column has no domain.HumanizeStatusPhrase chokepoint.
 // ---------------------------------------------------------------------------
 
 // wholeCellUpperSnakePattern matches a full cell value shaped like a raw
@@ -579,12 +576,11 @@ func findWholeCellEnumViolation(cell, resourceID, resourceName string, col app.C
 	return false
 }
 
-// cellStyleGateAllowlist pins today's known whole-cell raw-enum violations
-// for the rendered-cell sweep below — same burn-down contract as
-// styleGateAllowlist/knownVisibilityGaps: present + still violating -> skip
-// (known debt); present + no longer violating -> FAIL ("remove from
-// allowlist"); a violation NOT present here -> FAIL unconditionally (a new
-// regression the allowlist was never told about).
+// cellStyleGateAllowlist lists whole-cell raw-enum violations for the
+// rendered-cell sweep below — same ratchet as
+// styleGateAllowlist/knownVisibilityGaps: present and violating -> skip
+// (logged); present and not violating -> FAIL ("remove from allowlist"); a
+// violation not present here -> FAIL.
 //
 // Key shape: "<shortName>:<resourceID>:<columnTitle>".
 //
@@ -697,7 +693,7 @@ func checkCellStyleGate(
 //
 // A cause text that is ITSELF just the bare word "error", "warning", or
 // "issue" tells the operator nothing they didn't already know from the row's
-// color — the whole point of a cause text (S4 phrase / status cell /
+// color — the whole point of a cause text (phrase / status cell /
 // Attention row) is to say WHY, not to restate THAT something is wrong.
 // "error: volume unusable" passes (it says why); a bare "error" does not.
 // This is a WHOLE-STRING exact-match check (case-insensitive), not a
@@ -722,21 +718,16 @@ func isVacuousPhrase(text string) bool {
 }
 
 // vacuousPhraseAllowlist lists known vacuous-phrase violations — same
-// burn-down contract as styleGateAllowlist/knownVisibilityGaps: present +
-// still violating today -> skip (pre-existing debt); present + no longer
-// violating -> FAIL ("remove from allowlist"); a violation NOT present here
-// -> FAIL unconditionally (a new regression the allowlist was never told
-// about).
+// ratchet as styleGateAllowlist/knownVisibilityGaps: present and violating ->
+// skip (logged); present and not violating -> FAIL ("remove from
+// allowlist"); a violation not present here -> FAIL.
 //
 // Key shape for the catalog sweep: "phrase:<shortName>:<FindingCode>".
 // Key shape for the rendered sweep: "rendered:<shortName>:<resourceID>:<surface>"
 // where surface is "list-status" or "detail-attention[N]".
 //
 // Target: EMPTY. Any entry names a concrete production literal to fix; it
-// is not a permanent exemption. ct-events phrases
-// (ct-danger/ct-attention/ct-info status values) are NOT bare vacuous words
-// (they carry the "ct-" event-classification prefix, not a standalone
-// severity word), so this gate is green against them without an entry.
+// is not a permanent exemption.
 var vacuousPhraseAllowlist = map[string]string{ //nolint:gochecknoglobals // burn-down allowlist, see doc comment
 	"phrase:ebs:ebs.state.error":                             "colorEBS's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"error: volume unusable\").",
 	"phrase:ebs-snap:ebs-snap.state.error":                   "colorEBSSnap's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",

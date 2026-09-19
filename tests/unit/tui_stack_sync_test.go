@@ -1,24 +1,17 @@
-// tui_stack_sync_test.go — parity pins for the rendererState / controller
-// stack-sync convergence.
-//
-// The TUI keeps its own rendererState stack (m.stack, unexported) alongside
-// the headless app.Controller's own screen stack (m.ctrl, unexported). This
-// file hardens the invariant that the two never diverge in DEPTH or SCREEN
-// IDENTITY across every push/pop site (pushScreen, popRS/popRSOnly/
-// popRSWithCtrlPop, and the applyIntents/applyIntent PushScreen/PopScreen/
-// PopSelectorIntent cases).
+// The TUI's rendererState stack (m.stack) and the
+// headless app.Controller's screen stack (m.ctrl) never diverge in DEPTH or
+// SCREEN IDENTITY across every push/pop site (pushScreen,
+// popRS/popRSOnly/popRSWithCtrlPop, and the applyIntents/applyIntent
+// PushScreen/PopScreen/PopSelectorIntent cases).
 //
 // Oracle: internal/tui/app_stack_invariant.go's exported Model.StackInSync()
-// (backed by core/app/snapshot.go's Controller.ScreenIDs()) is the
-// debug-buildable invariant check — asserted after EVERY step below.
-// StackInSync groups some ScreenIDs under one rsKind (list: ScreenResourceList
-// or ScreenChildList; text: ScreenYAML or ScreenJSON; selector: any of the
-// three selector flavors), so a kind-swap within one of those groups (e.g.
-// YAML rendererState paired with a controller ScreenJSON) would NOT trip
-// StackInSync alone. Each test therefore ALSO asserts on rendered View()
-// content (frame title / body markers) to catch that narrower class of
-// desync, matching the harness precedent in tui_detail_parity_test.go /
-// qa_root_command_test.go.
+// (backed by core/app/snapshot.go's Controller.ScreenIDs()), asserted after
+// EVERY step. StackInSync groups some ScreenIDs under one rsKind (list:
+// ScreenResourceList or ScreenChildList; text: ScreenYAML or ScreenJSON;
+// selector: any of the three selector flavors), so a kind-swap within one of
+// those groups (e.g. YAML rendererState paired with a controller ScreenJSON)
+// would not trip StackInSync alone. Each test therefore also asserts on
+// rendered View() content (frame title / body markers).
 package unit
 
 import (
@@ -56,10 +49,6 @@ func stackSyncFirstNonEmptyContaining(s, substr string) string {
 	return ""
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 1. StackSync_NavigationRoundTrip
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestStackSync_NavigationRoundTrip drives menu -> list -> detail -> yaml ->
 // esc -> esc -> esc back to menu, asserting StackInSync() AND rendered
 // content correctness after EVERY step.
@@ -67,14 +56,12 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
-	// Step 0: main menu.
 	assertStackInSync(t, m, "step 0 (menu)")
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Fatalf("step 0 (menu): expected 'resource-types' in view, got:\n%s", plain)
 	}
 
-	// Step 1: menu -> list (ec2).
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -88,7 +75,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 1 (list): expected 'ec2' frame/content, got:\n%s", plain)
 	}
 
-	// Step 2: list -> detail.
 	res := &resource.Resource{
 		ID:   "i-stacksync01",
 		Name: "stacksync-instance",
@@ -109,7 +95,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 2 (detail): expected resource id/name in view, got:\n%s", plain)
 	}
 
-	// Step 3: detail -> yaml.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetYAML,
 		Resource:     res,
@@ -121,7 +106,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 3 (yaml): expected 'yaml' in frame title, got:\n%s", plain)
 	}
 
-	// Step 4: esc -> back to detail.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	assertStackInSync(t, m, "step 4 (esc->detail)")
 	plain = stripANSI(rootViewContent(m))
@@ -136,7 +120,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 4 (esc->detail): expected resource id/name back in view, got:\n%s", plain)
 	}
 
-	// Step 5: esc -> back to list.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	assertStackInSync(t, m, "step 5 (esc->list)")
 	plain = stripANSI(rootViewContent(m))
@@ -144,7 +127,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 5 (esc->list): stale detail content still present:\n%s", plain)
 	}
 
-	// Step 6: esc -> back to menu.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	assertStackInSync(t, m, "step 6 (esc->menu)")
 	plain = stripANSI(rootViewContent(m))
@@ -152,10 +134,6 @@ func TestStackSync_NavigationRoundTrip(t *testing.T) {
 		t.Errorf("step 6 (esc->menu): expected 'resource-types' back in view, got:\n%s", plain)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// 2. StackSync_SelectorFlow
-// ─────────────────────────────────────────────────────────────────────────
 
 // TestStackSync_SelectorFlow drives: open profile selector, esc-dismiss (back
 // to menu); open theme selector, confirm via the real
@@ -196,7 +174,6 @@ func TestStackSync_SelectorFlow(t *testing.T) {
 		t.Fatalf("baseline: expected main menu, got:\n%s", baseline)
 	}
 
-	// --- Profile selector: open then esc-dismiss. ---
 	var fetchCmd tea.Cmd
 	m, fetchCmd = rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 	if fetchCmd == nil {
@@ -224,9 +201,7 @@ func TestStackSync_SelectorFlow(t *testing.T) {
 		t.Errorf("after esc-dismiss of profile selector: expected main menu, got:\n%s", plain)
 	}
 
-	// --- Theme selector: open, then confirm via ThemeSelected -> ThemeFileRead
-	// (the real PopSelectorIntent-emitting success path). ---
-	// ':theme' + Enter (like ':root' in qa_root_command_test.go) executes
+	// ':theme' + Enter executes
 	// command mode and returns a cmd producing messages.Navigate{TargetTheme}
 	// — it does not push the selector synchronously in the same Update call,
 	// so the returned cmd must be executed and fed back.
@@ -274,16 +249,11 @@ func TestStackSync_SelectorFlow(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 3. StackSync_ChildListFlow
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestStackSync_ChildListFlow drives an S3-objects-style EnterChildView
-// (ChildListPayload resolution) and backs out via esc, pinning the wave-1
-// ChildListPayload fix: the pushed child-list rendererState must show child
-// resources (not vanish into a nil/empty ListState), StackInSync() must hold
-// at every step, and esc must return to the parent bucket list with the
-// parent's content restored, not skip a level.
+// (ChildListPayload resolution) and backs out via esc: the pushed child-list
+// rendererState shows child resources (not a nil/empty ListState),
+// StackInSync() holds at every step, and esc returns to the parent bucket
+// list with the parent's content restored, not skipping a level.
 func TestStackSync_ChildListFlow(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
@@ -353,10 +323,6 @@ func TestStackSync_ChildListFlow(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 4. StackSync_DoublePopGuard
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestStackSync_DoublePopGuard crafts the scenario the double-pop guard in
 // internal/tui/runtime_adapter.go's applyIntent (singular) PopSelectorIntent
 // case exists to protect: a selector rendererState sits ctrlBacked on top of
@@ -420,7 +386,7 @@ func TestStackSync_DoublePopGuard(t *testing.T) {
 	}
 
 	// Open the theme selector ON TOP of detail (4 levels deep: menu, list,
-	// detail, selector) via ':theme' + Enter, mirroring StackSync_SelectorFlow.
+	// detail, selector) via ':theme' + Enter.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: ":"})
 	for _, ch := range "theme" {
 		m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: string(ch)})

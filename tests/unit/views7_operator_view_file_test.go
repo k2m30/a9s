@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_operator_view_file_test.go — the file an operator edited.
+// The file an operator edited.
 //
 // A view file is the one thing in a9s a person is invited to change, and the
 // two ways they change a status column are renaming it and writing a key by
@@ -145,10 +145,8 @@ detail:
 // place a9s asks a person to edit — so the load says which file and which key,
 // once, and keeps the rest of their file.
 //
-// The channel is config.Load's error, which the TUI already turns into a
-// flash ("Config error: ... (using defaults)", internal/tui/app.go:214) and
-// which is the only report a view file has today. If dev routes it somewhere
-// else that reaches the operator, the assertion moves with it.
+// The channel is config.Load's error, which the TUI turns into a flash
+// ("Config error: ... (using defaults)").
 func TestUnknownColumnKeyIsReportedAtLoad(t *testing.T) {
 	const unknownKey = "att_stats"
 	dir := t.TempDir()

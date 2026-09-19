@@ -11,23 +11,17 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
-// ===========================================================================
-// EKS Clusters — List View
-// ===========================================================================
-
 // TestQA_EKS_ListColumns verifies the EKS cluster list displays all expected
 // columns: Cluster Name, Version, Status, Endpoint, Platform Version.
 func TestQA_EKS_ListColumns(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to EKS resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
-	// Load EKS fixture data
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
@@ -36,7 +30,6 @@ func TestQA_EKS_ListColumns(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Verify column headers are present
 	expectedHeaders := []string{"Cluster Name", "Version", "Status"}
 	for _, hdr := range expectedHeaders {
 		if !strings.Contains(plain, hdr) {
@@ -52,7 +45,7 @@ func TestQA_EKS_ListColumns(t *testing.T) {
 	// for fixture-only resources.
 	//
 	// Status is a Key-based status column (Key:"status") — per list_columns.go's
-	// isStatusCol chokepoint (11933a6f), Fields["status"] is routed through
+	// isStatusCol, Fields["status"] is routed through
 	// domain.HumanizeStatusPhrase before reaching the cell, so the raw AWS enum
 	// "ACTIVE" renders as "active".
 	if !strings.Contains(plain, "1.31") {
@@ -112,7 +105,6 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 	activeStyle := styles.ColorStyle(eksTd.Color(activeRes))
 	rendered := activeStyle.Render("ACTIVE row content")
 
-	// The rendered text should contain ANSI color codes (non-empty styling applied)
 	if rendered == "ACTIVE row content" {
 		t.Error("ACTIVE status should apply color styling, but got unstyled output")
 	}
@@ -152,17 +144,12 @@ func TestQA_EKS_FrameTitle(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// EKS Clusters — Detail View
-// ===========================================================================
-
 // TestQA_EKS_DetailView verifies pressing Enter on an EKS cluster opens
 // the detail view with the cluster name in the frame title.
 func TestQA_EKS_DetailView(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to EKS
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
@@ -174,7 +161,6 @@ func TestQA_EKS_DetailView(t *testing.T) {
 		Resources:    clusters,
 	})
 
-	// Navigate to detail view via NavigateMsg
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
@@ -201,7 +187,6 @@ func TestQA_EKS_DetailViewFields(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Check that key field values are rendered
 	expectedValues := []string{"test-cluster-1", "1.31", "ACTIVE", "eks.52"}
 	for _, val := range expectedValues {
 		if !strings.Contains(plain, val) {
@@ -209,10 +194,6 @@ func TestQA_EKS_DetailViewFields(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// EKS Clusters — YAML View
-// ===========================================================================
 
 // TestQA_EKS_YAMLView verifies pressing y on an EKS cluster opens the
 // YAML view with "yaml" in the frame title.
@@ -250,7 +231,6 @@ func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// YAML view should contain field keys from the Fields map
 	if !strings.Contains(plain, "cluster_name") {
 		t.Errorf("YAML view should contain 'cluster_name' key, got: %s", plain)
 	}
@@ -259,23 +239,17 @@ func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Secrets Manager — List View
-// ===========================================================================
-
 // TestQA_Secrets_ListColumns verifies the Secrets Manager list displays all
 // expected columns: Secret Name, Description, Last Accessed, Last Changed, Rotation.
 func TestQA_Secrets_ListColumns(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to Secrets Manager resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
-	// Load Secrets fixture data
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
@@ -284,7 +258,6 @@ func TestQA_Secrets_ListColumns(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Verify column headers are present
 	expectedHeaders := []string{"Secret Name", "Description"}
 	for _, hdr := range expectedHeaders {
 		if !strings.Contains(plain, hdr) {
@@ -366,17 +339,12 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Secrets Manager — Reveal (x key)
-// ===========================================================================
-
 // TestQA_Secrets_XKeyTriggersReveal verifies that pressing x on the secrets
 // resource list produces a command (fetching the secret value).
 func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to Secrets Manager
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -388,7 +356,6 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 		Resources:    secrets,
 	})
 
-	// Press x to trigger reveal
 	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
 
 	// The x key should return a command (fetchRevealValue)
@@ -403,7 +370,6 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to EC2 resource list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -417,7 +383,6 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 
 	contentBefore := rootViewContent(m)
 
-	// Press x — should do nothing
 	m, cmd := rootApplyMsg(m, rootKeyPress("x"))
 
 	contentAfter := rootViewContent(m)
@@ -550,17 +515,12 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Secrets Manager — Reveal View
-// ===========================================================================
-
 // TestQA_Secrets_RevealViewShowsSecretValue verifies that the reveal view
 // displays the secret value after receiving ValueRevealedMsg.
 func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to secrets list first
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -581,12 +541,10 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// The reveal view should show the secret value
 	if !strings.Contains(plain, "super-secret-password-123") {
 		t.Errorf("reveal view should contain the secret value, got: %s", plain)
 	}
 
-	// The frame title should show the secret name
 	if !strings.Contains(plain, "test/integration") {
 		t.Errorf("reveal view frame title should contain the secret name, got: %s", plain)
 	}
@@ -598,7 +556,6 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to secrets list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -610,7 +567,6 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 		Resources:    secrets,
 	})
 
-	// Trigger reveal
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
@@ -619,7 +575,6 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Header should show the warning text (with em dash)
 	if !strings.Contains(plain, "Secret visible") {
 		t.Errorf("reveal header should contain 'Secret visible', got: %s", plain)
 	}
@@ -627,7 +582,6 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 		t.Errorf("reveal header should contain 'press esc to close', got: %s", plain)
 	}
 
-	// The normal "? for help" should NOT be present while reveal is active
 	if strings.Contains(plain, "? for help") {
 		t.Error("reveal view should replace '? for help' with warning text")
 	}
@@ -639,7 +593,6 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to secrets list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -651,14 +604,12 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 		Resources:    secrets,
 	})
 
-	// Open reveal view
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "copy-me-secret",
 	})
 
-	// Press c to copy
 	_, cmd := rootApplyMsg(m, rootKeyPress("c"))
 
 	if cmd == nil {
@@ -672,7 +623,6 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to secrets list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -684,44 +634,33 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 		Resources:    secrets, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Open reveal view
-
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "my-secret-value",
 	})
 
-	// Verify we are in reveal view (warning text present)
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Secret visible") {
 		t.Fatal("should be in reveal view before pressing Escape")
 	}
 
-	// Press Escape
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain = stripANSI(rootViewContent(m))
 
-	// Should be back at secrets list
 	if !strings.Contains(plain, "secrets(5") {
 		t.Errorf("after Escape from reveal, should return to secrets list with 'secrets(5)', got: %s", plain)
 	}
 
-	// The warning should be gone
 	if strings.Contains(plain, "Secret visible") {
 		t.Error("after Escape from reveal, the warning text should be gone")
 	}
 
-	// The "? for help" hint should be back
 	if !strings.Contains(plain, "? for help") {
 		t.Errorf("after Escape from reveal, '? for help' should be restored, got: %s", plain)
 	}
 }
-
-// ===========================================================================
-// Secrets Manager — Detail and YAML Views
-// ===========================================================================
 
 // TestQA_Secrets_DetailView verifies the detail view shows secret metadata.
 func TestQA_Secrets_DetailView(t *testing.T) {
@@ -736,12 +675,10 @@ func TestQA_Secrets_DetailView(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Frame title should show the secret name
 	if !strings.Contains(plain, "test/integration") {
 		t.Errorf("detail view frame title should contain secret name, got: %s", plain)
 	}
 
-	// Detail view should render field values
 	if !strings.Contains(plain, "2025-12-08") {
 		t.Errorf("detail view should contain last_accessed date, got: %s", plain)
 	}
@@ -782,15 +719,10 @@ func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// YAML view should contain field keys
 	if !strings.Contains(plain, "secret_name") {
 		t.Errorf("YAML view should contain 'secret_name' key, got: %s", plain)
 	}
 }
-
-// ===========================================================================
-// Secrets Manager — Reveal on non-list views
-// ===========================================================================
 
 // TestQA_Secrets_XKeyDoesNothingOnMainMenu verifies that pressing x on the
 // main menu does nothing (handleReveal checks for resourceList != nil).
@@ -812,10 +744,6 @@ func TestQA_Secrets_XKeyDoesNothingOnMainMenu(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// EKS — Escape Navigation
-// ===========================================================================
-
 // TestQA_EKS_EscapeFromDetailReturnsToList verifies pressing Escape on the
 // detail view pops back to the EKS list.
 func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
@@ -833,14 +761,11 @@ func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Push detail view
-
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
 	})
 
-	// Press Escape
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain := stripANSI(rootViewContent(m))
@@ -867,14 +792,11 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 		Resources:    clusters, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Push YAML view
-
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &clusters[0],
 	})
 
-	// Press Escape
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	plain := stripANSI(rootViewContent(m))
@@ -884,18 +806,12 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// SSM Parameter — Reveal (x key) — #104
-// ===========================================================================
-
 // TestQA_SSM_XKeyTriggersReveal verifies that pressing x on the SSM parameter
 // list returns a non-nil command (to fetch the parameter value).
-// Before #104 this returned nil because only "secrets" was wired.
 func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to SSM resource list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
@@ -907,10 +823,8 @@ func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 		Resources:    params,
 	})
 
-	// Press x to trigger reveal.
 	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
 
-	// After #104 the x key must produce a command — previously it returned nil.
 	if cmd == nil {
 		t.Error("pressing 'x' on SSM parameter list should return a command to fetch the parameter value")
 	}
@@ -923,7 +837,6 @@ func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	// Navigate to SSM parameter list first.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
@@ -935,7 +848,6 @@ func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 		Resources:    params,
 	})
 
-	// Simulate receiving the parameter value via the generalised message.
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "ssm",
 		ResourceID:   "/app/db/password",
@@ -944,12 +856,10 @@ func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// The reveal view must show the parameter value.
 	if !strings.Contains(plain, "s3cr3t-db-pass!") {
 		t.Errorf("reveal view should contain the parameter value, got: %s", plain)
 	}
 
-	// The frame title or body should reference the parameter name.
 	if !strings.Contains(plain, "/app/db/password") {
 		t.Errorf("reveal view should contain the parameter name, got: %s", plain)
 	}

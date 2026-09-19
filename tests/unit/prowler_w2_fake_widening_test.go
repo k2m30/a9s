@@ -1,15 +1,14 @@
 package unit
 
-// prowler_w2_fake_widening_test.go — posture-neutral stubs that keep the
-// pre-existing fakes satisfying the aggregate interfaces the w2 Prowler batch
-// widened (S3API/S3FullAPI gained the five bucket-posture reads, RDSAPI and
-// DocDBAPI gained the snapshot attribute read, RedshiftAPI gained the cluster
-// parameter read), and the bucket ACL read S3API gained after it.
+// Posture-neutral stubs that let fakes built for other tests satisfy the
+// aggregate interfaces: the S3API/S3FullAPI bucket-posture and ACL reads, the
+// RDSAPI and DocDBAPI snapshot attribute read, and the RedshiftAPI cluster
+// parameter read.
 //
 // Every stub answers the healthy value for its condition, so the fakes that
-// carry them keep producing exactly the findings their own tests were written
-// to assert. A stub that returned a misconfigured value would silently add a
-// finding to fixtures those tests believe are clean.
+// carry them keep producing exactly the findings their own tests assert. A
+// stub that returned a misconfigured value would silently add a finding to
+// fixtures those tests believe are clean.
 
 import (
 	"context"
@@ -28,10 +27,6 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smithy "github.com/aws/smithy-go"
 )
-
-// ---------------------------------------------------------------------------
-// healthy answers, shared by every S3 stub below
-// ---------------------------------------------------------------------------
 
 func w2HealthyPolicyStatus() *s3.GetBucketPolicyStatusOutput {
 	return &s3.GetBucketPolicyStatusOutput{PolicyStatus: &s3types.PolicyStatus{IsPublic: aws.Bool(false)}}
@@ -94,10 +89,6 @@ func w2RequireSSLOn() *redshift.DescribeClusterParametersOutput {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// s3
-// ---------------------------------------------------------------------------
 
 func (f *coalesceS3Fake) GetBucketPolicyStatus(_ context.Context, _ *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
 	return w2HealthyPolicyStatus(), nil
@@ -189,9 +180,9 @@ func (f *s3TwoDenialsFake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInp
 	return w2HealthyACL(), nil
 }
 
-// The two cross-region fakes deliberately answer the cross-region error on
-// every call, so the enricher's "one redirect marks the bucket unknown and
-// skips the rest" rule is exercised on the new calls too.
+// The two cross-region fakes answer the cross-region error on every call, so
+// the enricher's "one redirect marks the bucket unknown and skips the rest"
+// rule is exercised on the posture calls too.
 func (f *s3CrossRegionFake) GetBucketPolicyStatus(ctx context.Context, in *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
 	if _, err := f.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: in.Bucket}); err != nil {
 		return nil, err
@@ -276,10 +267,6 @@ func (f *fakeS3IllegalLocation) GetBucketAcl(ctx context.Context, in *s3.GetBuck
 	return w2HealthyACL(), nil
 }
 
-// ---------------------------------------------------------------------------
-// rds / docdb / redshift
-// ---------------------------------------------------------------------------
-
 func (m *dbcMaintenanceFake) DescribeDBClusterSnapshotAttributes(_ context.Context, in *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
 	res := w2NoDocDBClusterSnapshotShares()
 	res.DBClusterSnapshotIdentifier = in.DBClusterSnapshotIdentifier
@@ -349,8 +336,8 @@ func (m *fullRDSMock) DescribeDBSnapshotAttributes(_ context.Context, in *rds.De
 	return w2NoSnapshotShares(in), nil
 }
 
-// The dbi maintenance fake predates the engine-version call the enricher now
-// makes; answering "available" keeps its cases about pending maintenance.
+// The dbi enricher also calls DescribeDBEngineVersions; answering "available"
+// keeps the maintenance cases about pending maintenance.
 func (m *dbiMaintenanceFake) DescribeDBEngineVersions(_ context.Context, in *rds.DescribeDBEngineVersionsInput, _ ...func(*rds.Options)) (*rds.DescribeDBEngineVersionsOutput, error) {
 	return w2AvailableEngineVersions(in), nil
 }

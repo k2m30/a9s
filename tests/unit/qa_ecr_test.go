@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ECR Repository fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &mockECRClient{
@@ -57,7 +53,6 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first repo
 	r0 := resources[0]
 	if r0.ID != "my-app" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "my-app", r0.ID)
@@ -66,7 +61,6 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-app", r0.Name)
 	}
 
-	// Verify required fields
 	requiredFields := []string{"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -89,7 +83,6 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"scan_on_push\"]: expected %q, got %q", "true", r0.Fields["scan_on_push"])
 	}
 
-	// Verify second repo (immutable, no scan config)
 	r1 := resources[1]
 	if r1.Fields["tag_mutability"] != "IMMUTABLE" {
 		t.Errorf("resource[1].Fields[\"tag_mutability\"]: expected %q, got %q", "IMMUTABLE", r1.Fields["tag_mutability"])

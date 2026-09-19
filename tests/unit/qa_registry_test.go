@@ -9,10 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Registry unit tests
-// ═══════════════════════════════════════════════════════════════════════════
-
 func TestRegistry_GetFetcher_ReturnsRegisteredFetcher(t *testing.T) {
 	// All types should be registered via init() in the aws package (spot-check 10)
 	types := []string{"s3", "ec2", "dbi", "redis", "dbc", "eks", "secrets", "vpc", "sg", "ng"}
@@ -27,7 +23,6 @@ func TestRegistry_GetFetcher_ReturnsRegisteredFetcher(t *testing.T) {
 }
 
 func TestRegistry_MockFetcher_CanBeCalledAndReturnsResources(t *testing.T) {
-	// Register a temporary test fetcher
 	testResources := []resource.Resource{
 		{ID: "test-1", Name: "Test Resource 1"},
 		{ID: "test-2", Name: "Test Resource 2"},
@@ -80,12 +75,6 @@ func TestRegistry_MockFetcher_CanReturnError(t *testing.T) {
 		t.Errorf("expected 'simulated AWS error', got: %v", err)
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Integration: fetchResources via registry still works for all 7 types
-// (existing qa_fetch_test.go covers this through the model, but we also
-// verify the registry is populated correctly)
-// ═══════════════════════════════════════════════════════════════════════════
 
 func TestRegistry_AllSevenTypes_HaveFetchers(t *testing.T) {
 	allTypes := resource.AllResourceTypes()

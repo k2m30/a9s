@@ -1,7 +1,6 @@
 package unit
 
-// prowler_w1_ebs_snap_test.go — behavioural pins for ebs-snap.public
-// (batch w1).
+// Behavioural pins for ebs-snap.public.
 //
 // A snapshot whose createVolumePermission names the "all" group can be
 // restored into any AWS account, which hands over everything the source
@@ -119,8 +118,7 @@ func TestEBSSnap_Public_RestorableByAnyone(t *testing.T) {
 	res := pw1EnrichEBSSnap(t, fake, pw1EBSCache("vol-0aaaa1111bbbb2222"), pub)
 	pw1RequireFinding(t, res.Findings["snap-0public00aaaaa1"], pw1EBSSnapCodePublic,
 		"shared with all AWS accounts", domain.SevBroken, "wave2")
-	// d4 row 20: the value is a word, not the SDK field's shape. Do not
-	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	// The value is a word, not the SDK field's shape.
 	pw1RequireRow(t, pw1Rows(res, "snap-0public00aaaaa1", pw1EBSSnapCodePublic), "Public", "yes")
 }
 

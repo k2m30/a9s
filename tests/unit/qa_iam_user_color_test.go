@@ -1,6 +1,6 @@
 package unit
 
-// qa_iam_user_color_test.go — Behavioral tests for the iam-user Color function.
+// Behavioral tests for the iam-user Color function.
 //
 // Contract assertions:
 //   - No console access (has_console_password=false) → ColorHealthy.

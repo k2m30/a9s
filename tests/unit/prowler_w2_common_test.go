@@ -1,10 +1,8 @@
 package unit
 
-// prowler_w2_common_test.go — shared assertion helpers for the w2
-// (DATABASES & STORAGE) Prowler gap-closure batch.
+// Shared assertion helpers for the database and storage posture findings.
 //
-// Every helper here pins a contract that holds for all 29 rows of the batch:
-// a finding is identified by its exact Code/Phrase/Severity/Source quadruple,
+// A finding is identified by its exact Code/Phrase/Severity/Source quadruple,
 // carries a non-empty Detail sentence, and is declared as a catalog.FindingDef
 // on its type's literal. Assertions are on literal strings, never on the
 // production constants, so a silent rename of a code or a phrase is caught
@@ -30,9 +28,9 @@ func w2Find(fs []domain.Finding, code string) (domain.Finding, bool) {
 }
 
 // w2AssertFinding pins the full identity of one finding: code, phrase,
-// severity and source must all match, and Detail must carry the S5 operator
-// sentence (rule 1 of the batch contract — an empty Detail leaves the detail
-// view with nothing but the phrase it already shows in the list).
+// severity and source must all match, and Detail must carry the operator
+// sentence — an empty Detail leaves the detail view with nothing but the
+// phrase it already shows in the list.
 func w2AssertFinding(t *testing.T, fs []domain.Finding, code, phrase string, sev domain.Severity, source string) domain.Finding {
 	t.Helper()
 	f, ok := w2Find(fs, code)
@@ -54,8 +52,7 @@ func w2AssertFinding(t *testing.T, fs []domain.Finding, code, phrase string, sev
 	return f
 }
 
-// w2AssertNoCode is the negative half of every row: the healthy counterpart
-// must emit nothing for that code.
+// w2AssertNoCode pins that a healthy resource emits nothing for code.
 func w2AssertNoCode(t *testing.T, fs []domain.Finding, code string) {
 	t.Helper()
 	if f, ok := w2Find(fs, code); ok {

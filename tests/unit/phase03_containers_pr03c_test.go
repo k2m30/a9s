@@ -1,11 +1,10 @@
 package unit_test
 
-// phase03_containers_pr03c_test.go — regression-pin tests for Wave 1 finding
-// migration, covering the 4 container types in PR-03c:
+// Wave 1 findings for the container types
 // ng, ecs, ecs-svc, ecs-task.
 //
-// Migration contract (PR-03c — NOT YET implemented; tests are intentionally RED):
-//   - Fetchers STOP writing Resource.Status for lifecycle states.
+// Contract:
+//   - Fetchers write no Resource.Status for lifecycle states.
 //   - Fetchers EMIT canonical Finding entries (Source: "wave1") for non-healthy
 //     states.
 //   - Each type has a corresponding core/aws/<svc>_codes.go with constants.
@@ -31,8 +30,7 @@ package unit_test
 //     DEPROVISIONING → SevWarn  (transitional)
 //     FAILED         → SevBroken
 //     INACTIVE       → SevBroken (cluster is dead — non-recoverable without
-//                                recreation; Color func currently maps to
-//                                ColorBroken)
+//                                recreation)
 //
 //   ecs-svc:
 //     ACTIVE   → no Finding (healthy)
@@ -42,8 +40,8 @@ package unit_test
 //
 //   ecs-task:
 //     RUNNING      → no Finding (healthy)
-//     STOPPED      → no Finding (lifecycle-terminal; stop_code carries the
-//                    meaningful info; structural Color func reads stop_code)
+//     STOPPED      → SevDim (lifecycle-terminal) with a UserInitiated
+//                    stop_code; stop_code carries the meaningful info
 //     PROVISIONING   → SevWarn  (transitional)
 //     PENDING        → SevWarn  (transitional)
 //     ACTIVATING     → SevWarn  (transitional)
@@ -73,7 +71,7 @@ import (
 // =============================================================================
 
 // TestPR03c_NGCodes_ConstantsExist verifies that ng_codes.go declares the Wave 1
-// finding constants. Fails to compile until the file is created.
+// finding constants.
 func TestPR03c_NGCodes_ConstantsExist(t *testing.T) {
 	var _ domain.FindingCode = awsclient.CodeNGStateCreating
 	var _ domain.FindingCode = awsclient.CodeNGStateUpdating
@@ -84,7 +82,7 @@ func TestPR03c_NGCodes_ConstantsExist(t *testing.T) {
 }
 
 // TestPR03c_NGFetcher_ActiveEmitsNoFinding asserts that an ACTIVE node group
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03c_NGFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	listClustersMock := &pr03cEKSListMock{clusters: []string{"prod-cluster"}}
 	listNGMock := &pr03cEKSListNodegroupsMock{
@@ -288,7 +286,7 @@ func pr03cFetchNodeGroups(ctx context.Context, listClusters *pr03cEKSListMock, l
 // =============================================================================
 
 // TestPR03c_ECSCodes_ConstantsExist verifies that ecs_codes.go declares the Wave 1
-// finding constants. Fails to compile until the file is created.
+// finding constants.
 func TestPR03c_ECSCodes_ConstantsExist(t *testing.T) {
 	var _ domain.FindingCode = awsclient.CodeECSStateProvisioning
 	var _ domain.FindingCode = awsclient.CodeECSStateDeprovisioning
@@ -297,7 +295,7 @@ func TestPR03c_ECSCodes_ConstantsExist(t *testing.T) {
 }
 
 // TestPR03c_ECSFetcher_ActiveEmitsNoFinding asserts that an ACTIVE ECS cluster
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03c_ECSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	listMock := &pr03cECSListClustersMock{
 		arns: []string{"arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"},
@@ -438,14 +436,14 @@ func (m *pr03cECSDescribeClustersMock) DescribeClusters(
 // =============================================================================
 
 // TestPR03c_ECSSvcCodes_ConstantsExist verifies that ecs_svc_codes.go declares
-// the Wave 1 finding constants. Fails to compile until the file is created.
+// the Wave 1 finding constants.
 func TestPR03c_ECSSvcCodes_ConstantsExist(t *testing.T) {
 	var _ domain.FindingCode = awsclient.CodeECSSvcStateInactive
 	var _ domain.FindingCode = awsclient.CodeECSSvcStateDraining
 }
 
 // TestPR03c_ECSSvcFetcher_ActiveEmitsNoFinding asserts that an ACTIVE ECS service
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03c_ECSSvcFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	listClustersMock := &pr03cECSListClustersMock{
 		arns: []string{"arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"},
@@ -485,7 +483,7 @@ func TestPR03c_ECSSvcFetcher_ActiveEmitsNoFinding(t *testing.T) {
 // emits one SevBroken Finding with CodeECSSvcStateInactive.
 //
 // INACTIVE is the terminal state for a deleted service — non-recoverable without
-// recreation. The Color func currently maps INACTIVE → ColorBroken.
+// recreation.
 func TestPR03c_ECSSvcFetcher_BrokenEmitsFinding(t *testing.T) {
 	listClustersMock := &pr03cECSListClustersMock{
 		arns: []string{"arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"},
@@ -606,12 +604,7 @@ func (m *pr03cECSDescribeServicesMock) DescribeServices(
 // =============================================================================
 
 // TestPR03c_ECSTaskCodes_ConstantsExist verifies that ecs_task_codes.go declares
-// the Wave 1 finding constants. Fails to compile until the file is created.
-//
-// NOTE: CodeECSTaskStateStopped is intentionally excluded. STOPPED is a
-// lifecycle-terminal state where the stop_code carries the meaningful information.
-// The structural Color func reads stop_code directly; emitting a wave1 Finding for
-// STOPPED would interfere with that override (same precedent as Lambda Inactive).
+// the Wave 1 finding constants.
 func TestPR03c_ECSTaskCodes_ConstantsExist(t *testing.T) {
 	var _ domain.FindingCode = awsclient.CodeECSTaskStateProvisioning
 	var _ domain.FindingCode = awsclient.CodeECSTaskStatePending
@@ -622,7 +615,7 @@ func TestPR03c_ECSTaskCodes_ConstantsExist(t *testing.T) {
 }
 
 // TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding asserts that a RUNNING ECS task
-// emits no Finding and no Status after migration.
+// emits no Finding and no Status.
 func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 	taskARN := "arn:aws:ecs:us-east-1:000000000000:task/prod-cluster/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 	clusterARN := "arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"
@@ -755,10 +748,8 @@ func TestPR03c_ECSTaskFetcher_TransitionalEmitsWarn(t *testing.T) {
 	}
 }
 
-// NOTE: ECS Tasks have no separate SevBroken lifecycle state at the fetcher
-// level. The broken classification (stop_code != UserInitiated, health_status ==
-// UNHEALTHY) is structural — handled by the Color func reading Fields directly.
-// No TestPR03c_ECSTaskFetcher_BrokenEmitsFinding is needed.
+// ECS Tasks have no SevBroken lifecycle state; the broken classification
+// (stop_code != UserInitiated, health_status == UNHEALTHY) is structural.
 
 // ---------------------------------------------------------------------------
 // ecs-task mocks
@@ -793,9 +784,8 @@ func (m *pr03cECSDescribeTasksMock) DescribeTasks(
 // ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
 // field. DescribeClusters/ListServices/DescribeServices are stubbed since
 // these ecs-task tests never touch them. DescribeTaskDefinition returns a
-// ClientException ("does not exist"), matching the pre-refactor 4-arg
-// FetchECSTasksPage contract (which never queried task definitions), so
-// Fields["task_def_join_error"] stays unset.
+// ClientException ("does not exist"), so Fields["task_def_join_error"]
+// stays unset.
 type pr03cECSFake struct {
 	*pr03cECSListClustersMock
 	*pr03cECSListTasksMock

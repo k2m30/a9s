@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// sort_one_representation_test.go — a list sorts the same warm or live.
+// A list sorts the same warm or live.
 //
 // A list opened over the disk cache renders rows with no SDK struct: every
 // cell is the text the save lane left behind. The same list a second later,
@@ -85,15 +85,9 @@ func TestSort_TheSameColumnOrdersTheSameWarmOrLive(t *testing.T) {
 	for i, r := range tf.Rows {
 		// A warm row that reached the sort without the key its path-only column
 		// is read back under would render blank and tie with every other such
-		// row — the one way the two frames could still disagree once the
-		// comparator reads the cell alone. The save writes
-		// config.TitleFieldKey and the render cascade reads
-		// config.TitleFieldKeys, of which that is the second spelling, so the
-		// key cannot be missing for a column whose live cell had a value; this
-		// asserts it on the row rather than on the two helpers. The
-		// registry-wide form is TestCols_CacheReplayRendersTheSameCellsAsTheLiveFetch
-		// (replay_cache_round_trip_test.go), which requires every cell of every
-		// registered type to survive the round trip.
+		// row. The save writes config.TitleFieldKey and the render cascade reads
+		// config.TitleFieldKeys, of which that is the second spelling, so the key
+		// cannot be missing for a column whose live cell had a value.
 		if got := r.Fields[config.TitleFieldKey("Launch Time")]; got == "" {
 			t.Errorf("row %s reached the warm frame with no value under %q — the sort would read a blank cell for a column the live frame renders; persisted fields: %v",
 				r.ID, config.TitleFieldKey("Launch Time"), r.Fields)
@@ -109,9 +103,9 @@ func TestSort_TheSameColumnOrdersTheSameWarmOrLive(t *testing.T) {
 	}
 }
 
-// TestSort_TheComparatorReadsNoSDKStruct is the gate that keeps it that way.
-// A second representation reintroduced in the comparator is a second answer to
-// one question, and the two frames are where it shows.
+// TestSort_TheComparatorReadsNoSDKStruct: a second representation in the
+// comparator is a second answer to one question, and the warm and live frames
+// are where it shows.
 func TestSort_TheComparatorReadsNoSDKStruct(t *testing.T) {
 	src, err := os.ReadFile("../../core/app/list_filter.go")
 	if err != nil {

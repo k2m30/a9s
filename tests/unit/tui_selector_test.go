@@ -1,28 +1,10 @@
-// tui_selector_test.go — live SelectorModel.Update() coverage: cursor
-// movement (Up/Down/Top/Bottom/PageUp/PageDown) and boundary clamping.
-//
-// NewSelector/NewProfile/NewRegion/NewTheme, View, FrameTitle, Title,
-// SetFilter, GetFilter, CopyContent, GetHelpContext, and Init are DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (selector.go: "LIVE:
-// NewSelectorWithCtrl, NewTransientSelector, Update, SetSize, RenderSelector;
-// DEAD: NewSelector, NewProfile, NewRegion, NewTheme, Init, View, FrameTitle,
-// CopyContent, GetHelpContext, Title, SetFilter, GetFilter"). The live
-// equivalents for what those dead methods pinned:
-//   - rendering shape (view-shows-current-marker/all-items/empty, filtered
-//     items): selector_render_parity_test.go's TestSelectorRender_LiveSeam,
-//     built on NewTransientSelector + app.SelectorBody.
-//   - the real '/' filter mode end-to-end: qa_filtering_test.go's
-//     TestQA_Filter_11_15/11_16_*SelectorFilterWorks.
-//   - copy is a no-op on a selector screen: text_ports_test.go's
-//     TestPort_SelectorCopy_IsNoOp.
-//
-// Update() itself IS live (app_stack.go's rsKindSelector case calls
-// NewSelectorWithCtrl(m.ctrl, ...).Update(msg)), and it drives real
+// SelectorModel.Update() cursor movement
+// (Up/Down/Top/Bottom/PageUp/PageDown) and boundary clamping. Update() is the
+// live selector path (app_stack.go's rsKindSelector case calls
+// NewSelectorWithCtrl(m.ctrl, ...).Update(msg)) and drives real
 // app.Controller cursor actions (ActionMoveUp/Down/Top/Bottom/PageUp/
-// PageDown) that nothing else in this suite exercises through a selector
-// screen — kept here via NewSelectorWithCtrl on a throwaway Controller
-// (mirroring exactly what the now-dead NewSelector did internally, minus
-// the dead wrapper itself).
+// PageDown), exercised here via NewSelectorWithCtrl on a throwaway
+// Controller.
 package unit
 
 import (
@@ -55,8 +37,6 @@ func newLiveSelector(t testing.TB, items []string, activeItem, title string, onS
 	m.SetSize(80, 20)
 	return m
 }
-
-// ── Navigation: Up/Down ─────────────────────────────────────────────────────
 
 func TestSelector_DownMovesSelection(t *testing.T) {
 	k := keys.Default()
@@ -100,8 +80,6 @@ func TestSelector_UpMovesSelection(t *testing.T) {
 	}
 }
 
-// ── Navigation: Top/Bottom (g/G) ────────────────────────────────────────────
-
 func TestSelector_GGoesToTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
@@ -143,8 +121,6 @@ func TestSelector_ShiftGGoesToBottom(t *testing.T) {
 		t.Errorf("after G, expected item-3 (bottom), got %s", selected)
 	}
 }
-
-// ── Navigation: PageUp/PageDown ─────────────────────────────────────────────
 
 func TestSelector_PageDownMovesCursor(t *testing.T) {
 	k := keys.Default()
@@ -195,8 +171,6 @@ func TestSelector_PageUpMovesCursor(t *testing.T) {
 	}
 }
 
-// ── Cursor boundaries ───────────────────────────────────────────────────────
-
 func TestSelector_CursorStopsAtTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b", "c"}
@@ -240,8 +214,6 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 		t.Errorf("cursor should stop at bottom, expected 'c', got %s", selected)
 	}
 }
-
-// ── Unhandled keys ──────────────────────────────────────────────────────────
 
 func TestSelector_UnhandledKeyReturnsNilCmd(t *testing.T) {
 	k := keys.Default()

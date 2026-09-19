@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ===========================================================================
-// Log Streams YAML view fixtures
-// ===========================================================================
-
 func fixtureLogStreams() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -30,10 +26,6 @@ func fixtureLogStreams() []resource.Resource {
 	}
 }
 
-// ===========================================================================
-// Log Events YAML view fixtures
-// ===========================================================================
-
 func fixtureLogEvents() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -47,10 +39,6 @@ func fixtureLogEvents() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Log Streams YAML tests
-// ===========================================================================
 
 func TestQA_YAML_LogStreams_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureLogStreams() {
@@ -81,10 +69,6 @@ func TestQA_YAML_LogStreams_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Log Events YAML tests
-// ===========================================================================
-
 func TestQA_YAML_LogEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureLogEvents() {
 		out := yamlView(t, r, 120, 40)
@@ -114,10 +98,6 @@ func TestQA_YAML_LogEvents_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Target Health YAML view fixtures
-// ===========================================================================
-
 func fixtureTargetHealth() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -134,10 +114,6 @@ func fixtureTargetHealth() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Target Health YAML tests
-// ===========================================================================
 
 func TestQA_YAML_TargetHealth_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureTargetHealth() {
@@ -168,10 +144,6 @@ func TestQA_YAML_TargetHealth_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Lambda Invocations YAML view fixtures
-// ===========================================================================
-
 func fixtureLambdaInvocations() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -188,10 +160,6 @@ func fixtureLambdaInvocations() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Lambda Invocations YAML tests
-// ===========================================================================
 
 func TestLambdaInvocationsYAMLViewContains(t *testing.T) {
 	for _, r := range fixtureLambdaInvocations() {
@@ -222,10 +190,6 @@ func TestLambdaInvocationsYAMLNoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Lambda Invocation Logs YAML view fixtures
-// ===========================================================================
-
 func fixtureLambdaInvocationLogs() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -238,10 +202,6 @@ func fixtureLambdaInvocationLogs() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Lambda Invocation Logs YAML tests
-// ===========================================================================
 
 func TestLambdaInvocationLogsYAMLViewContains(t *testing.T) {
 	for _, r := range fixtureLambdaInvocationLogs() {
@@ -272,10 +232,6 @@ func TestLambdaInvocationLogsYAMLNoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ECS Service Events YAML view fixtures
-// ===========================================================================
-
 func fixtureEcsSvcEvents() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -288,10 +244,6 @@ func fixtureEcsSvcEvents() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ECS Service Events YAML tests
-// ===========================================================================
 
 func TestQA_YAML_EcsSvcEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcEvents() {
@@ -322,10 +274,6 @@ func TestQA_YAML_EcsSvcEvents_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ECS Service Tasks YAML view fixtures
-// ===========================================================================
-
 func fixtureEcsSvcTasks() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -342,10 +290,6 @@ func fixtureEcsSvcTasks() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ECS Service Tasks YAML tests
-// ===========================================================================
 
 func TestQA_YAML_EcsSvcTasks_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcTasks() {
@@ -376,10 +320,6 @@ func TestQA_YAML_EcsSvcTasks_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ECS Service Logs YAML view fixtures
-// ===========================================================================
-
 func fixtureEcsSvcLogs() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -393,10 +333,6 @@ func fixtureEcsSvcLogs() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ECS Service Logs YAML tests
-// ===========================================================================
 
 func TestQA_YAML_EcsSvcLogs_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEcsSvcLogs() {
@@ -427,10 +363,6 @@ func TestQA_YAML_EcsSvcLogs_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CFN Stack Events YAML view fixtures
-// ===========================================================================
-
 func fixtureCfnEvents() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -446,10 +378,6 @@ func fixtureCfnEvents() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// CFN Stack Events YAML tests
-// ===========================================================================
 
 func TestQA_YAML_CfnEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureCfnEvents() {
@@ -480,10 +408,6 @@ func TestQA_YAML_CfnEvents_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CFN Stack Resources YAML view fixtures
-// ===========================================================================
-
 func fixtureCfnResources() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -500,10 +424,6 @@ func fixtureCfnResources() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// CFN Stack Resources YAML tests
-// ===========================================================================
 
 func TestQA_YAML_CfnResources_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureCfnResources() {
@@ -534,10 +454,6 @@ func TestQA_YAML_CfnResources_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ASG Scaling Activities YAML view fixtures
-// ===========================================================================
-
 func fixtureAsgActivities() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -562,10 +478,6 @@ func fixtureAsgActivities() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ASG Scaling Activities YAML tests
-// ===========================================================================
 
 func TestQA_YAML_AsgActivities_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureAsgActivities() {
@@ -596,10 +508,6 @@ func TestQA_YAML_AsgActivities_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Alarm History YAML view fixtures
-// ===========================================================================
-
 func fixtureAlarmHistory() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -622,10 +530,6 @@ func fixtureAlarmHistory() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Alarm History YAML tests
-// ===========================================================================
 
 func TestQA_YAML_AlarmHistory_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureAlarmHistory() {
@@ -656,10 +560,6 @@ func TestQA_YAML_AlarmHistory_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ELB Listeners YAML view fixtures
-// ===========================================================================
-
 func fixtureELBListeners() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -688,10 +588,6 @@ func fixtureELBListeners() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ELB Listeners YAML tests
-// ===========================================================================
 
 func TestQA_YAML_ELBListeners_ContainsFields(t *testing.T) {
 	for _, r := range fixtureELBListeners() {
@@ -722,10 +618,6 @@ func TestQA_YAML_ELBListeners_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CodeBuild Builds YAML view fixtures
-// ===========================================================================
-
 func fixtureCBBuilds() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -750,10 +642,6 @@ func fixtureCBBuilds() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// CodeBuild Builds YAML tests
-// ===========================================================================
 
 func TestQA_YAML_CBBuilds_ContainsFields(t *testing.T) {
 	for _, r := range fixtureCBBuilds() {
@@ -784,10 +672,6 @@ func TestQA_YAML_CBBuilds_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CodeBuild Build Logs YAML view fixtures
-// ===========================================================================
-
 func fixtureCBBuildLogs() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -802,10 +686,6 @@ func fixtureCBBuildLogs() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// CodeBuild Build Logs YAML tests
-// ===========================================================================
 
 func TestQA_YAML_CBBuildLogs_ContainsFields(t *testing.T) {
 	for _, r := range fixtureCBBuildLogs() {
@@ -836,10 +716,6 @@ func TestQA_YAML_CBBuildLogs_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ECR Images YAML view fixtures
-// ===========================================================================
-
 func fixtureECRImages() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -857,10 +733,6 @@ func fixtureECRImages() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ECR Images YAML tests
-// ===========================================================================
 
 func TestQA_YAML_ECRImages_ContainsFields(t *testing.T) {
 	for _, r := range fixtureECRImages() {
@@ -891,10 +763,6 @@ func TestQA_YAML_ECRImages_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Pipeline Stages YAML view fixtures
-// ===========================================================================
-
 func fixturePipelineStages() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -915,10 +783,6 @@ func fixturePipelineStages() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Pipeline Stages YAML tests
-// ===========================================================================
 
 func TestQA_YAML_PipelineStages_ContainsFields(t *testing.T) {
 	for _, r := range fixturePipelineStages() {
@@ -949,10 +813,6 @@ func TestQA_YAML_PipelineStages_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Role Policies YAML view fixtures
-// ===========================================================================
-
 func fixtureRolePolicies() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -975,10 +835,6 @@ func fixtureRolePolicies() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Role Policies YAML tests
-// ===========================================================================
 
 func TestQA_YAML_RolePolicies_ContainsFields(t *testing.T) {
 	for _, r := range fixtureRolePolicies() {
@@ -1009,10 +865,6 @@ func TestQA_YAML_RolePolicies_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// IAM Group Members YAML view fixtures
-// ===========================================================================
-
 func fixtureIAMGroupMembers() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1027,10 +879,6 @@ func fixtureIAMGroupMembers() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// IAM Group Members YAML tests
-// ===========================================================================
 
 func TestQA_YAML_IAMGroupMembers_ContainsFields(t *testing.T) {
 	for _, r := range fixtureIAMGroupMembers() {
@@ -1061,10 +909,6 @@ func TestQA_YAML_IAMGroupMembers_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ELB Listener Rules YAML view fixtures
-// ===========================================================================
-
 func fixtureELBListenerRules() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1079,10 +923,6 @@ func fixtureELBListenerRules() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// ELB Listener Rules YAML tests
-// ===========================================================================
 
 func TestQA_YAML_ELBListenerRules_ContainsFields(t *testing.T) {
 	for _, r := range fixtureELBListenerRules() {
@@ -1113,10 +953,6 @@ func TestQA_YAML_ELBListenerRules_NoANSI(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// RDS Instance Events (dbi_events) YAML view fixtures
-// ===========================================================================
-
 func fixtureDbiEvents() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1133,10 +969,6 @@ func fixtureDbiEvents() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// RDS Instance Events (dbi_events) YAML tests
-// ===========================================================================
 
 func TestQA_YAML_DbiEvents_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureDbiEvents() {
@@ -1167,10 +999,6 @@ func TestQA_YAML_DbiEvents_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// SNS Topic Subscriptions (sns_subscriptions) YAML view fixtures
-// ===========================================================================
-
 func fixtureSnsSubscriptions() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1187,10 +1015,6 @@ func fixtureSnsSubscriptions() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// SNS Topic Subscriptions (sns_subscriptions) YAML tests
-// ===========================================================================
 
 func TestQA_YAML_SnsSubscriptions_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureSnsSubscriptions() {
@@ -1221,10 +1045,6 @@ func TestQA_YAML_SnsSubscriptions_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// EventBridge Rule Targets YAML view fixtures
-// ===========================================================================
-
 func fixtureEbRuleTargets() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1251,10 +1071,6 @@ func fixtureEbRuleTargets() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// EventBridge Rule Targets YAML tests
-// ===========================================================================
 
 func TestQA_YAML_EbRuleTargets_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureEbRuleTargets() {
@@ -1285,10 +1101,6 @@ func TestQA_YAML_EbRuleTargets_RawContentUncolored(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Glue Job Runs YAML view fixtures
-// ===========================================================================
-
 func fixtureGlueRuns() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -1307,10 +1119,6 @@ func fixtureGlueRuns() []resource.Resource {
 		},
 	}
 }
-
-// ===========================================================================
-// Glue Job Runs YAML tests
-// ===========================================================================
 
 func TestQA_YAML_GlueRuns_ViewContainsFields(t *testing.T) {
 	for _, r := range fixtureGlueRuns() {
@@ -1340,10 +1148,6 @@ func TestQA_YAML_GlueRuns_RawContentUncolored(t *testing.T) {
 		t.Error("GlueRuns RawContent() contains ANSI codes, expected plain YAML")
 	}
 }
-
-// ===========================================================================
-// Registry-driven: ALL child types
-// ===========================================================================
 
 // TestQA_YAML_AllChildTypes iterates every registered child type and verifies:
 //

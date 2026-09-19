@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w3_subnet_test.go — subnet.auto-public-ip.
+// Subnet.auto-public-ip.
 //
 // A subnet with MapPublicIpOnLaunch set gives every instance launched into it
 // a routable address without anyone asking for one, so the posture signal has

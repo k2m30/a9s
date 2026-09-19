@@ -1,19 +1,14 @@
 package unit_test
 
-// wipfix_costs_completeness_test.go — rows 1 and 7: a partial Cost Explorer
-// answer must stay visibly partial.
+// A partial Cost Explorer answer must stay visibly partial.
 //
-// Row 1: a grid fetch cut by the CE pagination cap merges its partial records
-// into the store and stamps the whole window covered, while the "partial data"
-// warning lives only on the active drill frame. Leave the screen and the
-// warning is gone; the periods that had closed by then are cached as
-// authoritative and a refresh cannot repair them. Completeness has to travel
-// with the data into the store and into its coverage decision.
+// A grid fetch cut by the CE pagination cap is partial for every screen that
+// reads the store, not only for the drill frame that fetched it: completeness
+// travels with the data into the store and into its coverage decision, so a
+// period that had closed by then is not cached as authoritative.
 //
-// Row 7: a page-capped GetAnomalies result is dropped outright by
-// ApplyFetchResult, so confirmed anomalies vanish from the grid with nothing
-// said. A visibly incomplete overlay is worth keeping — separately from the
-// authoritative snapshot the cache serves.
+// A page-capped GetAnomalies result is kept as a visibly incomplete overlay,
+// separately from the authoritative snapshot the cache serves.
 
 import (
 	"strings"
@@ -48,7 +43,7 @@ func wipfixSeededCostsController(t *testing.T, now time.Time, seed func(*costs.S
 	return c
 }
 
-// TestCostsStore_TruncatedGridStillWarnsAfterReopen pins row 1's first half:
+// TestCostsStore_TruncatedGridStillWarnsAfterReopen:
 // the warning about partial dollars survives leaving and re-entering the
 // screen, because the store knows the window it is serving was cut short.
 func TestCostsStore_TruncatedGridStillWarnsAfterReopen(t *testing.T) {
@@ -71,7 +66,7 @@ func TestCostsStore_TruncatedGridStillWarnsAfterReopen(t *testing.T) {
 	}
 }
 
-// TestCostsStore_TruncatedPeriodIsNeverImmutable pins row 1's second half: a
+// TestCostsStore_TruncatedPeriodIsNeverImmutable: a
 // bucket whose fetch was cut short must stay refetchable, so a later complete
 // fetch replaces it. Without it, a period that had already closed when the
 // capped fetch landed is cached as authoritative forever.
@@ -91,7 +86,6 @@ func TestCostsStore_TruncatedPeriodIsNeverImmutable(t *testing.T) {
 		Truncated: true,
 	}, capped)
 
-	// The repair: the same window, fetched whole.
 	store.ApplyFetchResult(costs.FetchResult{
 		Query:    q,
 		Records:  []costs.Record{fullMetricRecord(closed, "Amazon EC2", 900)},
@@ -116,7 +110,7 @@ func TestCostsStore_TruncatedPeriodIsNeverImmutable(t *testing.T) {
 	}
 }
 
-// TestCostsStore_PartialAnomalyOverlayStillRenders pins row 7: a page-capped
+// TestCostsStore_PartialAnomalyOverlayStillRenders: a page-capped
 // GetAnomalies result keeps its marks on the grid, with the warning that says
 // they are a lower bound — and leaves the authoritative cached snapshot alone.
 func TestCostsStore_PartialAnomalyOverlayStillRenders(t *testing.T) {
@@ -160,8 +154,8 @@ func TestCostsStore_PartialAnomalyOverlayStillRenders(t *testing.T) {
 	}
 }
 
-// TestCostsStore_PartialAnomalyOverlayLeavesAuthoritativeCacheAlone is row 7's
-// other half: keeping the incomplete overlay must not promote it to the
+// TestCostsStore_PartialAnomalyOverlayLeavesAuthoritativeCacheAlone:
+// keeping the incomplete overlay must not promote it to the
 // snapshot the cache serves as CE's own complete list for the window.
 func TestCostsStore_PartialAnomalyOverlayLeavesAuthoritativeCacheAlone(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

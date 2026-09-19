@@ -1,10 +1,8 @@
 package unit
 
-// qa_review_fix_enricher_truncated_test.go — Tests for IssueEnricherFunc signature
-// and EnrichmentCap constant behavior.
-//
-// Updated for the IssueEnricherResult return type:
-//   IssueEnricherFunc = func(ctx, clients, resources, cache) (IssueEnricherResult, error)
+// The IssueEnricherFunc signature,
+// func(ctx, clients, resources, cache) (IssueEnricherResult, error), and
+// EnrichmentCap behaviour.
 
 import (
 	"context"
@@ -15,8 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestIssueEnricherFuncSignatureReturnsResult verifies that IssueEnricherFunc accepts
-// functions with the new signature (ctx, clients, resources, cache) → (IssueEnricherResult, error).
+// IssueEnricherFunc accepts func(ctx, clients, resources, cache) →
+// (IssueEnricherResult, error).
 func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,

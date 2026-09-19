@@ -1,10 +1,9 @@
 package unit
 
-// qa_probe_issue_count_test.go — T011: issue counting logic for availability probe.
+// Issue counting for the availability probe.
 //
-// Tests the counting logic used inside probeResourceAvailability to populate
-// AvailabilityCheckedMsg.Issues. Post-refactor, counting is per-type via
-// td.Color(r).IsIssue() (and ExcludeFromIssueBadge for badge-exempt types).
+// Counting is per-type via td.Color(r).IsIssue() (and ExcludeFromIssueBadge
+// for badge-exempt types).
 
 import (
 	"testing"
@@ -29,16 +28,11 @@ func countIssueRowsForType(td *resource.ResourceTypeDef, resources []resource.Re
 	return count
 }
 
-// ---------------------------------------------------------------------------
-// TestCountIssueRowsForType_EC2
-// ---------------------------------------------------------------------------
-
 // TestCountIssueRowsForType_EC2 verifies the counting logic for EC2 instances.
 //
-// Since the color-findings-conformance wave, colorEC2 is
-// colorFromAnyFinding-only (core/aws/catalog_compute.go) — it has NO
-// raw-field fallback at all. Every non-healthy fixture here attaches the
-// Finding the real fetcher (core/aws/ec2.go, wave1) or Wave-2 enricher
+// colorEC2 reads findings only (core/aws/catalog_compute.go), so every
+// non-healthy fixture here attaches the Finding the real fetcher
+// (core/aws/ec2.go, wave1) or Wave-2 enricher
 // (core/aws/ec2_issue_enrichment.go, Source "wave2") would produce.
 func TestCountIssueRowsForType_EC2(t *testing.T) {
 	td := resource.FindResourceType("ec2")

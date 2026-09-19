@@ -1,16 +1,11 @@
 package unit
 
-// prowler_w6b_rebase_test.go — the two rebase rows folded into batch w6b.
+// The ecs_tasks Health column and the policy-document check.
 //
-// Row 12: the ecs_tasks child list renders its Health column from
-// strings.ToUpper(HealthStatus), so the cell reads HEALTHY and UNKNOWN. Those
-// are the SDK's enum spellings, not words an operator uses, and the
-// rendered-surface ruling bans them from every surface a9s draws.
-//
-// Row 11 (the ecs_tasks classifier) and the CodeArtifact policy migration are
-// already true on this base; the pin kept here is the one that stays useful
-// after the fix, namely that no type in the batch goes back to matching a
-// policy document as a string.
+// The Health column must read in lowercase words: HEALTHY and UNKNOWN are the
+// SDK's enum spellings, not words an operator uses, and no surface a9s draws
+// may show them. No code under core/aws may match a policy document as a
+// string.
 
 import (
 	"context"
@@ -29,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// w6bECSTaskFakes serves the list/describe pair FetchEcsSvcTasks needs.
+// w6bECSTaskListFake serves the list/describe pair FetchEcsSvcTasks needs.
 type w6bECSTaskListFake struct{ arns []string }
 
 func (f *w6bECSTaskListFake) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
@@ -69,8 +64,6 @@ func w6bFetchECSTasks(t *testing.T, tasks ...ecstypes.Task) []resource.Resource 
 	return out.Resources
 }
 
-// ─── rebase row 12: the Health column reads in words ────────────────────────
-
 // The Health cell is drawn straight from Fields["health"], so whatever this
 // field holds is what an operator reads. HEALTHY is the SDK's spelling of the
 // enum, not the word.
@@ -103,15 +96,14 @@ func TestW6BECSTasks_NoHealthReported_StaysEmpty(t *testing.T) {
 	}
 }
 
-// The class check on row 12. The health string feeds the findings function as
-// well as the column, so lower-casing the column without teaching the
-// predicate about it silently retires the unhealthy finding — the row would
-// read "unhealthy" and colour green.
+// The health string feeds the findings function as well as the column, so
+// lower-casing the column without teaching the predicate about it silently
+// drops the unhealthy finding — the row would read "unhealthy" and colour
+// green.
 func TestW6BECSTasks_UnhealthyTaskStillCarriesItsFinding(t *testing.T) {
 	rs := w6bFetchECSTasks(t, w6bECSTask("task-sick", ecstypes.HealthStatusUnhealthy, "RUNNING"))
-	// Asserted field by field rather than through pw1RequireFinding: this
-	// finding predates the batch and carries no Detail sentence, and requiring
-	// one here would fail for a reason row 12 is not about.
+	// Asserted field by field rather than through pw1RequireFinding, which
+	// requires a Detail sentence this finding does not carry.
 	f, ok := pw1FindFinding(rs[0].Findings, domain.FindingCode("ecs-task.health.unhealthy"))
 	if !ok {
 		t.Fatalf("an unhealthy task lost its finding: %+v", rs[0].Findings)
@@ -122,13 +114,10 @@ func TestW6BECSTasks_UnhealthyTaskStillCarriesItsFinding(t *testing.T) {
 	}
 }
 
-// ─── rebase row 11 / contract rule 6: one policy engine ─────────────────────
-
 // A resource policy is JSON with several legal spellings of the same grant:
 // "Principal":"*", {"AWS":"*"}, a list containing "*". Matching the document
-// as a string gets exactly one of them right, which is why the contract routes
-// every policy through iampolicy and why this stays pinned after the
-// CodeArtifact migration rather than being deleted with it.
+// as a string gets exactly one of them right, so every policy goes through
+// iampolicy.
 func TestW6BNoPolicyDocumentStringMatchingInCoreAWS(t *testing.T) {
 	root := filepath.Join("..", "..", "core", "aws")
 	needles := []string{`Principal":"*"`, `Principal": "*"`}

@@ -1,33 +1,11 @@
 package unit_test
 
-// qa_related_garbage_ids_test.go — regression pins for a live-reported
-// related-panel bug: opening the detail view over a CACHE-SEEDED s3 row
-// (thin fields — name/creation_date/notification_*/region,
-// RawStruct nil) fired the s3→kms related check, which returned a bare
-// (non-ARN) KMSMasterKeyID value equal to the SOURCE resource's own type
-// ("s3") as the navigation key ID. The downstream by-ID fetch then called
-// the live KMS API with keyId="s3", which AWS rejected with
-// NotFoundException "Invalid keyId 's3'".
-//
-// The fix (core/aws/related_common.go's kmsKeyIDFromField(raw, srcType))
-// now guards every *_related.go KMS checker registry-wide: an extracted
-// keyID equal to the source resource's own type short name is treated as
-// fabricated/garbage and dropped rather than handed to DescribeKey/FetchByIDs.
-//
-// Pin 1 drives checkS3KMS directly against a thin, cache-seeded-shaped s3
-// resource with a fake S3 client whose GetBucketEncryption response carries
-// exactly this degenerate KMSMasterKeyID shape, and asserts the checker must
-// never surface "s3" (the source Resource.Type) as a related ResourceID.
-// Passes now that the fix has landed; guards against regression.
-//
-// Pin 2 generalizes the contract across the FULL related-checker registry
-// (resource.GetRelated over every resource.AllShortNames() entry): for every
-// registered RelatedDef with a non-nil Checker, driving it against a thin
-// seeded-shape resource of that type — with a poisoned cache seeded under
-// every target type — must never yield a ResourceID equal to the source
-// type's own short name. See the COVERAGE BOUNDARY doc comment on
-// TestRelatedRegistry_ThinSeededRow_NeverFabricatesSourceTypeAsID for the
-// honest limits of what this sweep can hermetically exercise.
+// A cache-seeded s3 row carries thin fields (name/creation_date/
+// notification_*/region, RawStruct nil). A related check over such a row must
+// never return the source type's short name ("s3") as a target ID: handed to
+// DescribeKey it becomes keyId="s3", which KMS rejects with NotFoundException
+// "Invalid keyId 's3'". kmsKeyIDFromField(raw, srcType) in
+// core/aws/related_common.go drops such an ID for every KMS checker.
 
 import (
 	"context"
@@ -41,10 +19,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// s3EncryptionGarbageKeyFake returns a KMSMasterKeyID that is NOT an ARN —
-// a bare string equal to the value under test. This is the exact live-bug
-// shape: no "/" for checkS3KMS's inline ARN-strip to act on, so the bare
-// value passes straight through as the returned ResourceID.
+// s3EncryptionGarbageKeyFake returns a KMSMasterKeyID that is not an ARN: with
+// no "/" for checkS3KMS's ARN-strip to act on, the bare value passes through as
+// the returned ResourceID.
 type s3EncryptionGarbageKeyFake struct {
 	s3NoopAPI
 	keyID string
@@ -67,11 +44,10 @@ func (f *s3EncryptionGarbageKeyFake) GetBucketEncryption(
 	}, nil
 }
 
-// thinCacheSeededS3Resource mirrors the live-bug shape: a cache-seeded s3 row
-// carries only the list-view fields (name/creation_date/notification_*/
-// region) with RawStruct nil — no encryption-related field is
-// ever populated by the s3 fetcher, so a related check over this row has NO
-// legitimate source data to extract a KMS key ID from at all.
+// thinCacheSeededS3Resource is a cache-seeded s3 row: only the list-view
+// fields (name/creation_date/notification_*/region), RawStruct nil. The s3
+// fetcher populates no encryption field, so a related check over this row has
+// no source data to extract a KMS key ID from.
 func thinCacheSeededS3Resource(bucket string) resource.Resource {
 	return resource.Resource{
 		ID:   bucket,
@@ -89,13 +65,10 @@ func thinCacheSeededS3Resource(bucket string) resource.Resource {
 	}
 }
 
-// TestSeededRow_MissingSourceField_NeverFabricatesIDs pins the reported bug:
-// driving checkS3KMS against a thin, cache-seeded s3 resource whose
-// GetBucketEncryption response carries a bare (non-ARN) KMSMasterKeyID equal
-// to the source resource's own Type ("s3") must NOT surface "s3" as a related
-// ResourceID. This is the exact seam that fed keyId="s3" into the live KMS
-// DescribeKey/GetKeyPolicy call and produced the AWS NotFoundException
-// "Invalid keyId 's3'" before kmsKeyIDFromField's srcType guard landed.
+// checkS3KMS over a thin cache-seeded s3 row whose GetBucketEncryption
+// response carries a bare KMSMasterKeyID equal to the source Type ("s3") must
+// not surface "s3" as a related ResourceID; KMS rejects keyId="s3" with
+// NotFoundException "Invalid keyId 's3'".
 func TestSeededRow_MissingSourceField_NeverFabricatesIDs(t *testing.T) {
 	const bucket = "thin-seeded-bucket"
 	src := thinCacheSeededS3Resource(bucket)
@@ -178,25 +151,19 @@ func poisonedTargetCache(sourceShortName string, sourceID string) resource.Resou
 }
 
 // TestRelatedRegistry_ThinSeededRow_NeverFabricatesSourceTypeAsID sweeps
-// EVERY registered RelatedDef across the full resource-type registry
-// (resource.AllShortNames() x resource.GetRelated) and asserts that driving
-// each Checker against a thin, cache-seeded-shaped resource of its OWN source
-// type — with a poisonedTargetCache seeded under every target type — never
-// yields a ResourceID equal to that source type's own short name.
+// every registered RelatedDef (resource.AllShortNames() x resource.GetRelated)
+// against a thin, cache-seeded-shaped resource of its own source type, with a
+// poisonedTargetCache seeded under every target type, and asserts no
+// ResourceID equals that source type's short name.
 //
-// COVERAGE BOUNDARY (honest disclosure): clients=nil is hermetic — every
-// AWS-calling checker in core/aws guards with
-// `c, ok := clients.(*ServiceClients); if !ok || c == nil`, so with nil
-// clients those checkers short-circuit to State: RelatedUnknown (or a resolved 0) BEFORE reaching their
-// vulnerable ID-extraction logic, regardless of the cache. Of the 605
-// registered defs at time of writing, only ~5 pure cache-scan checkers
-// (e.g. checkS3Backup/Athena/Glue/EBRule/R53-shaped defs) actually run their
-// extraction logic against poisonedTargetCache and get checked for
-// fabrication here — the checked/exercisedWithIDs counts logged below report
-// the exact number for the current registry. This sweep does NOT re-prove
-// the live-API bug class (s3->kms and siblings) that pin 1 pins directly
-// with a real fake client — providing per-service fakes for every
-// registered checker's AWS client interface is out of scope for this pin.
+// Coverage boundary: clients=nil is hermetic — every AWS-calling checker in
+// core/aws guards with `c, ok := clients.(*ServiceClients); if !ok || c == nil`,
+// so it returns State: RelatedUnknown (or a resolved 0) before its ID
+// extraction. Only the pure cache-scan checkers (checkS3Backup/Athena/Glue/
+// EBRule/R53-shaped defs) run extraction against poisonedTargetCache; the
+// logged checked/exercisedWithIDs counts give the number for the current
+// registry. An AWS-calling checker needs its own fake client, as
+// TestSeededRow_MissingSourceField_NeverFabricatesIDs has for s3→kms.
 func TestRelatedRegistry_ThinSeededRow_NeverFabricatesSourceTypeAsID(t *testing.T) {
 	checked := 0
 	skippedNilChecker := 0

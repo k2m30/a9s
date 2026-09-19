@@ -1,17 +1,9 @@
 package unit
 
-// related_navigate_cache_detail_init_test.go — Tests for the bug where
-// handleRelatedNavigate's cache-hit branch never dispatches related checks.
-//
-// Bug (app_related.go:88-98 and 122-131): when TargetID or a single RelatedID
-// matches an entry in resourceCache, the code pushes a detail view and returns
-// (m, nil). It never calls NeedsRelatedCheck() / dispatches the related-check
-// task. This leaves the right column in permanent loading state for those
-// navigations.
-//
-// TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck — FAILS with current code.
-// TestRelatedNavigate_CachedTargetID_UsesCachedResults       — FAILS with current code.
-// TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck — FAILS with current code.
+// HandleRelatedNavigate's
+// cache-hit branch (TargetID or a single RelatedID matching a cached resource)
+// pushes a detail view and dispatches the related-check task, so the right
+// column leaves its loading state.
 
 import (
 	"context"
@@ -75,16 +67,6 @@ func containsRelatedCheckResultMsg(msgs []tea.Msg) bool {
 	return false
 }
 
-// ---------------------------------------------------------------------------
-// TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck
-//
-// Given: EC2 resources are loaded into resourceCache["ec2"].
-// When:  RelatedNavigateMsg{TargetType:"ec2", TargetID: ec2[0].ID} is sent.
-// Then:  The returned cmd is non-nil and produces a RelatedCheckResult.
-//
-// This FAILS now: the cache-hit branch returns (m, nil).
-// ---------------------------------------------------------------------------
-
 func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
@@ -110,7 +92,6 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 			"must dispatch the related-check fan-out so the detail right column loads")
 	}
 
-	// Drain one level of the cmd chain to find a RelatedCheckResult.
 	_, msgs := drainCmds(t, m, cmd, 3)
 
 	if !containsRelatedCheckResultMsg(msgs) {
@@ -123,16 +104,9 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRelatedNavigate_CachedTargetID_UsesCachedResults
-//
-// Given: EC2 detail has been opened, related results delivered (Count=stubRelatedCount), then Esc'd.
-//        The relatedCache now holds the results for ec2[0].
-// When:  RelatedNavigateMsg{TargetID: ec2[0].ID} is sent again for same resource.
-// Then:  The detail view immediately shows cached counts (e.g. "(7)") without
-//        waiting for async re-dispatch — openRelatedDetail (core/app/navigate.go)
-//        merges RelatedCacheGet's entries into the freshly pushed DetailState.
-// ---------------------------------------------------------------------------
+// A repeat RelatedNavigate shows cached counts immediately: openRelatedDetail
+// (core/app/navigate.go) merges RelatedCacheGet's entries into the freshly
+// pushed DetailState.
 
 func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 	defs := resource.GetRelated("ec2")
@@ -140,10 +114,8 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 		t.Fatal("no ec2 related defs registered — core/aws import should register them")
 	}
 
-	// Use setupEC2DetailWithResults to build state with results cached (Count=stubRelatedCount per type).
 	m := setupEC2DetailWithResults(t)
 
-	// Esc back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	ec2Client2 := fakes.NewEC2()
@@ -169,24 +141,11 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 
 	view := stripANSI(rootViewContent(m))
 
-	// After the fix: cached results (Count=stubRelatedCount) must appear immediately in the view.
-	// BUG: the view shows the right column in loading state because cached results
-	// are not applied when navigating via RelatedNavigateMsg (cache-hit branch).
 	if !strings.Contains(view, "(7)") {
 		t.Fatalf("BUG: after RelatedNavigateMsg to a resource with cached related results, "+
 			"the detail view must immediately show '(7)' — but it was not found.\nView:\n%s", view)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck
-//
-// Given: EC2 resources are loaded into resourceCache["ec2"].
-// When:  RelatedNavigateMsg{TargetType:"ec2", RelatedIDs:[]string{ec2[0].ID}} is sent.
-// Then:  The returned cmd is non-nil and produces a RelatedCheckResult.
-//
-// This FAILS now: the single-RelatedID cache-hit branch also returns (m, nil).
-// ---------------------------------------------------------------------------
 
 func TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck(t *testing.T) {
 	defs := resource.GetRelated("ec2")
@@ -213,7 +172,6 @@ func TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck(t *test
 			"must dispatch the related-check fan-out so the detail right column loads")
 	}
 
-	// Drain one level to find a RelatedCheckResult.
 	_, msgs := drainCmds(t, m, cmd, 3)
 
 	if !containsRelatedCheckResultMsg(msgs) {

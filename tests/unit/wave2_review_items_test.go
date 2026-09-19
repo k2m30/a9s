@@ -1,6 +1,6 @@
 package unit_test
 
-// wave2_review_items_test.go — Wave 2 partial failures. Each test starts from
+// Wave 2 partial failures. Each test starts from
 // a refused, throttled, missing or not-yet-loaded input. The rule is always the same: a check that
 // did not answer leaves its row marked, never inspected-and-clean, and the
 // badge says whether its count can be short.
@@ -95,10 +95,6 @@ func rvMenuPatch(t *testing.T, core *runtime.Core, ev messages.EnrichmentChecked
 	return runtime.PatchMenu{}
 }
 
-// ---------------------------------------------------------------------------
-// a refused row on a "!"-capable type makes the badge a lower bound
-// ---------------------------------------------------------------------------
-
 // TestBadge_RefusedRowOnIssueCapableTypeIsALowerBound: one row's check was
 // refused and another row carries a "!" finding. The refused row may hide a
 // second one, so the badge reads "at least 1", whatever flag the enricher
@@ -145,10 +141,6 @@ func TestBadge_RefusedRowOnIssueCapableTypeIsALowerBound(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// a throttled account walk keeps the partial answer
-// ---------------------------------------------------------------------------
 
 func rvThrottled(service, op string) error {
 	return bkOpErr(service, op, "Throttling")
@@ -215,10 +207,6 @@ func TestProbe_ThrottledAccountWalkKeepsThePartialAnswer(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// cf: a HeadBucket that did not answer is not "bucket exists"
-// ---------------------------------------------------------------------------
-
 type rvCFFake struct {
 	awsclient.CloudFrontAPI
 }
@@ -272,10 +260,6 @@ func TestCFOriginBucket_UnansweredHeadBucketMarksTheDistribution(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kms: a refused rotation read is a refused read
-// ---------------------------------------------------------------------------
-
 type rvKMSFake struct {
 	awsclient.KMSAPI
 	denied map[string]bool
@@ -316,10 +300,6 @@ func TestKMSRotation_DeniedOnCustomerKeyIsUninspected(t *testing.T) {
 		t.Errorf("the answered key carries %v, want kms.rotation-disabled", bkCodes(res.Findings[answered]))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// one badge lower-bound rule, live, on demand and after a restart
-// ---------------------------------------------------------------------------
 
 // TestBadge_EveryRowRefusedIsNotConfirmedZero: every ec2 row's check was
 // refused and no row has an issue. Zero is what was counted, not what was
@@ -431,10 +411,6 @@ func TestBadge_OnDemandRowCheckKeepsTheSweepsRule(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// a check whose sibling list is missing or cut did not run
-// ---------------------------------------------------------------------------
-
 // TestWave2CacheGate_EveryEnricherMarksRowsItCouldNotJudge runs each enricher
 // over the demo rows three ways: with every sibling list loaded, with no
 // sibling list, and with every sibling list cut short. A finding the full run
@@ -478,10 +454,6 @@ func TestWave2CacheGate_EveryEnricherMarksRowsItCouldNotJudge(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// redshift can hide no issue
-// ---------------------------------------------------------------------------
-
 type rvRedshiftFake struct {
 	awsclient.RedshiftAPI
 }
@@ -520,10 +492,6 @@ func TestRedshiftBadge_CapDoesNotMakeTheCountALowerBound(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// lambda: a policy a9s cannot parse is not "not public"
-// ---------------------------------------------------------------------------
-
 type rvLambdaFake struct {
 	awsclient.LambdaAPI
 	policy string
@@ -557,10 +525,6 @@ func TestLambdaPolicy_UnparseablePolicyIsUninspected(t *testing.T) {
 		t.Errorf("%s: an unparseable resource policy left the row unmarked — it reads as \"not public\"", fn)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// an ID the batch describe did not return was not inspected
-// ---------------------------------------------------------------------------
 
 const rvClusterARN = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-prod"
 
@@ -725,10 +689,6 @@ func TestECSBatches_DeadlineMarksEveryUnreachedRow(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// own account unknown: the cross-account check cannot run
-// ---------------------------------------------------------------------------
-
 // rvOwnRolePolicy grants the account's own role — cross-account only when the
 // account is unknown.
 const rvOwnRolePolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-app"},"Action":"*","Resource":"*"}]}`
@@ -821,10 +781,6 @@ func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// s3: an unread block cannot be assumed off
-// ---------------------------------------------------------------------------
 
 type rvS3PostureFake struct {
 	awsclient.S3API

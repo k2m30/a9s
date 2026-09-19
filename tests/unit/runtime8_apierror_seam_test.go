@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_apierror_seam_test.go — one place builds a failure.
+// One place builds a failure.
 //
 // messages.APIError's own doc says every construction site stamps the fields
 // the paired success would have carried, which is what lets a failure be
 // routed and discarded by the same rule as its success. A doc comment is not
-// an enforcement: the terminal's adapter builds both halves through one
-// outcome value, and the runtime's executor hand-writes four more literals
-// beside four ResourcesLoaded literals. Four pairs that have to agree, kept in
-// agreement by whoever edits them last.
+// an enforcement, so this file enforces it.
 package unit_test
 
 import (
@@ -76,7 +73,7 @@ func apiErrorLiteralFiles(t *testing.T) map[string]int {
 // TestAPIErrorSeam_OnePlaceBuildsAFailure pins the shape. A failure and the
 // success it replaces are the two endings of one request, and the fields that
 // route them are the same fields; built in two places they are one edit away
-// from disagreeing, which is what the doc comment asks for and nothing checks.
+// from disagreeing.
 func TestAPIErrorSeam_OnePlaceBuildsAFailure(t *testing.T) {
 	found := apiErrorLiteralFiles(t)
 	if len(found) == 0 {
@@ -97,7 +94,7 @@ func TestAPIErrorSeam_OnePlaceBuildsAFailure(t *testing.T) {
 
 // TestAPIErrorSeam_ARuntimeFailureCarriesThePairedSuccessStamps drives the
 // runtime's own four fetch kinds with no clients and reads what each answers
-// with. Whatever the seam ends up being, this is what it has to preserve.
+// with.
 func TestAPIErrorSeam_ARuntimeFailureCarriesThePairedSuccessStamps(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 

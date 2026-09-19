@@ -1,48 +1,18 @@
-// tui_help_identity_errorlog_parity_test.go — parity pins between the TUI
+// Parity between the TUI
 // overlays ('?' help, 'i' identity, '!' error log) and the headless
 // Controller.
 //
-//  1. Help-table parity: buildHelpBody() (core/app/snapshot.go) branches on
-//     the screen beneath the help screen the way HelpModel.buildGroups()
-//     branches on HelpContext (mainMenuGroups vs resourceListGroups vs
-//     detailGroups, internal/tui/views/help.go).
-//     TestHelpBody_ContentMatchesTUIMainMenuHelp pins that both renderers
-//     agree on a known set of main-menu bindings.
-//     TestHelpBody_UnderResourceList_CarriesListContextBindings pushes a bare
-//     ScreenResourceList, opens help on top and asserts the resulting
-//     HelpBody contains a list-only binding ("y", "yaml" — present in
-//     resourceListGroups, absent from mainMenuGroups).
-//
-//  2. Ctrl-backed overlays: '?' (newHelpRS), 'i' (newIdentityRS) and '!'
-//     (newErrorLogRS) push their rendererState through
-//     ctrl.Apply/ctrl.ApplyIntents (internal/tui/app_input.go) so the
-//     controller's own screen stack moves with them. app_stack_invariant.go's
-//     rsIsCtrlBacked excludes rsKindHelp/rsKindIdentity/error-log-text rs
-//     from the StackInSync() comparison (the "nonCtrlBackedException" list),
-//     so StackInSync() alone cannot see a partial wiring; the pins below
-//     assert (a) StackInSync() stays true across the full push+esc round
-//     trip for all three overlays — ctrlBacked:true and the matching
-//     screenIDMatchesRSKind case must land together, a partial pair flips
-//     this false — and (b) the rendered View() content for each overlay.
-//
-//  3. Error-log dual-store: internal/tui/app.go's m.errorHistory
-//     ([]errorEntry) and core/app/controller.go's c.errorHistory
-//     ([]controllerErrorEntry) are fed by hand-synced switch cases
-//     (internal/tui/runtime_adapter.go mirrors core/app/intents.go per that
-//     file's own comment, "mirror the headless applyIntents case").
-//     TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount drives
-//     messages.APIError through the TUI's real Update() loop (which appends
-//     to m.errorHistory via m.core.HandleAPIError -> an applied error
-//     FlashIntent) and asserts the '!' overlay's rendered line count exactly
-//     matches the number of error-flash events dispatched — a drifted
-//     dual-store (one store double-appending, or the '!' key wired to a
-//     stale/partial source) would produce a mismatch.
-//
-// Harness: mirrors tui_stack_sync_test.go / qa_help_context_test.go (TUI
-// lane: rootApplyMsg/newRootSizedModel/rootViewContent/stripANSI) and
-// tui_detail_parity_test.go (headless lane: directly-constructed
-// *app.Controller + *runtime.Core, package unit importing core/app
-// alongside the TUI helpers in the same file).
+//  1. Help table: buildHelpBody() (core/app/snapshot.go) branches on the
+//     screen beneath the help screen the way HelpModel.buildGroups()
+//     branches on HelpContext (internal/tui/views/help.go).
+//  2. Ctrl-backed overlays: '?', 'i' and '!' push their rendererState
+//     through ctrl.Apply/ctrl.ApplyIntents (internal/tui/app_input.go) so
+//     the controller's screen stack moves with them. rsIsCtrlBacked
+//     (app_stack_invariant.go) excludes these rs kinds from StackInSync(), so
+//     StackInSync() alone cannot see a partial wiring; the rendered View()
+//     content is asserted too.
+//  3. Error log: the '!' overlay's rendered line count equals the number of
+//     error-flash events dispatched.
 package unit
 
 import (
@@ -75,13 +45,9 @@ func newParityHeadlessController(t *testing.T, profile, region string) *app.Cont
 	return c
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 1. Help-table parity
-// ─────────────────────────────────────────────────────────────────────────
-
-// TestHelpBody_ContentMatchesTUIMainMenuHelp is a regression guard (already
-// green at HEAD): the same well-known main-menu bindings must appear in both
-// the controller's HelpBody sections and the TUI's rendered help View().
+// TestHelpBody_ContentMatchesTUIMainMenuHelp: the same well-known main-menu
+// bindings appear in both the controller's HelpBody sections and the TUI's
+// rendered help View().
 func TestHelpBody_ContentMatchesTUIMainMenuHelp(t *testing.T) {
 	ctrl := newParityHeadlessController(t, "help-parity-prof", "us-east-1")
 	vs, _ := ctrl.Apply(app.Action{Kind: app.ActionOpenHelp})
@@ -118,12 +84,10 @@ func TestHelpBody_ContentMatchesTUIMainMenuHelp(t *testing.T) {
 	}
 }
 
-// TestHelpBody_UnderResourceList_CarriesListContextBindings is the RED pin
-// for the wave-4a shared help-table gap: buildHelpBody() ignores what screen
-// is beneath ScreenHelp and always returns main-menu content. "y"/"yaml" is
-// present only in views.HelpModel.resourceListGroups (help.go L267-268),
-// never in mainMenuGroups (help.go L217-250) — so this assertion
-// distinguishes list-context help from main-menu-context help.
+// TestHelpBody_UnderResourceList_CarriesListContextBindings: "y"/"yaml" is
+// present only in views.HelpModel.resourceListGroups, not in mainMenuGroups
+// (internal/tui/views/help.go), so it distinguishes list-context help from
+// main-menu-context help.
 func TestHelpBody_UnderResourceList_CarriesListContextBindings(t *testing.T) {
 	ctrl := newParityHeadlessController(t, "help-parity-list-prof", "us-east-1")
 
@@ -163,8 +127,7 @@ func TestHelpBody_UnderResourceList_CarriesListContextBindings(t *testing.T) {
 
 // TestHelpBody_ListContext_ProducedByTUIAndControllerAgree cross-checks the
 // TUI's own resource-list-context HelpModel output against the same list of
-// list-only markers, so both halves of the shared-table gap are pinned
-// against the SAME renderer that will eventually source from one table.
+// list-only markers.
 func TestHelpBody_ListContext_ProducedByTUIAndControllerAgree(t *testing.T) {
 	hm := views.NewHelpWithResource(keys.Default(), views.HelpFromResourceList, "ec2")
 	hm.SetSize(100, 40)
@@ -195,10 +158,6 @@ func TestHelpBody_ListContext_ProducedByTUIAndControllerAgree(t *testing.T) {
 		t.Error("HelpBody built over ScreenResourceList does not contain a \"yaml\" hint that views.HelpModel.resourceListGroups carries — the two renderers have drifted apart, exactly the bug a shared table prevents")
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// 2. Ctrl-backed overlays: help / identity / error-log
-// ─────────────────────────────────────────────────────────────────────────
 
 // assertOverlayRoundTripStaysInSync opens an overlay via keyPress, asserts
 // StackInSync() and the expected content marker, dismisses via esc, and
@@ -248,19 +207,10 @@ func TestOverlayParity_ErrorLog_NoErrors_RoundTripStaysInSync(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 3. Error-log dual-store parity
-// ─────────────────────────────────────────────────────────────────────────
-
 // TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount drives N
-// distinct messages.APIError events through the TUI's real Update() loop
-// (each appends one error-flash-derived entry to BOTH
-// m.errorHistory, the TUI-local store, and — via the same Core.HandleAPIError
-// call — whatever store the post-refactor '!' overlay is wired to read from)
+// distinct messages.APIError events through the TUI's real Update() loop,
 // then opens the '!' overlay and asserts the rendered line count is EXACTLY N,
-// with every distinct error message present exactly once. A resurrected or
-// drifted dual-store (double-append, dropped entry, or wiring the overlay to
-// a stale/partial source) would produce a count mismatch here.
+// with every distinct error message present exactly once.
 func TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount(t *testing.T) {
 	m := newRootSizedModel()
 

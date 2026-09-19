@@ -2,14 +2,10 @@
 
 package integration
 
-// scenario_rds_snap_visual_test.go — Phase 8 render-gate for the dbi-snap resource.
-//
-// Verifies the rendered TUI output matches the universal UI rules and the
-// per-resource §4 contract in docs/resources/dbi-snap.md. Wave 2 = None for
-// this type, so glyph (`!`/`~`) and S5 EnrichmentFinding rules collapse to
-// N/A. The two cross-ref Wave-1 signals (orphan, automated past retention)
-// are emitted via the IssueEnricher's IssueAppends/FieldUpdates path.
-// Authored by the a9s-implement-resource skill runner.
+// scenario_dbi_snap_visual_test.go checks the rendered TUI output for
+// dbi-snap against the universal UI rules and docs/resources/dbi-snap.md.
+// The two cross-ref signals (orphan, automated past retention) are emitted
+// via the IssueEnricher's IssueAppends/FieldUpdates path.
 
 import (
 	"strings"
@@ -23,8 +19,7 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// -----------------------------------------------------------------
-	// S1 menu badge — assert BEFORE OpenList (the menu is the root view).
+	// The menu badge is read while the menu is the root view.
 	// The count is the rows whose colour is an issue, and colour is the worst
 	// severity among a row's findings across both waves.
 	// Over the 12 dbi-snap fixtures:
@@ -39,60 +34,45 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	//                       shared-with-all-dbi-snap (shared with all accounts)
 	//   Not counted (2):    rds:prod-dbi-1-2026-04-15 and
 	//                       awsbackup:job-deadbeef-snap are clean.
-	// 3 + 4 + 3 = 10. The copying row is the one this batch added, as the
-	// witness for a snapshot state a9s does not enumerate by name.
+	// 3 + 4 + 3 = 10. The copying row carries a snapshot state a9s does not
+	// enumerate by name.
 	scenario.ExpectMenuIssueCount("dbi-snap", 10)
 
 	scenario.OpenList("dbi-snap")
 
-	// -----------------------------------------------------------------
-	// Universal column rules — no jargon columns.
-	// -----------------------------------------------------------------
 	for _, jargon := range []string{"CIS", "NOBKP", "UNENC", "NOPROT", "Flags", "Policy"} {
 		scenario.ExpectViewNotContains(jargon)
 	}
-	// The Encrypted column was deleted per impl-plan §3.5 — guard against re-introduction.
 	scenario.ExpectViewNotContains("Encrypted ")
 
-	// -----------------------------------------------------------------
-	// Wave 1 §4 phrases per fixture.
-	// -----------------------------------------------------------------
-	// Healthy: blank Status.
 	scenario.ExpectRowStatusBlank(demofixtures.ProdDBISnapID)
 	scenario.ExpectRowStatusBlank(demofixtures.BackupCoveredDBISnapID)
 
-	// Transitional Warning.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapCreatingID, "creating: 42%")
 
-	// Broken (severity wins; failed phrase is bare per spec §4 — no per-row failure-reason field on DBSnapshot).
+	// DBSnapshot carries no failure-reason field, so the failed phrase is bare.
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenDBISnapFailedID, "failed")
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenDBISnapIncompatibleID, "incompatible-restore")
 
-	// U8 — Broken severity beats Warning: failed + Encrypted=false → "failed" alone (no suffix).
+	// Broken severity beats Warning: failed + Encrypted=false → "failed" alone.
 	scenario.ExpectRowStatusEquals(demofixtures.SeverityBrokenWarnDBISnapID, "failed")
 
-	// Single-W1 Warnings.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapUnencryptedID, "unencrypted")
 
-	// Cross-ref Wave-1 (enricher).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapOrphanID, "orphan: source DB deleted")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDBISnapPastRetentionID, "automated, 23d past retention")
 
-	// U7a — W1 unencrypted (fetcher, `~`) + W2 orphan (enricher, `!`) → top
+	// W1 unencrypted (fetcher, `~`) + W2 orphan (enricher, `!`) → top
 	// phrase + (+1). The top is decided by severity, not by wave or by a
 	// phrase ladder: domain.TopFinding takes the worst entry, so the `!`
 	// orphan leads and the `~` unencrypted becomes the (+1).
 	scenario.ExpectRowStatusEquals(demofixtures.MultiW1DBISnapID, "orphan: source DB deleted (+1)")
 
-	// -----------------------------------------------------------------
-	// Glyph rules.
-	// -----------------------------------------------------------------
 	// colorDBISnap (catalog_databases.go) resolves color via
 	// colorFromAnyFinding first. dbiSnapOrphanCode and
 	// dbiSnapPastRetentionCode are both declared Severity: SevBroken, so the
-	// cross-ref enricher's findings now promote those rows straight to
-	// Broken row color — they no longer stay Healthy-with-glyph the way they
-	// did when the enricher emitted Findings without a severity color read.
+	// cross-ref enricher's findings promote those rows straight to
+	// Broken row color.
 	// Every row here resolves a non-Healthy color via a finding (or a plain
 	// structural fallback for the truly healthy rows), so none carry a
 	// glyph.
@@ -111,15 +91,10 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// -----------------------------------------------------------------
-	// Related panel — graph-root = ProdDBISnapID. Per impl-plan §9.3
-	// dbi-snap has a structural exemption: dbi/kms are 1:1 by AWS data
-	// model, dbc is always Count=0 (Aurora cluster snapshots live in
-	// dbc-snap, not dbi-snap — real AWS rejects CreateDBSnapshot on
-	// Aurora cluster members). The universal "≥50% Count ≥ 2" rule is
-	// unsatisfiable; we assert ≥1 on the pivots that have a non-zero
-	// case for dbi-snap and accept Count=0 on dbc.
-	// -----------------------------------------------------------------
+	// dbi/kms are 1:1 by the AWS data model and dbc is always Count=0
+	// (Aurora cluster snapshots live in dbc-snap — AWS rejects
+	// CreateDBSnapshot on Aurora cluster members), so only the pivots with a
+	// non-zero case for dbi-snap are asserted.
 	root := selectDBISnapByID(t, scenario, demofixtures.ProdDBISnapID)
 	scenario.OpenDetailResource("dbi-snap", root)
 	scenario.ExpectNoAPIError()
@@ -131,14 +106,11 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// -----------------------------------------------------------------
-	// Paste the rendered list view once to the test log — Phase 8.4.
-	// -----------------------------------------------------------------
 	t.Log("\n" + scenario.currentView())
 }
 
-// TestScenario_DBISnapVisual_DetailSurfacesAllIssues asserts spec rule 7 for
-// the detail view. Multi-warning fixtures must enumerate every Resource.Issues
+// TestScenario_DBISnapVisual_DetailSurfacesAllIssues asserts that
+// multi-warning fixtures enumerate every Resource.Issues
 // entry, not just the top phrase shown in the Status column.
 func TestScenario_DBISnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
@@ -151,21 +123,17 @@ func TestScenario_DBISnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 	// Attention section capitalizes the first letter of each entry.
 	cases := []issueCase{
-		// Healthy baseline — Attention section must be absent.
 		{demofixtures.ProdDBISnapID, nil},
-		// Single Wave-1 phrases.
 		{demofixtures.WarnDBISnapCreatingID, []string{"Creating: 42%"}},
 		{demofixtures.BrokenDBISnapFailedID, []string{"Failed"}},
 		{demofixtures.BrokenDBISnapIncompatibleID, []string{"Incompatible-restore"}},
 		{demofixtures.WarnDBISnapUnencryptedID, []string{"Unencrypted"}},
-		// U8 — Broken severity beats Warning. Encrypted=false signal is
-		// suppressed by the fetcher when Status is a Broken end-state.
+		// The fetcher suppresses the Encrypted=false signal when Status is a
+		// Broken end-state.
 		{demofixtures.SeverityBrokenWarnDBISnapID, []string{"Failed"}},
-		// Cross-ref Wave-1 (enricher) — single phrase.
 		{demofixtures.WarnDBISnapOrphanID, []string{"Orphan: source DB deleted"}},
 		{demofixtures.WarnDBISnapPastRetentionID, []string{"Automated, 23d past retention"}},
-		// U7e — multi-W1 fixture: every entry must appear in the
-		// Attention section. Order is severity-first (`!` tier wins) per
+		// Order is severity-first (`!` tier wins) per
 		// the Attention block's stable sort, so the orphan finding (`!`
 		// tier from the cross-ref enricher) precedes the fetcher's
 		// "unencrypted" Wave-1 phrase (`~` tier from phraseTier).
@@ -190,9 +158,8 @@ func TestScenario_DBISnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 }
 
-// TestScenario_DBISnapVisual_HealthyRowHasNoIssuesPhrases is a regression pin
-// for "Healthy silence" in the detail view — no §4 phrase should leak onto
-// a Healthy snapshot's detail screen.
+// TestScenario_DBISnapVisual_HealthyRowHasNoIssuesPhrases pins "Healthy
+// silence" on a Healthy snapshot's detail screen.
 func TestScenario_DBISnapVisual_HealthyRowHasNoIssuesPhrases(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)

@@ -2,10 +2,8 @@
 
 package unit
 
-// tui5_view_upgrade_order_test.go — the view-file upgrade could add a column
-// and re-source one, but never reorder, so a corrected default column order
-// reached new installations only. These pin the rule that fixes it: a file
-// whose every column is still the source and width its stamp's build
+// The view-file upgrade's order rule: a
+// file whose every column is still the source and width its stamp's build
 // generated has never been touched, and takes this build's order wholesale;
 // a file the operator has edited keeps the order it has.
 
@@ -122,19 +120,15 @@ func TestViewUpgrade_EditedFileKeepsItsOrder(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // The migration table generalises. An entry names a title and the whole column
 // the previous build generated for it; an on-disk column still matching that
 // takes the current default column wholesale — source, width, and whatever a
 // later build adds — so a correction reaches an installation that already
 // exists rather than only a fresh one.
 //
-// The rule is demonstrated on logs' Retention column, whose correction is
-// live: an older build sourced it from the RawStruct path RetentionInDays
-// at width 10, and this build reads Fields["retention"] at width 12. The
-// humanize flag is the type's own declaration (ResourceTypeDef.HumanizeFields),
-// not a column field, so it is not something the carry delivers.
-// ---------------------------------------------------------------------------
+// The rule is demonstrated on logs' Retention column: an older build sourced
+// it from the RawStruct path RetentionInDays at width 10, and this build reads
+// Fields["retention"] at width 12.
 
 // tui5ColumnTitled returns the on-disk column with the given title.
 func tui5ColumnTitled(t *testing.T, dir, name, title string) config.ListColumn {
@@ -220,10 +214,6 @@ func TestViewUpgrade_OperatorsOwnFieldSurvivesTheCorrection(t *testing.T) {
 		t.Errorf("Retention = %+v — a width they set kept the correction off a field they never touched", got)
 	}
 }
-
-// TestUpgradeLeavesAnOperatorsOwnSourceAlone covers the other distinguishable
-// case, a field whose value the operator changed to something neither build
-// wrote.
 
 // tui5WithColumn returns cols with the entry sharing replacement's title
 // swapped for it.

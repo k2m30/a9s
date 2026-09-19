@@ -1,4 +1,4 @@
-// rowstore_stage4_pins_test.go — ListState.Rows is a store-derived VIEW,
+// ListState.Rows is a store-derived VIEW,
 // the Controller owns no resourceCache map of its own, and there is ONE save
 // lane through reconcileTypeFile.
 package unit
@@ -25,7 +25,7 @@ import (
 // file. "s3" is chosen (matching qa_cache_lifecycle_test.go's own choice)
 // because its default view (.a9s/views/s3.yaml) mixes a pure-Key column
 // (Status) with pure-Path columns (Bucket Name/Region/Creation Date) — the
-// exact "Key-only + Path columns" shape pin 2 requires, and it has a real
+// "Key-only + Path columns" shape the save-lane parity pin needs, and it has a real
 // registered ResourceTypeDef so resolveSaveColumns/resolveListColumnsForBuild
 // both resolve non-trivially.
 const stage4PinType = "s3"
@@ -58,15 +58,6 @@ func stage4PinReadTypeFile(t *testing.T, profile, region, shortName string) cach
 	}
 	return tf
 }
-
-// =============================================================================
-// Pin 1 — stacked isolation: a top-level s3 list and a stacked
-// related-filtered s3 list (same resource type, two independent
-// ScreenResourceList entries) never share rows/cursor/title. Ctrl+R and
-// load-more act on the TOP screen only; the screen underneath is untouched.
-// StackInSync-equivalent invariant (both screens are ScreenResourceList,
-// distinguishable by content) holds after every step.
-// =============================================================================
 
 // stage4PinRawFixture satisfies s3's real default column Paths (Bucket Name
 // -> Name, Region -> BucketRegion, Creation Date -> CreationDate) via
@@ -174,10 +165,9 @@ func TestStage4Pin_StackedIsolation_TopScreenActionsNeverTouchUnderlyingList(t *
 		t.Fatalf("precondition: stacked list must be exact (Truncated=false) to distinguish it from the top-level list's truncated state, got Truncated=true")
 	}
 
-	// --- Ctrl+R (refresh) on the TOP (stacked) screen only. ---
 	ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 	// DeleteResourceCache + Loading=true is the observable immediate effect
-	// when the stacked screen still has rows (C8: rows stay visible under a
+	// when the stacked screen still has rows (rows stay visible under a
 	// refreshing marker) — re-seed via the same ApplyResourcesLoaded seam to
 	// simulate the refresh's own verify-fetch landing, still scoped to the
 	// stacked (top) screen only. The stacked screen carries a non-nil
@@ -194,7 +184,6 @@ func TestStage4Pin_StackedIsolation_TopScreenActionsNeverTouchUnderlyingList(t *
 		stage4PinS3Resource("bucket-related-3"),
 	}, nil, false)
 
-	// --- Load-more append on the TOP (stacked) screen only. ---
 	// handleActionLoadMore requires ls.HasPagination; seed a truncated state
 	// first via another ApplyResourcesLoaded carrying pagination, then append.
 	ctrl.ApplyResourcesLoaded(stage4PinType, []resource.Resource{
@@ -240,14 +229,6 @@ func TestStage4Pin_StackedIsolation_TopScreenActionsNeverTouchUnderlyingList(t *
 		t.Errorf("top-level s3 list FrameTitle = %q after stacked-screen mutation, want unchanged %q — stacked isolation violated", postStack.FrameTitle, topLevelTitleBefore)
 	}
 }
-
-// =============================================================================
-// Pin 2 — single-save-lane byte-parity (D16 strongest form): identical
-// controller state saved via the list-close (list-lane) save and via the
-// sweep-completion (sweep-lane) save must persist IDENTICAL rows, for a type
-// whose columns mix Key-only and Path-only entries AND whose session has a
-// user-reordered/renamed column set (SetViewConfig override).
-// =============================================================================
 
 // stage4PinReorderedS3ViewConfig builds a ViewsConfig for "s3" with the same
 // four columns as the built-in default but in a DIFFERENT order (Region
@@ -361,14 +342,6 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 		}
 	}
 }
-
-// =============================================================================
-// Pin 3 — findings/wave2 carry survives the view-switch: a silent swap on a
-// seeded top-level s3 list still carries its known Wave-2 finding through
-// applyResourcesLoaded, exercised through the SAME production seam the
-// Stage-4 rewrite (store.Observe replacing the direct ls.Rows/resourceCache
-// mirror write) must preserve.
-// =============================================================================
 
 // TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane extends (does
 // not duplicate the assertions of) qa_cache_field_completeness_test.go's
@@ -484,14 +457,6 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	}
 }
 
-// =============================================================================
-// Pin 4 — Controller.resourceCache absence: a source-scan asserting no
-// `resourceCache map[string]` field exists under core/app, listing any
-// readers (mirrors rowstore_stage2_pins_test.go's
-// caseInsensitiveGrepSyncProbeResourcesForTypeCallers pattern applied to a
-// field declaration instead of a function name).
-// =============================================================================
-
 // scanForResourceCacheFieldDeclaration walks core/app's production Go
 // source (*.go, excluding *_test.go) for the literal field declaration
 // pattern `resourceCache map[string]`. Comment-only lines are skipped (a
@@ -537,13 +502,8 @@ func scanForResourceCacheFieldDeclaration(t *testing.T) (string, error) {
 }
 
 // scanForResourceCacheReaders walks core/app's production Go source for
-// any remaining CODE reference to `c.resourceCache` or `.resourceCache[` —
-// the field-access shape used throughout list_body.go, footer.go, text.go,
-// and controller.go today (per the row-store unification plan's own
-// verified inventory: controller.go:35-37 the field, controller.go:197,
-// footer.go:97, list_body.go:42/129-142/713-714/770/900, text.go:219 the
-// readers). Comment-only lines are skipped for the same reason as the
-// declaration scan above.
+// any CODE reference to `c.resourceCache` or `.resourceCache[`. Comment-only
+// lines are skipped for the same reason as the declaration scan above.
 func scanForResourceCacheReaders(t *testing.T) (string, error) {
 	t.Helper()
 	const needle = "resourceCache"
@@ -609,13 +569,6 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 	})
 }
 
-// =============================================================================
-// Pin 5 — ApplyListFieldUpdates single-application: field updates during an
-// open list apply exactly once (no dual-apply through both ls.Rows and the
-// dead resourceCache mirror), and a subsequent silent swap does not
-// double-append findings.
-// =============================================================================
-
 // TestStage4Pin_FieldUpdatesApplyExactlyOnce_NoDualApplyThroughDeadMirror
 // drives ApplyListFieldUpdates on an open top-level s3 list and asserts the
 // updated field's value equals exactly the update (not concatenated,
@@ -624,11 +577,10 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 // findings are not double-appended (exactly one copy of the carried
 // finding survives, not two). applyListFieldUpdates (core/app/list_body.go)
 // applies map[string]string updates via maps.Copy onto EACH row's Fields
-// map on ls.Rows once; an update loop that ran TWICE over the SAME ls.Rows
-// slice (once via a leftover legacy path, once via the store-view
-// derivation) would show up as an incorrect final value if the update
-// function were non-idempotent. outgoingRowFindingsByID's per-swap capture
-// + fold only ever runs once per applyResourcesLoaded call.
+// map on ls.Rows once; an update loop that ran twice over the same ls.Rows
+// slice would show up as an incorrect final value if the update function were
+// non-idempotent. outgoingRowFindingsByID's per-swap capture + fold runs once
+// per applyResourcesLoaded call.
 func TestStage4Pin_FieldUpdatesApplyExactlyOnce_NoDualApplyThroughDeadMirror(t *testing.T) {
 	ctrl := newStage4PinController(t)
 	openTopLevelList(ctrl, stage4PinType)

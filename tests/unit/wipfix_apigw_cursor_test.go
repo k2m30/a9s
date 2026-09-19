@@ -1,15 +1,13 @@
 package unit
 
-// wipfix_apigw_cursor_test.go — row 8: the merged API Gateway cursor must be
-// able to say a lane FINISHED.
+// The merged API Gateway cursor must be able to say a lane FINISHED.
 //
 // FetchAPIGatewaysPageMerged walks two independent lanes: APIGateway V1's
 // Position-based REST listing (capped per call at apigwV1PageCap) and
 // APIGateway V2's NextToken listing. When V2 drains on the first call while
-// V1 is still mid-walk, the encoded cursor carries a V1 position and an EMPTY
-// V2 token — and an empty V2 token is also what "first page" means, so the
-// next continuation restarts V2 from page one. Its rows are fetched twice and
-// enter the accumulated result a second time.
+// V1 is still mid-walk, an EMPTY V2 token cannot record that: it is also what
+// "first page" means, and a continuation reading it restarts V2 from page one
+// and delivers its rows a second time.
 
 import (
 	"context"
@@ -87,7 +85,7 @@ func countAPIGWIDs(seen map[string]int, res []resource.Resource) {
 	}
 }
 
-// TestFetchAPIGatewaysPageMerged_FinishedV2LaneIsNotRewalked pins row 8: after
+// TestFetchAPIGatewaysPageMerged_FinishedV2LaneIsNotRewalked: after
 // the V2 lane reports exhaustion, a continuation driven by the still-unfinished
 // V1 lane must not fetch V2 again, and must not deliver its rows twice.
 func TestFetchAPIGatewaysPageMerged_FinishedV2LaneIsNotRewalked(t *testing.T) {

@@ -1,6 +1,6 @@
 package unit
 
-// related_navigate_cache_enter_child_test.go — Pin for the "single-result
+// Pin for the "single-result
 // pivot always opens the target's DETAIL view" invariant on the CACHE-HIT
 // fast path.
 //
@@ -66,9 +66,8 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 }
 
 // containsEnterChildViewMsg returns true when any message in msgs is an
-// EnterChildViewMsg for the given child type. Retained for the negative
-// assertion below: the new rule requires this NEVER fires on the related-
-// panel Count=1 pivot.
+// EnterChildViewMsg for the given child type. The related-panel Count=1 pivot
+// must never produce one.
 func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.EnterChildView, bool) {
 	for _, msg := range msgs {
 		if m, ok := msg.(messages.EnterChildView); ok && m.ChildType == childType {

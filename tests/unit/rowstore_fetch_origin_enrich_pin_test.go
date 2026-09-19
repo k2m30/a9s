@@ -1,29 +1,10 @@
-// rowstore_fetch_origin_enrich_pin_test.go — regression pin for the
-// fetch-origin blind-spot in Core.ProbeResources (core/runtime/
-// accessors.go). Before the fix, ProbeResources gated its RowStore read on
-// tr.Origin being OriginProbe or OriginDisk, so a type whose ONLY retained
-// entry carried OriginFetch (the exact shape produced by a `-c <type>`
-// startup list-open, or any top-level list fetch, BEFORE the Wave-2 sweep's
-// enrich task ran for that type) fed ProbeEnrichment an empty resources
-// slice. The real Wave-2 enricher then ran against zero rows: zero findings,
-// zero glyphs, and the eventual completion save carried no findings for that
-// type — a silent, total loss of Wave-2 signal for whichever type happened
-// to be open on screen when the sweep reached it.
-//
-// This file drives the REAL execution path end to end:
-//  1. Seed a RowStore entry via Observe(..., session.OriginFetch, ...) — the
-//     open-list-fetch shape, not a hand-built ObserveRows/OriginProbe seed.
-//  2. Register a test Wave-2 enricher (SetWave2EnricherForTest) that records
-//     the rows it was actually invoked with.
-//  3. Call the real Core.ProbeEnrichment execution lane (TaskKindProbeEnrich's
-//     production path) and assert the enricher saw the NON-EMPTY fetch-origin
-//     rows.
-//  4. Drive the completion flow via Core.Handle(messages.EnrichmentChecked)
-//     and assert the dispatched TaskKindSaveCache payload's rows carry the
-//     findings the enricher emitted.
-//  5. Companion negative: a Partial-only entry must still be excluded from
-//     the enricher's input (mirrors ProbeResources' remaining tr.Partial
-//     gate, which this fix must not weaken).
+// Core.ProbeResources
+// (core/runtime/accessors.go) reads a type whose only retained RowStore entry
+// carries OriginFetch (the shape a `-c <type>` startup list-open or any
+// top-level list fetch leaves before the Wave-2 sweep's enrich task runs for
+// that type), so the Wave-2 enricher sees those rows and the completion save
+// carries their findings. A Partial-only entry stays excluded from the
+// enricher's input.
 package unit_test
 
 import (
@@ -132,13 +113,6 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 // type's rows — mirroring the dispatch-time payload-freeze pin's payload-inspection pattern
 // (TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend) but for
 // a fetch-origin-seeded type rather than a probe-seeded one.
-//
-// Pre-fix: the sweep never sees any rows for the fetch-origin type in the
-// first place (see the primary pin above), so this would trivially "pass"
-// with zero findings for the wrong reason; this test's own precondition
-// check (EnrichTotal/queue membership) and its independent seenRows
-// assertion on the enricher closure make sure the failure mode is visible
-// end-to-end, not just muted by an empty completion payload.
 func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t *testing.T) {
 	const sentinelType = "dbi-fetch-origin-completion-pin"
 
@@ -237,12 +211,10 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 	}
 }
 
-// TestProbeEnrichment_PartialOnlyRows_ExcludedFromEnricherInput is the
-// companion negative the dispatch calls for: a Partial-only entry (sparse
-// FetchByIDs lazy-add, never a canonical Observe/ObserveFetch/disk seed)
-// must remain excluded from the enricher's input — the fix widening the
-// origin gate to include OriginFetch must not also drop the pre-existing
-// tr.Partial exclusion.
+// TestProbeEnrichment_PartialOnlyRows_ExcludedFromEnricherInput: a
+// Partial-only entry (sparse FetchByIDs lazy-add, never a canonical
+// Observe/ObserveFetch/disk seed) stays excluded from the enricher's input,
+// while OriginFetch rows reach it.
 func TestProbeEnrichment_PartialOnlyRows_ExcludedFromEnricherInput(t *testing.T) {
 	const sentinelType = "dbi-partial-only-enrich-pin"
 

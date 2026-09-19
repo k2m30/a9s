@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ---------------------------------------------------------------------------
-// Identity view model tests — construct views.IdentityModel directly
-// ---------------------------------------------------------------------------
-
 // TestIdentityView_LoadedContent_AccountSection verifies that the identity
 // view renders account ID and alias after receiving identity data.
 func TestIdentityView_LoadedContent_AccountSection(t *testing.T) {
@@ -112,15 +108,6 @@ func TestIdentityView_ErrorState(t *testing.T) {
 	}
 }
 
-// CopyContent()/FrameTitle() are DEAD on IdentityModel per
-// specs/022-codebase-cleanup/wave3-map-text.md. Live equivalents:
-//   - loaded → copies exact ARN: text_ports_test.go's
-//     TestPort_IdentityCopy_CopiesExactARN (handleCopy/rsKindIdentity).
-//   - loading → copy is a no-op: text_ports_test.go's
-//     TestPort_IdentityCopy_NoOpWhileLoading.
-//   - FrameTitle: no live branch reads IdentityModel.FrameTitle() at all —
-//     the identity screen has no rs.helpContext/frame-title dependency on it.
-
 // TestIdentityView_AnyKeyDismisses verifies that any key press sends PopViewMsg.
 func TestIdentityView_AnyKeyDismisses(t *testing.T) {
 	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
@@ -192,13 +179,6 @@ func TestIdentityView_SessionSection(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Root wiring tests — use root model helpers
-// These tests require the tui package to compile. If app_handlers.go has
-// a compile error (e.g. wrong NewIdentity arg count), these will fail to
-// build until that is fixed.
-// ---------------------------------------------------------------------------
-
 // TestRoot_IKey_ShowsIdentityView verifies that pressing 'i' from the
 // main menu opens the identity view.
 func TestRoot_IKey_ShowsIdentityView(t *testing.T) {
@@ -219,18 +199,15 @@ func TestRoot_IdentityView_EscDismisses(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Open identity view
 	m, _ = rootApplyMsg(m, rootKeyPress("i"))
 	identityPlain := strings.ToLower(stripANSI(rootViewContent(m)))
 	if !strings.Contains(identityPlain, "identity") {
 		t.Fatal("identity view should be visible before dismiss test")
 	}
 
-	// Dismiss with Esc
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	afterPlain := strings.ToLower(stripANSI(rootViewContent(m)))
 
-	// Should be back on main menu, not identity
 	if strings.Contains(afterPlain, "fetching identity") {
 		t.Error("identity view should be dismissed after Esc")
 	}
@@ -260,10 +237,6 @@ func TestRoot_IdentityLoaded_UpdatesHeader(t *testing.T) {
 		t.Errorf("header should contain identity name after IdentityLoadedMsg, got:\n%s", plain)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Header layout tests — identity badge in RenderHeader
-// ---------------------------------------------------------------------------
 
 // TestLayoutRenderHeader_WithIdentityBadge verifies the header renders
 // account badge and identity name when provided.
@@ -308,23 +281,6 @@ func TestLayoutRenderHeader_WithIdentityBadge_Width(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Help screen test — identity binding
-// ---------------------------------------------------------------------------
-
-// ════════════════════════════════════════════════════════════════════════════
-// GetHelpContext — 0% hit: returns HelpFromMainMenu
-// ════════════════════════════════════════════════════════════════════════════
-
-// GetHelpContext() is DEAD on IdentityModel per wave3-map-text.md — no live
-// branch reads it; newIdentityRS (renderer.go) never sets rs.helpContext for
-// the identity screen at all (zero value), so there is no live behavior tied
-// to this accessor to port.
-
-// ════════════════════════════════════════════════════════════════════════════
-// Update — unrecognized message type returns unchanged model
-// ════════════════════════════════════════════════════════════════════════════
-
 // TestIdentityView_Update_UnknownMsg verifies that an unrecognized message type
 // leaves the model state unchanged and returns a nil command.
 func TestIdentityView_Update_UnknownMsg(t *testing.T) {
@@ -336,7 +292,6 @@ func TestIdentityView_Update_UnknownMsg(t *testing.T) {
 	if cmd != nil {
 		t.Error("Update(unknown msg) should return nil Cmd")
 	}
-	// State must remain loading (no identity data received)
 	plain := strings.ToLower(stripANSI(m2.View()))
 	if !strings.Contains(plain, "fetch") {
 		t.Errorf("after unknown msg, view should still show loading state, got:\n%s", plain)
@@ -396,7 +351,6 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 			tui.Version = "0.6.0"
 			m := tc.setup()
 
-			// Open help
 			m, _ = rootApplyMsg(m, rootKeyPress("?"))
 			plain := strings.ToLower(stripANSI(rootViewContent(m)))
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// wipfix_qa_drill_refresh_test.go drives row 29 through the terminal: Ctrl+R
-// pressed on a client-side related drill. The drill holds the subset the
+// wipfix_qa_drill_refresh_test.go drives Ctrl+R pressed on a client-side
+// related drill through the terminal. The drill holds the subset the
 // related check resolved, not the type's whole population, so a refresh
 // dispatched on the canonical lane either lands nowhere or replaces the
 // drill's rows with the full list — both of which the operator reads as the
@@ -107,12 +107,9 @@ func wipfixVisibleRowCount(s *fullIntegrationScenario) int {
 	return n
 }
 
-// TestScenario_CtrlROnRelatedDrill_BadgeCountsTheDrillsOwnRows pins row 38.
-// The refresh reaches the drill now, and the drill's count and rows come from
-// its own prefiltered set — but the issue badge is still counted over the
-// account's whole list, so ten instances built from one AMI are titled with
-// the eighteen issues of the forty-one the account has. The badge reads the
-// same set the count and the rows read.
+// TestScenario_CtrlROnRelatedDrill_BadgeCountsTheDrillsOwnRows pins that the
+// drill's issue badge reads the same prefiltered set its count and rows read,
+// not the account's whole list.
 func TestScenario_CtrlROnRelatedDrill_BadgeCountsTheDrillsOwnRows(t *testing.T) {
 	s := fullIntegrationNewDemoScenario(t)
 
@@ -163,7 +160,7 @@ func TestScenario_CtrlROnRelatedDrill_BadgeCountsTheDrillsOwnRows(t *testing.T) 
 		t.Errorf("after Ctrl+R the frame is %q, want the drill's own count and parent still there", after)
 	}
 
-	// The badge the drill must stop borrowing is still right where it belongs.
+	// The canonical list keeps its own badge.
 	s.Back()
 	s.Back()
 	s.Back()

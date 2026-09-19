@@ -1,23 +1,19 @@
 package unit
 
-// related_circular_reentry_test.go — a circular related drill (detail A ->
+// A circular related drill (detail A ->
 // drill count-1 row -> detail B -> drill count-1 row back to A) must re-seed
 // the re-entered A's RELATED panel: the cache replay in the
 // NavigationKindDetail branch of handleRelatedNavigate
 // (internal/tui/runtime_adapter_related.go) lands on the re-pushed detail
 // screen, and a cache MISS dispatches the related-check tasks again.
 //
-// Harness follows related_cache_bug_test.go / related_navigate_cache_enter_child_test.go:
-// build a demo root model, drive it via rootApplyMsg/drainCmds, and assert
-// on the ANSI-stripped rendered view. Package unit (not unit_test) is
-// required to reach those harness helpers.
+// Package unit (not unit_test) is required to reach the rootApplyMsg/drainCmds
+// harness helpers.
 //
-// Pin 4 (header/version): regardless of whether "[N]" is rendered, the
-// header of a
-// drill-entered detail screen must contain the resolved buildinfo version
-// string. tui.Version is a package var (set from cmd/a9s/main.go at real
-// run time) so the test sets it directly to a sentinel and asserts its
-// well-formed presence ("v"+sentinel) in the rendered header.
+// The header of a drill-entered detail screen contains the resolved buildinfo
+// version whether or not "[N]" is rendered. tui.Version is a package var (set
+// from cmd/a9s/main.go at run time), so the test sets it to a sentinel and
+// asserts "v"+sentinel in the rendered header.
 
 import (
 	"strings"
@@ -106,11 +102,6 @@ func feedEC2RelatedResults(m tui.Model, sourceID string) tui.Model {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Pin 1: circular drill A -> B -> A must show CACHED count badges on
-// re-entry, not bare rows.
-// ---------------------------------------------------------------------------
-
 // TestRelatedCircularReentry_CacheHit_ShowsCachedBadges verifies that after
 // A (ec2) accumulates related-check results, drilling A -> B (vpc) -> back to
 // the SAME A renders A's RELATED panel with the cached count badges
@@ -178,11 +169,6 @@ func TestRelatedCircularReentry_CacheHit_ShowsCachedBadges(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pin 2: circular drill with an EMPTY cache for A (fresh session) must show
-// the loading state and dispatch checks, not silently render bare rows.
-// ---------------------------------------------------------------------------
-
 // TestRelatedCircularReentry_CacheMiss_DispatchesChecks verifies the
 // cache-MISS half of the same circular drill: when A has never accumulated
 // related results before the B hop, drilling back into A must dispatch the
@@ -238,10 +224,6 @@ func TestRelatedCircularReentry_CacheMiss_DispatchesChecks(t *testing.T) {
 		t.Fatalf("BUG: circular re-entry into A with an EMPTY related cache must dispatch the related-check fan-out so the panel is populated instead of staying bare; got no RelatedCheckResult in the cmd chain. View:\n%s", viewA)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Pin 4: header version invariant on the drill-entered detail screen.
-// ---------------------------------------------------------------------------
 
 // TestRelatedCircularReentry_HeaderShowsResolvedVersion verifies that after
 // the A->B->A circular drill, the header of the re-entered detail screen

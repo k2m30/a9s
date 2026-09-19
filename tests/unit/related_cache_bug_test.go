@@ -1,12 +1,9 @@
 package unit
 
-// related_cache_bug_test.go — regression coverage for the related-check
-// cache: re-entering the same EC2 detail view after pressing Esc must reuse
-// cached related results (no re-dispatch of the checker fan-out, per D6:
-// no re-fan-out over cached data) and must show the cached count badges
-// immediately (Controller.replayRelatedCache merging RelatedCacheGet's
-// entries into the fresh DetailState). All five tests PASS with current
-// code.
+// Re-entering the same EC2 detail view after Esc
+// reuses cached related results without re-dispatching the checker fan-out, and
+// shows the cached count badges immediately (Controller.replayRelatedCache
+// merges RelatedCacheGet's entries into the fresh DetailState).
 
 import (
 	"context"
@@ -28,20 +25,14 @@ import (
 // the model after all produced messages have been processed.
 // Returns the final model plus the list of all messages that were produced.
 //
-// Batch-aware (mirrors the extractEnrichmentChecked idiom in
+// Batch-aware (mirrors extractEnrichmentChecked in
 // qa_enrich_pipeline_dispatch_test.go): detail-open/refresh for an enrichable
-// type now returns a tea.Batch (related-check cmd + enrich cmd), and the real
-// Bubble Tea runtime executes every batch member and delivers each leaf
-// message to Update independently — a walker that treated tea.BatchMsg as an
-// opaque leaf would simulate that unfaithfully. Cmds are processed via a
-// queue rather than a single linear chain so a batch's members (and whatever
-// cmds they each go on to produce) are all drained.
+// type returns a tea.Batch (related-check cmd + enrich cmd), and the Bubble Tea
+// runtime delivers each batch member's leaf message to Update independently, so
+// cmds are drained through a queue.
 //
-// maxDepth bounds APPLIED messages only (the pre-batching meaning every
-// caller's budget was tuned to) — a nil cmd, a nil msg, or unwrapping a
-// tea.BatchMsg into its members is free and does not consume the budget.
-// Only a leaf message that is actually applied to the model via rootApplyMsg
-// counts toward maxDepth.
+// maxDepth bounds applied messages only: a nil cmd, a nil msg, or unwrapping a
+// tea.BatchMsg into its members costs nothing.
 func drainCmds(t *testing.T, m tui.Model, cmd tea.Cmd, maxDepth int) (tui.Model, []tea.Msg) {
 	t.Helper()
 	var allMsgs []tea.Msg
@@ -117,11 +108,8 @@ func applyImmediateCmd(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, []tea
 // instance (fakes.NewEC2()'s ec2Res[0], "i-0a1b2c3d4e5f60001") on ANY
 // registered related type — otherwise a genuinely fresh, correct count
 // re-arriving after Ctrl+R is indistinguishable from the stale fixture value
-// a test is checking has been cleared. Verified empirically: every one of
-// the 19 registered ec2 RelatedDefs resolves to Count 0, 1, or 2 for that
-// instance against the real demo fixtures (highest: Security Groups=2,
-// CloudTrail Events=2) — stubRelatedCount is more than 3x the highest real
-// value.
+// a test is checking has been cleared. Every registered ec2 RelatedDef resolves
+// to a count of at most 2 for that instance against the demo fixtures.
 const stubRelatedCount = 7
 
 var stubRelatedIDs = []string{
@@ -143,7 +131,6 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Navigate to EC2 list.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -170,7 +157,6 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	m, firstCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	m, firstMsgs := drainCmds(t, m, firstCmd, 5)
 
-	// Verify a RelatedCheckResult was produced somewhere in the chain.
 	foundRelatedCheck := false
 	for _, msg := range firstMsgs {
 		if _, ok := msg.(messages.RelatedCheckResult); ok {
@@ -205,21 +191,16 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 
 // TestBug_RelatedCheckResults_NotCachedOnReentry verifies that re-entering
 // the same EC2 instance's detail view does NOT re-dispatch the related-check
-// fan-out — replayRelatedCache (D6: no re-fan-out over cached data) serves
-// the cached results instead.
+// fan-out — replayRelatedCache serves the cached results instead.
 func TestBug_RelatedCheckResults_NotCachedOnReentry(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
-	// Esc → back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Re-enter the SAME EC2 instance (cursor is still on first item).
-	// Drain the full cmd chain to see all messages produced.
+	// The cursor is still on the first instance.
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 
-	// EXPECTED: no RelatedCheckResult on re-entry (results are cached).
-	// BUG: the root model always creates a fresh DetailModel, so it always re-emits.
 	for _, msg := range secondMsgs {
 		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			t.Fatal("BUG: re-entering the same EC2 detail view should NOT re-dispatch " +
@@ -236,17 +217,12 @@ func TestBug_RelatedCheckResults_NotCachedOnReentry(t *testing.T) {
 func TestBug_RelatedCheckResults_RightColShowsCachedCounts(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
-	// Esc → back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Re-enter the SAME EC2 instance.
-	// Use applyRootAndCmd to advance through the Navigate chain into detail.
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
 
 	view := stripANSI(rootViewContent(m))
 
-	// EXPECTED: at least one related type shows its cached count.
-	// BUG: no "(7)" appears because all checkers were re-dispatched and results are pending.
 	if !strings.Contains(view, "(7)") {
 		t.Fatalf("BUG: re-entering detail should show cached related counts immediately; "+
 			"expected '(7)' in view output.\nView:\n%s", view)
@@ -255,19 +231,13 @@ func TestBug_RelatedCheckResults_RightColShowsCachedCounts(t *testing.T) {
 
 // TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck verifies that
 // entering a DIFFERENT EC2 instance's detail view DOES trigger fresh checks.
-// This is a cache-miss scenario and must always produce a RelatedCheckResult.
-//
-// This test PASSES with current code (correct existing behavior).
 func TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
-	// Esc → back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Move cursor to the SECOND EC2 instance.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyDown))
 
-	// Enter the second EC2 instance → drain cmd chain → must include a RelatedCheckResult.
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 
@@ -286,21 +256,15 @@ func TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck(t *testing.T) {
 // TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch verifies that a profile
 // switch invalidates any cached related-check results so that the next detail
 // entry re-checks from scratch.
-//
-// Since there is no relatedCheckCache yet, this test PASSES with current code
-// (no cache to invalidate). It documents the required invalidation contract for
-// when the cache is implemented.
 func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
-	// Esc → back to EC2 list.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Simulate a profile switch. In demo mode, ProfileSelectedMsg is a no-op
 	// (returns immediately). But we feed it to exercise the cache invalidation path.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
 
-	// Re-enter the first EC2 instance — drain cmd chain.
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 

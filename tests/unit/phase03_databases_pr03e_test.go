@@ -1,12 +1,12 @@
 package unit_test
 
-// phase03_databases_pr03e_test.go — PR-03e migration contract tests for the
+// Wave 1 finding contract for the
 // 12 database resource types (dbi, dbi-snap, dbc, dbc-snap, s3, redis,
 // opensearch, ddb, redshift, msk, efs, kinesis).
 //
 // Invariants:
-//   - Fetcher writes Resource.Status == "" (no more Status writes)
-//   - Fetcher writes Resource.Issues == nil (no more Issues writes)
+//   - Fetcher writes Resource.Status == ""
+//   - Fetcher writes Resource.Issues == nil
 //   - Fetcher writes Resource.Findings with Source:"wave1" for each non-healthy signal
 //   - Healthy resources have len(Resource.Findings) == 0
 //   - Fields["status"] (or Fields["state"]) preserved for the display column
@@ -125,11 +125,9 @@ func TestPR03e_DBIFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 
 // TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding: a "stopped" RDS instance
 // must emit a SevBroken Finding (CodeDBIStopped)
-// so colorDBI's wave1-first prelude returns ColorBroken — matching the legacy
-// catalog colorDBI classification ("stopped" listed alongside "failed",
-// "storage-full", etc.). A default-branch SevWarn CodeDBITransitional
-// finding would regress the row from Broken to Warning under the wave1-first
-// color path.
+// so colorDBI's wave1-first prelude returns ColorBroken, classing "stopped"
+// alongside "failed", "storage-full", etc. A default-branch SevWarn
+// CodeDBITransitional finding would color the row Warning.
 func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 	mock := &pr03eRDSMock{
 		instances: []rdstypes.DBInstance{
@@ -164,13 +162,13 @@ func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken (AS-126 regression: stopped must keep Broken severity)", f.Severity)
 	}
-	// Task phrase7 row 2 renamed this phrase: the old wording was declared at more than one severity across the catalog, so the same words carried two colours.
+	// A phrase is declared at one severity across the catalog, so the same words never carry two colours.
 	if f.Phrase != "stopped (storage still billed)" {
 		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "stopped (storage still billed)")
 	}
 
-	// And the catalog colorDBI must classify the row as ColorBroken via the
-	// wave1-first prelude — closing the regression loop end-to-end.
+	// The catalog colorDBI classifies the row as ColorBroken via the
+	// wave1-first prelude.
 	td := resource.FindResourceType("dbi")
 	if td == nil {
 		t.Fatal("dbi type def not found in registry")
@@ -181,7 +179,7 @@ func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_DBIColor_ReadsWave1First pins that the dbi Color func evaluates
-// Findings before the legacy Fields["status"] switch.
+// Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="" (healthy).
 // Expect: ColorWarning (Findings wins over healthy-silence).
@@ -297,10 +295,10 @@ func TestPR03e_DBISnapFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03e_DBISnapColor_ReadsWave1First pins that the dbi-snap Color func
-// evaluates Findings before the legacy Fields["status"] switch.
+// evaluates Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="available".
-// Expect: ColorWarning (Findings wins over legacy "available"→ColorHealthy).
+// Expect: ColorWarning (Findings wins over "available"→ColorHealthy).
 func TestPR03e_DBISnapColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("dbi-snap")
 	if td == nil {
@@ -410,7 +408,7 @@ func TestPR03e_DBCFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_DBCColor_ReadsWave1First pins that the dbc Color func evaluates
-// Findings before the legacy Fields["status"] switch.
+// Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="" (healthy silence).
 // Expect: ColorWarning (Findings wins over structural).
@@ -527,10 +525,10 @@ func TestPR03e_DBCSnapFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03e_DBCSnapColor_ReadsWave1First pins that the dbc-snap Color func
-// evaluates Findings before the legacy Fields["status"] switch.
+// evaluates Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["status"]="available".
-// Expect: ColorBroken (Findings wins over legacy "available"→ColorHealthy).
+// Expect: ColorBroken (Findings wins over "available"→ColorHealthy).
 func TestPR03e_DBCSnapColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("dbc-snap")
 	if td == nil {
@@ -687,7 +685,7 @@ func TestPR03e_RedisFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03e_RedisColor_ReadsWave1First pins that the redis Color func evaluates
-// Findings before the legacy Fields["status"] switch.
+// Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="" (healthy silence).
 // Expect: ColorWarning (Findings wins over structural).
@@ -871,10 +869,10 @@ func TestPR03e_OpenSearchFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_OpenSearchColor_ReadsWave1First pins that the opensearch Color func
-// evaluates Findings before the legacy Fields["status"] switch.
+// evaluates Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevBroken, wave1} + Fields["status"]="active" (healthy).
-// Expect: ColorBroken (Findings wins over legacy "active"→ColorHealthy).
+// Expect: ColorBroken (Findings wins over "active"→ColorHealthy).
 func TestPR03e_OpenSearchColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("opensearch")
 	if td == nil {
@@ -956,7 +954,7 @@ func TestPR03e_DDBFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DDB table", len(r.Findings))
 	}
-	// Fields["status"] should be the healthy display phrase (empty string per spec).
+	// A healthy row's display phrase is the empty string.
 	if got := r.Fields["status"]; got != "" {
 		t.Errorf("Fields[\"status\"]: got %q, want %q (healthy silence)", got, "")
 	}
@@ -1004,7 +1002,7 @@ func TestPR03e_DDBFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_DDBColor_ReadsWave1First pins that the ddb Color func evaluates
-// Findings before the legacy Fields["status"] switch.
+// Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="" (healthy).
 // Expect: ColorWarning (Findings wins over healthy-silence).
@@ -1135,10 +1133,10 @@ func TestPR03e_RedshiftFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_RedshiftColor_ReadsWave1First pins that the redshift Color func
-// evaluates Findings before the legacy Fields["cluster_status"] switch.
+// evaluates Findings before the Fields["cluster_status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["cluster_status"]="available".
-// Expect: ColorWarning (Findings wins over legacy "available"→ColorHealthy).
+// Expect: ColorWarning (Findings wins over "available"→ColorHealthy).
 func TestPR03e_RedshiftColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("redshift")
 	if td == nil {
@@ -1256,10 +1254,10 @@ func TestPR03e_MSKFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_MSKColor_ReadsWave1First pins that the msk Color func evaluates
-// Findings before the legacy Fields["state"] switch.
+// Findings before the Fields["state"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["state"]="ACTIVE".
-// Expect: ColorWarning (Findings wins over legacy "ACTIVE"→ColorHealthy).
+// Expect: ColorWarning (Findings wins over "ACTIVE"→ColorHealthy).
 func TestPR03e_MSKColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("msk")
 	if td == nil {
@@ -1382,10 +1380,10 @@ func TestPR03e_EFSFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 }
 
 // TestPR03e_EFSColor_ReadsWave1First pins that the efs Color func evaluates
-// Findings before the legacy Fields["status"] switch.
+// Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="available".
-// Expect: ColorWarning (Findings wins over legacy "available"→ColorHealthy).
+// Expect: ColorWarning (Findings wins over "available"→ColorHealthy).
 func TestPR03e_EFSColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("efs")
 	if td == nil {
@@ -1506,10 +1504,10 @@ func TestPR03e_KinesisFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03e_KinesisColor_ReadsWave1First pins that the kinesis Color func
-// evaluates Findings before the legacy Fields["status"] switch.
+// evaluates Findings before the Fields["status"] switch.
 //
 // Setup: Finding{SevWarn, wave1} + Fields["status"]="ACTIVE".
-// Expect: ColorWarning (Findings wins over legacy "ACTIVE"→ColorHealthy).
+// Expect: ColorWarning (Findings wins over "ACTIVE"→ColorHealthy).
 func TestPR03e_KinesisColor_ReadsWave1First(t *testing.T) {
 	td := resource.FindResourceType("kinesis")
 	if td == nil {
@@ -2051,17 +2049,3 @@ func TestPR03e_EFSFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		t.Errorf("Findings: missing CodeEFSCreating; got %v", r.Findings)
 	}
 }
-
-// =============================================================================
-// Per-type case-class exceptions
-// =============================================================================
-
-// S3 has no Wave-1 codes — colorS3 returns ColorHealthy at the bucket level
-// and Wave-2 enrichment owns the rest. No `s3_codes.go` file
-// exists; the Healthy case above is the only Wave-1 contract that applies.
-// No PendingEmitsWarnFinding / BrokenEmitsBrokenFinding cases for s3 — the
-// three-case template collapses to Healthy here.
-//
-// Kinesis has no Wave-1 broken codes (lifecycle
-// states only emit Warn). The Healthy + Pending cases above cover the entire
-// Wave-1 surface; there is no BrokenEmitsBrokenFinding case for kinesis.

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_codex_build_test.go pins what the off-lock body build reads: a
-// map it shares with the locked writer (row 40), and the typeDef it resolves
-// twice (row 39).
+// Pins what the off-lock body build reads: a
+// map it shares with the locked writer, and the typeDef it resolves on two
+// paths.
 package unit_test
 
 import (
@@ -16,9 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// --- row 40: a map on both sides of the lock -------------------------------
-
-// TestOffLockBuild_DoesNotShareTheRelatedIDSet pins row 40. The build detaches
+// TestOffLockBuild_DoesNotShareTheRelatedIDSet: the build detaches
 // the list state by copying the struct, which copies the related-ID set by
 // reference. A body built off the lock then iterates the same map a result
 // landing under the lock inserts into, and Go ends the process on that.
@@ -59,8 +57,8 @@ func TestOffLockBuild_DoesNotShareTheRelatedIDSet(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		// Handle captures the build inputs under the lock, runs the build off
-		// it, and installs the memo back under it — the off-lock window this
-		// row is about.
+		// it, and installs the memo back under it — the off-lock window under
+		// test.
 		for i := range 200 {
 			id := "page-" + string(rune('a'+i%26)) + string(rune('a'+i/26))
 			_, _ = handlePage(c, messages.ResourcesLoaded{
@@ -88,12 +86,9 @@ func TestOffLockBuild_DoesNotShareTheRelatedIDSet(t *testing.T) {
 	}
 }
 
-// --- row 39: one typeDef owner per screen ----------------------------------
-
-// TestChildTypeResolvesTheSameOnBothPaths is row 39's behavioural half. A
-// child type is registered outside the catalog, and only one of the two
-// resolvers walks that rung: the display side finds the child's typeDef, the
-// filter side finds nothing, so a column that renders cannot be filtered on.
+// TestChildTypeResolvesTheSameOnBothPaths: a child type is registered
+// outside the catalog, and the display and filter resolvers must both find
+// its typeDef, or a column that renders cannot be filtered on.
 func TestChildTypeResolvesTheSameOnBothPaths(t *testing.T) {
 	c := newTestController(t)
 	child := resource.ResourceTypeDef{

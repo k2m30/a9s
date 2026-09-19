@@ -15,8 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// Regression guard for related navigation UX:
-// from related-filtered list, Esc should return to source detail (not clear filter first).
+// From a related-filtered list, Esc returns to the source detail rather than
+// clearing the filter first.
 func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -40,14 +40,12 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 		t.Fatalf("demo ami fixtures missing (err=%v, len=%d)", err, len(amis))
 	}
 
-	// Source detail view.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2[0],
 	})
 
-	// Open related target list using exact target ID (produces filtered title like ami(1/4)).
 	imageID := amis[0].ID
 	m, _ = rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "ami",
@@ -56,7 +54,6 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 		TargetID:       imageID,
 	})
 
-	// Simulate loaded target list.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 		ResourceType: "ami",
 		Resources:    amis,
@@ -73,7 +70,6 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 		t.Fatalf("expected the related drill's own count in the title before Esc; got:\n%s", beforeEsc)
 	}
 
-	// Esc should pop back to detail directly.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	afterEsc := stripANSI(rootViewContent(m))
 	if !strings.Contains(afterEsc, "detail --") {

@@ -1,9 +1,7 @@
 package unit
 
-// qa_pagination_view_test.go — the 'M' key (LoadMore) Update() behavior when
-// truncated, non-truncated, or already loading. The FrameTitle()/Append
-// format and cursor-stability pins are on the live Controller seam
-// (pagination_frametitle_ports_test.go and list_loadmore_ports_test.go).
+// The 'M' key (LoadMore) Update() behaviour when truncated, non-truncated, or
+// already loading.
 
 import (
 	"fmt"
@@ -19,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // pgTestTypeDef returns an EC2-like ResourceTypeDef for pagination tests.
 func pgTestTypeDef() resource.ResourceTypeDef {
@@ -97,37 +91,26 @@ func pgLoadResources(
 	return m
 }
 
-// ===========================================================================
-// LoadMore key (M) tests
-// ===========================================================================
-
-// TestResourceList_LoadMore_WhenTruncated_SendsMsg verifies that pressing M
-// on a truncated list returns a command (which will produce a LoadMoreMsg).
 func TestResourceList_LoadMore_WhenTruncated_SendsMsg(t *testing.T) {
 	m, ctrl := pgNewModel(t)
 
-	// Load truncated page
 	m = pgLoadResources(ctrl, m, pgTestResources(200), &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "token-abc",
 	}, false)
 
-	// Press M (LoadMore)
 	_, cmd := m.Update(pgKeyPress("M"))
 
 	if cmd == nil {
 		t.Fatal("expected M key on truncated list to return a non-nil command")
 	}
 
-	// Execute the command to verify it produces a LoadMoreMsg
 	msg := cmd()
 	if _, ok := msg.(messages.LoadMore); !ok {
 		t.Errorf("expected cmd to produce LoadMoreMsg, got %T", msg)
 	}
 }
 
-// TestResourceList_LoadMore_WhenNotTruncated_Noop verifies that pressing M
-// on a non-truncated list (all pages loaded) does nothing.
 func TestResourceList_LoadMore_WhenNotTruncated_Noop(t *testing.T) {
 	t.Run("nil pagination", func(t *testing.T) {
 		m, ctrl := pgNewModel(t)
@@ -152,39 +135,28 @@ func TestResourceList_LoadMore_WhenNotTruncated_Noop(t *testing.T) {
 	})
 }
 
-// TestResourceList_LoadMore_WhenAlreadyLoading_Noop verifies that pressing M
-// while a page is already being fetched does nothing (prevents double-fetching).
+// A second M while a page is in flight must not start a second fetch.
 func TestResourceList_LoadMore_WhenAlreadyLoading_Noop(t *testing.T) {
 	m, ctrl := pgNewModel(t)
 
-	// Load truncated page
 	m = pgLoadResources(ctrl, m, pgTestResources(200), &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "token-abc",
 	}, false)
 
-	// Press M once — should start loading
 	m, cmd1 := m.Update(pgKeyPress("M"))
 	if cmd1 == nil {
 		t.Fatal("precondition: first M press should return a command")
 	}
 
-	// Press M again while still loading — should be a no-op
 	_, cmd2 := m.Update(pgKeyPress("M"))
 	if cmd2 != nil {
 		t.Error("expected second M key press during loadingMore to return nil cmd (no double-fetch)")
 	}
 }
 
-// ===========================================================================
-// Edge case tests
-// ===========================================================================
-
-// TestResourceList_LoadMore_KeyBinding_Exists verifies that the LoadMore
-// binding is registered in the key map.
 func TestResourceList_LoadMore_KeyBinding_Exists(t *testing.T) {
 	k := keys.Default()
-	// Verify that LoadMore binding exists and matches "M"
 	if !key.Matches(pgKeyPress("M"), k.LoadMore) {
 		t.Error("expected 'M' key to match keys.Map.LoadMore binding")
 	}

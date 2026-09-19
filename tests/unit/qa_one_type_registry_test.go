@@ -1,4 +1,4 @@
-// qa_one_type_registry_test.go — one registry for resource types, and no
+// One registry for resource types, and no
 // production read of a test-only one.
 //
 // A test-only override map is safe while only tests touch it. It stops being
@@ -85,8 +85,8 @@ var productionRoots = []string{"../../core", "../../internal", "../../cmd"}
 // TestCoreResourceKeepsNoParallelTypeRegistry holds the ARCH rule directly:
 // the catalog is the registry, and core/resource keeps no map of its own
 // beside it. A second registry is a second answer to "what types exist", and
-// the readers that consult one and not the other were the bug this rule
-// closes — a child type's declaration that half the getters could not see.
+// a reader that consults one and not the other misses a child type's
+// declaration.
 func TestCoreResourceKeepsNoParallelTypeRegistry(t *testing.T) {
 	fset := token.NewFileSet()
 	pkg, err := parser.ParseDir(fset, "../../core/resource", func(fi os.FileInfo) bool {
@@ -136,8 +136,7 @@ func TestCoreResourceKeepsNoParallelTypeRegistry(t *testing.T) {
 // TestNoProductionCodeCallsATestSeam is the standing half of the rule: a test
 // seam may be declared in a production package (that is where the symbol it
 // overrides lives) but never called from one. A production call site is the
-// point at which the seam's unguarded state joins a production code path,
-// which is the shape of the defect this batch is closing.
+// point at which the seam's unguarded state joins a production code path.
 func TestNoProductionCodeCallsATestSeam(t *testing.T) {
 	var offenders []string
 

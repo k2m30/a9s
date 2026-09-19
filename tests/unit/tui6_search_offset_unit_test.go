@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_search_offset_unit_test.go — a search offset says what unit it is in.
+// A search offset says what unit it is in.
 //
 // A text screen publishes each match as ColStart/ColEnd on app.SearchMatch,
 // and serialises them as col_start/col_end. A reader that believes the name
@@ -80,9 +80,8 @@ func TestSearchOffsets_AreByteOffsetsAfterADoubleWidthRune(t *testing.T) {
 }
 
 // TestSearchOffsets_UnchangedOnAPlainASCIILine is the counterpart: on a line
-// where all three units agree, the published offsets are the same numbers they
-// have always been. A conversion that shifted every match by a constant would
-// fail here.
+// where the byte, rune and column units agree, the published offsets are that
+// one number.
 func TestSearchOffsets_UnchangedOnAPlainASCIILine(t *testing.T) {
 	const line = "Name: web-01-production"
 	matches := tui6TextMatches(t, []string{line}, tui6WideQuery)
@@ -96,8 +95,7 @@ func TestSearchOffsets_UnchangedOnAPlainASCIILine(t *testing.T) {
 }
 
 // TestSearchOffsets_EveryMatchOnALineIsPublished pins the second and third
-// occurrence too: a per-match conversion applied only to the first one would
-// leave the rest in the old unit.
+// occurrence too.
 func TestSearchOffsets_EveryMatchOnALineIsPublished(t *testing.T) {
 	const line = "Tags: 東京=production, env=production"
 	matches := tui6TextMatches(t, []string{line}, tui6WideQuery)
@@ -139,8 +137,8 @@ func TestSearchHighlight_LandsOnTheMatchAfterADoubleWidthRune(t *testing.T) {
 	}
 }
 
-// TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone pins the shape of
-// row 2 on both text lanes: the match set is computed once, by the controller,
+// TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone pins both text
+// lanes: the match set is computed once, by the controller,
 // and the terminal paints the set it is handed. A renderer that computes its
 // own would find the second occurrence on this line, which the body
 // deliberately does not carry.
@@ -193,7 +191,7 @@ func TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone(t *testing.T) {
 // unfolded line, shifts every later match by the difference.
 const tui6FoldLine = "Name: İstanbul-production"
 
-// TestSearchOffsets_UnshiftedByALengthChangingFold pins row 4 on the published
+// TestSearchOffsets_UnshiftedByALengthChangingFold pins the published
 // offsets: the match is where the operator sees it, not where it sits in a
 // folded copy of the line nobody paints.
 func TestSearchOffsets_UnshiftedByALengthChangingFold(t *testing.T) {
@@ -215,7 +213,7 @@ func TestSearchOffsets_UnshiftedByALengthChangingFold(t *testing.T) {
 	}
 }
 
-// TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold pins row 4 on
+// TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold pins
 // the painted surface: the highlight covers the word, not the word shifted by
 // the fold's byte difference.
 func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
@@ -245,9 +243,9 @@ func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
 // position, and why the published offset is a byte.
 const tui6MarkLine = "Name: e\u0301x-production"
 
-// TestSearchOffsets_ExactAroundACombiningMark pins the case the column unit
-// could not express: a search for the letter after the mark, and a search for
-// the mark itself.
+// TestSearchOffsets_ExactAroundACombiningMark pins the positions a column
+// unit cannot express: a search for the letter after the mark, and a search
+// for the mark itself.
 func TestSearchOffsets_ExactAroundACombiningMark(t *testing.T) {
 	t.Run("the letter after the mark", func(t *testing.T) {
 		matches := tui6TextMatches(t, []string{tui6MarkLine}, "x")
@@ -312,10 +310,9 @@ func TestSearchHighlight_CoversExactlyTheMatchedBytes(t *testing.T) {
 }
 
 // TestSearchMatches_ComputedOncePerContentAndQuery pins the cost. A text
-// screen is a document, and scanning it is not free: the match set was
-// recomputed by the action that set the query, by every snapshot, and again by
-// the renderer, so pressing n on a six-thousand-line document rescanned it
-// three times to move a highlight down one line.
+// screen is a document, and scanning it is not free: pressing n on a
+// six-thousand-line document moves a highlight down one line and rescans
+// nothing.
 //
 // The observable is the published set itself. Computing it again yields an
 // equal slice in a new allocation; handing back the one already decided for

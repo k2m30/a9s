@@ -2,7 +2,7 @@
 
 package unit
 
-// phrase_items_are_rows_test.go — one condition found on several items of one
+// One condition found on several items of one
 // resource states the condition once and lists every item.
 //
 // A pipeline with two failed stages, a user with two keys past rotation and a
@@ -13,10 +13,9 @@ package unit
 // item, and the loop that then stops at the first item leaves the reader with
 // no way to know the others were even inspected.
 //
-// The demo bench cannot see this: every demo witness carries exactly one
-// offending item, by the one-witness-per-finding rule, so the same-code
-// collapse never has a second emission to drop. These are the hand-built
-// multi-item cases.
+// The demo bench cannot see this: every demo fixture row carries exactly one
+// offending item per finding, so the same-code collapse never has a second
+// emission to drop. These are the hand-built multi-item cases.
 
 import (
 	"context"
@@ -39,8 +38,8 @@ import (
 
 // registeredPhrase returns the phrase the installed catalog declares for code
 // and fails the test when that phrase still carries a "<…>" placeholder. A
-// placeholder means the wording is still assembled per item at emit time,
-// which is the shape these tests exist to rule out.
+// placeholder means the wording is assembled per item at emit time, which is
+// the shape these tests rule out.
 func registeredPhrase(t *testing.T, code domain.FindingCode) string {
 	t.Helper()
 	for _, td := range append(catalog.All(), catalog.AllChildren()...) {

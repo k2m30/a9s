@@ -2,7 +2,7 @@
 
 package unit_test
 
-// phrase_is_the_codes_own_test.go — a finding's phrase, severity and detail
+// A finding's phrase, severity and detail
 // belong to its code, not to the item that happened to trigger it.
 //
 // A code is declared once, in a catalog.FindingDef that carries the phrase the
@@ -16,7 +16,7 @@ package unit_test
 // generated signals page carries a phrase no row ever renders.
 //
 // Severity has the same shape: the code declares one, and every call site
-// passes its own glyph. Nothing before this gate compared the two.
+// passes its own glyph; this gate compares the two.
 //
 // Scope is every demo row of every registered type, wave 1 read off the row
 // the real fetcher produced and wave 2 observed at the emission point through

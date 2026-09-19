@@ -1,23 +1,21 @@
 package unit_test
 
-// related_nil_branch_never_guesses_test.go — a checker that could not read its
+// A checker that could not read its
 // target list must say so, not answer from the source resource.
 //
 // Every related checker has a branch for "the list came back nil". Nil from a
 // fetch helper means one of two things, and neither is data: the cache held
-// nothing, or there was nothing to call. Checkers used that branch two ways,
-// both of them answers the code had no basis for. Some built IDs out of what
-// the SOURCE resource happens to know — an alias DNS name, an ARN, a snapshot's
-// own parent id — and returned them as a count. Others returned a zero, plain
-// or carrying the truncation flag, which reads as "there are none" or "none on
-// the pages read" about a list with no pages read at all.
+// nothing, or there was nothing to call. Such a branch may not build IDs out of
+// what the SOURCE resource happens to know — an alias DNS name, an ARN, a
+// snapshot's own parent id — nor return a zero, plain or carrying the
+// truncation flag, which reads as "there are none" or "none on the pages read"
+// about a list with no pages read at all.
 //
-// The scan is wide on the condition axis and on what counts as an answer,
-// because three times a survivor hid in width this gate lacked. A nil-list test
-// counts wherever it appears in the condition, including inside a compound one.
-// Any construction of a resolved result counts — appending, a non-empty slice
-// literal, or any of the resolved-result helpers, with nil ids as much as with
-// ids.
+// The scan is wide on the condition axis and on what counts as an answer. A
+// nil-list test counts wherever it appears in the condition, including inside a
+// compound one. Any construction of a resolved result counts — appending, a
+// non-empty slice literal, or any of the resolved-result helpers, with nil ids
+// as much as with ids.
 //
 // What keeps that width honest is the predicate on the VARIABLE. Only a nil
 // that came out of a fetch helper — the ones returning (list, truncation flag,
@@ -44,15 +42,15 @@ var (
 	// "nobody read it"; a nil from anything else is a fact about the source.
 	fetchAssignRe = regexp.MustCompile(`^\s*(\w+)\s*,\s*\w+\s*,\s*\w+\s*(?::=|=)\s*(?:\w+\.)?(?:relatedResourcesFor|FetchRelatedTarget|cachedTypedRows|\w*RelatedResources\w*)\s*\(`)
 	funcStartRe   = regexp.MustCompile(`^func `)
-	// The id-building rule predates the fetch-helper predicate and keeps its own
-	// narrower reach: a variable named like a list. Letting it loose on every
-	// nil check in the package flags "ids" and "c" and thirty-odd honest branches.
+	// The id-building rule has a narrower reach: a variable named like a list.
+	// Applied to every nil check in the package it flags "ids", "c" and dozens of
+	// honest branches.
 	listNameRe = regexp.MustCompile(`^\w*[Ll]ist$`)
 	// A slice literal with something in it. "[]string{}" is an empty answer and
 	// is fine; "[]string{name}" is an invented one.
 	nonEmptyLiteralRe = regexp.MustCompile(`\[\]string\{\s*[^}\s]`)
 	// Every helper that builds a RESOLVED result, so a new wrapper cannot hide a
-	// guess the way relatedResult and r53RelatedResult did.
+	// guess.
 	resolvedCallRe = regexp.MustCompile(`(?:\w*[Rr]elatedResult\w*|KnownRelated)\(`)
 	resolvedArgsRe = regexp.MustCompile(`(?:\w*[Rr]elatedResult\w*|KnownRelated)\(([^()]*(?:\([^()]*\)[^()]*)*)\)`)
 )
@@ -138,9 +136,9 @@ func TestRelatedNilBranch_NeverBuildsIDs(t *testing.T) {
 				}
 			}
 			block := strings.Join(body, "\n")
-			// A list nobody read may not produce ANY resolved answer, a zero
-			// included. A branch on anything else list-shaped is still held to
-			// the older rule: it may report nothing, but it may not invent ids.
+			// A list nobody read may not produce ANY resolved answer, a zero included. A
+			// branch on anything else list-shaped is held to the id rule: it may report
+			// nothing, but it may not invent ids.
 			listName := listNameRe.MatchString(m[2]) || listNameRe.MatchString(m[3])
 			if (readNothing && resolvedCallRe.MatchString(block)) || (listName && buildsIDs(block)) {
 				bad = append(bad, fmt.Sprintf("%s:%d", filepath.Base(path), i+1))

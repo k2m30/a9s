@@ -1,8 +1,7 @@
 package unit
 
-// prowler_w4_iam_group_test.go — behavioural test for the batch-w4 iam-group
-// row: an admin-equivalent managed policy attached to a group hands that
-// power to every current and future member.
+// An admin-equivalent managed policy attached
+// to a group hands that power to every current and future member.
 
 import (
 	"context"
@@ -107,9 +106,9 @@ func TestW4GroupAdminAttached(t *testing.T) {
 	w4AssertNoCode(t, res.Findings["acme-readers"], w4CodeGroupAdminAttached)
 }
 
-// TestW4GroupAdminAndOrphanAreIndependent pins that the new admin row does
-// not displace the group enricher's existing membership finding: an empty
-// admin group reports both, each with its own code and rows.
+// TestW4GroupAdminAndOrphanAreIndependent pins that the admin finding and the
+// group enricher's membership finding are independent: an empty admin group
+// reports both, each with its own code and rows.
 func TestW4GroupAdminAndOrphanAreIndependent(t *testing.T) {
 	fake := &w4GroupFake{
 		attached: map[string]map[string]string{
@@ -126,10 +125,9 @@ func TestW4GroupAdminAndOrphanAreIndependent(t *testing.T) {
 	}
 }
 
-// TestW4AdminPolicySetIsSharedAcrossPrincipals pins the architectural half of
-// rows 3/6/10: role, user and group answer "is this admin?" from one ARN set.
-// A per-file copy of the set is exactly what would let one principal type
-// recognise the probe and the other two miss it.
+// TestW4AdminPolicySetIsSharedAcrossPrincipals pins that role, user and group
+// answer "is this admin?" from one ARN set. A per-file copy of the set would
+// let one principal type recognise the probe and the other two miss it.
 //
 // The probe is not PowerUserAccess: AWS's PowerUserAccess excludes IAM,
 // Organizations and Account, so it is not administrator-equivalent and is

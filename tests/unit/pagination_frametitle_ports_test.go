@@ -1,18 +1,7 @@
-// pagination_frametitle_ports_test.go — live-seam port for the F/G-section
-// pins in qa_pagination_stories_test.go
-// (TestStoryF1/F2/F3/G1/G3): the "(N+)" truncated-count vs "(N)" exact-count
-// FrameTitle transition across Ctrl+R-reset, top-level re-fetch, empty-list
-// re-fetch, and cross-resource-type switch. These drive the legacy
-// views.ResourceListModel path (dead code — production never calls its
-// Update()/FrameTitle() directly; the controller/ViewState render path is
-// the only live consumer, per this file's list/detail/text sibling port files).
-//
-// The existing controller-oracle coverage (core/app/list_test.go's
-// TestListFrameTitle_LoadingState_NonEmpty / ShowsCountAfterLoad) only
-// asserts "non-empty" / "3 appears somewhere" — neither pins the exact
-// "(N+)"/"(N)" suffix format nor any of the five transition scenarios below.
-// This file closes that gap on the live seam: Controller.ApplyResourcesLoaded
-// -> ListFrameTitle / ListSelected.
+// pagination_frametitle_ports_test.go pins the "(N+)" truncated-count vs
+// "(N)" exact-count FrameTitle transition across Ctrl+R-reset, top-level
+// re-fetch, empty-list re-fetch, and cross-resource-type switch on the live
+// seam: Controller.ApplyResourcesLoaded -> ListFrameTitle / ListSelected.
 package unit_test
 
 import (
@@ -24,14 +13,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// wave3PagResources mirrors qa_pagination_stories_test.go's pgTestResources:
-// n EC2 instances with sequential zero-padded IDs starting at 0.
+// wave3PagResources returns n EC2 instances with sequential zero-padded IDs
+// starting at 0.
 func wave3PagResources(n int) []resource.Resource {
 	return wave3PagResourcesFrom(0, n)
 }
 
-// wave3PagResourcesFrom mirrors pgTestResourcesFrom: n EC2 instances with
-// sequential zero-padded IDs starting at start — used to generate a
+// wave3PagResourcesFrom returns n EC2 instances with sequential zero-padded
+// IDs starting at start — used to generate a
 // disjoint-ID second page (AWS pagination never repeats an ID across pages).
 func wave3PagResourcesFrom(start, n int) []resource.Resource {
 	out := make([]resource.Resource, n)
@@ -48,7 +37,6 @@ func wave3PagResourcesFrom(start, n int) []resource.Resource {
 func TestPaginationFrameTitle_CtrlR_ResetsPagination(t *testing.T) {
 	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 
-	// Initial truncated page.
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 	if title := c.ListFrameTitle(); title != "ec2(200+)" {
 		t.Fatalf("precondition: expected %q, got %q", "ec2(200+)", title)
@@ -159,8 +147,8 @@ func TestPaginationFrameTitle_SwitchingResourceType_ResetsPagination(t *testing.
 	}
 }
 
-// TestPaginationFrameTitle_RapidRefresh_ReplaceClean ports
-// TestStoryI3_RapidRefresh_ReplaceClean: several rapid Ctrl+R replace results
+// TestPaginationFrameTitle_RapidRefresh_ReplaceClean pins that several rapid
+// Ctrl+R replace results
 // arriving in sequence must leave the model reflecting only the last one,
 // with no stale "+" truncation marker once the final page is exact.
 func TestPaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
@@ -185,16 +173,11 @@ func TestPaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
 }
 
 // ===========================================================================
-// Additional PORT — buildListFrameTitle's LoadingMore and text-filter branches
-// (list_body.go ~line 513, 518-525), ported from qa_pagination_view_test.go.
-// The CtrlR/refresh scenarios above only exercise the bare "(N)"/"(N+)"
-// format; neither branch below is exercised by any other test at the live
-// seam.
+// buildListFrameTitle's LoadingMore and text-filter branches (list_body.go).
 // ===========================================================================
 
-// TestPaginationFrameTitle_LoadingMore_ShowsAndClears ports
-// TestResourceList_FrameTitle_LoadingMore + TestResourceList_LoadMore_
-// SetsAndClearsLoadingMore: the "(N+ loading...)" inline suffix appears
+// TestPaginationFrameTitle_LoadingMore_ShowsAndClears pins that the
+// "(N+ loading...)" inline suffix appears
 // while ActionLoadMore is in flight and disappears (replaced by the plain
 // count) once the appended page lands.
 func TestPaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
@@ -216,8 +199,7 @@ func TestPaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
 	}
 }
 
-// TestPaginationFrameTitle_TruncatedWithFilter ports
-// TestResourceList_FrameTitle_TruncatedWithFilter: an active text filter on a
+// TestPaginationFrameTitle_TruncatedWithFilter pins that an active text filter on a
 // still-truncated list shows "(filtered/total+)".
 func TestPaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
 	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
@@ -231,8 +213,7 @@ func TestPaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
 	}
 }
 
-// TestPaginationFrameTitle_AllLoadedWithFilter ports
-// TestResourceList_FrameTitle_AllLoadedWithFilter: an active text filter on a
+// TestPaginationFrameTitle_AllLoadedWithFilter pins that an active text filter on a
 // fully-loaded (non-truncated) list shows the exact "(filtered/total)" pair,
 // with no trailing "+".
 func TestPaginationFrameTitle_AllLoadedWithFilter(t *testing.T) {

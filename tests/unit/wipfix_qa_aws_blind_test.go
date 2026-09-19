@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_aws_blind_test.go drives three fetch-side
+// Drives three fetch-side
 // scenarios:
 //
 //   - a CodeArtifact repository whose package count hit its page cap, beside a
@@ -30,8 +30,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
-
-// --- row 5: a capped package count beside a completed policy check ---------
 
 const wipfixOpenRepoPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["codeartifact:ReadFromRepository"],"Resource":"*"}]}`
 
@@ -74,7 +72,7 @@ func wipfixCARows() []resource.Resource {
 	}}
 }
 
-// TestEnrichCodeArtifact_CappedPackageCountKeepsThePolicyVerdict pins row 5:
+// TestEnrichCodeArtifact_CappedPackageCountKeepsThePolicyVerdict:
 // the package count is informational and its cap is reported by the "+" on
 // the count. The permissions-policy verdict comes from a different call the
 // count says nothing about, and marking the row uninspected drops it.
@@ -121,8 +119,6 @@ func TestEnrichCodeArtifact_CappedPackageCountKeepsThePolicyVerdict(t *testing.T
 	}
 }
 
-// --- row 6: a capped subscription walk beside the posture read -------------
-
 // snsEndlessSubsFake never stops offering another page of subscriptions. The
 // topic is unencrypted, which GetTopicAttributes alone establishes.
 type snsEndlessSubsFake struct {
@@ -156,7 +152,7 @@ func (f *snsEndlessSubsFake) GetTopicAttributes(
 
 const wipfixSNSTopicARN = "arn:aws:sns:us-east-1:123456789012:example-busy-topic"
 
-// TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture pins row 6: the access
+// TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture: the access
 // policy and the encryption key come from GetTopicAttributes, one call that
 // the subscription walk's completeness has no bearing on. A topic with many
 // subscribers is exactly the topic whose posture matters most.
@@ -211,8 +207,6 @@ func TestEnrichSNS_CappedWalkNeverClaimsAllPending(t *testing.T) {
 	}
 }
 
-// --- row 8: the merged API Gateway cursor ----------------------------------
-
 // apigwV1ManyPagesFake hands back one REST API per call and always another
 // position, so the V1 lane truncates every time and the merged fetcher keeps
 // being asked to continue.
@@ -250,7 +244,7 @@ func (f *apigwV2OnePageFake) GetApis(
 	}, nil
 }
 
-// TestFetchAPIGatewaysPageMerged_FinishedV2LaneIsNotRewalked pins row 8: once
+// TestFetchAPIGatewaysPageMerged_FinishedV2LaneIsNotRewalked: once
 // the V2 lane has reported exhaustion the cursor must say so. A cursor that
 // can only record a token cannot distinguish "V2 finished" from "V2 starts at
 // page one", so every continuation re-walks it and its rows enter the

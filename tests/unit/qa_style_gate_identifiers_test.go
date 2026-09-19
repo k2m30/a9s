@@ -1,6 +1,6 @@
 package unit_test
 
-// qa_style_gate_identifiers_test.go — the raw-enum gate's blind spot.
+// The raw-enum gate's blind spot.
 //
 // TestIssueTextStyleGate_RenderedSurfacesNeverRawEnum only recognises a
 // violation shaped like SCREAMING_SNAKE (`^[A-Z][A-Z0-9_]+$`). That misses the
@@ -16,11 +16,8 @@ package unit_test
 // `10.0.0.0/8`, `sg-0abc123`), and forcing prose there would destroy the
 // information the row exists to carry.
 //
-// This gate has no allowlist on purpose. It is a purge, not a burn-down: the
-// violations are hand-written literals in the authoring layer, every one is a
-// one-line reword, and a green transition must require zero edits to this
-// file. A pre-existing hit on a type outside the current batch is a finding to
-// route, not an entry to add here.
+// This gate has no allowlist: every violation is a hand-written literal in
+// the authoring layer, and every one is a one-line reword.
 
 import (
 	"fmt"
@@ -67,9 +64,9 @@ var awsProductNames = map[string]bool{
 
 // parentheticalPattern matches a "(...)" aside. This codebase reports the
 // runtime value a sentence is about inside parentheses ("recorded a
-// destructive call (TerminateInstances)"). That is the row's data, and the
-// batch contract exempts values — so parentheticals are stripped before
-// scanning, the same way the raw-enum gate strips "<...>" placeholders.
+// destructive call (TerminateInstances)"). That is the row's data, and values
+// are exempt — so parentheticals are stripped before scanning, the same way
+// the raw-enum gate strips "<...>" placeholders.
 var parentheticalPattern = regexp.MustCompile(`\([^()]*\)`)
 
 // identifierTokens returns the tokens of text shaped like a machine

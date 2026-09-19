@@ -2,40 +2,30 @@
 
 package integration
 
-// scenario_related_drill_through_test.go — Drill-through regression pins.
+// Drill-through checks.
 //
 // These tests verify that every registered related-panel pivot and navigable
-// field on the graph-root fixture actually resolves to at least one real
-// resource in the demo cache. An empty landing means the checker produced a
-// resource ID in a format that does not match the target resource type's
-// Resource.ID field — the exact bug class that caused the SES EventBridge,
-// DDB KMS, opensearch→acm, and efs→backup navigation failures.
+// field on the graph-root fixture resolves to at least one real resource in
+// the demo cache. An empty landing means the checker produced a resource ID
+// in a format that does not match the target resource type's Resource.ID
+// field.
 //
-// The drill-through test (TestScenario_RelatedDrillThrough_All) runs checkers
-// DIRECTLY against a prefetched ResourceCache rather than through the TUI
-// event loop. The previous TUI-driven design had three loopholes that all
-// hid bugs at once:
+// TestScenario_RelatedDrillThrough_All runs checkers directly against a
+// prefetched ResourceCache rather than through the TUI event loop:
 //
-//  1) `Count < 1 → continue` silently skipped pivots that didn't resolve —
-//     whether from a genuine bug or a harness race.
-//  2) Detail-open fires related checks in parallel; checkers with
-//     NeedsTargetCache=true ran against a still-populating cache and
-//     committed Count=0 RelatedCheckResultMsgs before the sibling fetchers
-//     finished. The scenario harness didn't re-probe, so those zeros
-//     propagated to the test.
-//  3) When a drill did fire (Count >= 1), `DrillRelated` succeeded on the
-//     FetchFilter path even when the checker's emitted ResourceIDs didn't
-//     match the target fetcher's Resource.ID format, because that branch
-//     fetches and filters server-side — bypassing ID comparison.
+//   - Detail-open fires related checks in parallel, so a NeedsTargetCache
+//     checker driven through the TUI can run against a still-populating
+//     cache and commit Count=0 before the sibling fetchers finish.
+//   - `DrillRelated` on the FetchFilter path fetches and filters
+//     server-side, so it succeeds even when the checker's ResourceIDs do not
+//     match the target fetcher's Resource.ID format.
 //
-// Direct invocation eliminates all three: the cache is prewarmed before any
-// checker runs (no race), every pivot is evaluated (no skip), and the test
-// asserts every returned ResourceID exists in the target fetcher's output
-// (ID-format drift fails the test loudly).
+// With the cache prewarmed before any checker runs, every pivot is
+// evaluated and every returned ResourceID is checked against the target
+// fetcher's output.
 //
-// TestScenario_NavigableFieldDrillThrough_All still uses the TUI harness
-// because it exercises the NavigateMsg dispatch path, which is the thing
-// under test there.
+// TestScenario_NavigableFieldDrillThrough_All uses the TUI harness because
+// the NavigateMsg dispatch path is the thing under test there.
 
 import (
 	"context"
@@ -73,14 +63,12 @@ var drillThroughFixtures = []struct {
 	{"efs/prod-app-data", "efs", demofixtures.ProdEFSID},
 	{"opensearch/acme-logs", "opensearch", demofixtures.GraphRootDomain},
 	// redshift: two graph-roots because logs (CloudWatch) and s3 (audit bucket)
-	// are mutually exclusive per AWS LogDestinationType. Each root covers 10 of
-	// 11 `count shown: yes` pivots; together they cover all 11.
-	// See docs/historical/resources-impl-plans/redshift-impl-plan.md §5.1.
+	// are mutually exclusive per AWS LogDestinationType.
 	{"redshift/acme-warehouse", "redshift", demofixtures.AcmeWarehouseID},
 	{"redshift/acme-reporting", "redshift", demofixtures.AcmeReportingID},
 	// dbi-snap: graph-root is the non-Aurora prod fixture. The dbc pivot has
 	// no realistic non-zero case for dbi-snap (Aurora cluster snapshots live
-	// in dbc-snap), so dbc=0 is the AWS-API truth here. See dbi-snap-impl-plan §9.3.
+	// in dbc-snap), so dbc=0 is the AWS-API truth here.
 	{"dbi-snap/prod", "dbi-snap", demofixtures.ProdDBISnapID},
 	// dbc-snap: covers BOTH Aurora and DocumentDB cluster snapshots
 	// (DescribeDBClusterSnapshots is engine-agnostic). Aurora root covers
@@ -93,7 +81,7 @@ var drillThroughFixtures = []struct {
 	{"transfer/sftp-lambda-auth", "transfer", demofixtures.SftpLambdaAuthID},
 	// lt: two graph-roots — field pivots (ami/kms/sg) + cache cross-refs
 	// (asg/ec2) live on prod-web-lt; the NI-path pivots (ng/subnet) on
-	// eks-node-lt. Union semantics cover the full §2 contract.
+	// eks-node-lt.
 	{"lt/prod-web-lt", "lt", demofixtures.ProdWebLTID},
 	{"lt/eks-node-lt", "lt", demofixtures.EKSNodeLTID},
 	{"vpc-peer/prod-peer-shared", "vpc-peer", demofixtures.ProdPeerSharedID},
@@ -102,7 +90,7 @@ var drillThroughFixtures = []struct {
 // drillThroughGroups collapses the flat fixture list into groups sharing a
 // shortName. Resource types with multiple graph-roots (redshift) are
 // evaluated with UNION semantics: each pivot must resolve on at least one
-// root — per redshift-impl-plan.md §5.1 logs/s3 mutual exclusivity.
+// root, because redshift's logs/s3 destinations are mutually exclusive.
 type drillThroughGroup struct {
 	shortName  string
 	graphRoots []struct {
@@ -140,9 +128,8 @@ type rootPivotObservation struct {
 
 // buildAllTargetCache fetches every registered resource type via its paginated
 // fetcher against the demo clients and returns a pre-populated ResourceCache.
-// Every NeedsTargetCache=true checker's reads are served from this — eliminating
-// the async cache-population race that lets the TUI-driven harness report
-// Count=0 for pivots that actually resolve.
+// Every NeedsTargetCache=true checker's reads are served from this, so no
+// checker races the async cache population.
 func buildAllTargetCache(t *testing.T, clients any) resource.ResourceCache {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -175,8 +162,8 @@ func buildAllTargetCache(t *testing.T, clients any) resource.ResourceCache {
 }
 
 // idExistsInTarget reports whether any resource in the target-type cache
-// entry has Resource.ID == id. Exact-match comparison — the whole point of
-// this test is to catch ID-format drift between checker and fetcher.
+// entry has Resource.ID == id. The comparison is exact so ID-format drift
+// between checker and fetcher fails.
 func idExistsInTarget(cache resource.ResourceCache, targetType, id string) bool {
 	entry, ok := cache[targetType]
 	if !ok {
@@ -190,17 +177,11 @@ func idExistsInTarget(cache resource.ResourceCache, targetType, id string) bool 
 	return false
 }
 
-// ---------------------------------------------------------------------------
-// TestScenario_RelatedDrillThrough_All
-// ---------------------------------------------------------------------------
-
-// TestScenario_RelatedDrillThrough_All enforces U9 strictly:
+// TestScenario_RelatedDrillThrough_All enforces:
 //
 //   - every non-ct-events pivot on each resource type's graph-root union must
 //     have Count >= 1 AND return at least one ResourceID that exists as a
 //     Resource.ID in the target type's fetcher output.
-//
-// Direct checker invocation — no TUI event loop, no async races.
 func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 	clients := demo.NewServiceClients()
 	cache := buildAllTargetCache(t, clients)
@@ -284,10 +265,6 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestScenario_RelatedDrillNavigationLands_All — end-to-end navigation pass.
-// ---------------------------------------------------------------------------
-
 // TestScenario_RelatedDrillNavigationLands_All drives the FULL TUI navigation
 // path for every registered related pivot on every graph-root fixture. It
 // catches failures the direct-checker test (TestScenario_RelatedDrillThrough_All)
@@ -308,9 +285,8 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 //     NavigationKindDetail fast path, EnterChildViewMsg dispatch, or the child-view
 //     fetcher's ParentContext handling.
 //
-// To avoid the async race that made earlier TUI-driven tests flaky (related
-// checkers are goroutine-based; the scenario harness can't deterministically
-// wait for all results), this test:
+// Related checkers are goroutine-based and the scenario harness cannot
+// deterministically wait for all results, so this test:
 //
 //	a) Runs the checker synchronously against a prefetched cache to compute
 //	   the expected ResourceIDs / FetchFilter.
@@ -344,17 +320,14 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 						continue
 					}
 					t.Run(root.label+"/"+def.DisplayName, func(t *testing.T) {
-						// 1. Compute checker result synchronously.
 						src := fullIntegrationMustFindResourceByID(t, clients, group.shortName, root.id)
 						result := def.Checker(ctx, clients, src, cache)
 						if result.Count() < 1 && len(result.ResourceIDs()) == 0 && len(result.FetchFilter()) == 0 {
-							// Already caught by the direct-checker test as U9 violation — skip
-							// drilling here. This subtest is purely about drill-lands-non-empty.
+							// TestScenario_RelatedDrillThrough_All reports an unresolved pivot.
 							t.Skipf("checker returned Count=0 — see direct-checker test for the U9 failure")
 							return
 						}
 
-						// 2. Fresh scenario, open detail on the graph-root.
 						t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 						scenario := fullIntegrationNewDemoScenario(t)
 						runDemoStartup(t, scenario)
@@ -363,8 +336,6 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 						scenario.OpenDetailResource(group.shortName, srcView)
 						scenario.ExpectNoAPIError()
 
-						// 3. Dispatch synthetic RelatedNavigateMsg with the checker's
-						// output — bypasses the async check-result flow entirely.
 						navMsg := messages.RelatedNavigate{
 							TargetType:     def.TargetType,
 							SourceResource: srcView,
@@ -448,16 +419,12 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestScenario_NavigableFieldDrillThrough_All
-// ---------------------------------------------------------------------------
-
 // TestScenario_NavigableFieldDrillThrough_All verifies that every registered
 // navigable field on each graph-root fixture dispatches and lands on a non-empty
 // resource. Subtests for resource types with no registered NavigableFields are
 // skipped honestly — there is nothing to iterate.
 //
-// This one still uses the TUI harness because the NavigateMsg dispatch path
+// This one uses the TUI harness because the NavigateMsg dispatch path
 // (including fieldpath extraction, NavIDFromValue ARN stripping, and target
 // list resolution) IS the thing under test.
 func TestScenario_NavigableFieldDrillThrough_All(t *testing.T) {
@@ -522,12 +489,8 @@ func TestScenario_NavigableFieldDrillThrough_All(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 50% Count>=2 refinement
-// ---------------------------------------------------------------------------
-
-// TestScenario_GraphRootAtLeastHalfPivotsCountGE2 enforces the U9 refinement:
-// at least 50% of non-ct-events pivots must resolve to Count >= 2 on the
+// TestScenario_GraphRootAtLeastHalfPivotsCountGE2 enforces that at least
+// 50% of non-ct-events pivots resolve to Count >= 2 on the
 // graph-root union. A graph-root where every pivot resolves to exactly 1 is
 // trivially connected — it does not exercise the "which of these related
 // resources is the one I care about" path and gives false confidence.
@@ -535,8 +498,7 @@ func TestScenario_GraphRootAtLeastHalfPivotsCountGE2(t *testing.T) {
 	clients := demo.NewServiceClients()
 	cache := buildAllTargetCache(t, clients)
 
-	// Only resource types the user has signed off as "must have dense graph":
-	// efs, opensearch, redshift. Adding others is a new row.
+	// Only these resource types are held to a dense graph.
 	dense := map[string]bool{"efs": true, "opensearch": true, "redshift": true}
 
 	for _, group := range buildDrillThroughGroups() {

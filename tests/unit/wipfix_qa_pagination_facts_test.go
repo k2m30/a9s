@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_pagination_facts_test.go pins that a list screen keeps two
+// Pins that a list screen keeps two
 // separate facts about its population: whether the rows in hand are the
 // confirmed whole population, and whether the fetcher offered another page to
 // ask for. A partial-success fetch (some rows landed, a sibling enumeration
@@ -36,7 +36,7 @@ func wipfixS3Rows(n int) []resource.Resource {
 	return out
 }
 
-// TestPartialSuccessFetch_FullyLoadedList_TitlesWithoutPlus pins row 27: a
+// TestPartialSuccessFetch_FullyLoadedList_TitlesWithoutPlus: a
 // fetch that returned every row (pagination present, IsTruncated false) but
 // also reported a partial failure has confirmed the whole population is on
 // screen — the failure was a sibling enumeration, not a missing page. The
@@ -80,8 +80,7 @@ func TestPartialSuccessFetch_FullyLoadedList_TitlesWithoutPlus(t *testing.T) {
 
 // TestPartialSuccessFetch_TruncatedList_StillTitlesWithPlus is the negative
 // half: when the same partial-success fetch DID leave a page behind, the "+"
-// and the load-more offer must both survive. A fix that simply stops forcing
-// HasPagination would break this.
+// and the load-more offer must both survive.
 func TestPartialSuccessFetch_TruncatedList_StillTitlesWithPlus(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})

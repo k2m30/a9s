@@ -1,7 +1,7 @@
 package unit
 
-// prowler_w4_waf_test.go — behavioural test for the batch-w4 waf row: a Web
-// ACL with no rules is attached and logging traffic but blocking nothing.
+// waf posture: a Web ACL with no rules is attached and logging traffic but
+// blocking nothing.
 
 import (
 	"context"

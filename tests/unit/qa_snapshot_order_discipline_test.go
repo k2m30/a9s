@@ -1,22 +1,15 @@
-// qa_snapshot_order_discipline_test.go — Q4: the snapshot-order gate. Go
+// The snapshot-order gate. Go
 // evaluates return operands left-to-right, so `return c.snapshot(), <call>`
-// runs c.snapshot() BEFORE <call> — if <call> mutates controller state (as
-// forceRefreshCostsLocked does, setting cs.Loading), the returned
-// ViewState is the STALE pre-mutation snapshot, not the one the caller
-// actually needs. This is the third occurrence of this exact class this
-// session (return-operand-evaluates-before-a-mutating-sibling-operand); a
-// single call-site fix is not a structural guarantee against a fourth.
+// runs c.snapshot() before <call>; if <call> mutates controller state (as
+// forceRefreshCostsLocked does, setting cs.Loading), the returned ViewState is
+// the stale pre-mutation snapshot.
 //
-// This is a standing ratchet, not a burn-down: it scans every *.go file
-// under core/app (excluding tests) for a `return c.snapshot(), X` (or
-// 3-value `return c.snapshot(), X, Y`) statement whose second operand X is
-// itself a method call on the SAME receiver (`<recv>.method(...)`) rather
-// than an already-computed value (a bare identifier, nil, or a literal) —
-// exactly the shape that silently reorders a mutation after the snapshot
-// that's supposed to reflect it. A free-function call (e.g.
-// costsTaskSlice(task), which only wraps an already-computed value, no
-// receiver, no mutation) is not flagged — the danger is specifically a
-// receiver method call evaluated inline.
+// The gate scans every non-test *.go file under core/app for
+// `return c.snapshot(), X` (or `return c.snapshot(), X, Y`) whose X is a
+// method call on a receiver (`<recv>.method(...)`) rather than an
+// already-computed value (an identifier, nil, or a literal). A free-function
+// call such as costsTaskSlice(task) wraps an already-computed value with no
+// receiver to mutate through, so it is not flagged.
 package unit_test
 
 import (
@@ -74,9 +67,8 @@ func sodIsInlineMethodCall(e ast.Expr) bool {
 	return ok
 }
 
-// sodExprString renders e's source text via go/ast's own positions is
-// overkill here — a light manual render covering exactly the
-// `<ident>.<method>(...)` shape sodIsInlineMethodCall matches.
+// sodExprString renders the `<ident>.<method>(...)` shape sodIsInlineMethodCall
+// matches.
 func sodExprString(e ast.Expr) string {
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
@@ -143,13 +135,10 @@ func sodSiteKey(site sodSite) string {
 	return fmt.Sprintf("%s:%s#%d", site.file, site.funcName, site.line)
 }
 
-// TestSnapshotOrderDiscipline_NoInlineMutatingCallAfterSnapshot is the Q4
-// gate: every `return c.snapshot(), <call>` statement under core/app
-// must not evaluate a receiver method call as its second operand — Go's
-// left-to-right return-operand evaluation would run the snapshot BEFORE
-// that call's own mutation, returning a stale ViewState. Zero allowlist by
-// default: every site this gate finds today is a genuine, unfixed instance
-// of the bug, not legitimate debt.
+// TestSnapshotOrderDiscipline_NoInlineMutatingCallAfterSnapshot: no
+// `return c.snapshot(), <call>` under core/app evaluates a receiver method call
+// as its second operand. The allowlist is empty: every site found returns a
+// stale ViewState.
 func TestSnapshotOrderDiscipline_NoInlineMutatingCallAfterSnapshot(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

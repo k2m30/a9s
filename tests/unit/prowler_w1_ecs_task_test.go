@@ -1,12 +1,8 @@
 package unit
 
-// prowler_w1_ecs_task_test.go — behavioural pins for the ecs-task posture
-// signals of batch w1: privileged, host-namespace, writable-root, no-logging
-// and env-secret.
-//
-// All five read the task definition, which EnrichECSTasks fetches once per
-// distinct definition ARN. The tests drive the real enricher so the batching,
-// the per-item failure handling and the finding shapes are pinned together.
+// The ecs-task posture signals privileged, host-namespace, writable-root,
+// no-logging and env-secret all read the task definition, which
+// EnrichECSTasks fetches once per distinct definition ARN.
 
 import (
 	"context"
@@ -191,8 +187,6 @@ func pw1RunOneTask(t *testing.T, id string, def ecstypes.TaskDefinition) awsclie
 	return pw1EnrichECSTasks(t, fake, pw1ECSTaskResource(id, pw1TaskDefARN))
 }
 
-// ─── row 7: ecs-task.privileged ─────────────────────────────────────────────
-
 // TestECSTask_Privileged_ContainerEscapesIsolation pins the Broken finding and
 // one row per privileged container: a privileged container has the host's
 // device access, so a compromise inside it is a compromise of the instance.
@@ -229,8 +223,6 @@ func TestECSTask_Privileged_NilIsNotPrivileged(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 	pw1RequireNoFinding(t, res.Findings[id], pw1ECSTaskCodePrivileged)
 }
-
-// ─── row 8: ecs-task.host-namespace ─────────────────────────────────────────
 
 // TestECSTask_HostNamespace_HostNetworkMode pins the warning and that only the
 // condition that applies is cited.
@@ -293,8 +285,6 @@ func TestECSTask_HostNamespace_AwsvpcIsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, res.Findings[id], pw1ECSTaskCodeHostNamespace)
 }
 
-// ─── row 9: ecs-task.writable-root ──────────────────────────────────────────
-
 // TestECSTask_WritableRoot_ExplicitFalse pins the warning for a container that
 // declares a writable root filesystem.
 func TestECSTask_WritableRoot_ExplicitFalse(t *testing.T) {
@@ -344,8 +334,6 @@ func TestECSTask_WritableRoot_CitesOnlyTheWritableContainers(t *testing.T) {
 	}
 }
 
-// ─── row 10: ecs-task.no-logging ────────────────────────────────────────────
-
 // TestECSTask_NoLogging_MissingLogConfiguration pins the warning: without a
 // log driver the container's output is unreachable after the task stops.
 func TestECSTask_NoLogging_MissingLogConfiguration(t *testing.T) {
@@ -365,8 +353,6 @@ func TestECSTask_NoLogging_AwslogsIsHealthy(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, pw1HealthyContainer("app")))
 	pw1RequireNoFinding(t, res.Findings[id], pw1ECSTaskCodeNoLogging)
 }
-
-// ─── row 11: ecs-task.env-secret ────────────────────────────────────────────
 
 // TestECSTask_EnvSecret_PlaintextEnvironmentVariable pins the Broken finding,
 // the container citation and the Where:Kind row — and that the credential
@@ -417,8 +403,6 @@ func TestECSTask_EnvSecret_PlaceholderIsHealthy(t *testing.T) {
 	res := pw1RunOneTask(t, id, pw1TaskDef(pw1TaskDefARN, c))
 	pw1RequireNoFinding(t, res.Findings[id], pw1ECSTaskCodeEnvSecret)
 }
-
-// ─── cross-cutting ──────────────────────────────────────────────────────────
 
 // TestECSTask_AllFiveConditionsOnOneDefinitionAreFiveFindings pins
 // independence: a definition that trips every rule produces one finding per
@@ -507,8 +491,8 @@ func TestECSTask_TaskDefinitionErrorMarksOnlyItsOwnTasks(t *testing.T) {
 	}
 }
 
-// TestECSTask_DemoBench_EachSignalHasExactlyOneWitness pins the demo fixture
-// contract for all five ecs-task signals.
+// TestECSTask_DemoBench_EachSignalHasExactlyOneWitness pins that each of the
+// five ecs-task signals appears on exactly one demo task definition.
 func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	td := catalog.FindAny("ecs-task")
 	if td == nil || td.Fetcher == nil {
@@ -524,9 +508,7 @@ func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	}
 
 	// These five signals live on the task definition, not the task, so every
-	// task running the witness's definition carries them. The demo contract is
-	// therefore "the witness's definition and no other definition", which is
-	// what makes exactly one row shape appear on the bench.
+	// task running that definition carries them.
 	defOf := map[string]string{}
 	for _, r := range resources {
 		defOf[r.ID] = r.Fields["task_definition"]
@@ -623,8 +605,7 @@ func TestECSTask_TeardownStatesKeepTheirLifecycleFinding(t *testing.T) {
 		"STOPPING":       "stopping",
 		"DEPROVISIONING": "deprovisioning",
 		"DEACTIVATING":   "deactivating",
-		// Task phrase7 row 2 split this phrase: "stopped" was Dim here and Warn
-		// on ec2, so the same word carried two colours.
+		// Distinct from ec2's "stopped", which carries a different colour.
 		"STOPPED": "stopped (task exited)",
 	}
 	td := catalog.FindAny("ecs-task")

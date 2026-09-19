@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CodePipeline fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &mockCodePipelineClient{
@@ -54,7 +50,6 @@ func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first pipeline
 	r0 := resources[0]
 	if r0.ID != "deploy-prod" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "deploy-prod", r0.ID)
@@ -63,7 +58,6 @@ func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "deploy-prod", r0.Name)
 	}
 
-	// Verify required fields
 	requiredFields := []string{"name", "pipeline_type", "created", "updated", "version"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -80,7 +74,6 @@ func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"version\"]: expected %q, got %q", "3", r0.Fields["version"])
 	}
 
-	// Verify second pipeline
 	r1 := resources[1]
 	if r1.Fields["pipeline_type"] != "V1" {
 		t.Errorf("resource[1].Fields[\"pipeline_type\"]: expected %q, got %q", "V1", r1.Fields["pipeline_type"])

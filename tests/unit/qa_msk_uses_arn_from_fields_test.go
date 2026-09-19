@@ -1,11 +1,9 @@
 package unit
 
-// qa_msk_uses_arn_from_fields_test.go — Regression: EnrichMSKCluster must call
+// EnrichMSKCluster calls
 // DescribeClusterV2 with the cluster ARN from r.Fields["cluster_arn"], NOT the
-// bare cluster name in r.ID.
-//
-// Same shape as tg/sfn/elb/acm. msk fetcher (msk.go) sets `ID: clusterName`
-// and stores the ARN in Fields["cluster_arn"].
+// bare cluster name in r.ID: the msk fetcher sets ID to the cluster name and
+// stores the ARN in Fields["cluster_arn"].
 
 import (
 	"context"

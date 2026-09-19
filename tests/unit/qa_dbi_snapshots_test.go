@@ -56,9 +56,9 @@ func TestQA_DBISnapshots_FetchSuccess(t *testing.T) {
 	if r.Name != "dbi-snap-auto-001" {
 		t.Errorf("expected Name 'dbi-snap-auto-001', got %q", r.Name)
 	}
-	// §4 phrase design: r.Fields["status"] holds the §4 phrase, not the raw AWS status.
-	// Healthy snapshots (available + nil-encrypted treated as no unencrypted signal)
-	// produce r.Fields["status"] == "" (healthy silence).
+	// r.Fields["status"] holds the display phrase, not the raw AWS status.
+	// Healthy snapshots (available + nil-encrypted treated as no unencrypted
+	// signal) produce r.Fields["status"] == "" (healthy silence).
 	if r.Fields["snapshot_id"] != "dbi-snap-auto-001" {
 		t.Errorf("expected snapshot_id 'dbi-snap-auto-001', got %q", r.Fields["snapshot_id"])
 	}

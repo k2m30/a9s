@@ -1,11 +1,8 @@
 package unit
 
-// qa_tier_a_coverage_test.go — Group 5: column-key cross-check sweep.
-//
-// Verifies that DefaultViewDef for every resource type with an attention
-// column actually contains a List column whose Key (or Path for path-backed
-// columns) matches the intended attention-column field
-// (core/config/defaults_*.go).
+// DefaultViewDef for every resource type with an
+// attention column contains a List column whose Key (or Path for path-backed
+// columns) matches the attention-column field (core/config/defaults_*.go).
 
 import (
 	"strings"
@@ -27,7 +24,7 @@ type attentionColumnCase struct {
 	description string
 }
 
-// allAttentionColumns lists all 23 attention columns introduced in 017-issue-counts.
+// allAttentionColumns lists the attention columns and their backing fields.
 var allAttentionColumns = []attentionColumnCase{
 	// Group 1: Wave-2 enricher FieldUpdates
 	{resourceType: "tg", key: "health_summary", description: "TG health summary"},
@@ -43,8 +40,8 @@ var allAttentionColumns = []attentionColumnCase{
 	{resourceType: "cb", key: "last_build", description: "CodeBuild last build"},
 	{resourceType: "codeartifact", key: "package_count", description: "CodeArtifact package count"},
 	{resourceType: "glue", key: "last_run", description: "Glue job last run"},
-	// backup no longer exposes a last_status column; the Status column
-	// (key: status) owns every Wave-2 job-state phrase per docs/resources/backup.md §4.
+	// The Status column (key: status) owns every Wave-2 job-state phrase
+	// (docs/resources/backup.md).
 	{resourceType: "backup", key: "status", description: "Backup plan status (Wave-2 job findings)"},
 
 	// Group 2: Wave-1 fetcher-stored fields referenced by Key in list view
@@ -66,10 +63,10 @@ var allAttentionColumns = []attentionColumnCase{
 	{resourceType: "ami", key: "deprecated", description: "AMI deprecation status"},
 }
 
-// TestTierA_AllAttentionColumnsHaveBackingField is a sweep test that verifies every
-// attention column in the 017-issue-counts scope appears in the DefaultViewDef for
-// its resource type. For Key-backed columns, checks ListColumn.Key. For Path-backed
-// columns, checks ListColumn.Path contains the path prefix.
+// TestTierA_AllAttentionColumnsHaveBackingField checks every attention column
+// appears in the DefaultViewDef for its resource type: ListColumn.Key for
+// Key-backed columns, a ListColumn.Path containing the path prefix for
+// Path-backed ones.
 func TestTierA_AllAttentionColumnsHaveBackingField(t *testing.T) {
 	for _, tc := range allAttentionColumns {
 		tc := tc // capture range var
@@ -80,7 +77,6 @@ func TestTierA_AllAttentionColumnsHaveBackingField(t *testing.T) {
 			}
 
 			if tc.key != "" {
-				// Key-backed column: look for a ListColumn with matching Key.
 				found := false
 				for _, col := range viewDef.List {
 					if col.Key == tc.key {
@@ -101,7 +97,6 @@ func TestTierA_AllAttentionColumnsHaveBackingField(t *testing.T) {
 					)
 				}
 			} else if tc.path != "" {
-				// Path-backed column: look for a ListColumn whose Path contains the expected substring.
 				found := false
 				for _, col := range viewDef.List {
 					if strings.Contains(col.Path, tc.path) {

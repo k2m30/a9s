@@ -1,8 +1,7 @@
-// table_render_dead_mirror_ports_test.go — pins for the two live production
-// seams behind identity-column resolution and lifecycle-column widening,
-// reachable from tests/unit/ as an external (package unit_test) black-box:
+// Identity-column resolution and
+// lifecycle-column widening, driven black-box from package unit_test:
 //
-//  1. IdentityColumnIndex (core/app/list_columns.go) — the 5-step identity
+//  1. IdentityColumnIndex (core/app/list_columns.go) — the identity
 //     cascade. Driven via a fully-controlled per-type config.ViewsConfig
 //     (GetViewDef replaces userDef.List wholesale, giving byte-for-byte
 //     control over each column's Key/Path/Title) + RegisterFallbackTypeDef
@@ -10,12 +9,8 @@
 //     Snapshot().Body.List.IdentityCol — the exported field buildListBody
 //     bakes IdentityColumnIndex's return into.
 //  2. renderListWidenLifecycleColumn (internal/tui/views/resourcelist.go) —
-//     widens from body.Rows[i].Cells verbatim, post-bake, not by re-deriving
-//     from r.Findings/r.Fields. The one pin here is the stacked-findings
-//     width: the column is measured against the merged "<top> (+N)" phrase,
-//     not r.Findings[0].Phrase alone. Single-finding, no-findings-fallback
-//     and ignores-Fields["status"] are default list-render behavior covered
-//     by every other RenderList-driven test in this package.
+//     widens from body.Rows[i].Cells verbatim, post-bake: the column is
+//     measured against the merged "<top> (+N)" phrase.
 package unit_test
 
 import (
@@ -51,8 +46,7 @@ func wave3IdentityColControllerWith(t *testing.T, td resource.ResourceTypeDef, c
 }
 
 // wave3IdentityColOf applies a single resource and returns the resolved
-// full-column-space IdentityCol index — the live equivalent of calling
-// resolveIdentityColumn(cols, td) directly.
+// full-column-space IdentityCol index.
 func wave3IdentityColOf(t *testing.T, c *app.Controller) int {
 	t.Helper()
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "r1", Name: "r1"}}, nil, false)
@@ -63,16 +57,9 @@ func wave3IdentityColOf(t *testing.T, c *app.Controller) int {
 	return lb.IdentityCol
 }
 
-// ===========================================================================
-// IdentityColumnIndex cascade — port of resolve_identity_internal_test.go's
-// TestResolveIdentityColumn_* cases (cascade order: 1. td.IdentityKey matches
-// a column's key; 2. column key == "name"; 3. column title equals "Name"
-// (case-insensitive) or td.Name; 4. fall back to index 0). The dead test's
-// EmptyColumns case is dropped —
-// config.GetViewDef only replaces defaults when len(userDef.List) > 0, so an
-// intentionally-empty column list cannot be driven through this live seam;
-// the guard itself is a trivial zero-iteration loop with no branch to lose.
-// ===========================================================================
+// IdentityColumnIndex cascade order: 1. td.IdentityKey matches a column's
+// key; 2. column key == "name"; 3. column title equals "Name"
+// (case-insensitive) or td.Name; 4. fall back to index 0.
 
 func TestResolveListIdentityCol_MatchesIdentityKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "EC2 Instances", IdentityKey: "foo"}
@@ -101,10 +88,10 @@ func TestResolveListIdentityCol_FallsThroughToNameKey(t *testing.T) {
 	}
 }
 
-// There is no path-substring election step: "DBInstanceIdentifier" points
-// at a name-shaped field; it does not make its column the one that names
-// the row, and electing it would put the attention marker on a foreign
-// column. The cascade reaches the index-0 default.
+// A path naming "DBInstanceIdentifier" points at a name-shaped field without
+// making its column the one that names the row; electing it would put the
+// attention marker on a foreign column. The cascade reaches the index-0
+// default.
 func TestResolveListIdentityCol_PathIdentifierSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
@@ -209,12 +196,6 @@ func TestResolveListIdentityCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T)
 		t.Errorf("IdentityKey not found, should fall to name key at idx 0: got %d, want 0", got)
 	}
 }
-
-// ===========================================================================
-// renderListWidenLifecycleColumn — a narrow status column must widen to fit
-// the merged "<top> (+N)" phrase baked into body.Rows[i].Cells by
-// buildListBody, not truncate it.
-// ===========================================================================
 
 func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T) {
 	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}

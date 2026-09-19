@@ -1,6 +1,6 @@
 package unit
 
-// qa_navigable_fields_contract_test.go — per-resource-type navigable-field
+// Per-resource-type navigable-field
 // contract.
 //
 // The detail view underlines fields that are registered via
@@ -19,22 +19,6 @@ package unit
 // AWS API response field paths that MUST be navigable and the target
 // resource type they point at. Rows are anchored to the AWS API reference
 // so the contract is driven by AWS, not by the current a9s implementation.
-//
-// Tests:
-//
-//   (A) TestNavigableFields_AllExpectedFieldsRegistered — every
-//       navigableContracts row's FieldPath must appear in
-//       resource.GetNavigableFields(shortName) with the same TargetType.
-//       Failures reveal missing SetNavigableFieldsForTest entries.
-//
-//   (B) TestNavigableFields_TargetTypesAreRegistered — every navigable
-//       TargetType must be a registered resource type. Otherwise pressing
-//       Enter on the underlined value goes nowhere.
-//
-//   (C) TestNavigableFields_NoOrphans — every currently-registered
-//       NavigableField must have a corresponding row in
-//       navigableContracts. Adding an entry in source code requires
-//       adding/updating a contract row with the AWS API rationale.
 
 import (
 	"sort"
@@ -54,8 +38,9 @@ type navContract struct {
 // navigableContracts is the single source of truth for "this field on this
 // resource type's AWS API response must be navigable." Rows derive from
 // the AWS API reference documentation, NOT from current a9s registrations.
-// A row may describe a field that is not yet registered — that is the
-// whole point (test A will fail until the registration is added).
+// A row may describe a field with no registration:
+// TestNavigableFields_AllExpectedFieldsRegistered fails until the
+// registration is added.
 //
 // Rows sorted alphabetically by (shortName, fieldPath).
 var navigableContracts = []navContract{
@@ -119,13 +104,10 @@ var navigableContracts = []navContract{
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceBlockDeviceMapping.html", fieldPath: "BlockDeviceMappings.Ebs.VolumeId", targetType: "ebs", reasoning: "Instance.BlockDeviceMappings[].Ebs.VolumeId — attached EBS volumes."},
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GroupIdentifier.html", fieldPath: "SecurityGroups.GroupId", targetType: "sg", reasoning: "Instance.SecurityGroups[].GroupId — attached SGs."},
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceNetworkInterface.html", fieldPath: "NetworkInterfaces.NetworkInterfaceId", targetType: "eni", reasoning: "Instance.NetworkInterfaces[].NetworkInterfaceId — ENIs attached to the instance."},
-	// ec2 role reachability: IamInstanceProfile.Arn is intentionally NOT a
-	// navigable field (see ef9e65f2 "ec2->role related pivot resolves through
-	// GetInstanceProfile — profile name is not role name"). The instance
-	// profile ARN identifies the profile resource, not the role itself — the
-	// role name requires an iam:GetInstanceProfile call to resolve. That
-	// resolution happens in the ec2:role related-panel checker
-	// (checkRoleEC2 / ec2_related.go), not via a direct navigable field.
+	// ec2 role reachability: IamInstanceProfile.Arn identifies the instance
+	// profile, not the role; the role name needs an iam:GetInstanceProfile
+	// call, which the ec2:role related-panel checker (checkRoleEC2 /
+	// ec2_related.go) makes.
 
 	// ecr — ECR Repositories
 	{shortName: "ecr", apiDoc: "https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_EncryptionConfiguration.html", fieldPath: "EncryptionConfiguration.KmsKey", targetType: "kms", reasoning: "Repository.EncryptionConfiguration.KmsKey — KMS key for image encryption when EncryptionType=KMS."},
@@ -267,7 +249,7 @@ var navigableContracts = []navContract{
 	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.VpcEndpointId", targetType: "vpce", reasoning: "the endpoint that carries the security groups."},
 	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "IdentityProviderDetails.Function", targetType: "lambda", reasoning: "the custom authorizer; 'why is auth rejecting this user' jumps straight to it."},
 
-	// vpce — VPC Endpoints  (the user's screenshot bug class)
+	// vpce — VPC Endpoints
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "VpcEndpoint.VpcId — VPC the endpoint lives in."},
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "SubnetIds", targetType: "subnet", reasoning: "VpcEndpoint.SubnetIds — subnets the interface endpoint's ENIs are placed in. Shown in the user's screenshot but not registered — MISSING."},
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "NetworkInterfaceIds", targetType: "eni", reasoning: "VpcEndpoint.NetworkInterfaceIds — ENIs backing the endpoint. Shown in screenshot but not registered — MISSING."},
@@ -278,7 +260,7 @@ var navigableContracts = []navContract{
 	{shortName: "tgw", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html", fieldPath: "", targetType: "", reasoning: "TransitGateway has no built-in cross-resource ID fields beyond Options (ASNs, CIDRs). No navigable fields required today; attachments are a separate API."},
 
 	// Types with no cross-reference on the list/describe response — no navigable fields.
-	// Declaring as empty-row sentinels so test C (orphan detection) accepts the absence.
+	// Declaring as empty-row sentinels so TestNavigableFields_NoOrphans accepts the absence.
 	{shortName: "acm", apiDoc: "https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateSummary.html", fieldPath: "", targetType: "", reasoning: "ListCertificates summary has no cross-resource IDs; DomainValidationOptions refers to Route53 but a9s doesn't jump on that today."},
 	{shortName: "alarm", apiDoc: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html", fieldPath: "", targetType: "", reasoning: "MetricAlarm.Dimensions may reference other resources but the dimension names/values are arbitrary; no guaranteed target-type mapping."},
 	{shortName: "apigw", apiDoc: "https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html", fieldPath: "", targetType: "", reasoning: "GetApis response has no cross-resource IDs a9s browses today."},
@@ -307,7 +289,8 @@ var navigableContracts = []navContract{
 }
 
 // buildContractIndex returns shortName -> set of {fieldPath: targetType} from navigableContracts.
-// Sentinel rows with fieldPath=="" are included as an empty entry so test C can skip them.
+// Sentinel rows with fieldPath=="" are included as an empty entry so
+// TestNavigableFields_NoOrphans can skip them.
 func buildContractIndex() map[string]map[string]string {
 	idx := make(map[string]map[string]string, len(navigableContracts))
 	for _, c := range navigableContracts {

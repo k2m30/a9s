@@ -1,8 +1,7 @@
 package unit
 
-// semantics_selector_match_arn_test.go — wildcard ARN matching semantics for
-// core/semantics/selector. Migrated from aws_backup_match_test.go to keep
-// the package-level test where the package lives.
+// Wildcard ARN matching semantics for
+// core/semantics/selector.
 //
 // These tests pin:
 //   - Wildcard expansion: '*' matches any sequence (including empty).

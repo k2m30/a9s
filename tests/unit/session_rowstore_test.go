@@ -1,34 +1,9 @@
-// session_rowstore_test.go — the CONTRACT of core/session.RowStore /
+// The contract of core/session.RowStore /
 // core/session.TypeRows (core/session/rowstore.go) against
-// docs/design/cache-requirements.md C2/C5/C6/C6a/C6b/C9 and the defects
-// those rules rule out (D7, D12-D17), mirroring the semantics
+// docs/design/cache-requirements.md, matching the semantics
 // core/runtime/probes.go:reconcileTypeFile enforces for the on-disk file and
 // core/app/list_body.go's dedupAgainstExisting/isStaleReplace enforce for
 // the per-screen ListState.
-//
-// API pinned here (core/session/rowstore.go):
-//
-//	type Origin int
-//	const (OriginDisk Origin = iota; OriginProbe; OriginFetch)
-//
-//	type TypeRows struct {
-//	    Rows       []resource.Resource
-//	    Pagination *resource.PaginationMeta
-//	    TotalCount int
-//	    Origin     Origin
-//	    Partial    bool
-//	    Gen        domain.Gen
-//	}
-//
-//	type RowStore struct { ... } // mu sync.Mutex; types map[string]TypeRows
-//	func NewRowStore() *RowStore
-//	func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *resource.PaginationMeta, origin Origin, appendPage bool) ([]resource.Resource, domain.Gen)
-//	func (s *RowStore) ObserveCount(canon string, totalCount int) domain.Gen
-//	func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]resource.Resource, domain.Gen)
-//	func (s *RowStore) Amend(canon string, fn func([]resource.Resource) []resource.Resource) domain.Gen
-//	func (s *RowStore) Snapshot(canon string) TypeRows // zero value when never observed
-//	func (s *RowStore) SnapshotAll(includePartial bool) map[string]TypeRows
-//	func (s *RowStore) Clear()
 package unit_test
 
 import (
@@ -45,14 +20,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// -----------------------------------------------------------------------
-// Pin 1 — Observe append dedups by row ID (D13 semantics).
-// -----------------------------------------------------------------------
-
-// TestRowStore_Observe_AppendDedupsByID pins D13: "Cold-open + `m` duplicated
-// page 1 on screen ... the append path had no row-identity awareness" — an
-// Observe call with appendPage=true and overlapping IDs must NOT duplicate
-// rows; each ID appears once in the accepted/stored set.
+// TestRowStore_Observe_AppendDedupsByID: an Observe call with appendPage=true
+// and overlapping IDs keeps each ID once in the accepted/stored set.
 func TestRowStore_Observe_AppendDedupsByID(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -84,10 +53,8 @@ func TestRowStore_Observe_AppendDedupsByID(t *testing.T) {
 	}
 }
 
-// TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded verifies the dedup
-// guard does not also drop genuinely new rows in the same append batch — a
-// mixed replay (some already-known IDs, some new load-more IDs) keeps the
-// new ones.
+// TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded: a mixed replay
+// (some already-known IDs, some new load-more IDs) keeps the new ones.
 func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -108,10 +75,6 @@ func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 2 — stale truncated ID-subset replace rejected once exact (D14).
-// -----------------------------------------------------------------------
-
 // The store does not decide which of two results is older: ordering is
 // decided before the store is reached, by the per-type request sequence
 // (runtime.Core.ListResultSuperseded), so a replace that gets this far has
@@ -127,12 +90,8 @@ func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 	for i := range full {
 		full[i] = resource.Resource{ID: idFor(i), Name: idFor(i), Type: "s3"}
 	}
-	// Deep load-more already landed: 55 rows, exact (untruncated) pagination.
 	_, genAfterFull := store.Observe("s3", full, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
-	// A stale page-1 refetch arrives late: only the first 50 IDs, truncated —
-	// a strict ID subset of the stored 55, delivered as a non-append replace
-	// (append=false — a fresh fetch result, not a load-more page).
 	stalePage1 := full[:50]
 	accepted, genAfterStale := store.Observe("s3", stalePage1, &resource.PaginationMeta{IsTruncated: true}, session.OriginFetch, false)
 	if len(accepted) != 50 {
@@ -152,11 +111,6 @@ func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 		t.Errorf("TotalCount = %d, want 55 — a truncated replace must not shrink the known population", snap.TotalCount)
 	}
 }
-
-// -----------------------------------------------------------------------
-// Pin 3 — Disk-origin Observe never overwrites Fetch-origin rows;
-// Fetch/Probe replace Disk.
-// -----------------------------------------------------------------------
 
 // TestRowStore_Observe_DiskNeverOverwritesFetch pins the Origin precedence
 // half of Observe's documented contract: once a Fetch-origin observation has
@@ -239,12 +193,6 @@ func TestRowStore_Observe_ProbeReplacesDisk(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 4 — ObservePartial marks Partial; a later full Observe flips Partial
-// off and wholesale-replaces the row set (full-beats-partial); partial-only
-// entries are excluded from SnapshotAll(includePartial=false).
-// -----------------------------------------------------------------------
-
 // TestRowStore_ObservePartial_MarksPartial verifies ObservePartial's basic
 // contract: the resulting TypeRows.Partial is true.
 func TestRowStore_ObservePartial_MarksPartial(t *testing.T) {
@@ -319,7 +267,7 @@ func TestRowStore_Observe_FullReplacesPartial(t *testing.T) {
 // TestRowStore_SnapshotAll_ExcludesPartialWhenRequested pins
 // SnapshotAll(includePartial=false) filtering out partial-only entries
 // (the LazyResourceCache fold's "never poison canonical seeds/saves" scope
-// boundary, C6).
+// boundary).
 func TestRowStore_SnapshotAll_ExcludesPartialWhenRequested(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -340,14 +288,10 @@ func TestRowStore_SnapshotAll_ExcludesPartialWhenRequested(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 4b — ObserveCount (C6a): counts-only observation never touches Rows.
-// -----------------------------------------------------------------------
-
-// TestRowStore_ObserveCount_NeverTouchesRows pins C6a directly against
-// RowStore's dedicated counts-only entry point: TotalCount updates, Rows
-// (and Pagination/Origin/Partial) are carried forward untouched, even when
-// this leaves TotalCount numerically disagreeing with len(Rows).
+// TestRowStore_ObserveCount_NeverTouchesRows: RowStore's counts-only entry
+// point updates TotalCount and carries Rows (and Pagination/Origin/Partial)
+// forward untouched, even when this leaves TotalCount numerically disagreeing
+// with len(Rows).
 func TestRowStore_ObserveCount_NeverTouchesRows(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -369,7 +313,7 @@ func TestRowStore_ObserveCount_NeverTouchesRows(t *testing.T) {
 
 // TestRowStore_ObserveCount_OnAbsentType verifies ObserveCount creates a
 // counts-only entry even for a type RowStore has never seen rows for (the
-// disk-cache-loaded seed's placeholder-fallback case, C6a).
+// disk-cache-loaded seed's placeholder-fallback case).
 func TestRowStore_ObserveCount_OnAbsentType(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -384,16 +328,9 @@ func TestRowStore_ObserveCount_OnAbsentType(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 5 — Amend is copy-on-write (structural dispatch-time-freeze pin); Gen bumped.
-// -----------------------------------------------------------------------
-
-// TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged pins Amend's
-// copy-on-write contract: taking
-// a Snapshot, then Amend-ing (adding a finding/field), must NOT mutate the
-// rows already captured by the earlier Snapshot — the enrichment-fold rows
-// mutated in place today (runtime/helpers.go, tui/app_enrich_fold.go) are
-// exactly the bug class Amend's copy-on-write contract eliminates.
+// TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged: Amend-ing a row
+// (adding a finding/field) after a Snapshot never mutates the rows that
+// Snapshot captured.
 func TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -461,11 +398,6 @@ func TestRowStore_Amend_BumpsGenEvenWithNoRows(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 6 — Snapshot immunity: mutating slices returned earlier never affects
-// the store.
-// -----------------------------------------------------------------------
-
 // TestRowStore_Snapshot_MutatingReturnedSliceDoesNotAffectStore pins
 // snapshot immunity independently of Amend: a caller that takes a Snapshot
 // and mutates the returned Rows slice/elements in place (e.g. a renderer
@@ -514,11 +446,6 @@ func TestRowStore_SnapshotAll_MutatingReturnedMapDoesNotAffectStore(t *testing.T
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 7 — Clear on Session.Rotate (C9): store empty after rotate,
-// pair-scoped.
-// -----------------------------------------------------------------------
-
 // TestRowStore_Clear_EmptiesStore pins the store's own Clear contract in
 // isolation.
 func TestRowStore_Clear_EmptiesStore(t *testing.T) {
@@ -538,9 +465,8 @@ func TestRowStore_Clear_EmptiesStore(t *testing.T) {
 	}
 }
 
-// TestSession_Rotate_ClearsRowStore pins C9 (pair isolation) at the
-// Session level: Session.Rotate() must clear the session's RowStore exactly
-// like it clears ResourceCache/ProbeResources/LazyResourceCache today, so a
+// TestSession_Rotate_ClearsRowStore: Session.Rotate() clears the session's
+// RowStore along with ResourceCache/ProbeResources/LazyResourceCache, so a
 // profile/region switch never leaks rows from the old pair.
 func TestSession_Rotate_ClearsRowStore(t *testing.T) {
 	s := session.New()
@@ -562,16 +488,10 @@ func TestSession_Rotate_ClearsRowStore(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 8 — Concurrency: parallel Observe/Amend/Snapshot under -race
-// (D13 unguarded-RMW pin).
-// -----------------------------------------------------------------------
-
-// TestRowStore_ConcurrentObserveAmendSnapshot_NoRace pins D13's "the two
-// save lanes raced an unguarded read-modify-write on the shared store" —
-// concurrent Observe/Amend/Snapshot calls against the SAME type must never
-// race under `go test -race`. Every store read-modify-write must run under
-// one mutex end-to-end.
+// TestRowStore_ConcurrentObserveAmendSnapshot_NoRace: concurrent
+// Observe/Amend/Snapshot calls against the SAME type never race under
+// `go test -race`; every store read-modify-write runs under one mutex end to
+// end.
 //
 // Run in isolation to make the -race requirement explicit:
 //
@@ -621,7 +541,6 @@ func TestRowStore_ConcurrentObserveAmendSnapshot_NoRace(t *testing.T) {
 	}
 }
 
-// idFor returns a deterministic, distinguishable row ID for test fixtures.
 func idFor(i int) string {
 	const letters = "0123456789abcdefghijklmnopqrstuvwxyz"
 	if i < len(letters) {
@@ -629,15 +548,6 @@ func idFor(i int) string {
 	}
 	return "row-n" + string(rune('a'+i%26))
 }
-
-// -----------------------------------------------------------------------
-// Pin 9 — Controller.Handle wiring into RowStore: the SAME contract this
-// file pins at the RowStore-direct level, but through the real
-// Controller.Handle event path rather than calling RowStore/Core methods
-// directly — a regression here would mean the wiring between an inbound
-// event and the store broke even though RowStore's own unit contract (Pins
-// 1-8 above) stayed intact.
-// -----------------------------------------------------------------------
 
 // newRowStoreControllerPin mirrors the other per-file controller
 // constructors in this package (newSeededTestController,
@@ -723,7 +633,7 @@ func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRows_SeedRowStore
 // TestRowStoreControllerPin_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly
 // drives the disk-cache-loaded seed event through Controller.Handle with NO
 // on-disk per-type file (the placeholder-row fallback path) and asserts
-// RowStore treats it as a counts-only observation (C6a: TotalCount set, Rows
+// RowStore treats it as a counts-only observation (TotalCount set, Rows
 // untouched/empty) — a placeholder-only fallback must never fabricate Rows
 // in the store.
 func TestRowStoreControllerPin_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly(t *testing.T) {
@@ -880,11 +790,10 @@ func TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore(
 	}
 }
 
-// TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives pins
-// the D12-class survival behavior RowStore exists for: when a single-type
-// enrichment queue drains on the FIRST EnrichmentChecked delivery
-// (handleEnrichmentChecked's "all done" branch), RowStore's rows for that
-// type are retained after the sweep completes.
+// TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives: when
+// a single-type enrichment queue drains on the FIRST EnrichmentChecked
+// delivery (handleEnrichmentChecked's "all done" branch), RowStore's rows for
+// that type are retained after the sweep completes.
 func TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives(t *testing.T) {
 	s, _, c := newRowStoreControllerPin(t)
 
@@ -923,8 +832,8 @@ func TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives(t *tes
 }
 
 // TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore
-// drives a related lazy-add result through BOTH lanes that legitimately
-// exist for this message today:
+// drives a related lazy-add result through both lanes that exist for this
+// message:
 //
 //  1. runtime.Core.HandleRelatedCheckResult (the intent-returning method) +
 //     Controller.ApplyIntents — populates RowStore's Partial entry via
@@ -977,8 +886,8 @@ func TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore(t *
 		t.Error("RowStore SnapshotAll(true)[kms].Partial = false, want true — a lazy-add observation must mark Partial")
 	}
 
-	// Scope boundary (C6): a lazy-add row must never poison the canonical
-	// (non-partial) view of a type it was added under.
+	// A lazy-add row must never poison the canonical (non-partial) view of a
+	// type it was added under.
 	canonical := s.RowStore.SnapshotAll(false)
 	if tr, ok := canonical["kms"]; ok {
 		for _, r := range tr.Rows {
@@ -988,22 +897,6 @@ func TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore(t *
 		}
 	}
 }
-
-// -----------------------------------------------------------------------
-// Pin 10 — Observe/ObservePartial/Amend clone-on-ingress/egress (D13's
-// two-mutex aliasing fix): rows is deep-copied (cloneRows) on entry to
-// Observe/ObservePartial and Amend's fn receives a deep copy too, and every
-// returned/retained row set is likewise a deep copy — the store's own
-// backing array/Fields maps are never the same allocation as what a caller
-// passed in or received back. Before this fix, the caller's per-screen
-// ListState.Rows and RowStore.mu each held a reference into the SAME
-// backing array; a caller mutating either side (including an append into
-// spare capacity) silently corrupted the other with no Gen bump, and two
-// goroutines touching the two sides raced under `go test -race`. Pin 6
-// above covers Snapshot/SnapshotAll's PRE-EXISTING clone immunity; these
-// pin the NEW ingress/egress clones this fix adds to Observe/ObservePartial/
-// Amend specifically.
-// -----------------------------------------------------------------------
 
 // TestRowStore_Observe_MutatingPassedInSliceAfterCallDoesNotAffectStore pins
 // clone-on-ingress: mutating the slice (including a row's Fields map) the
@@ -1056,7 +949,6 @@ func TestRowStore_Observe_MutatingReturnedSliceAndAppendIntoSpareCapacityDoesNot
 		t.Fatalf("precondition: Observe returned %d rows, want 2", len(returned))
 	}
 
-	// Mutate a returned row's Fields map directly.
 	if returned[0].Fields == nil {
 		t.Fatal("precondition: returned[0].Fields must be non-nil (seeded above)")
 	}
@@ -1151,12 +1043,10 @@ func TestRowStore_ObservePartial_MutatingReturnedSliceAndAppendIntoSpareCapacity
 func TestRowStore_Amend_FnMutatesInputSliceInPlace_RetainedRowsAndPriorSnapshotUnaffected(t *testing.T) {
 	store := session.NewRowStore()
 
-	// The prior reference MUST come from Observe's own return value, not
-	// Snapshot's: Snapshot has always cloned (Pin 6, pre-D), so a
-	// Snapshot-derived "before" would stay protected even without this
-	// fix's Amend-ingress clone and this pin would be accidentally-green.
-	// Observe's return was the actual unprotected reference pre-D — exactly
-	// what a caller assigns onto its own ListState.Rows.
+	// The prior reference comes from Observe's own return value, not Snapshot's:
+	// Snapshot clones, so a Snapshot-derived "before" stays protected without
+	// Amend's ingress clone. Observe's return is what a caller assigns onto its
+	// own ListState.Rows.
 	before, _ := store.Observe("s3", []resource.Resource{
 		{ID: "bucket-1", Name: "bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
@@ -1165,20 +1055,13 @@ func TestRowStore_Amend_FnMutatesInputSliceInPlace_RetainedRowsAndPriorSnapshotU
 	}
 
 	store.Amend("s3", func(rows []resource.Resource) []resource.Resource {
-		// Mutate the fn's input slice in place — including its Fields map —
-		// and return that SAME slice, exactly the "didn't bother to copy"
-		// shape Amend's clone-on-ingress exists to make harmless. Pre-fix,
-		// rows here WAS the store's own backing array, which WAS also
-		// `before`'s backing array (Observe returned it directly) — so this
-		// in-place mutation would silently corrupt `before` too.
+		// Mutate the fn's input slice in place — including its Fields map — and
+		// return that same slice: the shape Amend's clone-on-ingress makes harmless.
 		rows[0].Name = "MUTATED-IN-PLACE-BY-FN"
 		rows[0].Fields["region"] = "eu-west-1"
 		return rows
 	})
 
-	// The slice returned by the EARLIER Observe call must be completely
-	// unaffected by the in-place mutation Amend's fn performed on its
-	// (cloned) input.
 	if before[0].Name != "bucket-1" {
 		t.Errorf("pre-Amend Observe-returned Rows[0].Name = %q after Amend's fn mutated its input in place, want %q unchanged — Amend must clone before handing rows to fn", before[0].Name, "bucket-1")
 	}
@@ -1186,27 +1069,19 @@ func TestRowStore_Amend_FnMutatesInputSliceInPlace_RetainedRowsAndPriorSnapshotU
 		t.Errorf("pre-Amend Observe-returned Rows[0].Fields[region] = %q, want %q unchanged", before[0].Fields["region"], "us-east-1")
 	}
 
-	// The store's own retained rows DO reflect the fn's returned (mutated)
-	// result — Amend applies whatever fn returns; only the EARLIER
-	// Observe-returned reference and the fn's own input clone are protected.
+	// Amend applies whatever fn returns, so the store's retained rows carry the
+	// mutation.
 	after := store.Snapshot("s3")
 	if after.Rows[0].Name != "MUTATED-IN-PLACE-BY-FN" {
 		t.Errorf("post-Amend Snapshot.Rows[0].Name = %q, want %q — Amend must still apply fn's returned replacement", after.Rows[0].Name, "MUTATED-IN-PLACE-BY-FN")
 	}
 }
 
-// TestRowStore_ConcurrentReturnedSliceWrite_vs_SnapshotObserve_NoRace pins
-// the actual crash mechanism directly, distinct from the existing Pin 8
-// concurrency test above: Pin 8 only exercises concurrent CALLS to
-// Observe/Amend/Snapshot (each internally mutex-guarded, so nothing there
-// ever raced even before this fix). The real crash mechanism this fix
-// closes is a goroutine writing through a slice/map an EARLIER
-// Observe/ObservePartial call had returned — entirely OUTSIDE the store's
-// mutex — while a second goroutine concurrently called Observe/Snapshot
-// against the SAME type. Before clone-on-egress, that returned slice/map
-// WAS the store's own backing allocation, so the two goroutines raced on
-// the same memory with no lock between them; go test -race must report
-// nothing here.
+// TestRowStore_ConcurrentReturnedSliceWrite_vs_SnapshotObserve_NoRace: one
+// goroutine writes through a slice/map an earlier Observe/ObservePartial call
+// returned — outside the store's mutex — while another calls Observe/Snapshot
+// against the SAME type. Clone-on-egress keeps the two off shared memory;
+// go test -race must report nothing here.
 func TestRowStore_ConcurrentReturnedSliceWrite_vs_SnapshotObserve_NoRace(t *testing.T) {
 	store := session.NewRowStore()
 	const iterations = 200

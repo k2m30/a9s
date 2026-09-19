@@ -1,7 +1,7 @@
 package unit
 
-// prowler_w4_kms_test.go — behavioural test for the batch-w4 kms row: a
-// customer-managed key whose key policy lets any principal use it.
+// kms posture: a customer-managed key whose key policy lets any principal use
+// it.
 
 import (
 	"context"
@@ -175,10 +175,10 @@ func TestW4KMSPolicyFetchFailureIsUnknown(t *testing.T) {
 		w4PhraseKMSPublic, domain.SevBroken, w4SourceKMSWave2)
 }
 
-// TestW4KMSPublicPolicyBeyondCapIsTruncated pins the cap semantics: the
-// kms enricher now emits a "!" finding, so a run that could not reach every
-// key must report itself truncated rather than presenting a lower bound as a
-// complete count.
+// TestW4KMSPublicPolicyBeyondCapIsTruncated pins the cap semantics: the kms
+// enricher emits a "!" finding, so a run that could not reach every key must
+// report itself truncated rather than presenting a lower bound as a complete
+// count.
 func TestW4KMSPublicPolicyBeyondCapIsTruncated(t *testing.T) {
 	policies := map[string]string{}
 	rs := make([]resource.Resource, 0, awsclient.EnrichmentCap+1)

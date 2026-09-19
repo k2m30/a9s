@@ -1,12 +1,12 @@
 //go:build integration
 
-// views7_config_report_test.go — the config report on the web lane.
+// The config report on the web lane.
 //
 // A view file whose column names a key nothing on the type writes renders a
 // blank cell on every row, and the load says so. The terminal shows that
-// report where it shows every other one, in the flash; the web lane wrote it
-// to stderr, which an operator who started the server with & and closed the
-// terminal never sees. One report, both lanes.
+// report in the flash, and the web lane shows it in the same place: stderr is
+// invisible to an operator who started the server with & and closed the
+// terminal.
 package webintegration
 
 import (
@@ -61,9 +61,6 @@ func views7Flash(t *testing.T, c *client) app.Flash {
 // TestWebLaneShowsTheConfigReport drives the server the way cmd/a9s does — the
 // operator's config folder, config.Load, the server started with what it
 // returned — and reads the report where the page shows the terminal's flash.
-//
-// If the report reaches the server by another route than the config it is
-// started with, this call is the signature-only change that says so.
 func TestWebLaneShowsTheConfigReport(t *testing.T) {
 	viewCfg, cfgErr := views7ViewsDir(t, "vpce", `generated: 6
 list:

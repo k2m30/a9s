@@ -1,11 +1,8 @@
 package unit
 
-// prowler_w1_lambda_test.go — behavioural pins for the lambda posture signals
-// of batch w1: public-policy, function-url-public and env-secret.
-//
-// public-policy and function-url-public are the lambda type's first Wave 2
-// enricher (EnrichLambdaPosture); env-secret is computed in the fetcher from
-// the ListFunctions response, which already carries the environment.
+// public-policy and function-url-public come from the lambda Wave 2 enricher
+// (EnrichLambdaPosture); env-secret is computed in the fetcher from the
+// ListFunctions response, which already carries the environment.
 //
 // The policy assertions are written against iampolicy's verdict, not against
 // the text of a document: a conditioned wildcard grant, a single-object
@@ -35,8 +32,6 @@ const (
 	pw1LambdaCodeURLPublic    = domain.FindingCode("lambda.function-url-public")
 	pw1LambdaCodeEnvSecret    = domain.FindingCode("lambda.env-secret")
 )
-
-// ─── fakes ──────────────────────────────────────────────────────────────────
 
 // pw1LambdaListFake serves ListFunctions for the wave-1 fetcher path.
 type pw1LambdaListFake struct {
@@ -86,9 +81,7 @@ func (f *pw1LambdaPostureFake) ListFunctionUrlConfigs(_ context.Context, in *lam
 	return &lambda.ListFunctionUrlConfigsOutput{FunctionUrlConfigs: f.urlConfigs[name]}, nil
 }
 
-// GetFunction is the stub half of a partial test double: this fake embeds
-// LambdaAPI as a nil interface and implements only the two posture reads. The
-// enricher now asks this one to tell a function with no resource policy from a
+// GetFunction lets the enricher tell a function with no resource policy from a
 // function that is gone, which GetPolicy answers with the same code. Every
 // function in these scenarios exists.
 func (f *pw1LambdaPostureFake) GetFunction(_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
@@ -156,8 +149,6 @@ func pw1EnrichLambda(t *testing.T, fake *pw1LambdaPostureFake, names ...string) 
 	}
 	return res
 }
-
-// ─── row 12: lambda.public-policy ───────────────────────────────────────────
 
 const pw1PublicInvokePolicy = `{
   "Version": "2012-10-17",
@@ -244,8 +235,8 @@ func TestLambda_PublicPolicy_URLEncodedDocument(t *testing.T) {
 }
 
 // TestLambda_PublicPolicy_CrossAccountGrantIsNotPublic pins that naming
-// another account is not the same as naming everyone: this batch defines no
-// cross-account row for lambda, so a named foreign principal is silent.
+// another account is not the same as naming everyone: a named foreign
+// principal is silent.
 func TestLambda_PublicPolicy_CrossAccountGrantIsNotPublic(t *testing.T) {
 	const name = "acme-partner"
 	doc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:root"},"Action":"lambda:InvokeFunction","Resource":"*"}]}`
@@ -334,8 +325,6 @@ func pw1Digits(n int) string {
 	const d = "0123456789"
 	return string([]byte{d[(n/100)%10], d[(n/10)%10], d[n%10]})
 }
-
-// ─── row 13: lambda.function-url-public ─────────────────────────────────────
 
 // TestLambda_FunctionURLPublic_AuthTypeNone pins the Broken finding: a
 // function URL with AuthType NONE is an unauthenticated HTTPS endpoint.
@@ -437,8 +426,6 @@ func TestLambda_PolicyAndURLAreTwoFindings(t *testing.T) {
 	}
 }
 
-// ─── row 14: lambda.env-secret ──────────────────────────────────────────────
-
 // TestLambda_EnvSecret_PlaintextVariable pins the Broken finding and the
 // Where:Kind row, and that the value never reaches the finding text.
 func TestLambda_EnvSecret_PlaintextVariable(t *testing.T) {
@@ -512,8 +499,6 @@ func TestLambda_EnvSecret_CoexistsWithLifecycleFinding(t *testing.T) {
 	}
 }
 
-// ─── demo bench ─────────────────────────────────────────────────────────────
-
 // TestLambda_DemoBench_EachSignalHasExactlyOneWitness pins the demo fixture
 // contract for the three lambda signals.
 func TestLambda_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
@@ -548,18 +533,13 @@ func TestLambda_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	}
 }
 
-// TestLambda_EnvSecret_StillReportedOnFailedOrInactiveFunction is deliberately
-// the inverse of the deleted-resource rule, and stays that way.
-//
-// Common contract rule 4 silences posture findings on deleted, terminated and
-// deleting resources. Lambda has no such state: a deleted function is simply
-// absent from ListFunctions. "Failed" means the last create or update did not
-// apply and "Inactive" means the function was evicted from memory after idle
-// time — both still exist, and both still hand their environment to anyone
-// who can call lambda:GetFunctionConfiguration. Silencing the credential leak
-// there would hide a live exposure behind a lifecycle state, so if this test
-// is ever inverted, the reason must be that lambda gained a real deleted
-// state.
+// TestLambda_EnvSecret_StillReportedOnFailedOrInactiveFunction pins that a
+// credential leak is reported on Failed and Inactive functions. Lambda has no
+// deleted state: a deleted function is absent from ListFunctions. "Failed"
+// means the last create or update did not apply and "Inactive" means the
+// function was evicted from memory after idle time — both still exist, and
+// both still hand their environment to anyone who can call
+// lambda:GetFunctionConfiguration.
 func TestLambda_EnvSecret_StillReportedOnFailedOrInactiveFunction(t *testing.T) {
 	for _, state := range []lambdatypes.State{lambdatypes.StateFailed, lambdatypes.StateInactive} {
 		name := "acme-" + strings.ToLower(string(state))

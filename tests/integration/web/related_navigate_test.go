@@ -9,15 +9,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 )
 
-// TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache guards the
-// related-navigate regression where navigating into a single-target related row
-// (NavigationKindDetail cache-hit path) produced an empty detail placeholder:
-// FrameTitle fell back to the literal screen-ID string "detail" and Fields was
-// empty, because the old code relied on a by-id fetcher that most resource
-// types don't register.
-//
-// The fix (applyRelatedNavResult NavigationKindDetail case) seeds the detail
-// synchronously from the already-cached resource via Core.RelatedCachedResource.
+// TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache pins that
+// navigating into a single-target related row (NavigationKindDetail
+// cache-hit path) seeds the detail synchronously from the already-cached
+// resource via Core.RelatedCachedResource. Most resource types register no
+// by-id fetcher, so the cache is the only source for the detail.
 //
 // Sequence:
 //  1. Navigate to the ec2 list → first row is "web-prod-01".
@@ -110,8 +106,6 @@ func TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache(t *testing.T) {
 	c.action(t, app.ActionSelect, "")
 	vs = c.state(t)
 
-	// --- Regression assertions ---
-
 	// The stack must have navigated to a detail screen, not stayed on the
 	// same detail with related focused.
 	if vs.Body.Kind != app.BodyKindDetail {
@@ -123,22 +117,16 @@ func TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache(t *testing.T) {
 		t.Fatal("related-navigate single-target: Body.Detail is nil — detail screen must be populated")
 	}
 
-	// FrameTitle must be the target group name, NOT the fallback "detail" or "".
-	// Pre-fix: applyRelatedNavResult for NavigationKindDetail called ensureDetailState
-	// without seeding from cache, so Resource.Name and Resource.ID were both empty,
-	// and detailFrameTitleLocked() returned "". The TUI renderer then substituted
-	// the ScreenID string "detail" as the frame title.
+	// An unseeded detail has an empty Resource.Name and Resource.ID, and the
+	// renderer substitutes the ScreenID string "detail" as the frame title.
 	name := vs.FrameTitle
 	if name == "" || name == "detail" {
 		t.Fatalf("related-navigate to single-target landed on empty placeholder "+
 			"(FrameTitle=%q, fields=%d) — want the cached target group detail \"acme-web-tg\"",
 			name, len(vs.Body.Detail.Fields))
 	}
-	// tui6 row 24 folded the controller's own Name-else-ID title into the one
-	// builder both lanes paint from, so the title now reads
-	// "detail -- <id> (<name>)". What this case is about is that the cached
-	// resource was seeded at all — restoring the bare-name comparison would
-	// restore the second builder with it.
+	// Both lanes paint the title from one builder, which reads
+	// "detail -- <id> (<name>)".
 	if !strings.Contains(name, "acme-web-tg") {
 		t.Fatalf("related-navigate to single-target: FrameTitle=%q, want it to name \"acme-web-tg\" — "+
 			"the cached target group detail was not seeded correctly",

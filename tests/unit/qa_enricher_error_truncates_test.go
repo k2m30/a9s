@@ -1,14 +1,8 @@
 package unit
 
-// qa_enricher_error_truncates_test.go — Regression: per-resource API errors mark result as Truncated.
-//
-// Bug: When a per-resource API call fails, the enricher was returning an error
-// (aborting the whole run) rather than continuing and marking Truncated=true.
-// Fix: Per-resource API errors set truncated=true and continue processing
-// remaining resources.
-//
-// Tests fail if the fix is reverted: Truncated would be false when an API error
-// occurs, causing the badge to show a definitive count rather than "N+".
+// A per-resource API error marks the
+// enricher result Truncated and processing continues, so the badge shows
+// "N+" rather than a definitive count.
 
 import (
 	"context"
@@ -31,7 +25,6 @@ var errFakeAPI = errors.New("simulated API error")
 func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 12, 0, 0, 0, time.UTC)
 
-	// Use the listErr field to simulate a failure for all ListBuildsForProject calls.
 	fake := &codeBuildEnrichFake{
 		listErr: errFakeAPI,
 		projectBuilds: map[string]string{

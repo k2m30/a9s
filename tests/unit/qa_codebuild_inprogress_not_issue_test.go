@@ -1,12 +1,7 @@
 package unit
 
-// qa_codebuild_inprogress_not_issue_test.go — Regression: CodeBuild IN_PROGRESS
-// builds must not produce findings.
-//
-// Bug: IN_PROGRESS builds were included in findings, causing false issues.
-// Fix: IN_PROGRESS status is explicitly skipped (same as SUCCEEDED).
-//
-// Test fails if the fix is reverted: an IN_PROGRESS build would produce a finding.
+// CodeBuild IN_PROGRESS builds
+// produce no findings: they are active work, not failures.
 
 import (
 	"context"

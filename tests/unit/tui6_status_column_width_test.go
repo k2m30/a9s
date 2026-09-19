@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_status_column_width_test.go — the status column is as wide as the body
+// The status column is as wide as the body
 // says it is.
 //
-// Every other column on a list publishes its width on the built body, and the
-// painter fills exactly that. The status column does not: the body publishes
-// the type's declared width and the terminal renderer widens it again, from
-// the row cells, on the way to the screen. That is the same shape the detail
-// key width had — a layout decision taken where only one lane can see it — and
-// it has the same two consequences. A lane with no renderer of its own reads a
-// width the screen never uses, and a caller that sets the width cannot make it
-// stick.
+// Every column on a list, the status column included, publishes its width on
+// the built body, and the painter fills exactly that. A layout decision taken
+// where only one lane can see it leaves a lane with no renderer of its own
+// reading a width the screen never uses, and a caller that sets the width
+// unable to make it stick.
 package unit
 
 import (
@@ -125,8 +122,7 @@ func TestStatusColumnWidth_RendererReadsTheBodys(t *testing.T) {
 }
 
 // TestStatusColumnWidth_UnchangedWhenNoCellNeedsMore is the counterpart: a
-// list whose status cells all fit keeps the type's declared width, so moving
-// the decision must not widen every list by default.
+// list whose status cells all fit keeps the type's declared width.
 func TestStatusColumnWidth_UnchangedWhenNoCellNeedsMore(t *testing.T) {
 	declared := tui6DeclaredStatusWidth(t)
 	body, _ := tui6StatusListBody(t, "stopped")

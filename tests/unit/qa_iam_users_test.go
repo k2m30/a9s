@@ -49,7 +49,6 @@ func TestQA_IAMUsers_FetchSuccess(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first user
 	r := resources[0]
 	if r.ID != "alice" {
 		t.Errorf("expected ID 'alice', got %q", r.ID)
@@ -70,7 +69,6 @@ func TestQA_IAMUsers_FetchSuccess(t *testing.T) {
 		t.Errorf("password_last_used should not be 'Never' for alice")
 	}
 
-	// Verify second user has "Never" for password_last_used
 	r2 := resources[1]
 	if r2.Fields["password_last_used"] != "Never" {
 		t.Errorf("expected password_last_used 'Never' for bob, got %q", r2.Fields["password_last_used"])
@@ -79,7 +77,6 @@ func TestQA_IAMUsers_FetchSuccess(t *testing.T) {
 		t.Errorf("expected path '/developers/', got %q", r2.Fields["path"])
 	}
 
-	// Verify RawStruct is set
 	if r.RawStruct == nil {
 		t.Error("expected RawStruct to be set")
 	}

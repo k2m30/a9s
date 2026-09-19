@@ -1,85 +1,21 @@
-// qa_related_transient_unknown_drill_test.go — a related-panel row showing
-// the transient "(?)" badge (resolved-unknown, cold-cache State:
-// RelatedUnknown with NO FetchFilter — see resource.FormatRelatedCount /
-// related_unknown_badge_test.go for the badge contract, and
-// TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
-// aws_ng_cold_cache_guard_test.go for the real checker that produces this
-// exact shape) is ACTIONABLE end-to-end:
+// A related-panel row that
+// resolved unknown on a cold cache (State: RelatedUnknown, no FetchFilter, no
+// RelatedIDs) renders with no count badge. Enter on it resolves in place: the
+// detail stays on screen, the checks are re-dispatched, and once the target
+// cache is warm the row shows its numeric badge.
 //
-//  1. Enter on a "(?)" row opens the TARGET TYPE's plain top-level list —
-//     the same navigation any menu entry would produce — not a filtered/
-//     related-contextual list and not a no-op.
-//  2. On returning to the detail (Esc), the pivot's count RECOMPUTES: once
-//     the target type's cache is warm from the visit, the "(?)" becomes the
-//     real number without a manual refresh (Ctrl+R).
+// The pair is "ng" -> "ebs": checkNGEBS (core/aws/ng_related.go) joins against
+// the "ec2" RowStore entry by tag rather than calling AWS, so it returns
+// resource.UnknownRelated("ebs") while "ec2" is cold (docs/resources/ng.md).
 //
-// Fixture pair: "ng" (node group) -> "ebs" (EBS Volumes), the SAME pair
-// related_unknown_badge_test.go and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch
-// use. checkNGEBS (core/aws/ng_related.go) returns
-// resource.UnknownRelated("ebs") (State: RelatedUnknown, Count: 0) — no
-// FetchFilter, no RelatedIDs — whenever the "ec2" RowStore entry is cold,
-// because it joins against the EC2 cache by tag rather than issuing a live
-// AWS call (docs/resources/ng.md §2 ebs bullet). This is constructible
-// directly from the harness: build an ng resource.Resource by hand
-// (mirroring ngResourceForCacheMissBadge in related_unknown_badge_test.go)
-// and never load "ec2" resources before opening its detail — the checker
-// result is then fed via a real messages.RelatedCheckResult, exactly as
-// production's fan-out would deliver it.
+// "ng" registers several related defs, and the keyboard cursor
+// (detailSkipUnselectableRelated / stepToSelectable, core/app/detail_cursor.go)
+// stops only on an actionable row. scopeNGToEBSOnly re-registers "ng" with its
+// real ebs def alone so that row sits at cursor 0.
 //
-// Registry scoping: "ng" registers NINE related defs in production
-// (catalog_containers.go). The real keyboard-cursor machinery
-// (detailSkipUnselectableRelated / stepToSelectable, core/app/detail_cursor.go
-// + actions_nav.go) only stops the cursor on a row that is ALREADY
-// actionable, and stepToSelectable returns the cursor unchanged when no
-// non-skippable index is found in either direction. This file scopes "ng"
-// down to its real, single ebs def via resource.SetRelatedForTest (restored
-// via t.Cleanup(CleanupRelatedForTest)) so the lone row starts focused at
-// cursor 0 — the checker, DisplayName, and TargetType are all captured live
-// from the production registry before scoping, so this is not a synthetic
-// stand-in def.
-//
-// Harness follows related_circular_reentry_test.go: build a demo root model,
-// drive it via rootApplyMsg/drainCmds, assert on the ANSI-stripped rendered
-// view (tui.Model exposes no controller accessor from tests/unit, so every
-// assertion here reads real, user-visible frame/footer content rather than
-// internal state). Package unit (not unit_test) is required to reach those
-// harness helpers.
-//
-// Seams pinned:
-//
-//   - Pin 1: the live keyboard Enter path on a focused related row is
-//     internal/tui/app_stack.go's handleDetailKeyMsg, case
-//     `!rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Enter)`. It
-//     reads m.ctrl.SelectedRelatedRow() (the controller-owned
-//     ds.RelatedCursor/ds.RelatedRows — NOT the renderer's own
-//     RightColumnModel.rows) and gates on
-//     resource.IsRelatedActionable(row.State, row.Count, row.Truncated),
-//     which returns true for State: RelatedUnknown with no FetchFilter
-//     (core/resource/related.go), so Enter fires the RelatedNavigate
-//     dispatch.
-//
-//   - Pin 2: ResolveRelatedNavigate (core/runtime/handlers_related.go)
-//     resolves a RelatedNavigate with empty TargetID/RelatedIDs/FetchFilter
-//     to the same navigation a menu entry produces
-//     (messages.Navigate{Target: TargetResourceList}, no title suffix, no
-//     forced EscPops), not a related/contextual list via m.newRelatedList
-//     (which sets runtime.RelatedTitleSuffix(src) and SetEscPops(true)).
-//     This test pins the user-visible distinguishing facts rendered straight
-//     into the frame: the frame TITLE (app_view.go's frameTitle ->
-//     ctrl.ListFrameTitle(), rendered by layout.RenderFrameWithHints) must
-//     not carry the RelatedTitleSuffix, and the footer must not show the
-//     "esc Back" hint (core/app/footer.go: buildListFooterHints only
-//     appends that hint when ls.EscPops is true) that every
-//     related/contextual list forces.
-//
-//   - Pin 3: after Esc-return, once the target cache has warmed, the
-//     ng->ebs row's badge must show the real resolved count, not a stale
-//     "(?)". The revealed detail's rendererState.rightCol is the SAME
-//     RightColumnModel instance from before the drill (rendererState fields
-//     live underneath the popped list on m.stack, untouched by popRS), so
-//     the return path must re-evaluate its cached State: RelatedUnknown
-//     row, the way the Detail-view Ctrl+R handler in
-//     runtime_adapter_navigate.go re-dispatches RelatedCheckStarted.
+// Assertions read the ANSI-stripped rendered view: tui.Model exposes no
+// controller accessor from tests/unit. Package unit (not unit_test) reaches
+// the root-model harness helpers.
 package unit
 
 import (
@@ -96,11 +32,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// transientUnknownNGResource returns a node-group resource.Resource with no
-// registered fetcher of its own — matching ngResourceForCacheMissBadge in
-// related_unknown_badge_test.go exactly, so this file's fixture is provably
-// the same shape TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch pins at
-// the checker level.
+// transientUnknownNGResource returns a node-group resource with no registered
+// fetcher of its own, the same shape as ngResourceForCacheMissBadge in
+// related_unknown_badge_test.go.
 func transientUnknownNGResource() resource.Resource {
 	return resource.Resource{
 		ID:   "prod-workers",
@@ -113,15 +47,11 @@ func transientUnknownNGResource() resource.Resource {
 	}
 }
 
-// scopeNGToEBSOnly captures the REAL, live ng->ebs RelatedDef ("EBS Volumes",
-// checkNGEBS) from the production registry, then re-registers "ng" with only
-// that single def for the duration of the calling test — restored via
-// t.Cleanup(resource.CleanupRelatedForTest). This makes the lone row the
-// deterministic cursor-0 landing spot (see file header: the real
-// keyboard-cursor skip machinery cannot land on a non-actionable row when no
-// actionable row exists anywhere in a multi-row panel), while keeping every
-// other fact about the def (TargetType, DisplayName, Checker) identical to
-// production.
+// scopeNGToEBSOnly captures the live ng->ebs RelatedDef ("EBS Volumes",
+// checkNGEBS) and re-registers "ng" with only that def for the calling test
+// (reset via t.Cleanup(resource.CleanupRelatedForTest)), so the lone row is
+// the cursor-0 landing spot while TargetType, DisplayName and Checker stay the
+// production values.
 func scopeNGToEBSOnly(t *testing.T) resource.RelatedDef {
 	t.Helper()
 	var ebsDef resource.RelatedDef
@@ -141,13 +71,10 @@ func scopeNGToEBSOnly(t *testing.T) resource.RelatedDef {
 	return ebsDef
 }
 
-// transientUnknownSetup builds a demo root model, opens the ng resource's
-// DETAIL view via a real Navigate message, and feeds a single
-// messages.RelatedCheckResult reproducing checkNGEBS's real cold-cache
-// output (State: RelatedUnknown, no FetchFilter, no RelatedIDs) for the ng->ebs row —
-// exactly what production's fan-out delivers when the "ec2" RowStore entry
-// is cold. Deliberately does NOT load "ec2" resources, so the transient
-// "(?)" state is genuine, not simulated past the checker boundary.
+// transientUnknownSetup builds a demo root model, opens the ng detail via a
+// real Navigate message, and feeds one messages.RelatedCheckResult carrying
+// checkNGEBS's cold-cache output (State: RelatedUnknown, no FetchFilter, no
+// RelatedIDs). "ec2" stays unloaded so the unknown state is genuine.
 func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource.RelatedDef) {
 	t.Helper()
 
@@ -161,16 +88,10 @@ func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource
 		tui.WithProfileForTest(demo.DemoProfile),
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	// tui.WithClients only seeds the option struct read at construction; the
-	// runtime Core's own ServiceClients (what runtime/fetchers.go checks
-	// before any live fetch, including the plain-list fetch Pin 2 drives)
-	// is populated exclusively by a real messages.ClientsReady dispatch
-	// (internal/tui/app_session.go's handleClientsReady ->
-	// core.HandleClientsReady). Without this, TestTransientUnknownDrill_
-	// EnterListShowsUnfilteredEBS's Enter-driven ebs fetch fails with "AWS
-	// clients not initialized" and the pushed list renders "ebs(0) No
-	// resources found" instead of the real demo EBS fixture rows — mirrors
-	// demoClientsReadyMsg() in demo_app_test.go / TestDemoMode_Init_NoAWSConnection.
+	// tui.WithClients only seeds the construction options; the runtime Core's
+	// ServiceClients, which runtime/fetchers.go checks before any live fetch, are
+	// set only by a messages.ClientsReady dispatch (handleClientsReady ->
+	// core.HandleClientsReady).
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients()})
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -200,48 +121,16 @@ func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource
 	return m, ngRes, def
 }
 
-// focusRelatedRow focuses the detail's right column via Tab
-// (keys.Default().Tab, "tab" — internal/tui/app_stack.go's handleDetailKeyMsg
-// case key.Matches(msg, m.keys.Tab) toggles rs.rightCol's focus, and
-// ActionToggleFocus initializes the controller's RelatedCursor to 0). Since
-// scopeNGToEBSOnly leaves exactly one row registered for "ng", the freshly
-// focused right column's cursor lands on the ebs row without any extra
-// Up/Down navigation — sidestepping the real cursor-skip machinery, which
-// (see file header) cannot land on a non-actionable row when other rows
-// exist.
+// focusRelatedRow toggles right-column focus with Tab, which sets the
+// controller's RelatedCursor to 0; with "ng" scoped to one def, the cursor
+// lands on the ebs row.
 func focusRelatedRow(m tui.Model) tui.Model {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Pin 1 + Pin 2: Enter on a transient "(?)" row opens the target type's
-// PLAIN top-level list — not a no-op, not a filtered/related-contextual list.
-// ---------------------------------------------------------------------------
-
-// TestTransientUnknownDrill_EnterOpensPlainTopLevelList verifies the FULL
-// contract of owner decision #38 bullet 1: Enter on the ng->ebs "(?)" row
-// must push a plain, unfiltered "ebs" list — the same navigation any menu
-// entry would produce (messages.Navigate{Target: TargetResourceList}) — not
-// a related/contextual list and not a silent no-op.
-//
-// Distinguishing signals, read straight off the rendered frame (real,
-// user-visible facts, not implementation internals):
-//   - The view must actually change (pre-#38: resource.IsRelatedActionable
-//     for a resolved-unknown row with no FetchFilter was false, so
-//     handleDetailKeyMsg's Enter case returned early and the ng detail
-//     stayed on screen; #38 flipped RelatedUnknown to actionable).
-//   - The pushed list's rendered frame TITLE must NOT carry the
-//     RelatedTitleSuffix (" -- prod-workers (prod-workers)") that
-//     runtime.RelatedTitleSuffix unconditionally appends in the
-//     related-list path (newRelatedList, internal/tui/related_helpers.go) —
-//     a plain menu-driven list never carries this suffix.
-//   - The rendered footer must NOT show the "esc Back" hint: a
-//     related/contextual list always calls SetEscPops(true)
-//     (related_helpers.go), which is the ONLY thing that puts "esc Back" in
-//     the footer (core/app/footer.go buildListFooterHints); a
-//     menu-driven TargetResourceList list leaves EscPops at its false
-//     default and never shows that hint.
+// Enter on a scoreless row (no ResourceIDs, no FetchFilter) resolves in place;
+// a pushed list would replace the "detail -- <id>" frame.
 func TestTransientUnknownDrill_EnterResolvesInPlaceStaysOnDetail(t *testing.T) {
 	m, ngRes, def := transientUnknownSetup(t)
 	m = focusRelatedRow(m)
@@ -250,9 +139,6 @@ func TestTransientUnknownDrill_EnterResolvesInPlaceStaysOnDetail(t *testing.T) {
 	m, _ = drainCmds(t, m, cmd, 6)
 
 	view := stripANSI(rootViewContent(m))
-	// Fix #3: a scoreless row (no ResourceIDs, no FetchFilter) RESOLVES IN
-	// PLACE — the ng detail stays rendered on top; had a list been pushed the
-	// view would render that list instead of "detail -- <id>".
 	if !strings.Contains(view, "detail -- "+ngRes.ID) {
 		t.Fatalf("BUG: Enter on the scoreless row (%s) must RESOLVE IN PLACE (stay on the ng detail), not navigate to a list; view:\n%s",
 			def.DisplayName, view)
@@ -288,6 +174,3 @@ func TestTransientUnknownDrill_EnterRecomputesInPlace(t *testing.T) {
 			def.DisplayName, view)
 	}
 }
-
-// (A scoreless row resolves in place on the drill itself, so there is no
-// list to Esc back from — see TestTransientUnknownDrill_EnterRecomputesInPlace.)

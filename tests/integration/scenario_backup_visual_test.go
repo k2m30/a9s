@@ -2,21 +2,16 @@
 
 package integration
 
-// scenario_backup_visual_test.go — Phase 8 render-gate for the backup resource.
+// scenario_backup_visual_test.go checks the rendered TUI output for backup
+// against the universal UI rules and docs/resources/backup.md.
 //
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the §4 contract in docs/resources/backup.md.
-//
-// backup has NO Wave-1 signals (§3.1) and two Wave-2 signals (§3.2):
+// backup has two Wave-2 signals:
 //   • FAILED/EXPIRED/ABORTED jobs in last 24h → Broken row color.
 //   • PARTIAL jobs in last 24h  → Warning row color.
-// Rule-7 (+N) suffix arithmetic (U7a/U7b/U7e/U7f) is N/A — the suffix only
-// activates when Wave-1 warnings coexist. U7d (! beats ~ on one row) is
-// covered by the plan-broken-mixed fixture.
 // colorBackup (catalog_backup.go) resolves color via colorFromAnyFinding, so
-// every plan with a finding renders its Broken/Warning row color directly —
-// no `!`/`~` name-glyph on backup rows (the glyph is reserved for findings
-// that land on an otherwise-Healthy row).
+// every plan with a finding renders its Broken/Warning row color directly;
+// the `!`/`~` name-glyph is reserved for findings that land on an
+// otherwise-Healthy row.
 
 import (
 	"testing"
@@ -26,20 +21,16 @@ import (
 )
 
 const (
-	// §4 Status column phrases (S4) — these are the canonical strings every
-	// row's Status cell must contain verbatim for the given fixture.
 	backupS4Broken1 = "1 job failed in last 24h"
 	backupS4Broken2 = "2 jobs failed in last 24h"
 	backupS4Partial = "partial: 1 of 3 resources skipped"
 
-	// §4 detail text fragments (S5) — substrings that must appear in the
-	// rendered detail view for the multi-finding fixtures.
 	backupDetailBroken2Capitalize = "2 jobs failed in last 24h"
 	backupDetailPartialCapitalize = "Partial: 1 of 3 resources skipped"
 
-	// Plan names — ExpectRowNamePrefix asserts `"<glyph> <NAME>"` because the
-	// glyph renders adjacent to the name column, and backup plan names
-	// differ from plan IDs (name = "acme-prod-critical", id = UUID).
+	// Glyph-prefix assertions key on `"<glyph> <NAME>"` because the glyph
+	// renders adjacent to the name column, and backup plan names differ from
+	// plan IDs.
 	backupNameProdCritical  = "acme-prod-critical"
 	backupNameProdDatabase  = "acme-prod-database"
 	backupNameStagingHourly = "acme-staging-hourly"
@@ -56,24 +47,14 @@ func TestScenario_BackupVisual(t *testing.T) {
 	// Drive the real demo startup so Wave 2 enrichment runs against the fake.
 	runDemoStartup(t, scenario)
 
-	// ---------------------------------------------------------------
-	// S1 menu badge — assert BEFORE OpenList while the main menu is
-	// still the current view.
-	//
-	// 4 plans carry `!` severity findings (plan-broken-1failed,
-	// plan-broken-2failed, plan-broken-aborted, plan-broken-mixed) and
-	// 1 plan carries a `~` severity finding (plan-warning-partial).
-	// Per universal rule 4, only `!` severity bumps the badge, so the
-	// expected count is 4. `unifiedIssueCount` filters by `!` severity.
+	// The menu badge is read while the main menu is still the current view.
+	// Only `!` severity bumps the badge, so the `~` finding on
+	// plan-warning-partial does not count.
 	scenario.ExpectMenuIssueCount("backup", 4)
 
 	scenario.OpenList("backup")
 
-	// ---------------------------------------------------------------
-	// Universal column rules — no jargon columns, in particular no
-	// revival of the retired "Last Status" column (spec §4 collapses
-	// every Wave-2 job-state phrase into the Status column).
-	// ---------------------------------------------------------------
+	// Every Wave-2 job-state phrase renders in the Status column.
 	for _, jargon := range []string{
 		"Last Status", "CIS", " Flags", "Policy ", " Issues ",
 		"NOBKP", "UNENC", " PUB ", "NOPROT",
@@ -81,43 +62,28 @@ func TestScenario_BackupVisual(t *testing.T) {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// ---------------------------------------------------------------
-	// Healthy rows (S2 green, S4 blank, no glyph) — three fixtures:
-	// plan-healthy-daily, plan-never-ran, plan-old-failure (its
-	// only job is 48h out of window).
-	// ---------------------------------------------------------------
+	// DevSporadicPlanID's only job is 48h old, outside the 24h window.
 	scenario.ExpectRowStatusBlank(demofixtures.HealthyDailyPlanID)
 	scenario.ExpectRowStatusBlank(demofixtures.NeverRanPlanID)
 	scenario.ExpectRowStatusBlank(demofixtures.DevSporadicPlanID)
-	// Pass NAMEs for glyph-prefix checks — the harness asserts on the
-	// literal substring `"<prefix><id>"`, and our glyph is rendered
-	// next to the name column (plan name ≠ plan ID).
 	scenario.ExpectRowNoGlyphPrefix(backupNameHealthyDaily)
 	scenario.ExpectRowNoGlyphPrefix(backupNameNeverRan)
 	scenario.ExpectRowNoGlyphPrefix(backupNameDevSporadic)
 
-	// ---------------------------------------------------------------
-	// §4 Status phrases — exact match.
-	// ---------------------------------------------------------------
 	scenario.ExpectRowStatusEquals(demofixtures.ProdCriticalPlanID, backupS4Broken1)
 	scenario.ExpectRowStatusEquals(demofixtures.ProdDatabasePlanID, backupS4Broken2)
 	scenario.ExpectRowStatusEquals(demofixtures.StagingHourlyPlanID, backupS4Broken1)
 	scenario.ExpectRowStatusEquals(demofixtures.AppDataPlanID, backupS4Partial)
-	// plan-broken-mixed: FAILED beats PARTIAL (U7d severity precedence).
+	// FAILED beats PARTIAL on one row.
 	scenario.ExpectRowStatusEquals(demofixtures.ComplianceMixedPlanID, backupS4Broken1)
 
-	// ---------------------------------------------------------------
-	// Rule 3 — glyph rules. colorBackup (catalog_backup.go) resolves color
-	// via colorFromAnyFinding first, so every plan carrying a Wave-2 finding
-	// now renders Broken/Warning row color directly instead of staying
-	// Healthy-green-with-glyph — the glyph is retired for this resource, the
-	// row color itself carries the severity signal.
-	// ---------------------------------------------------------------
+	// The row color carries the severity signal, so no backup row renders a
+	// name glyph.
 	for _, name := range []string{
 		backupNameProdCritical,
 		backupNameProdDatabase,
 		backupNameStagingHourly,
-		backupNameComplianceMix, // U7d: ! beats ~
+		backupNameComplianceMix,
 		backupNameAppData,
 		backupNameHealthyDaily,
 		backupNameNeverRan,
@@ -126,12 +92,7 @@ func TestScenario_BackupVisual(t *testing.T) {
 		scenario.ExpectRowNoGlyphPrefix(name)
 	}
 
-	// ---------------------------------------------------------------
-	// Related panel — graph-root is plan-broken-2failed (prod vault
-	// with full kms + role + sns wiring). Every §2 pivot with
-	// `count shown: yes` MUST render ≥1. ct-events is `count shown:
-	// unknown` and exempt.
-	// ---------------------------------------------------------------
+	// ct-events shows no count, so only counted pivots are asserted.
 	root := selectBackupByID(t, scenario, demofixtures.ProdDatabasePlanID)
 	scenario.OpenDetailResource("backup", root)
 	scenario.ExpectNoAPIError()
@@ -144,40 +105,25 @@ func TestScenario_BackupVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// ---------------------------------------------------------------
-	// Rule 7 U7c — S5 Attention section for plan-broken-2failed must
-	// render the Summary phrase and the per-job State rows so no
-	// Wave-2 fact silently disappears.
-	// ---------------------------------------------------------------
 	view := scenario.currentView()
-	t.Log("\n" + view) // 8.4 user-visible sanity render (mandatory)
+	t.Log("\n" + view)
 
-	// Attention primary entry: glyph + capitalized phrase.
 	scenario.ExpectViewContains(backupDetailBroken2Capitalize)
-	// Per-job State rows — the operator-phrase architecture humanizes the raw
-	// AWS enum before it reaches the rendered surface (State: failed / State:
-	// expired), never the bare SDK constant. Assert the new phrase, forbid
-	// the old raw whole-word enum from ever reappearing.
+	// Per-job State rows humanize the raw AWS enum before it reaches the
+	// rendered surface.
 	scenario.ExpectViewContains("State: failed")
 	scenario.ExpectViewContains("State: expired")
 	scenario.ExpectViewNotContains("FAILED")
 	scenario.ExpectViewNotContains("EXPIRED")
-	// Most-recent timestamp row should also appear — asserted loosely as
-	// a presence of the "Most recent" label (the concrete timestamp is
-	// relative and not pinned here).
+	// The timestamp is relative, so only the label is asserted.
 	scenario.ExpectViewContains("Most recent")
 
-	// U11 regression guard — Summary (`backupS4Broken2`) must not contain
-	// any concatenated Row value form. Asserted at unit-test level;
-	// here we confirm the stable phrase renders without a trailing
-	// "(KMSKeyNotAccessibleException: …)" leak or similar.
+	// The summary phrase carries no concatenated row value such as a trailing
+	// "(KMSKeyNotAccessibleException: …)".
 	scenario.ExpectViewNotContains(backupS4Broken2 + ":")
 
-	// ---------------------------------------------------------------
-	// U7d — plan-broken-mixed carries FAILED + PARTIAL. Detail view
-	// must show the partial-jobs count in Rows so the `~` signal
-	// does NOT silently disappear even though Status shows `!`.
-	// ---------------------------------------------------------------
+	// plan-broken-mixed carries FAILED + PARTIAL; the partial-jobs row keeps
+	// the `~` signal visible while Status shows `!`.
 	scenario.Back()
 	mixed := selectBackupByID(t, scenario, demofixtures.ComplianceMixedPlanID)
 	scenario.OpenDetailResource("backup", mixed)
@@ -185,13 +131,9 @@ func TestScenario_BackupVisual(t *testing.T) {
 	mixedView := scenario.currentView()
 	t.Log("\n" + mixedView)
 
-	scenario.ExpectViewContains("1 job failed in last 24h") // capitalized in Attention
-	scenario.ExpectViewContains("Partial jobs")             // Row label preserves ~ info
+	scenario.ExpectViewContains("1 job failed in last 24h")
+	scenario.ExpectViewContains("Partial jobs")
 
-	// ---------------------------------------------------------------
-	// Warning fixture — plan-warning-partial. Detail view shows the
-	// partial phrase and the supporting count rows.
-	// ---------------------------------------------------------------
 	scenario.Back()
 	partial := selectBackupByID(t, scenario, demofixtures.AppDataPlanID)
 	scenario.OpenDetailResource("backup", partial)

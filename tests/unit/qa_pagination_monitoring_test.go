@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_monitoring_test.go — pagination tests for monitoring/messaging fetchers:
+// Pagination tests for monitoring/messaging fetchers:
 // alarm, logs, ddb, sqs, sns
 
 import (
@@ -21,10 +21,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCloudWatchAlarmsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_FirstPage(t *testing.T) {
 	threshold := 90.0
@@ -159,10 +155,6 @@ func (m *mockCWLogsDescribeLogGroupsAPIPaginated) DescribeLogGroups(_ context.Co
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCloudWatchLogGroupsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCloudWatchLogGroupsPage_FirstPage(t *testing.T) {
 	storedBytes := int64(1048576) // 1 MB
@@ -312,10 +304,6 @@ func (m *mockDDBDescribeTableAPIPaginated) DescribeTable(_ context.Context, inpu
 	return m.DescribeFunc(m.Calls, name)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchDynamoDBTablesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchDynamoDBTablesPage_FirstPage(t *testing.T) {
 	itemCount := int64(1000)
 	tableBytes := int64(512000)
@@ -457,10 +445,6 @@ func TestQA_Pagination_FetchDynamoDBTablesPage_Error(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSQSQueuesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchSQSQueuesPage_FirstPage(t *testing.T) {
 	listMock := &fakeSQSListQueues{
 		PageFunc: func(_ int) (*sqs.ListQueuesOutput, error) {
@@ -593,13 +577,6 @@ func TestQA_Pagination_FetchSQSQueuesPage_Error(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Mock: SNS ListTopics (paginated)
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_sns_test.go
-// (fakeSNSListTopics) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestQA_Pagination_FetchSNSTopicsPage_FirstPage(t *testing.T) {
 	mock := &fakeSNSListTopics{
 		PageFunc: func(_ int) (*sns.ListTopicsOutput, error) {
@@ -631,11 +608,9 @@ func TestQA_Pagination_FetchSNSTopicsPage_FirstPage(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	// ID is the full ARN
 	if result.Resources[0].ID != "arn:aws:sns:us-east-1:111111111111:my-alerts" {
 		t.Errorf("resource ID: expected %q, got %q", "arn:aws:sns:us-east-1:111111111111:my-alerts", result.Resources[0].ID)
 	}
-	// Name is extracted from the last segment of the ARN
 	if result.Resources[0].Name != "my-alerts" {
 		t.Errorf("resource Name: expected %q, got %q", "my-alerts", result.Resources[0].Name)
 	}

@@ -1,49 +1,23 @@
-// resourcesloaded_provenance_guard_test.go — structural guard closing the
-// "forgot to declare Provenance" class at the source, the same shape as
-// event_genstamp_guard_test.go's production-side GenStamp guard but aimed at
-// this package: every messages.ResourcesLoaded{...} composite literal
-// anywhere under tests/ (every test tree — tests/unit, tests/integration,
-// and any tree added later; see rlpgTestsRoot) must set an explicit
+// Structural guard: every
+// messages.ResourcesLoaded{...} composite literal anywhere under tests/ (every
+// test tree, walked recursively from rlpgTestsRoot) must set an explicit
 // Provenance field.
 //
-// The zero value, FetchProvenanceUnknown, silently means "this is not the
-// type's canonical top-level population" to every real consumer
-// (core/app/handle.go's handleResourcesLoadedEvent, which owns both the
-// screen write and the store write) — so a test literal that never states
-// Provenance is not neutral, it is a discard instruction the author never
-// meant to write. #209 found ~200 such literals already in tests/unit,
-// several of them silently asserting against a PRIOR test's leaked rows
-// instead of their own (tui_root_test.go's newRootSizedModel isolation
-// defect made the leak possible; this guard closes the second half — the
-// literals that would still discard themselves even with isolation fixed).
+// The zero value, FetchProvenanceUnknown, means "this is not the type's
+// canonical top-level population" to every real consumer (core/app/handle.go's
+// handleResourcesLoadedEvent, which owns both the screen write and the store
+// write) — so a test literal that never states Provenance is not neutral: it is
+// a discard instruction the author never meant to write.
 //
-// The #209 migration and this guard both originally stopped at tests/unit —
-// tests/integration kept building unstamped ResourcesLoaded literals and
-// nothing caught it until a `make ready-to-push` run went red on a filtered
-// list that rendered "Loading..." forever (fix/resourcesloaded-provenance).
-// A guard whose scope is narrower than the problem just moves the blind
-// spot to whichever directory it doesn't cover, so this guard now scans
-// rlpgTestsRoot() — tests/ itself, walked recursively — rather than
-// listing tests/unit and tests/integration by name: any test tree nested
-// under tests/ today or added tomorrow (tests/stories, tests/e2e's Go
-// helpers, a future tests/web) is covered with no code change here.
-// Non-Go trees under tests/ (tests/e2e's Playwright/node_modules, tests/
-// testdata's fixtures) are walked but never parsed — rlpgWalkGoFiles
-// already filters by the ".go" suffix before calling parser.ParseFile — so
-// widening the root to all of tests/ costs nothing beyond a directory
-// listing over content that was always going to be skipped.
+// Scanning tests/ itself rather than a list of named trees covers any tree
+// added under it with no code change here. Non-Go trees are walked but never
+// parsed: rlpgWalkGoFiles filters by the ".go" suffix first.
 //
 // This guard requires the field's PRESENCE, not any particular value: a
-// literal that genuinely means "discard me" (a deliberate zero-Provenance
-// fail-safe pin, see resourcesloaded_provenance_test.go's
+// literal that genuinely means "discard me" (see
+// resourcesloaded_provenance_test.go's
 // TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCanonical)
-// satisfies this guard by writing `Provenance: messages.FetchProvenanceUnknown`
-// explicitly — stating the zero value on purpose is exactly the intent this
-// guard exists to force, not a violation of it.
-//
-// Style follows event_registry_contract_test.go's go/parser scanning
-// (ercScanMarkerReceivers, ercFindFuncDeclByName) and event_genstamp_guard_test.go's
-// production-side mirror: declared-set-from-AST, not a hand-maintained list.
+// writes `Provenance: messages.FetchProvenanceUnknown` explicitly.
 package unit
 
 import (
@@ -64,12 +38,8 @@ func rlpgRepoRoot() string {
 	return filepath.Join("..", "..")
 }
 
-// rlpgTestsRoot is the scan root for the production guard test below: the
-// repo's tests/ directory itself, not any single tree under it. Discovering
-// every test tree this way — one filepath.Walk from the shared parent —
-// means a future tests/<newtree> is swept automatically; naming tests/unit
-// and tests/integration explicitly here would only repeat the mistake this
-// guard exists to close (see the package doc comment above).
+// rlpgTestsRoot is the scan root for the guard: the repo's tests/ directory
+// itself, so one filepath.Walk sweeps every test tree under it.
 func rlpgTestsRoot() string {
 	return filepath.Join(rlpgRepoRoot(), "tests")
 }
@@ -187,16 +157,11 @@ func rlpgWalkGoFiles(t *testing.T, root string) []rlpgViolation {
 
 // TestResourcesLoadedProvenanceGuard_EveryLiteralStatesProvenance is the
 // structural guard: every messages.ResourcesLoaded{...} composite literal
-// anywhere under tests/ (every tree the repo has today, and every tree it
-// grows tomorrow — rlpgTestsRoot) must declare Provenance explicitly,
-// whatever value it declares. Zero exceptions today (the #209 migration
-// plus the fix/resourcesloaded-provenance follow-up closed every prior
-// site, in tests/unit and tests/integration alike) — this asserts an empty
-// violation set, not a tolerated allowlist. A future test that constructs a
-// bare literal fails this test by name, with the exact file:line, rather
-// than silently discarding itself the moment it happens to target a
-// canonical top-level list (core/app/handle.go's isTopLevelCanonicalList
-// gate) — regardless of which test tree it was written in.
+// anywhere under tests/ must declare Provenance explicitly, whatever value it
+// declares. The violation set must be empty; a bare literal fails this test
+// with its exact file:line rather than silently discarding itself when it
+// targets a canonical top-level list (core/app/handle.go's
+// isTopLevelCanonicalList gate).
 func TestResourcesLoadedProvenanceGuard_EveryLiteralStatesProvenance(t *testing.T) {
 	violations := rlpgWalkGoFiles(t, rlpgTestsRoot())
 
@@ -310,19 +275,11 @@ func buildStampedDotImported() ResourcesLoaded {
 }
 
 // TestResourcesLoadedProvenanceGuard_DiscoversViolationsAcrossSiblingTestTrees
-// is the canary for the actual defect this branch found: the #209 migration
-// and the original version of this guard both scanned only tests/unit/,
-// leaving tests/integration (and any other sibling tree) free to build
-// unstamped ResourcesLoaded literals with nothing to catch it — exactly what
-// happened to ec2_nav_chain_spec008_test.go. This test proves the fix is
-// general rather than "add tests/integration to a list": it builds three
-// sibling directories under one temp root — "unit" (stamped, clean),
-// "integration" (unstamped, a violation), and "somefuturetree" (unstamped, a
-// violation) — a name no production code names literally anywhere. Pointing
-// rlpgWalkGoFiles at the shared parent must find both non-"unit" violations
-// by recursion alone, with no per-tree-name special case, so a tree added
-// after this test is written is covered the same way "somefuturetree" is
-// covered here.
+// builds three sibling directories under one temp root — "unit" (stamped,
+// clean), "integration" (unstamped) and "somefuturetree" (unstamped, a name no
+// production code names) — and checks that rlpgWalkGoFiles pointed at the
+// shared parent finds both violations by recursion alone, with no
+// per-tree-name special case.
 func TestResourcesLoadedProvenanceGuard_DiscoversViolationsAcrossSiblingTestTrees(t *testing.T) {
 	root := t.TempDir()
 	trees := map[string]string{

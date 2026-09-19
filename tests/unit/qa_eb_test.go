@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-EB-001 - Test Elastic Beanstalk Environments response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	now := time.Now()
 	mock := &mockEBClient{
@@ -66,9 +62,7 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	if r.ID != "e-abc123" {
 		t.Errorf("expected ID 'e-abc123', got %q", r.ID)
 	}
-	// EB fetcher must NOT write Status and must NOT emit wave1 Findings for
-	// health. Health classification stays structural via the Color func
-	// reading Fields["health"].
+	// A Green environment carries no finding.
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for Green environment (health is structural, not wave1), got %d", len(r.Findings))
 	}
@@ -89,14 +83,10 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second env (Yellow health): RETIRED the old "no Status, no wave1
-	// Finding" invariant — since the color-findings-conformance wave, colorEB
-	// is colorFromAnyFinding-first (core/aws/catalog_compute.go) and
-	// ebEnvironmentFindings (core/aws/eb_codes.go) now emits
-	// CodeEBHealthYellow/SevWarn for a Yellow-health environment, because
-	// Color needs its own Finding to color from. See
-	// qa_color_findings_conformance_test.go for the standing architectural
-	// gate and TestPR03b_EBFetcher_EmitsHealthAsWave1Finding for full coverage.
+	// A Yellow-health environment carries CodeEBHealthYellow/SevWarn from
+	// ebEnvironmentFindings (core/aws/eb_codes.go): colorEB is
+	// colorFromAnyFinding-first (core/aws/catalog_compute.go), so Color needs
+	// its own Finding to color from.
 	r2 := resources[1]
 	if len(r2.Findings) != 1 {
 		t.Fatalf("expected 1 Finding for Yellow environment (colorEB needs its own Finding to color from), got %d", len(r2.Findings))

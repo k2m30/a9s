@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w1_ami_test.go — behavioural pins for ami.public (batch w1).
+// Behavioural pins for ami.public.
 //
 // An AMI marked public is readable by every AWS account: anyone can launch it
 // and read whatever the image's filesystem carries. The finding is only sound
@@ -71,8 +71,7 @@ func TestAMI_Public_SharedWithEveryAccount(t *testing.T) {
 	rs := pw1FetchAMIs(t, &pw1AMIFake{images: []ec2types.Image{pw1Image("ami-0public00aaaaaa1", aws.Bool(true))}})
 	r := pw1ResourceByID(t, rs, "ami-0public00aaaaaa1")
 	pw1RequireFinding(t, r.Findings, pw1AMICodePublic, "shared with all AWS accounts", domain.SevBroken, "wave1")
-	// d4 row 20: the value is a word, not the SDK field's shape. Do not
-	// restore "true" — TestNetworkingRowValues_AreWordsNotLiterals fails on it.
+	// The value is a word, not the SDK field's shape.
 	pw1RequireRow(t, r.AttentionDetails[pw1AMICodePublic].Rows, "Public", "yes")
 }
 
@@ -118,7 +117,7 @@ func TestAMI_Public_CoexistsWithLifecycleFinding(t *testing.T) {
 }
 
 // TestAMI_DemoBench_OnlyWitnessIsPublic pins that the demo bench shows exactly
-// one public AMI, the named witness row.
+// one public AMI, the named fixture row.
 func TestAMI_DemoBench_OnlyWitnessIsPublic(t *testing.T) {
 	out, err := awsclient.FetchAMIsPage(context.Background(), fakes.NewEC2(), "")
 	if err != nil {
@@ -133,10 +132,9 @@ func TestAMI_DemoBench_OnlyWitnessIsPublic(t *testing.T) {
 	pw1RequireOnlyWitness(t, pw1AMICodePublic, fixtures.AMIPublic, carriers)
 }
 
-// TestAMI_Public_DeregisteredImageIsNotAnExposure pins common contract rule 4
-// on ami: a deregistered image cannot be launched by anyone, so its launch
-// permission is no longer an exposure and the row is not an open posture item.
-// imageResource currently appends ami.public independently of State.
+// TestAMI_Public_DeregisteredImageIsNotAnExposure pins that a deregistered
+// image cannot be launched by anyone, so its launch permission is not an
+// exposure and the row is not an open posture item.
 func TestAMI_Public_DeregisteredImageIsNotAnExposure(t *testing.T) {
 	for _, state := range []ec2types.ImageState{
 		ec2types.ImageStateDeregistered,

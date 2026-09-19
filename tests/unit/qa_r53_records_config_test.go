@@ -7,10 +7,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// ===========================================================================
-// GAP 2: R53 Records Config Defaults (mirrors s3_objects config tests)
-// ===========================================================================
-
 func TestConfigDefaultViewDef_R53Records(t *testing.T) {
 	vd := config.DefaultViewDef("r53_records")
 	if len(vd.List) != 4 {
@@ -42,7 +38,6 @@ func TestConfigDefaultViewDef_R53Records_DetailPaths(t *testing.T) {
 		t.Fatal("r53_records default should have non-empty Detail paths")
 	}
 
-	// Verify key detail fields are present
 	wantPaths := []string{"Name", "Type", "TTL", "ResourceRecords", "AliasTarget"}
 	for _, want := range wantPaths {
 		found := slices.ContainsFunc(vd.Detail, func(df config.DetailField) bool {
@@ -93,7 +88,6 @@ func TestConfigYAMLParsing_R53Records(t *testing.T) {
 }
 
 func TestGetViewDef_R53Records_NilConfig(t *testing.T) {
-	// With nil config, should fall back to defaults
 	vd := config.GetViewDef(nil, "r53_records")
 	if len(vd.List) != 4 {
 		t.Fatalf("expected 4 default r53_records columns with nil config, got %d", len(vd.List))
@@ -132,7 +126,6 @@ func TestGetViewDef_R53Records_PartialConfig_FallsBackToDefaults(t *testing.T) {
 	if len(vd.List) != 4 {
 		t.Fatalf("expected 4 default r53_records columns (not in partial config), got %d", len(vd.List))
 	}
-	// Should be default widths
 	if vd.List[0].Width != 40 {
 		t.Errorf("expected default Name width 40, got %d", vd.List[0].Width)
 	}

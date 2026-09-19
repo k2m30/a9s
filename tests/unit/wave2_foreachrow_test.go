@@ -1,6 +1,6 @@
 package unit_test
 
-// wave2_foreachrow_test.go — a Wave 2 loop that stops at its deadline says
+// A Wave 2 loop that stops at its deadline says
 // which rows it never reached, and hands the error back.
 //
 // A row whose check never started is not a row that was inspected and found
@@ -143,10 +143,6 @@ func TestForEachRow_CompletedLoopMarksNothing(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// eb-rule, the witness
-// ---------------------------------------------------------------------------
-
 // bkEBFake answers ListTargetsByRule from a per-rule table and records which
 // rules it was asked about. A rule missing from the table has one target with
 // a dead-letter queue, which is the healthy shape.
@@ -195,8 +191,8 @@ func bkEBRule(name, state string) resource.Resource {
 	}
 }
 
-// TestEBRuleDeadline_RulesNeverAskedAreMarkedAndTheErrorSurfaces is the
-// witness: the Wave 2 deadline passes while the rule loop is still scheduling.
+// TestEBRuleDeadline_RulesNeverAskedAreMarkedAndTheErrorSurfaces: the Wave 2
+// deadline passes while the rule loop is still scheduling.
 // A rule whose ListTargetsByRule was never sent has no answer, so it must say
 // so; a rule that was asked has one and must not.
 func TestEBRuleDeadline_RulesNeverAskedAreMarkedAndTheErrorSurfaces(t *testing.T) {
@@ -238,10 +234,6 @@ func TestEBRuleDeadline_RulesNeverAskedAreMarkedAndTheErrorSurfaces(t *testing.T
 		t.Error("result.Truncated = false: the issue count reads complete although rules were never checked")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Every enricher, on the demo bench
-// ---------------------------------------------------------------------------
 
 // TestWave2Deadline_EveryEnricherAccountsForRowsItNeverReached runs each
 // registered enricher twice over the demo rows: once with time to finish and
@@ -285,10 +277,6 @@ func TestWave2Deadline_EveryEnricherAccountsForRowsItNeverReached(t *testing.T) 
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// The sweep
-// ---------------------------------------------------------------------------
 
 // TestWave2Loops_NoCallerDiscardsTheLoopError: the loop's error is how a
 // stop reaches the result. A caller that drops it reports a stopped loop as a

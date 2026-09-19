@@ -24,17 +24,7 @@ import (
 // file's sweeps use — the detail view legitimately projects the
 // post-enrichment resource (see core/resource.DetailEnricher), and wrapper
 // transparency (embedded raw-struct fields still resolve through fieldpath)
-// is pinned separately by fieldpath_embedded_traversal_test.go. A future
-// enrichment-only path on another resource type needs one entry here, keyed
-// by its config Detail path string, instead of being excluded from its sweep.
-// sfn (Status, RoleArn) and lambda (Concurrency) also gained enrichment-only
-// Detail paths, but deliberately have no entry here: this file's per-path
-// sweep would need brand-new fixtures/tests built from scratch for both
-// (neither has any fixture in this file today), which is redundant with the
-// wrapper-transparency pin (fieldpath_embedded_traversal_test.go) and the
-// enricher-correctness suites (aws_sfn_detail_enrich_test.go,
-// aws_lambda_detail_enrich_test.go); rendered rows are covered end-to-end by
-// the smoke-enrichers gate.
+// is pinned separately by fieldpath_embedded_traversal_test.go.
 var enrichmentOnlyDetailFixtures = map[string]map[string]any{
 	"ec2": {
 		"UserData": awsclient.InstanceEnriched{
@@ -60,15 +50,7 @@ var enrichmentOnlyDetailFixtures = map[string]map[string]any{
 	},
 }
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
-
 var testTime = time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
-
-// ===========================================================================
-// Realistic SDK struct builders
-// ===========================================================================
 
 func realisticS3Bucket() s3types.Bucket {
 	return s3types.Bucket{
@@ -312,10 +294,6 @@ func realisticSecretListEntry() smtypes.SecretListEntry {
 	}
 }
 
-// ===========================================================================
-// S3 Buckets
-// ===========================================================================
-
 func TestQA_ListViewColumns_S3Bucket(t *testing.T) {
 	bucket := realisticS3Bucket()
 	vd := config.DefaultViewDef("s3")
@@ -335,7 +313,6 @@ func TestQA_ListViewColumns_S3Bucket(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(bucket, "Name"); got != "my-production-bucket" {
 		t.Errorf("Name: expected %q, got %q", "my-production-bucket", got)
 	}
@@ -362,13 +339,11 @@ func TestQA_DetailViewPaths_S3Bucket(t *testing.T) {
 }
 
 func TestQA_NilFields_S3Bucket(t *testing.T) {
-	// Minimal bucket with nil fields
 	bucket := s3types.Bucket{}
 	vd := config.DefaultViewDef("s3")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractScalar(bucket, col.Path)
 		})
 	}
@@ -376,15 +351,10 @@ func TestQA_NilFields_S3Bucket(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(bucket, path)
 		})
 	}
 }
-
-// ===========================================================================
-// S3 Objects (files) — s3types.Object
-// ===========================================================================
 
 func TestQA_ListViewColumns_S3ObjectFile(t *testing.T) {
 	obj := realisticS3ObjectFile()
@@ -406,7 +376,6 @@ func TestQA_ListViewColumns_S3ObjectFile(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(obj, "Key"); got != "data/report-2025.csv" {
 		t.Errorf("Key: expected %q, got %q", "data/report-2025.csv", got)
 	}
@@ -432,21 +401,15 @@ func TestQA_DetailViewPaths_S3ObjectFile(t *testing.T) {
 }
 
 func TestQA_NilFields_S3ObjectFile(t *testing.T) {
-	// Minimal S3 Object with nil fields
 	obj := s3types.Object{}
 	vd := config.DefaultViewDef("s3_objects")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic — nil fields should return ""
 			_ = fieldpath.ExtractScalar(obj, col.Path)
 		})
 	}
 }
-
-// ===========================================================================
-// S3 Objects (folders) — s3types.CommonPrefix — CRITICAL: ONLY has Prefix!
-// ===========================================================================
 
 func TestQA_ListViewColumns_S3ObjectFolder(t *testing.T) {
 	folder := realisticS3ObjectFolder()
@@ -456,7 +419,6 @@ func TestQA_ListViewColumns_S3ObjectFolder(t *testing.T) {
 	// The extraction must NOT crash on missing fields — it should return ""
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
-			// Must not panic
 			result := fieldpath.ExtractScalar(folder, col.Path)
 			// Only "Key" maps to nothing on CommonPrefix — Prefix is the field name
 			// All paths (Key, Size, LastModified, StorageClass) should return "" for CommonPrefix
@@ -465,27 +427,23 @@ func TestQA_ListViewColumns_S3ObjectFolder(t *testing.T) {
 		})
 	}
 
-	// Verify Prefix extraction works directly
 	if got := fieldpath.ExtractScalar(folder, "Prefix"); got != "data/reports/" {
 		t.Errorf("Prefix: expected %q, got %q", "data/reports/", got)
 	}
 }
 
 func TestQA_NilFields_S3ObjectFolder(t *testing.T) {
-	// Completely empty CommonPrefix
 	folder := s3types.CommonPrefix{}
 	vd := config.DefaultViewDef("s3_objects")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractScalar(folder, col.Path)
 		})
 	}
 }
 
 func TestQA_S3ObjectFolder_DoesNotCrashOnAnyColumn(t *testing.T) {
-	// Ensure that every s3_objects column applied to a CommonPrefix never panics
 	folder := realisticS3ObjectFolder()
 	vd := config.DefaultViewDef("s3_objects")
 
@@ -498,10 +456,6 @@ func TestQA_S3ObjectFolder_DoesNotCrashOnAnyColumn(t *testing.T) {
 		})
 	}
 }
-
-// ===========================================================================
-// EC2 Instances
-// ===========================================================================
 
 func TestQA_ListViewColumns_EC2(t *testing.T) {
 	inst := realisticEC2Instance()
@@ -529,7 +483,6 @@ func TestQA_ListViewColumns_EC2(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(inst, "InstanceId"); got != "i-0abcdef1234567890" {
 		t.Errorf("InstanceId: expected %q, got %q", "i-0abcdef1234567890", got)
 	}
@@ -566,19 +519,16 @@ func TestQA_DetailViewPaths_EC2(t *testing.T) {
 		})
 	}
 
-	// Verify Tags renders as YAML (non-empty, multi-line content)
 	tagsYAML := fieldpath.ExtractSubtree(inst, "Tags")
 	if tagsYAML == "" {
 		t.Error("Tags should produce non-empty YAML")
 	}
 
-	// Verify SecurityGroups renders as YAML
 	sgYAML := fieldpath.ExtractSubtree(inst, "SecurityGroups")
 	if sgYAML == "" {
 		t.Error("SecurityGroups should produce non-empty YAML")
 	}
 
-	// Verify State renders as YAML subtree (has Name and Code fields)
 	stateYAML := fieldpath.ExtractSubtree(inst, "State")
 	if stateYAML == "" {
 		t.Error("State should produce non-empty YAML")
@@ -586,7 +536,6 @@ func TestQA_DetailViewPaths_EC2(t *testing.T) {
 }
 
 func TestQA_NilFields_EC2(t *testing.T) {
-	// Minimal EC2 instance — no public IP, no tags, no state
 	inst := ec2types.Instance{
 		InstanceType: ec2types.InstanceTypeT3Micro,
 	}
@@ -594,7 +543,6 @@ func TestQA_NilFields_EC2(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic — nil pointer fields should return ""
 			_ = fieldpath.ExtractScalar(inst, col.Path)
 		})
 	}
@@ -602,25 +550,18 @@ func TestQA_NilFields_EC2(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(inst, path)
 		})
 	}
 
-	// Specifically verify nil PublicIpAddress returns ""
 	if got := fieldpath.ExtractScalar(inst, "PublicIpAddress"); got != "" {
 		t.Errorf("nil PublicIpAddress should return empty, got %q", got)
 	}
 
-	// Specifically verify nil State returns "" for nested path
 	if got := fieldpath.ExtractScalar(inst, "State.Name"); got != "" {
 		t.Errorf("nil State.Name should return empty, got %q", got)
 	}
 }
-
-// ===========================================================================
-// DB Instances
-// ===========================================================================
 
 func TestQA_ListViewColumns_RDS(t *testing.T) {
 	db := realisticRDSInstance()
@@ -644,7 +585,6 @@ func TestQA_ListViewColumns_RDS(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(db, "DBInstanceIdentifier"); got != "prod-db-01" {
 		t.Errorf("DBInstanceIdentifier: expected %q, got %q", "prod-db-01", got)
 	}
@@ -682,13 +622,11 @@ func TestQA_DetailViewPaths_RDS(t *testing.T) {
 		})
 	}
 
-	// Verify Endpoint renders as YAML subtree (has Address and Port)
 	epYAML := fieldpath.ExtractSubtree(db, "Endpoint")
 	if epYAML == "" {
 		t.Error("Endpoint should produce non-empty YAML")
 	}
 
-	// Verify TagList extraction works directly (the actual SDK field name)
 	tagListYAML := fieldpath.ExtractSubtree(db, "TagList")
 	if tagListYAML == "" {
 		t.Error("TagList should produce non-empty YAML")
@@ -696,7 +634,6 @@ func TestQA_DetailViewPaths_RDS(t *testing.T) {
 }
 
 func TestQA_NilFields_RDS(t *testing.T) {
-	// Minimal RDS instance — creating state, no endpoint
 	db := rdstypes.DBInstance{
 		DBInstanceIdentifier: new("test-db"),
 		DBInstanceStatus:     new("creating"),
@@ -705,7 +642,6 @@ func TestQA_NilFields_RDS(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic — nil Endpoint should not crash on Endpoint.Address
 			_ = fieldpath.ExtractScalar(db, col.Path)
 		})
 	}
@@ -713,20 +649,14 @@ func TestQA_NilFields_RDS(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(db, path)
 		})
 	}
 
-	// Specifically verify nil Endpoint.Address returns ""
 	if got := fieldpath.ExtractScalar(db, "Endpoint.Address"); got != "" {
 		t.Errorf("nil Endpoint.Address should return empty, got %q", got)
 	}
 }
-
-// ===========================================================================
-// Redis (ElastiCache)
-// ===========================================================================
 
 func TestQA_ListViewColumns_Redis(t *testing.T) {
 	rg := realisticRedisReplicationGroup()
@@ -745,7 +675,6 @@ func TestQA_ListViewColumns_Redis(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(rg, "ReplicationGroupId"); got != "redis-prod-001" {
 		t.Errorf("ReplicationGroupId: expected %q, got %q", "redis-prod-001", got)
 	}
@@ -768,7 +697,6 @@ func TestQA_DetailViewPaths_Redis(t *testing.T) {
 		})
 	}
 
-	// Verify ConfigurationEndpoint renders as YAML subtree (has Address and Port)
 	epYAML := fieldpath.ExtractSubtree(rg, "ConfigurationEndpoint")
 	if epYAML == "" {
 		t.Error("ConfigurationEndpoint should produce non-empty YAML")
@@ -776,7 +704,6 @@ func TestQA_DetailViewPaths_Redis(t *testing.T) {
 }
 
 func TestQA_NilFields_Redis(t *testing.T) {
-	// Minimal Redis replication group — no endpoint, no member clusters
 	rg := elasticachetypes.ReplicationGroup{
 		ReplicationGroupId: new("redis-test"),
 		Status:             new("creating"),
@@ -785,7 +712,6 @@ func TestQA_NilFields_Redis(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic — nil ConfigurationEndpoint should not crash
 			_ = fieldpath.ExtractScalar(rg, col.Path)
 		})
 	}
@@ -793,20 +719,14 @@ func TestQA_NilFields_Redis(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(rg, path)
 		})
 	}
 
-	// Specifically verify nil ConfigurationEndpoint.Address returns ""
 	if got := fieldpath.ExtractScalar(rg, "ConfigurationEndpoint.Address"); got != "" {
 		t.Errorf("nil ConfigurationEndpoint.Address should return empty, got %q", got)
 	}
 }
-
-// ===========================================================================
-// DocumentDB
-// ===========================================================================
 
 func TestQA_ListViewColumns_DocDB(t *testing.T) {
 	cluster := realisticDocDBCluster()
@@ -815,7 +735,7 @@ func TestQA_ListViewColumns_DocDB(t *testing.T) {
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
 			// Columns with an empty Path read from the Resource.Fields map via
-			// Key (fetcher-computed values like the §4 status phrase). ExtractScalar
+			// Key (fetcher-computed values like the status phrase). ExtractScalar
 			// cannot derive a value from the raw SDK struct for these.
 			if col.Path == "" {
 				return
@@ -834,7 +754,6 @@ func TestQA_ListViewColumns_DocDB(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(cluster, "DBClusterIdentifier"); got != "docdb-prod-cluster" {
 		t.Errorf("DBClusterIdentifier: expected %q, got %q", "docdb-prod-cluster", got)
 	}
@@ -860,7 +779,6 @@ func TestQA_DetailViewPaths_DocDB(t *testing.T) {
 		})
 	}
 
-	// Verify DBClusterMembers renders as YAML
 	membersYAML := fieldpath.ExtractSubtree(cluster, "DBClusterMembers")
 	if membersYAML == "" {
 		t.Error("DBClusterMembers should produce non-empty YAML")
@@ -868,7 +786,6 @@ func TestQA_DetailViewPaths_DocDB(t *testing.T) {
 }
 
 func TestQA_NilFields_DocDB(t *testing.T) {
-	// Minimal DocDB cluster — no members, no endpoints
 	cluster := docdbtypes.DBCluster{
 		DBClusterIdentifier: new("docdb-test"),
 		Status:              new("creating"),
@@ -877,7 +794,6 @@ func TestQA_NilFields_DocDB(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractScalar(cluster, col.Path)
 		})
 	}
@@ -885,15 +801,10 @@ func TestQA_NilFields_DocDB(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(cluster, path)
 		})
 	}
 }
-
-// ===========================================================================
-// EKS Clusters
-// ===========================================================================
 
 func TestQA_ListViewColumns_EKS(t *testing.T) {
 	cluster := realisticEKSCluster()
@@ -914,7 +825,6 @@ func TestQA_ListViewColumns_EKS(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(cluster, "Name"); got != "prod-cluster" {
 		t.Errorf("Name: expected %q, got %q", "prod-cluster", got)
 	}
@@ -943,7 +853,6 @@ func TestQA_DetailViewPaths_EKS(t *testing.T) {
 		})
 	}
 
-	// Verify KubernetesNetworkConfig renders as YAML subtree
 	kncYAML := fieldpath.ExtractSubtree(cluster, "KubernetesNetworkConfig")
 	if kncYAML == "" {
 		t.Error("KubernetesNetworkConfig should produce non-empty YAML")
@@ -951,7 +860,6 @@ func TestQA_DetailViewPaths_EKS(t *testing.T) {
 }
 
 func TestQA_NilFields_EKS(t *testing.T) {
-	// Minimal EKS cluster — no endpoint, no network config
 	cluster := &ekstypes.Cluster{
 		Name:   new("test-cluster"),
 		Status: ekstypes.ClusterStatusCreating,
@@ -960,7 +868,6 @@ func TestQA_NilFields_EKS(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractScalar(cluster, col.Path)
 		})
 	}
@@ -968,15 +875,10 @@ func TestQA_NilFields_EKS(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(cluster, path)
 		})
 	}
 }
-
-// ===========================================================================
-// Secrets Manager
-// ===========================================================================
 
 func TestQA_ListViewColumns_Secrets(t *testing.T) {
 	secret := realisticSecretListEntry()
@@ -991,7 +893,6 @@ func TestQA_ListViewColumns_Secrets(t *testing.T) {
 		})
 	}
 
-	// Verify specific values
 	if got := fieldpath.ExtractScalar(secret, "Name"); got != "prod/database/password" {
 		t.Errorf("Name: expected %q, got %q", "prod/database/password", got)
 	}
@@ -1017,7 +918,6 @@ func TestQA_DetailViewPaths_Secrets(t *testing.T) {
 		})
 	}
 
-	// Verify Tags renders as YAML
 	tagsYAML := fieldpath.ExtractSubtree(secret, "Tags")
 	if tagsYAML == "" {
 		t.Error("Tags should produce non-empty YAML")
@@ -1025,7 +925,6 @@ func TestQA_DetailViewPaths_Secrets(t *testing.T) {
 }
 
 func TestQA_NilFields_Secrets(t *testing.T) {
-	// Minimal secret — only name
 	secret := smtypes.SecretListEntry{
 		Name: new("test-secret"),
 	}
@@ -1033,7 +932,6 @@ func TestQA_NilFields_Secrets(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractScalar(secret, col.Path)
 		})
 	}
@@ -1041,15 +939,10 @@ func TestQA_NilFields_Secrets(t *testing.T) {
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
-			// Must not panic
 			_ = fieldpath.ExtractSubtree(secret, path)
 		})
 	}
 }
-
-// ===========================================================================
-// Cross-cutting: Verify all default view defs exist and have paths
-// ===========================================================================
 
 func TestQA_AllResourceTypesHaveDefaults(t *testing.T) {
 	resourceTypes := append(resource.AllShortNames(), "s3_objects")
@@ -1064,10 +957,6 @@ func TestQA_AllResourceTypesHaveDefaults(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: S3 Object Size field — int64 scalar extraction
-// ===========================================================================
-
 func TestQA_S3Object_SizeField_Int64Extraction(t *testing.T) {
 	obj := realisticS3ObjectFile()
 
@@ -1081,10 +970,6 @@ func TestQA_S3Object_SizeField_Int64Extraction(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: S3 Object StorageClass — named string type (enum)
-// ===========================================================================
-
 func TestQA_S3Object_StorageClass_EnumExtraction(t *testing.T) {
 	obj := realisticS3ObjectFile()
 
@@ -1097,10 +982,6 @@ func TestQA_S3Object_StorageClass_EnumExtraction(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: EC2 InstanceType — named string type (enum)
-// ===========================================================================
-
 func TestQA_EC2_InstanceType_EnumExtraction(t *testing.T) {
 	inst := realisticEC2Instance()
 
@@ -1109,10 +990,6 @@ func TestQA_EC2_InstanceType_EnumExtraction(t *testing.T) {
 		t.Errorf("InstanceType: expected %q, got %q", "t3.medium", got)
 	}
 }
-
-// ===========================================================================
-// Edge Case: EC2 with no public IP (private instance)
-// ===========================================================================
 
 func TestQA_EC2_NilPublicIP(t *testing.T) {
 	inst := ec2types.Instance{
@@ -1128,15 +1005,10 @@ func TestQA_EC2_NilPublicIP(t *testing.T) {
 	if got := fieldpath.ExtractScalar(inst, "PublicIpAddress"); got != "" {
 		t.Errorf("expected empty for nil PublicIpAddress, got %q", got)
 	}
-	// PrivateIpAddress should still work
 	if got := fieldpath.ExtractScalar(inst, "PrivateIpAddress"); got != "10.0.0.1" {
 		t.Errorf("PrivateIpAddress: expected %q, got %q", "10.0.0.1", got)
 	}
 }
-
-// ===========================================================================
-// Edge Case: RDS with nil Endpoint (during creation)
-// ===========================================================================
 
 func TestQA_RDS_NilEndpoint(t *testing.T) {
 	db := rdstypes.DBInstance{
@@ -1145,20 +1017,14 @@ func TestQA_RDS_NilEndpoint(t *testing.T) {
 		// Endpoint is nil during creation
 	}
 
-	// Nested path through nil struct should return "" without panic
 	if got := fieldpath.ExtractScalar(db, "Endpoint.Address"); got != "" {
 		t.Errorf("expected empty for nil Endpoint.Address, got %q", got)
 	}
 
-	// ExtractSubtree on nil Endpoint should return ""
 	if got := fieldpath.ExtractSubtree(db, "Endpoint"); got != "" {
 		t.Errorf("expected empty for nil Endpoint, got %q", got)
 	}
 }
-
-// ===========================================================================
-// Edge Case: Redis with nil ConfigurationEndpoint
-// ===========================================================================
 
 func TestQA_Redis_NilConfigurationEndpoint(t *testing.T) {
 	rg := elasticachetypes.ReplicationGroup{
@@ -1176,18 +1042,12 @@ func TestQA_Redis_NilConfigurationEndpoint(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: DocDB with empty DBClusterMembers slice
-// ===========================================================================
-
 func TestQA_DocDB_EmptyMembers(t *testing.T) {
 	cluster := docdbtypes.DBCluster{
 		DBClusterIdentifier: new("docdb-empty"),
 		Status:              new("creating"),
-		// DBClusterMembers is nil/empty
 	}
 
-	// ExtractScalar on a slice should return ""
 	if got := fieldpath.ExtractScalar(cluster, "DBClusterMembers"); got != "" {
 		t.Errorf("expected empty for nil DBClusterMembers, got %q", got)
 	}
@@ -1199,15 +1059,10 @@ func TestQA_DocDB_EmptyMembers(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: EKS with nil KubernetesNetworkConfig
-// ===========================================================================
-
 func TestQA_EKS_NilNetworkConfig(t *testing.T) {
 	cluster := &ekstypes.Cluster{
 		Name:   new("cluster-no-net"),
 		Status: ekstypes.ClusterStatusActive,
-		// KubernetesNetworkConfig is nil
 	}
 
 	if got := fieldpath.ExtractSubtree(cluster, "KubernetesNetworkConfig"); got != "" {
@@ -1215,14 +1070,9 @@ func TestQA_EKS_NilNetworkConfig(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Edge Case: Secrets with no tags and no rotation
-// ===========================================================================
-
 func TestQA_Secrets_MinimalFields(t *testing.T) {
 	secret := smtypes.SecretListEntry{
 		Name: new("minimal-secret"),
-		// No description, no dates, no rotation, no tags
 	}
 
 	if got := fieldpath.ExtractScalar(secret, "Description"); got != "" {

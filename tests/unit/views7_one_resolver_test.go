@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_one_resolver_test.go — one lookup for a type name.
+// One lookup for a type name.
 //
-// A view file, a migration and a report each had to ask twice — the parents,
-// then the children — and each place that asked once answered wrong for half
-// the catalog. The remaining callers are the same shape: the related panel,
-// the navigable fields and the by-id fetch resolve a name among the parents
-// only, so a child type that declares any of them is a declaration nothing
-// reads. Nothing declares one today, which is the whole hazard: the first one
-// added is silently ignored, and the file that ignores it looks correct.
+// The related panel, the navigable fields and the by-id fetch resolve a name
+// among parents and children alike. A lookup among the parents only would
+// silently ignore a child type's declaration, and the file that ignores it
+// would look correct.
 package unit
 
 import (
@@ -26,8 +23,7 @@ import (
 // definition. FindAny answers for a parent and a child alike; the two narrow
 // ones exist because two callers mean one half and say so — the parents
 // accessor and the child registry. A fourth is a caller somewhere resolving
-// half the catalog again, which is the defect this task removed from eight
-// places.
+// half the catalog again.
 var views7LookupSurface = map[string]bool{
 	"FindAny":      true,
 	"TopLevelOnly": true,
@@ -80,9 +76,8 @@ func TestCatalogLookupSurfaceIsTheThree(t *testing.T) {
 // parent does, and the getters that read them must find it — the related
 // panel, the navigable fields and the by-id fetch.
 //
-// The registry written here is the one production reads: GetChildType has
-// consulted it and the catalog's children since before this task, which is
-// why a child's ChildFetcher works and its Related does not.
+// The registry written here is the one production reads: GetChildType
+// consults it and the catalog's children.
 func TestChildTypeDeclarationsAreReachable(t *testing.T) {
 	const child = "views7_widget_health"
 	resource.SetChildTypeForTest(resource.ResourceTypeDef{

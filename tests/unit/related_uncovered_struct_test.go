@@ -1,6 +1,5 @@
-// related_uncovered_struct_test.go tests stub checkers (constant results) and
-// struct-extraction checkers (extract IDs from RawStruct, no cache needed)
-// that were previously uncovered.
+// related_uncovered_struct_test.go covers constant-result checkers and
+// struct-extraction checkers (extract IDs from RawStruct, no cache needed).
 package unit_test
 
 import (
@@ -36,10 +35,6 @@ func checkerByTargetUncovered(t *testing.T, shortName, target string) resource.R
 	t.Fatalf("%s related checker for %s not found", shortName, target)
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// STUB CHECKERS — return constant results regardless of input
-// ---------------------------------------------------------------------------
 
 // TestRelated_DBI_Secrets_MatchesByARN verifies the dbi→secrets checker resolves
 // the managed master-user secret via DBInstance.MasterUserSecret.SecretArn by
@@ -116,7 +111,7 @@ func TestRelated_DBI_Secrets_NoManagedSecret(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_CB_ReturnsUnknown verifies pipeline→cb reports Count=-1 because
+// TestRelated_Pipeline_CB_ReturnsUnknown verifies pipeline→cb reports Unknown because
 // the pipeline list RawStruct (cptypes.PipelineSummary) carries no stages/actions —
 // resolving CodeBuild project references would require GetPipeline per pipeline (N+1).
 func TestRelated_Pipeline_CB_ReturnsUnknown(t *testing.T) {
@@ -131,7 +126,7 @@ func TestRelated_Pipeline_CB_ReturnsUnknown(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_Role_ReturnsUnknown verifies pipeline→role reports Count=-1 because
+// TestRelated_Pipeline_Role_ReturnsUnknown verifies pipeline→role reports Unknown because
 // the pipeline list RawStruct has no RoleArn — it is only on GetPipelineOutput.
 func TestRelated_Pipeline_Role_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "role")
@@ -146,7 +141,7 @@ func TestRelated_Pipeline_Role_ReturnsUnknown(t *testing.T) {
 }
 
 // TestRelated_Lambda_SQS_UnknownWithoutClients verifies the lambda→sqs checker
-// returns Count=-1 when live Lambda clients are unavailable (requires
+// returns Unknown when live Lambda clients are unavailable (requires
 // lambda:ListEventSourceMappings — FunctionConfiguration does not embed event
 // sources, so there is no cache-only path).
 func TestRelated_Lambda_SQS_UnknownWithoutClients(t *testing.T) {
@@ -173,7 +168,7 @@ func TestRelated_Lambda_SQS_EmptyIDReturnsZero(t *testing.T) {
 }
 
 // TestRelated_Lambda_CFN_UnknownWithoutClients verifies the lambda→cfn checker
-// returns Count=-1 when live Lambda clients are unavailable (requires
+// returns Unknown when live Lambda clients are unavailable (requires
 // lambda:ListTags because FunctionConfiguration does not carry tags).
 func TestRelated_Lambda_CFN_UnknownWithoutClients(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "cfn")
@@ -213,7 +208,7 @@ func TestRelated_Lambda_CFN_NoARNReturnsZero(t *testing.T) {
 }
 
 // TestRelated_Lambda_EbRule_UnknownWithoutClients verifies the lambda→eb-rule
-// checker returns Count=-1 without live clients. Rule structs do not include
+// checker returns Unknown without live clients. Rule structs do not include
 // targets (those come from events:ListTargetsByRule), so the checker has no
 // cache-only signal to use.
 func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
@@ -235,13 +230,6 @@ func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 	}
 }
 
-// elb:r53 (checkELBR53) was removed along with its registration: it was
-// hardcoded to State: RelatedUnknown whenever Fields["dns_name"] != "" (i.e. always, for
-// any real ELB), with no AWS API path to reverse-resolve which R53 records
-// alias to the LB's DNS name from cache alone. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
-
 // TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN verifies sfn→eb-rule reports Count=0
 // when the state machine ARN field is empty. checkSFNEbRule uses a live
 // ListRuleNamesByTarget call; without an ARN there is nothing to look up.
@@ -257,7 +245,7 @@ func TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ELB_ZoneReturnsUnknown: real zone → -1 (alias records live per-zone).
+// TestRelated_R53_ELB_ZoneReturnsUnknown: real zone → Unknown (alias records live per-zone).
 func TestRelated_R53_ELB_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "elb")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
@@ -280,7 +268,7 @@ func TestRelated_R53_ELB_EmptyZoneReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_CF_ZoneReturnsUnknown: real zone → -1 (alias records per-zone).
+// TestRelated_R53_CF_ZoneReturnsUnknown: real zone → Unknown (alias records per-zone).
 func TestRelated_R53_CF_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "cf")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
@@ -303,7 +291,7 @@ func TestRelated_R53_CF_EmptyZoneReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ACM_ZoneReturnsUnknown: real zone → -1 (validation records per-zone).
+// TestRelated_R53_ACM_ZoneReturnsUnknown: real zone → Unknown (validation records per-zone).
 func TestRelated_R53_ACM_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "acm")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
@@ -325,19 +313,6 @@ func TestRelated_R53_ACM_EmptyZoneReturnsZero(t *testing.T) {
 		t.Errorf("expected Count=0 (empty zone id), got %d", got.Count())
 	}
 }
-
-// kms:s3 (checkKMSS3) was removed along with its registration: it was
-// hardcoded to State: RelatedUnknown whenever res.ID != "" — S3 resources do not expose
-// KMS key IDs in Fields or RawStruct, so the relationship was never
-// determinable from cache alone. See qa_demo_pivot_coverage_test.go's
-// knownDisconnectedPivots terminal-state comment for the burn-down
-// precedent this deletion follows.
-
-// ---------------------------------------------------------------------------
-// STRUCT EXTRACTION CHECKERS
-// ---------------------------------------------------------------------------
-
-// --- DBI → SG ---
 
 func TestRelated_DBI_SG_ExtractsSecurityGroups(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "dbi", "sg")
@@ -385,8 +360,6 @@ func TestRelated_DBI_SG_WrongType(t *testing.T) {
 	}
 }
 
-// --- DBC → SG ---
-
 func TestRelated_DBC_SG_ExtractsSecurityGroups(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "dbc", "sg")
 	res := resource.Resource{
@@ -406,8 +379,6 @@ func TestRelated_DBC_SG_ExtractsSecurityGroups(t *testing.T) {
 		t.Errorf("expected ResourceIDs=[sg-docdb1], got %v", got.ResourceIDs())
 	}
 }
-
-// --- DocDB Snapshot → DBC ---
 
 func TestRelated_DbcSnap_DBC_ExtractsCluster(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "dbc-snap", "dbc")
@@ -443,8 +414,6 @@ func TestRelated_DbcSnap_DBC_NoCluster(t *testing.T) {
 	}
 }
 
-// --- DocDB Snapshot → KMS ---
-
 func TestRelated_DbcSnap_KMS_ExtractsKey(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "dbc-snap", "kms")
 	res := resource.Resource{
@@ -475,8 +444,6 @@ func TestRelated_DbcSnap_KMS_NoKey(t *testing.T) {
 		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
-
-// --- MSK → SG ---
 
 func TestRelated_MSK_SG_ExtractsFromProvisioned(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "msk", "sg")
@@ -513,8 +480,6 @@ func TestRelated_MSK_SG_NilProvisioned(t *testing.T) {
 	}
 }
 
-// --- EventBridge Rule → Role ---
-
 func TestRelated_EbRule_Role_ExtractsRoleName(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "eb-rule", "role")
 	res := resource.Resource{
@@ -545,8 +510,6 @@ func TestRelated_EbRule_Role_NoRoleArn(t *testing.T) {
 		t.Errorf("expected Count=0, got %d", got.Count())
 	}
 }
-
-// --- OpenSearch → Logs ---
 
 func TestRelated_OpenSearch_Logs_ExtractsLogGroups(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "opensearch", "logs")

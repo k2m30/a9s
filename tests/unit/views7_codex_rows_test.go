@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_codex_rows_test.go — the five ways a view file an operator edited is
-// still not read the way they wrote it.
-//
-// Every one of them is the same mistake in a different place: a rule about
-// what a person MEANT, inferred from what their file happens to differ from
-// rather than from what the build before this one wrote. A key that differs is
-// read as a key this build moved. A column renamed is read as a column that
-// never was the status. A child type is not looked up at all. A file whose
-// name is not exactly the short name is validated and then never read. A
-// column whose value comes from a path is reported as one nothing fills.
+// Operator-edited view files must be read the way they were written: an
+// explicit key, a renamed status column, a child type's file, a file whose
+// name resolves to no type, and a column whose value comes from a path. A
+// rule about what a person MEANT has to come from what the previous build
+// wrote, not from what the file happens to differ from.
 package unit_test
 
 import (
@@ -32,7 +27,7 @@ type views7EC2Placement struct {
 	AvailabilityZone string
 }
 
-// views7EC2Raw carries the two paths the row 22 case names.
+// views7EC2Raw carries the two paths TestPathBackedCustomColumnIsAProducer reads.
 type views7EC2Raw struct {
 	InstanceType string
 	Placement    views7EC2Placement
@@ -81,7 +76,7 @@ func views7CellOf(t *testing.T, shortName string, col config.ListColumn, r resou
 		views7TypeOf(t, shortName), r)
 }
 
-// TestOperatorsExplicitKeySurvivesTheKeyMove pins row 18. The key move's
+// TestOperatorsExplicitKeySurvivesTheKeyMove: the key move's
 // bargain is that a column still holding what the previous build wrote takes
 // this build's key. A column holding something ELSE is the operator's, and
 // "differs from what this build declares" is not the same question.
@@ -129,13 +124,13 @@ detail:
 	}
 }
 
-// TestRenamedStatusColumnMigratesToTheLifecycleKey pins row 19. Until stamp 7
-// a column was the status column if its TITLE said so, so an operator who
-// renamed it kept a status column. This build asks the key, and the migration
-// is what carries them across a rule it replaced.
+// TestRenamedStatusColumnMigratesToTheLifecycleKey: a file stamped below 7
+// marks the status column by its TITLE, so an operator who renamed it kept a
+// status column. The runtime picks the status column by key, and the
+// migration carries a renamed status column to the lifecycle key.
 func TestRenamedStatusColumnMigratesToTheLifecycleKey(t *testing.T) {
-	// The v5 ec2 file with two renames: the status column, which the old rule
-	// recognised by title, and an ordinary column, which it never did.
+	// The v5 ec2 file with two renames: the status column, which a v5 file
+	// marks by title, and an ordinary column.
 	cfg, _ := views7Migrate(t, "ec2", `generated: 5
 list:
   Name:
@@ -175,8 +170,7 @@ detail:
 			"flagged for", got, "public ip")
 	}
 
-	// The other half: a column the old rule never treated as the status is
-	// left exactly as they wrote it.
+	// An ordinary renamed column is left exactly as they wrote it.
 	ordinary := views7ResolvedColumn(t, cfg, "ec2", "Size")
 	if ordinary.Key != "" {
 		t.Errorf("the renamed Type column gained key %q — only the column the replaced rule recognised "+
@@ -187,10 +181,10 @@ detail:
 	}
 }
 
-// TestChildViewFileMigratesLikeAnyOther pins row 20. A child type has a view
-// file, a lifecycle key and an operator, and the migration looked its type up
-// in the parent catalog only — so every child file is stamped as migrated and
-// migrated by nothing.
+// TestChildViewFileMigratesLikeAnyOther: a child type has a view file, a
+// lifecycle key and an operator, so the migration must resolve child types as
+// well as parent ones; a lookup limited to the parent catalog stamps a child
+// file as migrated while changing nothing in it.
 func TestChildViewFileMigratesLikeAnyOther(t *testing.T) {
 	// The status column is renamed, which is the half a title merge cannot
 	// cover: the renderer folds the catalog's key onto a column whose title
@@ -244,10 +238,10 @@ detail:
 	}
 }
 
-// TestViewFileNameResolvesOrIsReported pins row 21. A file is only in use when
-// the name it is stored under is the name the runtime asks for, and a file
-// that names no type is the same mistake as a key that names no field: silent
-// today, and the operator believes their file is live.
+// TestViewFileNameResolvesOrIsReported: a file is only in use when the name
+// it is stored under is the name the runtime asks for, and a file that names
+// no type is the same mistake as a key that names no field: unless reported,
+// the operator believes their file is live.
 func TestViewFileNameResolvesOrIsReported(t *testing.T) {
 	dir := t.TempDir()
 	views7WriteViewFile(t, dir, "EC2", `generated: 7
@@ -297,7 +291,7 @@ detail:
 	}
 }
 
-// TestPathBackedCustomColumnIsAProducer pins row 22. The report asks whether
+// TestPathBackedCustomColumnIsAProducer: the load report asks
 // anything can fill a column's key; a path IS what fills it, on both lanes —
 // the cascade reads the struct live and the save lane writes that value under
 // the same key for the next start.
@@ -358,7 +352,7 @@ detail:
 	}
 }
 
-// TestTwoFilesForOneTypeAreReported pins row 24. Two files in one directory
+// TestTwoFilesForOneTypeAreReported: two files in one directory
 // can name the same type — an operator who renamed a file and kept the old
 // one, or one file named for the type and another for its alias — and the
 // loader merges them in directory order with the last one winning. Whichever
@@ -422,8 +416,8 @@ detail:
 }
 
 // views7SaysWhichIsActive reports whether a collision report states that the
-// named file is the one in use. The sentence is dev's; what it has to carry is
-// the file name and the fact that this is the one being read.
+// views7SaysWhichIsActive reports whether a collision report states that the
+// named file is the one in use. The wording is free; what it has to carry is
 func views7SaysWhichIsActive(report, active string) bool {
 	i := strings.Index(report, active)
 	if i < 0 {
@@ -490,13 +484,12 @@ detail:
   - DBClusterSnapshotIdentifier
 `
 
-// TestRenamedViewFilesAreMigrated pins row 26. An installation that ran an
-// April build has docdb-snap.yaml and rds-snap.yaml in its views dir: the
-// generator wrote them, then the types were renamed, and the files stayed
-// behind naming nothing. They carry no stamp — they predate stamping — so
-// nothing about the file itself says whose it is. The rename history does,
-// and it is the same shape the column migration already uses: a table of what
-// this build renamed, and a file under an old name is carried to the new one.
+// TestRenamedViewFilesAreMigrated: an installation can hold docdb-snap.yaml
+// and rds-snap.yaml, written by the generator before those types were
+// renamed, naming nothing. They carry no stamp, so nothing about the file
+// itself says whose it is. The rename history does, in the same shape the
+// column migration uses: a table of renames, and a file under an old name is
+// carried to the new one.
 func TestRenamedViewFilesAreMigrated(t *testing.T) {
 	for from, to := range views7RenamedViewFiles(t) {
 		t.Run(from+" carried to "+to, func(t *testing.T) {

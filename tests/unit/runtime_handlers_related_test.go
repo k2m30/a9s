@@ -1,9 +1,9 @@
-// runtime_handlers_related_test.go — public-seam coverage for
+// Public-seam coverage for
 // (*runtime.Core).HandleRelatedNavigate.
 //
-// Cases A–K stand up *runtime.Core directly through
-// runtime.New(session.New(), catalog.All()) and assert the
-// NavigationResult + []TaskRequest pair returned for each branch.
+// Each case stands up *runtime.Core directly through
+// runtime.New(session.New(), catalog.All()) and asserts the
+// NavigationResult + []TaskRequest pair returned for its branch.
 //
 // HARD CONSTRAINT: this file MUST NOT import charm.land/bubbletea/v2,
 // lipgloss, or bubbles. The handler is decoupled from Bubble Tea; bringing
@@ -33,7 +33,7 @@ func newRuntimeCore(t *testing.T) (*runtime.Core, *session.Session) {
 	return c, s
 }
 
-// Case A — unknown target type → Flash with FlashIsError true, no tasks.
+// Unknown target type → Flash with FlashIsError true, no tasks.
 func TestHandleRelatedNavigate_UnknownType_Flash(t *testing.T) {
 	c, _ := newRuntimeCore(t)
 
@@ -52,7 +52,7 @@ func TestHandleRelatedNavigate_UnknownType_Flash(t *testing.T) {
 	}
 }
 
-// Case B — child type (e.g. "s3_objects") → EnterChildView, no tasks.
+// Child type (e.g. "s3_objects") → EnterChildView, no tasks.
 //
 // Registers a transient child type for this test so the assertion does not
 // depend on core/aws being imported (which would pull init() side effects
@@ -79,7 +79,7 @@ func TestHandleRelatedNavigate_ChildType_EnterChildView(t *testing.T) {
 	}
 }
 
-// Case C — top-level cache hit via TargetID → Detail, no tasks.
+// Top-level cache hit via TargetID → Detail, no tasks.
 func TestHandleRelatedNavigate_TopLevelCacheHit_TargetID_Detail(t *testing.T) {
 	c, s := newRuntimeCore(t)
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
@@ -100,7 +100,7 @@ func TestHandleRelatedNavigate_TopLevelCacheHit_TargetID_Detail(t *testing.T) {
 	}
 }
 
-// Case D — top-level cache hit via single RelatedIDs → Detail, no tasks.
+// Top-level cache hit via single RelatedIDs → Detail, no tasks.
 func TestHandleRelatedNavigate_TopLevelCacheHit_SingleRelatedID_Detail(t *testing.T) {
 	c, s := newRuntimeCore(t)
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
@@ -118,7 +118,7 @@ func TestHandleRelatedNavigate_TopLevelCacheHit_SingleRelatedID_Detail(t *testin
 	}
 }
 
-// Case E — FetchFilter + registered filtered fetcher → FilteredList with
+// FetchFilter + registered filtered fetcher → FilteredList with
 // FetchFilter preserved and a single KindFetchFiltered task.
 //
 // Registers a no-op filtered paginated fetcher for the test type. t.Cleanup
@@ -153,16 +153,9 @@ func TestHandleRelatedNavigate_FetchFilter_RegisteredFetcher_FilteredList(t *tes
 	}
 }
 
-// Case F — TargetID cache miss (no filtered fetcher, no cache entry) on a
+// TargetID cache miss (no filtered fetcher, no cache entry) on a
 // by-ID-capable type → FilteredList with FilterText==TargetID and a single
 // KindFetchByIDDetail task.
-//
-// "ec2" now registers FetchByIDs (core/aws/catalog_compute.go — the
-// costs resource-row navigation jump added it), so this case moved from the
-// KindFetchResources else-branch to the KindFetchByIDDetail branch. The
-// KindFetchResources-else-branch behavior itself is still pinned, just
-// against "lambda" now — see
-// TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources.
 func TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList(t *testing.T) {
 	c, _ := newRuntimeCore(t)
 
@@ -190,7 +183,7 @@ func TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList(t *testing.T) {
 	}
 }
 
-// Case G — multiple RelatedIDs cache miss, no further pages → FilteredList
+// Multiple RelatedIDs cache miss, no further pages → FilteredList
 // with RelatedIDs preserved and a single KindFetchResources task.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *testing.T) {
 	c, _ := newRuntimeCore(t)
@@ -217,7 +210,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *te
 	}
 }
 
-// Case H — multiple RelatedIDs, partial coverage + truncated cache →
+// Multiple RelatedIDs, partial coverage + truncated cache →
 // FilteredList with a single KindFetchMore task (continuation):
 // the continuation token rides on the TaskRequest as a FetchMorePayload.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_FetchMore(t *testing.T) {
@@ -232,11 +225,10 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 	if result.Kind != runtime.NavigationKindFilteredList {
 		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
 	}
-	// ContinuesInitialLoad is true here and must stay true: this is the one
-	// continuation nobody pressed "m" for. The drill screen is still in its
-	// initial Loading, so the flag its result retires is Loading — a
-	// completion that cleared LoadingMore instead left the fetched rows
-	// behind the loading screen.
+	// ContinuesInitialLoad is true here: this is the one continuation nobody
+	// pressed "m" for. The drill screen is still in its initial Loading, so the
+	// flag its result retires is Loading; clearing LoadingMore instead would
+	// leave the fetched rows behind the loading screen.
 	wantTasks := []runtime.TaskRequest{{
 		Key:   runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
 		Cache: runtime.CacheNone,
@@ -251,7 +243,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 	}
 }
 
-// Case I — multiple RelatedIDs fully covered by ResourceCache → FilteredList
+// Multiple RelatedIDs fully covered by ResourceCache → FilteredList
 // with no fetch task.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing.T) {
 	c, s := newRuntimeCore(t)
@@ -270,7 +262,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing
 	}
 }
 
-// Case J — a truncated "(0+)" that found none yet (Truncated, no IDs) → a SCOPED
+// A truncated "(0+)" that found none yet (Truncated, no IDs) → a SCOPED
 // FilteredList seeded empty, WITH a KindFetchResources task so the reapply-checker
 // can populate and scope it. This is the identical path "(N+)" takes; the zero
 // lower bound is never special-cased into a "goes to all" list, and never left
@@ -306,7 +298,7 @@ func TestHandleRelatedNavigate_TruncatedZero_ScopedListWithFetch(t *testing.T) {
 	}
 }
 
-// Case K — pure-lazy passthrough for Detail: TargetID hit lives only in a
+// Pure-lazy passthrough for Detail: TargetID hit lives only in a
 // Partial RowStore entry (ObservePartial); no full Observe ever landed.
 //
 // This proves relatedCacheSnapshot includes Partial RowStore entries when
@@ -328,14 +320,8 @@ func TestHandleRelatedNavigate_PureLazyCacheHit_Detail(t *testing.T) {
 	}
 }
 
-// Case L — exact-ID drill to a by-ID-capable type, cache MISS → emits
+// Exact-ID drill to a by-ID-capable type, cache MISS → emits
 // KindFetchByIDDetail instead of KindFetchResources.
-//
-// This is the key TDD case for the new by-ID dispatch path. The test
-// registers a no-op FetchByIDs helper for a synthetic type, fires a
-// RelatedNavigateEvent whose TargetID is absent from the session cache,
-// and asserts that the runtime emits exactly one KindFetchByIDDetail task
-// with the correct type-asserted FetchByIDDetailPayload.
 func TestHandleRelatedNavigate_ByIDCapableType_CacheMiss_EmitsFetchByIDDetail(t *testing.T) {
 	const targetType = "test-fetchbyid-type-l"
 	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]domain.Resource, error) {
@@ -377,20 +363,11 @@ func TestHandleRelatedNavigate_ByIDCapableType_CacheMiss_EmitsFetchByIDDetail(t 
 	}
 }
 
-// Case M — exact-ID drill to a type with NO FetchByIDs helper, cache MISS →
-// regression guard that KindFetchResources is still emitted (not
-// KindFetchByIDDetail).
-//
-// This pins the else-branch of the new conditional so a future refactor
-// cannot accidentally route all cache-miss TargetID drills through the
-// by-ID path.
+// Exact-ID drill to a type with NO FetchByIDs helper, cache MISS →
+// KindFetchResources, not KindFetchByIDDetail.
 func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *testing.T) {
-	// "lambda" has no FetchByIDs helper registered in core/aws/
-	// catalog_compute.go (unlike "ec2", "ebs-snap", "ami" — confirmed
-	// directly against that file). If that ever changes this test will
-	// catch the regression in the opposite direction. "ec2" itself moved to
-	// the by-ID branch once it registered FetchByIDs — see
-	// TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList.
+	// "lambda" has no FetchByIDs helper registered in
+	// core/aws/catalog_compute.go (unlike "ec2", "ebs-snap", "ami").
 	c, _ := newRuntimeCore(t)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
@@ -415,7 +392,7 @@ func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *test
 	}
 }
 
-// Case N — exact-ID drill to a by-ID-capable type, cache HIT → NavigationKindDetail,
+// Exact-ID drill to a by-ID-capable type, cache HIT → NavigationKindDetail,
 // NO fetch task at all.
 //
 // Safety property: the KindFetchByIDDetail path must only fire on cache miss.

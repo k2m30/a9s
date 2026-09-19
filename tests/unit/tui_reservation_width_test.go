@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui_reservation_width_test.go — a cell paints exactly the columns it reserved.
+// A cell paints exactly the columns it reserved.
 //
 // Every fixed-width cell in the TUI is laid out by reserving w columns and
 // handing the content to text.PadOrTrunc. When the content is wider than w and

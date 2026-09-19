@@ -21,12 +21,11 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// multiStatusRedisFixtures returns Redis replication groups with different statuses for color tests.
-// Post-phase-7: RawStruct is ReplicationGroup (DescribeReplicationGroups).
-// Fields["status"] carries the §4 phrase (Healthy silence = empty string) per
-// docs/resources/redis.md §4, matching what the fetcher emits in production.
-// RawStruct.Status still holds the raw AWS enum value because that is what the
-// AWS SDK reports and any direct-RawStruct consumer will see.
+// multiStatusRedisFixtures returns Redis replication groups with different
+// statuses. RawStruct is the ReplicationGroup (DescribeReplicationGroups).
+// Fields["status"] carries the status phrase from docs/resources/redis.md
+// (empty for a healthy group), as the fetcher emits it; RawStruct.Status holds
+// the raw AWS enum.
 func multiStatusRedisFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -74,14 +73,6 @@ func multiStatusRedisFixtures() []resource.Resource {
 	}
 }
 
-// ===========================================================================
-// REDIS-DETAIL-01 / REDIS-DETAIL-02: Redis detail view
-// ===========================================================================
-
-// TestQA_Redis_DetailView is the live-seam replacement for the retired
-// views.NewDetail(...).View() call (DetailModel.View is dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md) — drives
-// Controller.EnsureDetailState + NewTransientDetail.RenderDetail instead.
 func TestQA_Redis_DetailView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	res := fixtures[0]
@@ -99,7 +90,6 @@ func TestQA_Redis_DetailView(t *testing.T) {
 		t.Fatal("Redis detail view returned empty or initializing")
 	}
 
-	// Detail view should contain field keys and values from the resource's Fields map
 	for key, val := range res.Fields {
 		if val == "" {
 			continue
@@ -110,32 +100,24 @@ func TestQA_Redis_DetailView(t *testing.T) {
 	}
 }
 
-// TestQA_Redis_DetailFrameTitle is the live-seam replacement for the retired
-// views.NewDetail(...).FrameTitle() call — drives Snapshot().FrameTitle
-// instead (detailFrameTitleLocked mirrors the legacy Name-else-ID semantics).
 func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	res := fixtures[0]
 	c := newDetailControllerUnit(t, res, "redis")
 	title := c.Snapshot().FrameTitle
 
-	// This pins that the snapshot's title is the one builder's output, not a
-	// second Name-else-ID answer of the controller's own; what the builder
-	// produces is pinned in tui6_detail_frame_title_test.go.
+	// The snapshot's title is the one builder's output, not a second Name-else-ID
+	// answer of the controller's own; the builder is pinned in
+	// tui6_detail_frame_title_test.go.
 	expected := resource.DetailFrameTitle(res.ID, res.Name, resource.DetailTitleOmitsID("redis"))
 	if title != expected {
 		t.Errorf("Redis detail FrameTitle = %q, want %q", title, expected)
 	}
 }
 
-// ===========================================================================
-// REDIS-DETAIL-04: Redis detail status coloring (per-type Color func)
-// ===========================================================================
-
 func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	// Redis Color func reads Fields["status"].
 	td := resource.FindResourceType("redis")
 	if td == nil {
 		t.Fatal("redis resource type not found")
@@ -159,8 +141,8 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 		return r
 	}
 
-	// Post-migration (2026-04-23): Fields["status"] carries §4 PHRASES, not
-	// bare keywords. Healthy = empty string.
+	// Fields["status"] carries status phrases, not bare keywords; a healthy group
+	// is the empty string.
 	availableStyle := styles.ColorStyle(td.Color(redisRes("", domain.SevOK)))
 	if availableStyle.GetForeground() != styles.ColRunning {
 		t.Errorf("redis healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
@@ -171,16 +153,12 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 		t.Errorf("redis 'creating — new group': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
-	// Per spec: redis deleting → Warning (not Broken).
+	// A deleting group is Warning, not Broken.
 	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting — teardown", domain.SevWarn)))
 	if deletingStyle.GetForeground() != styles.ColPending {
 		t.Errorf("redis 'deleting — teardown': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
 	}
 }
-
-// ===========================================================================
-// REDIS-YAML-01 / REDIS-YAML-03: Redis YAML view
-// ===========================================================================
 
 func TestQA_Redis_YAMLView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
@@ -194,16 +172,14 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 		t.Fatal("Redis YAML view returned empty or initializing")
 	}
 
-	// YAML view renders from RawStruct (SDK struct field names) when RawStruct is set
-	// Post-phase-7: RawStruct is ReplicationGroup, so field names changed.
-	// MemberClusters is omitted from fixture to keep YAML output as key:value pairs only.
+	// YAML renders RawStruct's SDK field names. The fixture leaves MemberClusters
+	// empty so the output stays key:value pairs.
 	expectedKeys := []string{"ReplicationGroupId", "Description", "Status", "CacheNodeType"}
 	for _, key := range expectedKeys {
 		if !strings.Contains(out, key) {
 			t.Errorf("Redis YAML view missing SDK struct key %q", key)
 		}
 	}
-	// Values from the RawStruct should appear
 	expectedValues := []string{"test-redis-1", "cache.t2.micro", "available"}
 	for _, val := range expectedValues {
 		if !strings.Contains(out, val) {
@@ -211,14 +187,6 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 		}
 	}
 }
-
-// TestQA_Redis_YAMLFrameTitle retired: YAMLModel.FrameTitle() is DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
-// title-string behavior is not resource-type-specific.
-
-// ===========================================================================
-// REDIS-YAML-06: Redis YAML raw content for copy
-// ===========================================================================
 
 func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureRedisClusters()
@@ -231,9 +199,8 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 		t.Fatal("Redis YAML RawContent() returned empty string")
 	}
 
-	// RawContent renders from RawStruct (SDK struct field names)
-	// Post-phase-7: RawStruct is ReplicationGroup, so field names changed.
-	// MemberClusters is omitted from fixture to keep YAML output as key:value pairs only.
+	// RawContent renders RawStruct's SDK field names. The fixture leaves
+	// MemberClusters empty so the output stays key:value pairs.
 	expectedKeys := []string{"ReplicationGroupId", "Description", "Status", "CacheNodeType"}
 	for _, key := range expectedKeys {
 		if !strings.Contains(raw, key) {
@@ -242,15 +209,10 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Redis integration: full root model navigation
-// ===========================================================================
-
 func TestQA_Redis_NavigateFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis list
 	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -269,13 +231,11 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
 
-	// Load fixtures
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures, Provenance: messages.FetchProvenanceCanonicalList,
@@ -285,11 +245,8 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	if !strings.Contains(plain, "redis(1)") {
 		t.Errorf("after loading Redis, frame title should contain 'redis(1)', got: %s", plain)
 	}
-	// Note: At root model level (80-char width), config-driven columns use Path-based
-	// extraction (CacheClusterId, etc.) which requires RawStruct. Fixtures use Fields
-	// maps instead, so cell data appears via ResourceListModel directly (unit-level
-	// tests above), not through the root model integration path.
-	// Verify column headers are present instead.
+	// Config-driven columns extract by Path from RawStruct, and these fixtures
+	// carry Fields only, so the root-level check is on the column headers.
 	if !strings.Contains(plain, "Cluster ID") {
 		t.Errorf("Redis list should contain 'Cluster ID' column header, got: %s", plain)
 	}
@@ -301,7 +258,6 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis and load data
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -311,7 +267,6 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 		Resources:    fixtures,
 	})
 
-	// Navigate to detail
 	res := fixtures[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
@@ -334,7 +289,6 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis and load data
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -344,7 +298,6 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 		Resources:    fixtures,
 	})
 
-	// Navigate to YAML
 	res := fixtures[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
@@ -363,7 +316,6 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -373,14 +325,12 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 		Resources:    fixtures,
 	})
 
-	// Navigate to detail
 	res := fixtures[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
-	// Pop back
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
@@ -388,23 +338,16 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// REDIS command mode: :redis navigates correctly
-// ===========================================================================
-
 func TestQA_Redis_CommandNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type "redis"
 	for _, r := range "redis" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Press enter to execute
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
 	if cmd == nil {
@@ -412,17 +355,12 @@ func TestQA_Redis_CommandNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// REDIS-YAML-07: YAML back navigation via root model
-// ===========================================================================
-
 func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate: Redis list -> YAML -> pop
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -437,13 +375,11 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 		Resource: &res,
 	})
 
-	// Verify YAML view
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "yaml") {
 		t.Fatalf("should be on YAML view, got: %s", plain)
 	}
 
-	// Pop back to list
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
@@ -451,17 +387,12 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Redis: Full round-trip list -> detail -> yaml -> pop -> pop -> pop
-// ===========================================================================
-
 func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Main menu -> Redis list
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -471,34 +402,29 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 		Resources:    fixtures,
 	})
 
-	// Redis list -> detail
 	res := fixtures[0]
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
-	// Detail -> YAML
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
 
-	// Pop YAML -> detail
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, res.Name) && !strings.Contains(plain, res.ID) {
 		t.Errorf("pop from YAML should return to detail, got: %s", plain)
 	}
 
-	// Pop detail -> list
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
 		t.Errorf("pop from detail should return to Redis list, got: %s", plain)
 	}
 
-	// Pop list -> main menu
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -506,15 +432,10 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Redis: Filter via root model header display
-// ===========================================================================
-
 func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Navigate to Redis
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
@@ -524,7 +445,6 @@ func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 		Resources:    multiStatusRedisFixtures(),
 	})
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "prod" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -536,10 +456,6 @@ func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CROSS-HELP-01: Help accessible from Redis view
-// ===========================================================================
-
 func TestQA_Redis_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -549,7 +465,6 @@ func TestQA_Redis_HelpOverlay(t *testing.T) {
 		ResourceType: "redis",
 	})
 
-	// Open help
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))

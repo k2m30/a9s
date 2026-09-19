@@ -2,18 +2,13 @@
 
 package integration
 
-// scenario_s3_visual_test.go — Phase 8 render-gate for the s3 resource.
+// scenario_s3_visual_test.go checks the rendered TUI output (not fetcher
+// return values) for s3 against the universal UI rules and
+// docs/resources/s3.md.
 //
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the §4 contract in docs/resources/s3.md.
-//
-// s3 has zero Wave-1 signals and one Wave-2 signal (`~` SevWarn via
-// GetPublicAccessBlock, per docs/attention-signals.md). colorS3
-// (catalog_databases.go) resolves color via colorFromAnyFinding, so a PAB
-// finding renders its bucket row Warn directly — no Healthy-with-glyph rows
-// for this resource. The rule-7 multi-finding cases (U7a/U7b/U7c/U7d/U7e/U7f)
-// are therefore N/A for this resource and skipped with a per-item
-// justification below.
+// s3 has no Wave-1 signals. colorS3 (catalog_databases.go) resolves color
+// via colorFromAnyFinding, so a public-access-block finding renders its
+// bucket row Warn directly and no s3 row carries a glyph.
 
 import (
 	"testing"
@@ -23,24 +18,22 @@ import (
 )
 
 const (
-	// Bucket IDs for the 4 PAB-finding fixtures. Only the no-PAB bucket has an
-	// exported name, under the role that made it exported — it is also the
-	// witness for the access-control-list route into s3.public. The other
-	// three are pinned locally.
+	// Bucket IDs for the 4 PAB-finding fixtures. The no-PAB bucket is exported
+	// because it also carries the access-control-list route into s3.public.
 	s3NoPABBucketID  = demofixtures.S3BucketPublicByACL
 	s3PartialPABID   = "a9s-demo-partial-pab"
 	s3MultiFailPABID = "a9s-demo-multifail-pab"
 	s3NilCfgPABID    = "a9s-demo-nilcfg"
-	// S1 rule: the badge counts rows whose Wave-1-only colour IsIssue, plus
+	// The badge counts rows whose Wave-1-only colour IsIssue, plus
 	// Healthy rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so
 	// only the second clause can fire. Two of the 42 bucket fixtures carry a
-	// `!`, one for each route into s3.public (spec row s3-0916/1):
+	// `!`, one for each route into s3.public:
 	// acme-public-datasets, whose bucket policy status is public, and
 	// a9s-demo-nopab, whose access control list grants AllUsers read with no
 	// public access block to disregard it.
 	// Every other s3 finding — the three remaining PAB fixtures and the
 	// versioning, MFA-delete, access-logging, lifecycle and object-lock
-	// witnesses — is Wave-2 `~` and never bumps the badge.
+	// fixtures — is Wave-2 `~` and never bumps the badge.
 	s3ExpectedIssueBkt = 2
 
 	// Wave-2 Rows row labels/values emitted by EnrichS3Posture.
@@ -52,9 +45,9 @@ const (
 	s3S4Phrase               = "public access block incomplete"
 	s3DetailPhraseCapitalize = "Public access block incomplete"
 
-	// s3ACLPublicStatus is the no-PAB bucket's Status cell. That bucket is
-	// also the witness for the access-control-list route into s3.public
-	// (spec row s3-0916/1), so it carries two findings: the broken-tier
+	// s3ACLPublicStatus is the no-PAB bucket's Status cell. That bucket's
+	// access control list also routes it into s3.public, so it carries two
+	// findings: the broken-tier
 	// phrase takes the cell and "(+1)" stands for the warn-tier public
 	// access block finding beside it. The other three PAB fixtures carry
 	// one finding each and still render s3S4Phrase alone.
@@ -67,20 +60,11 @@ func TestScenario_S3Visual(t *testing.T) {
 	// Drive the real demo startup so Wave 2 enrichment runs against the fake.
 	runDemoStartup(t, scenario)
 
-	// ---------------------------------------------------------------
-	// S1 menu badge — assert BEFORE OpenList while the main menu is
-	// still the current view. The 4 PAB finding fixtures are all `~`
-	// SevWarn, which never bumps the badge → no issues badge on the
-	// s3 entry.
-	// ---------------------------------------------------------------
+	// The menu badge is read while the main menu is still the current view.
 	scenario.ExpectMenuIssueCount("s3", s3ExpectedIssueBkt)
 
 	scenario.OpenList("s3")
 
-	// ---------------------------------------------------------------
-	// Universal column rules — no jargon columns.
-	// The old `Public Access` jargon column was deleted in phase 7.
-	// ---------------------------------------------------------------
 	for _, jargon := range []string{
 		"Public Access", "CIS", " Flags", "Policy ", " Issues ",
 		"NOBKP", "UNENC", " PUB ", "NOPROT",
@@ -88,34 +72,22 @@ func TestScenario_S3Visual(t *testing.T) {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// Healthy baseline — graph root. Single healthy bucket with all-true PAB.
 	scenario.ExpectRowStatusBlank(demofixtures.HealthyBucketName)
 
-	// The 4 finding fixtures render the stable spec §4 phrase in S4; the
-	// no-PAB one leads with its broken-tier finding and counts this one.
+	// The no-PAB bucket leads with its broken-tier finding and counts the PAB
+	// one in its suffix.
 	scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3ACLPublicStatus)
 	scenario.ExpectRowStatusEquals(s3PartialPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3MultiFailPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3NilCfgPABID, s3S4Phrase)
 
-	// Rule 3 — glyph rules. colorS3 resolves color via colorFromAnyFinding,
-	// so every PAB-finding bucket renders Warn row color directly instead
-	// of staying Healthy-with-`~`-glyph.
 	for _, id := range []string{s3NoPABBucketID, s3PartialPABID, s3MultiFailPABID, s3NilCfgPABID} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
-	// The healthy baseline must NOT carry a glyph.
 	scenario.ExpectRowNoGlyphPrefix(demofixtures.HealthyBucketName)
 
-	// ---------------------------------------------------------------
-	// Related panel — graph-root fixture shows non-zero counts for
-	// EVERY pivot whose §2 contract is `count shown: yes`. Related
-	// pivots are a product contract: a registered pivot that always
-	// returns 0 is a bug, not a deferred feature. See user guidance
-	// 2026-04-23: "related resources MUST work. if they don't it's a
-	// bug. simple".
-	// ---------------------------------------------------------------
+	// A registered pivot that always returns 0 is a defect.
 	root := selectS3ByID(t, scenario, demofixtures.HealthyBucketName)
 	scenario.OpenDetailResource("s3", root)
 	scenario.ExpectNoAPIError()
@@ -139,18 +111,12 @@ func TestScenario_S3Visual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// The §5 Out-of-Scope pivots must NOT appear in the related panel.
+	// IAM Users and WAF are not s3 pivots.
 	scenario.ExpectViewNotContains("IAM Users")
 	scenario.ExpectViewNotContains("WAF")
 
-	// ---------------------------------------------------------------
-	// Related panel on a PAB-ISSUE bucket — an operator pivots here
-	// from the `!` row. The panel MUST show non-zero counts for at
-	// least the server-side-resolved pivots (KMS, CFN, Log Groups,
-	// CloudFront, Trails, Glue). A bare issue bucket with every row
-	// at (0) is a fixture defect: the operator has nothing to drill
-	// into when investigating the problem.
-	// ---------------------------------------------------------------
+	// An operator investigating an issue bucket needs something to drill
+	// into, so its related panel resolves non-zero counts too.
 	scenario.Back()
 	issueBkt := selectS3ByID(t, scenario, s3PartialPABID)
 	scenario.OpenDetailResource("s3", issueBkt)
@@ -165,38 +131,25 @@ func TestScenario_S3Visual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// ---------------------------------------------------------------
-	// Rule 7 U7c — S5 Attention section shows Wave-2 Rows detail.
 	// The multi-false-pab fixture has BlockPublicAcls=false AND
-	// BlockPublicPolicy=false; both rows must render in the detail
-	// view so no Wave-2 fact silently disappears.
-	// ---------------------------------------------------------------
+	// BlockPublicPolicy=false; both rows render in the detail view.
 	scenario.Back()
 	multiFail := selectS3ByID(t, scenario, s3MultiFailPABID)
 	scenario.OpenDetailResource("s3", multiFail)
 	scenario.ExpectNoAPIError()
 	view := scenario.currentView()
-	t.Log("\n" + view) // 8.4 user-visible sanity render (mandatory)
+	t.Log("\n" + view)
 
-	// Attention primary entry: glyph + capitalized phrase.
 	scenario.ExpectViewContains(s3DetailPhraseCapitalize)
-	// Both false-flag rows must be present.
 	scenario.ExpectViewContains(s3Row_BlockPublicAcls)
 	scenario.ExpectViewContains(s3Row_BlockPublicPolicy)
-	// Account-level context row.
 	scenario.ExpectViewContains(s3Row_AccountLevelLabel)
 	scenario.ExpectViewContains(s3Row_AccountLevelValue)
 
-	// U11 regression guard — Summary (`s3S4Phrase`) must not contain any
-	// Row value. Asserted at unit-test level; here we confirm the stable
-	// phrase still renders exactly (no cause text leaked in).
+	// The Summary carries no Row value.
 	scenario.ExpectViewNotContains("public access block incomplete: ")
 	scenario.ExpectViewNotContains(s3S4Phrase + " (")
 
-	// ---------------------------------------------------------------
-	// Rule 7 U7c — detail view of the no-PAB fixture shows the Status
-	// row "no public access block configuration" + account-level row.
-	// ---------------------------------------------------------------
 	scenario.Back()
 	noPab := selectS3ByID(t, scenario, s3NoPABBucketID)
 	scenario.OpenDetailResource("s3", noPab)

@@ -1,9 +1,8 @@
 package unit
 
-// qa_retry_probe_test.go — probeResourceAvailability wraps its paginated
-// fetcher call in RetryOnThrottle, with the generic instantiation
-// RetryOnThrottle[resource.FetchResult]. The four tests pin exactly this
-// retry contract; a change to the generic type or config fails them.
+// ProbeResourceAvailability wraps its paginated
+// fetcher call in RetryOnThrottle[resource.FetchResult]; a change to the
+// generic type or the retry config fails these tests.
 
 import (
 	"context"

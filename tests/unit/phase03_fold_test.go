@@ -1,4 +1,4 @@
-// phase03_fold_test.go — enrichment folds into the cached rows.
+// Enrichment folds into the cached rows.
 //
 // After EnrichmentCheckedMsg is handled, every cached row of the given
 // resource type must have its r.Findings and r.AttentionDetails updated
@@ -74,10 +74,9 @@ func newRootModel(t testing.TB) tui.Model {
 
 // ── Test 1: EnrichmentCheckedMsg mutates rows directly in all three caches ──
 
-// TestFold_EnrichmentCheckedMutatesRowsDirectly verifies that after the fold
-// implementation handles EnrichmentCheckedMsg, the wave 2 finding is written
-// DIRECTLY into the cached row's r.Findings slice — not via the parallel
-// EnrichmentFindings map.
+// TestFold_EnrichmentCheckedMutatesRowsDirectly verifies that
+// EnrichmentCheckedMsg writes the wave 2 finding DIRECTLY into the cached
+// row's r.Findings slice.
 //
 // Table-driven: exercises canonical-only types (ec2, s3, sg, role, ng, kms)
 // and aliased types (dbi/rds, redis/elasticache) to ensure ShortName and
@@ -276,12 +275,6 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 //   - Findings[1].Phrase == second summary (second wave2 only, not both)
 //   - Findings[0].Source == "wave1"
 //   - Findings[1].Source == "wave2:<canonShort>"
-//
-// Red-light today: the shim's DeriveFindings is deterministic; the second call
-// re-derives from m.EnrichmentFindings which holds finding B. This test should
-// actually pass with the shim. However after fold, the test validates that
-// applyEnrichment replaces (not appends) the wave2 slot. It is listed as
-// red-light because if fold incorrectly appends, len would be 3 (wave1 + A + B).
 func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 	cases := []struct {
 		name, canonShort, alias string
@@ -402,12 +395,6 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 //   - len(r.Findings) == 1 (wave1 only; wave2 cleared)
 //   - r.Findings[0].Source == "wave1"
 //   - r.AttentionDetails is nil or empty (wave2 detail removed)
-//
-// Red-light today: same reasoning as Test 2. After fold, applyEnrichment
-// with empty perResource must strip wave2 entries. The shim path currently
-// re-derives and correctly clears wave2 since DeriveFindings uses the updated
-// (now empty) m.EnrichmentFindings[type]. This test guards against fold
-// implementations that forget to clear the wave2 slot on empty input.
 func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 	cases := []struct {
 		name, canonShort, alias string
@@ -530,7 +517,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 	}
 }
 
-// ── Test 4: Session.EnrichmentFindings field is deleted ────────────────────
+// ── Test 4: Session has no EnrichmentFindings field ────────────────────────
 
 // TestFold_EnrichmentFindingsFieldDeleted verifies at compile+runtime that
 // session.Session does NOT have an EnrichmentFindings field. The reflection
@@ -544,22 +531,17 @@ func TestFold_EnrichmentFindingsFieldDeleted(t *testing.T) {
 	}
 }
 
-// ── Ctrl+R on resource list clears stale wave2 ──
+// ── Ctrl+R on resource list keeps wave2 until replaced ──
 
-// TestFold_CtrlROnList_ClearsActiveRowFindings verified that pressing Ctrl+R
-// while viewing a resource list cleared stale wave2 findings from the rows
-// held by the active ResourceListModel IMMEDIATELY at keypress time. That
-// contract is superseded: eagerly blanking findings on Ctrl+R produced a
-// real, user-visible flicker for the full AWS round-trip between the
-// keypress and the rerun's EnrichmentChecked arrival. Findings are now
-// stale-until-replaced, not blank-until-replaced — this test asserts both
-// halves: the wave2 finding must still be present immediately after Ctrl+R
-// (no blank window), and it must be genuinely removed once a fresh
-// EnrichmentChecked result lands that no longer contains it (real
-// replacement still works, it just doesn't fire eagerly at keypress time).
+// TestFold_CtrlROnList_ClearsActiveRowFindings pins that findings are
+// stale-until-replaced, not blank-until-replaced: blanking them at keypress
+// would flicker for the full AWS round-trip until the rerun's
+// EnrichmentChecked arrives. The wave2 finding is still present immediately
+// after Ctrl+R, and it is removed once a fresh EnrichmentChecked result lands
+// that does not contain it.
 //
 // See qa_glyph_continuity_test.go's TestRerunStart_KeepsVisibleFindingsUntilReplaced
-// for the from-scratch pin of the same corrected invariant.
+// for the same invariant.
 func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	const (
 		rid        = "i-ctrl-r"
@@ -621,7 +603,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	// Step 5: send Ctrl+R — this triggers handleRefresh on the resource list path.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
-	// Assertion (corrected), half 1: immediately after Ctrl+R, BEFORE any
+	// Half 1: immediately after Ctrl+R, BEFORE any
 	// fresh enrichment result has landed, the wave2 finding must still be
 	// present — no blank window (stale-until-replaced).
 	postKeypress := m.ActiveListResources()
@@ -649,7 +631,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 		TypeGen:      0,
 	})
 
-	// Assertion, half 2: after the fresh result lands and genuinely omits
+	// Half 2: after the fresh result lands and genuinely omits
 	// rid, no wave2 entry should remain on the rows visible in the active
 	// ResourceListModel.
 	postFreshResult := m.ActiveListResources()
@@ -680,8 +662,8 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 // previous enrichment wave and the user sees stale wave2 markers on the next
 // list until a fresh EnrichmentCheckedMsg overwrites them.
 //
-// Note: this model is built WITHOUT WithNoCache so handleRefresh does not
-// return early on the main-menu path (noCache=true short-circuits at line 349).
+// This model is built WITHOUT WithNoCache so handleRefresh does not
+// return early on the main-menu path (noCache=true short-circuits it).
 func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	const (
 		ec2ID    = "i-menu-ctrlr"
@@ -767,10 +749,6 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// Step 4: send Ctrl+R while on the main menu.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
-	// Assertion: RowStore entries for both types must have NO wave2 findings.
-	// Pre-fix: RowStore is untouched by main-menu Ctrl+R, so wave2 persists.
-	// Post-fix: handleRefresh on main-menu path must also clear wave2 from all
-	// cached rows (iterate over RowStore and call applyEnrichment per type).
 	for _, tc := range []struct {
 		short  string
 		source string
@@ -797,10 +775,10 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	}
 }
 
-// ── Test 5: Wave1 + wave2 coexist when row enters via Site 4 (CachedPages) ──
+// ── Test 5: Wave1 + wave2 coexist when row enters via CachedPages ──
 
 // TestFold_AttentionDetailsCarryAcrossEntryPoints verifies that a resource
-// entering via Site 4 (RelatedCheckResultMsg.CachedPages) receives wave1
+// entering via RelatedCheckResultMsg.CachedPages receives wave1
 // findings at entry, then wave2 findings at enrichment, and both coexist in
 // r.Findings with wave1 first, wave2 second.
 //
@@ -809,7 +787,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 //
 // Entry sequence:
 //  1. RelatedCheckResultMsg with CachedPages — row enters ResourceCache with
-//     Status "impaired" → wave1 finding derived at entry (shim site #4).
+//     Status "impaired" → wave1 finding derived at entry.
 //  2. EnrichmentCheckedMsg with wave2 finding — applyEnrichment must preserve
 //     wave1 and append/replace wave2 slot.
 //
@@ -819,9 +797,6 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 //   - Findings[1].Source == "wave2:<canonShort>", Findings[1].Phrase == summary
 //   - Findings[1].Code == "<canonShort>.<slug(summary)>"
 //   - r.AttentionDetails[<code>].Rows is non-empty
-//
-// Red-light today: site #4 shim may or may not be wired, and fold is not yet
-// implemented; the test asserts the post-fold steady-state.
 func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 	cases := []struct {
 		name, canonShort, alias string
@@ -860,7 +835,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 
 			m := newRootModel(t)
 
-			// Step 1: resource enters via Site 4 (CachedPages).
+			// Step 1: resource enters via CachedPages.
 			m = applyMsg(m, messages.RelatedCheckResult{
 				ResourceType:     tc.canonShort,
 				SourceResourceID: "src-1",
@@ -887,7 +862,6 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				},
 			})
 
-			// Verify entry-point wave1 was set (shim site #4 must be wired for this to hold).
 			{
 				tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
 				if tr.Gen == 0 || len(tr.Rows) == 0 {

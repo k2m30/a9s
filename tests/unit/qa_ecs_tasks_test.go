@@ -19,9 +19,8 @@ import (
 // awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher reads
 // ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
 // field. ListServices/DescribeServices/DescribeClusters/DescribeTaskDefinition
-// are stubbed since these ecs-task tests never touch them (nil
-// describeTaskDefAPI equivalent — the join is skipped when it errors/returns
-// nothing, matching the pre-refactor 3-arg FetchECSTasksPage contract).
+// are stubbed; the task-definition join is skipped when it errors or returns
+// nothing.
 type qaECSTaskFake struct {
 	*mockECSListClustersClient
 	*mockECSListTasksClient
@@ -42,8 +41,7 @@ func (f *qaECSTaskFake) DescribeServices(_ context.Context, _ *ecs.DescribeServi
 
 // DescribeTaskDefinition returns a ClientException ("does not exist"), the
 // production join's own signal for "no such task definition" — this keeps
-// Fields["task_def_join_error"] unset, matching the pre-refactor 3-arg
-// FetchECSTasksPage contract (which never queried task definitions at all).
+// Fields["task_def_join_error"] unset.
 func (f *qaECSTaskFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
 }
@@ -116,8 +114,7 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	if r.Name != "abc123def456" {
 		t.Errorf("expected Name 'abc123def456', got %q", r.Name)
 	}
-	// Post-PR-03c: fetcher no longer writes Status for RUNNING tasks.
-	// State lives in Fields["status"]; RUNNING tasks emit no Finding.
+	// RUNNING tasks keep their state in Fields["status"] and emit no Finding.
 	if r.Fields["status"] != "RUNNING" {
 		t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
 	}
@@ -141,15 +138,10 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	// Post-PR-03c: fetcher no longer writes Status for STOPPED tasks.
-	//
-	// RETIRED the old "STOPPED emits no Finding" invariant (stop_code carries
-	// actionable info instead): since the color-findings-conformance wave,
-	// colorECSTask is colorFromAnyFinding-first (core/aws/catalog_compute.go)
-	// and ecsTaskStructuralFindings (core/aws/ecs_task_codes.go) now emits
-	// CodeECSTaskStateStopped/SevDim for a normal (empty/UserInitiated
-	// stop_code) STOPPED task — Color needs its own Finding to color from. See
-	// qa_color_findings_conformance_test.go for the standing architectural gate.
+	// A normal (empty/UserInitiated stop_code) STOPPED task carries
+	// CodeECSTaskStateStopped/SevDim from ecsTaskStructuralFindings
+	// (core/aws/ecs_task_codes.go): colorECSTask is colorFromAnyFinding-first,
+	// so Color needs its own Finding to color from.
 	if r2.Fields["status"] != "STOPPED" {
 		t.Errorf("r2 Fields[status]: expected %q, got %q", "STOPPED", r2.Fields["status"])
 	}

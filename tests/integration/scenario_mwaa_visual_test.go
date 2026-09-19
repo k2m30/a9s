@@ -2,15 +2,14 @@
 
 package integration
 
-// scenario_mwaa_visual_test.go — Phase 8 render-gate for the mwaa resource.
-// Verifies the rendered TUI output (not fetcher return values) matches the
-// universal UI rules and the §4 contract in docs/resources/mwaa.md.
+// scenario_mwaa_visual_test.go checks the rendered TUI output (not fetcher
+// return values) for mwaa against the universal UI rules and
+// docs/resources/mwaa.md.
 //
-// mwaa has NO Wave-1 signals (ListEnvironments returns only names). Every
-// signal comes from the in-fetcher GetEnvironment pass (the eks pattern), so
-// all findings land during demo startup with no separate enricher. Every
-// issue-severity finding is color-bearing (color-findings conformance gate) —
-// no glyph-on-green exists for this type:
+// ListEnvironments returns only names. Every signal comes from the
+// in-fetcher GetEnvironment pass (the eks pattern), so all findings land
+// during demo startup with no separate enricher. Every issue-severity
+// finding is color-bearing, so no row stays green while carrying one:
 //   - CREATING/CREATING_SNAPSHOT/PENDING/UPDATING/ROLLING_BACK/MAINTENANCE → Warning
 //   - CREATE_FAILED/UPDATE_FAILED/UNAVAILABLE → Broken
 //   - DELETING/DELETED → Dim
@@ -24,8 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// §4 phrases pinned locally — any drift in the fetcher surfaces here instead
-// of in unit tests that could be rewritten without noticing.
 const (
 	mwaaPhraseCreating      = "creating"
 	mwaaPhraseSnapshotting  = "creating snapshot"
@@ -42,7 +39,6 @@ const (
 	mwaaPhrasePublic        = "webserver public"
 	mwaaPhraseDetailsDenied = "details denied"
 
-	// Rule-7 rolled-up forms (framework-derived (+N)).
 	mwaaPhraseRollbackP1    = "rolling back: update failed (+1)"
 	mwaaPhraseStaleUpdateP1 = "last update failed (+1)"
 
@@ -57,21 +53,19 @@ func TestScenario_MWAAVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// S1 menu badge — unifiedIssueCount counts issue-COLORED rows
+	// Menu badge — unifiedIssueCount counts issue-COLORED rows
 	// (Warning + Broken). For mwaa: 6 Warning-state + 3 Broken + 3
 	// background-warning + 1 details-denied = 13. Dim rows do not bump.
 	scenario.ExpectMenuIssueCount("mwaa", 14)
 
 	scenario.OpenList("mwaa")
 
-	// Universal column rules — no jargon columns.
 	for _, jargon := range []string{
 		"CIS", " Flags", " Issues ", "NOBKP", "UNENC", "NOPROT", "PUB ",
 	} {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// Healthy rows: blank Status.
 	for _, id := range []string{
 		demofixtures.ProdAirflowEtlID,
 		demofixtures.ProdAirflowReportingID,
@@ -79,7 +73,6 @@ func TestScenario_MWAAVisual(t *testing.T) {
 		scenario.ExpectRowStatusBlank(id)
 	}
 
-	// §4 phrases per state bucket.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowCreatingID, mwaaPhraseCreating)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowSnapshottingID, mwaaPhraseSnapshotting)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowPendingID, mwaaPhrasePending)
@@ -90,23 +83,18 @@ func TestScenario_MWAAVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.DimAirflowDeletingID, mwaaPhraseDeleting)
 	scenario.ExpectRowStatusEquals(demofixtures.DimAirflowDeletedID, mwaaPhraseDeleted)
 
-	// Background-warning findings (yellow rows, color is the signal).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowStaleUpdateID, mwaaPhraseStaleUpdate)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowPublicID, mwaaPhrasePublic)
 	// Listed-but-denied environment: name-only degraded row, never dropped
-	// (live-witnessed IAM shape: List allowed, GetEnvironment denied).
+	// (a real IAM shape: List allowed, GetEnvironment denied).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowDetailsDeniedID, mwaaPhraseDetailsDenied)
 
-	// Rule 7 — multi-finding suffixes (framework-derived).
 	// ROLLING_BACK state + failed-update finding on the same row.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowRollbackID, mwaaPhraseRollbackP1)
 	// UPDATE_FAILED state + failed-update finding.
 	scenario.ExpectRowStatusEquals(demofixtures.BrokenAirflowUpdateFailedID, mwaaPhraseUpdateFailed+" (+1)")
-	// Two background findings on one row: first-in-precedence + (+1).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnAirflowMultiID, mwaaPhraseStaleUpdateP1)
 
-	// Glyph rules: NO glyph anywhere for mwaa — every finding is
-	// color-bearing, so no row stays green while carrying one.
 	for _, id := range []string{
 		demofixtures.WarnAirflowStaleUpdateID,
 		demofixtures.WarnAirflowPublicID,
@@ -122,18 +110,14 @@ func TestScenario_MWAAVisual(t *testing.T) {
 		demofixtures.BrokenAirflowUpdateFailedID,
 		demofixtures.BrokenAirflowUnavailableID,
 		demofixtures.DimAirflowDeletingID,
-		// The details-denied degraded row is color-bearing (Warning), not a
-		// glyphed green row — it belongs in the no-glyph contract too.
+		// The details-denied degraded row is color-bearing (Warning).
 		demofixtures.WarnAirflowDetailsDeniedID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
-	// Healthy no-finding rows: also glyph-free.
 	scenario.ExpectRowNoGlyphPrefix(demofixtures.ProdAirflowEtlID)
 	scenario.ExpectRowNoGlyphPrefix(demofixtures.ProdAirflowReportingID)
 
-	// Related panel — every §2 pivot with `count shown: yes` ≥ 1 on the
-	// graph root: alarm 2, kms 1, logs 5, role 1, s3 1, sg 2, subnet 2.
 	root := selectMWAAByID(t, scenario, demofixtures.ProdAirflowEtlID)
 	scenario.OpenDetailResource("mwaa", root)
 	scenario.ExpectNoAPIError()
@@ -152,14 +136,11 @@ func TestScenario_MWAAVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// Rule 7 U7c/U7e — the multi fixture's detail enumerates BOTH `~`
-	// findings as their own capitalized Attention entries; the failed-update
-	// entry carries the ErrorMessage row.
+	// The failed-update Attention entry carries the ErrorMessage row.
 	multi := selectMWAAByID(t, scenario, demofixtures.WarnAirflowMultiID)
 	scenario.OpenDetailResource("mwaa", multi)
 	scenario.ExpectNoAPIError()
 
-	// 8.4 user-visible sanity render (mandatory).
 	t.Log("\n" + scenario.currentView())
 
 	scenario.ExpectViewContains(mwaaDetailStaleUpdate)
@@ -168,9 +149,7 @@ func TestScenario_MWAAVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// Finding on a non-green row still surfaces in S5 (no finding silently
-	// disappears): ROLLING_BACK row lists the state phrase AND the
-	// failed-update entry.
+	// A finding on a non-green row still surfaces in the detail view.
 	rollback := selectMWAAByID(t, scenario, demofixtures.WarnAirflowRollbackID)
 	scenario.OpenDetailResource("mwaa", rollback)
 	scenario.ExpectNoAPIError()
@@ -180,10 +159,10 @@ func TestScenario_MWAAVisual(t *testing.T) {
 	scenario.AssertNoEnrichmentErrors()
 }
 
-// TestScenario_MWAAVisual_HealthySilence — spec §4 "Healthy silence": the
-// showroom row renders no Attention section and no finding phrase, and the
-// wave-3 anti-test holds (disabled WebserverLogs on prod-airflow-reporting
-// produces no finding; AirflowVersion is a plain fact).
+// TestScenario_MWAAVisual_HealthySilence — the showroom row renders no
+// Attention section and no finding phrase; disabled WebserverLogs on
+// prod-airflow-reporting produces no finding and AirflowVersion is a plain
+// fact.
 func TestScenario_MWAAVisual_HealthySilence(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	scenario := fullIntegrationNewDemoScenario(t)

@@ -1,6 +1,6 @@
 package unit
 
-// runtime_task_opid_test.go — coverage for runtime.TaskOpID (core/runtime/tasks.go),
+// Coverage for runtime.TaskOpID (core/runtime/tasks.go),
 // the payload-op-ID derivation helper behind core/web's op-aware background-task
 // admission (server.go's drainBackgroundTasks): a same-key task already draining
 // is skipped UNLESS the incoming task's TaskOpID is strictly newer than the

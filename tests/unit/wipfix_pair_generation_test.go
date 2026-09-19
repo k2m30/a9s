@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_pair_generation_test.go pins row 52: the queued-save guard compares
-// the visit unconditionally. A generation of zero is not a pass — it is a pair
-// value captured before the session resolved one, and after two switches it
-// answers for no visit at all.
+// The queued-save guard compares the visit unconditionally. A generation of
+// zero is not a pass — it is a pair value captured before the session
+// resolved one, and after two switches it answers for no visit at all.
 package unit_test
 
 import (
@@ -27,13 +26,11 @@ func wipfixSaveRuns(t *testing.T, s *session.Session, p session.Pair) bool {
 	return ran
 }
 
-// TestQueuedSave_CapturedBeforeThePairResolved pins row 52. The pair value is
-// taken while the session still carries the names it was constructed with and
-// has entered no visit, so it carries generation zero. The operator then
-// switches twice, ending on those same names. A guard that treats zero as
-// "nothing to check" lets that save write into a visit it was never prepared
-// for — the same defect row 41 closed for a named round trip, reached through
-// the escape hatch instead of past the comparison.
+// TestQueuedSave_CapturedBeforeThePairResolved: the pair value is taken while
+// the session still carries the names it was constructed with and has entered
+// no visit, so it carries generation zero. The operator then switches twice,
+// ending on those same names. A guard that treats zero as "nothing to check"
+// lets that save write into a visit it was never prepared for.
 func TestQueuedSave_CapturedBeforeThePairResolved(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
@@ -67,7 +64,7 @@ func TestQueuedSave_CapturedBeforeThePairResolved(t *testing.T) {
 	}
 }
 
-// TestQueuedSave_FirstResolvedVisitIsGenerationOne is row 52's other half: the
+// TestQueuedSave_FirstResolvedVisitIsGenerationOne: the
 // first visit has a generation of its own, so a save prepared in it is told
 // apart from one prepared before it.
 func TestQueuedSave_FirstResolvedVisitIsGenerationOne(t *testing.T) {
@@ -97,7 +94,7 @@ func TestQueuedSave_FirstResolvedVisitIsGenerationOne(t *testing.T) {
 // and one whose pair is resolved by the load lane, are both on a numbered
 // visit. Left at zero, the visit the session booted into would be the same
 // value as having entered none, and the guard would be comparing one answer
-// against two meanings again.
+// against two meanings.
 func TestPairVisit_EveryPathThatEstablishesAPairEntersOne(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 

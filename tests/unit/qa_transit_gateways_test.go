@@ -69,7 +69,6 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 		t.Errorf("expected description 'Main transit gateway', got %q", r.Fields["description"])
 	}
 
-	// Second TGW has no Name tag
 	r2 := resources[1]
 	if r2.Name != "" {
 		t.Errorf("expected empty Name for second TGW, got %q", r2.Name)
@@ -124,8 +123,7 @@ func TestQA_TransitGateways_TypeDef(t *testing.T) {
 	}{
 		{"name", "Name"},
 		{"tgw_id", "TGW ID"},
-		// The built-in view's list, folded into the type's own, is what the
-		// operator sees: a Status column resolving through its title, and the
+		// A Status column resolving through its title, and the
 		// attachment-issue count beside it; the status column names the key its
 		// cell reads.
 		{"state", "Status"},

@@ -1,12 +1,9 @@
 package unit
 
-// prowler_w2_dbi_snap_test.go — dbi-snap row 18 of the w2 Prowler batch:
-// a DB snapshot shared with every AWS account.
+// dbi-snap public sharing: a DB snapshot shared with every AWS account.
 //
 // The restore attribute is the only place this is visible; DescribeDBSnapshots
-// does not carry it. The enricher reached here is the one wired on the
-// dbi-snap catalog literal, so the test also proves the new call landed in the
-// registered cross-ref enricher rather than in a second, unregistered one.
+// does not carry it.
 
 import (
 	"context"

@@ -29,14 +29,12 @@ func TestQA_FieldAlias_RegisterAndApply(t *testing.T) {
 	if result["State"] != "running" {
 		t.Errorf("expected State=running, got %q", result["State"])
 	}
-	// original keys must be preserved
 	if result["instance_id"] != "i-123" {
 		t.Errorf("expected original instance_id=i-123, got %q", result["instance_id"])
 	}
 	if result["state"] != "running" {
 		t.Errorf("expected original state=running, got %q", result["state"])
 	}
-	// unaliased key must be untouched
 	if result["name"] != "web" {
 		t.Errorf("expected name=web, got %q", result["name"])
 	}
@@ -87,7 +85,6 @@ func TestQA_FieldAlias_NoAliasRegistered(t *testing.T) {
 	if result["db_id"] != "mydb" {
 		t.Errorf("expected db_id=mydb, got %q", result["db_id"])
 	}
-	// verify same pointer by checking length is unmodified
 	if len(result) != 1 {
 		t.Errorf("expected map length 1, got %d", len(result))
 	}
@@ -126,14 +123,12 @@ func TestQA_FieldAlias_NoCopyWhenAllPresent(t *testing.T) {
 
 	result := resource.ApplyFieldAliases("ec2", fields)
 
-	// Value must be unchanged
 	if result["State"] != "running" {
 		t.Errorf("expected State=running, got %q", result["State"])
 	}
 	if result["state"] != "running" {
 		t.Errorf("expected state=running, got %q", result["state"])
 	}
-	// No extra keys should appear
 	if len(result) != 2 {
 		t.Errorf("expected map length 2, got %d", len(result))
 	}

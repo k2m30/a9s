@@ -107,12 +107,11 @@ func TestTryJSONToYAMLLines_NestedObject(t *testing.T) {
 	}
 }
 
-// TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly pins F2: TryJSONToYAMLLines
-// must decode with json.Decoder.UseNumber so an integer above 2^53 renders
-// with its full digits, not a plain json.Unmarshal-into-any float64 that
-// silently rounds 9007199254740993 to 9007199254740992 — corrupting policy
-// documents and templates on render/copy (the same defect core/fieldpath's
-// tryParseJSON was fixed for, extract.go's doc comment).
+// TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly: TryJSONToYAMLLines
+// decodes with json.Decoder.UseNumber so an integer above 2^53 renders with
+// its full digits; a plain json.Unmarshal into any float64 rounds
+// 9007199254740993 to 9007199254740992, corrupting policy documents and
+// templates on render/copy.
 func TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly(t *testing.T) {
 	const bigInt = "9007199254740993"
 	lines := jsonyaml.TryJSONToYAMLLines(`{"id":` + bigInt + `}`)
@@ -125,12 +124,11 @@ func TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly(t *testing.T) {
 	}
 }
 
-// TestTryJSONToYAMLLines_TrailingGarbage_StillRejected pins F2's other half:
-// switching from json.Unmarshal to a json.Decoder for UseNumber must not
-// relax the "no trailing content" contract — a single Decoder.Decode call
-// does not reject trailing content on its own (unlike json.Unmarshal), so
-// this must still explicitly check Decoder.More() the way core/fieldpath's
-// tryParseJSON does.
+// TestTryJSONToYAMLLines_TrailingGarbage_StillRejected: decoding through a
+// json.Decoder must keep the "no trailing content" contract — a single
+// Decoder.Decode call does not reject trailing content on its own (unlike
+// json.Unmarshal), so trailing content has to be checked explicitly the way
+// core/fieldpath's tryParseJSON does.
 func TestTryJSONToYAMLLines_TrailingGarbage_StillRejected(t *testing.T) {
 	lines := jsonyaml.TryJSONToYAMLLines(`{"a":1} trailing garbage`)
 	if lines != nil {
@@ -297,11 +295,7 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 // with a CloudTrailEvent JSON payload containing embedded JSON in RequestParameters.
 //
 // Drives the live Controller.EnsureDetailState + NewTransientDetail.RenderDetail
-// seam. Not a duplicate of detail_ports_test.go's
-// Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that test pins
-// section ORDER via a minimal fixture with no embedded JSON; this one pins
-// the distinct "requestParameters.policy embedded JSON string is not
-// exploded into sub-fields by expandJSONItems" no-crash contract.
+// seam.
 func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	ctJSON := `{"eventVersion":"1.08","eventSource":"s3.amazonaws.com","eventName":"PutObject","requestParameters":{"bucketName":"my-bucket","key":"data.json","policy":"{\"Version\":\"2012-10-17\"}"},"responseElements":null}`
 	event := cloudtrailtypes.Event{
@@ -326,17 +320,12 @@ func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	m := views.NewTransientDetail(120, 40, vp)
 	view := stripAnsi(m.RenderDetail(*body))
 
-	// CT branch must be taken — verify CT-specific content appears.
 	if !strings.Contains(view, "PutObject") {
 		t.Errorf("ct-events detail should show event name 'PutObject':\n%s", view)
 	}
-	// The embedded JSON in requestParameters.policy should NOT be expanded
-	// by expandJSONItems (CT uses its own rendering). Verify the raw policy
-	// string is NOT expanded into YAML sub-fields.
 	if strings.Contains(view, "2012-10-17") {
-		// If the policy version appears, it was rendered by the CT summarizer
-		// as a compact string — not by expandJSONItems. That's fine.
-		// The key assertion is that we don't crash and CT path is taken.
+		// The CT summarizer renders the policy version as a compact string,
+		// not through expandJSONItems.
 	}
 }
 
@@ -352,8 +341,7 @@ func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 //
 // The stray-closing-delimiter cases are the ones a Decoder.More() check waves
 // through: More() reports whether another VALUE follows, and "}" alone is not
-// a value. Each of these three call sites carried its own copy of that wrong
-// check before they were collapsed onto this one.
+// a value.
 func TestParseStrict_RejectsTrailingContent(t *testing.T) {
 	accepted := []string{
 		`{"Version":"2012-10-17"}`,

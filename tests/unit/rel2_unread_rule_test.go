@@ -1,6 +1,6 @@
 package unit_test
 
-// rel2_unread_rule_test.go — the answer-side rule at its four boundaries.
+// The answer-side rule at its four boundaries.
 //
 // unreadZero turns a resolved zero from a row with no RawStruct into Unknown.
 // unreadZeroScanned is the same except a zero over a population of none keeps
@@ -70,8 +70,8 @@ func TestRel2UnreadZeroOverRealRowsIsUnknown(t *testing.T) {
 	}
 }
 
-// TestRel2LowerBoundSurvivesTheUnreadRule pins the interaction between the two
-// rules the batch has now landed. A truncated list that matched nothing is a
+// TestRel2LowerBoundSurvivesTheUnreadRule pins the interaction between the
+// lower-bound and unread rules. A truncated list that matched nothing is a
 // lower bound — "(0+)" — and it must stay one even when the source row was
 // never read, because the "+" is a fact about the list, not about the row.
 // Collapsing it to "?" would lose the one thing the scan did establish.
@@ -95,12 +95,11 @@ func TestRel2LowerBoundSurvivesTheUnreadRule(t *testing.T) {
 	}
 }
 
-// TestRel2VolumeIDCallersAnswerBothWays pins ec2VolumeIDs' two callers, the
-// helper that swallowed its assertion and returned an empty map. Dev declined
-// to give it an ok result, so the two callers are the only place the
-// distinction can be checked: an unread instance owes "?", and an instance
-// that was read and genuinely has no block devices owes a zero. If the helper
-// ever loses that distinction again both halves cannot hold at once.
+// TestRel2VolumeIDCallersAnswerBothWays pins ec2VolumeIDs' two callers. The
+// helper returns an empty map both for an unread instance and for one with no
+// block devices, so the callers are where the distinction is checked: an unread
+// instance owes "?", and an instance that was read and has no block devices
+// owes a zero.
 func TestRel2VolumeIDCallersAnswerBothWays(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ebs":      resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: "vol-0a1b2c3d4e5f60001"}}},

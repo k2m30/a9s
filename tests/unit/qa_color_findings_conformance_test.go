@@ -1,4 +1,4 @@
-// qa_color_findings_conformance_test.go — the gate for the
+// The gate for the
 // "color derives from findings" architectural invariant: for every registered
 // type × demo fixture row, td.ResolveColor(merged) must equal the color
 // implied by the resource's own Findings (Wave-1 seeded, Wave-2 merged) via
@@ -24,21 +24,16 @@
 //   - a Finding is present but its Severity disagrees with the branch color
 //     the classifier actually returned.
 //
-// Neither case is a visibility bug (qa_issue_visibility_gate_test.go already
-// polices "is the problem shown somewhere") — this is the DIFFERENT, stricter
-// rule that the single source of truth for color must be Findings, so a
-// future refactor that deletes the raw-field branches and reads only
-// Findings would need this divergence list to shrink to reflect real
-// conversions, not silently drift.
+// Neither case is a visibility bug (qa_issue_visibility_gate_test.go polices
+// "is the problem shown somewhere") — this is the stricter rule that the
+// single source of truth for color is Findings.
 //
-// No exemption is carved out for "lifecycle dim without findings": the one
-// exported function in core/resource/severity_color.go (ColorFromSeverity)
-// defines no such carve-out, and colorFromAnyFinding's ok=false path (no
-// Finding present) returns (ColorHealthy, false), not Dim. A classifier that
-// reads a raw status word, such as colorFallback in
-// core/catalog/color_helpers.go, is exactly what this gate is designed to
-// catch — it is not one of "the shared severity functions" the rule's
-// exemption clause refers to.
+// No exemption exists for "lifecycle dim without findings": ColorFromSeverity
+// (core/resource/severity_color.go) defines no such carve-out, and
+// colorFromAnyFinding's ok=false path (no Finding present) returns
+// (ColorHealthy, false), not Dim. A classifier that reads a raw status word,
+// such as colorFallback in core/catalog/color_helpers.go, is what this gate
+// catches.
 //
 // RATCHET semantics (identical contract to knownVisibilityGaps /
 // knownStateCoverageGaps):
@@ -46,9 +41,7 @@
 //     fails, unconditionally.
 //   - An allowlisted divergence that NOW conforms (colors match) fails with a
 //     "remove from allowlist" message.
-//   - An allowlisted divergence still mismatched is skipped (logged),
-//     pre-existing debt — this list IS the deliverable driving the
-//     findings-conversion work.
+//   - An allowlisted divergence still mismatched is skipped (logged).
 package unit_test
 
 import (
@@ -115,7 +108,7 @@ func severityRank(s domain.Severity) int {
 // gate: for every registered type with a Wave-1 Fetcher,
 // every fixture resource's td.ResolveColor(merged) must equal
 // findingsDerivedColor(merged.Findings) — UNLESS the (type, resourceID) pair
-// is pinned in knownColorDivergence as pre-existing debt, in which case it is
+// is pinned in knownColorDivergence, in which case it is
 // skipped (logged) instead of failed.
 func TestColorFindingsConformanceGate_ColorAlwaysDerivesFromFindings(t *testing.T) {
 	clients := demo.NewServiceClients()

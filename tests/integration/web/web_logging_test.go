@@ -1,10 +1,9 @@
 //go:build integration
 
-// web_logging_test.go — pins CONTRACT 3(a) of the observability slice: a
-// request-logging middleware wraps core/web's mux, active only when the
-// logging facility (core/logging) is enabled, logging a JSON line (msg "web
-// request", attrs method/path/status/duration_ms) per handled request
-// through it.
+// A request-logging middleware wraps core/web's mux,
+// active only when the logging facility (core/logging) is enabled, logging a
+// JSON line (msg "web request", attrs method/path/status/duration_ms) per
+// handled request through it.
 package webintegration
 
 import (
@@ -30,7 +29,7 @@ func resetLoggingToDisabled(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// (a) Enabled: every handled request logs a "web request" line with
+// Enabled: every handled request logs a "web request" line with
 // method/path/status/duration_ms.
 // -----------------------------------------------------------------------
 
@@ -69,7 +68,7 @@ func TestWebLogging_RequestMiddleware_EnabledLogsRequestLine(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// (b) Disabled: a request adds nothing to the log file.
+// Disabled: a request adds nothing to the log file.
 // -----------------------------------------------------------------------
 
 func TestWebLogging_RequestMiddleware_DisabledLogsNothing(t *testing.T) {

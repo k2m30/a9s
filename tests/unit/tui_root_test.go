@@ -17,76 +17,29 @@ import (
 )
 
 // prevRootModel is the tui.Model (if any) newRootSizedModel handed back on
-// its previous call in this binary. Retained solely so this function can
-// flush that model's headless controller (CloseController, nil-safe) before
-// abandoning its config directory below — see the Close call's comment for
-// why.
+// its previous call in this binary, kept so the next call can flush its
+// headless controller (CloseController, nil-safe) before abandoning its
+// config directory.
 var prevRootModel *tui.Model
 
-// helper: create a model with a size set so View() actually renders.
+// newRootSizedModel creates a model with a size set so View() actually
+// renders.
 //
-// #17 wave 2 isolation fix: every one of this helper's ~575 call sites shares
-// the hardcoded "testprofile"/"us-east-1" pair. Since #17 wave 1
-// made a top-level TUI list open genuinely persist to
-// <A9S_CONFIG_FOLDER>/cache/testprofile--us-east-1/<type>.yaml (previously a
-// dead gate — see runtime_adapter_navigate.go), every caller now reads and
-// writes the SAME on-disk pair within one binary-wide TestMain temp dir,
-// so an earlier test's list rows leak into a later test's "fresh model"
-// precondition (12 tests flipped red on ec2/dbi/rds once the save gate
-// started firing for real). None of these ~575 call sites thread a
-// *testing.T through today, and retrofitting one is a much larger, riskier
-// diff than isolating at this single shared constructor — so a fresh,
-// unique A9S_CONFIG_FOLDER is set via plain os.Setenv (not t.Setenv, since
-// there is no *testing.T parameter here) UNCONDITIONALLY on every call, full
-// stop. An earlier version tried to skip rotating whenever the current env
-// value still looked like this function's own last write, so a caller that
-// had redirected A9S_CONFIG_FOLDER itself (e.g. to seed a themes/ directory
-// the theme selector reads from disk) wouldn't get clobbered. That guard
-// compared os.Getenv("A9S_CONFIG_FOLDER") against a remembered "last dir I
-// set" — a comparison that silently and permanently breaks the first time
-// ANY test anywhere in the binary calls t.Setenv("A9S_CONFIG_FOLDER", ...):
-// Go restores the env at that test's cleanup to whatever was live before
-// its call, which need not be (and in practice stops being) the value this
-// function last remembered, desyncing the two for the rest of the binary
-// and silently disabling isolation for every later caller. There is no
-// weaker version of that comparison that survives an external t.Setenv,
-// because the state it depends on (the live env var) is not under this
-// function's control. Isolating unconditionally has no history to fall out
-// of sync with. A caller that needs the constructed model to read specific
-// pre-seeded files (e.g. a themes/ directory) must call this function
-// FIRST, then seed those files into the directory THIS call resolved
-// (os.Getenv("A9S_CONFIG_FOLDER") after the call returns) — never the other
-// way around; see TestStackSync_SelectorFlow / TestStackSync_DoublePopGuard
-// in tui_stack_sync_test.go. Every caller in this package runs sequentially
-// (no t.Parallel() call site here also invokes this helper — see
-// tui_stack_sync_test.go), so a later call's Setenv safely lands before
-// that caller's own I/O runs.
+// Every call sets a fresh, unique A9S_CONFIG_FOLDER via os.Setenv (there is
+// no *testing.T to call t.Setenv with): callers share the
+// "testprofile"/"us-east-1" pair, so a shared directory would leak one
+// test's persisted list rows into another's fresh model. A caller that needs
+// the model to read pre-seeded files (e.g. a themes/ directory) calls this
+// FIRST, then seeds the directory this call resolved
+// (os.Getenv("A9S_CONFIG_FOLDER") after it returns); see
+// TestStackSync_SelectorFlow / TestStackSync_DoublePopGuard in
+// tui_stack_sync_test.go.
 //
-// Task #41: any caller that delivers messages.ResourcesLoaded (or otherwise
-// reaches Controller.persistMenuAvailabilityCache) through the returned
-// Model queues an async availability-cache write on that Model's own
-// headless controller. None of these ~575 call sites ever closed it, so the
-// writer goroutine outlived its test — and, because cache.DirForTest reads
-// A9S_CONFIG_FOLDER live at write time (not at goroutine-launch time), a
-// still-running writer from an EARLIER call here can land its write inside
-// whatever directory A9S_CONFIG_FOLDER points to by the time the OS
-// scheduler gets to it, including an unrelated LATER test's own
-// t.TempDir() — surfacing there as "TempDir RemoveAll cleanup: ... directory
-// not empty" (see app_availsave_tempdir_cleanup_race_test.go for the traced
-// mechanism and canary). Closing the previous call's controller before
-// abandoning its directory below — the same point this function already
-// treats as "this dir is no longer live" — closes that leak for every
-// caller without threading *testing.T through any of them.
-//
-// The Close call below runs on EVERY invocation (not only the directory-
-// rotation branch above): the residual gap — a test that calls this once,
-// then independently reassigns A9S_CONFIG_FOLDER itself (its own t.Setenv)
-// without ever calling this helper again — cannot be closed from here
-// (there is no hook back into that test's cleanup), but draining the
-// previous call's writer as early as the very next invocation, anywhere in
-// the ~575-call-site suite, shrinks that window from "for the rest of the
-// binary" to "until this helper is next called" — which in this suite is
-// almost always within the same or next test.
+// Each call also closes the previous call's headless controller before
+// abandoning its directory: a queued availability-cache write resolves
+// A9S_CONFIG_FOLDER at write time, so a writer left running could land in a
+// later test's t.TempDir() and fail its RemoveAll cleanup
+// (app_availsave_tempdir_cleanup_race_test.go).
 func newRootSizedModel() tui.Model {
 	if prevRootModel != nil {
 		prevRootModel.CloseController()
@@ -100,27 +53,21 @@ func newRootSizedModel() tui.Model {
 	return m
 }
 
-// helper: send a message through Update and return the updated model
 func rootApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
 	return tuitest.Step(m, msg)
 }
 
-// helper: get rendered content string from View()
 func rootViewContent(m tui.Model) string {
 	return tuitest.Render(m)
 }
 
-// helper: create key press for a printable character
 func rootKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
 }
 
-// helper: create key press for a special key
 func rootSpecialKey(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: code}
 }
-
-// ── View() tests ────────────────────────────────────────────────────────────
 
 func TestRootView_ReturnsNonEmptyWithFrame(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -156,7 +103,6 @@ func TestRootView_ContainsFrameBorders(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Frame should have border characters
 	if !strings.Contains(plain, "\u250c") { // top-left corner
 		t.Error("View() should contain top-left corner character")
 	}
@@ -185,7 +131,6 @@ func TestRootView_ContainsFrameTitle(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// MainMenu frame title is "resource-types(10)"
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("View() should contain frame title with resource-types, got: %s", plain)
 	}
@@ -203,8 +148,6 @@ func TestRootView_HeaderAndFrameLines(t *testing.T) {
 		t.Errorf("View() should have at least 3 lines, got %d", len(lines))
 	}
 }
-
-// ── handleNavigate tests ────────────────────────────────────────────────────
 
 func TestRootHandleNavigate_ResourceList(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -324,16 +267,12 @@ func TestRootHandleNavigate_Region(t *testing.T) {
 	}
 }
 
-// ── popView tests ───────────────────────────────────────────────────────────
-
 func TestRootPopView_ReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Push help
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
-	// Pop it
 	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	plain := stripANSI(rootViewContent(m))
@@ -347,7 +286,6 @@ func TestRootPopView_CannotPopLastView(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Try to pop the only view — should not crash
 	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	plain := stripANSI(rootViewContent(m))
@@ -357,24 +295,18 @@ func TestRootPopView_CannotPopLastView(t *testing.T) {
 	}
 }
 
-// ── executeCommand tests ────────────────────────────────────────────────────
-
 func TestRootExecuteCommand_ResourceType(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type "ec2"
 	for _, r := range "ec2" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Press enter to execute
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
-	// The command should return a NavigateMsg via cmd
 	if cmd == nil {
 		t.Error("executeCommand('ec2') should return a command (NavigateMsg)")
 	}
@@ -384,16 +316,12 @@ func TestRootExecuteCommand_Quit(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type "q"
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
 
-	// Press enter
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
-	// Should return tea.Quit
 	if cmd == nil {
 		t.Fatal("executeCommand('q') should return a quit command")
 	}
@@ -403,24 +331,18 @@ func TestRootExecuteCommand_UnknownCommand(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type "nonsense"
 	for _, r := range "nonsense" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Press enter
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
-	// Should produce a FlashMsg (error) — delivered via cmd
 	if cmd == nil {
 		t.Fatal("executeCommand with unknown command should return a command for FlashMsg")
 	}
 }
-
-// ── headerRight tests ───────────────────────────────────────────────────────
 
 func TestRootHeaderRight_NormalMode(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -437,10 +359,8 @@ func TestRootHeaderRight_FilterMode(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
-	// Type some filter text
 	for _, r := range "test" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
@@ -456,10 +376,8 @@ func TestRootHeaderRight_CommandMode(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	// Enter command mode
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
-	// Type some command text
 	for _, r := range "dbi" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
@@ -484,25 +402,20 @@ func TestRootHeaderRight_FlashMsg(t *testing.T) {
 	}
 }
 
-// ── fetchResources nil clients test ─────────────────────────────────────────
-
 func TestRootFetchResources_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 	// m.clients is nil (no AWS connection)
 
-	// Navigate to resource list — should not panic
 	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// The cmd should be non-nil (either a fetch command or an error)
 	if cmd == nil {
 		t.Error("navigating to resource list with nil clients should still return a command")
 	}
 
-	// Execute the command — it should return an APIErrorMsg, not panic
 	msg := cmd()
 	switch msg.(type) {
 	case messages.APIError:
@@ -513,8 +426,6 @@ func TestRootFetchResources_NilClients(t *testing.T) {
 		// Could be a batch cmd, that's also OK
 	}
 }
-
-// ── Integration: navigate then pop round-trip ───────────────────────────────
 
 func TestRootNavigateAndPopRoundTrip(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -532,14 +443,12 @@ func TestRootNavigateAndPopRoundTrip(t *testing.T) {
 		Resource: res,
 	})
 
-	// Pop back to resource list
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "s3") {
 		t.Errorf("after first pop, should be at s3 resource list, got: %s", plain)
 	}
 
-	// Pop back to main menu
 	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -582,8 +491,6 @@ func TestRoot_View_AltScreenOnZeroWidth(t *testing.T) {
 	}
 }
 
-// --- Bug fix tests: header width, filter on main menu, row wrapping ---
-
 func TestRoot_View_HeaderExactWidth(t *testing.T) {
 	m := newRootSizedModel()
 	content := rootViewContent(m)
@@ -609,7 +516,6 @@ func TestRoot_View_LineCountMatchesHeight(t *testing.T) {
 	m := newRootSizedModel()
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
-	// Should be exactly 40 lines (terminal height)
 	if len(lines) != 40 {
 		t.Errorf("expected 40 lines for height 40, got %d", len(lines))
 	}
@@ -617,18 +523,14 @@ func TestRoot_View_LineCountMatchesHeight(t *testing.T) {
 
 func TestRoot_FilterMode_WorksOnMainMenu(t *testing.T) {
 	m := newRootSizedModel()
-	// Press "/" to enter filter mode
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '/'})
-	// Type "ec2"
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '2', Text: "2"})
 	content := rootViewContent(m)
-	// Should still show EC2 Instances
 	if !strings.Contains(content, "EC2") {
 		t.Error("filter on main menu should show EC2 match")
 	}
-	// Should show filter text in header
 	if !strings.Contains(content, "/ec2") {
 		t.Error("header should show active filter text /ec2")
 	}
@@ -639,7 +541,6 @@ func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
 	// Verify that each resource type name appears on exactly one line (no wrapping).
-	// Check a representative sample of resource types from different categories.
 	sampleNames := []string{
 		"EC2 Instances",
 		"ECS Services",
@@ -669,32 +570,25 @@ func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
 
 func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 	m := newRootSizedModel()
-	// Navigate to S3
 	m, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
-	// Execute fetch cmd (ignored — we'll load manually)
+	// The fetch cmd is not run; rows are loaded below.
 	_ = cmd
-	// Load buckets
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "s3", Resources: buckets})
-	// Press Enter on the bucket — returns a cmd that produces EnterChildViewMsg
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	// Execute the cmd to get the EnterChildViewMsg and process it
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 	content := rootViewContent(m)
-	// Frame title should show the bucket name (objects view), not detail view title
 	plain := stripANSI(content)
-	// Should be loading objects or showing object list — frame title has bucket name
 	if strings.Contains(plain, "my-bucket") && !strings.Contains(plain, "my-bucket yaml") {
 		// Good — we're in an objects view with the bucket name in the title
 	} else {
 		t.Errorf("Enter on S3 bucket should show objects for my-bucket, got: %s", plain[:min(200, len(plain))])
 	}
-	// Must NOT be in detail view
 	if strings.Contains(plain, "No detail") || strings.Contains(plain, "Initializing") {
 		t.Error("Enter on S3 bucket should drill into objects list, not show detail/yaml view")
 	}
@@ -702,14 +596,11 @@ func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 
 func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 	m := newRootSizedModel()
-	// Navigate to S3 buckets
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets, Provenance: messages.FetchProvenanceCanonicalList})
-
-	// Enter bucket — execute returned cmd
 
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -717,17 +608,13 @@ func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	// Escape should go back to bucket list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	content := rootViewContent(m)
 	plain := stripANSI(content)
-	// Frame title should show s3(1) — back to bucket list
 	if !strings.Contains(plain, "s3(1)") && !strings.Contains(plain, "my-bucket") {
 		t.Errorf("Escape from objects should return to bucket list, got: %s", plain[:min(200, len(plain))])
 	}
 }
-
-// ── Test 1: Unknown child type at root model level ──────────────────────────
 
 func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -744,7 +631,6 @@ func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 		t.Fatal("EnterChildViewMsg with unknown child type should return a command")
 	}
 
-	// Execute the returned cmd — should produce a FlashMsg error
 	msg := cmd()
 	flashMsg, ok := msg.(messages.Flash)
 	if !ok {
@@ -757,8 +643,6 @@ func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 		t.Errorf("FlashMsg.Text should contain 'unknown child type', got %q", flashMsg.Text)
 	}
 }
-
-// ── Test 2: Nil clients for child fetches ───────────────────────────────────
 
 func TestRoot_EnterChildView_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -805,11 +689,8 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 	}
 }
 
-// ── Test 4: Nil ParentContext in EnterChildViewMsg ──────────────────────────
-
 func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	tui.Version = "0.6.0"
-	// Register a temporary child type
 	testChildType := "test_nil_ctx"
 	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Nil Ctx",
@@ -831,26 +712,21 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Send EnterChildViewMsg with nil ParentContext — must not panic
 	m, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     testChildType,
 		ParentContext: nil,
 		DisplayName:   "test",
 	})
 
-	// Verify no panic occurred and the view was pushed
 	content := rootViewContent(m)
 	if content == "" {
 		t.Error("View() should return non-empty content after entering child view")
 	}
 
-	// Execute returned cmd if any (should not panic)
 	if cmd != nil {
 		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic on execution
 	}
 }
-
-// ── Bug #84: Multi-line error messages in header push content off-screen ─────
 
 // longAWSError is a realistic AWS AccessDeniedException message (~250 chars)
 // that overflows the header.
@@ -860,7 +736,6 @@ func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Send a long API error that exceeds terminal width
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),
@@ -885,7 +760,6 @@ func TestRoot_View_LongErrorStillOneLine(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Send a long API error
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),
@@ -904,7 +778,6 @@ func TestRoot_View_ErrorTruncatedInHeader(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Send a long API error
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),

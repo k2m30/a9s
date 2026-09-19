@@ -1,20 +1,13 @@
 package unit
 
-// qa_ami_color_test.go — Color contract pin for AMIs.
+// Color contract for AMIs.
 //
-// Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
-// colorAMI is colorFromAnyFinding-only (core/aws/catalog_compute.go) — it
-// has NO raw-field fallback at all. Every non-healthy case here attaches a
-// Finding shaped exactly like the real fetcher (core/aws/ami.go, wave1
-// state/deprecation Findings, codes in ami_codes.go). Fields are kept for
-// realism/context only — they are no longer read by Color.
-//
-// colorAMI is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does not
-// branch on finding Code, only on Severity and Source-prefix ("wave1" or
-// "wave2:"). One representative case per severity tier (plus the no-finding
-// Healthy anchor) exercises every branch colorAMI can take; per-state
-// wave1-emission mapping (which AWS state produces which code/severity) is
-// pinned at the fetcher layer, not here.
+// colorAMI is `colorFromAnyFinding(r) or ColorHealthy`
+// (core/aws/catalog_compute.go): it reads finding Severity and Source prefix
+// ("wave1" or "wave2:") only, so one case per severity tier plus the
+// no-finding Healthy anchor covers every branch. Each finding is shaped like
+// the fetcher's (core/aws/ami.go, codes in ami_codes.go); which AWS state
+// produces which code is pinned at the fetcher layer.
 
 import (
 	"testing"

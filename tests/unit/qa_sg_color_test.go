@@ -11,13 +11,11 @@ import (
 
 // TestSgColor pins that a security group's row colour is derived from the
 // findings the fetcher emitted, never re-derived from the raw
-// dangerous_open_count / wide_open fields. Those fields still exist for the
-// list's Risk column and for ec2's exposure composite, but a second
-// classifier reading them would be a second source of truth that can disagree
-// with the Attention block the operator opens next.
-//
-// The cases therefore go in as security groups and come out through the real
-// fetcher, exactly as they do in the app.
+// dangerous_open_count / wide_open fields. Those fields serve the list's Risk
+// column and ec2's exposure composite; a second classifier reading them would
+// be a second source of truth that can disagree with the Attention block the
+// operator opens next. The cases go in as security groups and come out
+// through the real fetcher, as they do in the app.
 func TestSgColor(t *testing.T) {
 	td := resource.FindResourceType("sg")
 	if td == nil {
@@ -85,10 +83,9 @@ func TestSgColor(t *testing.T) {
 	}
 }
 
-// TestSgColor_RawFieldsAloneDoNotColour is the other half of the same
-// contract: a row carrying the risk fields but no findings must stay healthy.
-// If this ever goes red, a raw-field branch has been reintroduced into the sg
-// classifier and the colour can now disagree with the Attention block.
+// A row carrying the risk fields but no findings stays healthy; a raw-field
+// branch in the sg classifier would let the colour disagree with the Attention
+// block.
 func TestSgColor_RawFieldsAloneDoNotColour(t *testing.T) {
 	td := resource.FindResourceType("sg")
 	if td == nil {

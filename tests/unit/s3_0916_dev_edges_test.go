@@ -1,6 +1,6 @@
 package unit_test
 
-// s3_0916_dev_edges_test.go — edge cases of the S3 reference and exposure
+// Edge cases of the S3 reference and exposure
 // rules: the negated form of each rule, the empty input, the malformed
 // element, and a non-commercial partition.
 
@@ -21,10 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// which part of the record names the bucket
-// ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row3_BucketPrefixedTargetNamesNoBucket pins that a
 // bucket segment inside the alias target is not a bucket. S3 routes a website
@@ -105,10 +101,6 @@ func (f *row3ZoneFake) ListResourceRecordSets(
 	return &route53.ListResourceRecordSetsOutput{ResourceRecordSets: f.sets}, nil
 }
 
-// ---------------------------------------------------------------------------
-// S3 endpoint hostnames
-// ---------------------------------------------------------------------------
-
 // TestS3_0916_Dev_Row4_ChinaPartitionOriginIsAnS3Endpoint pins the other
 // partition: a China endpoint is an S3 endpoint exactly as its commercial twin.
 func TestS3_0916_Dev_Row4_ChinaPartitionOriginIsAnS3Endpoint(t *testing.T) {
@@ -129,10 +121,6 @@ func TestS3_0916_Dev_Row4_BareEndpointAddressesNoBucket(t *testing.T) {
 		t.Fatalf("Count = %d (%v), want 0 — a bare endpoint addresses no bucket", got.Count(), got.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// the empty list and the element that is not an ARN
-// ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row2_EmptyAndMalformedElements pins that an element which is
 // not a usable ARN drops out rather than becoming a row that navigates
@@ -185,10 +173,6 @@ func TestS3_0916_Dev_Row2_ErrorOutranksTruncation(t *testing.T) {
 		t.Fatalf("State = %v, want RelatedError", got.State())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// grantee shapes and an uninspectable block
-// ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row1_LogDeliveryGroupIsNotPublic pins the third group S3
 // grants to. Log delivery writes access logs into the bucket; it reaches
@@ -264,10 +248,6 @@ func TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged(t *testing.T) {
 		t.Error("the bucket whose public access block was refused is not marked not inspected")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// the page boundary: an empty NextToken
-// ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row5_EmptyTokenIsNotTruncation pins that a NextToken present
 // but empty is the last page. Reading the field's presence rather than its

@@ -1,4 +1,4 @@
-// qa_enricher_finding_builder_discipline_test.go — build-contract gate:
+// Build-contract gate:
 // setWave2Finding is the append-only builder for
 // IssueEnricherResult.Findings (core/aws/issue_enrichment.go, its
 // "Append-style:" doc paragraph), and no enricher reaches past the builder
@@ -19,13 +19,6 @@
 // `len(result.Findings)` or `maps.Copy(dst, result.Findings)` whole-map read
 // cannot gate a per-resource emit decision the way an index or range read
 // can, so those are deliberately NOT flagged).
-//
-// knownFindingMapInspectionDebt lists the benign shape: `for _, fs := range
-// result.Findings { for _, f := range fs { if f.Severity == domain.SevBroken
-// { issueCount++; break } } }` immediately before `result.IssueCount =
-// issueCount` and the function's `return` — the range is the LAST statement,
-// strictly after every setWave2Finding call has already run; it computes a
-// derived scalar and never influences what gets appended.
 package unit_test
 
 import (
@@ -40,35 +33,20 @@ import (
 	"testing"
 )
 
-// efbdFindingsFieldName is the exact struct field name this gate watches.
-// IssueEnricherResult.Findings (core/aws/issue_enrichment.go:197) is the
-// only field this gate scans for — AttentionDetails has no enricher-side
-// direct-access violations today (verified: `grep -rn "\.AttentionDetails\b"
-// core/aws/*_issue_enrichment.go` returns zero matches), so it is out of
-// this gate's scope.
+// efbdFindingsFieldName is the struct field this gate watches:
+// IssueEnricherResult.Findings (core/aws/issue_enrichment.go).
 const efbdFindingsFieldName = "Findings"
 
-// knownFindingMapInspectionDebt pins the exact inventory of pre-existing
-// direct .Findings index/range sites this gate's scanner finds today that are
-// NOT the targeted anti-pattern (see file header CENSUS). Keyed
-// "<file>:<enclosing-func-or-package-level>#<occurrence>", mirroring
+// knownFindingMapInspectionDebt allowlists direct .Findings index/range sites
+// that are not the targeted anti-pattern. Keyed
+// "<file>:<enclosing-func-or-package-level>#<occurrence>", with
 // qa_controller_construction_discipline_test.go's knownConstructionDebt
 // ratchet semantics:
 //
-//   - A found site NOT in this allowlist is a NEW VIOLATION — always fails.
-//   - An allowlisted site the live scan no longer finds fails with a
-//     "prune from allowlist" message — the burn-down signal.
+//   - A found site not in this allowlist fails.
+//   - An allowlisted site the live scan does not find fails with a
+//     "prune from allowlist" message.
 //   - An allowlisted site the live scan still finds is skipped (logged).
-//
-// msk_issue_enrichment.go:EnrichMSKCluster#1 is intentionally ABSENT — see
-// file header "KNOWN DEBT vs. TARGET" for why.
-//
-// PRUNED (IssueEnricherResult.IssueCount field deletion): the four sites
-// below were each the enclosing function's post-append `result.IssueCount =
-// issueCount` aggregation — removed by production alongside the field, so
-// none of the four `for _, fs := range result.Findings { ... }` blocks exist
-// in core/aws/*_issue_enrichment.go anymore. Pruning rather than leaving them
-// allowlisted-but-unfound, which would trip this gate's own BURN-DOWN case.
 var knownFindingMapInspectionDebt = map[string]bool{}
 
 // efbdSite is one direct .Findings index/range access site the scanner found.
@@ -199,9 +177,7 @@ func efbdSiteKey(site efbdSite, occurrence int) string {
 // TestEnricherFindingBuilderDisciplineGate is the standing ratchet: every
 // direct index/range access to a "*.Findings" selector under
 // core/aws/*_issue_enrichment.go must either be pinned in
-// knownFindingMapInspectionDebt (pre-existing, vetted-benign) or the gate
-// fails. See the file-level doc comment for full census and ratchet-shape
-// rationale.
+// knownFindingMapInspectionDebt or the gate fails.
 func TestEnricherFindingBuilderDisciplineGate(t *testing.T) {
 	root, err := filepath.Abs("../../core/aws")
 	if err != nil {

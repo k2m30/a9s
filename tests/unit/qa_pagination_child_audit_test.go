@@ -1,14 +1,9 @@
 package unit
 
-// QA Stories B.3 (Load More for Specific Child Views) and M (Fetcher Pagination Audit).
-//
-// Section B.3: For each child fetcher, verifies the two-call Load More flow:
-//   1. Call with continuationToken="" → gets page 1 with IsTruncated=true
-//   2. Call with NextToken from page 1 → gets page 2 with IsTruncated=false
-//   3. Verify total items = page1 + page2
-//
-// Section M: Verifies that all Phase 4b child fetchers are registered as
-// PaginatedChildFetcher via resource.GetPaginatedChildFetcher(shortName).
+// Child-view Load More: each child fetcher returns one page per call, and a
+// second call with page 1's NextToken returns the rest. Child fetchers are
+// registered as PaginatedChildFetcher via
+// resource.GetPaginatedChildFetcher(shortName).
 
 import (
 	"context"
@@ -43,7 +38,7 @@ import (
 )
 
 // ===========================================================================
-// Section B.3: Load More for Specific Child Views
+// Load More for specific child views
 // ===========================================================================
 
 // TestStory_B3_SFNExecutions_LoadMore verifies the two-call Load More flow
@@ -55,7 +50,6 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sfn.ListExecutionsOutput
 	for page := range 2 {
 		var executions []sfntypes.ExecutionListItem
@@ -80,7 +74,6 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	// Call 1: continuationToken="" — one API call, returns page 0 with IsTruncated=true
 	mock := &mockSFNListExecutionsClient{outputs: outputs}
 	result1, err := awsclient.FetchSFNExecutions(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -105,7 +98,6 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: use NextToken from call 1 — one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockSFNListExecutionsClient{outputs: outputs[1:]} // page 1 only
 	result2, err := awsclient.FetchSFNExecutions(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
@@ -141,7 +133,6 @@ func TestStory_B3_SFNExecutions_LoadMore(t *testing.T) {
 func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 	const pageSize = 50
 
-	// Build mock: 2 pages of 50 streams each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
 	for page := range 2 {
 		var streams []cwlogstypes.LogStream
@@ -158,7 +149,6 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 		outputs = append(outputs, out)
 	}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockCWLogsDescribeLogStreamsClient{outputs: outputs}
 	result1, err := awsclient.FetchLogStreams(context.Background(), mock, "/aws/lambda/my-func", "")
 	if err != nil {
@@ -183,7 +173,6 @@ func TestStory_B3_LogStreams_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: use the continuation token — one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockCWLogsDescribeLogStreamsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchLogStreams(context.Background(), mock2, "/aws/lambda/my-func", result1.Pagination.NextToken)
 	if err != nil {
@@ -220,7 +209,6 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 activities each. Page 0 has NextToken, page 1 does not.
 	var outputs []*autoscaling.DescribeScalingActivitiesOutput
 	for page := range 2 {
 		var activities []asgtypes.Activity
@@ -242,7 +230,6 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 
 	parentCtx := map[string]string{"asg_name": "test-asg"}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockASGDescribeScalingActivitiesClient{outputs: outputs}
 	result1, err := awsclient.FetchAsgActivities(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -264,7 +251,6 @@ func TestStory_B3_AsgActivities_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockASGDescribeScalingActivitiesClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchAsgActivities(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
@@ -303,7 +289,6 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 	startTs := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 build IDs each. Page 0 has NextToken, page 1 does not.
 	var listOutputs []*codebuild.ListBuildsForProjectOutput
 	for page := range 2 {
 		var ids []string
@@ -317,7 +302,6 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 		listOutputs = append(listOutputs, out)
 	}
 
-	// BatchGetBuilds mock: returns build details for each batch of IDs
 	buildNum := int64(1)
 	batchMock := &b3CBBatchGetBuildsMock{
 		startTs:  &startTs,
@@ -327,7 +311,6 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "my-project"}
 
-	// Call 1: one list API call, returns page 0 with IsTruncated=true
 	listMock := &mockCodeBuildListBuildsForProjectClient{outputs: listOutputs}
 	result1, err := awsclient.FetchCBBuilds(context.Background(), listMock, batchMock, parentCtx, "")
 	if err != nil {
@@ -349,7 +332,6 @@ func TestStory_B3_CBBuilds_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one list API call, returns page 1 with IsTruncated=false
 	listMock2 := &mockCodeBuildListBuildsForProjectClient{outputs: listOutputs[1:]}
 	batchMock2 := &b3CBBatchGetBuildsMock{
 		startTs:  &startTs,
@@ -418,7 +400,6 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 	startTs := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	endTs := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 runs each. Page 0 has NextToken, page 1 does not.
 	var outputs []*glue.GetJobRunsOutput
 	for page := range 2 {
 		var runs []gluetypes.JobRun
@@ -439,7 +420,6 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 		outputs = append(outputs, out)
 	}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockGlueGetJobRunsClient{outputs: outputs}
 	result1, err := awsclient.FetchGlueJobRuns(context.Background(), mock, "test-etl-job", "")
 	if err != nil {
@@ -461,7 +441,6 @@ func TestStory_B3_GlueJobRuns_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockGlueGetJobRunsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchGlueJobRuns(context.Background(), mock2, "test-etl-job", result1.Pagination.NextToken)
 	if err != nil {
@@ -498,7 +477,6 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 items each. Page 0 has NextToken, page 1 does not.
 	var outputs []*cloudwatch.DescribeAlarmHistoryOutput
 	for page := range 2 {
 		var items []cwtypes.AlarmHistoryItem
@@ -520,7 +498,6 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 
 	parentCtx := map[string]string{"alarm_name": "test-alarm"}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockCloudWatchDescribeAlarmHistoryClient{outputs: outputs}
 	result1, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -542,7 +519,6 @@ func TestStory_B3_AlarmHistory_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockCloudWatchDescribeAlarmHistoryClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchAlarmHistory(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
@@ -579,7 +555,6 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 	const pageSize = 50
 	pushTime := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 images each. Page 0 has NextToken, page 1 does not.
 	var pages []*ecr.DescribeImagesOutput
 	for page := range 2 {
 		var images []ecrtypes.ImageDetail
@@ -604,7 +579,6 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/test-repo",
 	}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockECRDescribeImagesClient{pages: pages}
 	result1, err := awsclient.FetchECRImages(context.Background(), mock, parentCtx, "")
 	if err != nil {
@@ -626,7 +600,6 @@ func TestStory_B3_ECRImages_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockECRDescribeImagesClient{pages: pages[1:]}
 	result2, err := awsclient.FetchECRImages(context.Background(), mock2, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
@@ -700,7 +673,6 @@ func TestStory_B3_EcsSvcLogs_LoadMore(t *testing.T) {
 		logOutputs = append(logOutputs, out)
 	}
 
-	// Call 1
 	logMock := &mockCWLogsFilterLogEventsClient{outputs: logOutputs}
 	result1, err := awsclient.FetchEcsSvcLogs(
 		context.Background(), taskDefMock, logMock,
@@ -724,7 +696,6 @@ func TestStory_B3_EcsSvcLogs_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2
 	logMock2 := &mockCWLogsFilterLogEventsClient{outputs: logOutputs[4:]}
 	result2, err := awsclient.FetchEcsSvcLogs(
 		context.Background(), taskDefMock, logMock2,
@@ -765,7 +736,6 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 	const pageSize = 50
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Build mock: 2 pages of 50 events each. Page 0 has Marker, page 1 does not.
 	var outputs []*rds.DescribeEventsOutput
 	for page := range 2 {
 		var events []rdstypes.Event
@@ -784,7 +754,6 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 		outputs = append(outputs, out)
 	}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockRDSDescribeEventsClient{outputs: outputs}
 	result1, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db-instance", "")
 	if err != nil {
@@ -806,7 +775,6 @@ func TestStory_B3_RDSEvents_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockRDSDescribeEventsClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchRDSEvents(context.Background(), mock2, "my-db-instance", result1.Pagination.NextToken)
 	if err != nil {
@@ -843,7 +811,6 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 	const pageSize = 50
 	topicArn := "arn:aws:sns:us-east-1:123456789012:test-topic"
 
-	// Build mock: 2 pages of 50 subscriptions each. Page 0 has NextToken, page 1 does not.
 	var outputs []*sns.ListSubscriptionsByTopicOutput
 	for page := range 2 {
 		var subs []snstypes.Subscription
@@ -863,7 +830,6 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 		outputs = append(outputs, out)
 	}
 
-	// Call 1: one API call, returns page 0 with IsTruncated=true
 	mock := &mockSNSListSubscriptionsByTopicClient{outputs: outputs}
 	result1, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock, topicArn, "")
 	if err != nil {
@@ -885,7 +851,6 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 		}
 	})
 
-	// Call 2: one API call, returns page 1 with IsTruncated=false
 	mock2 := &mockSNSListSubscriptionsByTopicClient{outputs: outputs[1:]}
 	result2, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), mock2, topicArn, result1.Pagination.NextToken)
 	if err != nil {
@@ -918,17 +883,13 @@ func TestStory_B3_SNSTopicSubscriptions_LoadMore(t *testing.T) {
 // TestStory_B3_LambdaInvocations_LoadMore verifies the two-call Load More flow
 // for Lambda invocations (max cap 50). Uses REPORT lines from CW Logs.
 //
-// Fixture has 3 pages (not 2) of 40 events each so that hitting the local cap
-// (after page 0+1 = 80 >= 50) lands on a page that ITSELF still carries an
-// AWS NextToken, leaving a genuine page 2 unconsumed for call 2 to resume
-// into. FetchLambdaInvocations now derives IsTruncated solely from whether
-// AWS's own last-observed NextToken is non-empty (never claiming truncation
-// it cannot resume — a dead cursor with IsTruncated=true, NextToken="" would
-// make Load More restart from page 1 forever). A 2-page fixture where the
-// cap-triggering page happened to also be AWS's terminal page (no NextToken)
-// is a case where the API is genuinely exhausted — IsTruncated=false there
-// is correct, not a bug — so this test now exercises the case it actually
-// intends to: more real data waiting beyond the cap.
+// The fixture has 3 pages of 40 events each so that hitting the local cap
+// (after page 0+1 = 80 >= 50) lands on a page that still carries an AWS
+// NextToken, leaving page 2 for call 2 to resume into.
+// FetchLambdaInvocations derives IsTruncated solely from AWS's last-observed
+// NextToken: a dead cursor (IsTruncated=true, NextToken="") would make Load
+// More restart from page 1 forever, and a cap-triggering page that is AWS's
+// terminal page means the API is exhausted.
 func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 	const maxCap = 50
 
@@ -1009,14 +970,12 @@ func TestStory_B3_LambdaInvocations_LoadMore(t *testing.T) {
 }
 
 // ===========================================================================
-// Section M: Fetcher Pagination Audit — PaginatedChildFetcher Registration
+// PaginatedChildFetcher registration
 // ===========================================================================
 
-// TestStory_M_PaginatedChildFetcher_Registration verifies that all child
-// fetchers migrated to PaginatedChildFetcher in Phase 4b are properly
-// registered via resource.GetPaginatedChildFetcher(shortName).
+// TestStory_M_PaginatedChildFetcher_Registration verifies that the child
+// fetchers are registered via resource.GetPaginatedChildFetcher(shortName).
 func TestStory_M_PaginatedChildFetcher_Registration(t *testing.T) {
-	// Phase 4b child fetchers
 	phase4bFetchers := []struct {
 		shortName   string
 		displayName string
@@ -1040,8 +999,8 @@ func TestStory_M_PaginatedChildFetcher_Registration(t *testing.T) {
 	}
 }
 
-// TestStory_M_AllB3ChildFetchers_AreRegistered verifies that all B.3 child
-// fetchers are also registered as PaginatedChildFetcher.
+// TestStory_M_AllB3ChildFetchers_AreRegistered verifies that the Load More
+// child fetchers above are also registered as PaginatedChildFetcher.
 func TestStory_M_AllB3ChildFetchers_AreRegistered(t *testing.T) {
 	b3Fetchers := []struct {
 		shortName   string

@@ -1,7 +1,7 @@
 package unit_test
 
-// rel2_rawstruct_class_gate_test.go — row 7's class gate: a checker that reads
-// its source row's RawStruct, handed a row that carries none, must answer "?".
+// A checker that reads its source row's
+// RawStruct, handed a row that carries none, must answer "?".
 //
 // The on-disk cache carries no RawStruct by design (core/cache/cache.go), and
 // the detail operation runs the checkers against the restored row before
@@ -129,7 +129,7 @@ func rel2CheckerFuncName(c resource.RelatedChecker) string {
 	return strings.TrimSuffix(full, "-fm")
 }
 
-// TestRel2WarmRowNeverGetsAConfidentZero is row 7's class gate. Every checker
+// TestRel2WarmRowNeverGetsAConfidentZero is the class gate. Every checker
 // that reads its source row's RawStruct is handed a real demo row of its own
 // type with RawStruct stripped — the exact shape a disk-cache replay produces —
 // against the full demo target cache. A resolved zero is the failure: the

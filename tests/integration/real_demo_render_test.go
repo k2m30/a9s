@@ -2,12 +2,10 @@
 
 package integration
 
-// real_demo_render_test.go — drives the EXACT production startup path that
+// real_demo_render_test.go drives the production startup path that
 // `./a9s --demo` uses, renders a few dbi detail views, and dumps the rendered
-// frame to the test log. Phase 8.4 "user-observable visual sanity".
-//
-// No scenario-harness abstractions. If the dumped frame lacks the Issues
-// section, the bug is real and reproducible — users WILL see this.
+// frame to the test log. It bypasses the scenario harness, so a frame that
+// lacks the Attention section is the frame an operator sees.
 
 import (
 	"strings"
@@ -33,7 +31,7 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 	m, cmd = fullIntegrationApplyMsg(m, initMsg)
 
 	// Drain every message produced by the ClientsReady → Availability →
-	// Enrichment chain. Walk all yielded messages recursively.
+	// Enrichment chain.
 	m = drainAll(t, m, cmd)
 
 	// Navigate to the dbi list via the same NavigateMsg a user keypress would produce.
@@ -43,8 +41,6 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 	})
 	m = drainAll(t, m, cmd)
 
-	// Fetch a concrete dbi resource from the clients (production path — same as
-	// the app's own lookups).
 	targets := []struct {
 		id          string
 		mustContain []string
@@ -57,9 +53,8 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 			mustBeAfter: "Attention",
 		},
 		{
-			// The bulk pool sets DeletionProtection, so warn-dbi-unprotected is
-			// this finding's one witness (TestD4_DeletionProtectionHasOneWitness).
-			// aws_dbi_test.go and scenario_dbi_visual_test.go pin the same rows.
+			// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
+			// carries the deletion-protection finding.
 			id:          "db-public-no-encryption",
 			mustContain: []string{"No automated backups", "Public endpoint", "Unencrypted storage"},
 			mustBeAfter: "Attention",
@@ -85,13 +80,11 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 			view := fullIntegrationStripANSI(fullIntegrationViewContent(m2))
 			t.Logf("\n--- rendered detail for %s ---\n%s\n--- end ---", tc.id, view)
 
-			// Check Attention section header is present.
 			hdrIdx := findAttentionHeaderLine(view)
 			if hdrIdx < 0 {
 				t.Fatalf("Attention section header NOT FOUND in rendered detail for %s. This is the bug the user sees.", tc.id)
 			}
 
-			// Every expected phrase must appear AFTER the header.
 			lines := strings.Split(view, "\n")
 			for _, phrase := range tc.mustContain {
 				found := -1

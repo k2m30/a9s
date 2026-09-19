@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui6_one_dirty_predicate_test.go — one rule for what counts as dirty, and it
+// One rule for what counts as dirty, and it
 // covers every string the boundary claims.
 //
-// Three functions decide dirtiness today and each writes the rule out again:
-// the resource-level check, and the finding and attention-row entry points
-// beside it. They agree, which is the danger — a rule copied three times
-// agrees until one copy is edited, and nothing reports the day it stops.
-//
-// Copying it three times also made it easy to miss a string. Two of them are
-// missed: a finding's Code and an attention row's Tier are strings that reach
-// the serialised state and the painter's style selector, and no copy of the
-// rule looks at either. One predicate over every string is what closes both
-// halves at once.
+// A rule copied into several functions agrees until one copy is edited, and
+// nothing reports the day it stops, so the finding and attention-row entry
+// points share the resource-level predicate. A finding's Code and an
+// attention row's Tier are strings that reach the serialised state and the
+// painter's style selector, so the predicate covers them too.
 package unit_test
 
 import (
@@ -28,7 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
-// tui6DirtyEntryPoints are the two finding-level entry points the row names.
+// tui6DirtyEntryPoints are the two finding-level entry points.
 var tui6DirtyEntryPoints = []string{"SanitizedFindings", "SanitizedAttentionDetails"} //nolint:gochecknoglobals // test-only lookup
 
 // TestOneDirtyPredicate_EntryPointsHoldNoRuleOfTheirOwn is the gate. A
@@ -103,7 +98,6 @@ func tui6CallsSanitize(e ast.Expr) bool {
 // TestOneDirtyPredicate_CoversEveryStringOnAFinding pins the coverage half.
 // The Code keys the attention block the web lane decodes and the detail body
 // groups its rows by; the Tier is the style selector a painter switches on.
-// Both are strings on a finding, and neither is cleaned today.
 func TestOneDirtyPredicate_CoversEveryStringOnAFinding(t *testing.T) {
 	code := domain.FindingCode("ec2.pub\x1b[31mlic")
 	findings := []domain.Finding{{
@@ -166,12 +160,8 @@ func TestOneDirtyPredicate_ResourceLevelCoversTheSameStrings(t *testing.T) {
 	}
 }
 
-// TestOneDirtyPredicate_BareC1InAPhraseAlreadyAgrees is the counterpart, and
-// it records what this row is NOT about. The three copies of the rule are
-// behaviourally identical today — a bare C1 byte in a phrase is recognised by
-// every one of them — so the row is about the duplication and the strings the
-// duplication let everyone miss, not about a disagreement. If this ever fails,
-// the copies HAVE diverged and the row was more urgent than it looked.
+// TestOneDirtyPredicate_BareC1InAPhraseAlreadyAgrees: a bare C1 byte in a
+// phrase is recognised through every entry point.
 func TestOneDirtyPredicate_BareC1InAPhraseAlreadyAgrees(t *testing.T) {
 	phrase := "public\u009b31m address"
 	findings := []domain.Finding{{Code: "ec2.public-ip", Phrase: phrase, Severity: domain.SevBroken, Source: "wave1"}}

@@ -1,13 +1,12 @@
 package unit
 
-// qa_ecs_task_color_test.go — Color contract pin for ECS Tasks.
+// Color contract pin for ECS Tasks.
 //
-// Since the color-findings-conformance wave, colorECSTask
-// (core/aws/catalog_compute.go) prefers colorFromAnyFinding, falling back
-// to a raw last_status switch that has NO stop_code/health_status logic —
-// those two overrides are Findings-only now (ecsTaskStructuralFindings,
-// core/aws/ecs_task_codes.go). Cases exercising stop_code or
-// health_status must attach the matching Finding to be meaningful.
+// colorECSTask (core/aws/catalog_compute.go) prefers colorFromAnyFinding,
+// falling back to a raw last_status switch; stop_code and health_status
+// reach the colour only through Findings (ecsTaskStructuralFindings,
+// core/aws/ecs_task_codes.go), so cases exercising them attach the matching
+// Finding.
 
 import (
 	"testing"

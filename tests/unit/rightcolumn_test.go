@@ -1,13 +1,10 @@
 package unit_test
 
 // rightcolumn_test.go tests the right column panel via the live
-// Controller + NewTransientDetail.RenderDetail(body) seam (022-codebase-cleanup
-// wave 3, DetailModel cluster — views.NewDetail/.Update()/.View() are
-// production-dead; RenderDetail is the only reachable render entry point,
-// see internal/tui/renderer.go).
+// Controller + NewTransientDetail.RenderDetail(body) seam, the reachable render
+// entry point (see internal/tui/renderer.go).
 //
-// Design spec: docs/design/related-resources.md v4.3
-// QA stories:  docs/qa/related-resources-stories.md
+// Related-panel contract: docs/related-resources.md
 //
 // Key design facts:
 //   - `r` (ActionToggleRelated) toggles the right column ON/OFF
@@ -32,10 +29,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ---------------------------------------------------------------------------
-// Shared test helpers
-// ---------------------------------------------------------------------------
 
 // rightColEC2Resource returns the Fields-only ec2 resource shared by every
 // test below.
@@ -131,10 +124,6 @@ func deliverRightColResult(c *app.Controller, displayName, targetType string, co
 	c.ApplyDetailRelatedResultForResource("ec2", "i-test123", displayName, targetType, state, count, false, errMsg, false, nil, nil)
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_ToggleShowsRelatedHeader
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -147,10 +136,6 @@ func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 		t.Errorf("after ActionToggleRelated, render should contain \"RELATED\"; got:\n%s", view)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_ShowsLoadingState
-// ---------------------------------------------------------------------------
 
 func TestRightColumn_ShowsLoadingState(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
@@ -168,10 +153,6 @@ func TestRightColumn_ShowsLoadingState(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_CountUpdatesOnResult
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -188,10 +169,6 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_ZeroCountDim
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_ZeroCountDim(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -207,10 +184,6 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_ErrorShowsDash
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_ErrorShowsDash(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -225,10 +198,6 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 		t.Errorf("after an error result, render should contain em dash \"—\"; got:\n%s", view)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_ToggleOffHidesPanel
-// ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
@@ -248,10 +217,6 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 		t.Errorf("after second ActionToggleRelated, render should NOT contain \"RELATED\"; got:\n%s", viewOff)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_NarrowTerminalIgnoresToggle
-// ---------------------------------------------------------------------------
 
 // TestRightColumn_NarrowTerminalIgnoresToggle drives the real full-TUI 'r'
 // key (via the demo root model), not a bare Controller.Apply(ActionToggleRelated) —
@@ -297,10 +262,6 @@ func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_EmptyDefsShowsHint
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 	unregisterEC2Related(t)
 
@@ -317,10 +278,6 @@ func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 		t.Errorf("with empty defs, render should show the empty-state hint 'No related types registered'; got:\n%s", view)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_MultipleResults_EachUpdatesIndependently
-// ---------------------------------------------------------------------------
 
 func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
@@ -344,10 +301,6 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRightColumn_ToggleDefaultState_OnEntry
-// ---------------------------------------------------------------------------
-
 func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -360,10 +313,6 @@ func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 		t.Errorf("right column should be ON by default (no toggle needed); render should contain \"RELATED\"; got:\n%s", view)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_View_WideTerminalShowsSideBySide
-// ---------------------------------------------------------------------------
 
 func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{

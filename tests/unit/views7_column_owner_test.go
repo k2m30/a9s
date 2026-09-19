@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_column_owner_test.go — one owner of the per-type column list.
+// One owner of the per-type column list.
 //
 // A list column is one fact: a title, the place its value comes from, how wide
-// it renders, whether it sorts and what it sorts on. That fact is declared
-// twice today — once on the catalog type (domain.Column) and once in
-// core/config's per-type defaults (config.ListColumn) — and the two disagree,
-// which is how lambda's Handler column reached one of them and not the other.
-//
-// These tests pin the one owner: the catalog column carries every field a view
-// column needs, the built-in view config is derived from the catalog, and no
-// per-type column literal is left in core/config for the two to drift apart
-// again.
+// it renders, whether it sorts and what it sorts on. The catalog column
+// (domain.Column) carries every field a view column needs, the built-in view
+// config is derived from the catalog, and core/config holds no per-type column
+// literal for the two to drift apart.
 package unit
 
 import (
@@ -32,8 +27,8 @@ import (
 )
 
 // views7ColumnField reads a named string field off a catalog column by
-// reflection, so this file compiles — and reports the missing field as a
-// failure a person can act on — before domain.Column carries it.
+// reflection, so a missing field is reported as a failure a person can act on
+// rather than as a compile error.
 func views7ColumnField(col domain.Column, field string) (string, bool) {
 	v := reflect.ValueOf(col).FieldByName(field)
 	if !v.IsValid() || v.Kind() != reflect.String {
@@ -156,14 +151,13 @@ func views7IsListColumnLiteral(lit *ast.CompositeLit) bool {
 	return false
 }
 
-// TestNoPerTypeColumnLiteralInConfig is the half of the change that keeps it
-// done. Deriving the built-in views from the catalog while the per-type lists
-// stay in core/config leaves both owners in the tree and the next column is
-// added to whichever one the writer happened to open.
+// TestNoPerTypeColumnLiteralInConfig: a per-type column list in core/config
+// beside the catalog is a second owner, and the next column is added to
+// whichever one the writer happened to open.
 //
 // The migration table in ensure_views.go is not a declaration of a column: it
 // records, whole, what an OLDER build generated, so an installed file can be
-// told apart from an edited one. It is history, and it stays.
+// told apart from an edited one.
 func TestNoPerTypeColumnLiteralInConfig(t *testing.T) {
 	fset, files := views7ConfigFiles(t)
 
@@ -236,13 +230,12 @@ func TestRepoViewFilesAreWhatThisBuildGenerates(t *testing.T) {
 	}
 }
 
-// TestInstalledViewFileMigratesToTheMovedColumns pins that the move is
-// RECORDED, not only made. An untouched file written by the build before it
-// takes this build's column set — but only while every column in it is one
-// this build still declares or one the migration table names, whole, as what
-// an older build wrote. A column whose key or width changed without a line in
-// that table makes the file look edited, and the operator keeps the old
-// column forever.
+// TestInstalledViewFileMigratesToTheMovedColumns: an untouched file written by
+// an older build takes this build's column set — but only while every column
+// in it is one this build still declares or one the migration table names,
+// whole, as what an older build wrote. A column whose key or width changed
+// without a line in that table makes the file look edited, and the operator
+// keeps the old column forever.
 func TestInstalledViewFileMigratesToTheMovedColumns(t *testing.T) {
 	previous := views7PreChangeViewFiles(t)
 	dir := t.TempDir()
@@ -292,9 +285,9 @@ func TestInstalledViewFileMigratesToTheMovedColumns(t *testing.T) {
 	}
 }
 
-// views7PreChangeViewFiles reads the view files this build generated before
-// the column list moved, captured from the tree at task/views7's base. They
-// are what an operator who has run a9s once has on disk.
+// views7PreChangeViewFiles reads the view files an older build generated,
+// before the column list moved onto the catalog. They are what an operator
+// who has run a9s once has on disk.
 func views7PreChangeViewFiles(t *testing.T) map[string]string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(projectRoot(t), "tests", "unit", "testdata", "views7_pre_change_views.txt"))

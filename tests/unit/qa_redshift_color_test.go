@@ -24,12 +24,10 @@ func d1RedshiftBaseline() redshifttypes.Cluster {
 	}
 }
 
-// TestRedshiftColor pins the cluster status → colour mapping for Redshift.
-//
-// The old table read Fields["cluster_status"] directly. The raw enum is still
-// the input, but it now reaches the colour through the fetcher's findings, so
-// the two status axes and the posture flags are compared the way production
-// compares them.
+// TestRedshiftColor pins the cluster status → colour mapping for Redshift. The
+// raw enum reaches the colour through the fetcher's findings, so the two
+// status axes and the posture flags are compared the way production compares
+// them.
 func TestRedshiftColor(t *testing.T) {
 	cases := []struct {
 		name   string

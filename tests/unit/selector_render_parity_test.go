@@ -1,17 +1,8 @@
-// selector_render_parity_test.go — live-path coverage for SelectorModel.RenderSelector
-// across selector kinds (profile/region/theme) and a set of scenarios per kind.
-//
-// Originally a byte-parity gate comparing RenderSelector(body) against the legacy
-// SelectorModel.View() built via NewProfile/NewRegion/NewTheme. Those constructors
-// and View() are DEAD per specs/022-codebase-cleanup/wave3-map-text.md (selector.go:
-// "LIVE: NewSelectorWithCtrl, NewTransientSelector, Update, SetSize, RenderSelector").
-// Retargeted onto the live seam: NewTransientSelector(w, h) — RenderSelector reads
-// only m.width/m.height from the model, everything else comes from app.SelectorBody
-// — so no Update()-driven cursor walk is needed; each scenario passes the cursor
-// position directly into the SelectorBody it renders. Assertions check that
-// RenderSelector's own contract (selector.go) holds: every visible item renders,
-// every filtered-out item does not, and the active item's "(current)" marker
-// appears when it's in the visible window.
+// SelectorModel.RenderSelector across
+// selector kinds (profile/region/theme). RenderSelector reads only
+// m.width/m.height from the model; everything else comes from
+// app.SelectorBody, so each scenario passes the cursor position directly into
+// the SelectorBody it renders.
 package unit_test
 
 import (
@@ -22,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // bodyFromModel constructs the SelectorBody that buildSelectorBody(SelectorState)
 // would produce for the same logical state — mirroring the filtering and
@@ -89,10 +76,6 @@ func assertSelectorRender(t *testing.T, w, h int, body app.SelectorBody, kind, s
 	return got
 }
 
-// ---------------------------------------------------------------------------
-// Selector kind descriptors
-// ---------------------------------------------------------------------------
-
 type selectorKind struct {
 	name       string
 	items      []string
@@ -135,13 +118,8 @@ func selectorKinds() []selectorKind {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Top-level test
-// ---------------------------------------------------------------------------
-
-// TestSelectorRender_LiveSeam is the live-path coverage gate for RenderSelector.
-// Each subtest builds a SelectorBody for a given scenario and asserts
-// RenderSelector's rendering contract against it.
+// TestSelectorRender_LiveSeam asserts RenderSelector's rendering contract
+// for each selector kind and scenario.
 func TestSelectorRender_LiveSeam(t *testing.T) {
 	tuitest.NoColor(t)
 
@@ -161,19 +139,16 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 	}
 	filter := filterMap[kind.name]
 
-	// S1: Default state — no filter, cursor at 0.
 	t.Run("S1_Default", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
 		assertSelectorRender(t, 80, 24, body, kind.name, "S1_Default")
 	})
 
-	// S2: Filter active narrowing the list.
 	t.Run("S2_FilterActive", func(t *testing.T) {
 		body := bodyFromModel(kind.items, filter, kind.activeItem, kind.title, 0)
 		assertSelectorRender(t, 80, 24, body, kind.name, "S2_FilterActive")
 	})
 
-	// S3: Filter matching nothing.
 	t.Run("S3_FilterNoMatch", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "zzznomatch", kind.activeItem, kind.title, 0)
 		got := assertSelectorRender(t, 80, 24, body, kind.name, "S3_FilterNoMatch")
@@ -182,27 +157,23 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		}
 	})
 
-	// S4: Cursor on first item.
 	t.Run("S4_CursorFirst", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
 		assertSelectorRender(t, 80, 24, body, kind.name, "S4_CursorFirst")
 	})
 
-	// S5: Cursor on middle item.
 	t.Run("S5_CursorMiddle", func(t *testing.T) {
 		mid := len(kind.items) / 2
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, mid)
 		assertSelectorRender(t, 80, 24, body, kind.name, "S5_CursorMiddle")
 	})
 
-	// S6: Cursor on last item.
 	t.Run("S6_CursorLast", func(t *testing.T) {
 		last := len(kind.items) - 1
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, last)
 		assertSelectorRender(t, 80, 24, body, kind.name, "S6_CursorLast")
 	})
 
-	// S7: Active-item indicator — activeItem's row must carry "(current)".
 	t.Run("S7_ActiveItemIndicator", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
 		got := assertSelectorRender(t, 80, 24, body, kind.name, "S7_ActiveItemIndicator")
@@ -211,7 +182,6 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		}
 	})
 
-	// S7b: Active-item on a non-cursor row (cursor moved past the active item).
 	t.Run("S7b_ActiveItemNonCursorRow", func(t *testing.T) {
 		activeIdx := -1
 		for i, item := range kind.items {
@@ -231,19 +201,17 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		}
 	})
 
-	// S8: Narrow width (40) — forces label truncation by Lipgloss Width().
+	// Width 40 forces label truncation by Lipgloss Width().
 	t.Run("S8_NarrowWidth40", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
 		assertSelectorRender(t, 40, 24, body, kind.name, "S8_NarrowWidth40")
 	})
 
-	// S9: Wide width (200).
 	t.Run("S9_WideWidth200", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
 		assertSelectorRender(t, 200, 24, body, kind.name, "S9_WideWidth200")
 	})
 
-	// S10: Filter active AND cursor on the last filtered result.
 	t.Run("S10_FilterActiveCursorMid", func(t *testing.T) {
 		var filtered []string
 		q := strings.ToLower(filter)
@@ -260,11 +228,10 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		assertSelectorRender(t, 80, 24, body, kind.name, "S10_FilterActiveCursorMid")
 	})
 
-	// S11: Small viewport (height=3) — cursor past the first visible window
-	// forces RenderSelector's VisibleWindow scroll logic to kick in. Only the
-	// scrolled-to window is rendered, so this does NOT use assertSelectorRender
-	// (which expects every body.Items entry to be visible) — it checks the
-	// window size and that the cursor's own item scrolled into view instead.
+	// Height 3 with the cursor past the first visible window scrolls
+	// RenderSelector's VisibleWindow, so only the scrolled-to window is rendered:
+	// this checks the window size and that the cursor's own item scrolled into
+	// view.
 	t.Run("S11_SmallViewport", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 3)
 		m := views.NewTransientSelector(80, 3)
@@ -278,7 +245,6 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		}
 	})
 
-	// S12: Empty items list — RenderSelector's documented empty-state text.
 	t.Run("S12_EmptyItems", func(t *testing.T) {
 		body := bodyFromModel([]string{}, "", "", kind.title, 0)
 		m := views.NewTransientSelector(80, 24)
@@ -288,7 +254,6 @@ func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
 		}
 	})
 
-	// S13: Single item list.
 	t.Run("S13_SingleItem", func(t *testing.T) {
 		singleItem := kind.items[0]
 		body := bodyFromModel([]string{singleItem}, "", singleItem, kind.title, 0)

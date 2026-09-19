@@ -2,15 +2,13 @@
 
 package unit_test
 
-// wave2_source_owner_test.go — a Wave-2 finding's provenance is the registry's.
+// A Wave-2 finding's provenance is the registry's.
 //
 // Finding.Source's only readers ask one question: did a Wave-2 enricher emit
-// this? They test the "wave2:" prefix; nothing reads the short name after it.
-// That name was passed in by every enricher at every call site, so a typo
-// stamped a provenance no reader could catch, and two call sites for one type
-// could disagree. The runtime already knows which type's enricher it is
-// merging — it has the registry entry in hand — so the stamp belongs there and
-// only there.
+// this? They test the "wave2:" prefix. The runtime knows which type's enricher
+// it is merging — it has the registry entry in hand — so the stamp belongs
+// there and only there, where a typo or two disagreeing call sites cannot
+// reach it.
 
 import (
 	"testing"

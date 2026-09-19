@@ -1,17 +1,7 @@
 package unit
 
-// qa_partial_success_dispatcher_test.go — Regression pin for the
-// partial-success contract on the paginated-fetch dispatch path.
-//
-// Bug found in code review of commit 1ca32ee247b3fab13319bb55dbf6f658e717dd85
-// (PR k2m30/a9s#299): the iam_policies fetcher started returning
-// (managed+inline resources, inlineErr) per E1-E6, but the dispatcher in
-// fetchResources / fetchMoreResources discarded result.Resources whenever
-// err != nil — a single transient ListGroupPolicies throttle dropped the
-// entire policies list to empty + APIErrorMsg, instead of rendering the
-// list and surfacing the failure via FlashMsg.
-//
-// Contract pinned by these tests:
+// Partial-success contract on the paginated-fetch dispatch path. A throttled
+// per-item call must not empty a list whose other pages loaded:
 //   - Hard failure (no Resources, err != nil)              → APIErrorMsg.
 //   - Soft failure (Resources non-empty AND err != nil)    → ResourcesLoadedMsg
 //     with Err set; the handler routes Err through FlashMsg → errorHistory.
@@ -56,15 +46,10 @@ func drainAllMessages(cmd tea.Cmd) []tea.Msg {
 	return out
 }
 
-// TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg verifies that when
-// ResourcesLoadedMsg.Err is set, the app handler returns a FlashMsg routed
-// to errorHistory (the `!` log) AND the partial Resources list isn't lost.
-//
-// This is the most direct contract pin: the handler is what guarantees the
-// "preserve partial results AND surface the error" semantic. The dispatcher
-// branches in fetchResources / fetchMoreResources / fetchMoreResources*
-// (filtered/child/top) all funnel into ResourcesLoadedMsg{Err:...} when
-// resources are non-empty, so this single test exercises the join point.
+// When ResourcesLoadedMsg.Err is set, the handler returns a FlashMsg routed to
+// errorHistory (the `!` log) and keeps the partial Resources. Every dispatcher
+// branch (fetchResources / fetchMoreResources*) funnels a non-empty partial
+// result into ResourcesLoadedMsg{Err:...}, so the handler is the join point.
 func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -104,10 +89,8 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 	}
 }
 
-// TestResourcesLoadedMsg_HasErrField is a compile-time pin: removing the Err
-// field from ResourcesLoadedMsg would break the partial-success contract by
-// forcing the dispatcher back to "either resources OR error". This test
-// fails to compile if the field is removed.
+// Compile-time pin: ResourcesLoadedMsg carries resources and an error together,
+// which the partial-success contract depends on.
 func TestResourcesLoadedMsg_HasErrField(t *testing.T) {
 	msg := messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
 		Err: errors.New("compile-time pin"),

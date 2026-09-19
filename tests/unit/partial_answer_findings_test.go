@@ -1,10 +1,8 @@
 package unit
 
-// partial_answer_findings_test.go — the sites the batch's own rule reaches and
-// its fixes did not. Rows 3 and 4 replaced a work list sliced at EnrichmentCap
-// with capAtEnrichmentCap, which marks every row the dropped items would have
-// answered for. Three more enrichers still slice the same way, and the rows
-// past their caps still render inspected-and-clean.
+// Enrichers whose work list is capped at
+// EnrichmentCap mark every row the dropped items would have answered for, so
+// a row past the cap never renders inspected-and-clean.
 
 import (
 	"context"
@@ -24,13 +22,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ── finding 1: lambda's own cap, in the file row 1 changed ────────────────
+// ── lambda ────────────────────────────────────────────────────────────────
 
 // TestPartialFindingLambda_FunctionsPastTheCapAreNotInspected pins the cap
-// rule on the enricher the batch already owns. The work list is filtered and
-// then sliced, so the 51st function's resource policy and function URL are
-// never read — and its row claims a function nobody asked about is not
-// invokable by anyone.
+// rule on the lambda enricher. The work list is filtered and then capped, so
+// the 51st function's resource policy and function URL are never read, and
+// its row must not claim the function is not invokable by anyone.
 func TestPartialFindingLambda_FunctionsPastTheCapAreNotInspected(t *testing.T) {
 	const n = awsclient.EnrichmentCap + 1
 	dropped := fmt.Sprintf("acme-fn-%03d", n-1)
@@ -57,7 +54,7 @@ func TestPartialFindingLambda_FunctionsPastTheCapAreNotInspected(t *testing.T) {
 	partialAssertInspected(t, res, "acme-fn-000")
 }
 
-// ── finding 2: asg, where a comment already states the rule ───────────────
+// ── asg ───────────────────────────────────────────────────────────────────
 
 // partialASGFake answers DescribeLaunchConfigurations for whatever names it is
 // asked for, with a configuration that trips the IMDSv1 rule. Scaling
@@ -84,11 +81,9 @@ func (f *partialASGFake) DescribeLaunchConfigurations(_ context.Context, in *aut
 }
 
 // TestPartialFindingASG_GroupsPastTheCapAreNotInspected pins the same rule on
-// the enricher that already states it. Two comments below the slice say a
-// configuration the walk never read leaves its groups "not inspected" rather
-// than "nothing to report", and the page-cap branch below implements exactly
-// that — over the already-truncated name list, so the configurations the slice
-// dropped are the one set nothing marks.
+// the asg enricher: a launch configuration the walk never read leaves its
+// groups "not inspected" rather than "nothing to report", including the
+// configurations the cap dropped from the name list.
 func TestPartialFindingASG_GroupsPastTheCapAreNotInspected(t *testing.T) {
 	const n = awsclient.EnrichmentCap + 1
 	dropped := fmt.Sprintf("acme-asg-%03d", n-1)
@@ -107,7 +102,7 @@ func TestPartialFindingASG_GroupsPastTheCapAreNotInspected(t *testing.T) {
 	partialAssertInspected(t, res, "acme-asg-000")
 }
 
-// ── finding 3: codebuild ──────────────────────────────────────────────────
+// ── codebuild ─────────────────────────────────────────────────────────────
 
 // partialCBFake gives every project one build, and every build has failed.
 type partialCBFake struct {
@@ -134,9 +129,10 @@ func (f *partialCBFake) BatchGetBuilds(_ context.Context, in *codebuild.BatchGet
 	return out, nil
 }
 
-// TestPartialFindingCodeBuild_ProjectsPastTheCapAreNotInspected pins the third
-// site. The project list is sliced before any build is listed, so a project
-// past the cap shows no build status at all while its row reads as inspected.
+// TestPartialFindingCodeBuild_ProjectsPastTheCapAreNotInspected pins the cap
+// rule on codebuild. The project list is capped before any build is listed,
+// so a project past the cap has no build status and its row must not read as
+// inspected.
 func TestPartialFindingCodeBuild_ProjectsPastTheCapAreNotInspected(t *testing.T) {
 	const n = awsclient.EnrichmentCap + 1
 	dropped := fmt.Sprintf("acme-build-%03d", n-1)

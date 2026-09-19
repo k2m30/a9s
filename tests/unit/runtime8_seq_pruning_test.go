@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_seq_pruning_test.go — a screen's sequence dies with the screen.
+// A screen's sequence dies with the screen.
 //
 // The list ordering counter is keyed by the screen instance that dispatched,
 // which is what lets a drill order its own refreshes. A screen instance is
@@ -62,8 +62,7 @@ func TestListFetchSeq_OpeningAndClosingDrillsLeavesNothingBehind(t *testing.T) {
 			"for the life of the session", len(kept), kept)
 	}
 
-	// The drill still on screen keeps its own, or the fix has pruned a live
-	// screen's ordering out from under it.
+	// The drill still on screen keeps its own sequence.
 	live := openSeqDrill(t, c)
 	if core.LatestListFetchSeq(live) == 0 {
 		t.Errorf("the drill still open (screen %d) lost its sequence — pruning must follow the pop, not "+

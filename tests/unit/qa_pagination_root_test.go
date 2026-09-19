@@ -1,35 +1,9 @@
 package unit
 
-// qa_pagination_root_test.go — TDD tests for pagination bugs at the root model level.
-//
-// Bug 1: Paginated fetcher returns IsTruncated=true but frame title shows "(50)"
-//        instead of "(50+)". These tests verify the root model correctly passes
-//        PaginationMeta from ResourcesLoadedMsg down to the active resource list view.
-//
-// Bug 2: After loading resources, pressing Esc, and re-entering the same resource
-//        type, the model makes new API calls and shows only the first page again.
-//        The desired behavior is to preserve the previously loaded resources and
-//        not issue any new fetch commands.
-//
-// Bug 3 (probe truncation): probeResourceAvailability calls GetFetcher, which
-//        returns []Resource with no truncation info. For ct-events, which has a
-//        paginated fetcher, the probe should call GetPaginatedFetcher and use
-//        FetchResult.IsTruncated to set AvailabilityCheckedMsg.Truncated=true.
-//        The downstream wiring (handler→menu→view) already works correctly, so
-//        a fix to the probe alone is sufficient.
-//
-// Tests 1–2 exercise currently-working view-layer wiring at the root level and
-// should PASS immediately.
-//
-// Tests 3–5 document the desired cache behavior that does not yet exist and are
-// SKIPPED via t.Skip() so they do not block CI. Remove the t.Skip() once the
-// resource cache is implemented.
-//
-// Tests 6–7 (TestQA_MainMenu_TruncatedAvailabilityShowsPlus and
-// TestQA_MainMenu_NonTruncatedAvailabilityNoPlus) verify the downstream
-// rendering path for Bug 3 at the MainMenuModel view level. They confirm the
-// wiring from SetAvailability+SetTruncated through to View() already works for
-// ct-events, so the only fix needed is in probeResourceAvailability itself.
+// Pagination at the root model: a truncated
+// first page renders "(N+)", load-more appends, re-entering a list restores
+// its rows per resource type, and loadingMore clears on error and on
+// re-entry.
 
 import (
 	"fmt"
@@ -48,7 +22,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // ctEventsResources returns n ct-events resources with sequential IDs.
-// Uses the new _ct.* field schema (Status is severity-based, not ReadOnly).
+// Uses the _ct.* field schema (Status is severity-based, not ReadOnly).
 // CreateBucket → W verb → "ct-attention".
 // _ct.actor is set to "usr-NNNN" so it renders in the ACTOR column and can be
 // used as a unique per-resource assertion target.
@@ -69,7 +43,7 @@ func ctEventsResources(n int) []resource.Resource {
 				"resource_type": "",
 				"resource_name": "",
 				"read_only":     "false",
-				// New _ct.* fields required by the redesigned list columns.
+				// _ct.* fields the list columns read.
 				"_ct.verb":    "W",
 				"_ct.actor":   actor,
 				"_ct.origin":  "CLI",
@@ -102,7 +76,7 @@ func ctEventsResources2(n, offset int) []resource.Resource {
 				"resource_type": "",
 				"resource_name": "",
 				"read_only":     "false",
-				// New _ct.* fields required by the redesigned list columns.
+				// _ct.* fields the list columns read.
 				"_ct.verb":    "D",
 				"_ct.actor":   actor,
 				"_ct.origin":  "CLI",
@@ -134,26 +108,21 @@ func ec2TestResources(n int) []resource.Resource {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Initial truncated load shows "(50+)" in root rendered view
+// Initial truncated load shows "(50+)" in root rendered view
 // ---------------------------------------------------------------------------
 
 // TestQA_PaginationRoot_InitialLoadShowsTruncated verifies that when a paginated
 // resource type loads its first page with IsTruncated=true, the root model's
 // rendered frame title contains "50+" (not just "50").
-//
-// This is Bug 1: the "(50+)" indicator was not being shown in practice.
 func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to ct-events (push the resource list view onto the stack)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Simulate the first page arriving with IsTruncated=true.
-	// We bypass the actual fetch command and inject the message directly.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -168,19 +137,14 @@ func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// The "+" is the key indicator. The frame title must show "ct-events(50+)".
 	if !strings.Contains(plain, "50+") {
 		t.Errorf("expected frame title to contain '50+' for truncated first page, but got:\n%s", plain)
 	}
 
-	// Negative: must NOT show "(50)" without the "+". Because "ct-events(50+)"
-	// contains the substring "ct-events(50", we check for the exact pattern
-	// by asserting that the "+" is present immediately after "50" in the title.
-	// The Contains("50+") assertion above is sufficient for this requirement.
 }
 
 // ---------------------------------------------------------------------------
-// Test 2: Load more appends and updates the count to "(100)"
+// Load more appends and updates the count to "(100)"
 // ---------------------------------------------------------------------------
 
 // TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount verifies that after
@@ -190,13 +154,11 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Navigate to ct-events
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Load page 1: truncated
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -209,8 +171,6 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Press M to trigger load more
-
 	m, cmd := rootApplyMsg(m, rootKeyPress("M"))
 
 	// The resource list view must return a non-nil command when M is pressed on
@@ -219,7 +179,6 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 		t.Fatal("pressing M on a truncated list at root level should return a non-nil command")
 	}
 
-	// Load page 2: final page, not truncated
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
@@ -234,41 +193,33 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Total loaded = 100, no more pages → "(100...)" without "+"
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Errorf("after loading two pages, expected frame title 'ct-events(100...)', got:\n%s", plain)
 	}
 
-	// Must NOT show "100+" since the last page was not truncated
 	if strings.Contains(plain, "100+") {
 		t.Errorf("after loading final page, frame title must not contain '100+', got:\n%s", plain)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Esc and re-enter preserves cached resources (EXPECTED TO FAIL)
+// Esc and re-enter preserves cached resources
 // ---------------------------------------------------------------------------
 
-// TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources documents the
-// desired behavior for Bug 2: after loading resources (including pressing M),
-// pressing Esc to return to the main menu, and then re-entering the same
-// resource type, the previously loaded 100 resources must be restored without
-// issuing any new fetch commands.
-//
-// This test is SKIPPED until the resource cache is implemented.
-// Remove the t.Skip() call once the cache feature is in place.
+// TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources verifies that
+// after loading resources (including pressing M), pressing Esc to return to
+// the main menu, and re-entering the same resource type, the previously
+// loaded 100 resources are restored.
 func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) {
 
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: Navigate to ct-events
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Step 2: Load page 1 (truncated)
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -281,11 +232,8 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Step 3: Press M to load more
-
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 
-	// Step 4: Load page 2 (final)
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
@@ -297,17 +245,13 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 		Append: true, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Verify 100 resources are loaded before navigating away
-
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Fatalf("precondition: expected 'ct-events(100...)' before Esc, got:\n%s", plain)
 	}
 
-	// Step 5: Press Esc to return to main menu
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 6: Re-navigate to ct-events
 	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -315,20 +259,17 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if cmd == nil {
 		t.Errorf("re-entering ct-events after Esc should seed the retained rows and re-verify them, but issued no command")
 	}
 
 	plain = stripANSI(rootViewContent(m))
 
-	// Should still show 100 resources
 	if !strings.Contains(plain, "ct-events(100") {
 		t.Errorf("after re-entering ct-events, expected 'ct-events(100...)' (from cache), got:\n%s", plain)
 	}
 
-	// The first resource from page 1 must still be present.
 	// We check for "usr-0000" which is the _ct.actor value rendered in the ACTOR column
 	// for the first ctEventsResources() entry (the ID "evt-0000" is not rendered in any column).
 	if !strings.Contains(plain, "usr-0000") {
@@ -337,20 +278,17 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: Re-entering cached list — M continues from last token (EXPECTED TO FAIL)
+// Re-entering cached list — M continues from last token
 // ---------------------------------------------------------------------------
 
-// TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken documents the
-// desired behavior: after re-entering a cached resource list that was truncated,
-// pressing M should continue from the saved continuation token, not start over.
-//
-// This test is SKIPPED until the resource cache is implemented.
+// TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken verifies that
+// after re-entering a cached resource list that was truncated, pressing M
+// continues from the saved continuation token instead of starting over.
 func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T) {
 
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: Navigate to ct-events, load one page, leave it truncated
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -367,24 +305,19 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 		Append: false, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Step 2: Press Esc to go back to main menu
-
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: Re-enter ct-events (should use cache — no fetch)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Step 4: Press M — should continue from "page2-continuation-token"
 	_, cmd := rootApplyMsg(m, rootKeyPress("M"))
 
 	if cmd == nil {
 		t.Fatal("pressing M on a cached truncated list should return a non-nil command")
 	}
 
-	// Execute the command and verify it carries the correct continuation token
 	msg := cmd()
 	loadMore, ok := msg.(messages.LoadMore)
 	if !ok {
@@ -397,21 +330,18 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 }
 
 // ---------------------------------------------------------------------------
-// Test 5: Independent cache per resource type (EXPECTED TO FAIL)
+// Independent cache per resource type
 // ---------------------------------------------------------------------------
 
-// TestQA_PaginationRoot_CachePerResourceType documents the desired behavior that
+// TestQA_PaginationRoot_CachePerResourceType verifies that
 // different resource types have independent caches: navigating to ct-events,
 // then ec2, then back to ct-events should restore the ct-events resources (not
 // the ec2 resources), and vice versa.
-//
-// This test is SKIPPED until the resource cache is implemented.
 func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Step 1: Navigate to ct-events, load 50 resources, Esc back
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -428,7 +358,6 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 2: Navigate to ec2, load 30 resources, Esc back
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -445,7 +374,6 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 3: Re-enter ct-events — must show 50 (not 30 or 0)
 	m, ctCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
@@ -453,8 +381,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if ctCmd == nil {
 		t.Errorf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -465,7 +392,6 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Step 4: Re-enter ec2 — must show 30 (not 50 or 0)
 	m, ec2Cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -473,8 +399,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if ec2Cmd == nil {
 		t.Errorf("re-entering ec2 should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -486,52 +411,25 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests 6–7: MainMenuModel view-level wiring for probe truncation (Bug 3)
-// ---------------------------------------------------------------------------
-//
-// TestQA_MainMenu_TruncatedAvailabilityShowsPlus / NonTruncatedAvailabilityNoPlus
-// (dead views.MainMenuModel SetAvailability/SetTruncated/View) removed —
-// live-seam replacement: TestMainMenuRenderBody_TruncatedZero_ShowsPlusSuffix /
-// TestMainMenuRenderBody_ConfirmedZero_ShowsBareZero in
-// mainmenu_renderbody_truncated_test.go, driven through
-// MainMenuModel.RenderBody(app.MenuBody{...}) — the live render entry point.
-
-// ---------------------------------------------------------------------------
-// Tests 8–10: loadingMore error transitions
-//
-// TestPagination_ErrorClearsLoadingMore — handleAPIError calls
-//   ClearLoading(), which sets loadingMore=false. If the active view is NOT
-//   a *ResourceListModel at the time of the error (e.g., a spinner-only view
-//   before resources arrive), loadingMore is never cleared.
-//
-// TestPagination_DoubleLoadIgnored — the `!m.loadingMore` guard in
-//   resourcelist.go prevents a second fetch.
-//
-// TestPagination_PopViewClearsLoadingMore — when the user presses Esc and
-//   re-enters the resource list, a new ResourceListModel is created via
-//   NewResourceList (loadingMore defaults to false), so re-entry produces a
-//   clean state.
+// loadingMore transitions
 // ---------------------------------------------------------------------------
 
 // TestPagination_ErrorClearsLoadingMore verifies that delivering an APIErrorMsg
 // while loadingMore=true clears the loadingMore flag AND retains the pagination
 // meta (so the user can retry with M after the error is resolved).
 //
-// Documents CONCERNS.md #16: if APIErrorMsg did not clear loadingMore, the view
-// would be permanently stuck showing "ct-events(50+ loading...)" with no way to
-// retry the next page.
+// If APIErrorMsg left loadingMore set, the view would stay on
+// "ct-events(50+ loading...)" with no way to retry the next page.
 func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
 
-	// Navigate to ct-events.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Load page 1 — truncated.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -551,7 +449,6 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 		t.Fatal("pressing M on a truncated list must return a non-nil command")
 	}
 
-	// Confirm we are now in the "loading..." state before the error arrives.
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "loading...") {
 		t.Fatalf("precondition: expected frame title to contain 'loading...' after pressing M, got:\n%s", plain)
@@ -574,9 +471,8 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 
 	plain = stripANSI(rootViewContent(m))
 
-	// ASSERTION 1: loadingMore must be cleared — frame title must NOT contain "loading...".
-	// Failure here means the deadlock from CONCERNS.md #16 is present: the user
-	// cannot retry M and is stuck on "ct-events(50+ loading...)".
+	// A stale loadingMore leaves the user stuck on "ct-events(50+ loading...)",
+	// unable to retry M.
 	if strings.Contains(plain, "loading...") {
 		t.Errorf("APIErrorMsg should clear loadingMore — frame title must not contain 'loading...' after error, got:\n%s", plain)
 	}
@@ -597,13 +493,11 @@ func TestPagination_DoubleLoadIgnored(t *testing.T) {
 
 	m := newRootSizedModel()
 
-	// Navigate to ct-events.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Load page 1 — truncated.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -652,13 +546,11 @@ func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 
 	m := newRootSizedModel()
 
-	// Navigate to ct-events.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
-	// Load page 1 — truncated.
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
@@ -675,16 +567,13 @@ func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 
-	// Precondition: confirm we are mid-load.
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "loading...") {
 		t.Fatalf("precondition: expected 'loading...' after pressing M, got:\n%s", plain)
 	}
 
-	// Pop the view (simulate Esc back to main menu).
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	// Re-push ct-events (simulate the user pressing Enter on it again in the menu).
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",

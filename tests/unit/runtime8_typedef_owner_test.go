@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_typedef_owner_test.go — one typeDef owner per screen, in the
+// One typeDef owner per screen, in the
 // findings/colour lane.
 //
 // A screen's typeDef is what its columns, its title and its Wave-2 fold are

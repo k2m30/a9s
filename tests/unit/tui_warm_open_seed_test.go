@@ -1,5 +1,5 @@
-// tui_warm_open_seed_test.go — the warm-open seed, D9 (C1 + Goal 4 of
-// docs/design/cache-requirements.md).
+// The warm-open seed
+// (docs/design/cache-requirements.md).
 //
 // On a cache-MISS (no session.ResourceCache entry for the type yet, but
 // session.RowStore DOES hold retained first-page rows from a prior Wave-1
@@ -8,26 +8,14 @@
 // branch, when session.RowStore.Snapshot(canon) is non-empty, the runtime
 // attaches a synthetic session.ResourceCacheEntry on
 // NavigateResult.CachedEntry (the same field the cache-HIT branch populates)
-// while STILL returning the KindFetchResources task (C1 "show what you know,
-// then verify on sight" — the seed never substitutes for the live fetch).
+// while STILL returning the KindFetchResources task (the seed never
+// substitutes for the live fetch).
 // Both renderer adapters (core/app/navigate.go's applyNavResult
 // NavigateKindPushResourceList branch and
 // internal/tui/runtime_adapter_navigate.go's NavigateKindPushResourceList
 // case) consume CachedEntry uniformly, so the list renders instantly with
 // Refreshing=true instead of the bare "Loading..." shell (resourcelist.go
 // View(), "snap.Body.List == nil") while the live fetch round-trip lands.
-//
-// Test 1 (HandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask) pins the
-// runtime-level contract directly against Core.HandleNavigate.
-//
-// Test 2 (TUI_WarmOpen_RendersSeededRows_NotLoading) drives the real Bubble
-// Tea renderer seam (tuitest.Step/Render, exactly as tui_savecache_routing_test.go
-// and tui_error_marker_parity_test.go do) and asserts the rendered View()
-// shows the seeded row instead of the bare "Loading..." shell.
-//
-// Test 8 in app_cache_wave_regressions_test.go
-// (TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch) is the
-// parity anchor for the controller/headless lane.
 package unit
 
 import (
@@ -46,11 +34,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 1 — runtime-level: HandleNavigate must attach the probe-row seed on
-// a cache miss, without dropping the verify-on-sight fetch task.
-// ────────────────────────────────────────────────────────────────────────────
-
 // TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask pins the warm-open seed
 // at the runtime.Core.HandleNavigate seam: session.ResourceCache has NO entry
 // for "s3" (a genuine cache miss), but session.RowStore holds retained
@@ -64,11 +47,7 @@ import (
 //     IsTruncated=true pagination marker, so the adapter can seed the list
 //     immediately instead of rendering a blank Loading shell,
 //  3. still return the KindFetchResources task — the seed augments the
-//     miss path, it does not replace the live verify-on-sight fetch (C1).
-//
-// RED today: CachedEntry is nil on the miss branch (handlers_navigate.go's
-// NavigateTargetResourceList case only populates CachedEntry on the
-// cache-HIT branch, lines ~140-145).
+//     miss path, it does not replace the live verify-on-sight fetch.
 func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T) {
 	sess := session.New()
 	probeRows := []resource.Resource{
@@ -127,11 +106,9 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 	}
 }
 
-// TestHandleNavigate_MissWithoutProbeRows_NoCachedEntry is the non-regression
-// half of Test 1: a genuine cache miss with NO retained probe rows (the
-// common cold-open case) must NOT synthesize a CachedEntry out of thin air —
-// CachedEntry stays nil and the adapter falls back to the ordinary Loading
-// shell, exactly as before this fix.
+// TestHandleNavigate_MissWithoutProbeRows_NoCachedEntry: a genuine cache miss
+// with NO retained probe rows (the common cold-open case) leaves CachedEntry
+// nil, and the adapter falls back to the ordinary Loading shell.
 func TestHandleNavigate_MissWithoutProbeRows_NoCachedEntry(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -152,11 +129,6 @@ func TestHandleNavigate_MissWithoutProbeRows_NoCachedEntry(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 2 — TUI-level: a warm list-open must render seeded rows, not the bare
-// Loading shell.
-// ────────────────────────────────────────────────────────────────────────────
-
 // newWarmOpenApp builds a tui.Model wired to demo clients (no real AWS
 // calls), sized so View() renders real content. Mirrors newErrorMarkerApp /
 // newSaveCacheApp's construction pattern from sibling test files in this
@@ -173,27 +145,20 @@ func newWarmOpenApp(t *testing.T) tui.Model {
 	return m
 }
 
-// TestTUI_WarmOpen_RendersSeededRows_NotLoading pins the warm-open seed at the real
-// Bubble Tea Update/View seam. A prior Wave-1 availability probe for "s3" is
-// driven through the exact same seam tui_savecache_routing_test.go's
-// driveSweepCompletion uses (a real messages.AvailabilityChecked with
-// Gen: 1 — session.New() seeds AvailabilityGen at 1, not 0, and
-// AvailabilityChecked.AcceptZeroGen() is false), which naturally populates
-// session.RowStore's "s3" entry (Rows + Pagination.IsTruncated = true) via
-// handleAvailabilityChecked — exactly as a live warm-open scenario would
-// have them populated from a completed background sweep. Crucially, this
-// probe result does NOT populate session.ResourceCache — only a subsequent
-// list-open (Navigate) would, and that is the cache-miss path under test.
+// TestTUI_WarmOpen_RendersSeededRows_NotLoading pins the warm-open seed at the
+// real Bubble Tea Update/View seam. A prior Wave-1 availability probe for "s3"
+// is driven as a real messages.AvailabilityChecked with Gen: 1 (session.New()
+// seeds AvailabilityGen at 1, and AvailabilityChecked.AcceptZeroGen() is
+// false), which populates session.RowStore's "s3" entry (Rows +
+// Pagination.IsTruncated = true) via handleAvailabilityChecked, as a completed
+// background sweep would. The probe result leaves session.ResourceCache
+// empty — only a subsequent list-open populates it, and that is the
+// cache-miss path under test.
 //
 // Navigating to "s3" (a Navigate message, exactly as pressing Enter on the
 // main menu would send) must render the seeded row and pagination-truncated
 // "2+" marker immediately, WITHOUT waiting for a fetch round-trip — the
 // rendered View() must NOT show the bare "Loading..." shell.
-//
-// RED today: runtime_adapter_navigate.go's NavigateKindPushResourceList case
-// only calls rl.Init() and dispatches the fetch; it never seeds from
-// RowStore, so the list starts empty (Loading=true) until the fetch
-// completes.
 func TestTUI_WarmOpen_RendersSeededRows_NotLoading(t *testing.T) {
 	m := newWarmOpenApp(t)
 

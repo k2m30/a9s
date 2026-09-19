@@ -1,14 +1,10 @@
 package unit
 
-// prowler_w5_sfn_ses_eb_test.go — batch w5 rows 9-15: the three Step
-// Functions signals, the SES DKIM signal, and the three Elastic Beanstalk
-// environment settings.
+// Step Functions, SES DKIM and Elastic Beanstalk posture signals.
 //
-// All seven are additions to enrichers that already exist, per rule 5 of the
-// batch contract — never a second enricher for a type that has one. The
-// fakes below therefore have to serve BOTH the call the enricher already
-// made and the new one, or the pre-existing findings vanish and the tests
-// would pass for the wrong reason.
+// Each lives in its type's single enricher next to a finding that comes from
+// a different call, so the fakes serve both calls; otherwise that finding
+// vanishes and the tests pass for the wrong reason.
 
 import (
 	"context"
@@ -31,12 +27,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Rows 9, 10, 11 — sfn.logging-off, sfn.no-cmk, sfn.definition-secret
-// ---------------------------------------------------------------------------
-
-// w5SFNFake serves ListExecutions (which EnrichStepFunctionsStatus already
-// called) and DescribeStateMachine (which rows 9-11 need).
+// w5SFNFake serves ListExecutions and DescribeStateMachine for
+// EnrichStepFunctionsStatus.
 type w5SFNFake struct {
 	awsclient.SFNAPI
 	describe    map[string]*sfnsvc.DescribeStateMachineOutput
@@ -91,7 +83,7 @@ func w5SFNRes(name, smType string) resource.Resource {
 }
 
 // w5CleanDefinition is an Amazon States Language document with no credential
-// in it — the healthy counterpart for row 11.
+// in it — the healthy counterpart for sfn.definition-secret.
 const w5CleanDefinition = `{
   "Comment": "Order settlement",
   "StartAt": "Validate",
@@ -280,8 +272,8 @@ func TestW5_SFNDefinitionSecret_Positive(t *testing.T) {
 	finding := w2AssertFinding(t, res.Findings[sm], "sfn.definition-secret",
 		"credential in state machine definition", domain.SevBroken, "wave2")
 
-	// Rule 7: the value never appears anywhere an operator can read it.
-	// Where and Kind are the whole of the evidence.
+	// The value never appears anywhere an operator can read it. Where and Kind
+	// are the whole of the evidence.
 	rows := w2Rows(t, res, sm, "sfn.definition-secret")
 	if len(rows) == 0 {
 		t.Fatal("the secret finding carries no supporting row; Where and Kind are the only evidence there can be")
@@ -321,8 +313,8 @@ func TestW5_SFNDefinitionSecret_AbsentDefinitionIsNotAFinding(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[sm], "sfn.definition-secret")
 }
 
-// Rule 4: a state machine that is unlogged, on the AWS-owned key, and
-// carrying a credential reports three findings, not one.
+// A state machine that is unlogged, on the AWS-owned key, and carrying a
+// credential reports three findings, not one.
 func TestW5_SFNAllThreeConditions_AreThreeFindings(t *testing.T) {
 	sm := "acme-settlement-worst"
 	f := newW5SFNFake()
@@ -340,8 +332,8 @@ func TestW5_SFNAllThreeConditions_AreThreeFindings(t *testing.T) {
 	}
 }
 
-// The pre-existing execution finding must survive the addition. An enricher
-// that returns early on the new call would silently drop it.
+// The execution finding must survive alongside the configuration findings. An
+// enricher that returns early on DescribeStateMachine would silently drop it.
 func TestW5_SFNNewFindingsDoNotDisplaceTheExecutionFinding(t *testing.T) {
 	sm := "acme-settlement-failed"
 	f := newW5SFNFake()
@@ -390,12 +382,8 @@ func TestW5_SFN_APIErrorOnOneMachineTruncatesOnlyThatMachine(t *testing.T) {
 		"execution logging off", domain.SevWarn, "wave2")
 }
 
-// ---------------------------------------------------------------------------
-// Row 12 — ses.dkim-off
-// ---------------------------------------------------------------------------
-
-// w5SESFake serves GetAccount (which EnrichSESAccount already called) and
-// GetEmailIdentity per identity (which row 12 needs).
+// w5SESFake serves GetAccount and GetEmailIdentity per identity for
+// EnrichSESAccount.
 type w5SESFake struct {
 	awsclient.SESv2API
 	account     *sesv2svc.GetAccountOutput
@@ -528,9 +516,9 @@ func TestW5_SESDKIMOff_EmailAddressIdentityIsNotAFinding(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[id], "ses.dkim-off")
 }
 
-// The finding is per identity. The account-level findings this enricher
-// already produced are replicated onto every row, and DKIM must not inherit
-// that shape: one unsigned domain does not make every other domain unsigned.
+// The finding is per identity. The enricher's account-level findings are
+// replicated onto every row, and DKIM must not inherit that shape: one
+// unsigned domain does not make every other domain unsigned.
 func TestW5_SESDKIMOff_IsPerIdentityNotReplicated(t *testing.T) {
 	bad, good := "nodkim.acme-corp.com", "acme-corp.com"
 	f := newW5SESFake()
@@ -567,7 +555,7 @@ func TestW5_SESDKIMOff_APIErrorOnOneIdentityTruncatesOnlyThatIdentity(t *testing
 		"DKIM not enabled", domain.SevWarn, "wave2")
 }
 
-// The pre-existing account-level finding must still reach every row.
+// The account-level finding must still reach every row.
 func TestW5_SESDKIMDoesNotDisplaceTheAccountFinding(t *testing.T) {
 	id := "nodkim.acme-corp.com"
 	f := newW5SESFake()
@@ -586,12 +574,8 @@ func TestW5_SESDKIMDoesNotDisplaceTheAccountFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Rows 13, 14, 15 — the three Elastic Beanstalk environment settings
-// ---------------------------------------------------------------------------
-
-// w5EBFake serves DescribeEnvironmentHealth (which EnrichEBEnvironmentHealth
-// already called) and DescribeConfigurationSettings (which rows 13-15 need).
+// w5EBFake serves DescribeEnvironmentHealth and DescribeConfigurationSettings
+// for EnrichEBEnvironmentHealth.
 type w5EBFake struct {
 	awsclient.ElasticBeanstalkAPI
 	options   map[string][]ebtypes.ConfigurationOptionSetting
@@ -701,8 +685,8 @@ func w5EnrichEB(t *testing.T, f *w5EBFake, rows ...resource.Resource) awsclient.
 }
 
 // One DescribeConfigurationSettings call returns all three option values, so
-// the enricher reads them once and emits three independent rows from the one
-// response rather than calling three times.
+// the enricher reads them once and emits three independent findings from the
+// one response rather than calling three times.
 func TestW5_EBReadsAllThreeSettingsFromOneCall(t *testing.T) {
 	env := "acme-eb-bare"
 	f := newW5EBFake()
@@ -865,7 +849,7 @@ func TestW5_EB_APIErrorOnOneEnvironmentTruncatesOnlyThatEnvironment(t *testing.T
 		"managed platform updates off", domain.SevWarn, "wave2")
 }
 
-// The pre-existing causes finding must survive the addition.
+// The causes finding must survive alongside the configuration findings.
 func TestW5_EBNewFindingsDoNotDisplaceTheCausesFinding(t *testing.T) {
 	env := "acme-eb-red"
 	f := newW5EBFake()
@@ -914,12 +898,9 @@ func TestW5_EB_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// Rule 4: a resource being torn down emits no posture finding. The demo
-// terminated environment escaped only because its fixture happened to carry
-// no configuration settings, so nothing in the code was stopping it — the
-// row below is the one the old code would have coloured, built on purpose:
-// a Terminating and a Terminated environment whose settings trip all three
-// conditions at once.
+// A resource being torn down emits no posture finding. The Terminating and
+// Terminated environments below carry settings that trip all three
+// conditions at once, so only the lifecycle guard keeps them silent.
 func TestW5_EBLifecycleEndedEmitsNoConfigurationFinding(t *testing.T) {
 	for _, status := range []string{"Terminating", "Terminated"} {
 		t.Run(status, func(t *testing.T) {

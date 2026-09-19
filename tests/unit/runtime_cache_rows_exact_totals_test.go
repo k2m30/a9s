@@ -1,45 +1,16 @@
-// runtime_cache_rows_exact_totals_test.go — RED tests for the CACHE-FIRST
-// LIST UX epic's exact-total menu sync-back (exact totals on load-more
-// exhaustion, moved to the controller level).
+// Exact-total menu sync-back at the
+// controller level. When load-more exhausts pagination (no next token), the
+// exact total becomes authoritative: menu availability for that type updates
+// to the exact count with Truncated=false, in-session and on disk, and
+// survives returning to the menu and an app restart. The tests drive
+// Controller.Handle(messages.ResourcesLoaded{...}) directly, with no
+// *tui.Model, so the web lane gets the same behaviour.
 //
-// Exact-total menu sync-back: when load-more exhausts pagination (no next token), the exact
-// total becomes authoritative: menu availability for that type updates to
-// the exact count with Truncated=false (both in-session AND persisted via
-// the disk cache), survives returning to the menu and — via the cache file —
-// an app restart. The sync-back currently living in
-// internal/tui/app_stack.go's popRS (TUI-only, renderer-owned) moves into
-// the controller's ResourcesLoaded/load-more handling so web gets it too.
-//
-// Today (confirmed by reading internal/tui/app_stack.go:40-99 and
-// core/app/handle.go + core/app/list_body.go) this sync-back exists
-// ONLY in the TUI's popRS — core/app.Controller.Handle/
-// handleResourcesLoadedEvent/applyResourcesLoaded never touch
-// PatchMenuAvailability at all. These tests pin the controller-level
-// behavior directly via Handle(messages.ResourcesLoaded{...}) — no
-// TUI/*tui.Model involvement — per the epic's explicit "NO TUI involvement"
-// requirement.
-//
-// AMBIGUITY RESOLUTIONS (stated, not deferred):
-//   - "Load-more that exhausts pagination" is modeled as a ResourcesLoaded
-//     event with Append=true and Pagination.IsTruncated=false — the natural
-//     shape of the KindFetchMore task's result once the fetcher's next-token
-//     comes back empty (mirrors FetchMorePayload/handleActionLoadMore in
-//     core/app/actions_list.go, which starts the load-more fetch but
-//     does not itself see the result — the result re-enters through the
-//     same Handle(ResourcesLoaded) lane as a normal fetch, distinguished by
-//     Append=true).
-//   - The "only-increase guard" mirrored from popRS (menu count/issues never
-//     regress) is preserved as part of the ported behavior: a pre-existing
-//     higher truncated menu count must not be overwritten by a smaller
-//     load-more total. This mirrors the exact guard in
-//     internal/tui/app_stack.go:57 (`!newTrunc || !known || newCount >
-//     curCount`).
-//   - Disk persistence is pinned via the same on-disk cache.Entry.Count/
-//     Truncated fields the SaveAvailabilityCache seam already writes
-//     (core/runtime/probes.go) — this test asserts the controller
-//     triggers that same disk write path when the in-session
-//     PatchMenuAvailability fires from a load-more exhaustion, not a novel
-//     disk format.
+// "Load-more that exhausts pagination" is a ResourcesLoaded event with
+// Append=true and Pagination.IsTruncated=false: handleActionLoadMore
+// (core/app/actions_list.go) starts the fetch, and the result re-enters
+// through the same Handle(ResourcesLoaded) lane as a normal fetch,
+// distinguished by Append=true.
 package unit_test
 
 import (
@@ -53,16 +24,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// -----------------------------------------------------------------------
-// Exact-total menu sync-back — exact totals move to the controller (no TUI involvement)
-// -----------------------------------------------------------------------
-
 // TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI pins the core
 // controller-level outcome: a load-more ResourcesLoaded result whose
 // pagination is no longer truncated must update the ROOT menu's
 // availability for that type to the exact count with Truncated=false —
 // driven purely through Controller.Handle, with no *tui.Model anywhere in
-// this test (proving the sync-back no longer needs TUI popRS to fire).
+// this test.
 func TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI(t *testing.T) {
 	s := session.New()
 	s.Profile = "demo"
@@ -99,7 +66,6 @@ func TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI(t *testing.T) {
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// AcceptZeroGen=true
 	_ = vs
 
 	avail := c.GetMenuAvailability()
@@ -139,10 +105,8 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Pop back to the menu — a plain controller-level ActionBack, not a TUI
-	// popRS call. If the sync-back is correctly moved to the controller, the
-	// exact total set above must already be in MenuState and popping must
-	// not need to (re)compute it.
+	// Pop back to the menu with a plain controller-level ActionBack: the exact
+	// total is already in MenuState, so popping does not recompute it.
 
 	c.Apply(app.Action{Kind: app.ActionBack})
 
@@ -156,18 +120,11 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 	}
 }
 
-// TestLoadMoreExhausted_OnlyIncreaseGuard pins what the only-increase guard
-// still covers now that both writers of the availability map follow one rule:
-// a TRUNCATED result never shrinks a known count, and a result that exceeds
-// the known count still wins. Both sub-cases are asserted together so this
-// test cannot pass merely because the exact-total sync-back is entirely
-// unimplemented (an unimplemented sync-back would leave availability untouched
-// in BOTH sub-cases, which the "wins" sub-case catches).
-//
-// An untruncated observation always wins, in both lanes: a list-open lane
-// private rule that let an EXACT load-more result of 2 leave a stored exact
-// 500 alone is why a canonical list of 5 rows could sit under a badge of 200
-// and queue that 200 to the disk writer.
+// TestLoadMoreExhausted_OnlyIncreaseGuard pins the one rule both writers of
+// the availability map follow: a TRUNCATED result never shrinks a known
+// count, a result that exceeds the known count wins, and an untruncated
+// observation always wins. The sub-cases are asserted together so a
+// controller that never syncs back cannot pass.
 func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 	newCtrl := func(seedCount int, seedTruncated bool) (*runtime.Core, *app.Controller) {
 		s := session.New()

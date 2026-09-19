@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_absorb_shape_test.go — a timing pin that measures the code.
+// A timing pin that measures the code.
 //
 // "The lock is held for under 35 ms" is a statement about the machine the
 // suite happens to run on. It is green on an idle bench and red beside a full
 // -race run, and neither reading says whether the row work is under the lock.
 //
-// What the row is about is a proportion: absorbing a fetch result does a lot
+// What matters is a proportion: absorbing a fetch result does a lot
 // of work, and only the swap of the built body may happen with the lock held.
 // A fraction is read off two clocks that move together, so a loaded machine
 // stretches both and the verdict does not change.
@@ -36,10 +36,10 @@ import (
 // views7LockedFraction is the largest share of an absorption that may pass
 // with the controller lock held. It separates two shapes, not two machines:
 // doing the row work under the lock spends about a third to a half of the
-// absorption there (0.46 ordinary, 0.30 under -race, measured against the tree
-// before the work moved off the lock), and swapping a body built outside it
-// spends 0.05 to 0.07 in either build. A loaded machine stretches the hold and
-// the absorption together, so the reading stays on its own side of the bound.
+// absorption there (0.46 ordinary, 0.30 under -race), and swapping a body
+// built outside it spends 0.05 to 0.07 in either build. A loaded machine
+// stretches the hold and the absorption together, so the reading stays on its
+// own side of the bound.
 const views7LockedFraction = 0.2
 
 // wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
@@ -128,11 +128,10 @@ func views7MinLockedShare(t *testing.T, n int) (share float64, held, total time.
 	return share, held, total
 }
 
-// TestLargeFetchAbsorb_LockIsHeldForASmallPartOfTheAbsorb is row 23's pin
-// rewritten as the shape it is about. The two sizes are what separates a swap
-// from row work: a swap is a small share of a larger absorption and a smaller
-// share of a larger one still, while row work under the lock is nearly all of
-// either.
+// TestLargeFetchAbsorb_LockIsHeldForASmallPartOfTheAbsorb: the two sizes are
+// what separates a swap from row work: a swap is a small share of a larger
+// absorption and a smaller share of a larger one still, while row work under
+// the lock is nearly all of either.
 func TestLargeFetchAbsorb_LockIsHeldForASmallPartOfTheAbsorb(t *testing.T) {
 	for _, n := range []int{6000, 12000} {
 		share, held, total := views7MinLockedShare(t, n)
@@ -531,9 +530,8 @@ func views7ConfiguredBounds(scope ast.Node) map[string]bool {
 	return names
 }
 
-// TestNoTestFailsOnAWallClockBudget sweeps tests/unit for the same defect the
-// pin above was rewritten out of: a test that fails when a measured span
-// exceeds a duration written into the test.
+// TestNoTestFailsOnAWallClockBudget sweeps tests/unit for a test that fails
+// when a measured span exceeds a duration written into the test.
 //
 // Such a pin reports the machine. It goes red on a loaded bench where the code
 // is right, and green on a fast one where the code is wrong, and every red it

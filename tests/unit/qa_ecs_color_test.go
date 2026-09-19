@@ -25,7 +25,7 @@ func TestEcsColor(t *testing.T) {
 		{
 			// Per docs/attention-signals.md: ecs Cluster INACTIVE → Broken
 			// (cluster has been deleted; downstream resources may still
-			// reference it). Was Dim — corrected per doc + PR273 contract.
+			// reference it).
 			name:   "inactive",
 			fields: map[string]string{"status": "INACTIVE"},
 			want:   resource.ColorBroken,

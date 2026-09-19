@@ -1,8 +1,7 @@
 //go:build integration
 
-// scenario_console_open_test.go — demo-mode smoke coverage for the
-// "o = open in AWS console / O = copy console URL" feature (spec:
-// console-url-spec.md). Uses the scripted scenario harness
+// Demo-mode smoke coverage for the
+// "o = open in AWS console / O = copy console URL" feature. Uses the scripted scenario harness
 // (SCENARIO_HARNESS.md) rather than a PTY/subprocess launch of ./a9s
 // --demo: the harness drives tui.Model.Update() directly and executes the
 // returned tea.Cmd values, which is sufficient to prove (a) the demo-mode
@@ -10,10 +9,6 @@
 // "O" produces a copy-confirmation flash and (where the environment
 // supports reading the system clipboard) that the copied value really is
 // an https console URL.
-//
-// Uses the shared fullIntegrationNewDemoScenario constructor directly — it
-// now sets tui.WithIsDemo(true) (see scripted_scenario_helpers_test.go), so
-// this file no longer needs its own model-construction workaround.
 package integration
 
 import (
@@ -30,11 +25,9 @@ import (
 // at a sentinel script that would create a marker file if ever executed,
 // then presses "o" on a loaded demo resource list. Demo mode must short-
 // circuit to the disabled-link flash before ever reaching openBrowserCmd, so
-// the marker must never appear — this is a regression guard against that
-// short-circuit ever being accidentally removed or reordered. The marker
-// check runs before the flash-text assertion so a wording drift in the
-// flash copy can never mask a real (and far more serious) no-exec
-// regression.
+// the marker must never appear. The marker check runs before the
+// flash-text assertion so a wording drift in the flash copy can never mask
+// a browser exec.
 func TestConsoleOpen_Demo_KeyFlashesDisabledAndNeverExecsBrowser(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("sentinel script uses a POSIX shebang; not portable to this harness on windows")

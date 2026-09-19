@@ -2,12 +2,12 @@
 
 package integration
 
-// scenario_all_types_reference_test.go — the all-types generalization of the
+// The all-types generalization of the
 // s3 reference walk (scenario_s3_reference_test.go): every registered
 // top-level resource type runs the same per-surface gate in demo mode, with
 // no per-type special cases. Surfaces per type: main-menu count, list open
-// (frame count + first row render), detail fields body, related-panel
-// witness among sampled rows, YAML and JSON id visibility, back-navigation
+// (frame count + first row render), detail fields body, a navigable related
+// pivot among sampled rows, YAML and JSON id visibility, back-navigation
 // stack integrity, and a full fetch-origin cache entry. Related drills stay
 // with related_view_validation_test.go and
 // scenario_related_drill_through_test.go; deep render assertions stay with
@@ -25,9 +25,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// allTypesSampledRows bounds the related-witness walk. The pivot-coverage
-// gate (tests/unit/qa_demo_pivot_coverage_test.go) guarantees a witness
-// exists on SOME fixture row, but not necessarily the first; sampling keeps
+// allTypesSampledRows bounds the related-pivot walk. The pivot-coverage
+// gate (tests/unit/qa_demo_pivot_coverage_test.go) guarantees a navigable
+// pivot exists on SOME fixture row, but not necessarily the first; sampling keeps
 // the per-type wall cost small while still finding it in practice.
 const allTypesSampledRows = 5
 

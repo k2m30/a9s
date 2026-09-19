@@ -1,12 +1,11 @@
 package unit_test
 
-// qa_networking_color_phrase_agree_test.go — ruling M for the five networking
-// types.
+// One finding decides both colour
+// and Status cell for the five networking types.
 //
-// One selector decides both the row colour and the Status cell. When they were
-// chosen separately, a row whose findings arrived warn-then-broken rendered red
-// while reading as the warning, so the operator saw the colour that says "drop
-// everything" next to the sentence for the lesser problem.
+// Chosen separately, a row whose findings arrive warn-then-broken renders red
+// while reading as the warning, so the operator sees the colour that says
+// "drop everything" next to the sentence for the lesser problem.
 //
 // This is the demo-bench half of tests/unit/prowler_w1_status_phrase_test.go,
 // which pins domain.TopFinding's own rules. The expectation here is computed

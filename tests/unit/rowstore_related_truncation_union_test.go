@@ -1,22 +1,17 @@
 package unit_test
 
-// rowstore_related_truncation_union_test.go — regression pin for
-// core/runtime/rowstore_observe.go's resolveCachedPagePagination (#261
-// boundary-sealing wave, item b): truncation is a UNION of
-// entry.IsTruncated and entry.Pagination.IsTruncated, never a downgrade.
-// Before the fix, a non-nil entry.Pagination won outright — an entry
-// carrying IsTruncated=true alongside a Pagination whose own IsTruncated
-// field was false silently lost the truncation signal. Driven through
-// app.Controller.Handle(messages.RelatedCheckResult{CachedPages: ...}) —
-// Core.HandleRelatedCheckResult's own CachedPages loop
+// rowstore_related_truncation_union_test.go —
+// core/runtime/rowstore_observe.go's resolveCachedPagePagination: truncation is
+// a UNION of entry.IsTruncated and entry.Pagination.IsTruncated, never a
+// downgrade, so an entry carrying IsTruncated=true alongside a Pagination
+// whose own IsTruncated is false stays truncated. Driven through
+// app.Controller.Handle(messages.RelatedCheckResult{CachedPages: ...}):
+// Core.HandleRelatedCheckResult's CachedPages loop
 // (core/runtime/handlers_resources.go) calls resolveCachedPagePagination to
-// build the PatchResourceCache intent, the exact real path, not the
-// unexported helper directly. (Core.HandleEvent's RowStore dual-write lane,
-// observeRelatedCheckResultRows, shares the same helper but deliberately
-// does not surface raw Pagination through BuildResourceCacheSnapshot —
-// Core.ResourceCache, reading PatchResourceCache's own
-// domain.ListViewCacheEntry, is this fix's one directly observable
-// read-back.)
+// build the PatchResourceCache intent. Core.ResourceCache, reading
+// PatchResourceCache's domain.ListViewCacheEntry, is the observable read-back;
+// the RowStore dual-write lane (observeRelatedCheckResultRows) keeps raw
+// Pagination out of BuildResourceCacheSnapshot.
 
 import (
 	"testing"

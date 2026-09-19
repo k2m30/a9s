@@ -28,10 +28,6 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 )
 
-// ===========================================================================
-// Realistic SDK struct builders for v2.2.0 resource types
-// ===========================================================================
-
 func realisticCFDistribution() cloudfronttypes.DistributionSummary {
 	return cloudfronttypes.DistributionSummary{
 		Id:         new("E1A2B3C4D5E6F7"),
@@ -353,15 +349,7 @@ func realisticBackup() backuptypes.BackupPlansListMember {
 	}
 }
 
-// ===========================================================================
-// 1. CloudFront (cf)
-// ===========================================================================
-
 var _ = time.Now
-
-// ===========================================================================
-// Realistic SDK struct builders for EBS, Snapshots, AMIs, CloudTrail Events
-// ===========================================================================
 
 func realisticVolume() ec2types.Volume {
 	createTime := time.Date(2025, 3, 10, 14, 0, 0, 0, time.UTC)
@@ -439,7 +427,3 @@ func realisticCloudTrailEvent() cloudtrailtypes.Event {
 		},
 	}
 }
-
-// ===========================================================================
-// 23. EBS Volume
-// ===========================================================================

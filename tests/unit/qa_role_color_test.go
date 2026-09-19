@@ -1,6 +1,6 @@
 package unit
 
-// qa_role_color_test.go — Wave 1 Color tests for IAM Roles.
+// Wave 1 Color tests for IAM Roles.
 //
 // Contract:
 //   - The row color is derived from the resource's Findings alone. The trust

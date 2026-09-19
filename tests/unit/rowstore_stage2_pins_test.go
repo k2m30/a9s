@@ -1,9 +1,7 @@
-// rowstore_stage2_pins_test.go — RowStore is the source of truth for a
-// type's rows: docs/design/cache-requirements.md D12 and D16, the
-// dispatch-time payload freeze (the requirements doc calls this defect
-// class out under the snapshotProbeResourcesForSave doc comment), the
-// observed-empty guard on the disk-store fallback, and the
-// sweep-vs-list-lane save depth.
+// RowStore is the source of truth for a
+// type's rows (docs/design/cache-requirements.md): a warm list open after the
+// enrichment sweep, the dispatch-time save payload freeze, the observed-empty
+// guard on the disk-store fallback, and the sweep-vs-list-lane save depth.
 package unit_test
 
 import (
@@ -43,9 +41,8 @@ func newStage2PinTestController(t *testing.T) (*session.Session, *runtime.Core, 
 // stage2PinReadTypeFile re-reads the on-disk TypeFile for shortName under
 // (profile, region), failing the test if it is missing. A local variant of
 // qa_cache_lifecycle_test.go's readTypeFile (package unit, not unit_test —
-// this file's package cannot see it directly) so the D16 lockstep pin can use
-// the identical byte-compare pattern the dispatch calls out
-// (qa_cache_lifecycle_test.go:219).
+// this file's package cannot see it directly) so the lockstep pin can use the
+// same byte-compare pattern.
 func stage2PinReadTypeFile(t *testing.T, profile, region, shortName string) cache.TypeFile {
 	t.Helper()
 	store := cache.LoadDirForTest(profile, region)
@@ -56,20 +53,13 @@ func stage2PinReadTypeFile(t *testing.T, profile, region, shortName string) cach
 	return tf
 }
 
-// -----------------------------------------------------------------------
-// Pin 1 — D12 strengthened: post-sweep-completion list open still seeds
-// title+rows+enriched field, no disk-store fallback needed.
-// -----------------------------------------------------------------------
-
-// stage2PinWave2Type is a catalog-absent Wave-2 short name registered so the
-// enrichment queue drains on the pinned type's own EnrichmentChecked
-// delivery — a single-type queue makes that delivery the terminal one,
-// exercising the exact "all done" free (handlers_availability.go's
-// ProbeResources/ProbeTruncated nil-out) that D12 was originally caught by.
+// stage2PinType is the pinned type; a single-type enrichment queue makes its
+// EnrichmentChecked delivery the terminal one, exercising the "all done" path
+// in handlers_availability.go.
 const stage2PinType = "ec2"
 
 // TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField drives
-// the full flow D12 describes: probe → enrichment completes → HandleNavigate
+// the full flow: probe → enrichment completes → HandleNavigate
 // (via Controller.Apply, the same seam app_cache_first_seeding_test.go uses)
 // opens the list. Asserts the seed comes through with BOTH the row set
 // (title-driving count) AND the enriched field — sourced from RowStore, not
@@ -101,10 +91,8 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 		TypeGen:      s.EnrichmentTypeGen[stage2PinType],
 		FieldUpdates: map[string]map[string]string{
 			// instance_status is a real ec2 list column (.a9s/views/ec2.yaml's
-			// "Health" column, key: instance_status) — cost_estimate is not a
-			// registered column for ec2 and would never surface in Cells
-			// regardless of RowStore/legacy-map sourcing, making it unfit to
-			// prove the "enriched field renders" half of this pin.
+			// "Health" column, key: instance_status); a field that is not a registered
+			// ec2 column would never surface in Cells.
 			"i-0d12seed0001": {"instance_status": "42.00"},
 		},
 	})
@@ -143,12 +131,6 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 		t.Errorf("Rows[0].Cells = %v, want the enriched instance_status=42.00 field to be present in the seeded row (D12 requires title+ROWS+enriched field, not a bare count)", row.Cells)
 	}
 }
-
-// -----------------------------------------------------------------------
-// Pin 2 — the dispatch-time payload freeze restated structurally: the enrichment-completion save
-// payload equals the store snapshot AT DISPATCH TIME even when a later
-// Amend lands before the executor runs.
-// -----------------------------------------------------------------------
 
 // TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend drives an
 // enrichment-completion sweep to termination (producing a TaskKindSaveCache
@@ -232,24 +214,15 @@ func TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testing.T) 
 	}
 }
 
-// -----------------------------------------------------------------------
-// Pin 3 — D16 lockstep: open list → load-more to depth 2 →
-// sweep-completion save persists the SAME accumulated depth the list lane
-// would save. No SyncProbeResourcesForType caller left in production.
-// -----------------------------------------------------------------------
-
-// TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft pins
-// the byte-equivalence contract: after a list-open + one load-more append
-// (accumulated depth 2), an independent sweep-completion save (a SEPARATE,
-// smaller probe result for the same type landing via EnrichmentChecked's
-// "all done" branch — the exact D16 scenario, where the sweep lane's own
-// first-page-only probe result would otherwise stomp the list lane's deeper
-// accumulated rows) must persist the list lane's FULL accumulated depth, not
-// the sweep's shallower snapshot — using the readTypeFile byte-compare
-// pattern from qa_cache_lifecycle_test.go. Also asserts (via source grep)
-// that no production caller of SyncProbeResourcesForType exists: RowStore's
-// own lockstep through ObserveRows/AmendRows carries the depth-2
-// accumulation without a sync function.
+// TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft: after a
+// list-open + one load-more append (accumulated depth 2), an independent
+// sweep-completion save (a separate, smaller probe result for the same type
+// landing via EnrichmentChecked's "all done" branch) persists the list lane's
+// full accumulated depth, not the sweep's shallower snapshot — compared with
+// the readTypeFile byte-compare pattern from qa_cache_lifecycle_test.go. A
+// source grep also asserts that production code carries no
+// SyncProbeResourcesForType: RowStore's lockstep through ObserveRows/AmendRows
+// carries the depth-2 accumulation.
 func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) {
 	t.Run("no_production_caller_of_SyncProbeResourcesForType_remains", func(t *testing.T) {
 		out, err := caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t)
@@ -307,10 +280,9 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 	}
 
 	// Independent sweep-completion save for the SAME type: a Wave-1 probe
-	// result carrying only ONE row (the D16 scenario's shallower, independent
-	// AWS list call) followed by its own enrichment-completion "all done"
-	// save — must NOT stomp the list lane's deeper 3-row file with its own
-	// shallower snapshot.
+	// result carrying only ONE row (a shallower, independent AWS list call)
+	// followed by its own enrichment-completion "all done" save — must NOT stomp
+	// the list lane's deeper 3-row file with its own shallower snapshot.
 	sweepSeed := []resource.Resource{
 		{ID: "bucket-stage2-1", Name: "bucket-stage2-1", Type: "s3"},
 	}
@@ -401,12 +373,6 @@ func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, 
 	return strings.Join(hits, "\n"), nil
 }
 
-// -----------------------------------------------------------------------
-// Pin 4 — Observed-empty: a live probe returning zero rows must
-// seed an EMPTY list on navigation. Origin=Probe empty beats Origin=Disk
-// rows; no stale disk rows resurrect.
-// -----------------------------------------------------------------------
-
 // TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows pins the
 // "observed-empty is fresher than any disk row" rule the handlers_navigate.go
 // doc comment states explicitly: a live Wave-1 probe confirming a type is
@@ -462,11 +428,6 @@ func TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 		}
 	}
 }
-
-// -----------------------------------------------------------------------
-// Pin 5 — Issue-count parity: unifiedIssueCount-driven menu badge equals the
-// same aggregation computed from the store rows.
-// -----------------------------------------------------------------------
 
 // handCountDistinctIssueRows returns the count of rows carrying at least one
 // finding — a faithful hand-count only when every finding in the row set is

@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// trace_test.go — regression coverage for core/trace, the opt-in JSON-lines
-// event stream for the detail-operation lifecycle (see core/trace/trace.go's
-// package doc for the "~50 defects thousands of green tests missed" context
-// this package exists to make observable). package unit_test (not unit) so
-// these tests can reuse the already-allowlisted newTestControllerAndCore
-// helper (app_patch_cache_intents_test.go) — required by the construction
+// Core/trace, the opt-in JSON-lines event stream for the
+// detail-operation lifecycle. package unit_test (not unit) so these tests can
+// reuse the allowlisted newTestControllerAndCore helper
+// (app_patch_cache_intents_test.go) — required by the construction
 // discipline gate (qa_controller_construction_discipline_test.go) — and
-// detail_operation_test.go's detailOpSfnFake / detailOpFindTaskKind, the
-// existing real-SFN-related-checker fixtures.
+// detail_operation_test.go's detailOpSfnFake / detailOpFindTaskKind.
 //
 // Every Enable call here is paired with t.Cleanup(trace.Disable); none of
 // these tests calls t.Parallel(), so core/trace's package-level global state
@@ -244,8 +241,7 @@ func TestTrace_ConcurrentRelatedFanout_ProducesWellFormedNonInterleavedJSONLines
 
 // nonEmptyTraceLines splits raw (a trace sink's accumulated writes) into its
 // constituent JSON lines, dropping any trailing empty line left by the final
-// '\n'. Shared by every test in this file that inspects more than one
-// possible line.
+// '\n'.
 func nonEmptyTraceLines(t *testing.T, raw string) []string {
 	t.Helper()
 	raw = strings.TrimRight(raw, "\n")

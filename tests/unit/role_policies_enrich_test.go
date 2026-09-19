@@ -14,10 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Narrow mocks for IAMGetPolicyAPI, IAMGetPolicyVersionAPI, IAMGetRolePolicyAPI
-// (local to enrich tests — distinct names from aws_role_policies_test.go mocks)
-// ---------------------------------------------------------------------------
+// Mock names differ from aws_role_policies_test.go's, which shares this package.
 
 type enrichGetPolicyClient struct {
 	output *iam.GetPolicyOutput
@@ -71,10 +68,6 @@ func (m *countingEnrichGetPolicyVersionClient) GetPolicyVersion(_ context.Contex
 	*m.count++
 	return m.output, nil
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 func TestFetchManagedPolicyDocument_ReturnsParsedDocument(t *testing.T) {
 	docJSON := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::my-bucket/*"}]}`
@@ -204,12 +197,10 @@ func TestFetchRolePolicies_IncludesRoleNameInFields(t *testing.T) {
 	if len(result.Resources) < 2 {
 		t.Fatalf("expected at least 2 resources, got %d", len(result.Resources))
 	}
-	// Check managed policy has role_name
 	managedRes := result.Resources[0]
 	if managedRes.Fields["role_name"] != "my-role" {
 		t.Errorf("managed policy: expected role_name=my-role, got %q", managedRes.Fields["role_name"])
 	}
-	// Check inline policy has role_name
 	inlineRes := result.Resources[1]
 	if inlineRes.Fields["role_name"] != "my-role" {
 		t.Errorf("inline policy: expected role_name=my-role, got %q", inlineRes.Fields["role_name"])
@@ -235,7 +226,6 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 		count: &callCount,
 	}
 
-	// First call
 	_, err := awsclient.FetchManagedPolicyDocument(context.Background(), getPolicyMock, getVersionMock, "arn:aws:iam::123456789012:policy/no-cache-test")
 	if err != nil {
 		t.Fatalf("first call error: %v", err)
@@ -328,24 +318,20 @@ type errFake string
 
 func (e errFake) Error() string { return string(e) }
 
-// ---------------------------------------------------------------------------
 // fakeIAMBase embeds awsclient.IAMAPI so the struct satisfies that interface
 // at compile time (via embedding), but provides no concrete method
 // implementations. When enrichRolePolicy does c.IAM.(IAMGetRolePolicyAPI) or
 // c.IAM.(IAMGetPolicyAPI), the assertion fails at runtime — which is exactly
 // what TestEnrichRolePolicy_InlineIAMTypeAssertionFails and
 // TestEnrichRolePolicy_ManagedIAMTypeAssertionFails need to verify.
-// ---------------------------------------------------------------------------
 
 type fakeIAMBase struct {
 	awsclient.IAMAPI
 }
 
-// ---------------------------------------------------------------------------
 // combinedIAMMock satisfies IAMGetPolicyAPI + IAMGetPolicyVersionAPI via
 // concrete method implementations, and delegates all other IAMAPI methods
-// to the embedded awsclient.IAMAPI. Used for managed-policy enricher tests.
-// ---------------------------------------------------------------------------
+// to the embedded awsclient.IAMAPI.
 
 type combinedIAMMock struct {
 	awsclient.IAMAPI
@@ -363,13 +349,10 @@ func (m *combinedIAMMock) GetPolicyVersion(_ context.Context, _ *iam.GetPolicyVe
 	return m.getPolicyVerOut, m.getPolicyVerErr
 }
 
-// ---------------------------------------------------------------------------
 // inlineIAMMock wraps *enrichGetRolePolicyClient so it satisfies the full
 // awsclient.IAMAPI interface. All methods other than GetRolePolicy are
-// delegated to the embedded fakeIAMBase (which will panic if called —
-// that is intentional: the enricher should only call GetRolePolicy for inline
-// policy tests, and any unexpected call to another method indicates a bug).
-// ---------------------------------------------------------------------------
+// delegated to the embedded fakeIAMBase, which panics if called: the enricher
+// should only call GetRolePolicy for inline policies.
 
 type inlineIAMMock struct {
 	awsclient.IAMAPI
@@ -379,11 +362,6 @@ type inlineIAMMock struct {
 func (m *inlineIAMMock) GetRolePolicy(ctx context.Context, in *iam.GetRolePolicyInput, opts ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {
 	return m.inner.GetRolePolicy(ctx, in, opts...)
 }
-
-// ---------------------------------------------------------------------------
-// rolePoliciesEnricher retrieves the registered detail enricher for
-// "role_policies" and fails the test immediately if it is not found.
-// ---------------------------------------------------------------------------
 
 func rolePoliciesEnricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -449,10 +427,6 @@ func validEnrichedDoc(t *testing.T, res resource.Resource) map[string]any {
 	}
 	return doc
 }
-
-// ---------------------------------------------------------------------------
-// TestEnrichRolePolicy_* — enrichRolePolicy behavioral tests (via registry)
-// ---------------------------------------------------------------------------
 
 func TestEnrichRolePolicy_InlineCacheHit(t *testing.T) {
 	// Cache pre-populated — enricher must not call any IAM API.
@@ -732,10 +706,6 @@ func TestEnrichRolePolicy_DetailEnrichmentCtx_NilPolicyDocs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// decodePolicyDocument additional tests (exercised via FetchManagedPolicyDocument)
-// ---------------------------------------------------------------------------
-
 // TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued: a query-style
 // document is not rescued by a second QueryUnescape pass. That fallback
 // would silently turn a literal '+' inside a policy — a resource name, a
@@ -818,10 +788,6 @@ func TestDecodePolicyDocument_BothFail_ReturnsJSONParseError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FetchManagedPolicyDocument nil-guard tests
-// ---------------------------------------------------------------------------
-
 func TestFetchManagedPolicyDocument_NilPolicy(t *testing.T) {
 	getPolicyMock := &enrichGetPolicyClient{output: &iam.GetPolicyOutput{Policy: nil}}
 	getVersionMock := &enrichGetPolicyVersionClient{output: &iam.GetPolicyVersionOutput{}}
@@ -877,10 +843,6 @@ func TestFetchManagedPolicyDocument_NilPolicyVersionDocument(t *testing.T) {
 		t.Errorf("expected 'nil document' in error, got: %v", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// FetchInlinePolicyDocument nil-guard test
-// ---------------------------------------------------------------------------
 
 func TestFetchInlinePolicyDocument_NilDocument(t *testing.T) {
 	mock := &enrichGetRolePolicyClient{

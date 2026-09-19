@@ -1,6 +1,6 @@
 package unit_test
 
-// related_navigate_count_spec008_test.go — Spec-008: handleRelatedNavigate
+// HandleRelatedNavigate
 // behavior: the TargetID case opens detail, not a list, and RelatedIDs>1
 // creates a filtered list.
 //
@@ -9,9 +9,7 @@ package unit_test
 // lanes (TUI and web) — never the target's enter-keyed child view, which
 // would make the two lanes diverge since the web lane always renders
 // detail. Child views stay reachable by pressing Enter inside the target's
-// own list. TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget (tg) and
-// TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
-// (asg) pin this rule.
+// own list.
 
 import (
 	"strings"
@@ -27,9 +25,8 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ---------------------------------------------------------------------------
-// Local helpers (unit_test package cannot access unit package internals)
-// ---------------------------------------------------------------------------
+// The unit_test package cannot reach unit package internals, so these helpers
+// are local.
 
 // relatedApplyMsg sends a message through the tui.Model's Update.
 func relatedApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
@@ -111,10 +108,6 @@ func applyRelatedFollowUp(m tui.Model, cmd tea.Cmd) tui.Model {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Count=1: single related resource should open DETAIL view, not list
-// ---------------------------------------------------------------------------
-
 // TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget verifies that when a
 // RelatedNavigateMsg arrives with a single TargetID (count=1 path), the model
 // opens the target resource's DETAIL view: a related-panel Count=1 pivot
@@ -138,7 +131,6 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	}
 	m = applyRelatedResourcesLoaded(m, "tg", []resource.Resource{tgRes})
 
-	// Deliver RelatedNavigateMsg with TargetID set (single resource navigation).
 	m, cmd := relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-spec008-single",
@@ -237,9 +229,9 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 		},
 	})
 	m = m2
-	// asg is issue-capable, so the auto-open Navigate now arrives batched
-	// alongside a ProbeEnrich task dispatch (tea.Batch) — drain batch-safe so
-	// the Navigate still reaches the model instead of being silently dropped.
+	// asg is issue-capable, so the auto-open Navigate arrives batched alongside a
+	// ProbeEnrich task dispatch (tea.Batch) — drain batch-safe so the Navigate
+	// reaches the model instead of being silently dropped.
 	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
@@ -315,10 +307,9 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 
 	view := stripAnsi(relatedViewContent(m))
 	// alarm has Children[Key="enter"]=alarm_history, but a related pivot that
-	// narrows to exactly ONE resource always opens that resource's detail
-	// view. The load-more mechanics under test are unchanged: once the later
-	// page yields the target, the user must not be left on a dead-end 1-row
-	// list.
+	// narrows to exactly ONE resource always opens that resource's detail view.
+	// Once the later page yields the target, the user must not be left on a
+	// dead-end 1-row list.
 	if strings.Contains(view, "alarm_history") {
 		t.Fatalf("exact-ID related navigation must NOT auto-open alarm_history (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
 	}
@@ -327,15 +318,9 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Count>1: multiple related resources must be filtered to only those IDs
-// ---------------------------------------------------------------------------
-
 // TestApp_008_RelatedNavigate_MultipleIDs_ShowsOnlyThoseResources verifies that
 // when a RelatedNavigateMsg arrives with multiple RelatedIDs, the resulting list
 // view shows only the matching resources and NOT unrelated ones.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by exact IDs.
 func TestApp_008_RelatedNavigate_MultipleIDs_ShowsOnlyThoseResources(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -367,8 +352,6 @@ func TestApp_008_RelatedNavigate_MultipleIDs_ShowsOnlyThoseResources(t *testing.
 // TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount verifies that when
 // a multi-ID RelatedNavigateMsg is applied, the frame title reflects the count
 // of filtered resources.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by exact IDs.
 func TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -386,7 +369,6 @@ func TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount(t *testing.T) {
 
 	view := stripAnsi(relatedViewContent(m))
 
-	// Frame title should indicate count=2 for filtered alarm list
 	if !strings.Contains(view, "2") {
 		t.Errorf("frame/view should indicate count=2 for filtered alarm list; got:\n%s", view)
 	}
@@ -458,14 +440,8 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 	}
 }
 
-// ---------------------------------------------------------------------------
-// RelatedCheckResultMsg: count=0 regression guard
-// ---------------------------------------------------------------------------
-
 // TestApp_008_RelatedCheckResult_Count0_NoNavigation verifies that a
 // RelatedCheckResultMsg with Count=0 does not produce navigation.
-//
-// PASSES NOW — regression guard.
 func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -483,12 +459,8 @@ func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Count=1 drill rule: detail for every target type, including childless
-// ones. Parameterized over three enter-child types (s3, tg, asg) plus one
-// childless type (kms): with no Children[Key="enter"] to redirect through,
-// kms lands on detail without the rule and must continue to do so.
-// ---------------------------------------------------------------------------
+// A Count=1 drill lands on detail for every target type, with or without an
+// enter-keyed child view.
 
 func TestApp_008_RelatedNavigate_CountOne_AlwaysOpensDetail(t *testing.T) {
 	cases := []struct {

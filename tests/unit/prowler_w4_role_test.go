@@ -1,9 +1,8 @@
 package unit
 
-// prowler_w4_role_test.go — behavioural tests for the batch-w4 role rows:
-// the trust-policy verdict migration onto core/iampolicy, the
-// confused-deputy trust finding, the inline privilege-escalation finding,
-// and the admin-policy-attached wave-2 finding.
+// role posture: the trust-policy verdict from core/iampolicy, the
+// confused-deputy trust finding, the inline privilege-escalation finding, and
+// the admin-policy-attached wave-2 finding.
 
 import (
 	"context"
@@ -44,12 +43,9 @@ const (
 	w4PowerUserAccessARN = "arn:aws:iam::aws:policy/PowerUserAccess"
 )
 
-// --- trust policy documents -------------------------------------------------
-
 // The bare-string principal form. AWS returns it verbatim for
 // {"Principal": "*"}; a typed unmarshal into a struct whose Principal is an
-// object cannot see it, which is why the pre-migration code needed a
-// substring check alongside the parse.
+// object cannot see it.
 const w4TrustBareStarNoCondition = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Principal":"*","Action":"sts:AssumeRole"}]}`
 
@@ -95,15 +91,11 @@ const w4TrustStarAndLambda = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole"},` +
 	`{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`
 
-// --- inline policy documents ------------------------------------------------
-
 const w4InlinePrivEscDoc = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Action":"iam:CreateLoginProfile","Resource":"*"}]}`
 
 const w4InlineBenignDoc = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":"arn:aws:s3:::acme-reports/*"}]}`
-
-// --- fakes ------------------------------------------------------------------
 
 // w4RoleListFake serves ListRoles plus the two optional inline-policy
 // interfaces FetchIAMRolesPage type-asserts on.
@@ -182,8 +174,6 @@ func w4FetchRole(t *testing.T, fake *w4RoleListFake, name string) resource.Resou
 	t.Fatalf("role %q not in fetch result", name)
 	return resource.Resource{}
 }
-
-// --- row 1: the trust verdict comes from iampolicy -------------------------
 
 // TestW4RoleWildcardTrustVerdict pins which trust policies are "anyone can
 // assume this role". The verdict is the shared policy evaluator's, so a
@@ -268,10 +258,9 @@ func TestW4TrustExternalIDIsTrustOnly(t *testing.T) {
 	}
 }
 
-// TestW4NoPrincipalStringMatchingLeftInRoleCode pins the architectural half of
-// the migration: the trust verdict has exactly one implementation. A second
-// copy in the fetcher or the classifier is what let the Findings list and the
-// row color disagree in the first place.
+// TestW4NoPrincipalStringMatchingLeftInRoleCode pins that the trust verdict
+// has exactly one implementation: a second copy in the fetcher or the
+// classifier lets the Findings list and the row color disagree.
 func TestW4NoPrincipalStringMatchingLeftInRoleCode(t *testing.T) {
 	for _, path := range []string{"../../core/aws/iam_roles.go", "../../core/aws/catalog_security.go"} {
 		b, err := os.ReadFile(path)
@@ -292,8 +281,8 @@ type w4RoleGetFake struct {
 	roles map[string]iamtypes.Role
 }
 
-// The drill path walks inline policies now, so a fake that claims the whole
-// IAM API has to answer for them; the embedded nil interface would panic.
+// The drill path walks inline policies, so a fake that claims the whole IAM
+// API has to answer for them; the embedded nil interface would panic.
 func (f *w4RoleGetFake) ListRolePolicies(
 	_ context.Context, _ *iam.ListRolePoliciesInput, _ ...func(*iam.Options),
 ) (*iam.ListRolePoliciesOutput, error) {
@@ -342,10 +331,8 @@ func TestW4RoleByIDCarriesTheSameTrustVerdict(t *testing.T) {
 	})
 }
 
-// --- row 2: confused deputy -------------------------------------------------
-
-// TestW4RoleConfusedDeputy pins the trust-policy row for a service principal
-// that can assume the role on behalf of any caller.
+// TestW4RoleConfusedDeputy pins the trust-policy finding for a service
+// principal that can assume the role on behalf of any caller.
 func TestW4RoleConfusedDeputy(t *testing.T) {
 	fake := &w4RoleListFake{roles: []iamtypes.Role{
 		w4Role("acme-lambda-exec-role", "/", w4TrustLambdaNoSourceScope),
@@ -415,9 +402,7 @@ func TestW4RoleTwoTrustConditionsTwoFindings(t *testing.T) {
 	}
 }
 
-// --- row 5: inline privilege escalation -------------------------------------
-
-// TestW4RoleInlinePrivilegeEscalation pins the inline-policy row: the finding
+// TestW4RoleInlinePrivilegeEscalation pins the inline-policy finding: it
 // names both the policy that carries the grant and the escalation it adds up
 // to, so the operator knows which document to edit.
 func TestW4RoleInlinePrivilegeEscalation(t *testing.T) {
@@ -484,8 +469,6 @@ func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 	})
 }
 
-// --- row 3: admin policy attached (wave 2) ----------------------------------
-
 // w4RoleAdminFake serves the role enricher: GetRole for the dormancy check
 // and ListAttachedRolePolicies for the admin check.
 type w4RoleAdminFake struct {
@@ -533,8 +516,8 @@ func w4RoleResource(name, path string) resource.Resource {
 	}
 }
 
-// TestW4RoleAdminAttached pins the wave-2 row: a role holding a managed
-// admin policy is reported on the role row itself, naming the policy.
+// TestW4RoleAdminAttached pins that a role holding a managed admin policy is
+// reported on the role row itself, naming the policy.
 func TestW4RoleAdminAttached(t *testing.T) {
 	fake := &w4RoleAdminFake{attached: map[string]map[string]string{
 		"acme-deploy-admin-role": {"AdministratorAccess": w4AdminAccessARN},

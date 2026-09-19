@@ -1,6 +1,6 @@
 package unit
 
-// prowler_w3_tgw_test.go — tgw.auto-accept-attachments.
+// Tgw.auto-accept-attachments.
 //
 // A transit gateway set to auto-accept shared attachments joins any VPC an
 // RAM share points at it without review, so the option is a posture signal

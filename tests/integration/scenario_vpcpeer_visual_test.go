@@ -2,16 +2,15 @@
 
 package integration
 
-// scenario_vpcpeer_visual_test.go — Phase 8 render-gate for the vpc-peer
-// resource. Verifies the rendered TUI output (not fetcher return values)
-// matches the universal UI rules and the §4 contract in
+// scenario_vpcpeer_visual_test.go checks the rendered TUI output (not
+// fetcher return values) for vpc-peer against the universal UI rules and
 // docs/resources/vpc-peer.md.
 //
 // vpc-peer is a single-call type (DescribeVpcPeeringConnections carries the
 // whole story — no N+1, no degraded rows). Every finding is color-bearing
 // (the fleet color invariant); the two derived route checks (no-local-route,
 // blackholed) come from the zero-API rtb cache-scan enricher as `~`-class
-// findings — Warning-colored rows that deliberately do not bump the S1 badge.
+// findings — Warning-colored rows that do not bump the menu badge.
 
 import (
 	"testing"
@@ -20,8 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// §4 phrases pinned locally — any drift in the fetcher/enricher surfaces here
-// instead of in unit tests that could be rewritten without noticing.
 const (
 	vpcPeerPhraseProvisioning = "provisioning"
 	vpcPeerPhraseInitiating   = "initiating"
@@ -47,24 +44,22 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// S1 menu badge — issue-COLORED rows: provisioning, initiating, pending,
+	// Menu badge — issue-COLORED rows: provisioning, initiating, pending,
 	// expired, deleting, overlap (6 Warning) + rejected, failed (2 Broken)
 	// = 8. Dim (deleted) and the two `~` route checks do not bump.
 	scenario.ExpectMenuIssueCount("vpc-peer", 8)
 
 	scenario.OpenList("vpc-peer")
 
-	// Universal column rules — no jargon columns.
 	for _, jargon := range []string{
 		"CIS", " Flags", " Issues ", "NOBKP", "UNENC", "NOPROT", "PUB ",
 	} {
 		scenario.ExpectViewNotContains(jargon)
 	}
 
-	// Healthy row: blank Status — active, routed, disjoint CIDRs.
+	// The healthy row is active, routed, with disjoint CIDRs.
 	scenario.ExpectRowStatusBlank(demofixtures.ProdPeerSharedID)
 
-	// §4 state phrases.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerProvisioningID, vpcPeerPhraseProvisioning)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerInitiatingID, vpcPeerPhraseInitiating)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerPendingID, vpcPeerPhrasePending)
@@ -77,14 +72,11 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	// Config-derived warning: active-only CIDR overlap.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerOverlapID, vpcPeerPhraseOverlap)
 
-	// The two `~`-class route background checks: Warning-colored rows
-	// carrying the phrase (colour derives from findings uniformly; the `~`
-	// class only keeps them out of the S1 badge).
+	// The two `~`-class route background checks colour their rows Warning;
+	// the `~` class only keeps them out of the menu badge.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerNoRouteID, vpcPeerPhraseNoRoute)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerBlackholeID, vpcPeerPhraseBlackhole)
 
-	// Glyph rules: every finding is color-bearing — no row wears a glyph
-	// (the color is the signal); the healthy baseline is also glyph-free.
 	for _, id := range []string{
 		demofixtures.ProdPeerSharedID,
 		demofixtures.WarnPeerProvisioningID,
@@ -119,7 +111,6 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario.OpenDetailResource("vpc-peer", rejected)
 	scenario.ExpectNoAPIError()
 
-	// 8.4 user-visible sanity render (mandatory).
 	t.Log("\n" + scenario.currentView())
 
 	scenario.ExpectViewContains(vpcPeerDetailRejected)
@@ -127,7 +118,6 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 
 	scenario.Back()
 
-	// Both `~` findings surface as their own S5 Attention entries.
 	blackhole := selectVpcPeerByID(t, scenario, demofixtures.WarnPeerBlackholeID)
 	scenario.OpenDetailResource("vpc-peer", blackhole)
 	scenario.ExpectNoAPIError()
@@ -152,8 +142,8 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario.AssertNoEnrichmentErrors()
 }
 
-// TestScenario_VpcPeerVisual_HealthySilence — spec §4 "Healthy silence": the
-// showroom row renders no Attention section and no finding phrase; the
+// TestScenario_VpcPeerVisual_HealthySilence — the showroom row renders no
+// Attention section and no finding phrase; the
 // cross-account accepter renders as plain facts (OwnerId visible), never a
 // signal.
 func TestScenario_VpcPeerVisual_HealthySilence(t *testing.T) {

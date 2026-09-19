@@ -1,6 +1,6 @@
 package unit_test
 
-// views_detail_rightcol_hide_zeros_test.go — whether a zero-resolved pivot row
+// Whether a zero-resolved pivot row
 // reaches the right column.
 //
 // The four ct-events self-pivot rows (CT events by AccessKeyId / Username /
@@ -12,11 +12,6 @@ package unit_test
 //
 // Typed groups from other resource types (e.g. "EC2 Instances (0)") are
 // deliberately allowed to render a zero: there the zero is the answer.
-//
-// The two tests here replace a pair that were skipped pending a cold-cache
-// harness. They now drive the real checkers through the Controller the app
-// itself builds the right column from, so the behaviour has a live test rather
-// than a deferred one.
 
 import (
 	"context"

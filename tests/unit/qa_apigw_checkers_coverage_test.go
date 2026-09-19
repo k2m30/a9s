@@ -1,19 +1,6 @@
-// qa_apigw_checkers_coverage_test.go — Behavioral coverage tests for APIGW related-resource checkers.
-//
-// Tests cover functions with zero coverage: checkApigwACM, checkApigwAlarm, checkApigwCF,
-// checkApigwELB, checkApigwRole.
-//
-// checkApigwR53, checkApigwSFN, checkApigwSNS, checkApigwVPCE were removed
-// along with their registrations: each was hardcoded to State: RelatedUnknown
-// (or a resolved 0), never a witnessable Count>0, with no AWS API path to resolve a concrete match from
-// GetApis/GetIntegrations alone (R53/VPCE: private-API endpoint id and
-// alias-record resolution are outside GetApis; SFN/SNS: the target ARN lives
-// in the per-route request template, not the integration URI). See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
-//
-// Each test exercises the real checker logic (no mocking the checker itself).
-// Tests in this file should PASS against current main — they cover existing, correct code.
+// Behavioural tests for the APIGW
+// related-resource checkers checkApigwACM, checkApigwAlarm, checkApigwCF,
+// checkApigwELB and checkApigwRole, run against the real checker logic.
 package unit_test
 
 import (
@@ -63,7 +50,6 @@ func TestRelated_APIGW_ACM_EmptyID(t *testing.T) {
 func TestRelated_APIGW_Alarm_Match(t *testing.T) {
 	const apiID = "api-test-alarm123"
 
-	// Build a CloudWatch MetricAlarm with dimension ApiId = apiID.
 	alarm := cwtypes.MetricAlarm{
 		AlarmName: aws.String("apigw-5xx-alarm"),
 		Dimensions: []cwtypes.Dimension{
@@ -76,7 +62,6 @@ func TestRelated_APIGW_Alarm_Match(t *testing.T) {
 		Fields:    map[string]string{},
 		RawStruct: alarm,
 	}
-	// Second alarm for a different API — must NOT match.
 	otherAlarm := cwtypes.MetricAlarm{
 		AlarmName: aws.String("other-api-alarm"),
 		Dimensions: []cwtypes.Dimension{
@@ -136,7 +121,6 @@ func TestRelated_APIGW_Alarm_NoMatch(t *testing.T) {
 }
 
 func TestRelated_APIGW_Alarm_CacheNotLoaded(t *testing.T) {
-	// Empty cache + nil clients → State: RelatedUnknown.
 	checker := apigwCheckerByTarget(t, "alarm")
 	res := resource.Resource{ID: "api-xyz987", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
@@ -163,7 +147,6 @@ func TestRelated_APIGW_Alarm_EmptyID(t *testing.T) {
 func TestRelated_APIGW_CF_Match(t *testing.T) {
 	const apiID = "a1b2c3d4e5"
 
-	// CloudFront distribution with an origin pointing at this API's invoke URL.
 	dist := cftypes.DistributionSummary{
 		ARN: aws.String("arn:aws:cloudfront::123456789012:distribution/E1EXAMPLE"),
 		Origins: &cftypes.Origins{
@@ -182,7 +165,6 @@ func TestRelated_APIGW_CF_Match(t *testing.T) {
 		RawStruct: dist,
 	}
 
-	// Another distribution pointing at a different API — must NOT match.
 	otherDist := cftypes.DistributionSummary{
 		ARN: aws.String("arn:aws:cloudfront::123456789012:distribution/E2OTHER"),
 		Origins: &cftypes.Origins{
@@ -326,14 +308,3 @@ func TestRelated_APIGW_Role_EmptyID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
-
-// checkApigwSFN, checkApigwSNS, checkApigwVPCE (Pattern C GetIntegrations /
-// v1-endpoint stubs) were removed along with their registrations: SFN/SNS
-// could detect that an integration existed but the target ARN lives in the
-// per-route request template (not the integration URI), and VPCE's
-// endpoint_configuration is v1-only, unavailable via v2 GetApis — none ever
-// witnessable. apigwListIntegrations itself (the shared GetIntegrations
-// helper) remains covered via checkApigwLambda's tests in
-// aws_apigw_related_test.go. See qa_demo_pivot_coverage_test.go's
-// knownDisconnectedPivots terminal-state comment for the burn-down
-// precedent this deletion follows.

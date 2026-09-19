@@ -1,15 +1,9 @@
-// qa_console_open_test.go — key wiring for the "o = open in AWS console /
-// O = copy console URL" feature (spec: console-url-spec.md, "Behavior
-// contract (TUI)"). Follows the established Copy-key ('c') wiring pattern in
-// tui_wiring_test.go and the filter/command-mode suppression pattern in
-// qa_filtering_test.go / qa_mainmenu_nav_test.go.
+// Key wiring for "o" (open in AWS console) and
+// "O" (copy console URL).
 //
-// Demo mode is used throughout for the "o" (open) path so no real process is
-// ever exec'd: per spec, "o" in demo mode returns the disabled-link Flash
-// directly instead of calling openBrowserCmd. "O" (copy) is exercised the
-// same tolerant way tui_wiring_test.go already exercises 'c' — clipboard
-// access may fail in a headless CI environment, and that is an accepted,
-// logged outcome, not a test failure.
+// Demo mode is used for the "o" path so no real process is ever exec'd: in
+// demo mode "o" returns the disabled-link Flash instead of calling
+// openBrowserCmd.
 package unit
 
 import (
@@ -25,15 +19,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// consoleDemoDisabledFlashText is the exact spec-mandated flash text
-// (console-url-spec.md, "Behavior contract (TUI)": `o` -> Flash "demo mode
-// — console link disabled (O still copies)"). Kept as the literal contract
-// string — if the implementation's wording ever drifts from this, that is a
-// real regression this test must catch, not something to paper over here.
+// consoleDemoDisabledFlashText is the exact flash text `o` shows in demo mode.
 const consoleDemoDisabledFlashText = "demo mode — console link disabled (O still copies)"
 
-// newDemoConsoleModel builds a sized, demo-mode root model with clients
-// wired, mirroring demo_app_test.go's TestDemoMode_* constructor pattern.
+// newDemoConsoleModel builds a sized, demo-mode root model with clients wired.
 // The window is intentionally wide (200 cols) so the flash-text truncation
 // in app_view.go's header render (maxFlash = width-40) never kicks in —
 // consoleDemoDisabledFlashText is 50 runes and would otherwise be clipped
@@ -66,8 +55,6 @@ func loadDemoEC2List(m tui.Model) tui.Model {
 	return m
 }
 
-// ─── "o" on a resource list, demo mode ───────────────────────────────────────
-
 func TestConsoleOpen_ResourceList_DemoMode_FlashesDisabledMessage(t *testing.T) {
 	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
@@ -88,18 +75,10 @@ func TestConsoleOpen_ResourceList_DemoMode_FlashesDisabledMessage(t *testing.T) 
 	}
 }
 
-// ─── "O" on a resource list — copy path (tolerant of clipboard failure, same
-// convention as TestWiring_CopyInResourceList_ReturnsFlashMsg) ──────────────
-
 // TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL drives the real
 // clipboard write and reads it back — handleOpenConsole(copyOnly=true) ->
-// copyToClipboard always returns messages.Flash (a constant success/failure
-// label, never the copied content itself: see
-// TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL and
-// text_ports_test.go's wave3CopyAndReadClipboard doc comment for the same
-// contract on the 'c' key). A prior version of this test asserted against a
-// messages.Copied case that copyToClipboard never actually produces — that
-// branch was dead code and never executed.
+// copyToClipboard returns messages.Flash, a constant success/failure label,
+// never the copied content itself.
 func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
 	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
@@ -125,8 +104,6 @@ func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
 		t.Errorf("clipboard content after 'O' = %q, want %q", got, want)
 	}
 }
-
-// ─── filter mode suppresses "o" / "O" — they type into the filter ──────────
 
 func TestConsoleOpen_FilterModeActive_OTypesIntoFilterInsteadOfTriggering(t *testing.T) {
 	m := newDemoConsoleModel(t)
@@ -154,8 +131,6 @@ func TestConsoleOpen_FilterModeActive_UppercaseOTypesIntoFilterInsteadOfTriggeri
 		t.Errorf("with filter mode active, 'O' should be typed into the filter (expected '/O' in header), got:\n%s", plain)
 	}
 }
-
-// ─── command mode suppresses "o" / "O" — they type into the command bar ────
 
 func TestConsoleOpen_CommandModeActive_OTypesIntoCommandBarInsteadOfTriggering(t *testing.T) {
 	m := newDemoConsoleModel(t)
@@ -185,8 +160,6 @@ func TestConsoleOpen_CommandModeActive_UppercaseOTypesIntoCommandBarInsteadOfTri
 		t.Errorf("with command mode active, 'O' should be typed into the command bar (expected ':O' in header), got:\n%s", plain)
 	}
 }
-
-// ─── main menu: no-op, no crash ─────────────────────────────────────────────
 
 func TestConsoleOpen_MainMenu_NoOpNoCrash(t *testing.T) {
 	m := newDemoConsoleModel(t)
@@ -219,8 +192,6 @@ func TestConsoleOpen_MainMenu_UppercaseO_NoOpNoCrash(t *testing.T) {
 	}
 }
 
-// ─── detail view: "o"/"O" resolve the detailed resource ────────────────────
-
 func TestConsoleOpen_DetailView_DemoMode_FlashesDisabledMessage(t *testing.T) {
 	m := newDemoConsoleModel(t)
 	res := &resource.Resource{
@@ -245,11 +216,8 @@ func TestConsoleOpen_DetailView_DemoMode_FlashesDisabledMessage(t *testing.T) {
 	}
 }
 
-// TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL — see the doc
-// comment on TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL:
-// copyToClipboard only ever returns messages.Flash, so verification reads
-// the real clipboard back rather than matching a messages.Copied case that
-// production code never produces.
+// TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL reads the real
+// clipboard back, since copyToClipboard returns only messages.Flash.
 func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 	m := newDemoConsoleModel(t)
 	res := &resource.Resource{
@@ -285,22 +253,12 @@ func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 	}
 }
 
-// ─── Overlay fall-through: "o"/"O" must never be silently consumed ──────────
-//
-// OpenConsole/CopyConsoleURL are only intercepted on resource list (incl.
-// child list) and detail screens. On every other screen kind — help,
-// identity, selectors, costs, etc. — "o"/"O" must reach that screen's own
-// key handling exactly like any other unbound key, per the "any key closes
-// help"/"any key closes identity" precedent (app_stack.go's updateActiveRS:
-// "Any key on the help overlay closes it." / "Any key on the identity
-// overlay closes it.", pinned for an arbitrary key via
-// qa_mainmenu_nav_test.go's TestQA_MainMenu_AnyKeyClosesHelp). A
-// consoleTarget() that ran ahead of the screen-kind guard would resolve
-// ok=false on rsKindHelp/rsKindIdentity and return a silent (m, nil) no-op —
-// the overlay never dismissed and no console action run. These pins use
-// "o"/"O" in place of TestQA_MainMenu_AnyKeyClosesHelp's arbitrary "a" and
-// assert the identical outcome: back to the main menu.
-
+// assertOverlayDismissedByConsoleOpenKey: OpenConsole/CopyConsoleURL are only
+// intercepted on resource list (incl. child list) and detail screens. On
+// every other screen kind — help, identity, selectors, costs, etc. — "o"/"O"
+// reach that screen's own key handling like any other unbound key, so on
+// help/identity they close the overlay (app_stack.go's updateActiveRS) and
+// return to the main menu.
 func assertOverlayDismissedByConsoleOpenKey(t *testing.T, openKey, dismissKey, label string) {
 	t.Helper()
 	m := newRootSizedModel()
@@ -334,21 +292,14 @@ func TestConsoleOpen_IdentityOverlay_UppercaseOKeyClosesIdentityInsteadOfBeingCo
 	assertOverlayDismissedByConsoleOpenKey(t, "i", "O", "identity overlay")
 }
 
-// ─── TUI 'o' path / web snapshot ConsoleURL parity ──────────────────────────
+// TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL: both
+// surfaces resolve the console URL through
+// consolelink.Resolve(Controller.ConsoleTarget()). The TUI's Update() loop
+// via 'O' and an independently-built headless Controller's
+// Snapshot().ConsoleURL, driven against equivalent state, must agree.
 //
-// The closure wave deleted the TUI's own duplicate target resolver in favor
-// of a single controller-owned Controller.ConsoleTarget() (internal/tui/
-// console_open.go's handleOpenConsole now calls m.ctrl.ConsoleTarget()
-// directly). This test drives both surfaces against equivalent state — the
-// TUI's real Update() loop via the 'O' key, and an independently-built
-// headless Controller's Snapshot().ConsoleURL — and asserts they agree on
-// the exact same URL, since both now resolve through the identical
-// consolelink.Resolve(ConsoleTarget()) call.
-//
-// 'O' (uppercase, copy) is used rather than 'o' (open) because 'o' in demo
-// mode short-circuits to the disabled-link flash before ever resolving a
-// URL (see TestConsoleOpen_ResourceList_DemoMode_FlashesDisabledMessage) —
-// 'O' still resolves and copies even in demo mode, per spec.
+// 'O' (copy) is used rather than 'o' (open) because 'o' in demo mode
+// short-circuits to the disabled-link flash before resolving a URL.
 func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing.T) {
 	// ApplyResourcesLoaded on a top-level canonical list triggers a real
 	// disk-cache save (maybeSaveResourceListCache) — redirect it into a
@@ -369,7 +320,6 @@ func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing
 		t.Fatalf("setup: headless Snapshot().ConsoleURL = %q, want %q", headlessURL, wantURL)
 	}
 
-	// TUI side: press 'O' on the same resource in a real Bubble Tea Update loop.
 	m := newDemoConsoleModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{ec2Row}})

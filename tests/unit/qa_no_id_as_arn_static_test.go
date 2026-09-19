@@ -1,27 +1,19 @@
 package unit
 
-// qa_no_id_as_arn_static_test.go — Static guard against the recurring
-// "fetcher emits ID = bare name, enricher passes r.ID as *Arn" bug.
-//
-// First found in tg_issue_enrichment.go (TestEnrichTargetGroupHealth_UsesARNFromFields),
-// then sfn and elb the same day. All three are the same anti-pattern:
+// Static guard: an enricher or related
+// checker under core/aws/ must not pass r.ID as a *Arn parameter,
 //
 //   <Field>Arn: aws.String(r.ID),
 //
-// when the corresponding fetcher actually sets `ID: <bare-name>` and stores
-// the ARN in Fields["<key>_arn"]. Real AWS rejects with InvalidArn /
-// ValidationError; demo mode silently returned empty for forgiving fakes.
+// when its fetcher sets `ID: <bare-name>` and stores the ARN in
+// Fields["<key>_arn"]. Real AWS rejects that with InvalidArn /
+// ValidationError, while forgiving demo fakes return empty.
 //
-// This static test walks every Wave-2 enricher and related-checker file under
-// core/aws/ and asserts no occurrence of the anti-pattern. If a future
-// enricher legitimately needs r.ID as an ARN (because its fetcher does emit
-// ID = ARN), assign through a clearly-named local first:
+// An enricher whose fetcher does emit ID = ARN assigns through a
+// clearly-named local that says so:
 //
-//   resourceARN := r.ID  // <fetcher>.go sets ID = ARN intentionally
+//   resourceARN := r.ID  // <fetcher>.go sets ID = ARN
 //   ... <Field>Arn: aws.String(resourceARN), ...
-//
-// — that variable name + comment make the intent reviewable; an audit can
-// then confirm the fetcher really does emit the ARN as ID.
 
 import (
 	"os"

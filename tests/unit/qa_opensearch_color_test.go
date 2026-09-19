@@ -15,13 +15,10 @@ import (
 
 // TestOpenSearchColor pins the domain state → colour mapping for OpenSearch.
 //
-// Two rows read differently from the phrase-matching era, and both follow from
-// colour being the worst finding's severity. An available software update is
-// only reported when AWS has already passed the automated-install date, so an
+// Colour is the worst finding's severity. An available software update is
+// reported only when AWS has already passed the automated-install date, so an
 // update flag on its own leaves the row green. Encryption at rest being off is
-// a Warn finding, so it colours the row: the old table kept it green on the
-// grounds that a background signal shows as a glyph instead, and that
-// distinction does not survive a severity comparison.
+// a Warn finding, so it colours the row.
 func TestOpenSearchColor(t *testing.T) {
 	cases := []struct {
 		name   string

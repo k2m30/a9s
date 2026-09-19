@@ -41,14 +41,13 @@ func wipfixUnreadableConfigs() []struct {
 	}
 }
 
-// TestFailedProfileRead_ReadsTheSameOnBothLanes pins row 57. A failed read of
-// the local AWS config is one failure with one sentence. The controller's
-// profile selector and the terminal host's profile fetch are two lanes over
-// that one failure, and an operator who meets it on one lane and then the
-// other must not be told two different things about the same file. The
-// sentence is the one the landed contract already carries — the local AWS
-// config named, then the file's own words — and a caller that adds words to
-// what the formatter returned is a second owner of it.
+// TestFailedProfileRead_ReadsTheSameOnBothLanes: a failed read of the local
+// AWS config is one failure with one sentence. The controller's profile
+// selector and the terminal host's profile fetch are two lanes over that one
+// failure, and an operator who meets it on one lane and then the other must
+// not be told two different things about the same file. The sentence names
+// the local AWS config, then the file's own words; a caller that adds words
+// to what the formatter returned is a second owner of it.
 func TestFailedProfileRead_ReadsTheSameOnBothLanes(t *testing.T) {
 	if stdruntime.GOOS == "windows" {
 		t.Skip("Windows has no POSIX file modes and phrases file errors in its own words")
@@ -105,11 +104,10 @@ func TestFailedProfileRead_ReadsTheSameOnBothLanes(t *testing.T) {
 	}
 }
 
-// TestFailedProfileRead_NeitherLaneAddsWordsToTheFormatter is the shape half of
-// row 57. Equal strings today can drift apart again the moment either flash
-// site is edited, because each builds its own sentence out of a shared
-// fragment. The sentence has one owner; a flash site hands the error over and
-// flashes what comes back, with no literal of its own.
+// TestFailedProfileRead_NeitherLaneAddsWordsToTheFormatter: two flash sites
+// that each build their own sentence out of a shared fragment drift apart the
+// moment either is edited. The sentence has one owner; a flash site hands the
+// error over and flashes what comes back, with no literal of its own.
 func TestFailedProfileRead_NeitherLaneAddsWordsToTheFormatter(t *testing.T) {
 	for _, site := range []struct {
 		rel  string

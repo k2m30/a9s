@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_remaining_test.go — pagination tests for remaining fetchers:
+// Pagination tests for remaining fetchers:
 // eventbridge, kinesis, msk, sfn, sns-sub, glue, athena, redshift, backup, ses, waf
 
 import (
@@ -34,10 +34,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEventBridgeRulesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_FirstPage(t *testing.T) {
 	mock := &fakeEventBridgeListRules{
@@ -177,10 +173,6 @@ func (m *mockKinesisListStreamsAPIPaginated) ListStreams(_ context.Context, in *
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchKinesisStreamsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchKinesisStreamsPage_FirstPage(t *testing.T) {
 	mock := &mockKinesisListStreamsAPIPaginated{
@@ -324,10 +316,6 @@ func (m *mockMSKListClustersV2APIPaginated) ListClustersV2(_ context.Context, in
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchMSKClustersPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchMSKClustersPage_FirstPage(t *testing.T) {
 	mock := &mockMSKListClustersV2APIPaginated{
 		PageFunc: func(_ int) (*kafka.ListClustersV2Output, error) {
@@ -451,13 +439,6 @@ func TestQA_Pagination_FetchMSKClustersPage_Error(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Mock: SFN ListStateMachines (paginated, NextToken)
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_sfn_test.go
-// (fakeSFNListStateMachines) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestQA_Pagination_FetchStepFunctionsPage_FirstPage(t *testing.T) {
 	mock := &fakeSFNListStateMachines{
 		PageFunc: func(_ int) (*sfn.ListStateMachinesOutput, error) {
@@ -580,13 +561,6 @@ func TestQA_Pagination_FetchStepFunctionsPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Mock: SNS ListSubscriptions (paginated, NextToken)
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_sns_test.go
-// (fakeSNSListSubscriptions) — see that file's header for the one-fake-per-
-// interface convention.
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_FirstPage(t *testing.T) {
 	mock := &fakeSNSListSubscriptions{
@@ -729,10 +703,6 @@ func (m *mockGlueGetJobsAPIPaginated) GetJobs(_ context.Context, in *glue.GetJob
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchGlueJobsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchGlueJobsPage_FirstPage(t *testing.T) {
 	mock := &mockGlueGetJobsAPIPaginated{
 		PageFunc: func(_ int) (*glue.GetJobsOutput, error) {
@@ -855,17 +825,6 @@ func TestQA_Pagination_FetchGlueJobsPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Mock: Athena ListWorkGroups (paginated, NextToken)
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_athena_test.go
-// (fakeAthenaListWorkGroups) — see that file's header for the one-fake-per-
-// interface convention.
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchAthenaWorkgroupsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_FirstPage(t *testing.T) {
 	mock := &fakeAthenaListWorkGroups{
@@ -1004,10 +963,6 @@ func (m *mockRedshiftDescribeClustersAPIPaginated) DescribeClusters(_ context.Co
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRedshiftClustersPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchRedshiftClustersPage_FirstPage(t *testing.T) {
 	mock := &mockRedshiftDescribeClustersAPIPaginated{
@@ -1148,10 +1103,6 @@ func (m *mockBackupListBackupPlansAPIPaginated) ListBackupPlans(_ context.Contex
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchBackupPlansPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchBackupPlansPage_FirstPage(t *testing.T) {
 	mock := &mockBackupListBackupPlansAPIPaginated{
 		PageFunc: func(_ int) (*backup.ListBackupPlansOutput, error) {
@@ -1289,10 +1240,6 @@ func (m *mockSESv2ListEmailIdentitiesAPIPaginated) ListEmailIdentities(_ context
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSESIdentitiesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchSESIdentitiesPage_FirstPage(t *testing.T) {
 	mock := &mockSESv2ListEmailIdentitiesAPIPaginated{
@@ -1435,10 +1382,6 @@ func (m *mockWAFv2ListWebACLsAPIPaginated) ListWebACLs(_ context.Context, in *wa
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchWAFWebACLsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchWAFWebACLsPage_FirstPage(t *testing.T) {
 	mock := &mockWAFv2ListWebACLsAPIPaginated{

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// views7_status_declared_test.go — every type declares its status column.
+// Every type declares its status column.
 //
 // The cascade reads the status cell from the column's own key and from
 // nothing else. That makes a mistyped key a blank cell rather

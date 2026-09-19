@@ -1,28 +1,17 @@
 package unit_test
 
-// related_truncated_zero_test.go — tests for relatedResultTrunc and
-// the truncated-empty-cache honest-lower-bound contract.
+// RelatedResultTrunc and the
+// truncated-empty-cache lower-bound contract.
 //
-// Anti-pattern (pre-task-#58; historically 225 occurrences across 69
-// *_related*.go files):
-//
-//   if len(ids) == 0 && truncated {
-//       return resource.RelatedCheckResult{TargetType: "X", Count: -1}
-//   }
-//
-// Contract per resource.ValidateRelatedResult (related.go:144) and
-// relatedResultTrunc's docstring: the honest state for "truncated cache
-// with zero hits" is:
+// Per resource.ValidateRelatedResult and relatedResultTrunc's docstring, the
+// honest state for "truncated cache with zero hits" is:
 //
 //   {State: RelatedResolved (zero value), Count: 0, Truncated: true}   — a valid lower bound, not unknown
 //
-// Task #58 replaced the Count==-1 sentinel with the domain.RelatedRowState
-// enum, so the anti-pattern's modern equivalent is a checker returning any
-// non-RelatedResolved state (RelatedUnknown/RelatedError/RelatedDeferred)
-// instead of the honest Resolved+Truncated lower bound — that misrepresents
-// a "we scanned what we could see and found nothing (more may exist)" result
-// as "unknown"/"errored"/"deferred" when the count is actually a known >=0
-// lower bound.
+// A checker returning any non-RelatedResolved state (RelatedUnknown/
+// RelatedError/RelatedDeferred) there misrepresents a "we scanned what we could
+// see and found nothing (more may exist)" result as unknown/errored/deferred
+// when the count is a known >=0 lower bound.
 
 import (
 	"context"
@@ -51,10 +40,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestTruncatedResult_EmptyTargetType
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestTruncatedResult_EmptyTargetType verifies that TruncatedResult("") returns a
 // result with an empty TargetType, which ValidateRelatedResult reports as invalid.
 // This lets callers detect the empty-TargetType invariant at validation time.
@@ -76,10 +61,6 @@ func TestTruncatedResult_EmptyTargetType(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestTruncatedResult_PassesValidation
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestTruncatedResult_PassesValidation verifies that for any non-empty targetType,
 // the result returned by TruncatedResult passes ValidateRelatedResult with no error.
 func TestTruncatedResult_PassesValidation(t *testing.T) {
@@ -100,18 +81,11 @@ func TestTruncatedResult_PassesValidation(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCheckVPC_TruncatedCacheReturnsTruncatedResult
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestCheckVPC_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkVPCSubnet checker (via the "vpc"→"subnet" RelatedDef) with a cache
 // that has only the VPC resource and a subnet entry that is truncated with
 // zero resources. The vpc resource has ID "vpc-12345678" which will not match
 // any subnet in the empty (truncated) list.
-//
-// Expected: {Count: 0, Truncated: true} (honest lower bound), never
-// {Count: -1} (discards the lower bound).
 func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	vpcResource := resource.Resource{
 		ID:   "vpc-12345678",
@@ -132,7 +106,6 @@ func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 		},
 	}
 
-	// Find the checkVPCSubnet checker via the registry.
 	var checker resource.RelatedChecker
 	for _, def := range resource.GetRelated("vpc") {
 		if def.TargetType == "subnet" {
@@ -161,17 +134,10 @@ func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCheckSG_TruncatedCacheReturnsTruncatedResult
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestCheckSG_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkSGEC2 checker (via the "sg"→"ec2" RelatedDef) with an EC2 cache that
 // is truncated with zero resources. The SG resource has a real ID that will
 // not match any instance in the empty list.
-//
-// EXPECTED: {Count: 0, Truncated: true}
-// ACTUAL (BUG): {Count: -1}
 func TestCheckSG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	sgResource := resource.Resource{
 		ID:   "sg-0abcdef123456789",
@@ -183,7 +149,6 @@ func TestCheckSG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 		},
 	}
 
-	// EC2 cache entry: truncated, zero resources.
 	cache := resource.ResourceCache{
 		"ec2": {
 			Resources:   []resource.Resource{},
@@ -219,17 +184,10 @@ func TestCheckSG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkAMING checker (via the "ami"→"ng" RelatedDef) with an NG cache that is
 // truncated with zero resources. The AMI resource has a real ID that will not
 // match any node group in the empty list.
-//
-// EXPECTED: {Count: 0, Truncated: true}
-// ACTUAL (BUG): {Count: -1}
 func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	amiResource := resource.Resource{
 		ID:   "ami-0abcdef1234567890",
@@ -241,7 +199,6 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 		},
 	}
 
-	// NG cache entry: truncated, zero resources.
 	cache := resource.ResourceCache{
 		"ng": {
 			Resources:   []resource.Resource{},
@@ -277,15 +234,11 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated iterates over
 // every registered (sourceType, RelatedDef) where NeedsTargetCache is true,
 // constructs a ResourceCache where ALL target entries are {IsTruncated: true,
 // Resources: []}, calls the checker with a minimal parent resource, and asserts
-// the result is {Count: 0, Truncated: true} — NEVER {Count: -1}.
+// the result is a resolved {Count: 0, Truncated: true}.
 func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	// Minimal parent resources keyed by source type. These are shaped to avoid
 	// the early-exit "no ID / no key field → Count=0 definitively" guard, so
@@ -343,7 +296,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				}},
 			},
 		},
-		// Row 7: the parents below carry the RawStruct their fetcher
+		// The parents below carry the RawStruct their fetcher
 		// produces, because a checker handed a row with none never read it and
 		// answers "?" — which is a different rule from the lower bound this
 		// test pins. Giving the struct keeps each subtest on the truncated-scan
@@ -729,7 +682,6 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		},
 	}
 
-	// fallbackParent is used for any source type not in the above map.
 	fallbackParent := resource.Resource{
 		ID:   "test-resource-id",
 		Name: "test-resource",
@@ -739,9 +691,6 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		},
 	}
 
-	// Enumerate all registered source types from the related registry.
-	// We need to iterate over all source types. Use all resource type short names
-	// that have registered related defs.
 	allSourceTypes := []string{
 		"vpc", "sg", "ec2", "ami", "ng", "eks", "elb", "rds",
 		"lambda", "ecs-svc", "asg", "subnet", "eni", "nat", "igw",
@@ -751,7 +700,6 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		"alarm", "backup", "vpce", "tgw",
 	}
 
-	// Deduplicate: track already-tested (sourceType, targetType) pairs.
 	tested := make(map[string]bool)
 
 	for _, sourceType := range allSourceTypes {
@@ -806,7 +754,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 				// combined with IsTruncated=true is the anti-pattern that drops the
 				// honest lower bound.
 				if reason, expected := reverseScanExpectsUnknown[key]; expected {
-					// Row 18: this checker never reaches a scan of the target
+					// This checker never reaches a scan of the target
 					// list under this harness, so there are no pages for a zero
 					// to be a lower bound over.
 					if result.State() != domain.RelatedUnknown {
@@ -862,8 +810,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 // reverseScanExpectsUnknown names the checkers this harness cannot put on the
 // truncated-scan path, with the reason for each. Most read a list OTHER than
 // their target type, and the harness seeds only the target entry — so the join
-// list is absent, the target list is never fetched, and row 18 makes that
-// Unknown rather than a zero nobody counted. Two need a live client to read the
+// list is absent, the target list is never fetched, and the nil-list rule makes
+// that Unknown rather than a zero nobody counted. Two need a live client to read the
 // rows they were handed, and the harness has none. Either way there are no
 // pages for a lower bound to be over, so Unknown is the honest answer and the
 // truncation rule has nothing to apply to.

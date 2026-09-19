@@ -1,8 +1,8 @@
 package unit
 
-// partial_answer_test.go — the rule the repo already states in
+// The rule the repo already states in
 // core/aws/issue_enrichment.go: a row that could not be inspected renders "?",
-// never clean. Nine sites break it in their own way — a cap that drops targets
+// never clean. A site can break it in several ways — a cap that drops targets
 // without marking them, an error that discards a sibling check's success, a
 // missing datum that defaults to the clean value, a partial page cached as a
 // complete one. Each test drives the real enricher or fetcher and asserts the
@@ -66,7 +66,7 @@ func partialAssertInspected(t *testing.T, res awsclient.IssueEnricherResult, id 
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 1 — lambda: two independent checks, one failure
+// lambda: two independent checks, one failure
 // ───────────────────────────────────────────────────────────────────────────
 
 const (
@@ -116,11 +116,9 @@ func (f *partialLambdaFake) ListFunctionUrlConfigs(_ context.Context, _ *lambdas
 	}}}, nil
 }
 
-// GetFunction is the stub half of a partial test double: this fake embeds
-// LambdaAPI as a nil interface and implements only the two posture reads the
-// enricher made when it was written. It now asks this one to tell a function
-// with no resource policy from a function that is gone, which GetPolicy
-// answers with the same code. The function in these scenarios exists.
+// GetFunction tells a function with no resource policy from a function that
+// is gone, which GetPolicy answers with the same code. The function in these
+// scenarios exists.
 func (f *partialLambdaFake) GetFunction(_ context.Context, in *lambdasvc.GetFunctionInput, _ ...func(*lambdasvc.Options)) (*lambdasvc.GetFunctionOutput, error) {
 	return &lambdasvc.GetFunctionOutput{
 		Configuration: &lambdatypes.FunctionConfiguration{FunctionName: in.FunctionName},
@@ -177,7 +175,7 @@ func TestPartialLambda_OneFailedCheckKeepsTheOtherOne(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 2 — eks: an unread version catalogue is unknown, not standard
+// eks: an unread version catalogue is unknown, not standard
 // ───────────────────────────────────────────────────────────────────────────
 
 // The third word of the version-support vocabulary. "standard" is a claim
@@ -244,7 +242,7 @@ func TestPartialEKS_SupportIsUnknownUntilTheCatalogueSaysOtherwise(t *testing.T)
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 3 — ecs-task: definitions past the cap
+// ecs-task: definitions past the cap
 // ───────────────────────────────────────────────────────────────────────────
 
 // partialECSTaskID builds a 32-hex task id whose last two digits index it, so
@@ -315,7 +313,7 @@ func TestPartialECSTask_EveryDefinitionAtTheCapIsInspected(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 4 — ec2: user-data targets past the cap
+// ec2: user-data targets past the cap
 // ───────────────────────────────────────────────────────────────────────────
 
 // partialEC2UserDataWithKey is a boot script that leaves a long-lived access
@@ -411,13 +409,13 @@ func TestPartialEC2_EveryInstanceAtTheCapIsInspected(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 5 — backup: selection enumeration
+// backup: selection enumeration
 // ───────────────────────────────────────────────────────────────────────────
 
 const partialBackupPlanID = "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"
 
 // partialBackupFake serves the three calls FetchBackupPlansPage makes. Every
-// field is a knob one case of row 5 turns: an enumeration that fails, one that
+// field is a knob one case turns: an enumeration that fails, one that
 // spans two pages, one whose selection is expressed as a structured condition.
 type partialBackupFake struct {
 	selections    [][]backuptypes.BackupSelectionsListMember
@@ -514,8 +512,7 @@ func TestPartialBackup_SelectionEnumerationNeverInventsCoverage(t *testing.T) {
 		// only avoid the downstream warning: the marker is what a second
 		// reader of this row learns the enumeration was cut short from, and
 		// it is the form a site that records no finding still records
-		// something in (runtime8 row 15's accepted shape for backup.go's
-		// ListBackupSelections arm).
+		// something in.
 		plans := cacheEntry["backup"].Resources
 		if len(plans) != 1 {
 			t.Fatalf("the fetcher returned %d plan rows, want 1", len(plans))
@@ -580,13 +577,13 @@ func TestPartialBackup_SelectionEnumerationNeverInventsCoverage(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 6 — ebs: the same volume must get the same verdict after a cache replay
+// ebs: the same volume must get the same verdict after a cache replay
 // ───────────────────────────────────────────────────────────────────────────
 
 // partialCacheReplay puts a row through the real disk cache and reads it back
 // the way the app seeds a list from it: ID, Name, Fields and Findings survive,
 // RawStruct does not. Anything an enricher needs that lives only on RawStruct
-// is therefore gone on the replayed row, which is the whole point of the pin.
+// is therefore gone on the replayed row.
 func partialCacheReplay(t *testing.T, shortName string, r resource.Resource) resource.Resource {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -674,7 +671,7 @@ func TestPartialEBS_CoverageVerdictSurvivesACacheReplay(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 7 — ebs: a failed status read keeps the findings already computed
+// ebs: a failed status read keeps the findings already computed
 // ───────────────────────────────────────────────────────────────────────────
 
 // partialEBSStatusFake fails the account-wide volume-status call and nothing
@@ -695,7 +692,7 @@ func (f *partialEBSStatusFake) DescribeVolumeStatus(_ context.Context, _ *ec2svc
 // already had, and leaves the volume looking healthier than it is.
 func TestPartialEBS_StatusFailureKeepsTheCoverageFindings(t *testing.T) {
 	// The backup-coverage join builds a volume ARN from the session's region;
-	// a session with none answers "cannot tell" (aws5 row 2).
+	// a session with none answers "cannot tell".
 	clients := &awsclient.ServiceClients{Region: "us-east-1", EC2: &partialEBSStatusFake{}}
 	store := session.NewIdentityStore()
 	store.Set(w7Account, nil)
@@ -718,7 +715,7 @@ func TestPartialEBS_StatusFailureKeepsTheCoverageFindings(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 8 — ecr: only NotFound means the lifecycle policy is missing
+// ecr: only NotFound means the lifecycle policy is missing
 // ───────────────────────────────────────────────────────────────────────────
 
 const partialECRRepo = "acme/api"
@@ -805,7 +802,7 @@ func TestPartialECR_OnlyNotFoundMeansTheLifecyclePolicyIsMissing(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 9 — redshift: a parameter walk cut short is not an empty answer
+// redshift: a parameter walk cut short is not an empty answer
 // ───────────────────────────────────────────────────────────────────────────
 
 const partialRedshiftGroup = "acme-analytics-params"
@@ -899,7 +896,7 @@ func TestPartialRedshift_ParameterWalkCutShortIsNotAnEmptyAnswer(t *testing.T) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// row 10 — backup: a Conditions block the flat tag list cannot represent
+// backup: a Conditions block the flat tag list cannot represent
 // ───────────────────────────────────────────────────────────────────────────
 
 // partialRow10Volume is w7Volume carrying exactly the tags a case needs, so
@@ -955,8 +952,8 @@ func partialSelectionPlan(t *testing.T, sel backuptypes.BackupSelection) (resour
 // what the plan appears to cover, and a plan that appears to cover more is a
 // plan that silences warnings it has no business silencing.
 //
-// The rule is the same one row 5 established for a walk that was cut short:
-// abstain rather than model. A block a9s cannot represent is a selection it
+// The rule is the same one as for a walk that was cut short: abstain rather
+// than model. A block a9s cannot represent is a selection it
 // did not finish reading.
 func TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain(t *testing.T) {
 	for _, tc := range []struct {
@@ -967,8 +964,9 @@ func TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain(t *testing.T) 
 		wantWarning bool
 	}{
 		{
-			// A negative operator has no "k=v" spelling at all, so today it
-			// folds to nothing and the volume it selects reads uncovered.
+			// A negative operator has no "k=v" spelling at all, so through the
+			// flat list it folds to nothing and the volume it selects reads
+			// uncovered.
 			name: "one negative parameter",
 			conditions: &backuptypes.Conditions{
 				StringNotEquals: []backuptypes.ConditionParameter{partialRow10Param("environment", "sandbox")},
@@ -989,8 +987,8 @@ func TestPartialRow10_ConditionsTheFlatListCannotRepresentAbstain(t *testing.T) 
 		{
 			// Two parameters are an AND; the flat list ORs them, so a volume
 			// carrying either one alone reads covered when the plan selects
-			// neither. This volume carries neither, and today it warns while
-			// the plan's real reach is unknown.
+			// neither. This volume carries neither, and through the flat list
+			// it warns while the plan's real reach is unknown.
 			name: "two positive parameters in one block",
 			conditions: &backuptypes.Conditions{
 				StringEquals: []backuptypes.ConditionParameter{

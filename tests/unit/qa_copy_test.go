@@ -26,7 +26,6 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("c on resource list should return a copy command")
 	}
-	// Execute the cmd to get the FlashMsg
 	msg := cmd()
 	flash, ok := msg.(messages.Flash)
 	if !ok {
@@ -56,14 +55,12 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
-	// Navigate to detail
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
 	if cmd != nil {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
 
-	// Press c on detail view — should copy the active field value.
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd == nil {
 		t.Fatal("c on detail view should return a copy command")
@@ -94,7 +91,6 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
-	// Navigate to YAML via y key
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'y'})
 	if cmd != nil {
 		msg := cmd()
@@ -128,10 +124,9 @@ func TestQA_Copy_MainMenu_NoOp(t *testing.T) {
 	}
 }
 
-// --- All 10 resource types: c works on resource list ---
+// --- Resource list: c works across resource types ---
 
 func TestQA_Copy_AllResourceTypes(t *testing.T) {
-	// Representative sample — full sweep in CI slow suite
 	types := []struct {
 		name string
 		id   string

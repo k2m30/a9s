@@ -77,7 +77,6 @@ func TestSort_SavedSortSurvivesReEntry(t *testing.T) {
 	ctrl.ApplyResourcesLoaded(shortName, sortTwoRows(), nil, false)
 	ctrl.Apply(app.Action{Kind: app.ActionSort, Arg: key})
 
-	// The save direction: leaving the list stores the sort column's index.
 	sortCol, dir := ctrl.GetListSort()
 	if sortCol != key {
 		t.Fatalf("controller holds sort column %q, want %q", sortCol, key)
@@ -87,7 +86,6 @@ func TestSort_SavedSortSurvivesReEntry(t *testing.T) {
 		t.Fatalf("leaving the list saved column index %d for key %q, want %d", savedIdx, key, colIdx)
 	}
 
-	// The restore direction: re-entering rebuilds the list from the entry.
 	restored := newTestController(t)
 	sortOpenList(restored, shortName)
 	views.NewResourceListFromCache(

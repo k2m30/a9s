@@ -1,12 +1,9 @@
 package unit
 
-// prowler_w2_s3_test.go — s3 posture rows 1–6 of the w2 Prowler batch:
-// public bucket policy, versioning off, MFA-delete off, access logging off,
-// no lifecycle rules, no object lock.
+// s3 posture: public bucket policy, versioning off, MFA-delete off, access
+// logging off, no lifecycle rules, no object lock.
 //
-// The enricher under test is whatever function the s3 catalog literal wires
-// into Wave2 — the rename of EnrichS3Posture to EnrichS3Posture is
-// permitted by the batch spec, so the tests reach it through the registry.
+// The tests reach the enricher through the s3 catalog literal's Wave2 entry.
 // Every bucket in these tests is otherwise healthy for the five conditions it
 // is not exercising, so a finding that appears is unambiguously the one the
 // case set up.
@@ -37,10 +34,6 @@ const (
 
 	w2S3Source = "wave2"
 )
-
-// ---------------------------------------------------------------------------
-// mock
-// ---------------------------------------------------------------------------
 
 // w2S3Posture is a per-bucket posture fake. Absent map entries mean "healthy":
 // PAB fully on, policy not public, versioning + MFA delete enabled, logging
@@ -93,9 +86,9 @@ func (f *w2S3Posture) GetBucketPolicyStatus(_ context.Context, in *s3.GetBucketP
 	}, nil
 }
 
-// GetBucketAcl answers the default owner-only ACL: the rows this fake serves
-// are about the policy and the block, and a group grant here would make every
-// one of their buckets public.
+// GetBucketAcl answers the default owner-only ACL: these cases are about the
+// policy and the block, and a group grant here would make every one of their
+// buckets public.
 func (f *w2S3Posture) GetBucketAcl(_ context.Context, in *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
 	if err := f.fail(aws.ToString(in.Bucket)); err != nil {
 		return nil, err
@@ -190,10 +183,6 @@ func w2S3Run(t *testing.T, fake *w2S3Posture, buckets ...string) awsclient.Issue
 	return res
 }
 
-// ---------------------------------------------------------------------------
-// row 1 — s3.public
-// ---------------------------------------------------------------------------
-
 func TestW2S3PublicPolicyStatus(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{policyPublic: map[string]bool{"acme-public": true}}, "acme-public", "acme-private")
 
@@ -222,10 +211,6 @@ func TestW2S3PolicyStatusNotPublicEmitsNothing(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{}, "acme-private")
 	w2AssertNoCode(t, res.Findings["acme-private"], w2S3CodePublic)
 }
-
-// ---------------------------------------------------------------------------
-// rows 2 & 3 — versioning / MFA delete
-// ---------------------------------------------------------------------------
 
 func TestW2S3VersioningOff(t *testing.T) {
 	fake := &w2S3Posture{versioning: map[string]*s3.GetBucketVersioningOutput{
@@ -270,10 +255,6 @@ func TestW2S3VersioningOffSuppressesMFADeleteRow(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-noversion"], w2S3CodeMFADeleteOff)
 }
 
-// ---------------------------------------------------------------------------
-// rows 4, 5, 6 — logging / lifecycle / object lock
-// ---------------------------------------------------------------------------
-
 func TestW2S3AccessLoggingOff(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{noLogging: map[string]bool{"acme-nolog": true}}, "acme-nolog", "acme-logged")
 
@@ -309,10 +290,6 @@ func TestW2S3NoObjectLock(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-locked"], w2S3CodeNoObjectLock)
 	w2AssertFindingDef(t, "s3", w2S3CodeNoObjectLock, "object lock off", domain.SevWarn, "wave2")
 }
-
-// ---------------------------------------------------------------------------
-// cross-cutting Wave-2 discipline
-// ---------------------------------------------------------------------------
 
 // Two independent conditions on one bucket produce two findings; neither is
 // folded into the other's rows, and each keeps its own AttentionDetail entry.

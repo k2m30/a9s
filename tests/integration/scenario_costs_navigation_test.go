@@ -11,12 +11,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestCostsScenario_GridPivotDrillAndBackToMenu is the Cost Explorer's first
-// tests/integration/ scenario-harness coverage: `make integration` (the
-// release gate) previously exercised core/costs, core/costs/screen
-// and core/app/costs_*.go only via tests/unit, never end-to-end through
-// the real tui.Model.Update() loop the way every other resource screen is
-// covered here.
+// TestCostsScenario_GridPivotDrillAndBackToMenu drives the Cost Explorer
+// end-to-end through the real tui.Model.Update() loop.
 //
 // Walks: open Cost Explorer via the same Navigate{Target: TargetCosts}
 // message the ":costs"/":ce" colon-command dispatches (core/app/
@@ -58,7 +54,7 @@ func TestCostsScenario_GridPivotDrillAndBackToMenu(t *testing.T) {
 
 	// --- drill the growth cell to usage types ---
 	// The root frame opens with the cursor on the newest (rightmost) of the
-	// 12 trailing months (FR-002 "open at today"); fixtures.CostsGrowthMonth
+	// 12 trailing months; fixtures.CostsGrowthMonth
 	// is fixed, by fixtures/costs.go's own construction, at exactly 6 months
 	// before the anchor month -> exactly 6 ScrollLeft presses from the
 	// newest column.
@@ -88,10 +84,9 @@ func TestCostsScenario_GridPivotDrillAndBackToMenu(t *testing.T) {
 	scenario.ExpectFrameContains("USAGE_TYPE")
 	scenario.ExpectFrameContains(growthLabel)
 
-	// A fresh drill frame's cursor now opens already on the newest column of
-	// its own (weekly) window (PushDrill pins Cursor.Col to the newest
-	// column, same as the root frame's own FR-002 default) — the
-	// over-scroll right below is therefore redundant but harmless:
+	// A fresh drill frame's cursor opens on the newest column of its own
+	// (weekly) window (PushDrill pins Cursor.Col to the newest column, same as
+	// the root frame) — the over-scroll right below is redundant but harmless:
 	// ScrollRight clamps at the window's own end regardless of how many
 	// weeks the current month actually has.
 	const overScrollWeeks = 8

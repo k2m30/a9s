@@ -1,6 +1,6 @@
 package unit
 
-// qa_navigable_absent_contract_test.go — absent/nil AWS fields must not
+// Absent/nil AWS fields must not
 // be marked navigable.
 //
 // fieldpath.ExtractFieldList must not mark the "-" placeholder
@@ -11,29 +11,11 @@ package unit
 // navigate to a kms resource identified by "-"). The "navigable" annotation
 // must depend on a real value existing to navigate to, not only on the path
 // match.
-// value exists to navigate to.
 //
-// Contract (asserted below for every registered shortName × every
-// registered NavigableField):
-//
-//   Given:
-//     - paths: [nf.FieldPath]
-//     - navigable: {nf.FieldPath: nf.TargetType}
-//     - fields: empty
-//     - obj: nil (AWS SDK response had nil pointer / empty slice)
-//
-//   Then ExtractFieldList must return a FieldItem whose Value is the
-//   absent sentinel "-" AND IsNavigable is false.
-//
-// This test stays at the fieldpath layer (no DetailModel, no rendering,
-// no RawStruct fabrication per type) because:
-//   (a) The bug IS at the fieldpath layer — rendering just passes the
-//       IsNavigable flag through.
-//   (b) Constructing realistic-but-absent RawStruct values for every
-//       registered nav path across ~50 AWS SDK types is not tractable
-//       and would conflate the test with struct composition details.
-//   (c) The assertion is on the returned FieldItem shape — a stable,
-//       documented API of the fieldpath package.
+// This test stays at the fieldpath layer: rendering passes the IsNavigable
+// flag through, and realistic-but-absent RawStruct values for every
+// registered nav path across ~50 AWS SDK types would conflate the test with
+// struct composition details.
 
 import (
 	"testing"
@@ -62,7 +44,6 @@ func TestNavigableAbsent_AbsentFields_NotNavigable(t *testing.T) {
 				if len(items) == 0 {
 					t.Fatalf("ExtractFieldList returned no items for path %q", path)
 				}
-				// Find the scalar item for this path.
 				var scalar *fieldpath.FieldItem
 				for i := range items {
 					if items[i].Path != path {

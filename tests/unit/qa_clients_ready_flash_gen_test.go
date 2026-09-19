@@ -1,4 +1,4 @@
-// qa_clients_ready_flash_gen_test.go — the `handleClientsReady` flash.gen
+// The `handleClientsReady` flash.gen
 // gate on `internal/tui/app_session.go`.
 //
 // The gate is `hasFlashWork(intents, tasks)`: `m.flash.gen` is bumped only
@@ -17,20 +17,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged
-// exercises the regression that the R3 fix addresses: a non-stale
-// ClientsReadyMsg success path with `PendingRefresh=false` triggers
-// `FetchIdentity` + `LoadAvailCache` tasks but no flash work — the
-// adapter must not advance `m.flash.gen` because any in-flight
-// `ClearFlashMsg` for the current flash would otherwise stop matching.
-//
-// Reverting `internal/tui/app_session.go` to the prior broad gate
-// (`len(intents) > 0 || len(tasks) > 0`) makes this test fail because
-// the success path emits two non-flash tasks.
+// TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged: a
+// non-stale ClientsReadyMsg success path with `PendingRefresh=false` triggers
+// `FetchIdentity` + `LoadAvailCache` tasks but no flash work, so the adapter
+// must not advance `m.flash.gen` — an in-flight `ClearFlashMsg` for the
+// current flash would otherwise stop matching.
 func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Establish a non-zero baseline flash.gen via a normal FlashMsg.
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "first flash"})
 	genBefore := m.FlashGen()
 	if genBefore == 0 {
@@ -51,13 +45,9 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 	}
 }
 
-// TestHandleClientsReady_StaleGen_FlashGenUnchanged pins the symmetric
-// stale-gen invariant: when `msg.Gen` does not match the session's
-// `ConnectGen`, Core returns (nil, nil) and the adapter must leave
-// `flash.gen` alone. The broad gate would also pass this test, but
-// keeping the assertion makes the invariant explicit at the adapter
-// level so future changes that only tweak the success path cannot
-// inadvertently regress the stale path.
+// TestHandleClientsReady_StaleGen_FlashGenUnchanged: when `msg.Gen` does not
+// match the session's `ConnectGen`, Core returns (nil, nil) and the adapter
+// leaves `flash.gen` alone.
 func TestHandleClientsReady_StaleGen_FlashGenUnchanged(t *testing.T) {
 	m := newRootSizedModel()
 

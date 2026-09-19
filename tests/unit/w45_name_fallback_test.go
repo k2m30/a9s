@@ -1,4 +1,4 @@
-// w45_name_fallback_test.go — the cell extractor's name fallback and the
+// The cell extractor's name fallback and the
 // identity-column election must both key on the type's identity column, never
 // on a substring of a key, a title or a path.
 //
@@ -220,12 +220,12 @@ func w45ColumnByTitle(t *testing.T, td resource.ResourceTypeDef, title string) a
 }
 
 // TestW45_NameFallbackOnlyFillsTheIdentityColumn pins the cell extractor
-// branch by branch. Each case is a column that the old cascade matched on a
-// "name" substring of its key, its title or its path; on a struct-less row
-// none of them can answer from a path, and none of them is the column that
-// names the row, so the honest cell is empty. The identity column is the one
-// place the row's name belongs, and it must still be filled — a blank first
-// column would make a warm-cache list unreadable.
+// branch by branch. Each case is a column with a "name" substring in its key,
+// its title or its path; on a struct-less row none of them can answer from a
+// path, and none of them is the column that names the row, so the honest cell
+// is empty. The identity column is the one place the row's name belongs, and it
+// must still be filled — a blank first column would make a warm-cache list
+// unreadable.
 func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 	alarmTD, alarmRow := w45DemoRow(t, "alarm", "api-high-error-rate")
 	redshiftTD, redshiftRow := w45DemoRow(t, "redshift", "acme-warehouse")
@@ -363,13 +363,12 @@ func w45LoadedViewConfig(t *testing.T) *config.ViewsConfig {
 	return vc
 }
 
-// TestW45_IdentityColumnSurvivesALoadedViewFile is the round-trip half of the
-// fix. The extractor decides which column names the row from the built-in
-// column set, but what it is handed at render time came through the session's
-// view config; if the two disagree about the identity column, the first column
-// of a warm-cache list goes blank — worse than the wrong value this task
-// removes. Every shipped view file is loaded and compared against the built-in
-// election for the same type, and the identity cell is then rendered on a real
+// TestW45_IdentityColumnSurvivesALoadedViewFile: the extractor decides which
+// column names the row from the built-in column set, but what it is handed at
+// render time came through the session's view config; if the two disagree
+// about the identity column, the first column of a warm-cache list goes blank.
+// Every shipped view file is loaded and compared against the built-in election
+// for the same type, and the identity cell is then rendered on a real
 // struct-less demo row.
 func TestW45_IdentityColumnSurvivesALoadedViewFile(t *testing.T) {
 	vc := w45LoadedViewConfig(t)
@@ -417,7 +416,7 @@ func TestW45_IdentityColumnSurvivesALoadedViewFile(t *testing.T) {
 }
 
 // TestW45_IdentityTitleIsUniqueWithinAType pins the assumption the extractor
-// now rests on: it identifies the row-naming column by comparing titles, so a
+// rests on: it identifies the row-naming column by comparing titles, so a
 // type with two columns under one title would have a second column inheriting
 // the row's name, and a type whose identity column has no title at all would
 // hand the name to every title-less column beside it.
@@ -477,13 +476,13 @@ func TestW45_LiveRowWithANilNameFieldRendersBlank(t *testing.T) {
 	}
 }
 
-// TestW45_RenderedListPutsTheNameInTheNameColumn drives the fix through the
-// app's own list-body path rather than the extractor alone. The rendered
+// TestW45_RenderedListPutsTheNameInTheNameColumn drives the election through
+// the app's own list-body path rather than the extractor alone. The rendered
 // ViewState is what both the TUI and the web draw from, and it is where the
 // two user-visible consequences land: the marker glyph is prepended to the
-// IdentityCol cell, and the cells are the values a reader sees. ec2's marker
-// column moved from Status to Name with the election fix, and no golden covers
-// that move because no row in the golden scenarios carries a Decorator.
+// IdentityCol cell, and the cells are the values a reader sees. No row in the
+// golden scenarios carries a Decorator, so no golden covers ec2's marker on
+// the Name column.
 func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 	clients := demo.NewServiceClients()
 
@@ -533,13 +532,12 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 				byTitle[col.Title] = i
 			}
 			for i, row := range lb.Rows {
-				// The name the cell shows is the name after the text boundary,
-				// not the bytes the fetcher read off AWS: tui6 row 1 makes
-				// AWS-supplied text inert where it enters the controller, and
-				// the demo's one hostile Name tag (fixtures.EC2HostileTagValue)
-				// is exactly the row that tells the two apart. Comparing
-				// against the raw name again would be asking for the escape
-				// sequence back on the screen.
+				// The name the cell shows is the name after the text boundary, not
+				// the bytes the fetcher read off AWS: AWS-supplied text is made inert
+				// where it enters the controller, and the demo's one hostile Name tag
+				// (fixtures.EC2HostileTagValue) is exactly the row that tells the two
+				// apart. Comparing against the raw name would be asking for the
+				// escape sequence back on the screen.
 				name := domain.Sanitize(stripped[i].Name)
 				if got := row.Cells[lb.IdentityCol]; got != name {
 					t.Errorf("%s row %d: the column that names the row shows %q, want %q", tc.shortName, i, got, name)
@@ -561,9 +559,8 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 
 // TestW45_ArchitectureDocDescribesTheLiveElection pins the identity-column
 // paragraph of docs/architecture.md against the code it documents. The doc is
-// what a reader consults before touching this cascade, so a step it lists that
-// the code no longer runs, or a function name the tree no longer defines,
-// sends the next reader to restore a defect.
+// what a reader consults before touching this cascade, so every step it lists
+// must be one the code runs and every function it names must exist.
 func TestW45_ArchitectureDocDescribesTheLiveElection(t *testing.T) {
 	data, err := os.ReadFile("../../docs/architecture.md")
 	if err != nil {

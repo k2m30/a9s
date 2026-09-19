@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-SES-001 - Test SES Email Identities response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -75,7 +71,6 @@ func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second identity
 	r2 := resources[1]
 	if r2.Fields["identity_type"] != "email address" {
 		t.Errorf("expected Fields[identity_type] 'email address', got %q", r2.Fields["identity_type"])

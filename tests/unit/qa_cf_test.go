@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CloudFront Distribution fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 	now := time.Now()
 	mock := &fakeCloudFrontListDistributions{
@@ -75,7 +71,6 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first distribution
 	r0 := resources[0]
 	if r0.ID != "E1ABC2DEF3GHIJ" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "E1ABC2DEF3GHIJ", r0.ID)
@@ -87,7 +82,6 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "Deployed", r0.Fields["status"])
 	}
 
-	// Verify required fields
 	requiredFields := []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -97,7 +91,6 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values
 	if r0.Fields["distribution_id"] != "E1ABC2DEF3GHIJ" {
 		t.Errorf("resource[0].Fields[\"distribution_id\"]: expected %q, got %q", "E1ABC2DEF3GHIJ", r0.Fields["distribution_id"])
 	}
@@ -111,7 +104,6 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"aliases\"]: expected %q, got %q", "cdn.example.com", r0.Fields["aliases"])
 	}
 
-	// Verify second distribution (disabled, no aliases).
 	// The fetcher stores raw AWS status in Fields["status"]; disabled state is visible via Fields["enabled"].
 	r1 := resources[1]
 	if r1.Fields["status"] != "InProgress" {

@@ -1,7 +1,6 @@
 package unit_test
 
-// s3_0916_row3_r53_s3_alias_test.go pins r53→s3 taking the bucket from the
-// record's own name.
+// r53→s3 takes the bucket from the record's own name.
 //
 // A Route 53 alias to an S3 static website targets the bare regional endpoint
 // (s3-website-<region>.amazonaws.com); the bucket name is never inside it.

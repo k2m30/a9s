@@ -1,20 +1,14 @@
 package unit
 
-// qa_iam_policy_lazy_retry_test.go — Regression pin for the IAM policy lazy-add
-// inline retry contract (Group H).
-//
-// Bug (fixed at HEAD): FetchIAMPoliciesByIDsFull previously set
-// allInlinePoliciesBuilt=true even when fetchInlineGroupPolicies returned an
-// error. This meant a transient ListGroupPolicies throttle permanently prevented
-// inline policy resolution on subsequent calls within the same session.
-//
-// Contract after fix (core/aws/iam_policies.go):
-//   - When fetchInlineGroupPolicies returns (inlines, inlineErr) with inlineErr != nil,
-//     store.InlineBuilt() remains false → next call retries the inline fetch.
-//   - When fetchInlineGroupPolicies succeeds, store.MarkInlineBuilt() is called → cached.
-//   - Partial inline results from the first (errored) call are incorporated AND
-//     the composite error is propagated (never-silent-skip).
-//   - The second call (after retry succeeds) finds the inline policy by name.
+// FetchIAMPoliciesByIDsFull
+// (core/aws/iam_policies.go) marks inline policies built only after
+// fetchInlineGroupPolicies succeeds:
+//   - on an inline error, store.InlineBuilt() stays false and the next call
+//     retries, so a transient ListGroupPolicies throttle does not block inline
+//     policy resolution for the rest of the session;
+//   - on success, store.MarkInlineBuilt() caches the result;
+//   - partial inline results from an errored call are incorporated and the
+//     composite error is returned.
 
 import (
 	"context"
@@ -48,7 +42,6 @@ type iamPolicyRetryFake struct {
 	listGroupPoliciesErr error
 }
 
-// Compile-time interface check.
 var _ awsclient.IAMAPI = (*iamPolicyRetryFake)(nil)
 
 func (f *iamPolicyRetryFake) ListPolicies(
@@ -103,7 +96,6 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 		inlinePolicyName  = "inline-ops-policy"
 	)
 
-	// Build the fake: managed list always succeeds; inline fails first, then succeeds.
 	fake := &iamPolicyRetryFake{
 		managedPolicies: []iamtypes.Policy{
 			{
@@ -126,13 +118,8 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	ctx := context.Background()
 
 	// ── Call 1: inline fetch fails ──────────────────────────────────────────────
-	// Contract:
-	//   - Managed policy is found (buildAllManagedPolicies succeeds).
-	//   - Inline fetch fails → composite error returned alongside partial results.
-	//   - store.InlineBuilt() must remain false.
 	results1, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{managedPolicyID}, store, "aws")
 
-	// Managed policy should be found even with inline failure.
 	if len(results1) == 0 {
 		t.Fatalf("call 1: expected managed policy in results even with inline error; got none (err: %v)", err1)
 	}
@@ -152,7 +139,6 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	}
 
 	// ── Call 2: fix inline fake to succeed ────────────────────────────────────
-	// Now remove the inline error so retry can succeed.
 	fake.listGroupPoliciesErr = nil
 
 	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName}, store, "aws")
@@ -194,7 +180,6 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 		},
 	}
 
-	// Wrap ListGroupPolicies to count calls.
 	original := fake
 	countingFake := &countingIAMPolicyFake{
 		iamPolicyRetryFake: original,
@@ -205,7 +190,6 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Call 1: inline fetch succeeds → should call ListGroupPolicies.
 	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
 	if err1 != nil {
 		t.Errorf("call 1: unexpected error: %v", err1)
@@ -215,7 +199,6 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	}
 	callsAfterFirst := listGroupPoliciesCallCount
 
-	// Call 2: inline cache should be warm — ListGroupPolicies must NOT be called again.
 	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
 	if err2 != nil {
 		t.Errorf("call 2: unexpected error: %v", err2)

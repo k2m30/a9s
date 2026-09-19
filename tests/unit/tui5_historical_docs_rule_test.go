@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// tui5_historical_docs_rule_test.go — when a symbol is deleted, the docs are
-// swept for references to it, and docs/historical/ was being swept along with
-// the live pages. Those pages describe the world before a refactor; editing
-// them to match today destroys the record they exist for. Nothing said so, so
-// every sweep re-litigated it.
+// Docs/historical/ pages describe the
+// world before a refactor; editing them to match today destroys the record
+// they exist for, so a symbol sweep of the docs leaves them alone.
 package unit_test
 
 import (

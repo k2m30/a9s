@@ -1,13 +1,11 @@
 package unit
 
-// prowler_w2_opensearch_test.go — opensearch rows 22–24 of the w2 Prowler
-// batch: reachable outside a VPC, HTTPS not enforced, node-to-node encryption
-// off.
+// opensearch posture: reachable outside a VPC, HTTPS not enforced,
+// node-to-node encryption off.
 //
-// EnrichOpenSearchDomains makes no API call — it reads Fields the fetcher
-// populated. Driving the fetcher and the enricher back to back is therefore
-// the only way to prove the whole path: a field the fetcher never writes makes
-// the enricher silently clean, which no enricher-only test would catch.
+// The checks read the DescribeDomains response the fetcher holds, so the tests
+// drive the fetcher: a field the fetcher never writes makes the check silently
+// clean.
 
 import (
 	"context"
@@ -27,7 +25,6 @@ const (
 	w2OSCodePublic   = "opensearch.public"
 	w2OSCodeHTTPSOff = "opensearch.https-not-enforced"
 	w2OSCodeN2NOff   = "opensearch.node-to-node-tls-off"
-	// d1 moved these three checks to wave 1 with the rest of the type's signals.
 	w2OSSource       = "wave1"
 	w2OSPublicPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"es:*","Resource":"arn:aws:es:eu-central-1:123456789012:domain/acme-search/*"}]}`
 	w2OSScopedPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/app"},"Action":"es:ESHttpGet","Resource":"*"}]}`
@@ -81,8 +78,8 @@ func w2OSDomain(name string) ostypes.DomainStatus {
 	}
 }
 
-// w2OSRun drives the fetcher and then the registered enricher, returning both
-// the produced resources and the enrichment result.
+// w2OSRun drives the fetcher and returns the produced resources plus their
+// findings and attention details in IssueEnricherResult shape.
 func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource.Resource, awsclient.IssueEnricherResult) {
 	t.Helper()
 	fake := &w2OSFake{domains: domains}
@@ -91,9 +88,7 @@ func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource
 		t.Fatalf("FetchOpenSearchDomainsAt: %v", err)
 	}
 	// The three network-posture checks read the DescribeDomains response the
-	// fetcher already holds and make no AWS call, so they are wave-1 findings
-	// on the row and opensearch registers no wave 2 at all. The result is
-	// rebuilt from the fetched rows so the assertions below read them.
+	// fetcher already holds, so they are wave-1 findings on the row.
 	res := awsclient.IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
@@ -109,10 +104,6 @@ func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource
 	}
 	return w2ByID(rs), res
 }
-
-// ---------------------------------------------------------------------------
-// row 22 — reachable outside a VPC
-// ---------------------------------------------------------------------------
 
 // Public reachability needs both halves: no VPC boundary AND an access policy
 // anyone can use. Either one alone still leaves a gate in front of the data.
@@ -139,8 +130,8 @@ func TestW2OpenSearchPublicNeedsBothNoVPCAndOpenPolicy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-search-vpc"], w2OSCodePublic)
 	w2AssertNoCode(t, res.Findings["acme-search-safe"], w2OSCodePublic)
 
-	// The enricher makes no API call, so it can only see what the fetcher
-	// wrote. Pin the two fields it depends on.
+	// The checks can only see what the fetcher wrote; pin the two fields they
+	// depend on.
 	if got := fields["acme-search"].Fields["vpc_enabled"]; got != "false" {
 		t.Errorf("acme-search vpc_enabled = %q, want \"false\"", got)
 	}
@@ -165,10 +156,6 @@ func TestW2OpenSearchConditionedPolicyIsNotOpen(t *testing.T) {
 		t.Errorf("access_policy_public = %q on a conditioned policy, want \"false\"", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// rows 23 & 24 — transport encryption
-// ---------------------------------------------------------------------------
 
 func TestW2OpenSearchHTTPSNotEnforced(t *testing.T) {
 	off := w2OSDomain("acme-search-http")
@@ -202,10 +189,6 @@ func TestW2OpenSearchNodeToNodeEncryptionOff(t *testing.T) {
 	w2AssertFindingDef(t, "opensearch", w2OSCodeN2NOff, "node-to-node encryption off", domain.SevWarn, "wave1")
 }
 
-// ---------------------------------------------------------------------------
-// independence and lifecycle
-// ---------------------------------------------------------------------------
-
 // Three conditions on one domain stay three findings, each with its own rows.
 func TestW2OpenSearchThreeConditionsOnOneDomain(t *testing.T) {
 	bad := w2OSDomain("acme-search-worst")
@@ -224,8 +207,7 @@ func TestW2OpenSearchThreeConditionsOnOneDomain(t *testing.T) {
 	w2AssertNoRows(t, res, "acme-search-worst", w2OSCodeN2NOff)
 }
 
-// A domain being deleted emits no posture finding — the existing enricher
-// already guards this for its own signals and the new rows must not slip past.
+// A domain being deleted emits no posture finding.
 func TestW2OpenSearchDeletedDomainEmitsNoPostureFinding(t *testing.T) {
 	gone := w2OSDomain("acme-search-gone")
 	gone.Deleted = aws.Bool(true)

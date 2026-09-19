@@ -20,26 +20,6 @@ import (
 // HandleProfileSelected/HandleRegionSelected on rotation) must reach it, not
 // only the CONTROLLER, through the TUI's applyIntent
 // (internal/tui/runtime_adapter.go, ClearIdentityIntent case).
-//
-// Real flow driven here (see the stack-shape t.Logf below): press 'i'
-// (pushes rsKindIdentity, loading=true, schedules a fetch) ->
-// messages.IdentityLoaded lands while that rs is still on the stack
-// (populates rs.identityData via the live SetIdentityIntent path, exactly
-// as TestRoot_IdentityLoaded_UpdatesHeader/text_ports_test.go's
-// TestPort_IdentityCopy_CopiesExactARN do) -> the ':' key is a GLOBAL key in
-// app_input.go's key router (no rs.kind guard, unlike Identity/Help/ErrorLog
-// which only special-case their OWN key), so colon-command mode works from
-// the identity screen -> "profile"/"ctx" resolves to
-// messages.Navigate{Target: messages.TargetProfile} (app_input.go's
-// executeCommand), pushing the profile selector ON TOP of the still-present
-// identity rs -> messages.ProfileSelected{Profile: ...} is exactly what the
-// selector's Enter-confirm emits (core/runtime/messages/cmd.go), routed to
-// Model.handleProfileSelected -> Core.HandleProfileSelected ->
-// dispatchHandlerResult -> applyIntent per intent, including the
-// ClearIdentityIntent forward -> PopSelectorIntent (also emitted) pops the
-// selector screen (it only pops a profile/region/theme selector — core/app/
-// intents.go), REVEALING the identity screen again, which must not carry
-// the pre-switch ARN.
 func TestRoot_IdentityScreen_StaleARN_ClearedAfterProfileRotation(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -171,11 +151,9 @@ const identityFetchingPlaceholder = "Fetching identity..."
 // never in --no-cache/demo mode, so a rotation while the identity screen is
 // open must not leave it showing "Fetching identity..." forever.
 //
-// Cheapest no-cache arrangement: tui.WithNoCache(true) (internal/tui/
-// app_options.go's WithNoCache calls m.core.SetNoCache, the same session.
-// NoCache flag handlers.go's "if s.NoCache" branches on) — the same option
-// already used by the sibling tests above and by text_ports_test.go's reveal
-// tests, paired with tui.WithClients so Init() doesn't need a live connect.
+// No-cache arrangement: tui.WithNoCache(true) (internal/tui/app_options.go)
+// sets the session.NoCache flag handlers.go's "if s.NoCache" branches on,
+// paired with tui.WithClients so Init() needs no live connect.
 //
 // The rotation's OWN Connect task cmd fails locally for the bogus
 // "other-profile" (SharedConfigProfileNotExistError — no such profile in

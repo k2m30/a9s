@@ -1,9 +1,8 @@
 package unit_test
 
-// rel2_redis_dbc_subnet_test.go — rows 1 and 2: the two-hop subnet checkers
-// answer "there is none" and "we could not look" with the same Unknown, and a
-// replication group with no members leaves its four member-driven pivots
-// without a count at all.
+// The two-hop subnet checkers tell "there is
+// none" from "we could not look", and a replication group with no members
+// gives its four member-driven pivots a count.
 
 import (
 	"context"
@@ -50,12 +49,9 @@ func rel2RedisSubnetCache() resource.ResourceCache {
 	}
 }
 
-// --- row 1: three answers, three results ------------------------------------
-
-// TestRel2RedisSubnetNoMemberIsAProvenZero pins the first of the three answers
-// the checker collapses today: a replication group with no member cluster has
-// no subnet group to reach, which is a fact about the group and not a gap in
-// what we could read.
+// TestRel2RedisSubnetNoMemberIsAProvenZero: a replication group with no member
+// cluster has no subnet group to reach, which is a fact about the group and not
+// a gap in what we could read.
 func TestRel2RedisSubnetNoMemberIsAProvenZero(t *testing.T) {
 	clients := &awsclient.ServiceClients{ElastiCache: &mockElastiCacheFullAPI{}}
 	checker := redisCheckerByTarget(t, "subnet")
@@ -69,9 +65,9 @@ func TestRel2RedisSubnetNoMemberIsAProvenZero(t *testing.T) {
 	}
 }
 
-// TestRel2RedisSubnetMemberWithoutGroupIsAProvenZero pins the second answer: a
-// member cluster that names no subnet group is a cluster outside a VPC, which
-// is again a fact rather than a gap.
+// TestRel2RedisSubnetMemberWithoutGroupIsAProvenZero: a member cluster that
+// names no subnet group is a cluster outside a VPC, which is again a fact rather
+// than a gap.
 func TestRel2RedisSubnetMemberWithoutGroupIsAProvenZero(t *testing.T) {
 	clients := &awsclient.ServiceClients{ElastiCache: &mockElastiCacheFullAPI{
 		cacheClustersOutput: &elasticache.DescribeCacheClustersOutput{
@@ -92,9 +88,9 @@ func TestRel2RedisSubnetMemberWithoutGroupIsAProvenZero(t *testing.T) {
 	}
 }
 
-// TestRel2RedisSubnetCallFailureIsAnError pins the third answer: a describe
-// that failed is not a zero and not an unknown shape — it is the error, so the
-// panel can say what went wrong instead of showing a bare "?".
+// TestRel2RedisSubnetCallFailureIsAnError: a describe that failed is not a zero
+// and not an unknown shape — it is the error, so the panel can say what went
+// wrong instead of showing a bare "?".
 func TestRel2RedisSubnetCallFailureIsAnError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ElastiCache: &mockElastiCacheFullAPI{
 		cacheClustersOutput: &elasticache.DescribeCacheClustersOutput{
@@ -126,7 +122,7 @@ func rel2DbcCluster(subnetGroup string) resource.Resource {
 	return resource.Resource{ID: "acme-aurora-prod", Name: "acme-aurora-prod", Type: "dbc", RawStruct: cluster}
 }
 
-// rel2RDSFake serves DescribeDBSubnetGroups for the dbc half of row 1.
+// rel2RDSFake serves DescribeDBSubnetGroups.
 type rel2RDSFake struct {
 	awsclient.RDSAPI
 	groups []rdstypes.DBSubnetGroup
@@ -195,8 +191,6 @@ func TestRel2DbcSubnetResolvesWhatItFinds(t *testing.T) {
 	}
 }
 
-// --- row 2: a memberless group's four pivots ---------------------------------
-
 // TestRel2MemberlessRedisGroupResolvesZeroEverywhere pins the four pivots that
 // hang off the member cluster. With no member there is nothing to read and
 // nothing to guess, so each renders a count of zero rather than a bare label:
@@ -223,8 +217,6 @@ func TestRel2MemberlessRedisGroupResolvesZeroEverywhere(t *testing.T) {
 		})
 	}
 }
-
-// --- the fourth answer: a row that was never enriched ------------------------
 
 // TestRel2WarmCacheRowIsUnknownNotAnError pins the state a row restored from
 // the on-disk cache must produce. That cache deliberately carries no RawStruct
@@ -268,23 +260,19 @@ func TestRel2WarmCacheRowIsUnknownNotAnError(t *testing.T) {
 	}
 }
 
-// --- row 2 on the rendered panel --------------------------------------------
-
-// TestRel2MemberlessDemoGroupRendersFourZeros pins row 2 where the operator
-// reads it: the panel. "dev-feature-redis" is a demo replication group AWS
-// reports with no member clusters, and the four pivots that hang off the
-// member must each render a count of zero. A row with no count at all tells
-// the operator neither that there is none nor that we could not tell, which is
-// the ambiguity this row exists to remove.
+// TestRel2MemberlessDemoGroupRendersFourZeros: "dev-feature-redis" is a demo
+// replication group AWS reports with no member clusters, and the four pivots
+// that hang off the member must each render a count of zero on the panel. A row
+// with no count at all tells the operator neither that there is none nor that
+// we could not tell.
 func TestRel2MemberlessDemoGroupRendersFourZeros(t *testing.T) {
 	rel2AssertRenderedRedisZeros(t, "dev-feature-redis", "sg", "sns", "subnet", "vpc")
 }
 
-// TestRel2NoSubnetGroupDemoGroupRendersZeros pins the demo witness on the
-// panel: "legacy-redis-classic" has a member cluster that names no subnet
-// group, so the subnet and vpc pivots have nothing to reach. That is a fact
-// about the group, and the panel must state it as a zero rather than a "?"
-// that would also mean "the call failed".
+// TestRel2NoSubnetGroupDemoGroupRendersZeros: "legacy-redis-classic" has a
+// member cluster that names no subnet group, so the subnet and vpc pivots have
+// nothing to reach. That is a fact about the group, and the panel must state it
+// as a zero rather than a "?" that would also mean "the call failed".
 func TestRel2NoSubnetGroupDemoGroupRendersZeros(t *testing.T) {
 	rel2AssertRenderedRedisZeros(t, fixtures.RedisNoSubnetGroupID, "subnet", "vpc")
 }

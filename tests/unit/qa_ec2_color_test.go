@@ -1,6 +1,6 @@
 package unit
 
-// qa_ec2_color_test.go — Color contract pin for EC2 Instances.
+// Color contract pin for EC2 Instances.
 //
 // colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go) — it
 // has NO raw-field fallback at all. Color is entirely derived from Findings,
@@ -13,7 +13,7 @@ package unit
 // branch on finding Code, only on Severity and Source-prefix ("wave1" or
 // "wave2:"). One representative case per severity tier (plus the no-finding
 // Healthy anchor) exercises every branch colorEC2 can take, and one wave2:ec2
-// case pins the Source-prefix acceptance (a bug class where a finding with
+// case pins the Source-prefix handling (a bug class where a finding with
 // the wrong Source string is silently dropped from color resolution).
 // Per-state wave1-emission mapping (which AWS state produces which code) is
 // pinned at the fetcher layer, not here.
@@ -66,8 +66,7 @@ func TestEc2Color(t *testing.T) {
 			want: resource.ColorBroken,
 		},
 		{
-			// Terminated instance — end-of-life state. Now emits a SevDim Finding
-			// (wave #42): terminated is no longer a silent "no finding" state.
+			// Terminated instance — end-of-life state, a SevDim Finding.
 			name:   "terminated",
 			fields: map[string]string{"state": "terminated"},
 			findings: []domain.Finding{

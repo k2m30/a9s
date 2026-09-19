@@ -1,14 +1,8 @@
 package unit
 
-// prowler_w1_ec2_test.go — behavioural pins for the ec2 posture signals of
-// batch w1 (Prowler gap closure): imdsv1-allowed, public-ip,
-// internet-exposed and user-data-secret.
-//
-// Wave 1 (imdsv1-allowed, public-ip) is asserted through
-// FetchEC2InstancesPage so the tests exercise the shape the real
-// DescribeInstances response has. Wave 2 (internet-exposed,
-// user-data-secret) is asserted through EnrichEC2InstanceStatus, the type's
-// single Wave-2 enricher.
+// imdsv1-allowed and public-ip are Wave 1 signals set by FetchEC2InstancesPage;
+// internet-exposed and user-data-secret are Wave 2 signals set by
+// EnrichEC2InstanceStatus, the type's single Wave-2 enricher.
 
 import (
 	"context"
@@ -35,8 +29,6 @@ const (
 	pw1EC2CodeInternetExposed = domain.FindingCode("ec2.internet-exposed")
 	pw1EC2CodeUserDataSecret  = domain.FindingCode("ec2.user-data-secret")
 )
-
-// ─── shared helpers ─────────────────────────────────────────────────────────
 
 // pw1FindFinding returns the finding carrying code, or (zero, false).
 func pw1FindFinding(findings []domain.Finding, code domain.FindingCode) (domain.Finding, bool) {
@@ -104,8 +96,6 @@ func pw1RequireRow(t *testing.T, rows []domain.DetailRow, label, value string) {
 	}
 	t.Fatalf("missing AttentionDetail row %q: %q (rows: %+v)", label, value, rows)
 }
-
-// ─── ec2 fakes ──────────────────────────────────────────────────────────────
 
 // pw1EC2ListFake serves DescribeInstances/DescribeInstanceStatus for the
 // wave-1 fetcher path.
@@ -203,8 +193,6 @@ func pw1ResourceByID(t *testing.T, rs []resource.Resource, id string) resource.R
 	return resource.Resource{}
 }
 
-// ─── row 1: ec2.imdsv1-allowed ──────────────────────────────────────────────
-
 // TestEC2_IMDSv1Allowed_Optional pins that HttpTokens=optional on a running
 // instance is a warning: IMDSv1 lets any process that can reach the link-local
 // address read the instance's role credentials without a session token.
@@ -242,8 +230,6 @@ func TestEC2_IMDSv1Allowed_SkipsTerminatedAndShuttingDown(t *testing.T) {
 		pw1RequireNoFinding(t, r.Findings, pw1EC2CodePublicIP)
 	}
 }
-
-// ─── row 2: ec2.public-ip ───────────────────────────────────────────────────
 
 // TestEC2_PublicIP_Present pins the warning and the row that names the
 // address the operator has to look up in their SG rules.
@@ -291,8 +277,6 @@ func TestEC2_TwoPostureConditionsOnOneInstance(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, pw1EC2CodeIMDSv1, "IMDSv1 allowed", domain.SevWarn, "wave1")
 	pw1RequireFinding(t, r.Findings, pw1EC2CodePublicIP, "public address", domain.SevWarn, "wave1")
 }
-
-// ─── row 3: ec2.internet-exposed ────────────────────────────────────────────
 
 // pw1SGCache builds a cache["sg"] entry through the real security-group
 // fetcher, so the risk fields the ec2 enricher reads are produced by sg.go's
@@ -462,9 +446,8 @@ func TestEC2_InternetExposed_TerminatedInstanceIsSilent(t *testing.T) {
 }
 
 // TestEC2_InternetExposed_EvaluatesEveryInputInstance pins that the exposure
-// rule iterates the input resources. The existing enricher body iterates the
-// DescribeInstanceStatus response instead, and an instance AWS omits from
-// that response (a freshly launched machine) would silently escape the check.
+// rule iterates the input resources: an instance AWS omits from the
+// DescribeInstanceStatus response (a freshly launched machine) is still checked.
 func TestEC2_InternetExposed_EvaluatesEveryInputInstance(t *testing.T) {
 	cache := pw1SGCache(t, pw1SG("sg-0rdp00000aaaaaa1", 3389, 3389, false))
 	res, err := pw1EnrichEC2(t, &pw1EC2EnrichFake{}, cache,
@@ -480,14 +463,9 @@ func TestEC2_InternetExposed_EvaluatesEveryInputInstance(t *testing.T) {
 	}
 }
 
-// TestEC2_PublicIPAndInternetExposedBothFire pins the interim behaviour the
-// batch spec mandates while the suppression question is unresolved: an
-// exposed instance carries both the wave-1 public-IP warning and the wave-2
-// exposure finding, and worst severity decides the row colour.
-//
-// This test encodes the interim contract deliberately. If a suppression
-// mechanism is later added to ApplyWave2ToRow, invert this test rather than
-// deleting it, and say so here.
+// TestEC2_PublicIPAndInternetExposedBothFire pins that an exposed instance
+// carries both the wave-1 public-IP warning and the wave-2 exposure finding,
+// and worst severity decides the row colour.
 func TestEC2_PublicIPAndInternetExposedBothFire(t *testing.T) {
 	const id = "i-0bothexposed0aa1"
 	cache := pw1SGCache(t, pw1SG("sg-0ssh20000aaaaaa1", 22, 22, false))
@@ -503,8 +481,6 @@ func TestEC2_PublicIPAndInternetExposedBothFire(t *testing.T) {
 	pw1RequireFinding(t, res.Findings[id], pw1EC2CodeInternetExposed,
 		"port 22 reachable from the internet", domain.SevBroken, "wave2")
 }
-
-// ─── row 4: ec2.user-data-secret ────────────────────────────────────────────
 
 const pw1UserDataWithSecret = `#!/bin/bash
 yum install -y awscli
@@ -669,11 +645,9 @@ func pw1InstanceID(n int) string {
 	return "i-" + string(suffix)
 }
 
-// ─── demo bench ─────────────────────────────────────────────────────────────
-
 // TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding pins the demo fixture
-// contract: each ec2 posture code is carried by its named witness row and by
-// no other row, so the demo bench shows one example of each signal.
+// contract: each ec2 posture code is carried by its named demo row and by no
+// other row, so the demo bench shows one example of each signal.
 func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
 	out, err := awsclient.FetchEC2InstancesPage(context.Background(), fakes.NewEC2(), "")
 	if err != nil {
@@ -693,10 +667,8 @@ func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
 	}
 	pw1RequireOnlyWitness(t, pw1EC2CodeIMDSv1, fixtures.EC2InstanceIMDSv1, imdsv1)
 
-	// Three rows legitimately carry ec2.public-ip: its own witness, and the
-	// two exposure witnesses, which need a public address to be reachable at
-	// all. Both signals fire on those rows under the interim no-suppression
-	// rule, so the demo contract here is "these three and nobody else".
+	// Three rows carry ec2.public-ip: its own demo row and the two exposure rows,
+	// which need a public address to be reachable at all.
 	publicIP := map[string]bool{}
 	for _, r := range out.Resources {
 		if _, ok := pw1FindFinding(r.Findings, pw1EC2CodePublicIP); ok {
@@ -753,7 +725,7 @@ func pw1DemoNameFor(rs []resource.Resource, id string) string {
 }
 
 // pw1RequireOnlyWitness fails unless exactly one row carries the code and it
-// is the fixture named as that code's witness.
+// is the named fixture.
 func pw1RequireOnlyWitness(t *testing.T, code domain.FindingCode, witness string, carriers []string) {
 	t.Helper()
 	if len(carriers) != 1 {

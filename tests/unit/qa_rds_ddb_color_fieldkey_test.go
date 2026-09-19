@@ -1,6 +1,6 @@
 package unit
 
-// qa_rds_ddb_color_fieldkey_test.go — the status → colour table for DynamoDB,
+// The status → colour table for DynamoDB,
 // driven the way production drives it: an SDK TableDescription through the
 // ddb fetcher, and a colour computed from the worst finding's severity. No
 // classifier reads a Fields key; the dbi cases live in qa_dbi_color_test.go.
@@ -45,9 +45,9 @@ func d1FetchDDBRow(t *testing.T, table *ddbtypes.TableDescription) resource.Reso
 
 // TestDDBColor pins the table status → colour mapping for DynamoDB.
 //
-// The wave-2 point-in-time-recovery row and the "(+N)" suffix row are gone: the
-// enricher owns the first and prowler_w2_ddb covers it, and the suffix is added
-// for display after the severity that decides colour has been read.
+// The wave-2 point-in-time-recovery finding is the enricher's (prowler_w2_ddb
+// covers it), and the "(+N)" suffix is added for display after the severity
+// that decides colour has been read.
 func TestDDBColor(t *testing.T) {
 	cases := []struct {
 		name   string

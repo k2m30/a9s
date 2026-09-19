@@ -1,45 +1,24 @@
-// qa_demo_related_ids_resolve_test.go — pins the "count shown, drill fails"
-// class of demo-mode defect: a related-panel checker reports Count > 0 and a
-// list of ResourceIDs, but the demo fakes cannot resolve any of those IDs when
-// the user actually drills into the row.
+// Every related ID a demo checker
+// reports resolves when the user drills into the row: a related-panel count
+// whose IDs the demo fakes cannot fetch lies about what the user can open.
 //
-// Concrete instance this test pins: ./a9s --demo, EC2 instance
-// i-0a1b2c3d4e5f60016 shows a non-zero IAM Roles related count (the ec2
-// fixture references instance profile "acme-ec2-instance-profile" at
-// core/demo/fixtures/ec2.go:53), but drilling in fails with
-// "role FetchByIDs failed for 1 of 1 IDs: acme-ec2-instance-profile:
-// NoSuchEntity" because no such role exists in core/demo/fixtures/iam.go.
-//
-// This reuses qa_demo_pivot_coverage_test.go's harness verbatim
+// It walks the fixture graph with qa_demo_pivot_coverage_test.go's harness
 // (buildDemoTypeCache / demo.NewServiceClients / the real registered
-// checkers) so the fixture graph is walked exactly as that gate walks it, and
-// resolves each witnessed ResourceID the same way the app's related-drill
-// resolves a single/known target ID: resource.GetFetchByIDs(targetType),
-// called as fn(ctx, clients, []string{id}) (see
-// core/runtime/executor.go's KindFetchByIDDetail case and
+// checkers) and resolves each ID the way the app's related drill does:
+// resource.GetFetchByIDs(targetType) called as fn(ctx, clients,
+// []string{id}) (core/runtime/executor.go's KindFetchByIDDetail case,
 // core/runtime/handlers_related.go's ResolveRelatedNavigate /
-// relatedFetchTasks, which is the only production consumer of the
-// FetchByIDs field on catalog.ResourceTypeDef). Target types with no
-// registered FetchByIDs helper cannot be drilled by exact ID in demo mode
-// either — those are logged and skipped, not silently ignored.
+// relatedFetchTasks). Target types with no registered FetchByIDs helper
+// cannot be drilled by exact ID in demo mode either; those are logged and
+// skipped. There is no allowlist: every orphaned ID is a hard failure.
 //
-// Unlike qa_demo_pivot_coverage_test.go, this test carries NO burn-down
-// allowlist: every orphaned ID is a hard failure. The pivot-coverage ratchet
-// tracks "the count is a dead zero"; this test tracks "the count lies about
-// what you can actually open" — a strictly worse user experience, so it does
-// not get a grace period.
-//
-// Exactly one witnessed ID is expected NOT to resolve, and it is REQUIRED to
-// be present: a demo role attaches fixtures.RetiredManagedPolicyName, a
-// policy AWS has retired, so the attachment survives on the role while
-// GetPolicy answers NoSuchEntity. That is not the defect this gate hunts:
-// the lie is a FIXTURE gap, and here the name came from the role's OWN
-// attachment list, which is what AWS itself reports, and the aggregate says
-// which id it could not read. Dropping the name instead would render the
-// role's attachments one row short with no sign anything was missing. The
-// exception is not an allowlist: it names one id, and it goes red if that
-// id ever starts resolving or stops being witnessed, so it cannot quietly
-// widen to cover a real orphan.
+// Exactly one reported ID must NOT resolve, and it must be present: a demo
+// role attaches fixtures.RetiredManagedPolicyName, a policy AWS has retired,
+// so the attachment survives on the role while GetPolicy answers
+// NoSuchEntity. That name is what AWS itself reports in the role's
+// attachment list; dropping it would render the role's attachments one row
+// short with no sign anything was missing. The exception names one id and
+// goes red if that id ever starts resolving or stops being reported.
 package unit_test
 
 import (

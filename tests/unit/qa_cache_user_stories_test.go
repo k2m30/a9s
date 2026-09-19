@@ -47,8 +47,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 	})
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if cmd == nil {
 		t.Fatal("warm re-entry should be served from cache AND re-verified")
 	}
@@ -106,8 +105,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	})
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if cmd == nil {
 		t.Fatal("re-entering a paginated list after load-more should re-verify the merged page set")
 	}
@@ -175,16 +173,13 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// Must NOT enter tg_health — a single-target pivot always opens detail.
 	if strings.Contains(plain, "tg_health") {
 		t.Fatalf("related cache hit on tg must NOT enter tg_health (2026-07-06 rule: Count=1 pivot always opens detail), got:\n%s", plain)
 	}
-	// Must NOT show an intermediate filtered list.
 	if strings.Contains(plain, "tg(1)") {
 		t.Fatalf("related cache hit should not show an intermediate target list, got:\n%s", plain)
 	}
-	// Must show the plain tg detail using target data cached from the
-	// background load — this is the story this test pins.
+	// The tg detail uses target data cached from the background load.
 	if !strings.Contains(plain, "detail -- "+tg1.ID) {
 		t.Fatalf("related cache hit on tg should open the TG DETAIL view using cached data, got:\n%s", plain)
 	}
@@ -274,7 +269,7 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// New schema: Status is verb-based, not ReadOnly. _ct.actor is set to the resource
+	// Status is verb-based, not ReadOnly. _ct.actor is set to the resource
 	// Name so it renders in the ACTOR column and can be used as an assertion target
 	// (the Name is not rendered in any default column without a RawStruct).
 	topLevelEvents := []resource.Resource{
@@ -340,8 +335,7 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	})
 	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
 	// task for the row-store hit, so both adapters seed the retained rows AND
-	// fetch; a list is never fresh forever. The rows-rendered-instantly half
-	// below is unchanged.
+	// fetch; a list is never fresh forever.
 	if cmd == nil {
 		t.Fatal("refreshing a child view must not evict an unrelated top-level cache entry")
 	}

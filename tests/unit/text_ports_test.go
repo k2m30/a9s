@@ -1,10 +1,5 @@
-// text_ports_test.go — text-viewer family unique behavior pins ported onto
-// the live controller/renderer-adapter path, per
-// specs/022-codebase-cleanup/wave3-map-text.md. The dying legacy-model tests
-// these port from (qa_yaml_test.go, qa_json_test.go, qa_error_log_test.go,
-// ct_events_t_key_test.go's YAML case, qa_view_switching_test.go,
-// scroll_state_test.go) stay untouched — nothing is deleted here, only new
-// live-path pins are added so the behavior survives their eventual removal.
+// Text-viewer family behavior through the live
+// controller/renderer-adapter path.
 package unit
 
 import (
@@ -30,8 +25,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ── Shared helper: press Copy and read back what was copied ────────────────
-//
 // The 'c' key routes through Model.handleCopy() -> copyToClipboard(content,
 // label). On rsKindText/Reveal/Identity the returned messages.Flash.Text
 // carries a constant label (e.g. "Copied YAML to clipboard"), never the
@@ -59,13 +52,6 @@ func wave3CopyAndReadClipboard(t *testing.T, m tui.Model) string {
 	})
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 1 + 11 (JSON) — rsKindText copy strips color for JSON.
-// Verify-then-port: no existing test drives handleCopy's rsKindText branch
-// for JSON at all (qa_json_test.go's RawContent/CopyContent tests all use the
-// dead NewJSON()/JSONModel path). PORTED.
-// ═══════════════════════════════════════════════════════════════════════════
-
 func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
@@ -77,7 +63,6 @@ func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{res}})
 
-	// Navigate to the JSON view (mirrors qa_copy_test.go's YAML case).
 	m, cmd := rootApplyMsg(m, rootKeyPress("J"))
 	if cmd == nil {
 		t.Fatal("J on resource list should return a navigate command")
@@ -93,13 +78,6 @@ func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 		t.Errorf("JSON copy content must include the resource's real field value, got: %q", content)
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 1 (YAML) — strengthens the existing TestQA_Copy_YAML_CopiesFullYAML
-// (tests/unit/qa_copy_test.go), which only checks the constant Flash label
-// ("...YAML..."), not that the copied body is actually uncolored / correct.
-// PORTED.
-// ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_YAMLCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
@@ -128,26 +106,16 @@ func TestPort_YAMLCopy_UncoloredContent(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 4 — error-log copy label + uncolored content. qa_error_log_test.go's
-// TestTextViewer_CopyContentReturnsRawText/RawContentReturnsRawText assert on
-// the dead NewTextViewer().CopyContent()/RawContent(); the live error-log
-// screen is ctrl-backed via newErrorLogRS+EnsureTextState and shares
-// handleCopy's rsKindText branch, which had zero coverage. PORTED.
-// ═══════════════════════════════════════════════════════════════════════════
-
 func TestPort_ErrorLogCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	// Seed error history via a real APIError flow (mirrors qa_error_log_test.go).
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          errors.New("wave3-port-error: AccessDenied on DescribeInstances"),
 	})
 
-	// '!' opens the error log.
 	m, cmd := rootApplyMsg(m, rootKeyPress("!"))
 	if cmd != nil {
 		msg := cmd()
@@ -166,17 +134,6 @@ func TestPort_ErrorLogCopy_UncoloredContent(t *testing.T) {
 		t.Errorf("error-log copy content must include the logged error text, got: %q", content)
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 3 — colorizeYAML/colorizeJSON exact-line golden, ported onto the live
-// ContentLines() path (NewYAMLWithCtrl / NewJSONWithCtrl are LIVE per the
-// map). text_render_parity_test.go only proves the legacy View() and the
-// live RenderText() agree with EACH OTHER (both call the same colorize
-// functions) — it is not an independent pin that a specific field renders
-// with real color codes. qa_yaml_test.go's SyntaxColoring / qa_json_test.go's
-// ColorizeStructuralTokens tests all build via the dead NewYAML()/NewJSON()
-// constructors. PORTED.
-// ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_YAML_ColorizeGolden_LiveContentLines(t *testing.T) {
 	res := resource.Resource{
@@ -229,14 +186,10 @@ func TestPort_JSON_ColorizeGolden_LiveContentLines(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 5 — YAML text-screen 't' key -> ct-events RelatedNavigate on the LIVE
-// path (internal/tui/app_stack.go's handleTextKeyMsg, the rsKindText key
-// router, must route m.keys.CloudTrail), per docs/shared/keybindings.md
+// The rsKindText key router (internal/tui/app_stack.go's handleTextKeyMsg)
+// routes m.keys.CloudTrail from a YAML screen, per docs/shared/keybindings.md
 // ("t: Jump to CloudTrail Events for the selected resource (all resource
-// types)"). This pins ONLY the YAML/text case. Do not weaken this assertion
-// to a no-op.
-// ═══════════════════════════════════════════════════════════════════════════
+// types)").
 
 func TestPort_YAML_TKey_LiveCTEventsNavigate(t *testing.T) {
 	tui.Version = "test"
@@ -275,16 +228,6 @@ func TestPort_YAML_TKey_LiveCTEventsNavigate(t *testing.T) {
 		t.Errorf("FetchFilter[ResourceName] = %q, want %q", nav.FetchFilter["ResourceName"], "i-test")
 	}
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 7 — ScrollState.VisibleWindow centered-window cases, copied verbatim
-// from scroll_state_test.go (which is slated for a later partial deletion:
-// cursor-arithmetic cases removed, VisibleWindow cases kept). Copying now
-// means the pin survives regardless of when/how that trim lands. ScrollState
-// itself is untouched production code (LIVE via RenderSelector) — these are
-// duplicated test cases, not a "port" of dead-path behavior. PORTED (insurance
-// copy).
-// ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_ScrollState_VisibleWindow_AllFit(t *testing.T) {
 	s := views.NewScrollState(5)
@@ -351,15 +294,9 @@ func TestPort_ScrollState_VisibleWindow_ExactFit(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 10 — YAML<->JSON 'y'/'J' toggle on the LIVE path. qa_view_switching_test.go
-// drives the dead JSONModel/YAMLModel.Update() directly (jsonModel() ->
-// views.NewJSON()). No existing test presses 'J' at all on the live path.
-// handleTextKeyMsg routes m.keys.YAML and m.keys.JSON, so pressing 'J'
-// while on YAML (or 'y' while on JSON) toggles, per
-// docs/shared/keybindings.md's unscoped "y"/"J" actions. Do not weaken
-// these assertions to a no-op.
-// ═══════════════════════════════════════════════════════════════════════════
+// handleTextKeyMsg routes m.keys.YAML and m.keys.JSON, so pressing 'J' while
+// on YAML (or 'y' while on JSON) toggles, per docs/shared/keybindings.md's
+// unscoped "y"/"J" actions.
 
 func TestPort_YAMLToJSON_LiveToggle(t *testing.T) {
 	tui.Version = "test"
@@ -413,17 +350,9 @@ func TestPort_JSONToYAML_LiveToggle(t *testing.T) {
 	}
 }
 
-// TestPort_YAMLToggle_SurvivesAsyncEnrichment pins that a field added by
-// async detail enrichment (messages.EnrichDetailResult) survives a y/J
-// toggle. handleTextKeyMsg's YAML/JSON cases (app_stack.go) resolve the
-// resource to re-marshal via Controller.GetTextResource ->
-// findCachedResourceByID — the row cache — not the enriched TextState that
-// UpdateTextLines wrote (runtime_adapter_resources.go's
-// handleEnrichDetailResult). ApplyDetailEnrichmentForResource only mutates a
-// matching ScreenDetail's state, never the row cache, so a resource with no
-// Detail screen on the stack (as here, navigated straight to YAML) has no
-// path back to the enriched Fields at all: the toggle re-marshals the
-// pre-enrichment row and silently drops the field.
+// TestPort_YAMLToggle_SurvivesAsyncEnrichment: a field added by async detail
+// enrichment (messages.EnrichDetailResult) survives a y/J toggle, including
+// when no Detail screen is on the stack (navigated straight to YAML).
 func TestPort_YAMLToggle_SurvivesAsyncEnrichment(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
@@ -469,15 +398,9 @@ func TestPort_YAMLToggle_SurvivesAsyncEnrichment(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Item 11 — copy label/payload per remaining text-family view.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Selector and Help are not handled by handleCopy's switch at all (only
-// rsKindList/Detail/Reveal/Text/Identity are), so 'c' must be a true no-op
-// there. This ports qa_view_methods_test.go's dead
-// TestSelector_CopyContentReturnsEmpty / TestCopyContent_Help_ReturnsEmpty
-// pins onto the live path.
+// Selector and Help are outside handleCopy's switch (only
+// rsKindList/Detail/Reveal/Text/Identity are in it), so 'c' is a true no-op
+// there.
 func TestPort_SelectorCopy_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
@@ -504,9 +427,8 @@ func TestPort_HelpCopy_IsNoOp(t *testing.T) {
 	}
 }
 
-// Identity copy: press 'i' after a live IdentityLoaded event so rs.identityData
-// is seeded synchronously (app_input.go), then verify 'c' copies the exact ARN.
-// No prior test drove handleCopy's rsKindIdentity branch. PORTED.
+// Identity copy: 'i' after a live IdentityLoaded event seeds rs.identityData
+// synchronously (app_input.go), so 'c' copies the exact ARN.
 func TestPort_IdentityCopy_CopiesExactARN(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
@@ -535,10 +457,8 @@ func TestPort_IdentityCopy_CopiesExactARN(t *testing.T) {
 }
 
 // Identity copy while still loading (no IdentityLoaded event delivered yet)
-// must be a no-op — handleCopy's rsKindIdentity branch gates on
-// !rs.identityLoading. Ports tui_identity_test.go's dead-path
-// TestIdentityView_CopyContent_EmptyWhenLoading (m.CopyContent()) onto the
-// live seam.
+// is a no-op — handleCopy's rsKindIdentity branch gates on
+// !rs.identityLoading.
 func TestPort_IdentityCopy_NoOpWhileLoading(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
@@ -554,10 +474,9 @@ func TestPort_IdentityCopy_NoOpWhileLoading(t *testing.T) {
 	}
 }
 
-// Reveal copy: register a test reveal fetcher over "secrets" (restored via
-// t.Cleanup), drive the real 'x' -> fetchRevealValue -> ValueRevealed chain
-// with demo clients, then verify 'c' copies the exact revealed value. No
-// prior test drove handleCopy's rsKindReveal branch. PORTED.
+// Reveal copy: a test reveal fetcher over "secrets" (restored via
+// t.Cleanup) drives the real 'x' -> fetchRevealValue -> ValueRevealed chain
+// with demo clients; 'c' copies the exact revealed value.
 func TestPort_RevealCopy_CopiesExactValue(t *testing.T) {
 	const shortName = "secrets"
 	origFetcher := resource.GetRevealFetcher(shortName)
@@ -593,12 +512,10 @@ func TestPort_RevealCopy_CopiesExactValue(t *testing.T) {
 	}
 }
 
-// Reveal copy of a JSON secret must stay RAW (compact), not the pretty-printed
-// form RevealModel.displayValue() renders for View(). Ports the one unique
-// pin from qa_reveal_test.go's dead-path TestQA_Reveal_JSONValue_CopyReturnsRaw
-// (m.CopyContent()) onto the live handleCopy/rsKindReveal seam, which copies
-// rs.revealValue directly — the raw fetched string, never the display-only
-// json.MarshalIndent output.
+// Reveal copy of a JSON secret stays RAW (compact), not the pretty-printed
+// form RevealModel.displayValue() renders for View(): handleCopy's
+// rsKindReveal branch copies rs.revealValue — the raw fetched string, never
+// the display-only json.MarshalIndent output.
 func TestPort_RevealCopy_JSONValueStaysRaw(t *testing.T) {
 	const shortName = "secrets"
 	origFetcher := resource.GetRevealFetcher(shortName)
@@ -635,12 +552,8 @@ func TestPort_RevealCopy_JSONValueStaysRaw(t *testing.T) {
 // Reveal copy of an EMPTY secret value is a silent no-op on the live path:
 // handleCopy's rsKindReveal branch sets content=rs.revealValue unconditionally
 // (internal/tui/runtime_adapter_navigate.go), but the shared
-// `if content == "" { return m, nil }` guard AFTER the switch applies to
-// every rsKind including Reveal. This contradicts the dead
-// RevealModel.CopyContent(), which unconditionally returned
-// ("", "Secret copied to clipboard") — qa_reveal_test.go's
-// TestQA_Reveal_EmptyValue asserted behavior the live path does not actually
-// have. Ports that pin onto the live seam with the CORRECTED expectation.
+// `if content == "" { return m, nil }` guard after the switch applies to
+// every rsKind including Reveal.
 func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 	const shortName = "secrets"
 	origFetcher := resource.GetRevealFetcher(shortName)
@@ -674,13 +587,9 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// qa_view_switching_test.go's TestJSONView_PressD_EmitsNavigateToDetail /
-// TestYAMLView_PressD_EmitsNavigateToDetail ('d' from JSON/YAML -> Detail)
-// on the live path: handleTextKeyMsg (app_stack.go) routes keys.Detail, so
-// pressing 'd' on a live YAML/JSON text screen navigates to Detail per
-// docs/shared/keybindings.md's unscoped "d: Detail view". Do not weaken.
-// ═══════════════════════════════════════════════════════════════════════════
+// 'd' on a live YAML/JSON text screen navigates to Detail: handleTextKeyMsg
+// (app_stack.go) routes keys.Detail, per docs/shared/keybindings.md's
+// unscoped "d: Detail view".
 
 func TestPort_YAML_DKey_LiveNavigateToDetail(t *testing.T) {
 	tui.Version = "test"
@@ -744,44 +653,17 @@ func TestPort_JSON_DKey_LiveNavigateToDetail(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Round 4, item 4 — text_ctrl_interaction_test.go verify-then-port-then-delete.
-//
-// That file's own header claimed it drove "keys through YAMLModel/JSONModel
-// .Update() with ctrl wired" to close a gap where Update() might mutate
-// model-local state without reaching the controller. Verified false:
-// internal/tui/app_stack.go's handleTextKeyMsg (the real rsKindText key
-// router) never calls YAMLModel/JSONModel.Update() at all — search input
-// mode routes through rs.search, and Search/SearchNext/SearchPrev/Escape/
-// ToggleWrap/Up/Down/Top/Bottom/PageUp/PageDown all call m.ctrl.Apply(...)
-// directly (app_stack.go:594-755). YAMLModel/JSONModel.Update() is
-// unreachable from production — the file's "ViaUpdate" pins exercised dead
-// code under a false-confidence banner, not the live dispatch.
-//
-// The controller-level pins (non-"ViaUpdate": ToggleWrap, Search,
-// SearchNextPrev, Scroll) test real, live mechanism (ctrl.Apply + RenderText
-// are exactly what handleTextKeyMsg and the renderer use) with useful
-// precision (exact ScrollY arithmetic across 5 different actions, exact
-// SearchCursor index) that a single key-press integration test does not
-// practically reproduce — ported below with only the dead-constructor setup
-// fixed (NewYAML/NewJSON -> NewYAMLWithCtrl/NewJSONWithCtrl), no behavior
-// lost.
-//
-// The "ViaUpdate" pins are replaced by NEW pins below that drive the REAL
-// key path (root model -> handleTextKeyMsg -> ctrl.Apply), proving the
-// wiring the old file only assumed. handleTextKeyMsg's switch does not
-// branch on YAML vs JSON for any of these keys (verified by reading it) —
-// wrap/search/scroll dispatch is identical for both screen kinds, so each
-// mechanism is ported ONCE against YAML with a single JSON parity
-// spot-check, rather than duplicating all 5 mechanisms across both kinds
-// (duplicating a proven-identical dispatch path is padding, not coverage).
-// ═══════════════════════════════════════════════════════════════════════════
+// handleTextKeyMsg (internal/tui/app_stack.go, the rsKindText key router)
+// routes search input through rs.search and
+// Search/SearchNext/SearchPrev/Escape/ToggleWrap/Up/Down/Top/Bottom/PageUp/
+// PageDown through m.ctrl.Apply(...) directly. Wrap/search/scroll dispatch is
+// identical for YAML and JSON screens, so each mechanism is exercised against
+// YAML with a single JSON parity check.
 
 // newTextScreenController builds a Controller with a YAML or JSON screen on
-// the stack, mirroring text_ctrl_interaction_test.go's retired
-// newTextController. Blessed via knownConstructionDebt in
-// qa_controller_construction_discipline_test.go (no ResourcesLoaded/
-// EnrichmentChecked/AvailabilityChecked event is ever driven through it).
+// the stack. It is listed in knownConstructionDebt
+// (qa_controller_construction_discipline_test.go): no ResourcesLoaded/
+// EnrichmentChecked/AvailabilityChecked event is ever driven through it.
 func newTextScreenController(t testing.TB, screenID runtime.ScreenID, lines []string) *app.Controller {
 	s := session.New()
 	s.Profile = "demo"
@@ -793,8 +675,7 @@ func newTextScreenController(t testing.TB, screenID runtime.ScreenID, lines []st
 	return ctrl
 }
 
-// wave3CtrlInteractionResource mirrors text_ctrl_interaction_test.go's
-// retired textInteractionResource: enough fields (plus one deliberately long
+// wave3CtrlInteractionResource has enough fields (plus one deliberately long
 // value) that wrap, search, and scroll are all observable at a narrow
 // viewport.
 func wave3CtrlInteractionResource() resource.Resource {
@@ -824,9 +705,6 @@ func wave3TextInteractionLines(t *testing.T) []string {
 	m.SetSize(80, 24)
 	return m.ContentLines()
 }
-
-// ── ctrl.Apply-direct precision pins (live mechanism; only the dead-
-// constructor setup needed fixing) ─────────────────────────────────────────
 
 func TestPort_YAML_ToggleWrap_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
@@ -973,7 +851,6 @@ func TestPort_JSON_Search_CtrlPrecision(t *testing.T) {
 	}
 }
 
-// textSnapshotHelper returns Snapshot().Body.Text, failing the test if nil.
 func textSnapshotHelper(t *testing.T, ctrl *app.Controller) *app.TextBody {
 	t.Helper()
 	snap := ctrl.Snapshot()
@@ -982,8 +859,6 @@ func textSnapshotHelper(t *testing.T, ctrl *app.Controller) *app.TextBody {
 	}
 	return snap.Body.Text
 }
-
-// ── Real key-path pins: root model -> handleTextKeyMsg -> ctrl.Apply ───────
 
 // wave3EnterYAML navigates a fresh root model to the live YAML screen for
 // wave3CtrlInteractionResource via the real 'y' key from an ec2 list.
@@ -1119,7 +994,6 @@ func TestPort_YAML_Scroll_LiveKeyPath(t *testing.T) {
 	}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // colorizeYAML (internal/tui/views/yaml.go) must preserve a quoted map key
 // that itself contains a colon.
 //
@@ -1134,9 +1008,7 @@ func TestPort_YAML_Scroll_LiveKeyPath(t *testing.T) {
 //	aws: autoscaling:groupName: acme-web-prod-asg
 //
 // ContentLines() is the same colorizeYAML output View() renders, so this is
-// exactly what a user sees on the live YAML screen and copies from it. Do
-// not weaken this assertion to corrupted output.
-// ═══════════════════════════════════════════════════════════════════════════
+// exactly what a user sees on the live YAML screen and copies from it.
 
 func TestPort_ColorizeYAML_ColonInQuotedKey_Regression(t *testing.T) {
 	res := resource.Resource{

@@ -1,6 +1,6 @@
 package unit
 
-// resource_fetch_by_ids_test.go — registry tests for lazy-add
+// Registry tests for lazy-add
 // (SetFetchByIDsForTest / GetFetchByIDs). Exercises the round-trip contract
 // without hitting any AWS fake: callers that register a fetcher can recover
 // it by short name, and unregistered types return nil.

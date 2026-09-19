@@ -1,7 +1,7 @@
-// qa_wave2_enumeration_and_slot_gate_test.go — four rules the registrations
-// and the docs hold by convention today and nothing checks.
+// Four rules the registrations
+// and the docs hold.
 //
-// ROW 7. Wave 2 enumeration covers parents and children. A child type
+// Wave 2 enumeration covers parents and children. A child type
 // registers its enricher on the same field a parent does, and every consumer
 // of that registration — the dispatch queue, the declared-reads gate, the
 // detail bench's cache list — asks one enumeration for the set. An
@@ -9,18 +9,18 @@
 // the call site, and the half it drops is silent: no dispatch, no findings,
 // no error.
 //
-// ROW 8. The Wave 2 registration matches the docs generator's own input. A
+// The Wave 2 registration matches the docs generator's own input. A
 // type whose signals table carries a wave2 row is a type something has to run
 // on a second pass; a type with no wave2 row registering an enricher is
 // wiring nobody can read a reason for. Both directions, because either one
 // alone lets the pair drift.
 //
-// ROW 9. The colour rules in docs/design/ are generated from the catalog, the
-// way the resource docs and the signals table already are. A hand-typed
-// colour rule is a second declaration of a severity, and it went stale
-// exactly as a second declaration does.
+// The colour rules in docs/design/ are generated from the catalog, the way
+// the resource docs and the signals table are. A hand-typed colour rule is a
+// second declaration of a severity, and goes stale as a second declaration
+// does.
 //
-// ROW 10. No status cell carries a raw SDK error code. An error string AWS
+// No status cell carries a raw SDK error code. An error string AWS
 // returns is `Code: sentence`, and pasting it whole into a phrase slot puts
 // the code in front of the operator instead of the cause. The style gate
 // misses it because its whole-cell check exempts anything containing a colon
@@ -44,10 +44,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// ROW 7 — one enumeration over parents and children
-// ---------------------------------------------------------------------------
 
 // wave2ChildProbeName is a sentinel child type registered only for the
 // duration of the pin below. Named so a failure elsewhere points back here.
@@ -128,10 +124,6 @@ func TestAChildTypesWave2EnricherIsEnumeratedAndDispatched(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ROW 8 — the registration and the docs' Wave 2 column agree, both ways
-// ---------------------------------------------------------------------------
-
 // declaresWave2Signal reports whether the docs generator would print a wave2
 // row for this type. FindingDef.Source is the generator's input for the Wave
 // column of the signals table (cmd/catalogen), so it is the same fact the
@@ -182,10 +174,6 @@ func TestTheWave2RegistrationMatchesTheDocsWave2Column(t *testing.T) {
 			len(unexplainedRegistration), strings.Join(unexplainedRegistration, "\n  "))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ROW 9 — the design docs' colour rules are generated from the catalog
-// ---------------------------------------------------------------------------
 
 const (
 	designColorsBeginMarker = "<!-- BEGIN GENERATED: colors -->"
@@ -265,10 +253,6 @@ func TestTheDesignDocsColourRulesComeFromAGeneratedBlock(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ROW 10 — no status cell carries a raw SDK error code
-// ---------------------------------------------------------------------------
-
 // sdkErrorCodePrefix matches an AWS error code introducing the sentence after
 // it: two or more words run together, each Capitalised or an acronym, then a
 // colon and a space. It is the same shape core/aws's awsErrorCodeShape
@@ -294,8 +278,7 @@ var sdkErrorCodePrefix = regexp.MustCompile(`\b(?:[A-Z]+[a-z0-9]*){2,}: `)
 // TestTheSDKErrorCodePatternCatchesTheShapesAWSReturns pins which codes the
 // sweep above is looking for. The sweep is only as good as this pattern, and
 // its demo bench holds one offending row: a pattern narrowed by accident would
-// leave the sweep green and say nothing, which is how the acronym-led half of
-// these codes went unseen in the first place.
+// leave the sweep green and say nothing.
 func TestTheSDKErrorCodePatternCatchesTheShapesAWSReturns(t *testing.T) {
 	cases := []struct {
 		cell string
@@ -368,9 +351,9 @@ func TestNoStatusCellCarriesAnSDKErrorCode(t *testing.T) {
 // pass through untouched.
 const demoTrailDeliveryErrorID = "data-events-trail"
 
-// TestTheDemoTrailDeliveryErrorReadsAsWords holds the other half of row 10:
-// stripping the code must not throw the cause away with it. A cell reading
-// "delivery error" alone tells the operator less than the raw string did.
+// TestTheDemoTrailDeliveryErrorReadsAsWords: stripping the code must not throw
+// the cause away with it. A cell reading "delivery error" alone tells the
+// operator less than the raw string did.
 func TestTheDemoTrailDeliveryErrorReadsAsWords(t *testing.T) {
 	byType, cache := buildVisibilityTypeCache(t)
 	td := catalog.FindAny("trail")

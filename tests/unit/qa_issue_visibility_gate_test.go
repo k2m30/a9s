@@ -1,48 +1,20 @@
-// qa_issue_visibility_gate_test.go — the gate: if a
-// resource row carries a PROBLEM signal — a row color with IsIssue()==true,
-// or an issue-severity Finding (SevWarn/SevBroken; a glyph decorator is just
-// the render-time echo of that same Finding, see isVisibilityViolation) — the
-// problem must be visible either (a) in the list view's Status column cell,
-// or (b) at the top of the detail view (the Attention block).
+// If a resource row carries a problem
+// signal (a row color with IsIssue()==true, or an issue-severity Finding),
+// the problem must be visible in the list view's Status cell or in the
+// detail view's Attention block.
 //
-// SCOPE: Dim-ONLY rows (color == ColorDim, findings all SevDim, e.g. a
-// ct-events "routine event", a Lambda Inactive function, a deleted SNS
-// subscription) are OUT of scope by design — SevDim is a neutral/routine
-// state, not a problem, per domain.Severity.IsIssue() and the same "dim =
-// neutral" convention used elsewhere (related-panel rows, menu entries). See
-// isVisibilityViolation for the exact predicate and rationale.
+// Dim-only rows (color == ColorDim, findings all SevDim — e.g. a ct-events
+// "routine event", a Lambda Inactive function, a deleted SNS subscription)
+// are neutral per domain.Severity.IsIssue() and out of scope; see
+// isVisibilityViolation.
 //
-// Registry+demo-driven, one subtest per (type, resource) violation, mirroring
-// the ratchet style of qa_demo_state_coverage_test.go / qa_demo_pivot_coverage_test.go:
-//
-//  1. Drain each registered type's demo fixtures via its real Wave-1 Fetcher
-//     (drainDemoFixtures, shared with the state-coverage/pivot-coverage
-//     tests), building one shared resource.ResourceCache exactly as those
-//     tests do so cross-type Wave-2 enrichers see sibling data.
-//  2. Run the type's registered Wave-2 IssueEnricher (awsclient.Wave2EnricherFor)
-//     against the fixtures and fold any per-resource Finding into a COPY of
-//     that resource's Findings slice — mirroring what production's
-//     applyWave2ToRow (internal/tui/app_enrich_fold.go) does before render,
-//     without reimplementing that fold's full mechanics: the Color funcs and
-//     Attention builder only ever read Resource.Findings, so appending the
-//     Wave-2 finding there reproduces the same input those consumers see.
-//  3. For every (type, resource) that isVisibilityViolation flags (in-scope
-//     PROBLEM signal, not a Dim-only state), verify:
-//     (a) the REAL list Status cell for that row (driven through
-//     Controller.ApplyResourcesLoaded + Snapshot().Body.List, indexed by
-//     ListBody.StatusCol) is non-empty, OR
-//     (b) the REAL detail Attention block for that row (driven through
-//     Controller.EnsureDetailState + Snapshot().Body.Detail, filtered by
-//     FieldRow.Path=="Attention") is non-empty.
-//
-// RATCHET semantics (identical contract to knownStateCoverageGaps /
+// Ratchet semantics (same as knownStateCoverageGaps /
 // knownDisconnectedPivots):
-//   - A violation NOT in knownVisibilityGaps is a NEW regression — always
-//     fails, unconditionally.
-//   - An allowlisted violation that NOW shows the problem on both surfaces
-//     fails with a "remove from allowlist" message.
-//   - An allowlisted violation still showing on neither surface is skipped
-//     (logged), pre-existing debt.
+//   - A violation not in knownVisibilityGaps fails.
+//   - An allowlisted violation that shows the problem on a surface fails
+//     with a "remove from allowlist" message.
+//   - An allowlisted violation showing on neither surface is skipped
+//     (logged).
 package unit_test
 
 import (
@@ -62,30 +34,13 @@ import (
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
-// knownVisibilityGaps is the inventory of (type, resource-key) violations
-// found by this gate: a row with an in-scope PROBLEM signal (see
-// isVisibilityViolation — IsIssue()==true color or an issue-severity
-// Finding; Dim-only/neutral rows never reach this predicate at all) yet
-// showing the problem on NEITHER the list Status cell NOR the detail
-// Attention block. Same burn-down semantics as knownStateCoverageGaps in
-// qa_demo_state_coverage_test.go:
-//   - present + still invisible on both surfaces today -> skip (logged),
-//     expected pre-existing debt.
-//   - present + now visible on either surface           -> FAIL ("remove
-//     from allowlist").
-//   - a violation NOT present here                      -> FAIL
-//     unconditionally, a new regression the allowlist was never told about.
+// knownVisibilityGaps lists (type, resource) rows with an in-scope problem
+// signal (see isVisibilityViolation) that show it on neither the list Status
+// cell nor the detail Attention block. Ratchet semantics as in the file
+// header.
 //
 // Key shape: "<shortName>:<resourceID>" so per-type resource IDs never
 // collide across types.
-//
-// It is EMPTY: every (type, resource) pair that carries an issue-severity
-// color or Finding shows the problem on the list Status cell or the detail
-// Attention block. Dim-only rows (SevDim Finding, Dim color) are a
-// neutral/routine state, not a problem, per
-// domain.Severity.IsIssue()/domain.Color.IsIssue(). A new entry here would
-// mean a genuine issue-severity row is invisible on both surfaces — a real
-// regression, not a Dim/neutral non-issue.
 var knownVisibilityGaps = map[string]bool{}
 
 // drainVisibilityFixtures drains a type's demo rows through its own Wave-1
@@ -123,12 +78,10 @@ func buildVisibilityTypeCache(t *testing.T) (map[string][]resource.Resource, res
 // app folds them — through runtime.ApplyWave2ToRow, the same call the
 // enrichment handler makes.
 //
-// Folding by hand here is what let every wave-2 supporting row escape the
-// rendered-surface gates: a hand-rolled merge that appends Findings and
-// ignores IssueEnricherResult.AttentionDetails builds a row the app never
-// produces, so a gate reading it scans a detail block missing exactly the
-// rows this batch added. Any divergence between test fold and app fold is a
-// blind spot by construction, so there is only one fold.
+// A hand-rolled merge that appends Findings and ignores
+// IssueEnricherResult.AttentionDetails builds a row the app never produces,
+// so a gate reading it scans a detail block missing the supporting rows. One
+// fold leaves no blind spot between test and app.
 func mergeWave2Findings(
 	t *testing.T,
 	td resource.ResourceTypeDef,
@@ -241,25 +194,16 @@ func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string
 	return false
 }
 
-// isVisibilityViolation reports whether res is a candidate for the OWNER
-// RULE: the rule triggers on PROBLEM signals — a row color with
-// IsIssue()==true (domain.Color.IsIssue: Warning/Broken), OR at least one
-// issue-severity Finding (domain.Severity.IsIssue: SevWarn/SevBroken) —
-// Wave-1 seeded or Wave-2 merged. A glyph decorator (deleted with resolveListDecoratorFull
-// in core/app/list_columns.go) only ever fires from that same
-// issue-severity Finding check (the "healthy color + hidden issue-severity
-// Finding" case), so it is already covered by the Finding leg above and is
-// not a separate condition to test here.
+// isVisibilityViolation reports whether res carries a problem signal: a row
+// color with IsIssue()==true (domain.Color.IsIssue: Warning/Broken) or at
+// least one issue-severity Finding (domain.Severity.IsIssue:
+// SevWarn/SevBroken), Wave-1 seeded or Wave-2 merged.
 //
-// Dim-ONLY rows (color == ColorDim, and every Finding present is SevDim) are
-// explicitly OUT of scope: SevDim is a neutral/routine state by the app's own
-// severity design (domain.Severity.IsIssue excludes it, matching the same
-// "dim = neutral" convention used by related-panel rows and menu entries),
-// not a problem the rule is meant to police. A ct-events "routine
-// event" tier, a Lambda Inactive function, or a deleted SNS subscription are
-// all Dim-only under this design — they are states to observe, not issues to
-// surface via Status cell / Attention, so they never become gate violations
-// regardless of whether a Finding is attached.
+// Dim-only rows (color == ColorDim, every Finding SevDim) are out of scope:
+// SevDim is a neutral/routine state (domain.Severity.IsIssue excludes it,
+// matching the "dim = neutral" convention of related-panel rows and menu
+// entries) — a state to observe, not an issue to surface via Status cell or
+// Attention.
 func isVisibilityViolation(td resource.ResourceTypeDef, res resource.Resource) bool {
 	if hasIssueSeverityFinding(res.Findings) {
 		return true
@@ -288,9 +232,8 @@ func hasIssueSeverityFinding(findings []domain.Finding) bool {
 // PROBLEM signal (issue-severity color or Finding — Wave-1 seeded or Wave-2
 // merged; Dim-only/neutral rows are out of scope, see isVisibilityViolation)
 // must show the problem on the list Status cell or the detail Attention
-// block — UNLESS the (type, resourceID) pair is pinned in knownVisibilityGaps
-// as pre-existing debt, in which case it is skipped (logged) instead of
-// failed.
+// block — unless the (type, resourceID) pair is pinned in knownVisibilityGaps,
+// in which case it is skipped (logged).
 func TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
@@ -341,7 +284,6 @@ func TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere(t *testi
 						key, color, len(res.Findings), statusCell, detailVisible, key,
 					)
 				case visible:
-					// Visible on at least one surface and not allowlisted — expected steady state.
 				case allowlisted:
 					stillGapped = append(stillGapped, key)
 					t.Skipf(

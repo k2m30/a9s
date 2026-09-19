@@ -1,6 +1,6 @@
 package unit
 
-// qa_pagination_services_test.go — pagination tests for service fetchers:
+// Pagination tests for service fetchers:
 // rds, redis, docdb, dbi-snap, dbc-snap, efs, r53, cf, acm, apigw, cfn, cb, pipeline, ecr, codeartifact
 
 import (
@@ -38,10 +38,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRDSInstancesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchRDSInstancesPage_FirstPage(t *testing.T) {
 	mock := &fakeRDSDescribeDBInstances{
@@ -174,10 +170,6 @@ func (m *mockElastiCacheDescribeReplicationGroupsAPIPaginated) DescribeReplicati
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRedisPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchRedisPage_FirstPage(t *testing.T) {
 	mock := &mockElastiCacheDescribeReplicationGroupsAPIPaginated{
 		PageFunc: func(_ int) (*elasticache.DescribeReplicationGroupsOutput, error) {
@@ -289,10 +281,6 @@ func TestQA_Pagination_FetchRedisPage_Error(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchDocDBClustersPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchDocDBClustersPage_FirstPage(t *testing.T) {
 	mock := &fakeDocDBDescribeDBClusters{
 		PageFunc: func(_ int) (*docdb.DescribeDBClustersOutput, error) {
@@ -402,10 +390,6 @@ func TestQA_Pagination_FetchDocDBClustersPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchDBISnapshotsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchDBISnapshotsPage_FirstPage(t *testing.T) {
 	mock := &fakeRDSDescribeDBSnapshots{
@@ -524,10 +508,6 @@ func TestQA_Pagination_FetchDBISnapshotsPage_Error(t *testing.T) {
 // Mock: DocumentDB DescribeDBClusterSnapshots (paginated, uses Marker)
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchDocDBClusterSnapshotsPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_FirstPage(t *testing.T) {
 	mock := &fakeDocDBDescribeDBClusterSnapshots{
 		PageFunc: func(_ int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
@@ -639,10 +619,6 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchEFSFileSystemsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEFSFileSystemsPage_FirstPage(t *testing.T) {
 	encrypted := true
@@ -780,10 +756,6 @@ func (m *mockRoute53ListHostedZonesAPIPaginated) ListHostedZones(_ context.Conte
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchHostedZonesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchHostedZonesPage_FirstPage(t *testing.T) {
 	recordCount := int64(42)
 	mock := &mockRoute53ListHostedZonesAPIPaginated{
@@ -904,10 +876,6 @@ func TestQA_Pagination_FetchHostedZonesPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCloudFrontDistributionsPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCloudFrontDistributionsPage_FirstPage(t *testing.T) {
 	enabled := true
@@ -1040,10 +1008,6 @@ func TestQA_Pagination_FetchCloudFrontDistributionsPage_Error(t *testing.T) {
 // Mock: ACM ListCertificates (paginated)
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchACMCertificatesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchACMCertificatesPage_FirstPage(t *testing.T) {
 	inUse := true
 	mock := &fakeACMListCertificates{
@@ -1173,10 +1137,6 @@ func (m *mockAPIGatewayV2GetApisAPIPaginated) GetApis(_ context.Context, in *api
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchAPIGatewaysPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchAPIGatewaysPage_FirstPage(t *testing.T) {
 	mock := &mockAPIGatewayV2GetApisAPIPaginated{
 		PageFunc: func(_ int) (*apigatewayv2.GetApisOutput, error) {
@@ -1304,10 +1264,6 @@ func (m *mockCFNDescribeStacksAPIPaginated) DescribeStacks(_ context.Context, in
 	return m.PageFunc(m.Calls)
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCloudFormationStacksPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchCloudFormationStacksPage_FirstPage(t *testing.T) {
 	mock := &mockCFNDescribeStacksAPIPaginated{
 		PageFunc: func(_ int) (*cloudformation.DescribeStacksOutput, error) {
@@ -1415,13 +1371,6 @@ func TestQA_Pagination_FetchCloudFormationStacksPage_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Mock: CodeBuild ListProjects + BatchGetProjects (paginated)
-// ---------------------------------------------------------------------------
-// The fake clients for these operations now live in fakes_codebuild_test.go
-// (fakeCodeBuildListProjects, fakeCodeBuildBatchGetProjects) — see that
-// file's header for the one-fake-per-interface convention.
 
 func TestQA_Pagination_FetchCodeBuildProjectsPage_FirstPage(t *testing.T) {
 	listMock := &fakeCodeBuildListProjects{
@@ -1587,10 +1536,6 @@ func (m *mockCodePipelineListPipelinesAPIPaginated) GetPipeline(_ context.Contex
 	return &codepipeline.GetPipelineOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCodePipelinesPage
-// ---------------------------------------------------------------------------
-
 func TestQA_Pagination_FetchCodePipelinesPage_FirstPage(t *testing.T) {
 	version := int32(3)
 	mock := &mockCodePipelineListPipelinesAPIPaginated{
@@ -1716,10 +1661,6 @@ func (m *mockECRDescribeRepositoriesAPIPaginated) DescribeRepositories(_ context
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchECRRepositoriesPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchECRRepositoriesPage_FirstPage(t *testing.T) {
 	mock := &mockECRDescribeRepositoriesAPIPaginated{
@@ -1848,10 +1789,6 @@ func (m *mockCodeArtifactListRepositoriesAPIPaginated) ListRepositories(_ contex
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCodeArtifactReposPage
-// ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCodeArtifactReposPage_FirstPage(t *testing.T) {
 	mock := &mockCodeArtifactListRepositoriesAPIPaginated{

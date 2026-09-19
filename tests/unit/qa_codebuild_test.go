@@ -14,7 +14,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T-CB01 - Test CodeBuild two-step fetch (ListProjects -> BatchGetProjects)
+// CodeBuild two-step fetch (ListProjects -> BatchGetProjects)
 // ---------------------------------------------------------------------------
 
 func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
@@ -60,7 +60,6 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields
 	requiredFields := []string{"name", "source_type", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -70,7 +69,6 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		}
 	}
 
-	// Verify first project
 	r0 := resources[0]
 	if r0.ID != "project-alpha" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "project-alpha", r0.ID)
@@ -88,7 +86,6 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"description\"]: expected %q, got %q", "Alpha build project", r0.Fields["description"])
 	}
 
-	// Verify second project
 	r1 := resources[1]
 	if r1.ID != "project-beta" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "project-beta", r1.ID)
@@ -97,7 +94,6 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"source_type\"]: expected %q, got %q", "GITHUB", r1.Fields["source_type"])
 	}
 
-	// Verify RawStruct is set
 	if r0.RawStruct == nil {
 		t.Error("resource[0].RawStruct should not be nil")
 	}
@@ -162,7 +158,7 @@ func TestFetchCodeBuildProjects_BatchGetError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-CB02 - Resource type definition
+// Resource type definition
 // ---------------------------------------------------------------------------
 
 func TestCodeBuild_ResourceTypeDef(t *testing.T) {

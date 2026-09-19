@@ -1,24 +1,21 @@
 package unit
 
-// wipfix_list_lifecycle_test.go — rows 2, 3 and 4: who a fetch belongs to, and
-// which activity flag it owns.
+// Who a fetch belongs to, and which activity flag it owns.
 //
-// Row 2: a client-side related list (a detail's related panel handing a set of
-// IDs to a type whose scan was truncated) has neither a ParentContext nor a
+// A client-side related list (a detail's related panel handing a set of IDs
+// to a type whose scan was truncated) has neither a ParentContext nor a
 // FetchFilter — only EscPops says it is not the type's canonical list. A
-// continuation that re-derives its provenance from those two empty maps calls
-// itself a canonical-list fetch, and handle.go's symmetric gate then refuses
-// to land it on the very screen that asked for it.
+// continuation that derived its provenance from those two empty maps would
+// call itself a canonical-list fetch, and handle.go's symmetric gate would
+// refuse to land it on the screen that asked for it.
 //
-// Row 3: Ctrl+R while a load-more is outstanding supersedes the continuation.
-// The discard happens before any flag is cleared, and the refresh clears only
-// Loading/Refreshing — so LoadingMore stays true and the m key is dead for the
-// rest of the session.
+// Ctrl+R while a load-more is outstanding supersedes the continuation. The
+// refresh clears only Loading/Refreshing, so the discarded continuation must
+// clear LoadingMore itself or the m key stays dead.
 //
-// Row 4: an exact related-ID drill with no cached match but another cached page
-// begins with a KindFetchMore. Nothing raised LoadingMore for it (the screen is
-// in its initial Loading), yet its result carries Append=true and clears
-// LoadingMore, leaving the fetched rows behind a loading screen.
+// An exact related-ID drill with no cached match but another cached page
+// begins with a KindFetchMore while the screen is in its initial Loading; its
+// result carries Append=true and must still clear Loading.
 
 import (
 	"testing"
@@ -64,11 +61,7 @@ func wipfixFetchMoreTask(t *testing.T, tasks []runtime.TaskRequest) (runtime.Tas
 	return runtime.TaskRequest{}, runtime.FetchMorePayload{}
 }
 
-// ---------------------------------------------------------------------------
-// Row 2 — a continuation belongs to the list that issued it
-// ---------------------------------------------------------------------------
-
-// TestLoadMore_OnClientSideRelatedList_AppendsToThatList pins row 2: the
+// TestLoadMore_OnClientSideRelatedList_AppendsToThatList: the
 // continuation a related drill issues must carry the drill's own lane, so its
 // result lands on the drill and appends there.
 func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
@@ -76,7 +69,6 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	seedCanonical200(t, ctrl, core, profile, region)
 	wipfixRelatedDrillList(t, ctrl, []string{"i-drill-0", "i-drill-1"})
 
-	// The drill's first page: two rows and more to come.
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(1, "i-drill"),
@@ -105,7 +97,6 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 		t.Error("the drill's continuation names no screen — the sequence it drew belongs to nobody")
 	}
 
-	// The continuation's own result, carrying the lane the task recorded.
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(2, "i-drill")[1:],
@@ -127,11 +118,7 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	assertStillCanonical200(t, ctrl, core, profile, region, "related-drill load-more")
 }
 
-// ---------------------------------------------------------------------------
-// Row 3 — a superseded request retires its own flag
-// ---------------------------------------------------------------------------
-
-// TestRefreshDuringLoadMore_LeavesLoadMoreUsable pins row 3: when Ctrl+R
+// TestRefreshDuringLoadMore_LeavesLoadMoreUsable: when Ctrl+R
 // supersedes an outstanding continuation, the continuation's discarded result
 // must still retire the flag it raised, or the m key never works again.
 func TestRefreshDuringLoadMore_LeavesLoadMoreUsable(t *testing.T) {
@@ -153,11 +140,8 @@ func TestRefreshDuringLoadMore_LeavesLoadMoreUsable(t *testing.T) {
 		t.Fatal("precondition: the list must be marked loading-more after the m key")
 	}
 
-	// Ctrl+R while the continuation is still outstanding: a newer canonical
-	// list fetch is dispatched, superseding it.
 	ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 
-	// The superseded continuation lands and is discarded.
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-page2"),
@@ -176,11 +160,7 @@ func TestRefreshDuringLoadMore_LeavesLoadMoreUsable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 4 — a completion clears the flag its own request raised
-// ---------------------------------------------------------------------------
-
-// TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows pins row 4: a
+// TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows: a
 // drill that opens with a continuation (its target is not cached, but the
 // cached page it would come after is) raised Loading, not LoadingMore — so the
 // result must retire Loading, whatever Append says about how the rows merge.

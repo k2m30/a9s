@@ -1,17 +1,7 @@
 package unit
 
-// qa_pagination_stories_test.go — Tests for QA stories sections C, D, K
-// from docs/qa/pagination_stories.md.
-//
-// Sections A, B (basic), and E (retry) are already covered elsewhere.
-// Sections F/G/H/I's ResourceListModel-driven pins have been ported onto the
-// live Controller seam — see pagination_frametitle_ports_test.go and
-// list_loadmore_ports_test.go — since ResourceListModel.FrameTitle()
-// is dead code.
-// This file tests:
-//   - D: Top-Level Pagination Correctness (large-count multi-page fetchers)
-//   - C: Help View -- M Key Visibility (HelpModel, not ResourceListModel)
-//   - K: Log Events Time Range
+// Fetcher pagination over large counts, help-view load-more visibility, and
+// log-event fetch parameters.
 
 import (
 	"context"
@@ -37,19 +27,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// ===========================================================================
-// Section D: Top-Level Pagination Correctness
-//
-// These tests verify that fetchers paginate through ALL pages internally
-// and return the complete result set. The existing tests in
-// aws_toplevel_pagination_test.go cover correctness with small counts (2-3
-// items). These tests use the large counts specified in the QA stories.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// D.1: EC2 with 1500 instances across 2 API pages → all 1500 returned
-// ---------------------------------------------------------------------------
 
 // storyEC2PaginatedMock produces N instances split into pages of pageSize.
 type storyEC2PaginatedMock struct {
@@ -119,7 +96,6 @@ func TestStoryD1_EC2_1500Instances_AllReturned(t *testing.T) {
 		t.Fatalf("D.1: expected 1500 instances, got %d", len(resources))
 	}
 
-	// Verify first and last IDs to confirm both pages contributed
 	if resources[0].ID != "i-0000000" {
 		t.Errorf("first resource ID: expected %q, got %q", "i-0000000", resources[0].ID)
 	}
@@ -127,15 +103,10 @@ func TestStoryD1_EC2_1500Instances_AllReturned(t *testing.T) {
 		t.Errorf("last resource ID: expected %q, got %q", "i-0001499", resources[1499].ID)
 	}
 
-	// Verify all API pages were called (1000 + 500 = 2 pages)
 	if mock.callIdx != 2 {
 		t.Errorf("expected 2 API calls, got %d", mock.callIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// D.2: Lambda with 200 functions across 4 pages → all 200 returned
-// ---------------------------------------------------------------------------
 
 type storyLambdaPaginatedMock struct {
 	pages   []*lambda.ListFunctionsOutput
@@ -197,7 +168,6 @@ func TestStoryD2_Lambda_200Functions_AllReturned(t *testing.T) {
 		t.Fatalf("D.2: expected 200 functions, got %d", len(resources))
 	}
 
-	// First and last
 	if resources[0].ID != "func-0000" {
 		t.Errorf("first resource: expected %q, got %q", "func-0000", resources[0].ID)
 	}
@@ -205,15 +175,10 @@ func TestStoryD2_Lambda_200Functions_AllReturned(t *testing.T) {
 		t.Errorf("last resource: expected %q, got %q", "func-0199", resources[199].ID)
 	}
 
-	// 200/50 = 4 pages
 	if mock.callIdx != 4 {
 		t.Errorf("expected 4 API calls, got %d", mock.callIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// D.3: RDS with 250 instances across 3 pages → all 250 returned
-// ---------------------------------------------------------------------------
 
 type storyRDSPaginatedMock struct {
 	pages   []*rds.DescribeDBInstancesOutput
@@ -281,15 +246,10 @@ func TestStoryD3_RDS_250Instances_AllReturned(t *testing.T) {
 		t.Errorf("last: expected %q, got %q", "db-00249", resources[249].ID)
 	}
 
-	// 100 + 100 + 50 = 3 pages
 	if mock.callIdx != 3 {
 		t.Errorf("expected 3 API calls, got %d", mock.callIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// D.4: IAM Roles with 3000 roles → all returned
-// ---------------------------------------------------------------------------
 
 type storyIAMRolesPaginatedMock struct {
 	pages   []*iam.ListRolesOutput
@@ -358,15 +318,10 @@ func TestStoryD4_IAMRoles_3000Roles_AllReturned(t *testing.T) {
 		t.Errorf("last: expected %q, got %q", "role-02999", resources[2999].ID)
 	}
 
-	// 3000/100 = 30 pages
 	if mock.callIdx != 30 {
 		t.Errorf("expected 30 API calls, got %d", mock.callIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// D.5: CloudWatch Logs with 500 log groups → all returned
-// ---------------------------------------------------------------------------
 
 type storyCWLogsPaginatedMock struct {
 	pages   []*cloudwatchlogs.DescribeLogGroupsOutput
@@ -431,23 +386,10 @@ func TestStoryD5_CWLogs_500LogGroups_AllReturned(t *testing.T) {
 		t.Errorf("last: expected %q, got %q", "/aws/lambda/func-0499", resources[499].Name)
 	}
 
-	// 500/50 = 10 pages
 	if mock.callIdx != 10 {
 		t.Errorf("expected 10 API calls, got %d", mock.callIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// D.6: Security Groups with 1200 groups
-//
-// NOTE: The current SG fetcher (core/aws/sg.go) does NOT paginate.
-// It makes a single DescribeSecurityGroups call and returns whatever
-// the API returns in that one response. The DescribeSecurityGroups API
-// does support pagination (NextToken) but the fetcher does not loop.
-// This test documents the current behavior: all items in a single response.
-// When the fetcher is updated to paginate, this test should be expanded
-// to use multiple pages.
-// ---------------------------------------------------------------------------
 
 type storySGSinglePageMock struct {
 	output *ec2.DescribeSecurityGroupsOutput
@@ -462,7 +404,6 @@ func (m *storySGSinglePageMock) DescribeSecurityGroups(
 }
 
 func TestStoryD6_SG_1200Groups_CurrentBehavior(t *testing.T) {
-	// Current implementation: single API call returns all groups.
 	sgs := make([]ec2types.SecurityGroup, 1200)
 	for i := range 1200 {
 		sgs[i] = ec2types.SecurityGroup{
@@ -497,30 +438,15 @@ func TestStoryD6_SG_1200Groups_CurrentBehavior(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Section C: Help View -- M Key Visibility
-//
-// The help view conditionally shows "M" / "load more" only when the active
-// resource list is truncated (IsTruncated=true). This is achieved via
-// pagination-aware HelpContext variants: HelpFromResourceListPaginated and
-// HelpFromSecretsListPaginated. Non-paginated contexts omit the M binding.
-// ===========================================================================
-
-// TestStoryC1_HelpView_ShowsMKey_WhenTruncated verifies the help view output
-// for paginated resource lists. When the resource list is truncated, the help
-// view (opened via HelpFromResourceListPaginated context) should show the
-// "M" / "load more" key binding.
 func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	// When opened from a truncated resource list, help uses HelpFromResourceListPaginated.
 	help := views.NewHelpWithResource(keys.Default(), views.HelpFromResourceListPaginated, "ec2")
 	help.SetSize(120, 30)
 
 	output := help.View()
 	outputLower := strings.ToLower(output)
 
-	// Story C.1: paginated help MUST show "load more" binding.
 	if !strings.Contains(outputLower, "load more") {
 		t.Errorf("C.1: paginated help view must contain 'load more', got:\n%s", output)
 	}
@@ -528,7 +454,6 @@ func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 		t.Errorf("C.1: paginated help view must contain 'M' key, got:\n%s", output)
 	}
 
-	// Verify all expected static sections are still present
 	expectedSections := []string{"NAVIGATION", "ACTIONS", "SORT", "OTHER"}
 	for _, section := range expectedSections {
 		if !strings.Contains(output, section) {
@@ -536,7 +461,6 @@ func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 		}
 	}
 
-	// Verify core key bindings are present
 	expectedBindings := []string{"refresh", "back", "filter", "yaml", "copy id", "help"}
 	for _, binding := range expectedBindings {
 		if !strings.Contains(output, binding) {
@@ -545,24 +469,18 @@ func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 	}
 }
 
-// TestStoryC2_HelpView_HidesMKey_WhenNotTruncated verifies that the help
-// view does NOT show "Load More" when the list is fully loaded.
 func TestStoryC2_HelpView_HidesMKey_WhenNotTruncated(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	// For a non-truncated list, help uses HelpFromResourceList (non-paginated),
-	// which should NOT show "Load More".
 	help := views.NewHelpWithResource(keys.Default(), views.HelpFromResourceList, "ec2")
 	help.SetSize(120, 30)
 
 	output := help.View()
 
-	// Verify "Load More" is NOT present (correct for non-truncated).
 	if strings.Contains(output, "Load More") || strings.Contains(output, "load more") {
 		t.Errorf("C.2: help view should NOT show 'Load More' for non-truncated list, but it does")
 	}
 
-	// Also verify for the main menu context (M should never show there)
 	helpMenu := views.NewHelpWithResource(keys.Default(), views.HelpFromMainMenu, "")
 	helpMenu.SetSize(120, 30)
 	menuOutput := helpMenu.View()
@@ -571,21 +489,7 @@ func TestStoryC2_HelpView_HidesMKey_WhenNotTruncated(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Section K: Log Events Time Range
-//
-// K.1: Log events child fetcher should respect a default time range.
-// K.2: Load-more on log events should fetch older entries.
-//
-// NOTE: The current FetchLogEvents implementation does NOT use time range
-// filtering or continuation token. It fetches with StartFromHead=false
-// (newest first) and returns IsTruncated=false. These tests document
-// the current behavior and will reveal when time range support is added.
-// ===========================================================================
-
-// TestStoryK1_LogEvents_DefaultFetch verifies the log events fetcher behavior.
 func TestStoryK1_LogEvents_DefaultFetch(t *testing.T) {
-	// Create mock with 5 events
 	events := make([]cwlogstypes.OutputLogEvent, 5)
 	for i := range 5 {
 		ts := int64(1711100000000 + int64(i)*1000)
@@ -613,12 +517,10 @@ func TestStoryK1_LogEvents_DefaultFetch(t *testing.T) {
 		t.Fatalf("K.1: unexpected error: %v", err)
 	}
 
-	// Should return all 5 events
 	if len(result.Resources) != 5 {
 		t.Errorf("K.1: expected 5 resources, got %d", len(result.Resources))
 	}
 
-	// Verify the input was constructed correctly
 	if mock.lastInput == nil {
 		t.Fatal("K.1: expected lastInput to be set")
 	}
@@ -631,21 +533,18 @@ func TestStoryK1_LogEvents_DefaultFetch(t *testing.T) {
 			"2026/03/22/test-stream", mock.lastInput.LogStreamName)
 	}
 
-	// StartFromHead should be false (fetch newest first)
+	// StartFromHead=false returns the newest events first.
 	if mock.lastInput.StartFromHead == nil || *mock.lastInput.StartFromHead {
 		t.Errorf("K.1: expected StartFromHead=false, got %v", mock.lastInput.StartFromHead)
 	}
 
-	// Verify pagination metadata
 	if result.Pagination == nil {
 		t.Fatal("K.1: expected pagination metadata, got nil")
 	}
-	// Current implementation always returns IsTruncated=false
 	if result.Pagination.IsTruncated {
 		t.Log("K.1: FetchLogEvents returned IsTruncated=true — time range pagination may be implemented")
 	}
 
-	// Verify event content
 	for i, r := range result.Resources {
 		if r.Fields["timestamp"] == "" {
 			t.Errorf("K.1: event %d has empty timestamp", i)
@@ -656,8 +555,6 @@ func TestStoryK1_LogEvents_DefaultFetch(t *testing.T) {
 	}
 }
 
-// TestStoryK2_LogEvents_ContinuationToken verifies that the continuation
-// token parameter is accepted by the fetcher (even if not currently used).
 func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 	ts := int64(1711100000000)
 	msg := "2026-03-22T10:00:00.000Z INFO Older event"
@@ -669,7 +566,6 @@ func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 		},
 	}
 
-	// Call with a continuation token (simulating load-more)
 	result, err := awsclient.FetchLogEvents(
 		context.Background(), mock,
 		"/aws/lambda/test-func",
@@ -684,13 +580,4 @@ func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 		t.Errorf("K.2: expected 1 resource, got %d", len(result.Resources))
 	}
 
-	// NOTE: The current implementation ignores the continuation token.
-	// This test documents that behavior. When load-more pagination is added
-	// for log events, this test should be updated to verify that the token
-	// is passed to the API input (e.g., via NextToken field).
 }
-
-// ===========================================================================
-// Cross-section: Verify all resource types have consistent pagination behavior
-// at the view level.
-// ===========================================================================

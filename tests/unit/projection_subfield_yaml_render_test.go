@@ -1,27 +1,18 @@
 package unit_test
 
-// projection_subfield_yaml_render_test.go — regression test for PR-01 Bug 1.
+// An ItemSubfield with an empty
+// Label and a YAML continuation value like "  keyId: arn:..." (emitted by
+// ctevent.Project or any projector using buildRawJSONSection) renders as a
+// plain line.
 //
-// Bug: when ctevent.Project (or any projector using buildRawJSONSection) emits
-// an ItemSubfield with empty Label and a YAML continuation value like
-// "  keyId: arn:...", the adapter domainItemToFieldItem produces
-// FieldItem{Key: "", Value: "  keyId: arn:..."}.
-//
-// The renderer's `if item.Key != item.Value` branch then fires because
-// "" != "  keyId: arn:..." and produces:
+// domainItemToFieldItemDetail (core/app/detail_body.go) copies Value into
+// Key for such an item (Key == Value), so the renderer takes the plain-line
+// branch. With Key "" the renderer's `if item.Key != item.Value` branch
+// would produce:
 //
 //	indent + "" + ": " + "  keyId: arn:..."  →  ":   keyId: arn:..."
 //
-// Fix: domainItemToFieldItem (and its live-path mirror,
-// domainItemToFieldItemDetail in core/app/detail_body.go) must detect
-// ItemSubfield with empty Label and copy Value into Key (Key == Value), so
-// the renderer takes the plain-line branch instead.
-//
-// Retargeted (wave3 detail-family cleanup, specs/022-codebase-cleanup) off
-// views.NewDetail(...).View() onto the live NewTransientDetail+RenderDetail
-// seam, and moved from package unit to unit_test to route construction
-// through the blessed newTestController helper (qa_controller_construction_discipline_test.go):
-// this test constructs a cloudtrailtypes.Event with a nested
+// This test constructs a cloudtrailtypes.Event with a nested
 // requestParameters object, calls ctevent.Project() to get []domain.Section,
 // then drives it through a real app.Controller (buildDetailFieldItems ->
 // domainItemToFieldItemDetail -> RenderDetail) and asserts that NO rendered
@@ -103,13 +94,8 @@ func renderCTEventDetailViaController(t *testing.T, sdkEv cloudtrailtypes.Event)
 
 // TestCTEventRawYAMLRender_NoStrayColonPrefix verifies that a CloudTrail event
 // with nested requestParameters does NOT produce lines starting with ": " in the
-// rendered detail output.
-//
-// Failure today: domainItemToFieldItem sets Key="" for ItemSubfield with empty Label,
-// then the renderer fires the Key != Value branch and prepends ": " to the line.
-//
-// Expected after fix: every sub-field line in RAW EVENT renders as plain YAML
-// (no leading ": " prefix).
+// rendered detail output: every sub-field line in RAW EVENT renders as plain
+// YAML.
 func TestCTEventRawYAMLRender_NoStrayColonPrefix(t *testing.T) {
 	sdkEv := ctEventWithNestedParams()
 	r := domain.Resource{
@@ -130,8 +116,8 @@ func TestCTEventRawYAMLRender_NoStrayColonPrefix(t *testing.T) {
 			continue
 		}
 		rawEventFound = true
-		// Verify that at least one ItemSubfield with empty Label exists (confirms
-		// the fixture exercises the bug path).
+		// At least one ItemSubfield with empty Label exists, so the fixture
+		// exercises the empty-Label path.
 		hasEmptyLabelSubfield := false
 		for _, it := range sec.Items {
 			if it.Kind == domain.ItemSubfield && it.Label == "" {
@@ -162,17 +148,10 @@ func TestCTEventRawYAMLRender_NoStrayColonPrefix(t *testing.T) {
 
 // TestCTEventRawYAMLRender_NestedParamsExpanded verifies that the nested
 // requestParameters keys ("keyId", "bucketName") appear in the rendered output
-// as recognizable plain-text content — not mangled by the stray-colon bug.
-//
-// This is a companion assertion: even if the stray-colon test passes, this
-// confirms the values themselves are actually present and readable.
+// as recognizable plain-text content, not mangled by a stray colon prefix.
 func TestCTEventRawYAMLRender_NestedParamsExpanded(t *testing.T) {
 	sdkEv := ctEventWithNestedParams()
 
-	// Assert that no rendered line starts with ": " after trimming leading whitespace.
-	// Before fix: sub-field lines render as ":   keyId: arn:..." — the stray colon
-	// prefix is the observable symptom of the domainItemToFieldItem bug.
-	// This companion test independently verifies the fix from the rendered-value angle.
 	plain := stripAnsi(renderCTEventDetailViaController(t, sdkEv))
 	for _, line := range strings.Split(plain, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")

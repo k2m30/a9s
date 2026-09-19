@@ -10,10 +10,6 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
-// ===========================================================================
-// Realistic SDK struct builders
-// ===========================================================================
-
 func realisticVPC() ec2types.Vpc {
 	return ec2types.Vpc{
 		VpcId:     new("vpc-0abc1234def56789a"),
@@ -226,9 +222,5 @@ func realisticSNSSubscription() snstypes.Subscription {
 		Owner:           new("123456789012"),
 	}
 }
-
-// ===========================================================================
-// 1. VPC
-// ===========================================================================
 
 var _ = time.Now

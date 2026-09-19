@@ -1,4 +1,4 @@
-// related_unknown_badge_test.go — pins the four-state contract that "(?)" is
+// Pins the four-state contract that "(?)" is
 // FORBIDDEN: a RESOLVED unknown related count (State: RelatedUnknown, not
 // loading, no error, no FetchFilter) renders with NO count badge (blank) and is
 // ACTIONABLE, never as a "(?)" badge.
@@ -23,10 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
-
-// ---------------------------------------------------------------------------
-// Pin 1: FormatRelatedCount direct table — the single source of truth.
-// ---------------------------------------------------------------------------
 
 func TestFormatRelatedCount_Table(t *testing.T) {
 	cases := []struct {
@@ -56,13 +52,6 @@ func TestFormatRelatedCount_Table(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Pin 2: panel-level render — the "(?)" badge reaches the live TUI and the
-// row stays non-actionable (dim), extending tui_related_dim_parity_test.go's
-// conventions (newRelatedDimParityDetail / relatedDimParityBody /
-// extractRelatedLine) without duplicating its state-sweep matrix.
-// ---------------------------------------------------------------------------
 
 // ngResourceForCacheMissBadge returns a node-group resource, matching the
 // TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch fixture shape: a real

@@ -1,9 +1,8 @@
-// qa_late_replace_and_false_exact_test.go — the late-replace and false-exact
-// pair (D14).
+// The late-replace and false-exact
+// pair.
 //
 //	A) A staler page-1 REPLACE landing after a deeper load-more append must
-//	   not stomp the 55-row list back to 50+ (C2: older results are
-//	   discarded).
+//	   not stomp the 55-row list back to 50+: older results are discarded.
 //
 //	B) A page-1 session.ResourceCache entry must carry its Pagination
 //	   (HandleResourcesLoaded's PatchResourceCache at
@@ -13,16 +12,6 @@
 //	   (core/runtime/probes.go) would accept as a downgrade of the
 //	   previously-stored true-exact 55, persisting count:50, exact:true,
 //	   rows:0 on a 55-bucket account.
-//
-// Pins (harnesses: qa_load_more_dedup_test.go's poisoning-sequence shape +
-// runtime_executor_depth_refetch_test.go's seedCachedRows/bucketID/
-// page1Resources/page2Resources package-level helpers, reused directly —
-// both already live in this package, unit_test):
-//
-//  1. FalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact
-//  2. NilPaginationEntry_IsNotExact
-//  3. LateReplace_DoesNotStompDeeperList
-//  4. FreshReplace_StillWins
 package unit_test
 
 import (
@@ -40,7 +29,7 @@ import (
 )
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 1 — a page-1 entry saved without Pagination must never downgrade an
+// A page-1 entry saved without Pagination must never downgrade an
 // already-persisted true-exact total.
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -57,9 +46,6 @@ import (
 // The on-disk TypeFile for "s3" is pre-seeded (via seedCachedRows, reused
 // from runtime_executor_depth_refetch_test.go) with a true-exact 55-row
 // state, as if an earlier full-pagination sweep had already completed.
-//
-// RED today: the false-exact 50-row derivation downgrades the persisted
-// 55-row/exact state to 50/exact, dropping 5 rows.
 func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -136,23 +122,17 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 2 — availabilityFromResourceCache-derived Exact must never come from
+// availabilityFromResourceCache-derived Exact must never come from
 // a nil-Pagination entry.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestNilPaginationEntry_IsNotExact isolates the derivation itself (as
-// opposed to test 1's full HandleResourcesLoaded-to-disk round trip):
+// opposed to the full HandleResourcesLoaded-to-disk round trip above):
 // directly seed a session.ResourceCache entry with a nil Pagination field
 // (the exact shape HandleResourcesLoaded's PatchResourceCache intent
 // carries) and confirm the persisted save never marks that type Exact,
 // preserving whatever was already stored on disk (or leaving it unknown
 // when nothing was stored).
-//
-// RED today: SaveAvailabilityCache treats the nil-Pagination entry's
-// derived truncated=false as a genuine exact observation and persists
-// Exact=true with the entry's own (possibly incomplete) count — even when
-// no prior exact state existed to protect, this proves the derivation
-// itself, not just the downgrade-guard interaction, is wrong.
 func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -197,7 +177,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 3 — a late page-1 replace must not stomp a deeper, already-loaded
+// A late page-1 replace must not stomp a deeper, already-loaded
 // list (the stale verify-refetch discard).
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -208,12 +188,12 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // fires and the menu-availability/title-derived count is also exercised:
 // page 1 (50, truncated, token) lands with Append=false, then page 2 (5,
 // exact) with Append=true — landing the list at 55 exact, matching the
-// append-dedup contract (D13).
+// append-dedup contract.
 //
 // Then a LATE page-1 replace arrives (Append=false) carrying the SAME 50
 // page-1 IDs, still truncated — the exact shape a straggling background
 // verify-refetch racing behind the foreground load-more would produce
-// (C2: a result older than a later invalidation must be discarded). The
+// (a result older than a later invalidation must be discarded). The
 // list must REMAIN at 55 rows/exact — the late replace must be rejected,
 // not silently accepted as a fresher truth.
 //
@@ -330,12 +310,12 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 4 — a FRESH replace carrying genuinely new content must still win
+// A FRESH replace carrying genuinely new content must still win
 // (guard against over-blocking replaces).
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestFreshReplace_StillWins guards against a fix for test 3 that is too
-// aggressive — e.g. rejecting every smaller/truncated append=false replace
+// TestFreshReplace_StillWins guards against over-blocking replaces — e.g.
+// rejecting every smaller/truncated append=false replace
 // regardless of content. A replace whose incoming IDs are NOT a subset of
 // what is already on screen (e.g. after a manual refresh where the
 // underlying account's bucket set changed) must still swap the list

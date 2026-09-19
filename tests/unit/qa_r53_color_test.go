@@ -1,6 +1,6 @@
 package unit
 
-// qa_r53_color_test.go — a zone's record count does not colour its row.
+// A zone's record count does not colour its row.
 //
 // A record_count branch in r53Color would be a second read of a fact the row
 // already carries — r53CodeUnusedZone fires on the same condition over the
@@ -33,9 +33,7 @@ func TestR53Color(t *testing.T) {
 		{name: "one_record", recordCount: "1", want: resource.ColorWarning},
 		// A zone with 3 records has at least one real record in addition to SOA/NS.
 		{name: "three_records", recordCount: "3", want: resource.ColorHealthy},
-		// A zone with many records is healthy.
 		{name: "many_records", recordCount: "50", want: resource.ColorHealthy},
-		// No record_count field present at all — default to healthy.
 		{name: "missing", recordCount: "", want: resource.ColorHealthy},
 	}
 

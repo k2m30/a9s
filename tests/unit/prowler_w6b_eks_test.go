@@ -1,7 +1,6 @@
 package unit
 
-// prowler_w6b_eks_test.go — behavioural pins for the four eks posture signals
-// of batch w6b.
+// The four eks posture signals.
 //
 // All four are wave 1: FetchEKSClustersPage already calls DescribeCluster per
 // cluster, so the endpoint configuration, the control-plane log setup, the
@@ -41,9 +40,8 @@ const (
 	w6bEKSCodeVersionOld           = domain.FindingCode("eks.version-unsupported")
 )
 
-// Registered phrases. eks.public-endpoint does not read "API endpoint …" as
-// the batch table first wrote it: "API" is a bare uppercase token the
-// rendered-surface ruling bans.
+// Registered phrases. "API" is a bare uppercase token the rendered-surface
+// check bans, so eks.public-endpoint avoids it.
 const (
 	w6bEKSPhrasePublicEndpoint       = "cluster endpoint reachable from the internet"
 	w6bEKSPhrasePublicEndpointScoped = "cluster endpoint reachable from listed networks"
@@ -86,9 +84,8 @@ func (f *w6bEKSFake) DescribeClusterVersions(_ context.Context, _ *eks.DescribeC
 	out := &eks.DescribeClusterVersionsOutput{}
 	for v, info := range f.versions {
 		// Status (the deprecated lowercase field) is deliberately left unset.
-		// AWS's own docs say it is replaced by VersionStatus, and a reader
-		// that still consults it sees "" for every version — which means no
-		// cluster is ever flagged and the row silently stops working.
+		// AWS's own docs say it is replaced by VersionStatus; a reader that
+		// consults it sees "" for every version and flags no cluster.
 		out.ClusterVersions = append(out.ClusterVersions, ekstypes.ClusterVersionInformation{
 			ClusterVersion:           aws.String(v),
 			ClusterType:              aws.String("eks"),
@@ -143,7 +140,7 @@ func w6bEKSCluster(name, version string) *ekstypes.Cluster {
 var w6bEKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC)
 
 // w6bEKSSupportedVersions is the catalogue every test that is not about the
-// version row uses, so those clusters never trip row 18 by accident.
+// version check uses, so those clusters never trip it by accident.
 func w6bEKSSupportedVersions() map[string]w6bEKSVersionInfo {
 	return map[string]w6bEKSVersionInfo{
 		"1.33": {status: ekstypes.VersionStatusStandardSupport},
@@ -176,8 +173,6 @@ func w6bEKSFetchOne(t *testing.T, c *ekstypes.Cluster) resource.Resource {
 	})
 	return pw1ResourceByID(t, rs, name)
 }
-
-// ─── row 15: eks.public-endpoint ────────────────────────────────────────────
 
 // A public endpoint open to 0.0.0.0/0 puts the Kubernetes API on the internet,
 // where every credential-stuffing bot can reach it.
@@ -246,8 +241,6 @@ func TestW6BEKS_NilVpcConfig_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodePublicEndpoint)
 }
 
-// ─── row 16: eks.control-plane-logging-off ──────────────────────────────────
-
 // Missing audit and authenticator logs mean an intrusion leaves no record.
 func TestW6BEKS_ControlPlaneLoggingOff_SomeTypesDisabled(t *testing.T) {
 	c := w6bEKSCluster("acme-degraded-prod", "1.33")
@@ -309,8 +302,6 @@ func TestW6BEKS_LogTypesSplitAcrossEntries_IsHealthy(t *testing.T) {
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodeLoggingOff)
 }
 
-// ─── row 17: eks.secrets-not-kms ────────────────────────────────────────────
-
 // The cluster is below 1.28 on purpose: from 1.28 AWS envelope-encrypts
 // Kubernetes secrets with an AWS-owned key on every cluster, so an absent
 // EncryptionConfig there means no CUSTOMER key rather than no encryption, and
@@ -343,8 +334,6 @@ func TestW6BEKS_SecretsUnderKMS_IsHealthy(t *testing.T) {
 	r := w6bEKSFetchOne(t, w6bEKSCluster("acme-prod", "1.33"))
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodeSecretsNotKMS)
 }
-
-// ─── row 18: eks.version-unsupported ────────────────────────────────────────
 
 // w6bEKSVersionPhrase is the phrase with the cluster's own version spliced in.
 // The FindingDef registers it with a <version> placeholder.
@@ -390,9 +379,9 @@ func TestW6BEKS_VersionUnsupported_UnsupportedRowIsWordsAndDate(t *testing.T) {
 
 // The catalogue answers through VersionStatus. AWS deprecated the lowercase
 // Status field in favour of it, and this fake leaves Status unset on every
-// entry, so a reader still consulting the deprecated field sees "" for every
-// version and flags nothing. Without this test that regression looks exactly
-// like a clean run: no findings, no errors, no clue.
+// entry, so a reader consulting the deprecated field sees "" for every
+// version and flags nothing — which looks exactly like a clean run: no
+// findings, no errors, no clue.
 func TestW6BEKS_VersionCatalogue_ReadFromVersionStatusNotDeprecatedStatus(t *testing.T) {
 	const name = "acme-deprecated-field-probe"
 	fake := &w6bEKSFake{
@@ -459,8 +448,8 @@ func TestW6BEKS_VersionCatalogue_ReadOncePerPage(t *testing.T) {
 }
 
 // When AWS will not answer, the version is unknown. Guessing from a constant
-// is exactly what this row exists to avoid, so an unreadable catalogue means
-// no finding rather than a confident one.
+// is exactly what this check exists to avoid, so an unreadable catalogue
+// means no finding rather than a confident one.
 func TestW6BEKS_VersionCatalogueUnavailable_EmitsNoVersionFinding(t *testing.T) {
 	fake := &w6bEKSFake{
 		order:       []string{"acme-unknown-version"},
@@ -470,7 +459,7 @@ func TestW6BEKS_VersionCatalogueUnavailable_EmitsNoVersionFinding(t *testing.T) 
 	rs := w6bFetchEKS(t, fake)
 	r := pw1ResourceByID(t, rs, "acme-unknown-version")
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodeVersionOld)
-	// The other three rows read the DescribeCluster response and are
+	// The other three checks read the DescribeCluster response and are
 	// unaffected by the catalogue being unavailable.
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodePublicEndpoint)
 }
@@ -481,10 +470,8 @@ func TestW6BEKS_VersionAbsentFromCatalogue_EmitsNoVersionFinding(t *testing.T) {
 	pw1RequireNoFinding(t, r.Findings, w6bEKSCodeVersionOld)
 }
 
-// ─── independence ───────────────────────────────────────────────────────────
-
-// Contract rule 4: four conditions on one cluster are four findings, and the
-// lifecycle finding the fetcher already emits survives alongside them.
+// Four conditions on one cluster are four findings, and the lifecycle
+// finding the fetcher emits survives alongside them.
 func TestW6BEKS_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	// 1.26 rather than 1.28: the secrets condition only exists below 1.28,
 	// and 1.26 is out of standard support in the catalogue too, so all four
@@ -502,7 +489,7 @@ func TestW6BEKS_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld, w6bEKSVersionPhrase("1.26"), domain.SevBroken, "wave1")
 }
 
-// A cluster being deleted has no posture to fix — contract rule 4.
+// A cluster being deleted has no posture to fix.
 func TestW6BEKS_DeletingCluster_EmitsNoPostureFinding(t *testing.T) {
 	c := w6bEKSCluster("acme-going-away", "1.28")
 	c.Status = ekstypes.ClusterStatusDeleting
@@ -520,11 +507,10 @@ func TestW6BEKS_DeletingCluster_EmitsNoPostureFinding(t *testing.T) {
 }
 
 // eksSupportWords derives the words from the enum rather than switching on the
-// three values AWS publishes today, so a status AWS adds later still renders.
-// The switch it replaced returned "" for anything unlisted, which put a row on
-// screen reading ", standard support ended 2025-11-26" with nothing in front
-// of the comma. Pinned because only a status outside the three shows the
-// difference, and every other test uses one of the three.
+// three values AWS publishes today, so a status AWS adds later still renders
+// instead of leaving ", standard support ended 2025-11-26" with nothing in
+// front of the comma. Only a status outside the three shows the difference,
+// and every other test uses one of the three.
 func TestW6BEKS_UnknownSupportStatus_RendersAsWordsNotEmpty(t *testing.T) {
 	const name = "acme-future-status"
 	fake := &w6bEKSFake{

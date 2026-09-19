@@ -10,7 +10,7 @@ import (
 // TestRelatedEnter_ZeroPlusEqualsNPlus is the core pin: a truncated lower bound
 // takes the IDENTICAL Enter action regardless of how many were found so far —
 // "(0+)" and "(N+)" both Navigate. No site may special-case the zero bound into
-// a re-dispatch/no-op (the "0+ NOT NAVIGABLE" bug).
+// a re-dispatch/no-op.
 func TestRelatedEnter_ZeroPlusEqualsNPlus(t *testing.T) {
 	zeroPlus := resource.RelatedEnter(domain.RelatedResolved, 0, true)
 	nPlus := resource.RelatedEnter(domain.RelatedResolved, 7, true)

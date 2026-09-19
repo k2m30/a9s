@@ -1,10 +1,8 @@
 package unit_test
 
-// partial_cb_banner_test.go — the codebuild cap fix removed the `truncated`
-// local and both `result.Truncated = truncated` assignments that overwrote it.
-// Truncated is what puts the "+" on the menu's issue badge, so these pin that
-// the banner still lights when the walk was cut short and still stays dark
-// when it was not.
+// Truncated is what puts the "+" on the menu's
+// issue badge, so these pin that the codebuild banner lights when the walk
+// was cut short and stays dark when it was not.
 
 import (
 	"context"
@@ -86,8 +84,7 @@ func TestPartialCB_TheIssueBadgeStillSaysTheCountIsALowerBound(t *testing.T) {
 		},
 		{
 			// Under the cap, but one project's build list was denied. Its
-			// builds could be failing, so the count is a lower bound again —
-			// this is the branch whose write the fix rerouted.
+			// builds could be failing, so the count is a lower bound again.
 			name:          "one project denied",
 			projects:      3,
 			failFor:       map[string]bool{"acme-build-001": true},

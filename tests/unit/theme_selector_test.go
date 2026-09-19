@@ -1,12 +1,7 @@
-// theme_selector_test.go — theme selector: (current) marker correctness and
-// Enter -> ThemeSelected emission.
-//
-// views.NewTheme/FrameTitle/View are DEAD per
-// specs/022-codebase-cleanup/wave3-map-text.md (selector.go). Retargeted onto
-// the live seams: NewTransientSelector + app.SelectorBody + RenderSelector for
-// the marker-rendering pins (same live path as selector_render_parity_test.go),
-// and newLiveSelector (tui_selector_test.go) for the Update()-driven Enter
-// selection pin — ThemeSelected is the one message kind not exercised there.
+// Theme selector: (current) marker correctness and
+// Enter -> ThemeSelected emission, through NewTransientSelector +
+// app.SelectorBody + RenderSelector for the marker and newLiveSelector
+// (tui_selector_test.go) for the Update()-driven Enter selection.
 package unit
 
 import (
@@ -20,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ===========================================================================
-// T037 — theme selector (current) indicator
-// ===========================================================================
 
 func TestNewTheme_FrameTitleAndCurrentIndicator(t *testing.T) {
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
@@ -62,10 +53,6 @@ func TestNewTheme_FrameTitleAndCurrentIndicator(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T038 — NewTheme Enter returns ThemeSelectedMsg
-// ===========================================================================
-
 func TestNewTheme_SelectionReturnsThemeSelectedMsg(t *testing.T) {
 	k := keys.Default()
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
@@ -91,10 +78,6 @@ func TestNewTheme_SelectionReturnsThemeSelectedMsg(t *testing.T) {
 		t.Errorf("ThemeSelectedMsg.Theme = %q, want %q", tsm.Theme, "dracula.yaml")
 	}
 }
-
-// ===========================================================================
-// T060 — theme selector marks the correct theme as current, not others
-// ===========================================================================
 
 func TestNewTheme_MarksCorrectThemeAsCurrent(t *testing.T) {
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml", "nord.yaml"}

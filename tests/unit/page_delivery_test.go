@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// page_delivery_test.go — delivering a page a test built by hand.
+// Delivering a page a test built by hand.
 //
 // A production page message is built by the fetch command that asked for it,
 // which stamps the instance of the screen it was issued by. A test that hands

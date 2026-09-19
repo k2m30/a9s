@@ -1,6 +1,6 @@
 package unit_test
 
-// projection_coverage_test.go — PR-01 exit criterion #7.
+// Projector coverage across every type.
 //
 // TestProjectorCoverageAllTypes asserts that every registered resource type has a
 // working projector (either td.Project, or the Generic fallback) that returns
@@ -37,10 +37,6 @@ func minimalResource(shortName string) domain.Resource {
 // TestProjectorCoverageAllTypes iterates every registered resource type and
 // verifies that the Generic projector (the fallback used until td.Project is set)
 // returns at least one section for a representative fixture resource.
-//
-// Structural regression guard: any future per-resource breakage that loses
-// detail-view content fails this test. It replaces the old "verify ec2/s3/rds..."
-// smoke list and covers all 66+ registered types in one loop.
 func TestProjectorCoverageAllTypes(t *testing.T) {
 	types := resource.AllResourceTypes()
 	if len(types) == 0 {
@@ -55,7 +51,6 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 	for _, td := range types {
 		td := td
 		t.Run(td.ShortName, func(t *testing.T) {
-			// Use a demo fixture if available; fall back to a minimal synthetic resource.
 			var r domain.Resource
 			if rs, ok := demoResources[td.ShortName]; ok && len(rs) > 0 {
 				r = rs[0]
@@ -94,7 +89,6 @@ func TestGenericWithConfig_NilConfigSurvives(t *testing.T) {
 		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
 	})
 	if err != nil || len(ec2Resources) == 0 {
-		// Fall back to a minimal synthetic resource if demo fetch is unavailable.
 		t.Log("demo EC2 fetch returned no resources; using minimal synthetic fixture")
 		ec2Resources = []resource.Resource{
 			{
@@ -135,19 +129,16 @@ func fetchDemoResourceSample(t *testing.T) map[string][]domain.Resource {
 		out[shortName] = rs
 	}
 
-	// Compute
 	ec2res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchEC2InstancesPage(ctx, clients.EC2, token)
 	})
 	tryAdd("ec2", ec2res, err)
 
-	// Containers
 	ecsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchECSClustersPage(ctx, clients.ECS, clients.ECS, token)
 	})
 	tryAdd("ecs", ecsRes, err)
 
-	// Database
 	rdsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchRDSInstancesPage(ctx, clients.RDS, token)
 	})
@@ -158,19 +149,16 @@ func fetchDemoResourceSample(t *testing.T) map[string][]domain.Resource {
 	})
 	tryAdd("ddb", ddbRes, err)
 
-	// Storage
 	s3Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchS3BucketsPageWithNotifications(ctx, clients.S3, nil, token)
 	})
 	tryAdd("s3", s3Res, err)
 
-	// Serverless
 	lambdaRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchLambdaFunctionsPage(ctx, clients.Lambda, token)
 	})
 	tryAdd("lambda", lambdaRes, err)
 
-	// Security / identity
 	iamRoles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchIAMRolesPage(ctx, clients.IAM, token)
 	})
@@ -181,13 +169,11 @@ func fetchDemoResourceSample(t *testing.T) map[string][]domain.Resource {
 	})
 	tryAdd("secrets", secretsRes, err)
 
-	// Monitoring
 	ctRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchCloudTrailEventsPage(ctx, clients.CloudTrail, token)
 	})
 	tryAdd("ct-events", ctRes, err)
 
-	// Networking
 	sgsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchSecurityGroupsPage(ctx, clients.EC2, token)
 	})

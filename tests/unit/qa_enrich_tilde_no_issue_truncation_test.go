@@ -1,22 +1,11 @@
-// qa_enrich_tilde_no_issue_truncation_test.go — pins the Truncated=false
+// Pins the Truncated=false
 // invariant for "~"-only (informational) Wave-2 issue enrichers once the
 // input exceeds EnrichmentCap (50).
 //
-// Live bug this guards against: the menu/list issue badge renders an exact
-// resource total alongside a spurious "+" (e.g. "CloudWatch Log Groups (96)
-// issues:61+") even though all 96 rows loaded successfully. Root cause: the
-// 18 enrichers below never emit a "!" (SevBroken) finding — IssueCount is
-// always 0 — yet they still compute Truncated as len(resources) >
-// EnrichmentCap, tying the aggregate Truncated flag (read by the badge as
-// "this count is a lower bound") to their own per-resource API-call cap
-// instead of to the issue count. EnrichSESAccount
-// (core/aws/ses_issue_enrichment.go) already gets this right by setting
-// Truncated = false unconditionally; the 18 enrichers here must match it.
-//
-// Each subtest drives one enricher with EnrichmentCap+1 (51) synthetic
-// resources and asserts result.Truncated == false. Finding/IssueCount
-// content is deliberately not asserted here — this file pins only the
-// aggregate Truncated flag.
+// The menu/list issue badge reads the aggregate Truncated flag as "this count
+// is a lower bound" and renders a "+" after it. An enricher that never emits a
+// "!" (SevBroken) finding has IssueCount 0, so its per-resource API-call cap
+// says nothing about the issue count and must not set Truncated.
 package unit
 
 import (
@@ -43,15 +32,6 @@ type tildeOnlyEnricherCase struct {
 // tildeOnlyEnricherCases lists every enricher that emits only informational
 // "~" findings (IssueCount is always 0) and must therefore never let its own
 // EnrichmentCap lower-bound the aggregate Truncated flag.
-//
-// ddb and dbi are deliberately absent: their enrichers now also emit "!"
-// findings (an open resource policy, a deprecated engine version), so a capped
-// walk really can hide an issue and Truncated is the correct answer for them.
-//
-// cf, apigw and r53 joined them in batch w6a: cf.origin-bucket-missing,
-// apigw.no-authorizer-public, apigw.stage-variable-secret and
-// r53.dangling-record are all "!", so all three are covered by
-// TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated below instead.
 func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
 		{"athena", awsclient.EnrichAthenaWorkGroup},
@@ -60,16 +40,7 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 		{"elb", awsclient.EnrichELBAttributes},
 		{"iam-group", awsclient.EnrichIAMGroup},
 		{"iam-role", awsclient.EnrichIAMRoleLastUsed},
-		// kms is deliberately absent: EnrichKMSRotation now also reports an
-		// open key policy, an issue-severity finding, so its cap genuinely
-		// lower-bounds the issue count and Truncated must be allowed to rise.
 		{"logs", awsclient.EnrichLogsMetricFilters},
-		// msk, sns and sqs are deliberately absent, for the same reason ddb,
-		// dbi and kms are: each now also emits a "!" finding — brokers
-		// reachable from the internet and unauthenticated access on msk, an
-		// open topic policy on sns, an open queue policy on sqs — so a capped
-		// walk really can hide an issue and Truncated is the correct answer
-		// for them. See TestBrokenEmittingEnrichers_OverEnrichmentCap_Truncated.
 		{"vpc", awsclient.EnrichVPCFlowLogs},
 		{"waf", awsclient.EnrichWAFLogging},
 	}
@@ -77,7 +48,7 @@ func tildeOnlyEnricherCases() []tildeOnlyEnricherCase {
 
 // tildeOnlyOverCapResources returns EnrichmentCap+1 (51) minimal synthetic
 // resources — one more than every enricher under test's per-call cap. None
-// of the 18 enrichers need real Fields[] data to reach their
+// of the enrichers need real Fields[] data to reach their
 // `len(resources) > EnrichmentCap` truncation line: that comparison runs
 // before any per-resource API call, so a bare ID (used directly by most
 // enrichers, or as the fallback when a type-specific Fields[] key is empty)
@@ -93,7 +64,7 @@ func tildeOnlyOverCapResources() []resource.Resource {
 }
 
 // TestTildeOnlyEnrichers_OverEnrichmentCap_TruncatedFalse pins: none of the
-// 18 "~"-only enrichers may report Truncated=true purely because the input
+// "~"-only enrichers may report Truncated=true purely because the input
 // exceeds EnrichmentCap. Their per-resource cap limits informational
 // coverage only — it must never lower-bound the ("!"-only) issue count the
 // menu/list badge renders.
@@ -115,13 +86,9 @@ func TestTildeOnlyEnrichers_OverEnrichmentCap_TruncatedFalse(t *testing.T) {
 	}
 }
 
-// brokenEmittingEnricherCases names the enrichers this batch moved OFF the
-// list above: each emits at least one "!" finding now, so its per-resource
-// cap does bound the issue count and the aggregate flag must say so.
-//
-// Removing them from the list above only stops asserting the old answer. It
-// does not assert the new one, and an enricher that still hard-codes
-// Truncated = false would sail through the gap. That is what this pins.
+// brokenEmittingEnricherCases lists enrichers that emit at least one "!"
+// finding: their per-resource cap bounds the issue count, so the aggregate
+// flag must say so.
 func brokenEmittingEnricherCases() []tildeOnlyEnricherCase {
 	return []tildeOnlyEnricherCase{
 		{"apigw", awsclient.EnrichAPIGatewayStage},

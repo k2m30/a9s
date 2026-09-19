@@ -1,21 +1,5 @@
 package unit
 
-// qa67_cross_cutting_test.go — §K Cross-Cutting Error Resilience
-//
-// Bugs caught:
-//   - K.1: no panic on any input sequence (fuzz sampler)
-//   - K.2: view stack integrity after error — Esc returns to correct view
-//   - K.3: error in one child view does not affect sibling child views
-//   - K.4: rapid ctrl+r does not cause data corruption
-//   - K.6: error flash does not overlap with filter mode
-//   - K.7: frame title shows correct count after error then refresh
-//   - K.8: empty filter result followed by clear shows all resources
-//   - K.9: copy from empty resource list does not crash
-//   - K.10: sort on empty resource list is a no-op, no crash
-//   - K.11: filter on empty resource list does not crash
-//   - K.12: detail view on empty resource list is a no-op, no crash
-//   - K.13: YAML view on empty resource list is a no-op, no crash
-
 import (
 	"fmt"
 	"strings"
@@ -27,13 +11,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// K.1 — No panic on any common input in all view states.
+// No panic on any common input in any view state.
 func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 	type keyInput struct {
 		name string
 		key  tea.KeyPressMsg
 	}
-	// Keys that might cause crashes if not handled gracefully
 	inputs := []keyInput{
 		{name: "enter", key: tea.KeyPressMsg{Code: tea.KeyEnter}},
 		{name: "esc", key: tea.KeyPressMsg{Code: tea.KeyEscape}},
@@ -64,7 +47,6 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 		{name: "unicode-emoji", key: tea.KeyPressMsg{Code: -1, Text: "🚀"}},
 	}
 
-	// Test in main menu state
 	t.Run("main_menu", func(t *testing.T) {
 		m := newRootSizedModel()
 		for _, input := range inputs {
@@ -76,7 +58,6 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 		}
 	})
 
-	// Test in resource list state (loaded)
 	t.Run("resource_list_loaded", func(t *testing.T) {
 		m := newRootSizedModel()
 		m, _ = rootApplyMsg(m, messages.Navigate{
@@ -108,11 +89,10 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 	})
 }
 
-// K.2 — View stack integrity after error: Esc returns to the correct view.
+// View stack integrity after an error: Esc returns to the correct view.
 func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Navigate: main menu -> EC2 list -> detail
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -136,18 +116,15 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 		Resource: &resources[0],
 	})
 
-	// Send an API error (simulating a detail refresh failing)
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          errAccessDenied("ec2:DescribeInstances"),
 	})
 
-	// Esc from detail should go back to the EC2 list, not to main menu
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	out := rootViewContent(m)
 	plain := stripANSI(out)
-	// Should be on the EC2 list — the resource should be visible
 	if !strings.Contains(plain, "stack-test") {
 		t.Errorf("K.2: after Esc from detail (post-error), EC2 list should show 'stack-test', got: %s", plain[:min(200, len(plain))])
 	}
@@ -160,7 +137,7 @@ func errAccessDenied(action string) error {
 	return fmt.Errorf("AccessDenied: User is not authorized to perform: %s", action)
 }
 
-// K.3 — Error in one child view does not affect sibling child views.
+// An error in one child view does not affect sibling child views.
 func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -181,8 +158,6 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ecs-svc", Resources: services, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Open Events child view (key 'e') — execute the returned cmd to actually push the child view
-
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "e"})
 	if cmd != nil {
@@ -195,7 +170,6 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 		Err:          errAccessDenied("ecs:DescribeServices"),
 	})
 
-	// Esc back to the ECS services list
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	out := rootViewContent(m)
@@ -203,14 +177,13 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 		t.Error("K.3: View() should not be empty after returning from errored child view")
 	}
 
-	// The service should still be visible
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "my-service") {
 		t.Errorf("K.3: after returning from errored child view, ECS service 'my-service' should be visible, got: %s", plain[:min(200, len(plain))])
 	}
 }
 
-// K.4 — Rapid ctrl+r does not cause data corruption or crash.
+// Rapid ctrl+r does not cause data corruption or a crash.
 func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -231,19 +204,15 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Press ctrl+r three times rapidly
-
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
-	// Application should still be functional
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("K.4: View() should not be empty after rapid ctrl+r")
 	}
 
-	// Deliver resources for the last refresh — should not corrupt state
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 	out = rootViewContent(m)
 	plain := stripANSI(out)
@@ -252,7 +221,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	}
 }
 
-// K.6 — Error flash does not overlap with filter mode.
+// An error flash does not overlap with filter mode.
 func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -275,23 +244,20 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 		},
 	})
 
-	// Trigger an error flash
 	m, _ = rootApplyMsg(m, messages.Flash{
 		Text:    "Error: rate limit exceeded",
 		IsError: true,
 	})
 
-	// Now enter filter mode
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
 	out := rootViewContent(m)
-	// Must not crash; filter mode should be active
 	if out == "" {
 		t.Error("K.6: View() should not be empty when filter mode entered after error flash")
 	}
 }
 
-// K.7 — Frame title shows correct count after error then refresh.
+// The frame title shows the correct count after an error then a refresh.
 func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -299,20 +265,17 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// Send an error — resource list is empty
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          errAccessDenied("ec2:DescribeInstances"),
 	})
 
-	// Error state: the list should have 0 resources and show an error
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "AccessDenied") && !strings.Contains(plain, "access denied") && !strings.Contains(plain, "error") && !strings.Contains(plain, "Error") {
 		t.Errorf("K.7: after APIErrorMsg, view should show error indication, got: %s", plain[:min(200, len(plain))])
 	}
 
-	// User presses ctrl+r — then resources arrive
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
 	resources := make([]resource.Resource, 42)
@@ -337,7 +300,6 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 
 	out = rootViewContent(m)
 	plain = stripANSI(out)
-	// Frame title should show count (42)
 	if !strings.Contains(plain, "42") {
 		t.Errorf("K.7: expected count 42 in frame title after refresh, got: %s", plain[:min(300, len(plain))])
 	}
@@ -346,7 +308,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 	}
 }
 
-// K.8 — Empty filter result followed by clear shows all resources.
+// An empty filter result followed by clear shows all resources.
 func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -377,25 +339,20 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources, Provenance: messages.FetchProvenanceCanonicalList})
 
-	// Enter filter mode and type something that matches nothing
-
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "zzzzz" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
-	// Verify empty state
 	out := rootViewContent(m)
 	if out == "" {
 		t.Fatal("K.8: View() should not be empty during empty filter")
 	}
 
-	// Clear filter with Esc
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	out = rootViewContent(m)
 	plain := stripANSI(out)
-	// Both resources should be visible again
 	if !strings.Contains(plain, "alpha-server") {
 		t.Errorf("K.8: after filter clear, alpha-server should be visible, got: %s", plain[:min(300, len(plain))])
 	}
@@ -404,20 +361,18 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 	}
 }
 
-// K.9 — Copy from empty resource list does not crash.
+// Copy from an empty resource list does not crash.
 func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	// Load empty resources
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
 
-	// Press 'c' to copy — should be a no-op or show a warning
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
 	out := rootViewContent(m)
 	if out == "" {
@@ -425,7 +380,7 @@ func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 	}
 }
 
-// K.10 — Sort on empty resource list is a no-op, no crash.
+// Sort on an empty resource list is a no-op.
 func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -437,7 +392,6 @@ func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 		Resources:    []resource.Resource{},
 	})
 
-	// Press sort keys — should be no-op
 	for _, key := range []string{"N", "S", "A"} {
 		m, _ = rootApplyMsg(m, rootKeyPress(key))
 	}
@@ -447,7 +401,7 @@ func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 	}
 }
 
-// K.11 — Filter on empty resource list does not crash.
+// Filter on an empty resource list does not crash.
 func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -459,7 +413,6 @@ func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 		Resources:    []resource.Resource{},
 	})
 
-	// Enter filter mode and type
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, r := range "filter-on-empty" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
@@ -471,7 +424,7 @@ func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 	}
 }
 
-// K.12 — Detail view on empty resource list is a no-op, no crash.
+// Detail view on an empty resource list is a no-op.
 func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -485,7 +438,6 @@ func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 
 	viewBefore := rootViewContent(m)
 
-	// Press 'd' — should be no-op on empty list
 	m, _ = rootApplyMsg(m, rootKeyPress("d"))
 
 	viewAfter := rootViewContent(m)
@@ -493,11 +445,10 @@ func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 		t.Error("K.12: View() should not be empty after pressing d on empty list")
 	}
 
-	// Should still be in the resource list, not crashed into a detail view
 	_ = viewBefore
 }
 
-// K.13 — YAML view on empty resource list is a no-op, no crash.
+// YAML view on an empty resource list is a no-op.
 func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -509,7 +460,6 @@ func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
 		Resources:    []resource.Resource{},
 	})
 
-	// Press 'y' — should be no-op on empty list
 	m, _ = rootApplyMsg(m, rootKeyPress("y"))
 	out := rootViewContent(m)
 	if out == "" {
@@ -517,7 +467,7 @@ func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
 	}
 }
 
-// K.9–K.13 extended — all operations on empty list for all resource types.
+// Every empty-list operation on a sample of resource types.
 func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 	ops := []struct {
 		name string
@@ -531,7 +481,6 @@ func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 		{name: "yaml", key: "y"},
 	}
 
-	// Representative sample — full sweep in CI slow suite
 	sampleTypes := []string{"ec2", "s3", "secrets", "vpc"}
 	for _, rt := range sampleTypes {
 		for _, op := range ops {

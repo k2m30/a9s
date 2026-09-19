@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// runtime8_screen_request_guard_test.go — a list screen guards its own
+// A list screen guards its own
 // requests.
 //
 // Two list screens of one type are open at once whenever a drill sits on top
@@ -68,10 +68,9 @@ func guardOpenDrill(t *testing.T, c *app.Controller, rows []resource.Resource) {
 
 // TestListRequestGuard_ADrillOrdersItsOwnRefreshes pins the shape: a drill's
 // second refresh answers after its first, and the drill renders what the
-// second one returned. Today the sequence is drawn per canonical type and a
-// drill draws none at all, so neither of its own results is ordered against
-// the other and whichever lands last wins — the operator watches a refreshed
-// list revert to the rows the refresh replaced.
+// second one returned. A drill ordered against the type's sequence lets
+// whichever result lands last win, and the operator watches a refreshed list
+// revert to the rows the refresh replaced.
 func TestListRequestGuard_ADrillOrdersItsOwnRefreshes(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -114,11 +113,8 @@ func TestListRequestGuard_ADrillOrdersItsOwnRefreshes(t *testing.T) {
 }
 
 // TestListRequestGuard_TheCanonicalListStillOrdersItsOwnRefreshes is the
-// healthy counterpart, and it passes today: the canonical list is the one
-// screen the per-type sequence happens to be right for. Re-keying the guard by
-// the screen instance must keep it right — a drill that starts guarding its
-// own requests at the cost of the parent losing the ordering it has is not the
-// fix.
+// healthy counterpart: keying the guard by screen instance keeps the
+// canonical list's own refreshes ordered.
 func TestListRequestGuard_TheCanonicalListStillOrdersItsOwnRefreshes(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})

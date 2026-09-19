@@ -26,9 +26,8 @@ func d1DbiSnapBaseline() rdstypes.DBSnapshot {
 // TestDbiSnapColor pins the status → colour mapping for DB instance snapshots.
 //
 // Each case feeds an SDK DBSnapshot through the dbi-snap fetcher; the expected
-// colour is the one the worst finding's severity implies. The "empty status"
-// case survives the conversion because a snapshot with no Status is a shape the
-// SDK really returns, unlike the empty Fields map the old table also carried.
+// colour is the one the worst finding's severity implies. A snapshot with no
+// Status is a shape the SDK really returns.
 func TestDbiSnapColor(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -41,8 +40,7 @@ func TestDbiSnapColor(t *testing.T) {
 
 		{name: "creating", status: "creating", want: resource.ColorWarning},
 		// A snapshot being copied is not yet restorable, so the row has to say
-		// so. The phrase classifier warned on "copying"; the findings predicate
-		// has no branch for it.
+		// so.
 		{name: "copying", status: "copying", want: resource.ColorWarning},
 
 		{name: "failed", status: "failed", want: resource.ColorBroken},
