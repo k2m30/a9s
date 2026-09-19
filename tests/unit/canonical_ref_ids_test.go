@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
@@ -396,11 +398,20 @@ func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
 // rows loaded and navigability bootstrapped as the app does at startup.
 func refDetailController(t *testing.T, b refBench, skip ...string) *app.Controller {
 	t.Helper()
+	c, _ := refDetailControllerCore(t, b, skip...)
+	return c
+}
+
+// refDetailControllerCore also returns the runtime core, for tests that land
+// a related result the way the result lane does.
+func refDetailControllerCore(t *testing.T, b refBench, skip ...string) (*app.Controller, *runtime.Core) {
+	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = demo.DemoProfile
 	s.Region = refRegion
-	c := newBlessedController(t, runtime.New(s, nil))
+	core := runtime.New(s, nil)
+	c := newBlessedController(t, core)
 	c.SetViewConfig(config.DefaultConfig())
 	for typ, rows := range b.byType {
 		resource.SetNavigableFieldsForTest(typ, resource.GetNavigableFields(typ))
@@ -409,7 +420,7 @@ func refDetailController(t *testing.T, b refBench, skip ...string) *app.Controll
 			c.ApplyResourcesLoaded(typ, rows, nil, false)
 		}
 	}
-	return c
+	return c, core
 }
 
 // openDetail pushes a detail screen for res and returns its rendered rows.
@@ -450,36 +461,211 @@ func kmsKeyByAlias(t *testing.T, b refBench, alias string) string {
 	return ""
 }
 
-// TestSSMKeyId_AliasFieldAndRelatedRowOpenTheSameKey is the ssm witness: a
-// SecureString parameter names its key by alias. The KMS row counts the key
-// the alias points at, and Enter on KeyId must open that same key.
+// TestSSMKeyId_AliasFieldAndRelatedRowOpenTheSameKey: a SecureString
+// parameter names a customer key by alias. The KMS row counts the key the
+// alias points at, and Enter on KeyId must open that same key.
 func TestSSMKeyId_AliasFieldAndRelatedRowOpenTheSameKey(t *testing.T) {
 	b := newRefBench(t)
-	cases := []struct{ param, alias string }{
-		// The AWS-managed default key SSM encrypts with when none is named.
-		{"/acme/legacy/db/password", "alias/aws/ssm"},
-		{"/acme/prod/db/connection-string", "alias/acme-prod-key"},
+	const alias = "alias/acme-prod-key"
+	wantKey := kmsKeyByAlias(t, b, alias)
+	param := b.row(t, "ssm", "/acme/prod/db/connection-string")
+
+	related := refChecker(t, "ssm", "kms")(context.Background(), refClients(), param, b.cache)
+	if ids := sortedIDs(related); !slices.Equal(ids, []string{wantKey}) {
+		t.Errorf("ssm → KMS Key IDs = %v, want [%s]", ids, wantKey)
+	}
+	if got := resource.NavIDFromValue("kms", alias, b.rc("kms")); got != wantKey {
+		t.Errorf("NavIDFromValue(kms, %q) = %q, want %q", alias, got, wantKey)
+	}
+
+	c := refDetailController(t, b)
+	f := fieldAt(t, openDetail(c, "ssm", param), "KeyId")
+	if !f.IsNavigable || f.TargetType != "kms" || navTarget(f) != wantKey {
+		t.Errorf("KeyId row: navigable=%v target=%q opens %q, want navigable kms row opening %q",
+			f.IsNavigable, f.TargetType, navTarget(f), wantKey)
+	}
+}
+
+// TestAWSManagedKeys_ResolveThroughTheKeyLookup is the ssm witness. An
+// alias/aws/* alias names an AWS-managed key, which the kms list (customer
+// keys only) never holds. The related row still counts that key by its key
+// ID, found through the kms type's own by-ID lookup, and once the related
+// result lazy-adds the key, KeyId opens it.
+func TestAWSManagedKeys_ResolveThroughTheKeyLookup(t *testing.T) {
+	b := newRefBench(t)
+	ctx := context.Background()
+	cases := []struct{ source, id, alias string }{
+		{"ssm", "/acme/legacy/db/password", "alias/aws/ssm"},
+		{"s3", "a9s-demo-managed-kms", "alias/aws/s3"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.alias, func(t *testing.T) {
-			wantKey := kmsKeyByAlias(t, b, tc.alias)
-			param := b.row(t, "ssm", tc.param)
-
-			related := refChecker(t, "ssm", "kms")(context.Background(), refClients(), param, b.cache)
-			if ids := sortedIDs(related); !slices.Equal(ids, []string{wantKey}) {
-				t.Errorf("ssm %s → KMS Key IDs = %v, want [%s]", tc.param, ids, wantKey)
+			src := b.row(t, tc.source, tc.id)
+			related := refChecker(t, tc.source, "kms")(ctx, refClients(), src, b.cache)
+			ids := sortedIDs(related)
+			if len(ids) != 1 {
+				t.Fatalf("%s %s → KMS Key IDs = %v, want the one key behind %s", tc.source, tc.id, ids, tc.alias)
 			}
-			if got := resource.NavIDFromValue("kms", tc.alias, b.rc("kms")); got != wantKey {
-				t.Errorf("NavIDFromValue(kms, %q) = %q, want %q", tc.alias, got, wantKey)
+			key := ids[0]
+			if tc.alias == "alias/aws/ssm" && key != fixtures.SSMDefaultKeyID {
+				t.Errorf("KMS Key ID = %q, want %q", key, fixtures.SSMDefaultKeyID)
+			}
+			if strings.HasPrefix(key, "alias/") {
+				t.Errorf("KMS Key ID = %q, want a key ID, not an alias", key)
+			}
+			if b.has("kms", key) {
+				t.Errorf("key %q behind %s is a kms list row; AWS-managed keys are not in the customer-key list", key, tc.alias)
 			}
 
-			c := refDetailController(t, b)
-			f := fieldAt(t, openDetail(c, "ssm", param), "KeyId")
-			if !f.IsNavigable || f.TargetType != "kms" || navTarget(f) != wantKey {
-				t.Errorf("KeyId row: navigable=%v target=%q opens %q, want navigable kms row opening %q",
-					f.IsNavigable, f.TargetType, navTarget(f), wantKey)
+			rows, err := resource.GetFetchByIDs("kms")(ctx, refClients(), []string{key})
+			var got *resource.Resource
+			for i := range rows {
+				if rows[i].ID == key {
+					got = &rows[i]
+				}
+			}
+			if got == nil {
+				t.Fatalf("kms FetchByIDs(%q) returned no row with that ID (err %v)", key, err)
+			}
+			if meta, ok := got.RawStruct.(*kmstypes.KeyMetadata); !ok || meta.KeyManager != kmstypes.KeyManagerTypeAws {
+				t.Errorf("key %q: RawStruct %T is not an AWS-managed *KeyMetadata", key, got.RawStruct)
+			}
+
+			if tc.source != "ssm" {
+				return
+			}
+			c, core := refDetailControllerCore(t, b)
+			openDetail(c, "ssm", src)
+			intents, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+				ResourceType:       "ssm",
+				SourceResourceID:   src.ID,
+				DefDisplayName:     "KMS Key",
+				Result:             related,
+				LazyAddedResources: map[string][]resource.Resource{"kms": rows},
+			})
+			c.ApplyIntents(intents)
+			f := fieldAt(t, c.Snapshot().Body.Detail.Fields, "KeyId")
+			if !f.IsNavigable || f.TargetType != "kms" || navTarget(f) != key {
+				t.Errorf("KeyId after the key was lazy-added: navigable=%v target=%q opens %q, want %q",
+					f.IsNavigable, f.TargetType, navTarget(f), key)
 			}
 		})
+	}
+}
+
+// refKMSFake serves one key under several aliases. aliases lists what
+// ListAliases reports; describe answers DescribeKey by key ID or any alias,
+// including an alias ListAliases has not reported yet.
+type refKMSFake struct {
+	awsclient.KMSAPI
+	meta    kmstypes.KeyMetadata
+	aliases []string
+	lookup  []string
+}
+
+func (f *refKMSFake) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+	return &kms.ListKeysOutput{Keys: []kmstypes.KeyListEntry{{KeyId: f.meta.KeyId, KeyArn: f.meta.Arn}}}, nil
+}
+
+func (f *refKMSFake) ListAliases(context.Context, *kms.ListAliasesInput, ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
+	out := &kms.ListAliasesOutput{}
+	for _, a := range f.aliases {
+		out.Aliases = append(out.Aliases, kmstypes.AliasListEntry{AliasName: aws.String(a), TargetKeyId: f.meta.KeyId})
+	}
+	return out, nil
+}
+
+func (f *refKMSFake) DescribeKey(_ context.Context, in *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	id := aws.ToString(in.KeyId)
+	if id == aws.ToString(f.meta.KeyId) || slices.Contains(f.aliases, id) || slices.Contains(f.lookup, id) {
+		meta := f.meta
+		return &kms.DescribeKeyOutput{KeyMetadata: &meta}, nil
+	}
+	return nil, &kmstypes.NotFoundException{Message: aws.String("key " + id + " not found")}
+}
+
+func refKMSClients(f *refKMSFake) *awsclient.ServiceClients {
+	c := refClients()
+	c.KMS = f
+	return c
+}
+
+func refOrdersKey() kmstypes.KeyMetadata {
+	return kmstypes.KeyMetadata{
+		KeyId:      aws.String("0d1e2f3a-4b5c-4d6e-8f70-819203a4b5c6"),
+		Arn:        aws.String("arn:aws:kms:us-east-1:123456789012:key/0d1e2f3a-4b5c-4d6e-8f70-819203a4b5c6"),
+		KeyManager: kmstypes.KeyManagerTypeCustomer,
+		KeyState:   kmstypes.KeyStateEnabled,
+		Enabled:    true,
+	}
+}
+
+// TestKMSAliases_EveryAliasOfAKeyResolves: a key can carry several aliases,
+// and a resource may name it by any of them. The fetched row must answer to
+// each, or the resource that uses the second alias counts no key.
+func TestKMSAliases_EveryAliasOfAKeyResolves(t *testing.T) {
+	ctx := context.Background()
+	f := &refKMSFake{meta: refOrdersKey(), aliases: []string{"alias/acme-orders", "alias/acme-orders-legacy"}}
+	keyID := aws.ToString(f.meta.KeyId)
+
+	page, err := awsclient.FetchKMSKeysPage(ctx, refKMSClients(f), "")
+	if err != nil {
+		t.Fatalf("FetchKMSKeysPage: %v", err)
+	}
+	byIDs, err := awsclient.FetchKMSKeysByIDs(ctx, refKMSClients(f), []string{keyID})
+	if err != nil {
+		t.Fatalf("FetchKMSKeysByIDs: %v", err)
+	}
+	for name, rows := range map[string][]resource.Resource{"FetchKMSKeysPage": page.Resources, "FetchKMSKeysByIDs": byIDs} {
+		rc := domain.RefContext{AccountID: refAccount, Region: refRegion, Targets: rows}
+		for _, alias := range f.aliases {
+			for _, ref := range []string{alias, "arn:aws:kms:us-east-1:123456789012:" + alias} {
+				if id, ok := resource.ResolveRef("kms", ref, rc); !ok || id != keyID {
+					t.Errorf("%s rows: ResolveRef(kms, %q) = (%q, %v), want (%q, true)", name, ref, id, ok, keyID)
+				}
+			}
+		}
+	}
+}
+
+// TestKMSAliases_ByIDLookupRowCarriesTheRequestedAlias: an alias created
+// after the last ListAliases page was read is still an alias of the key
+// DescribeKey returns for it, so the row fetched for that alias answers to it.
+func TestKMSAliases_ByIDLookupRowCarriesTheRequestedAlias(t *testing.T) {
+	ctx := context.Background()
+	const fresh = "alias/acme-orders-2026"
+	f := &refKMSFake{meta: refOrdersKey(), aliases: []string{"alias/acme-orders"}, lookup: []string{fresh}}
+	keyID := aws.ToString(f.meta.KeyId)
+
+	rows, err := awsclient.FetchKMSKeysByIDs(ctx, refKMSClients(f), []string{fresh})
+	if err != nil {
+		t.Fatalf("FetchKMSKeysByIDs: %v", err)
+	}
+	rc := domain.RefContext{AccountID: refAccount, Region: refRegion, Targets: rows}
+	if id, ok := resource.ResolveRef("kms", fresh, rc); !ok || id != keyID {
+		t.Errorf("ResolveRef(kms, %q) over the row fetched for it = (%q, %v), want (%q, true)", fresh, id, ok, keyID)
+	}
+}
+
+// TestCfS3_StandardLogBucketCountsUnderS3: a distribution's standard access
+// logs land in an S3 bucket (DistributionConfig.Logging.Bucket, domain form),
+// which the S3 Buckets row counts beside the origin buckets. A distribution
+// with logging off adds no bucket.
+func TestCfS3_StandardLogBucketCountsUnderS3(t *testing.T) {
+	b := newRefBench(t)
+	check := refChecker(t, "cf", "s3")
+
+	got := check(context.Background(), refClients(), b.row(t, "cf", "E1A2B3C4D5E6F7"), b.cache)
+	// Its only S3-hosted origin is a website endpoint, which the origin rule
+	// does not count, so the log bucket is the whole answer.
+	want := []string{fixtures.LogsBucketName}
+	if ids := sortedIDs(got); !slices.Equal(ids, want) {
+		t.Errorf("E1A2B3C4D5E6F7 → S3 Buckets = %v, want %v (the standard-log bucket)", ids, want)
+	}
+
+	off := check(context.Background(), refClients(), b.row(t, "cf", fixtures.CFLoggingOff), b.cache)
+	if ids := sortedIDs(off); len(ids) != 0 {
+		t.Errorf("%s (logging off, custom origin) → S3 Buckets = %v, want none", fixtures.CFLoggingOff, ids)
 	}
 }
 

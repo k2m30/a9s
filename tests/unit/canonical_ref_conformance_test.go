@@ -2,8 +2,11 @@ package unit_test
 
 // canonical_ref_conformance_test.go — the class guard over the whole demo
 // bench. Every ID a related row counts, and every ID Enter on a navigable
-// field opens, must be a row of the target type's list; anything else is a
-// badge that drills into nothing or a field that opens nothing.
+// field opens, must open a row of the target type: a row of its list, or —
+// for a target that registers FetchByIDs — the row that lookup returns under
+// exactly that ID, which is the lazy-add the related drill and the by-ID
+// navigation perform. Anything else is a badge that drills into nothing or a
+// field that opens nothing.
 
 import (
 	"context"
@@ -12,15 +15,50 @@ import (
 	"strings"
 	"testing"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
+// refOpener answers whether an ID opens a row of its target, remembering the
+// by-ID lookups it has already made.
+type refOpener struct {
+	b       refBench
+	clients *awsclient.ServiceClients
+	seen    map[string]bool
+}
+
+func newRefOpener(b refBench) *refOpener {
+	return &refOpener{b: b, clients: refClients(), seen: map[string]bool{}}
+}
+
+func (o *refOpener) opens(target, id string) bool {
+	if o.b.has(target, id) {
+		return true
+	}
+	key := target + "\x00" + id
+	if ok, done := o.seen[key]; done {
+		return ok
+	}
+	ok := false
+	if fetch := resource.GetFetchByIDs(target); fetch != nil {
+		rows, _ := fetch(context.Background(), o.clients, []string{id}) //nolint:errcheck // a failed lookup returns no row, which is the verdict
+		for _, r := range rows {
+			if r.ID == id {
+				ok = true
+			}
+		}
+	}
+	o.seen[key] = ok
+	return ok
+}
+
 // TestRefConformance_RelatedIDsAreTargetRows runs every registered related
-// checker on every demo row and requires each returned ID to be a row ID of
-// the target's fixture list.
+// checker on every demo row and requires each returned ID to open a row of
+// the target.
 func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 	b := newRefBench(t)
+	o := newRefOpener(b)
 	clients := refClients()
 	ctx := context.Background()
 
@@ -31,7 +69,7 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 			for _, res := range b.byType[td.ShortName] {
 				for _, id := range def.Checker(ctx, clients, res, b.cache).ResourceIDs() {
 					checked++
-					if !b.has(def.TargetType, id) {
+					if !o.opens(def.TargetType, id) {
 						bad = append(bad, fmt.Sprintf("%s → %s (%s): source %q returned %q",
 							td.ShortName, def.TargetType, def.DisplayName, res.ID, id))
 					}
@@ -44,13 +82,13 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 	}
 	if len(bad) > 0 {
 		sort.Strings(bad)
-		t.Errorf("%d of %d related IDs are not rows of their target type:\n  %s", len(bad), checked, strings.Join(bad, "\n  "))
+		t.Errorf("%d of %d related IDs open no row of their target type:\n  %s", len(bad), checked, strings.Join(bad, "\n  "))
 	}
 }
 
 // TestRefConformance_NavigableFieldsOpenTargetRows opens every demo row's detail
 // as the app renders it and requires Enter on each navigable row to hand the
-// navigation a row ID of the target's list, and that ID to be the one
+// navigation an ID that opens a row of the target, and that ID to be the one
 // resource.NavIDFromValue gives the same value — one reading for both.
 //
 // ct-events is left out: its navigable rows are the event body's own
@@ -58,6 +96,7 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 // resources as they were when the call was made.
 func TestRefConformance_NavigableFieldsOpenTargetRows(t *testing.T) {
 	b := newRefBench(t)
+	o := newRefOpener(b)
 	c := refDetailController(t, b)
 
 	checked := 0
@@ -76,8 +115,8 @@ func TestRefConformance_NavigableFieldsOpenTargetRows(t *testing.T) {
 				opens := navTarget(f)
 				resolved := resource.NavIDFromValue(f.TargetType, value, b.rc(f.TargetType))
 				switch {
-				case !b.has(f.TargetType, opens):
-					bad = append(bad, fmt.Sprintf("%s.%s → %s: source %q value %q opens %q, not a %s row",
+				case !o.opens(f.TargetType, opens):
+					bad = append(bad, fmt.Sprintf("%s.%s → %s: source %q value %q opens %q, no %s row",
 						td.ShortName, f.Path, f.TargetType, res.ID, value, opens, f.TargetType))
 				case opens != resolved:
 					bad = append(bad, fmt.Sprintf("%s.%s → %s: source %q value %q opens %q but NavIDFromValue gives %q",
