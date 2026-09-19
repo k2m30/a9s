@@ -188,18 +188,13 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		return resource.ErrorRelated("apigw", err)
 	}
-	aliases := r53AliasDNSNames(sets)
-	// Extract API IDs from execute-api hostnames.
-	wantedIDs := make(map[string]struct{})
-	for _, d := range aliases {
-		if !strings.Contains(d, ".execute-api.") {
-			continue
-		}
-		if idx := strings.Index(d, ".execute-api."); idx > 0 {
-			wantedIDs[d[:idx]] = struct{}{}
+	var apiIDs []string
+	for _, d := range r53AliasDNSNames(sets) {
+		if id := executeAPIHostID(d); id != "" {
+			apiIDs = append(apiIDs, id)
 		}
 	}
-	if len(wantedIDs) == 0 {
+	if len(apiIDs) == 0 {
 		return relatedResultTrunc("apigw", nil, recordsTruncated)
 	}
 	apigwList, apigwTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
@@ -212,13 +207,8 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		// offer the operator a row that navigates to nothing.
 		return resource.UnknownRelated("apigw")
 	}
-	var ids []string
-	for _, apigwRes := range apigwList {
-		if _, found := wantedIDs[apigwRes.ID]; found {
-			ids = append(ids, apigwRes.ID)
-		}
-	}
-	return r53RelatedResult("apigw", ids, recordsTruncated, apigwTruncated)
+	ids, dropped := listedRefs("apigw", apiIDs, refContext(clients, cache, "apigw"), apigwList)
+	return r53RelatedResult("apigw", ids, recordsTruncated || dropped, apigwTruncated)
 }
 
 // checkR53S3 reports the S3 buckets this zone's S3-website alias records

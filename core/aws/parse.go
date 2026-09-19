@@ -231,3 +231,14 @@ func emailDomain(addr string) (string, bool) {
 	i := strings.LastIndex(addr, "@")
 	return addr[i+1:], i >= 0
 }
+
+// executeAPIHostID returns the API ID an API Gateway default endpoint host
+// ("<api-id>.execute-api.<region>.amazonaws.com") carries, or "" for any other
+// host.
+func executeAPIHostID(host string) string {
+	id, _, ok := strings.Cut(host, ".execute-api.")
+	if !ok {
+		return ""
+	}
+	return id
+}

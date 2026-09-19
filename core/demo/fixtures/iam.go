@@ -597,7 +597,7 @@ func buildIAMRoles() []iamtypes.Role {
 		roles = append(roles, iamtypes.Role{
 			RoleName:    aws.String(id),
 			RoleId:      aws.String(fmt.Sprintf("AROACT029%s", prefix)),
-			Arn:         aws.String(fmt.Sprintf("arn:aws:iam::111111111111:role/%s", id)),
+			Arn:         aws.String(fmt.Sprintf("arn:aws:iam::123456789012:role/%s", id)),
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
 			Description: aws.String(rd.desc),

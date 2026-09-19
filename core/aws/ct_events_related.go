@@ -89,9 +89,13 @@ func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []strin
 		return ctRoleAlternatives(username, rc)
 	}
 
-	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON string.
+	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON
+	// string. The issuer's ARN is read in preference to its name: only the ARN
+	// tells another account's role from the local one of that name.
 	if ok {
-		if name := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); name != "" {
+		if name, roleARN := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); roleARN != "" {
+			return ctRoleAlternatives(roleARN, rc)
+		} else if name != "" {
 			return ctRoleAlternatives(name, rc)
 		}
 	}

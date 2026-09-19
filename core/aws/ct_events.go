@@ -222,7 +222,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	// AWSService invokedBy values are service principals, not IAM roles.
 	roleName := ""
 	if uiType == "AssumedRole" || uiType == "Role" {
-		roleName = extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+		roleName, _ = extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
 	}
 
 	// Fields["user"] navigates to iam-user — only set it for actual IAM users.
@@ -799,31 +799,33 @@ type ctEventJSONUserIdentity struct {
 		SessionContext struct {
 			SessionIssuer struct {
 				UserName string `json:"userName"`
+				Arn      string `json:"arn"`
 			} `json:"sessionIssuer"`
 		} `json:"sessionContext"`
 	} `json:"userIdentity"`
 }
 
-// extractRoleNameFromCTEventJSON parses the raw CloudTrailEvent JSON string and returns
-// a human-readable identity string for the event:
-//   - AssumedRole/Role: userIdentity.sessionContext.sessionIssuer.userName (e.g., "AccountAccessRole")
-//   - AWSService: userIdentity.invokedBy (e.g., "ec2.amazonaws.com")
+// extractRoleNameFromCTEventJSON parses the raw CloudTrailEvent JSON string and
+// returns, for an AssumedRole/Role identity, the issuing role's name
+// (userIdentity.sessionContext.sessionIssuer.userName, e.g. "AccountAccessRole")
+// and its ARN, which carries the role's account.
 //
-// Returns "" for nil input, parse errors, or unrecognised identity types (e.g., IAMUser — those
+// Returns "" for nil input, parse errors, or other identity types (e.g., IAMUser — those
 // events already have Username set on the CloudTrail Event struct itself).
-func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) string {
+func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) (name, roleARN string) {
 	if cloudTrailEvent == nil || *cloudTrailEvent == "" {
-		return ""
+		return "", ""
 	}
 	var parsed ctEventJSONUserIdentity
 	if err := json.Unmarshal([]byte(*cloudTrailEvent), &parsed); err != nil {
-		return ""
+		return "", ""
 	}
 	switch parsed.UserIdentity.Type {
 	case "AssumedRole", "Role":
-		return parsed.UserIdentity.SessionContext.SessionIssuer.UserName
+		issuer := parsed.UserIdentity.SessionContext.SessionIssuer
+		return issuer.UserName, issuer.Arn
 	}
-	return ""
+	return "", ""
 }
 
 // ctLocalPrincipals clears role_name and user on every event whose principal
