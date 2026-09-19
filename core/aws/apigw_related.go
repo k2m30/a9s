@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,9 +26,9 @@ import (
 func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "apiID")
 	}
-	items, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("kms")
@@ -80,7 +81,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	// Some calls may have failed: ids is a proven subset, not necessarily
 	// exhaustive. Truncated (not Errored) keeps the row actionable rather
 	// than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("kms", ids, lowerBound || len(failures) > 0)
+	return relatedResultTrunc("kms", ids, lowerBound || len(failures) > 0 || !complete)
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this
@@ -94,7 +95,7 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		apiName = res.Fields["name"]
 	}
 	if apiID == "" && apiName == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "apiName")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -118,24 +119,24 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("logs", ids, truncated)
 }
 
-// apigwListIntegrations makes a single apigatewayv2:GetIntegrations call for
-// the given API via RetryOnThrottle, returning the integrations slice.
-func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]apigwtypes.Integration, error) {
+// apigwListIntegrations walks apigatewayv2:GetIntegrations for the given
+// API. complete is false when the walk stopped at the page cap.
+func apigwListIntegrations(ctx context.Context, clients any, apiID string) (items []apigwtypes.Integration, complete bool, err error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
 	api, ok := c.APIGatewayV2.(APIGatewayV2GetIntegrationsAPI)
 	if !ok {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetIntegrationsOutput, error) {
-		return api.GetIntegrations(ctx, &apigatewayv2.GetIntegrationsInput{ApiId: &apiID})
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Integration, *string, error) {
+		out, err := api.GetIntegrations(ctx, &apigatewayv2.GetIntegrationsInput{ApiId: &apiID, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.NextToken, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return out.Items, nil
 }
 
 // checkApigwLambda reports Lambda integration targets of this API Gateway.
@@ -144,9 +145,9 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "apiID")
 	}
-	items, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("lambda")
@@ -157,7 +158,8 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 	for _, item := range items {
 		arns = append(arns, lambdaIntegrationARN(aws.ToString(item.IntegrationUri)))
 	}
-	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
+	ids, dropped := resolveRefs("lambda", arns, refContext(clients, cache, "lambda"))
+	return relatedResultTrunc("lambda", ids, dropped || !complete)
 }
 
 // checkApigwACM reports ACM certificates attached to this API's custom domain names.
@@ -167,7 +169,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "apiID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
@@ -181,8 +183,12 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok {
 		return resource.UnknownRelated("acm")
 	}
-	dn, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetDomainNamesOutput, error) {
-		return dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{})
+	domains, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.DomainName, *string, error) {
+		out, err := dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
@@ -190,29 +196,25 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	var refs []string
 	var failures []Failure
 	total := 0
-	for _, d := range dn.Items {
+	for _, d := range domains {
 		if d.DomainName == nil {
 			continue
 		}
 		total++
-		m, merr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetApiMappingsOutput, error) {
-			return mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName})
+		mappings, mappingsComplete, merr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.ApiMapping, *string, error) {
+			out, err := mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName, NextToken: token})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.Items, out.NextToken, nil
 		})
 		if merr != nil {
 			failures = append(failures, FailedCall(*d.DomainName, merr))
 			continue
 		}
-		if m == nil {
-			continue
-		}
-		matched := false
-		for _, am := range m.Items {
-			if am.ApiId != nil && *am.ApiId == apiID {
-				matched = true
-				break
-			}
-		}
+		matched := slices.ContainsFunc(mappings, func(am apigwtypes.ApiMapping) bool { return aws.ToString(am.ApiId) == apiID })
 		if !matched {
+			complete = complete && mappingsComplete
 			continue
 		}
 		for _, dcfg := range d.DomainNameConfigurations {
@@ -232,7 +234,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	// Some GetApiMappings calls may have failed: ids is a proven subset, not
 	// necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("acm", ids, dropped || len(failures) > 0)
+	return relatedResultTrunc("acm", ids, dropped || len(failures) > 0 || !complete)
 }
 
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
@@ -248,7 +250,7 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "apiID")
 	}
 	suffix := apiID + ".execute-api."
 
@@ -285,10 +287,10 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "apiID")
 	}
 
-	items, err := apigwListIntegrations(ctx, clients, apiID)
+	items, integrationsComplete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("elb")
@@ -308,7 +310,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		vpcLinkIDs = append(vpcLinkIDs, *item.ConnectionId)
 	}
 	if len(vpcLinkIDs) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "vpcLinkIDs")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -320,47 +322,36 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("elb")
 	}
 
+	// GetVpcLinks is account-wide, not API-scoped.
+	links, linksComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.VpcLink, *string, error) {
+		out, callErr := vpcLinkAPI.GetVpcLinks(ctx, &apigatewayv2.GetVpcLinksInput{NextToken: token})
+		if callErr != nil {
+			return nil, nil, callErr
+		}
+		return out.Items, out.NextToken, nil
+	})
+	if err != nil {
+		return resource.ErrorRelated("elb", err)
+	}
 	wantedSubnets := make(map[string]struct{})
 	wantedSGs := make(map[string]struct{})
-	var nextToken *string
-	// GetVpcLinks is account-wide and paginated; VpcLinks are few per
-	// account, but the token is honored until exhausted rather than assuming
-	// a single page.
-	for {
-		var input apigatewayv2.GetVpcLinksInput
-		if nextToken != nil {
-			input.NextToken = nextToken
+	for _, link := range links {
+		if link.VpcLinkId == nil {
+			continue
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetVpcLinksOutput, error) {
-			return vpcLinkAPI.GetVpcLinks(ctx, &input)
-		})
-		if err != nil {
-			return resource.ErrorRelated("elb", err)
+		if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
+			continue
 		}
-		if out == nil {
-			break
+		for _, s := range link.SubnetIds {
+			wantedSubnets[s] = struct{}{}
 		}
-		for _, link := range out.Items {
-			if link.VpcLinkId == nil {
-				continue
-			}
-			if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
-				continue
-			}
-			for _, s := range link.SubnetIds {
-				wantedSubnets[s] = struct{}{}
-			}
-			for _, sg := range link.SecurityGroupIds {
-				wantedSGs[sg] = struct{}{}
-			}
+		for _, sg := range link.SecurityGroupIds {
+			wantedSGs[sg] = struct{}{}
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
+	complete := integrationsComplete && linksComplete
 	if len(wantedSubnets) == 0 && len(wantedSGs) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return relatedResultTrunc("elb", nil, !complete)
 	}
 
 	elbList, truncated, fetchErr := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -398,7 +389,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	return relatedResultTrunc("elb", ids, truncated)
+	return relatedResultTrunc("elb", ids, truncated || !complete)
 }
 
 // checkApigwRole reports IAM roles this API assumes to call the integration
@@ -410,13 +401,13 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "apiID")
 	}
 
 	var refs []string
 	rc := refContext(clients, cache, "role")
 
-	items, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil && !errors.Is(err, errClientMissing) {
 		return resource.ErrorRelated("role", err)
 	}
@@ -446,8 +437,12 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		return resource.UnknownRelated("role")
 	}
-	authOut, authErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
-		return authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID})
+	authorizers, authComplete, authErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Authorizer, *string, error) {
+		out, err := authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.NextToken, nil
 	})
 	if authErr != nil {
 		if len(refs) > 0 {
@@ -456,13 +451,12 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		return resource.ErrorRelated("role", authErr)
 	}
-	if authOut != nil {
-		for _, a := range authOut.Items {
-			if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {
-				refs = append(refs, *a.AuthorizerCredentialsArn)
-			}
+	for _, a := range authorizers {
+		if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {
+			refs = append(refs, *a.AuthorizerCredentialsArn)
 		}
 	}
 
-	return relatedRefs("role", refs, rc)
+	ids, dropped := resolveRefs("role", refs, rc)
+	return relatedResultTrunc("role", ids, dropped || !complete || !authComplete)
 }

@@ -24,7 +24,7 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("role")
 	}
 	if job.Role == nil || *job.Role == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "job.Role")
 	}
 	// The job's Role ARN normalizes to the role name, which is the role's
 	// Resource.ID, so it resolves by identity.
@@ -68,7 +68,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "jobName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
@@ -94,7 +94,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	stackName := out.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -126,7 +126,7 @@ func checkGlueS3(_ context.Context, clients any, res resource.Resource, cache re
 		return resource.UnknownRelated("s3")
 	}
 	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "job.Command.ScriptLocation")
 	}
 	return relatedRefs("s3", []string{*job.Command.ScriptLocation}, refContext(clients, cache, "s3"))
 }
@@ -140,7 +140,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("kms")
 	}
 	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "job.SecurityConfiguration")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
@@ -157,7 +157,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("kms", err)
 	}
 	if out.SecurityConfiguration == nil || out.SecurityConfiguration.EncryptionConfiguration == nil {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "out.SecurityConfiguration.EncryptionConfiguration")
 	}
 	enc := out.SecurityConfiguration.EncryptionConfiguration
 	var refs []string
@@ -178,30 +178,6 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 	return kmsRelated(ctx, clients, cache, refs)
 }
 
-// checkGlueAthena scans the athena cache for workgroups whose
-// Fields["glue_job"] or ID equals this job's name, falling back to
-// Count: 0 when no match is found.
-func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	jobName := res.ID
-	if jobName == "" {
-		return resource.KnownRelated("athena", nil, false)
-	}
-	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
-	if err != nil {
-		return resource.ErrorRelated("athena", err)
-	}
-	if wgList == nil {
-		return resource.UnknownRelated("athena")
-	}
-	var ids []string
-	for _, wg := range wgList {
-		if wg.Fields["glue_job"] == jobName || wg.ID == jobName {
-			ids = append(ids, wg.ID)
-		}
-	}
-	return relatedResultTrunc("athena", ids, truncated)
-}
-
 // checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
 // values that look like Secrets Manager references (arn:aws:secretsmanager:
 // prefix).
@@ -211,7 +187,7 @@ func checkGlueSecrets(_ context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("secrets")
 	}
 	if len(job.DefaultArguments) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "job.DefaultArguments")
 	}
 	var refs []string
 	for _, v := range job.DefaultArguments {

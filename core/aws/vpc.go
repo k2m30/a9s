@@ -32,25 +32,22 @@ func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []
 	for _, r := range resources {
 		vpcIDs = append(vpcIDs, r.ID)
 	}
-	byVPC := map[string][]string{}
-	var nextToken *string
-	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSubnetsOutput, error) {
-			return subnetAPI.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
-				Filters:   []ec2types.Filter{{Name: aws.String("vpc-id"), Values: vpcIDs}},
-				NextToken: nextToken,
-			})
+	subnets, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
+		out, err := subnetAPI.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+			Filters:   []ec2types.Filter{{Name: aws.String("vpc-id"), Values: vpcIDs}},
+			NextToken: token,
 		})
 		if err != nil {
-			return
+			return nil, nil, err
 		}
-		for _, sn := range out.Subnets {
-			byVPC[aws.ToString(sn.VpcId)] = append(byVPC[aws.ToString(sn.VpcId)], aws.ToString(sn.SubnetId))
-		}
-		if out.NextToken == nil {
-			break
-		}
-		nextToken = out.NextToken
+		return out.Subnets, out.NextToken, nil
+	})
+	if err != nil {
+		return
+	}
+	byVPC := map[string][]string{}
+	for _, sn := range subnets {
+		byVPC[aws.ToString(sn.VpcId)] = append(byVPC[aws.ToString(sn.VpcId)], aws.ToString(sn.SubnetId))
 	}
 	for i := range resources {
 		if ids := byVPC[resources[i].ID]; len(ids) > 0 {

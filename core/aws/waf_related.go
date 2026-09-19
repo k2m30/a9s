@@ -58,7 +58,7 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -70,12 +70,12 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if err != nil {
 		// WAFNonexistentItemException = no logging configured → real 0.
 		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-			return resource.KnownRelated("logs", nil, false)
+			return resource.ProvenZero("logs", "the API answered that none is configured")
 		}
 		return resource.ErrorRelated("logs", err)
 	}
 	if out.LoggingConfiguration == nil {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "out.LoggingConfiguration")
 	}
 	var groups []string
 	for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
@@ -93,7 +93,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	scope := res.Fields["scope"]
 	if scope != string(wafv2types.ScopeCloudfront) {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "scope")
 	}
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
@@ -103,7 +103,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		webACLArn = res.ID
 	}
 	if webACLArn == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
@@ -128,7 +128,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 			ids = append(ids, *d.Id)
 		}
 	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, false)
 }
 
 // checkWAFAPIGW calls wafv2:ListResourcesForWebACL with API Gateway resource type

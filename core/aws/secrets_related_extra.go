@@ -39,7 +39,7 @@ func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Res
 		text = append(text, val)
 	}
 	if !linked {
-		return resource.KnownRelated("codeartifact", nil, false)
+		return resource.ProvenZero("codeartifact", "the secret's name, description and tags")
 	}
 	repos, truncated, err := relatedResourcesFor(ctx, clients, cache, "codeartifact")
 	if err != nil {
@@ -54,7 +54,7 @@ func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Res
 			ids = append(ids, repo.ID)
 		}
 	}
-	return relatedResultTrunc("codeartifact", ids, truncated)
+	return heuristicResult("codeartifact", ids, truncated)
 }
 
 // checkSecretsEB is a reverse-scan checker for the secrets→eb relationship.
@@ -74,7 +74,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.KnownRelated("eb", nil, false)
+		return resource.ProvenZero("eb", "secretARN")
 	}
 
 	entry, ok := cache["eb"]
@@ -160,7 +160,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "secretARN")
 	}
 
 	entry, ok := cache["ecs-task"]
@@ -266,7 +266,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 		return resource.UnknownRelated("logs")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "secret.RotationLambdaARN")
 	}
 	rotationARN := *secret.RotationLambdaARN
 
@@ -277,24 +277,24 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 
 	defaultLogGroup := "/aws/lambda/" + funcName
 
+	// /aws/lambda/<name> is Lambda's default log group; a function with a
+	// custom LoggingConfig logs elsewhere, so without the function's
+	// configuration the default is a candidate, not a read.
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return relatedResult("logs", []string{defaultLogGroup})
+		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return relatedResult("logs", []string{defaultLogGroup})
+		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	})
-	// /aws/lambda/<name> is Lambda's own default and is derived from the ARN
-	// above; only a non-default LoggingConfig would have changed it, so the
-	// fallback states a fact this call would have refined, not guessed.
-	// no finding: the answer is already known without this call.
+	// no finding: the row carries the default log group as a candidate.
 	if err != nil || out == nil || out.Configuration == nil {
-		return relatedResult("logs", []string{defaultLogGroup})
+		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
 	}
 
 	logGroup := defaultLogGroup
@@ -302,7 +302,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 		*out.Configuration.LoggingConfig.LogGroup != "" {
 		logGroup = *out.Configuration.LoggingConfig.LogGroup
 	}
-	return relatedResult("logs", []string{logGroup})
+	return relatedResultTrunc("logs", []string{logGroup}, false)
 }
 
 // checkSecretsRole resolves IAM roles associated with this secret via two paths:
@@ -322,7 +322,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		secretID = secretName
 	}
 	if secretID == "" {
-		return unreadZero(res, resource.KnownRelated("role", nil, false))
+		return unreadZero(res, resource.ProvenZero("role", "secretID"))
 	}
 
 	c, cok := clients.(*ServiceClients)
@@ -396,7 +396,7 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("sns")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "secret.RotationLambdaARN")
 	}
 	rotationARN := *secret.RotationLambdaARN
 
@@ -421,10 +421,10 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	dlc := out.Configuration.DeadLetterConfig
 	if dlc == nil || dlc.TargetArn == nil || *dlc.TargetArn == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "dlc.TargetArn")
 	}
 	if _, isTopic := ARNForService(*dlc.TargetArn, "sns"); !isTopic {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "isTopic")
 	}
-	return relatedResult("sns", []string{*dlc.TargetArn})
+	return relatedResultTrunc("sns", []string{*dlc.TargetArn}, false)
 }

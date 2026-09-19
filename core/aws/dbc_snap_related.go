@@ -19,7 +19,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("dbc")
 	}
 	if p.cluster == "" || !p.local() {
-		return resource.KnownRelated("dbc", nil, false)
+		return resource.ProvenZero("dbc", "p.cluster")
 	}
 
 	dbcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
@@ -46,12 +46,12 @@ func checkDbcSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	var keyID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-			return resource.KnownRelated("kms", nil, false)
+			return resource.ProvenZero("kms", "snap.KmsKeyId")
 		}
 		keyID = *snap.KmsKeyId
 	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-			return resource.KnownRelated("kms", nil, false)
+			return resource.ProvenZero("kms", "snap.KmsKeyId")
 		}
 		keyID = *snap.KmsKeyId
 	} else {
@@ -59,7 +59,7 @@ func checkDbcSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	keyID = kmsRefFromField(keyID, res.Type)
 	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -69,17 +69,17 @@ func checkDbcSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return unreadZero(res, resource.KnownRelated("vpc", nil, false))
+			return unreadZero(res, resource.ProvenZero("vpc", "snap.VpcId"))
 		}
-		return unreadZero(res, relatedResult("vpc", []string{*snap.VpcId}))
+		return unreadZero(res, relatedResultTrunc("vpc", []string{*snap.VpcId}, false))
 	}
 	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.VpcId == nil || *snap.VpcId == "" {
-			return unreadZero(res, resource.KnownRelated("vpc", nil, false))
+			return unreadZero(res, resource.ProvenZero("vpc", "snap.VpcId"))
 		}
-		return unreadZero(res, relatedResult("vpc", []string{*snap.VpcId}))
+		return unreadZero(res, relatedResultTrunc("vpc", []string{*snap.VpcId}, false))
 	}
-	return unreadZero(res, resource.KnownRelated("vpc", nil, false))
+	return unreadZero(res, resource.ProvenZero("vpc", "the lookup completed"))
 }
 
 // checkDbcSnapBackup resolves AWS Backup PLANS that cover this DocumentDB or
@@ -103,7 +103,7 @@ func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource
 func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, ok := dbcSnapParentOf(res.RawStruct)
 	if !ok || p.cluster == "" || !p.local() {
-		return unreadZero(res, resource.KnownRelated("backup", nil, false))
+		return unreadZero(res, resource.ProvenZero("backup", "p.cluster"))
 	}
 
 	// Neither snapshot shape carries the parent cluster ARN, so it is
@@ -126,7 +126,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		if dbcTruncated {
 			return resource.UnknownRelated("backup")
 		}
-		return unreadZeroScanned(res, len(dbcList), resource.KnownRelated("backup", nil, false))
+		return unreadZeroScanned(res, len(dbcList), resource.ProvenZero("backup", "parentARN"))
 	}
 
 	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")

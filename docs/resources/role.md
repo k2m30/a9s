@@ -189,7 +189,7 @@ role — SECURITY & IAM. Status key: `state` — the column naming it is the sta
 | lambda | Lambda Functions | yes |
 | glue | Glue Jobs | yes |
 | ng | Node Groups | yes |
-| policy | IAM Policies | no |
+| policy | IAM Policies | yes |
 | ec2 | EC2 Instances | yes |
 | eks | EKS Clusters | yes |
 | iam-group | IAM Groups (trust) | no |

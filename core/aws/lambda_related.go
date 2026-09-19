@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -25,7 +26,7 @@ func checkLambdaRole(_ context.Context, clients any, res resource.Resource, cach
 		return resource.KnownRelated("role", nil, false)
 	}
 	if fn.Role == nil || *fn.Role == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "fn.Role")
 	}
 	// The execution Role ARN normalizes to the role name, which is the role's
 	// Resource.ID (roles keyed by name; role FetchByIDs drives the drill), so
@@ -51,7 +52,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "functionName")
 	}
 
 	expectedLogGroup := "/aws/lambda/" + functionName
@@ -85,7 +86,7 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.UnknownRelated("sg")
 	}
 	if fn.VpcConfig == nil {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "fn.VpcConfig")
 	}
 	var ids []string
 	for _, sgID := range fn.VpcConfig.SecurityGroupIds {
@@ -93,7 +94,7 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 			ids = append(ids, sgID)
 		}
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkLambdaVPC returns the VPC this Lambda function runs in.
@@ -105,9 +106,9 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("vpc")
 	}
 	if fn.VpcConfig == nil || fn.VpcConfig.VpcId == nil || *fn.VpcConfig.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "fn.VpcConfig.VpcId")
 	}
-	return relatedResult("vpc", []string{*fn.VpcConfig.VpcId})
+	return relatedResultTrunc("vpc", []string{*fn.VpcConfig.VpcId}, false)
 }
 
 // checkLambdaKMS extracts the KMS key ARN from the Lambda FunctionConfiguration
@@ -119,7 +120,7 @@ func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cac
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "fn.KMSKeyArn")
 	}
 	keyID := kmsRefFromField(*fn.KMSKeyArn, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -136,21 +137,40 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cac
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.KnownRelated("sqs", nil, false)
+		return resource.ProvenZero("sqs", "functionName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("sqs")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
-		return c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-			FunctionName: &functionName,
-		})
-	})
+	return lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", ":sqs:", refContext(clients, cache, "sqs"))
+}
+
+// lambdaEventSourceRefs is the result of an event-source pivot of a function:
+// the sources of every mapping whose ARN is service's, read through target's
+// resolver.
+func lambdaEventSourceRefs(ctx context.Context, api LambdaListEventSourceMappingsAPI, functionName, target, service string, rc domain.RefContext) resource.RelatedCheckResult {
+	mappings, complete, err := listEventSourceMappings(ctx, api, lambda.ListEventSourceMappingsInput{FunctionName: &functionName})
 	if err != nil {
-		return resource.ErrorRelated("sqs", err)
+		return resource.ErrorRelated(target, err)
 	}
-	return relatedRefs("sqs", eventSourceARNs(out.EventSourceMappings, ":sqs:"), refContext(clients, cache, "sqs"))
+	ids, dropped := resolveRefs(target, eventSourceARNs(mappings, service), rc)
+	return relatedResultTrunc(target, ids, dropped || !complete)
+}
+
+// listEventSourceMappings walks ListEventSourceMappings for the function or
+// event source in filter. complete is false when the walk stopped at the page
+// cap.
+func listEventSourceMappings(ctx context.Context, api LambdaListEventSourceMappingsAPI, filter lambda.ListEventSourceMappingsInput) ([]lambdatypes.EventSourceMappingConfiguration, bool, error) {
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]lambdatypes.EventSourceMappingConfiguration, *string, error) {
+		in := filter
+		in.Marker = marker
+		out, err := api.ListEventSourceMappings(ctx, &in)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.EventSourceMappings, out.NextMarker, nil
+	})
 }
 
 // checkLambdaCFN finds the CloudFormation stack that owns this Lambda by reading
@@ -164,7 +184,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("cfn")
 	}
 	if fn.FunctionArn == nil || *fn.FunctionArn == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "fn.FunctionArn")
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.Lambda == nil {
@@ -178,7 +198,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	stackName := tagsOut.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -204,7 +224,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 // open Image-package function, per docs/resources/lambda.md).
 func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["package_type"] != "Image" {
-		return resource.KnownRelated("ecr", nil, false)
+		return resource.ProvenZero("ecr", "res.Fields[package_type]")
 	}
 	fnName := res.ID
 	if fnName == "" {
@@ -252,7 +272,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		functionName = res.ID
 	}
 	if functionARN == "" && functionName == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "functionName")
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.EventBridge == nil {

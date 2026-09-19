@@ -29,8 +29,9 @@ type policyEntitiesCacheEntry struct {
 	fetchedAt time.Time
 }
 
-// listAllPolicyEntities issues ONE unfiltered ListEntitiesForPolicy call and returns
-// the full output. Results are cached per policyARN for policyEntitiesTTL.
+// listAllPolicyEntities walks the unfiltered ListEntitiesForPolicy pages and
+// returns them merged into one output, IsTruncated when the walk stopped at
+// the page cap. Results are cached per policyARN for policyEntitiesTTL.
 func listAllPolicyEntities(ctx context.Context, api IAMListEntitiesForPolicyAPI, policyARN string) (*iam.ListEntitiesForPolicyOutput, error) {
 	if v, ok := policyEntitiesCache.Load(policyARN); ok {
 		entry := v.(policyEntitiesCacheEntry)
@@ -40,9 +41,23 @@ func listAllPolicyEntities(ctx context.Context, api IAMListEntitiesForPolicyAPI,
 		policyEntitiesCache.Delete(policyARN)
 	}
 
-	out, err := api.ListEntitiesForPolicy(ctx, &iam.ListEntitiesForPolicyInput{
-		PolicyArn: &policyARN,
+	out := &iam.ListEntitiesForPolicyOutput{}
+	pages, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]*iam.ListEntitiesForPolicyOutput, *string, error) {
+		page, err := api.ListEntitiesForPolicy(ctx, &iam.ListEntitiesForPolicyInput{
+			PolicyArn: &policyARN,
+			Marker:    marker,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return []*iam.ListEntitiesForPolicyOutput{page}, iamNextMarker(page.IsTruncated, page.Marker), nil
 	})
+	for _, page := range pages {
+		out.PolicyRoles = append(out.PolicyRoles, page.PolicyRoles...)
+		out.PolicyUsers = append(out.PolicyUsers, page.PolicyUsers...)
+		out.PolicyGroups = append(out.PolicyGroups, page.PolicyGroups...)
+	}
+	out.IsTruncated = !complete
 	policyEntitiesCache.Store(policyARN, policyEntitiesCacheEntry{
 		out:       out,
 		err:       err,
@@ -68,7 +83,7 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
@@ -80,7 +95,7 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 			ids = append(ids, *r.RoleName)
 		}
 	}
-	return relatedResult("role", ids)
+	return relatedResultTrunc("role", ids, out.IsTruncated)
 }
 
 // checkPolicyUser uses the IAM ListEntitiesForPolicy API to return the IAM users
@@ -92,7 +107,7 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.KnownRelated("iam-user", nil, false)
+		return resource.ProvenZero("iam-user", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
@@ -104,7 +119,7 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 			ids = append(ids, *u.UserName)
 		}
 	}
-	return relatedResult("iam-user", ids)
+	return relatedResultTrunc("iam-user", ids, out.IsTruncated)
 }
 
 // checkPolicyGroup uses the IAM ListEntitiesForPolicy API to return the IAM groups
@@ -115,11 +130,11 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 		return resource.UnknownRelated("iam-group")
 	}
 	if groupName, ok := inlinePolicyGroup(res); ok {
-		return relatedResult("iam-group", []string{groupName})
+		return relatedResultTrunc("iam-group", []string{groupName}, false)
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.KnownRelated("iam-group", nil, false)
+		return resource.ProvenZero("iam-group", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
@@ -131,7 +146,7 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 			ids = append(ids, *g.GroupName)
 		}
 	}
-	return relatedResult("iam-group", ids)
+	return relatedResultTrunc("iam-group", ids, out.IsTruncated)
 }
 
 // policyARNFromResource extracts the policy ARN from Fields or RawStruct.

@@ -62,53 +62,43 @@ func awsManagedPolicyIn(policyARN string, sets ...[]string) bool {
 	return false
 }
 
+// iamNextMarker is the token of the next IAM list page: IAM marks a page
+// followed by another with IsTruncated, and its Marker is meaningful only then.
+func iamNextMarker(isTruncated bool, marker *string) *string {
+	if !isTruncated {
+		return nil
+	}
+	return marker
+}
+
 // listAttachedRolePolicies walks every page of a role's attached managed
-// policies. IAM caps a principal at 20 managed policies today, which fits one
-// page, but a quota is not a contract and the group sweep already paginates
-// its equivalent — one shape for all three principals.
-func listAttachedRolePolicies(ctx context.Context, api IAMListAttachedRolePoliciesAPI, roleName string) ([]iamtypes.AttachedPolicy, error) {
-	var all []iamtypes.AttachedPolicy
-	var marker *string
-	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedRolePoliciesOutput, error) {
-			return api.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-				RoleName: aws.String(roleName),
-				Marker:   marker,
-			})
+// policies. complete is false when the walk failed or stopped at the page
+// cap; the policies read so far are returned either way.
+func listAttachedRolePolicies(ctx context.Context, api IAMListAttachedRolePoliciesAPI, roleName string) ([]iamtypes.AttachedPolicy, bool, error) {
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.AttachedPolicy, *string, error) {
+		out, err := api.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
+			RoleName: aws.String(roleName),
+			Marker:   marker,
 		})
 		if err != nil {
-			return all, err
+			return nil, nil, err
 		}
-		all = append(all, out.AttachedPolicies...)
-		if !out.IsTruncated {
-			return all, nil
-		}
-		marker = out.Marker
-	}
-	return all, nil
+		return out.AttachedPolicies, iamNextMarker(out.IsTruncated, out.Marker), nil
+	})
 }
 
 // listAttachedUserPolicies is listAttachedRolePolicies for a user.
-func listAttachedUserPolicies(ctx context.Context, api IAMListAttachedUserPoliciesAPI, userName string) ([]iamtypes.AttachedPolicy, error) {
-	var all []iamtypes.AttachedPolicy
-	var marker *string
-	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListAttachedUserPoliciesOutput, error) {
-			return api.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
-				UserName: aws.String(userName),
-				Marker:   marker,
-			})
+func listAttachedUserPolicies(ctx context.Context, api IAMListAttachedUserPoliciesAPI, userName string) ([]iamtypes.AttachedPolicy, bool, error) {
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.AttachedPolicy, *string, error) {
+		out, err := api.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
+			UserName: aws.String(userName),
+			Marker:   marker,
 		})
 		if err != nil {
-			return all, err
+			return nil, nil, err
 		}
-		all = append(all, out.AttachedPolicies...)
-		if !out.IsTruncated {
-			return all, nil
-		}
-		marker = out.Marker
-	}
-	return all, nil
+		return out.AttachedPolicies, iamNextMarker(out.IsTruncated, out.Marker), nil
+	})
 }
 
 // AdminAttachedPolicyNameForTest is an exported test-only wrapper for the

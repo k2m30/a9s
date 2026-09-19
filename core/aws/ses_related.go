@@ -36,7 +36,7 @@ type ruleSetStore interface {
 func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain := canonicalDNS(sesIdentityDomain(res))
 	if domain == "" {
-		return resource.KnownRelated("r53", nil, false)
+		return resource.ProvenZero("r53", "domain")
 	}
 
 	r53List, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
@@ -60,7 +60,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 	if truncated {
 		return truncatedResultSES("r53", ids)
 	}
-	return relatedResult("r53", ids)
+	return relatedResultTrunc("r53", ids, false)
 }
 
 // sesIdentityDomain extracts the domain from a SES identity resource.
@@ -153,7 +153,7 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -169,7 +169,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if configSetName == "" {
 		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "configSetName")
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
@@ -196,7 +196,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(busNames) == 0 {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "busNames")
 	}
 
 	ebRules, truncated, cacheErr := relatedResourcesFor(ctx, clients, cache, "eb-rule")
@@ -219,7 +219,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	if truncated {
 		return truncatedResultSES("eb-rule", ids)
 	}
-	return relatedResult("eb-rule", ids)
+	return relatedResultTrunc("eb-rule", ids, false)
 }
 
 // sesRuleAppliesToIdentity reports whether a receipt rule should be considered
@@ -310,7 +310,7 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "out")
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -337,7 +337,7 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "out")
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -346,7 +346,7 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	buckets := sesS3BucketsFromRules(filtered)
-	return relatedResult("s3", buckets)
+	return relatedResultTrunc("s3", buckets, false)
 }
 
 // sesLambdaARNsFromRules walks ReceiptRule actions and collects
@@ -391,7 +391,7 @@ func sesS3BucketsFromRules(rules []sestypes.ReceiptRule) []string {
 func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -406,7 +406,7 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	if configSetName == "" {
 		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "configSetName")
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
@@ -426,7 +426,7 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 			ids = append(ids, *dest.SnsDestination.TopicArn)
 		}
 	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, false)
 }
 
 // truncatedResultSES returns a RelatedCheckResult with Truncated=true when the

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -135,17 +136,30 @@ func kmsRefFromField(raw, srcType string) string {
 	return raw
 }
 
-func relatedResult(target string, ids []string) resource.RelatedCheckResult {
-	return resource.KnownRelated(target, ids, false)
+// relatedResultTrunc is the result of a checker that searched: ids found,
+// and whether the search stopped short. A truncated scan renders "(N+)" —
+// 0+ and 10+ are the same case (N found so far, list truncated). A complete
+// search that found nothing is a proven zero.
+func relatedResultTrunc(target string, ids []string, truncated bool) resource.RelatedCheckResult {
+	if !truncated && !slices.ContainsFunc(ids, func(id string) bool { return id != "" }) {
+		return resource.ProvenZero(target, "the checker's search")
+	}
+	return resource.KnownRelated(target, ids, truncated)
 }
 
-// relatedResultTrunc is relatedResult with the truncation flag carried through
-// UNIFORMLY for any count. A truncated scan renders "(N+)" — the "+" means the
-// target list is truncated, so navigating shows "m for more". 0+ and 10+ are the
-// same case (N found so far, list truncated), not two: there is no special
-// zero-truncated result.
-func relatedResultTrunc(target string, ids []string, truncated bool) resource.RelatedCheckResult {
-	return resource.KnownRelated(target, ids, truncated)
+// heuristicResult is the result of a pivot that matches by a property every
+// related resource must share with the source but unrelated ones may share
+// too: the matches are candidates, and a complete scan that found none is a
+// proven zero.
+func heuristicResult(target string, ids []string, truncated bool) resource.RelatedCheckResult {
+	if !truncated && len(ids) == 0 {
+		return resource.ProvenZero(target, "the checker's scan")
+	}
+	r := resource.HeuristicRelated(target, ids)
+	if truncated {
+		return r.PartialScan()
+	}
+	return r
 }
 
 // alarmIDsByDimension is the shared body of every check*Alarm function whose
@@ -158,7 +172,7 @@ func relatedResultTrunc(target string, ids []string, truncated bool) resource.Re
 // all — reported as unknown, never as a proven zero.
 func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, namespace, dimName, dimValue string) resource.RelatedCheckResult {
 	if dimValue == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "dimValue")
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -199,7 +213,9 @@ type typedRow[T any] struct {
 // fetches. Tri-state contract: cache absent →
 // (nil, false, false) = unknown; entry present but zero rows assert to T
 // (disk-seeded, no RawStruct) → (nil, false, false) = unknown; entry present
-// and typed → the asserting rows only (non-asserting rows are dropped).
+// and typed → the asserting rows only. A row that carries no T — a row of
+// another type, a row whose details could not be read — may be the one that
+// matches, so dropping it makes the rows a subset and truncated true.
 func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []typedRow[T], truncated bool, ok bool) {
 	entry, present := cache[shortName]
 	if !present {
@@ -208,15 +224,19 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 	if len(entry.Resources) == 0 {
 		return nil, entry.IsTruncated, true
 	}
+	dropped := false
 	for _, r := range entry.Resources {
-		if raw, asserted := assertStruct[T](r.RawStruct); asserted {
-			rows = append(rows, typedRow[T]{ID: r.ID, Raw: raw})
+		raw, asserted := assertStruct[T](r.RawStruct)
+		if !asserted {
+			dropped = true
+			continue
 		}
+		rows = append(rows, typedRow[T]{ID: r.ID, Raw: raw})
 	}
 	if len(rows) == 0 {
 		return nil, false, false
 	}
-	return rows, entry.IsTruncated, true
+	return rows, entry.IsTruncated || dropped, true
 }
 
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
@@ -236,22 +256,17 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.UnknownRelated("lambda")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
-		return api.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-			EventSourceArn: aws.String(eventSourceArn),
-		})
-	})
+	mappings, complete, err := listEventSourceMappings(ctx, api, lambda.ListEventSourceMappingsInput{EventSourceArn: aws.String(eventSourceArn)})
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
 
 	var functionArns []string
-	for _, m := range out.EventSourceMappings {
-		if m.FunctionArn != nil && *m.FunctionArn != "" {
-			functionArns = append(functionArns, *m.FunctionArn)
-		}
+	for _, m := range mappings {
+		functionArns = append(functionArns, aws.ToString(m.FunctionArn))
 	}
-	return relatedRefs("lambda", functionArns, refContext(clients, cache, "lambda"))
+	ids, dropped := resolveRefs("lambda", functionArns, refContext(clients, cache, "lambda"))
+	return relatedResultTrunc("lambda", ids, dropped || !complete)
 }
 
 // eventSourceARNs returns the EventSourceArn of every mapping whose source is

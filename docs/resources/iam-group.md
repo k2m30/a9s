@@ -130,7 +130,7 @@ iam-group — SECURITY & IAM. Status key: `state` — the column naming it is th
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| iam-user | IAM Users | no |
-| policy | IAM Policies | no |
+| iam-user | IAM Users | yes |
+| policy | IAM Policies | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -15,8 +15,8 @@ Every row is exactly one of these. `(?)` is never shown.
 |-----------|---------|-------|
 | `Name (N)` | Found N (complete scan). | opens the N targets (N=1 → straight to its detail) |
 | `Name (N+)` / `Name (0+)` | Found N so far, the target list is **truncated** — more may exist. | opens the found targets / population; the list shows "m for more" |
-| `Name (0)` dimmed | Complete scan, found nothing. | — (dead end, cursor skips) |
-| `Name` (no count) | Couldn't count (Unknown) or navigates via a server-side filter (Deferred). | drills in |
+| `Name (0)` dimmed | Complete search, found nothing — a proven zero. | — (dead end, cursor skips) |
+| `Name` (no count) | Couldn't count (Unknown), nothing was searched (no discovery path, or nothing to search with), heuristic candidates, or navigates via a server-side filter (Deferred). | drills in |
 | `Name —` dimmed | The check errored. | — (dead end); the error shows in the error window + `!` log, **Ctrl+R** retries |
 | `Name` dimmed, no count | Still checking (transient). | — (resolves into one of the above) |
 
@@ -46,8 +46,26 @@ type RelatedCheckResult struct {
     ResourceIDs []string          // the found targets — drives the drill-in
     FetchFilter map[string]string // server-side filter for a Deferred drill-in
     Err         error             // non-nil → the error row (via EffectiveState)
+    Coverage    RelatedCoverage   // how far the lookup searched (see below)
 }
 ```
+
+Every result carries a coverage, read through `Coverage()`:
+
+| Coverage | Meaning | Built by |
+|----------|---------|----------|
+| `CoverageComplete` | Every place the relation is recorded was read. | `ProvenZero(target, evidence)` — the only complete zero — or `KnownRelated(target, ids, false)` with ids |
+| `CoveragePartial` | The search stopped short: a page walk hit its cap, a target list is truncated or holds a row the lookup could not read (no details, or another type), an intermediate list of a two-hop lookup was read in part, or one of several calls failed. | any constructor with `truncated` set |
+| `CoverageNoPath` | Nothing was searched: AWS records no link the lookup can read, or it had nothing to search with. | `NoDiscoveryPath(target)`, `KnownRelated(target, nil, false)`, every non-Resolved state |
+| `CoverageHeuristic` | The matches share a property with the source rather than a link AWS records. Candidates stay candidates however much of the list was read, so this outranks `CoveragePartial`. | `HeuristicRelated(target, ids)`, `PartialScan()` over it when the scan stopped short |
+
+`relatedResultTrunc` and `relatedRefs` answer a complete search that found
+nothing with `ProvenZero`. `EffectiveState` folds a resolved `CoverageNoPath`
+into `RelatedUnknown` and `CoverageHeuristic` into `RelatedDeferred` (blank,
+navigating to the candidates), so the three deciders below keep taking
+`(state, count, truncated)`. A paginated AWS read inside a checker goes
+through `aws.PageAll`, which walks the pages up to `PerParentPageCap` and
+reports whether the cap stopped it.
 
 Two pure functions in
 [`core/resource/related.go`](../core/resource/related.go) are the **only**

@@ -74,7 +74,6 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 (script bucket)", Checker: checkGlueS3},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkGlueKMS},
-			{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkGlueAthena, Truncated: true},
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkGlueSecrets},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("glue")},
 		},
@@ -114,7 +113,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3},
-			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAthenaLogs},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAthenaRole},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("athena")},

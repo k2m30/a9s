@@ -126,7 +126,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkELBSG},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkELBVPC},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkELBACM},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkELBACM, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkELBCF, Truncated: true},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkELBENI, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkELBS3},
@@ -289,7 +289,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkVPCVPCE, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkVPCCFN, NeedsTargetCache: false},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCENI, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW, NeedsTargetCache: false},
+			{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc")},
 		},
 		Findings: []catalog.FindingDef{
@@ -557,8 +557,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCEENI, NeedsTargetCache: false},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkVPCEVPC},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkVPCEAlarm, Truncated: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkVPCELogs},
-			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkVPCER53},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkVPCELogs, Truncated: true},
+			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkVPCER53, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpce")},
 		},
 		Navigable: []domain.NavigableField{
@@ -605,10 +605,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		IssueEnricherFieldKeys: []string{"att_status"},
 		FieldKeys:              []string{"tgw_id", "name", "state", "owner_id", "description"},
 		Related: []domain.RelatedDef{
-			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkTGWVPC, NeedsTargetCache: false},
+			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkTGWVPC, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkTGWRTB, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole, NeedsTargetCache: false},
-			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet, NeedsTargetCache: false},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("tgw")},
 		},
 		Findings: []catalog.FindingDef{

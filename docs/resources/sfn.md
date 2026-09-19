@@ -190,7 +190,7 @@ sfn — MESSAGING. Status key: `state` — the column naming it is the status co
 | alarm | CloudWatch Alarms | yes |
 | logs | Log Groups | yes |
 | role | IAM Role | no |
-| eb-rule | EventBridge Rules | no |
+| eb-rule | EventBridge Rules | yes |
 | kms | KMS Key | no |
 | lambda | Lambda Functions | no |
 | ct-events | CloudTrail Events | no |

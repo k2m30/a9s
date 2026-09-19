@@ -23,19 +23,13 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `athena`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `cfn`, `kms`, `logs`, `role`, `s3`, `secrets`, `ct-events`. There is no `athena` pivot: a Glue job records no Athena workgroup and a workgroup records no Glue job (`docs/related-resources.md` § Explicitly excluded).
 
 ### `alarm`
 
 - **Why related**: CloudWatch alarms that watch this job's run failures so on-call gets paged when a nightly ETL breaks — this is the hand-off from "a9s shows it broken" to "pager fires."
 - **How discovered**: cross-reference the already-loaded `alarm` list by `AlarmActions`/`Dimensions` referencing the Glue job name; fall back to name-contains match on `AlarmDescription` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue does not expose an inverse index of alarms; CloudWatch metric-alarm dimensions for Glue use `JobName` as the dimension key, which is the field the already-loaded alarm list can be filtered on client-side without extra API calls.
 - **Count shown**: yes.
-
-### `athena`
-
-- **Why related**: Athena workgroups whose queries consume the Glue Data Catalog that this Glue job populates — when the job fails, downstream Athena dashboards go stale and the operator needs the pivot to know which consumers to warn.
-- **How discovered**: show the full already-loaded `athena` list — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue jobs do not store a per-job list of consuming Athena workgroups (the Catalog is a shared-namespace resource), and there is no cheap inverse index. A9s therefore links `glue` → `athena` as an account-wide pivot rather than a per-job filter; this mirrors the rationale in `docs/related-resources.md` § `glue` that Athena queries Glue Catalog.
-- **Count shown**: yes (the full account-wide workgroup count).
 
 ### `cfn`
 
@@ -178,7 +172,6 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — S3 script/temp paths — `AWS SDK Go v2 — glue/types.JobCommand § ScriptLocation` and `glue/types.Job § DefaultArguments`.
 - AWS Go SDK v2 — KMS chain via SecurityConfiguration — `AWS SDK Go v2 — glue/types.Job § SecurityConfiguration` and `glue/types.SecurityConfiguration § EncryptionConfiguration`.
 - a9s-devops consultation — `alarm` pivot uses `AlarmActions`/`Dimensions` filter on loaded alarms — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudWatch alarms for Glue use JobName as the standard dimension; no inverse-index API, so filtering the already-loaded alarm list is the correct pivot.`
-- a9s-devops consultation — `athena` pivot is account-wide (not per-job filterable) — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Catalog is shared-namespace; Athena→Glue linkage is one-way only, matching the Athena-queries-Glue-Catalog rationale in docs/related-resources.md § glue.`
 - a9s-devops consultation — `cfn` pivot via `aws:cloudformation:stack-name` tag — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every created resource; reachable via Glue GetTags.`
 - a9s-devops consultation — `kms` pivot walks SecurityConfiguration encryption sub-fields — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. KMS references on Glue jobs live only through the named SecurityConfiguration.`
 - a9s-devops consultation — `logs` pivot combines Glue convention groups + `--continuous-log-logGroup` arg — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Default groups and the continuous-logging argument are the documented log destinations; Job.LogUri is the deprecated S3 path.`
@@ -209,7 +202,6 @@ glue — DATA & ANALYTICS. Status key: `state` — the column naming it is the s
 | cfn | CloudFormation Stacks | yes |
 | s3 | S3 (script bucket) | no |
 | kms | KMS Key | no |
-| athena | Athena WorkGroups | yes |
 | secrets | Secrets Manager | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

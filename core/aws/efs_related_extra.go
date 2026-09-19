@@ -21,7 +21,7 @@ import (
 func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "fsID")
 	}
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
@@ -50,7 +50,7 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
@@ -76,7 +76,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
@@ -117,7 +117,7 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("backup", nil, false)
 	}
 	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {
-		return resource.KnownRelated("backup", nil, false)
+		return resource.ProvenZero("backup", "fs.FileSystemArn")
 	}
 	fsARN := *fs.FileSystemArn
 

@@ -206,7 +206,7 @@ cfn — CI/CD. Status key: `status` — the key the status cell reads, and the c
 | role | IAM Roles | no |
 | cfn | Related Stacks | yes |
 | sns | SNS Topics | no |
-| s3 | S3 (stack resources) | no |
-| eb-rule | EventBridge Rules | no |
+| s3 | S3 (stack resources) | yes |
+| eb-rule | EventBridge Rules | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

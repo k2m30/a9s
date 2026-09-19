@@ -251,12 +251,12 @@ msk — MESSAGING. Status key: `state` — the key the status cell reads, and th
 | alarm | CW Alarms | yes |
 | sg | Security Groups | no |
 | kms | KMS Key | no |
-| lambda | Lambda Functions | no |
+| lambda | Lambda Functions | yes |
 | cfn | CloudFormation | yes |
 | subnet | Subnets | no |
 | vpc | VPC | no |
 | logs | Log Groups | no |
 | s3 | S3 (broker logs) | no |
-| secrets | Secrets Manager | no |
+| secrets | Secrets Manager | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

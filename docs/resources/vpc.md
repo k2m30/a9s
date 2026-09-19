@@ -203,6 +203,6 @@ vpc — NETWORKING. Status key: `state` — the key the status cell reads, and t
 | vpce | VPC Endpoints | yes |
 | cfn | CloudFormation | no |
 | eni | Network Interfaces | yes |
-| tgw | Transit Gateways | no |
+| tgw | Transit Gateways | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -165,36 +165,36 @@ func (g *redshiftParamGroupCache) requireSSL(ctx context.Context, clients *Servi
 		if cached, ok := g.values.Load(name); ok {
 			return cached, nil
 		}
-		value := ""
-		var marker *string
 		// A parameter group holds dozens of parameters and AWS pages them, so
-		// require_ssl can land past the first page.
-		for range PerParentPageCap {
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeClusterParametersOutput, error) {
-				return clients.Redshift.DescribeClusterParameters(ctx, &redshift.DescribeClusterParametersInput{
-					ParameterGroupName: aws.String(name),
-					Marker:             marker,
-				})
+		// require_ssl can land past the first page; the walk ends on the page
+		// that holds it.
+		values, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]string, *string, error) {
+			out, err := clients.Redshift.DescribeClusterParameters(ctx, &redshift.DescribeClusterParametersInput{
+				ParameterGroupName: aws.String(name),
+				Marker:             marker,
 			})
 			if err != nil {
-				return "", err
+				return nil, nil, err
 			}
 			for _, param := range out.Parameters {
-				if strings.EqualFold(aws.ToString(param.ParameterName), "require_ssl") {
-					value = aws.ToString(param.ParameterValue)
+				if strings.EqualFold(aws.ToString(param.ParameterName), "require_ssl") && aws.ToString(param.ParameterValue) != "" {
+					return []string{aws.ToString(param.ParameterValue)}, nil, nil
 				}
 			}
-			marker = out.Marker
-			if value != "" || marker == nil || *marker == "" {
-				marker = nil
-				break
-			}
+			return nil, out.Marker, nil
+		})
+		if err != nil {
+			return "", err
 		}
-		if marker != nil {
+		if !complete {
 			// The cap is a limit on what a9s read, not evidence the parameter
 			// is unset. Failing here keeps the empty value out of the cache,
 			// so the next cluster sharing the group does not inherit it.
 			return "", errRedshiftParamsCutShort
+		}
+		value := ""
+		if len(values) > 0 {
+			value = values[0]
 		}
 		g.values.Store(name, value)
 		return value, nil

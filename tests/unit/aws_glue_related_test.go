@@ -457,56 +457,22 @@ func TestRelated_Glue_Secrets_InvalidRawStruct(t *testing.T) {
 	}
 }
 
+// A Glue job records no Athena workgroup and a workgroup records no Glue job:
+// Athena reads the account's Data Catalog implicitly, so neither type offers
+// a pivot to the other.
 func TestRelated_Glue_Athena_MatchByGlueJobField(t *testing.T) {
-	const jobName = "acme-etl-job"
-	wgRes := resource.Resource{
-		ID:     "acme-workgroup",
-		Name:   "acme-workgroup",
-		Fields: map[string]string{"glue_job": jobName},
-	}
-	cache := resource.ResourceCache{
-		"athena": resource.ResourceCacheEntry{Resources: []resource.Resource{wgRes}},
-	}
-	source := resource.Resource{ID: jobName, Name: jobName}
-
-	checker := glueCheckerByTarget(t, "athena")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-workgroup" {
-		t.Errorf("ResourceIDs = %v, want [acme-workgroup]", result.ResourceIDs())
+	for _, def := range resource.GetRelated("glue") {
+		if def.TargetType == "athena" {
+			t.Errorf("glue registers an athena pivot %q; no AWS field links a job to a workgroup", def.DisplayName)
+		}
 	}
 }
 
 func TestRelated_Glue_Athena_NoMatch(t *testing.T) {
-	wgRes := resource.Resource{
-		ID:     "acme-workgroup",
-		Name:   "acme-workgroup",
-		Fields: map[string]string{"glue_job": "other-job"},
-	}
-	cache := resource.ResourceCache{
-		"athena": resource.ResourceCacheEntry{Resources: []resource.Resource{wgRes}},
-	}
-	source := resource.Resource{ID: "acme-etl-job", Name: "acme-etl-job"}
-
-	checker := glueCheckerByTarget(t, "athena")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0", result.Count())
-	}
-}
-
-func TestRelated_Glue_Athena_CacheMissNoClients(t *testing.T) {
-	source := resource.Resource{ID: "acme-etl-job", Name: "acme-etl-job"}
-
-	checker := glueCheckerByTarget(t, "athena")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
+	for _, def := range resource.GetRelated("athena") {
+		if def.TargetType == "glue" {
+			t.Errorf("athena registers a glue pivot %q; no AWS field links a workgroup to a job", def.DisplayName)
+		}
 	}
 }
 

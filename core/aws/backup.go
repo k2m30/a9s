@@ -146,39 +146,34 @@ func enumerateBackupSelections(
 	if selectionAPI == nil || getSelectionAPI == nil || planID == "" {
 		return nil, false
 	}
+	members, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]backuptypes.BackupSelectionsListMember, *string, error) {
+		out, err := selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
+			BackupPlanId: aws.String(planID),
+			NextToken:    token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.BackupSelectionsList, out.NextToken, nil
+	})
 	var sels []backuptypes.BackupSelection
-	var nextToken *string
-	for range PerParentPageCap {
-		listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
-			return selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
+	for _, sel := range members {
+		if sel.SelectionId == nil {
+			continue
+		}
+		selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
+			return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
 				BackupPlanId: aws.String(planID),
-				NextToken:    nextToken,
+				SelectionId:  sel.SelectionId,
 			})
 		})
 		// Every coverage reader turns the false return into "cannot tell".
 		// no finding: the false return is the recorder.
-		if err != nil || listOut == nil {
+		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
 			return sels, false
 		}
-		for _, sel := range listOut.BackupSelectionsList {
-			if sel.SelectionId == nil {
-				continue
-			}
-			selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
-				return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
-					BackupPlanId: aws.String(planID),
-					SelectionId:  sel.SelectionId,
-				})
-			})
-			// no finding: the false return is the recorder, as for the list walk.
-			if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
-				return sels, false
-			}
-			sels = append(sels, *selOut.BackupSelection)
-		}
-		if nextToken = listOut.NextToken; nextToken == nil || *nextToken == "" {
-			return sels, true
-		}
+		sels = append(sels, *selOut.BackupSelection)
 	}
-	return sels, false
+	// no finding: the false return is the recorder, as for a failed selection.
+	return sels, complete && err == nil
 }

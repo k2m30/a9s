@@ -249,5 +249,5 @@ alarm — MONITORING. Status key: `state` — the key the status cell reads, and
 | s3 | S3 Buckets | no |
 | sfn | Step Functions | no |
 | waf | WAF Web ACLs | no |
-| ct-events | CloudTrail Events | no |
+| ct-events | CloudTrail Events | yes |
 <!-- END GENERATED: related -->

@@ -177,7 +177,7 @@ ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ami | AMIs | yes |
-| ebs | EBS Volume | no |
+| ebs | EBS Volume | yes |
 | ec2 | EC2 Instance | yes |
 | kms | KMS Key | no |
 | backup | Backup | yes |

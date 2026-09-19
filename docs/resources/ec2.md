@@ -118,8 +118,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `tg`
 
 - **Why related**: Target groups this instance is registered with — traffic routing.
-- **How discovered**: cross-reference the already-loaded `tg` list by calling `DescribeTargetHealth` per TG and matching `TargetHealthDescriptions[].Target.Id == <instance-id>` — a9s-devops: target-group membership is not on `Instance`; it lives on the TG side via `DescribeTargetHealth`, which a9s already fans out for the `tg` Wave 2 enrichment. The same result set answers the ec2→tg pivot, so no net-new API call is required when `tg` is already loaded.
-- **Count shown**: yes.
+- **How discovered**: the already-loaded `tg` list, kept to instance-type target groups in the instance's VPC — the cached target groups carry no registered targets, and reading them costs `DescribeTargetHealth` per target group.
+- **Count shown**: no — the matches are candidates (heuristic coverage), rendered as a blank, navigable row.
 
 ### `vpc`
 

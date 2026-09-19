@@ -799,6 +799,10 @@ func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 // and an allowlist entry then hides the real single-call regression the audit
 // exists to catch.
 //
+// The PageAll arm: a call inside the page reader handed to PageAll is walked
+// page by page up to the page cap, and PageAll reports whether the cap cut
+// the walk short.
+//
 // The walkAccountPages arm: an account-wide enricher does not write its own
 // loop, because the loop and the marking of the rows past the last walked
 // page are one rule (one page-cap helper owns the walk bound). A call inside
@@ -812,7 +816,7 @@ func inPaginatedWalk(stack []ast.Node) bool {
 				return true
 			}
 		case *ast.CallExpr:
-			if fn, ok := node.Fun.(*ast.Ident); ok && fn.Name == "walkAccountPages" {
+			if fn, ok := node.Fun.(*ast.Ident); ok && (fn.Name == "walkAccountPages" || fn.Name == "PageAll") {
 				return true
 			}
 		}

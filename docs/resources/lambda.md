@@ -368,17 +368,17 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 | sg | Security Groups | no |
 | vpc | VPC | no |
 | kms | KMS Key | no |
-| sqs | SQS Queues | no |
+| sqs | SQS Queues | yes |
 | cfn | CloudFormation | yes |
 | eb-rule | EventBridge Rules | yes |
 | subnet | Subnets | no |
 | efs | EFS File Systems | no |
 | apigw | API Gateways | yes |
 | cf | CloudFront | yes |
-| ddb | DynamoDB Tables | no |
-| kinesis | Kinesis Streams | no |
-| msk | MSK Clusters | no |
-| ct-events | CloudTrail Events | no |
+| ddb | DynamoDB Tables | yes |
+| kinesis | Kinesis Streams | yes |
+| msk | MSK Clusters | yes |
+| ct-events | CloudTrail Events | yes |
 | tg | Target Groups | yes |
 | sns | SNS Topics | yes |
 | sns-sub | SNS Subscriptions | yes |

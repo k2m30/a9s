@@ -12,7 +12,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -70,7 +69,7 @@ func checkRoleIamUser(_ context.Context, clients any, res resource.Resource, cac
 func roleTrustPrincipals(clients any, res resource.Resource, cache resource.ResourceCache, target, kind string) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
-		return resource.KnownRelated(target, nil, false)
+		return resource.ProvenZero(target, "assume_role_policy_document")
 	}
 	roleARN := ""
 	if raw, ok := assertStruct[iamtypes.Role](res.RawStruct); ok {
@@ -197,16 +196,13 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	if roleName == "" {
-		return resource.KnownRelated("policy", nil, false)
+		return resource.ProvenZero("policy", "roleName")
 	}
-	out, err := c.IAM.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
-		RoleName: &roleName,
-	})
+	attached, complete, err := listAttachedRolePolicies(ctx, c.IAM, roleName)
 	if err != nil {
 		return resource.ErrorRelated("policy", err)
 	}
-	ids := attachedPolicyNames(out.AttachedPolicies)
-	return relatedResult("policy", ids)
+	return relatedResultTrunc("policy", attachedPolicyNames(attached), !complete)
 }
 
 // checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile
@@ -227,7 +223,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if roleName == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "roleName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")

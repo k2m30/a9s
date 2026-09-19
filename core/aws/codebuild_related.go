@@ -31,7 +31,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 		projectName = res.ID
 	}
 	if projectName == "" {
-		return resource.KnownRelated("pipeline", nil, false)
+		return resource.ProvenZero("pipeline", "projectName")
 	}
 
 	entry, ok := cache["pipeline"]

@@ -39,7 +39,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.KnownRelated("elb", nil, false)
 	}
 	if len(raw.LoadBalancerArns) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "raw.LoadBalancerArns")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -79,7 +79,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return resource.ProvenZero("ecs-svc", "tgArn")
 	}
 
 	svcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-svc")
@@ -111,7 +111,7 @@ func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cach
 func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "tgArn")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -140,7 +140,7 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgARNVal := tgARN(res)
 	if tgARNVal == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "tgARNVal")
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -176,9 +176,9 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "vpcID")
 	}
-	return relatedResult("vpc", []string{vpcID})
+	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
 
 // checkTGCFN reports the CloudFormation stack owning this TG via
@@ -187,7 +187,7 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := tgARN(res)
 	if arn == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "arn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -206,11 +206,11 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 	for _, td := range out.TagDescriptions {
 		for _, tag := range td.Tags {
 			if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil && *tag.Value != "" {
-				return relatedResult("cfn", []string{*tag.Value})
+				return relatedResultTrunc("cfn", []string{*tag.Value}, false)
 			}
 		}
 	}
-	return resource.KnownRelated("cfn", nil, false)
+	return resource.ProvenZero("cfn", "the aws:cloudformation:stack-name tag")
 }
 
 // checkTGEC2 reports EC2 instances registered as targets of this TG.
@@ -219,13 +219,13 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "tgArn")
 	}
 	// Skip the API call if the TG is a lambda/IP-only TG; EC2 targets only
 	// apply to target_type=instance.
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if ok && raw.TargetType != "" && raw.TargetType != elbv2types.TargetTypeEnumInstance {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "raw.TargetType")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {
@@ -250,7 +250,7 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 		seen[id] = true
 		ids = append(ids, id)
 	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, false)
 }
 
 // checkTGLambda reports Lambda functions registered as targets (lambda-type TG).
@@ -262,11 +262,11 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("lambda")
 	}
 	if raw.TargetType != elbv2types.TargetTypeEnumLambda {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "raw.TargetType")
 	}
 	tgArn := tgARN(res)
 	if tgArn == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "tgArn")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {

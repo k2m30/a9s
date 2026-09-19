@@ -241,19 +241,19 @@ ct-events — MONITORING. Status key: `status` — the key the status cell reads
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| role | IAM Roles | no |
-| iam-user | IAM Users | no |
-| ec2 | EC2 Instances | no |
-| s3 | S3 Buckets | no |
-| lambda | Lambda Functions | no |
-| dbi | RDS Instances | no |
-| kms | KMS Keys | no |
-| secrets | Secrets | no |
-| vpce | VPC Endpoints | no |
-| sg | Security Groups | no |
-| ddb | DynamoDB Tables | no |
-| cfn | CloudFormation Stacks | no |
-| trail | CloudTrail Trails | no |
+| role | IAM Roles | yes |
+| iam-user | IAM Users | yes |
+| ec2 | EC2 Instances | yes |
+| s3 | S3 Buckets | yes |
+| lambda | Lambda Functions | yes |
+| dbi | RDS Instances | yes |
+| kms | KMS Keys | yes |
+| secrets | Secrets | yes |
+| vpce | VPC Endpoints | yes |
+| sg | Security Groups | yes |
+| ddb | DynamoDB Tables | yes |
+| cfn | CloudFormation Stacks | yes |
+| trail | CloudTrail Trails | yes |
 | ct-events | CT events by AccessKeyId | no |
 | ct-events | CT events by Username | no |
 | ct-events | CT events by EventName | no |

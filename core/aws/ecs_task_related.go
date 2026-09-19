@@ -20,7 +20,7 @@ func checkECSTaskService(_ context.Context, clients any, res resource.Resource, 
 		return resource.UnknownRelated("ecs-svc")
 	}
 	if raw.Group == nil || !strings.HasPrefix(*raw.Group, "service:") {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return resource.ProvenZero("ecs-svc", "raw.Group")
 	}
 	return relatedRefs("ecs-svc", []string{*raw.Group}, refContext(clients, cache, "ecs-svc"))
 }
@@ -49,11 +49,11 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		taskDefARN = *raw.TaskDefinitionArn
 	}
 	if taskDefARN == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "taskDefARN")
 	}
 	family := taskDefFamily(taskDefARN)
 	if family == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "family")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -91,7 +91,7 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		arns = append(arns, v)
 	}
 	if len(arns) == 0 {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "arns")
 	}
 
 	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")

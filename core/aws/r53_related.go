@@ -71,7 +71,7 @@ func r53RelatedResult(target string, ids []string, recordsTruncated, targetTrunc
 func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -128,7 +128,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -179,7 +179,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("apigw", nil, false)
+		return resource.ProvenZero("apigw", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -217,7 +217,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -262,7 +262,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -314,7 +314,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -324,14 +324,18 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok {
 		return resource.UnknownRelated("logs")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListQueryLoggingConfigsOutput, error) {
-		return api.ListQueryLoggingConfigs(ctx, &route53.ListQueryLoggingConfigsInput{HostedZoneId: &zoneID})
+	configs, configsComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]r53types.QueryLoggingConfig, *string, error) {
+		out, err := api.ListQueryLoggingConfigs(ctx, &route53.ListQueryLoggingConfigsInput{HostedZoneId: &zoneID, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.QueryLoggingConfigs, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
-	if out == nil || len(out.QueryLoggingConfigs) == 0 {
-		return resource.KnownRelated("logs", nil, false)
+	if len(configs) == 0 {
+		return relatedResultTrunc("logs", nil, !configsComplete)
 	}
 
 	logList, logsTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
@@ -346,13 +350,13 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 
 	var arns []string
-	for _, cfg := range out.QueryLoggingConfigs {
+	for _, cfg := range configs {
 		if cfg.CloudWatchLogsLogGroupArn != nil {
 			arns = append(arns, *cfg.CloudWatchLogsLogGroupArn)
 		}
 	}
 	ids, dropped := listedRefs("logs", arns, refContext(clients, cache, "logs"), logList)
-	return r53RelatedResult("logs", ids, dropped, logsTruncated)
+	return r53RelatedResult("logs", ids, dropped || !configsComplete, logsTruncated)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.
@@ -360,11 +364,11 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 // for private zones.
 func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["private_zone"] != "true" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "res.Fields[private_zone]")
 	}
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -385,5 +389,5 @@ func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		seen[*v.VPCId] = true
 		ids = append(ids, *v.VPCId)
 	}
-	return relatedResult("vpc", ids)
+	return relatedResultTrunc("vpc", ids, false)
 }

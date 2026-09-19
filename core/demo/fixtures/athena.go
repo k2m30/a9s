@@ -105,10 +105,8 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					SelectedEngineVersion:  aws.String("AUTO"),
 				},
 			},
-			// acme-etl-orders workgroup — required for the glue:athena
-			// related-panel pivot. checkGlueAthena matches wg.ID == jobName;
-			// this workgroup is provisioned for analysts querying the ETL
-			// job's output tables via Athena (glue.go acme-etl-orders job).
+			// acme-etl-orders workgroup — provisioned for analysts querying
+			// the ETL job's output tables via Athena (glue.go acme-etl-orders job).
 			{
 				Name:         aws.String("acme-etl-orders"),
 				State:        athenatypes.WorkGroupStateEnabled,

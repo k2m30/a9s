@@ -67,7 +67,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, Truncated: true},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3, NeedsTargetCache: true, Truncated: true},
@@ -211,15 +211,15 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		IssueEnricherFieldKeys: []string{"stages_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda, Truncated: true},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkApigwAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkApigwCF, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkApigwELB, Truncated: true},
 			// API Gateway has no direct KMS field; Lambda integrations are followed
 			// as a best effort.
-			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkApigwKMS, NeedsTargetCache: false},
-			{TargetType: "role", DisplayName: "IAM Role", Checker: checkApigwRole},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkApigwKMS, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkApigwRole, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("apigw")},
 		},
 		Findings: []catalog.FindingDef{

@@ -53,33 +53,18 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		// nothing. The subnet ids come off the row the fetcher built.
 		scopes := append([]string{vpcID}, splitCSV(r.Fields["subnet_ids"])...)
 
-		var allFlowLogs []ec2types.FlowLog
-		var flNextToken *string
-		flPages := 0
-		flTruncated := false
-		var flErr error
-		for {
-			if flPages >= PerParentPageCap {
-				flTruncated = true
-				break
-			}
+		allFlowLogs, complete, flErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.FlowLog, *string, error) {
 			out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
 				Filter: []ec2types.Filter{
 					{Name: aws.String("resource-id"), Values: scopes},
 				},
-				NextToken: flNextToken,
+				NextToken: token,
 			})
-			flPages++
 			if err != nil {
-				flErr = err
-				break
+				return nil, nil, err
 			}
-			allFlowLogs = append(allFlowLogs, out.FlowLogs...)
-			if out.NextToken == nil {
-				break
-			}
-			flNextToken = out.NextToken
-		}
+			return out.FlowLogs, out.NextToken, nil
+		})
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -87,7 +72,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		case flErr != nil:
 			MarkSkipped(&result, r.ID, &failures, flErr)
 			return
-		case flTruncated:
+		case !complete:
 			markUninspected(&result, r.ID, CheckCap)
 			return
 		}

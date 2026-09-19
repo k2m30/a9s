@@ -20,7 +20,7 @@ import (
 func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoName := res.ID
 	if repoName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "repoName")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -48,7 +48,7 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoName := res.ID
 	if repoName == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "repoName")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -90,7 +90,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.KnownRelated("pipeline", nil, false)
+		return resource.ProvenZero("pipeline", "repoName")
 	}
 
 	entry, ok := cache["pipeline"]
@@ -157,7 +157,7 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "repoName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -177,12 +177,12 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 	if err != nil {
 		// RepositoryPolicyNotFoundException means no policy exists → 0
 		if ErrCodeIs(err, "RepositoryPolicyNotFoundException") {
-			return resource.KnownRelated("role", nil, false)
+			return resource.ProvenZero("role", "the API answered that none is configured")
 		}
 		return resource.ErrorRelated("role", err)
 	}
 	if out.PolicyText == nil || *out.PolicyText == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "out.PolicyText")
 	}
 
 	// repo.RegistryId is the owning account, the one whose roles are local.

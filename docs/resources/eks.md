@@ -293,8 +293,8 @@ eks — CONTAINERS. Status key: `status` — the key the status cell reads, and 
 | role | IAM Role | no |
 | kms | KMS Key | no |
 | subnet | Subnets | no |
-| ami | AMI | no |
+| ami | AMI | yes |
 | asg | Auto Scaling Groups | yes |
-| ec2 | EC2 Instances | no |
-| ct-events | CloudTrail Events | no |
+| ec2 | EC2 Instances | yes |
+| ct-events | CloudTrail Events | yes |
 <!-- END GENERATED: related -->

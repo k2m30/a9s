@@ -64,29 +64,17 @@ func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resour
 	// param (page size is a fixed 100), and SNS's own per-topic quota
 	// (12.5M subscriptions) is 125,000 pages — far beyond what a single
 	// enrichment pass can walk.
-	var subs []snstypes.Subscription
-	var nextToken *string
-	var pagedErr error
-	pageCapped := false
-	for pages := 0; ; pages++ {
+	subs, complete, pagedErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]snstypes.Subscription, *string, error) {
 		out, err := clients.SNS.ListSubscriptionsByTopic(ctx, &snssvc.ListSubscriptionsByTopicInput{
 			TopicArn:  aws.String(topicARN),
-			NextToken: nextToken,
+			NextToken: token,
 		})
 		if err != nil {
-			pagedErr = err
-			break
+			return nil, nil, err
 		}
-		subs = append(subs, out.Subscriptions...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		if pages+1 >= PerParentPageCap {
-			pageCapped = true
-			break
-		}
-		nextToken = out.NextToken
-	}
+		return out.Subscriptions, out.NextToken, nil
+	})
+	pageCapped := !complete
 
 	if pagedErr != nil {
 		MarkSkipped(&row, r.ID, &rowFailures, pagedErr)

@@ -17,7 +17,7 @@ import (
 func checkECSServices(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.KnownRelated("ecs-svc", nil, false)
+		return resource.ProvenZero("ecs-svc", "clusterName")
 	}
 
 	clusterArn := ""
@@ -69,7 +69,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -106,7 +106,7 @@ func checkECSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "Configuration.ExecuteCommandConfiguration.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})

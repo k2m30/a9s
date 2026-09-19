@@ -21,9 +21,9 @@ func checkEIPEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("ec2")
 	}
 	if raw.InstanceId == nil || *raw.InstanceId == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "raw.InstanceId")
 	}
-	return relatedResult("ec2", []string{*raw.InstanceId})
+	return relatedResultTrunc("ec2", []string{*raw.InstanceId}, false)
 }
 
 // checkEIPENI returns the network interface associated with this Elastic IP (Pattern F).
@@ -33,9 +33,9 @@ func checkEIPENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("eni")
 	}
 	if raw.NetworkInterfaceId == nil || *raw.NetworkInterfaceId == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "raw.NetworkInterfaceId")
 	}
-	return relatedResult("eni", []string{*raw.NetworkInterfaceId})
+	return relatedResultTrunc("eni", []string{*raw.NetworkInterfaceId}, false)
 }
 
 // checkEIPNAT checks the NAT gateway cache for NAT gateways using this Elastic IP
@@ -47,7 +47,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		allocationID = *raw.AllocationId
 	}
 	if allocationID == "" {
-		return resource.KnownRelated("nat", nil, false)
+		return resource.ProvenZero("nat", "allocationID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -89,9 +89,9 @@ func checkEIPCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
-	return relatedResult("cfn", []string{stackName})
+	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
 // checkEIPAlarm reports CloudWatch alarms on entities this EIP is attached
@@ -111,7 +111,7 @@ func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		wanted["NetworkInterfaceId"] = *raw.NetworkInterfaceId
 	}
 	if len(wanted) == 0 {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "wanted")
 	}
 	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
 	if err != nil {
@@ -156,7 +156,7 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("asg")
 	}
 	if raw.InstanceId == nil || *raw.InstanceId == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "raw.InstanceId")
 	}
 	instanceID := *raw.InstanceId
 
@@ -185,12 +185,12 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 		break
 	}
 	if asgName != "" {
-		return relatedResult("asg", []string{asgName})
+		return relatedResultTrunc("asg", []string{asgName}, false)
 	}
 	// The instance was located and read: its ASG membership is definitively
 	// empty, regardless of whether other EC2 pages were truncated.
 	if instanceReadable {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "instanceReadable")
 	}
 	// The instance is not on this page (or its struct was unreadable). A
 	// truncated cache may hold it later, so report unknown rather than a
@@ -198,7 +198,7 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if truncated {
 		return resource.UnknownRelated("asg")
 	}
-	return resource.KnownRelated("asg", nil, false)
+	return resource.ProvenZero("asg", "the complete ec2 list")
 }
 
 // eipENIID resolves the network interface ID this Elastic IP is attached to,
@@ -243,7 +243,7 @@ func eipMatchingECSTask(ctx context.Context, clients any, cache resource.Resourc
 func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
+		return unreadZero(res, resource.ProvenZero("ecs-task", "eniID"))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -255,7 +255,7 @@ func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		return unreadZero(res, resource.KnownRelated("ecs-task", nil, false))
 	}
-	return unreadZero(res, relatedResult("ecs-task", []string{taskRes.ID}))
+	return unreadZero(res, relatedResultTrunc("ecs-task", []string{taskRes.ID}, false))
 }
 
 // checkEIPECSSvc reports the ECS service whose task currently holds this EIP,
@@ -264,7 +264,7 @@ func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, ca
 func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
+		return unreadZero(res, resource.ProvenZero("ecs-svc", "eniID"))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -278,7 +278,7 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
 	if !ok || task.Group == nil || !strings.HasPrefix(*task.Group, "service:") {
-		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
+		return unreadZero(res, resource.ProvenZero("ecs-svc", "task.Group"))
 	}
 	return unreadZero(res, relatedRefs("ecs-svc", []string{*task.Group}, refContext(clients, cache, "ecs-svc")))
 }
@@ -289,7 +289,7 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eniID := eipENIID(res)
 	if eniID == "" {
-		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
+		return unreadZero(res, resource.ProvenZero("ecs", "eniID"))
 	}
 	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
 	if err != nil {
@@ -303,7 +303,7 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
 	if !ok || task.ClusterArn == nil || *task.ClusterArn == "" {
-		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
+		return unreadZero(res, resource.ProvenZero("ecs", "task.ClusterArn"))
 	}
 	return unreadZero(res, relatedRefs("ecs", []string{*task.ClusterArn}, refContext(clients, cache, "ecs")))
 }

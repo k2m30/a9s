@@ -23,6 +23,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instance field opens the instance its DB Instances row names, and an EBS
   snapshot's EC2 Instance row counts the CreateImage instance only while it
   is still in the loaded instance list.
+- Related-panel rows walk every page of the AWS list they read, so a count is
+  the whole answer and not the first page: an IAM group's members and
+  policies, a user's groups and policies, a role's policies, a policy's
+  roles, users and groups, a function's event sources, an API's
+  integrations, custom domains, mappings, VPC links and authorizers, a
+  cluster's node groups and instances, a load balancer's listeners, a
+  gateway's attachments, a VPC's transit gateways, a log group's
+  subscription filters, a plan's backup selections, a stack's resources, a
+  rule's targets and the EventBridge rules that target a pipeline, a state
+  machine or a queue. A walk that stops at its page cap renders `(N+)` and
+  stays navigable instead of showing a short count as exact. The ECS service
+  and task lists now show every service and task of a cluster, resuming
+  inside a large cluster instead of skipping to the next one.
+- A related row says how far it looked: only a search that read every place
+  the relation is recorded shows the dimmed `(0)` dead end. A pivot AWS
+  records no link for, a lookup that had nothing to search with, and
+  matches found by a shared property (an instance's target groups in its
+  VPC, an RDS-managed network interface on a shared security group, the
+  account-wide transit-gateway service-linked role, a secret whose name
+  mentions CodeArtifact, a rotation Lambda's default log group after a
+  failed read) now render as a blank, navigable row rather than a count or
+  a proven zero. A target list holding rows whose details could not be read
+  is reported as a lower bound. ECS clusters are fetched with their
+  configuration and tags, so the execute-command key and the CloudFormation
+  stack rows are answered from what was read. The Glue → Athena and
+  CodePipeline → CodeArtifact pivots are gone: neither AWS API records the
+  link.
+- A partial read stays visible all the way to the count. A pivot that reaches
+  its targets through an intermediate list — an ECS service's load balancers
+  through its target groups, an ECS task's security groups and a subnet's
+  file systems through network interfaces — renders `(N+)` when that
+  intermediate list was read in part. A target list holding a row of another
+  type, or a row whose details could not be read, is a lower bound for the
+  pivots that scan it directly, and a list the detail view prefetched reports
+  the same completeness as the same list fetched on demand. A Redis
+  replication group's security groups and subnets, and every backup-plan
+  pivot, leave the row blank when the list they match against was never read,
+  instead of showing a dead-end zero. Candidate matches stay candidates when
+  the scan stops short, and the per-resource docs now mark every pivot that
+  can answer with a lower bound.
 - Resource and trust policies are read the way IAM applies them: an explicit
   Deny that takes a grant from everyone, or fences it to an account,
   organisation, VPC endpoint, address range or the principals a NotPrincipal

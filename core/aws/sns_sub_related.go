@@ -14,7 +14,7 @@ import (
 func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "topicARN")
 	}
 
 	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
@@ -39,12 +39,12 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 // names is matched against lambda cache IDs.
 func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "lambda" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "res.Fields[protocol]")
 	}
 
 	endpoint := res.Fields["endpoint"]
 	if endpoint == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "endpoint")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -73,12 +73,12 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 // is matched against sqs cache IDs.
 func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "sqs" {
-		return resource.KnownRelated("sqs", nil, false)
+		return resource.ProvenZero("sqs", "res.Fields[protocol]")
 	}
 
 	endpoint := res.Fields["endpoint"]
 	if endpoint == "" {
-		return resource.KnownRelated("sqs", nil, false)
+		return resource.ProvenZero("sqs", "endpoint")
 	}
 
 	sqsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sqs")

@@ -188,6 +188,46 @@ type RelatedCheckResult struct {
 	// result derived from a truncated cache page, or a partial-success union
 	// of calls where some failed ("N+"), never the other states.
 	truncated bool
+	// coverage is how far a RelatedResolved lookup searched; Coverage derives
+	// the answer for every other state.
+	coverage RelatedCoverage
+}
+
+// RelatedCoverage states how far a related lookup searched, and so whether a
+// zero it reports is evidence of absence.
+type RelatedCoverage uint8
+
+const (
+	// CoverageComplete: every place the relation is recorded was read; a zero
+	// is a proven dead end.
+	CoverageComplete RelatedCoverage = iota
+	// CoveragePartial: the search stopped short (a capped page walk, a
+	// truncated or degraded target list, a failed call beside successful
+	// ones); the count is a lower bound.
+	CoveragePartial
+	// CoverageNoPath: nothing was searched — AWS records no link the lookup
+	// could read, or the lookup had nothing to search with.
+	CoverageNoPath
+	// CoverageHeuristic: the matches share a property with the source rather
+	// than a link AWS records; they are candidates, not a count.
+	CoverageHeuristic
+)
+
+// Coverage returns how far the lookup behind r searched. Only a
+// RelatedResolved result searched at all; a truncated one is partial. A
+// heuristic match rule offers candidates however much of the list was read,
+// so it outranks a partial scan.
+func (r RelatedCheckResult) Coverage() RelatedCoverage {
+	switch {
+	case r.state != RelatedResolved:
+		return CoverageNoPath
+	case r.coverage == CoverageHeuristic:
+		return CoverageHeuristic
+	case r.truncated:
+		return CoveragePartial
+	default:
+		return r.coverage
+	}
 }
 
 // TargetType returns the related resource type this result describes.
@@ -246,9 +286,21 @@ func (r RelatedCheckResult) WithFetchFilter(filter map[string]string) RelatedChe
 // retries with Ctrl+R. Every site that derives a mirror-row state or
 // actionability from a result must go through this rather than reading State
 // directly, so IsRelatedActionable stays the single source of truth.
+//
+// A resolved result that searched nothing renders as RelatedUnknown, and one
+// holding heuristic candidates as RelatedDeferred (blank, navigating to the
+// candidates): neither count is a number the panel may show.
 func (r RelatedCheckResult) EffectiveState() RelatedRowState {
 	if r.err != nil {
 		return RelatedError
+	}
+	switch r.Coverage() {
+	case CoverageNoPath:
+		if r.state == RelatedResolved {
+			return RelatedUnknown
+		}
+	case CoverageHeuristic:
+		return RelatedDeferred
 	}
 	return r.state
 }

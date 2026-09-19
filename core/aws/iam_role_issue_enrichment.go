@@ -56,7 +56,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		if roleName == "" {
 			return
 		}
-		attachedRole, aerr := listAttachedRolePolicies(ctx, clients.IAM, roleName)
+		attachedRole, _, aerr := listAttachedRolePolicies(ctx, clients.IAM, roleName)
 		adminPolicy := adminAttachedPolicyName(attachedRole)
 		if aerr != nil {
 			mu.Lock()

@@ -125,9 +125,9 @@ func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ids")
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkDbcAlarm searches the alarm cache for alarms with a "DBClusterIdentifier" dimension
@@ -141,7 +141,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if clusterID == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "clusterID")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -176,7 +176,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		clusterID = id
 	}
 	if clusterID == "" {
-		return resource.KnownRelated("dbi", nil, false)
+		return resource.ProvenZero("dbi", "clusterID")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -204,7 +204,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 // cluster (dbcSnapTakenFrom).
 func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.KnownRelated("dbc-snap", nil, false)
+		return resource.ProvenZero("dbc-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc-snap")
@@ -236,7 +236,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "sng")
 	}
 	var ids []string
 	for _, s := range sng.Subnets {
@@ -244,7 +244,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 			ids = append(ids, *s.SubnetIdentifier)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkDbcVPC resolves the VPC that hosts the cluster's subnet group via a
@@ -256,12 +256,12 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "sng")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "sng.VpcId")
 	}
-	return relatedResult("vpc", []string{*sng.VpcId})
+	return relatedResultTrunc("vpc", []string{*sng.VpcId}, false)
 }
 
 // dbcSubnetGroup dispatches to the appropriate engine-specific helper based on
@@ -297,18 +297,23 @@ func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) 
 	if !cok || c == nil || c.RDS == nil {
 		return nil, errDbcNoClusterDetail
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBSubnetGroupsOutput, error) {
-		return c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
+	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]rdstypes.DBSubnetGroup, *string, error) {
+		out, err := c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
+			Marker:            marker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.DBSubnetGroups, out.Marker, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
-	if out == nil || len(out.DBSubnetGroups) == 0 {
+	if len(groups) == 0 {
 		return nil, nil
 	}
-	sg := out.DBSubnetGroups[0]
+	sg := groups[0]
 	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
 	for _, s := range sg.Subnets {
 		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
@@ -327,18 +332,23 @@ func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource
 	if !cok || c == nil || c.DocDB == nil {
 		return nil, errDbcNoClusterDetail
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBSubnetGroupsOutput, error) {
-		return c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
+	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]docdb_types.DBSubnetGroup, *string, error) {
+		out, err := c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
+			Marker:            marker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.DBSubnetGroups, out.Marker, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
-	if out == nil || len(out.DBSubnetGroups) == 0 {
+	if len(groups) == 0 {
 		return nil, nil
 	}
-	sg := out.DBSubnetGroups[0]
+	sg := groups[0]
 	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
 	for _, s := range sg.Subnets {
 		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
@@ -356,7 +366,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		// Parent has no MasterUserSecret — true regardless of whether the
 		// RawStruct shape was a recognised cluster. Returning Count=0 is
 		// definitive: there is no cluster-managed master secret to associate.
-		return unreadZero(res, resource.KnownRelated("secrets", nil, false))
+		return unreadZero(res, resource.ProvenZero("secrets", "secretARN"))
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -387,7 +397,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
-		return unreadZero(res, resource.KnownRelated("kms", nil, false))
+		return unreadZero(res, resource.ProvenZero("kms", "keyID"))
 	}
 	keyID = kmsRefFromField(keyID, res.Type)
 	return unreadZero(res, kmsRelated(ctx, clients, cache, []string{keyID}))

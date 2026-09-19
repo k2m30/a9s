@@ -39,7 +39,7 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 	return func(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 		id := cfg.IDExtractor(res)
 		if id == "" {
-			return resource.KnownRelated("ct-events", nil, false)
+			return resource.ProvenZero("ct-events", "id")
 		}
 
 		fetchFilter := map[string]string{"ResourceName": id}
@@ -77,6 +77,6 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 			return resource.DeferredRelated("ct-events", fetchFilter)
 		}
 
-		return relatedResult("ct-events", ids).WithFetchFilter(fetchFilter)
+		return relatedResultTrunc("ct-events", ids, false).WithFetchFilter(fetchFilter)
 	}
 }

@@ -46,10 +46,12 @@
    without this the pivot renders `?` with no actionable cause. Op-name
    convention: `"<short>-related: <Verb>"` (e.g. `"s3-related: GetBucketPolicy"`).
 7. **Call budget** — a checker runs on every detail open, so it gets AT MOST
-   one extra AWS API call beyond reading the already-loaded sibling caches
+   one extra AWS API beyond reading the already-loaded sibling caches
    (`resource.ResourceCache`); per-item fan-outs over the OPEN resource's own
    sub-objects are inside the budget, fan-outs over the TARGET type's whole
-   population are not. A mechanism that cannot resolve within that budget on
+   population are not. A paginated API is walked page by page through
+   `aws.PageAll`, up to `PerParentPageCap` pages; a walk the cap stopped is a
+   lower bound `(N+)`, never an exact count. A mechanism that cannot resolve within that budget on
    ANY cache state is NOT REGISTERED — it is documented under
    **Explicitly excluded** below instead of shipping a checker that never
    produces a real answer. A permanently-unknowable row (never drillable, never
@@ -98,7 +100,7 @@
 | `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
 | `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
 | `eni` | [API_NetworkInterface](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html) | `ct-events`, `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce` |
-| `glue` | [API_Job](https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html) | `alarm`, `athena`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets` |
+| `glue` | [API_Job](https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets` |
 | `iam-group` | [API_Group](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html) | `ct-events`, `iam-user`, `policy` |
 | `iam-user` | [API_User](https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html) | `ct-events`, `iam-group`, `policy` |
 | `igw` | [API_InternetGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html) | `ct-events`, `rtb`, `vpc` |
@@ -112,7 +114,7 @@
 | `nat` | [API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html) | `alarm`, `ct-events`, `eip`, `eni`, `rtb`, `subnet`, `vpc` |
 | `ng` | [API_Nodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html) | `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet` |
 | `opensearch` | [API_DomainStatus](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html) | `acm`, `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `sg`, `subnet`, `vpc` |
-| `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns` |
+| `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns` |
 | `policy` | [API_Policy](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html) | `ct-events`, `iam-group`, `iam-user`, `role` |
 | `r53` | [API_HostedZone](https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html) | `acm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`, `s3`, `vpc` |
 | `dbi-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbi`, `kms` |
@@ -329,7 +331,7 @@ AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstan
 - **`alarm`** — CloudWatch alarms on CPU/Storage/Connections.
 - **`ct-events`** — Audit trail for DB config / modifyDBInstance.
 - **`dbc`** — Aurora instance → cluster.
-- **`eni`** — DB instances back onto ENIs.
+- **`eni`** — DB instances back onto ENIs. Heuristic: RDS-managed ENIs on the instance's security groups; an ENI records no DB instance, and another instance sharing a group shares its ENIs.
 - **`kms`** — KmsKeyId — storage encryption key.
 - **`logs`** — DB engine log exports (e.g. /aws/rds/instance/<id>/error).
 - **`dbi-snap`** — Snapshots of this instance.
@@ -434,7 +436,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.ht
 - **`role`** — IamInstanceProfile → role — permissions the instance operates with.
 - **`sg`** — Instance.SecurityGroups[] — ingress/egress rules; first stop for connectivity issues.
 - **`subnet`** — Instance.SubnetId — primary ENI's subnet; used when diagnosing placement/routing.
-- **`tg`** — Target groups this instance is registered with — traffic routing.
+- **`tg`** — Target groups this instance is registered with — traffic routing. Heuristic: instance target groups in the instance's VPC; the cached target groups carry no registered targets.
 - **`vpc`** — Instance.VpcId — network parent; pivoted to for VPC-wide troubleshooting.
 
 ### `ecr`
@@ -597,7 +599,6 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInte
 AWS API: <https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html>
 
 - **`alarm`** — Job-run failure alarms.
-- **`athena`** — Athena queries Glue Catalog.
 - **`cfn`** — CloudFormation stack that created the job.
 - **`ct-events`** — Audit trail for job events.
 - **`kms`** — Data + bookmark encryption key.
@@ -797,7 +798,6 @@ AWS API: <https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_Pipel
 
 - **`cb`** — CodeBuild projects used as pipeline actions.
 - **`cfn`** — Deploy CFN action.
-- **`codeartifact`** — CodeArtifact as source.
 - **`ct-events`** — Audit trail for pipeline state changes.
 - **`eb-rule`** — Triggered by EventBridge.
 - **`ecr`** — Push/pull images.
@@ -932,14 +932,14 @@ AWS API: <https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_Sec
 
 - **`cb`** — Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix.
 - **`cfn`** — SecretListEntry.Tags["aws:cloudformation:stack-name"] matched against CFN stack cache.
-- **`codeartifact`** — Heuristic: secret Name or Tags contain "codeartifact" (no direct AWS API).
+- **`codeartifact`** — Heuristic: secret Name or Tags contain "codeartifact" (no direct AWS API). A secret that names none has no candidates, which is a proven zero.
 - **`ct-events`** — Audit trail for secret rotation/access.
 - **`dbi`** — Reverse-scan: DBInstance.MasterUserSecret.SecretArn == this secret's ARN.
 - **`eb`** — Reverse-scan: elasticbeanstalk:DescribeConfigurationSettings OptionSettings[].Value contains `{{resolve:secretsmanager:<ARN>`.
 - **`ecs-task`** — Reverse-scan: TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN or RepositoryCredentials.CredentialsParameter==ARN.
 - **`kms`** — SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache.
 - **`lambda`** — SecretListEntry.RotationLambdaARN — function name suffix matched against Lambda cache.
-- **`logs`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.LoggingConfig.LogGroup (or default /aws/lambda/<name>).
+- **`logs`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.LoggingConfig.LogGroup. When GetFunction does not answer, the default /aws/lambda/<name> is a heuristic candidate: a function with a custom LoggingConfig logs elsewhere.
 - **`role`** — secretsmanager:GetResourcePolicy → Statement[].Principal.AWS role ARNs; RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.Role.
 - **`sns`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.DeadLetterConfig.TargetArn if SNS ARN.
 
@@ -1054,7 +1054,7 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html>
 
 - **`ct-events`** — Audit trail for attachment changes.
-- **`role`** — Cross-account RAM share roles.
+- **`role`** — Cross-account RAM share roles. Heuristic: the account-wide `AWSServiceRoleForVPCTransitGateway` service-linked role, which no one gateway names.
 - **`rtb`** — VPC route tables with routes targeting this TGW.
 - **`subnet`** — VPC attachment subnets.
 - **`vpc`** — VPCs attached to this TGW.
@@ -1157,7 +1157,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 > for the evidence trail. Re-adding any of these pairs requires new AWS API
 > evidence cited per the Policy section at the top of this file.
 
-### Budget-excluded — structurally uncomputable on any cache state (23)
+### Budget-excluded — structurally uncomputable on any cache state (25)
 
 > These pivots were REMOVED from the registry (not merely marked
 > `budget-excluded` in a per-type row) because their checkers were
@@ -1175,10 +1175,12 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 - `apigw` → `sns` — APIGW -> SNS via integration: the integration URI only reveals `:sns:action/Publish` — the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri; identifying the topic requires per-route request-template parsing — checker returns Count -1.
 - `athena` → `glue` — every Athena workgroup queries the account's default Glue Data Catalog implicitly; no structured "glue job/catalog" field exists on the WorkGroupConfiguration to name a specific Glue resource, so the checker can only ever return Count 0 or Count -1 — never a real count.
 - `cf` → `logs` — [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) has no log-group field: standard logging names an S3 bucket (`DistributionConfig.Logging.Bucket`, counted under `s3`), and real-time logs go to Kinesis Data Streams — no row of the `logs` type is named.
+- `glue` → `athena` — a Glue job records no Athena workgroup and a workgroup records no Glue job ([API_Job](https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html), [API_WorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html)); Athena reads the account's Data Catalog implicitly, the same reason `athena` → `glue` is excluded — no lookup can discover a link.
 - `ec2` → `ssm` — the `ssm` type lists Parameter Store parameters ([API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html)); the SSM managed-instance registration of an instance (`DescribeInstanceInformation`) has no a9s type, and no parameter row stands for an instance.
 - `eip` → `logs` — EIPs emit no logs; flow logs on the associated ENI/subnet/VPC are not identifiable from the EIP without per-ENI `DescribeFlowLogs` — checker returns Count -1.
 - `elb` → `r53` — record sets live on per-zone `ListResourceRecordSets` and are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); identifying the aliasing records requires O(N) per-zone record-set queries — checker returns Count -1.
 - `kms` → `s3` — S3 bucket resources assembled by `FetchS3BucketsPage` do not store KMS key info in Fields or RawStruct, so the relationship cannot be determined from cache alone — checker returns Count -1.
+- `pipeline` → `codeartifact` — CodePipeline has no CodeArtifact action provider ([action structure reference](https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference.html)), so no `PipelineDeclaration` action names a CodeArtifact repository — no lookup can discover a link.
 - `tg` → `backup` — AWS Backup does not support target groups; no AWS field links a TG to a plan or recovery point — checker returns Count -1.
 - `tg` → `dbc` — TG target types are instance/ip/lambda/alb; no AWS field references a DocumentDB cluster — checker returns Count -1.
 - `tg` → `dbi` — TG target types are instance/ip/lambda/alb; no AWS field references an RDS instance — checker returns Count -1.
@@ -1813,7 +1815,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | pipeline | cb | CodeBuild Projects | no |
 | pipeline | role | IAM Roles | no |
 | pipeline | cfn | CloudFormation | no |
-| pipeline | codeartifact | CodeArtifact | no |
 | pipeline | eb-rule | EventBridge Rules | no |
 | pipeline | ecr | ECR Repositories | no |
 | pipeline | ecs-svc | ECS Services | no |
@@ -1852,7 +1853,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | glue | cfn | CloudFormation Stacks | no |
 | glue | s3 | S3 (script bucket) | no |
 | glue | kms | KMS Key | no |
-| glue | athena | Athena WorkGroups | no |
 | glue | secrets | Secrets Manager | no |
 | glue | ct-events | CloudTrail Events | no |
 | athena | s3 | S3 Buckets (results) | no |

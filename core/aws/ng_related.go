@@ -6,8 +6,6 @@ package aws
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -24,7 +22,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if clusterName == "" {
-		return resource.KnownRelated("eks", nil, false)
+		return resource.ProvenZero("eks", "clusterName")
 	}
 
 	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
@@ -55,7 +53,7 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.KnownRelated("role", nil, false)
 	}
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "ng.NodeRole")
 	}
 	// The node group's NodeRole ARN normalizes to the role name (== the
 	// role's Resource.ID), so it resolves by identity.
@@ -73,7 +71,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.KnownRelated("asg", nil, false)
 	}
 	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "ng.Resources.AutoScalingGroups")
 	}
 
 	asgNames := make(map[string]struct{}, len(ng.Resources.AutoScalingGroups))
@@ -83,7 +81,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(asgNames) == 0 {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "asgNames")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -115,7 +113,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "nodegroupName")
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
@@ -177,9 +175,9 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	}
 	if ng.Resources == nil || ng.Resources.RemoteAccessSecurityGroup == nil ||
 		*ng.Resources.RemoteAccessSecurityGroup == "" {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "Resources.RemoteAccessSecurityGroup")
 	}
-	return relatedResult("sg", []string{*ng.Resources.RemoteAccessSecurityGroup})
+	return relatedResultTrunc("sg", []string{*ng.Resources.RemoteAccessSecurityGroup}, false)
 }
 
 // checkNGAMI resolves the AMI used by this node group's launch template.
@@ -191,7 +189,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.UnknownRelated("ami")
 	}
 	if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "ng.LaunchTemplate.Id")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -199,31 +197,21 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.UnknownRelated("ami")
 	}
 
-	version := aws.String("$Latest")
-	if ng.LaunchTemplate.Version != nil && *ng.LaunchTemplate.Version != "" {
-		version = ng.LaunchTemplate.Version
-	}
-
-	ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-		return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-			LaunchTemplateId: ng.LaunchTemplate.Id,
-			Versions:         []string{*version},
-		})
-	})
+	versions, err := launchTemplateVersions(ctx, c.EC2, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
 	if err != nil {
 		// Launch template deleted upstream — that is a true zero, not a
 		// fetch failure: there is no AMI for this NG to relate to.
 		if ErrCodeIs(err, "InvalidLaunchTemplateId.NotFound") {
-			return resource.KnownRelated("ami", nil, false)
+			return resource.ProvenZero("ami", "the API answered that none is configured")
 		}
 		return resource.ErrorRelated("ami", err)
 	}
-	for _, v := range ltOut.LaunchTemplateVersions {
+	for _, v := range versions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedResult("ami", []string{*v.LaunchTemplateData.ImageId})
+			return relatedResultTrunc("ami", []string{*v.LaunchTemplateData.ImageId}, false)
 		}
 	}
-	return resource.KnownRelated("ami", nil, false)
+	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")
 }
 
 // checkNGEBS scans the EC2 instance cache for instances tagged with this node
@@ -235,7 +223,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.KnownRelated("ebs", nil, false)
+		return resource.ProvenZero("ebs", "nodegroupName")
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
@@ -275,7 +263,7 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "ids")
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }

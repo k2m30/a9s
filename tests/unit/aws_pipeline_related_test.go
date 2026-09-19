@@ -218,22 +218,13 @@ func TestRelated_Pipeline_CFN_Match(t *testing.T) {
 	}
 }
 
+// CodePipeline has no CodeArtifact action provider, so a pipeline declaration
+// never names a CodeArtifact repository and pipeline offers no pivot to it.
 func TestRelated_Pipeline_CodeArtifact_Match(t *testing.T) {
-	const pipelineName = "ca-pipeline"
-	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
-	clients := &awsclient.ServiceClients{
-		CodePipeline: newFakeCodePipelineWithDeclarations(map[string]*cptypes.PipelineDeclaration{
-			pipelineName: pipelineDeclarationWithCodeArtifactAction(pipelineName, "my-artifact-repo"),
-		}),
-	}
-	checker := pipelineCheckerByTarget(t, "codeartifact")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-artifact-repo" {
-		t.Errorf("ResourceIDs = %v, want [my-artifact-repo]", result.ResourceIDs())
+	for _, def := range resource.GetRelated("pipeline") {
+		if def.TargetType == "codeartifact" {
+			t.Errorf("pipeline registers a codeartifact pivot %q; no pipeline action names a CodeArtifact repository", def.DisplayName)
+		}
 	}
 }
 

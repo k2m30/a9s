@@ -47,7 +47,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Wave2:     IssueEnricher{Fn: EnrichBackupJobs, Priority: 100},
 		FieldKeys: []string{"plan_name", "plan_id", "creation_date", "last_execution"},
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkBackupKMS},
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkBackupSNS, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("backup")},

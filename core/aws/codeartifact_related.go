@@ -30,7 +30,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 		return resource.UnknownRelated("kms")
 	}
 	if repo.DomainName == nil || *repo.DomainName == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "repo.DomainName")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.CodeArtifact == nil {
@@ -55,7 +55,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 		return resource.UnknownRelated("kms")
 	}
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "out.Domain.EncryptionKey")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*out.Domain.EncryptionKey})
 }

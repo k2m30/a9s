@@ -46,8 +46,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `role`
 
 - **Why related**: Cross-account RAM-share IAM roles associated with this TGW in multi-account network hubs (`docs/related-resources.md` § `tgw`).
-- **How discovered**: TBD — a9s-devops: not available cleanly on the AWS surface. The `TransitGateway` response carries no `Role` ARN. RAM resource shares are reachable via `GetResourceShares` / `ListResources`, but those reference managed policies, not IAM roles. Discovering "the role used to accept a cross-account attachment" requires correlating CloudTrail `AcceptTransitGatewayVpcAttachment` events with principal ARNs — Wave 3 territory.
-- **Count shown**: unknown.
+- **How discovered**: `iam:GetRole(AWSServiceRoleForVPCTransitGateway)` — the account-wide service-linked role. The `TransitGateway` response carries no role ARN, and no field names the role that accepted a cross-account attachment.
+- **Count shown**: no — the role is the account's, not this gateway's (heuristic coverage), rendered as a blank, navigable row.
 
 ### `ct-events`
 
@@ -178,9 +178,9 @@ tgw — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| vpc | VPCs | no |
+| vpc | VPCs | yes |
 | rtb | Route Tables | yes |
 | role | IAM Role | no |
-| subnet | Subnets | no |
+| subnet | Subnets | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

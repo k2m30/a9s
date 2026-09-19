@@ -52,43 +52,24 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		total++
 		mu.Unlock()
-		var allAttachments []ec2types.TransitGatewayAttachment
-		var attNextToken *string
-		attPages := 0
-		attTruncated := false
-		fetchErr := false
-		var lastErr error
-		for {
-			if attPages >= PerParentPageCap {
-				attTruncated = true
-				break
-			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeTransitGatewayAttachmentsOutput, error) {
-				return clients.EC2.DescribeTransitGatewayAttachments(ctx, &ec2svc.DescribeTransitGatewayAttachmentsInput{
-					Filters: []ec2types.Filter{
-						{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
-					},
-					NextToken: attNextToken,
-				})
+		allAttachments, complete, lastErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayAttachment, *string, error) {
+			out, err := clients.EC2.DescribeTransitGatewayAttachments(ctx, &ec2svc.DescribeTransitGatewayAttachmentsInput{
+				Filters: []ec2types.Filter{
+					{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
+				},
+				NextToken: token,
 			})
-			attPages++
 			if err != nil {
-				fetchErr = true
-				lastErr = err
-				break
+				return nil, nil, err
 			}
-			allAttachments = append(allAttachments, out.TransitGatewayAttachments...)
-			if out.NextToken == nil {
-				break
-			}
-			attNextToken = out.NextToken
-		}
+			return out.TransitGatewayAttachments, out.NextToken, nil
+		})
 
-		if attTruncated || fetchErr {
+		if !complete {
 			mu.Lock()
 			defer mu.Unlock()
 			truncated = true
-			if fetchErr {
+			if lastErr != nil {
 				MarkSkipped(&result, r.ID, &failures, lastErr)
 			} else {
 				markUninspected(&result, r.ID, CheckCap)

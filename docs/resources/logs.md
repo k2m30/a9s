@@ -182,7 +182,7 @@ logs — MONITORING. Status key: `state` — the column naming it is the status 
 | kms | KMS Key | no |
 | apigw | API Gateway | yes |
 | ecs-task | ECS Tasks | yes |
-| kinesis | Kinesis Streams | no |
-| s3 | S3 (exports) | no |
+| kinesis | Kinesis Streams | yes |
+| s3 | S3 (exports) | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

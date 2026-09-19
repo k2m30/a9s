@@ -9,10 +9,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -59,104 +55,10 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			return
 		}
 
-		var allUsers []iamtypes.User
-		memberTruncated := false
-		var groupMarker *string
-		memberPages := 0
-		var memberErr error
-		memberFirstCallErrd := false
-		for {
-			if memberPages >= PerParentPageCap {
-				memberTruncated = true
-				break
-			}
-			groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
-				GroupName: aws.String(groupName),
-				Marker:    groupMarker,
-			})
-			if err != nil {
-				memberErr = err
-				if memberPages == 0 {
-					memberFirstCallErrd = true
-				} else {
-					memberTruncated = true
-				}
-				break
-			}
-			memberPages++
-			allUsers = append(allUsers, groupOut.Users...)
-			if groupOut.IsTruncated {
-				groupMarker = groupOut.Marker
-			} else {
-				break
-			}
-		}
-
-		var allAttached []iamtypes.AttachedPolicy
-		attachedTruncated := false
-		var attachedMarker *string
-		attachedPages := 0
-		var attachedErr error
-		attachedFirstCallErrd := false
-		for {
-			if attachedPages >= PerParentPageCap {
-				attachedTruncated = true
-				break
-			}
-			attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
-				GroupName: aws.String(groupName),
-				Marker:    attachedMarker,
-			})
-			if err != nil {
-				attachedErr = err
-				if attachedPages == 0 {
-					attachedFirstCallErrd = true
-				} else {
-					attachedTruncated = true
-				}
-				break
-			}
-			attachedPages++
-			allAttached = append(allAttached, attachedOut.AttachedPolicies...)
-			if attachedOut.IsTruncated {
-				attachedMarker = attachedOut.Marker
-			} else {
-				break
-			}
-		}
-
-		var allInline []string
-		inlineTruncated := false
-		var inlineMarker *string
-		inlinePages := 0
-		var inlineErr error
-		inlineFirstCallErrd := false
-		for {
-			if inlinePages >= PerParentPageCap {
-				inlineTruncated = true
-				break
-			}
-			inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
-				GroupName: aws.String(groupName),
-				Marker:    inlineMarker,
-			})
-			if err != nil {
-				inlineErr = err
-				if inlinePages == 0 {
-					inlineFirstCallErrd = true
-				} else {
-					inlineTruncated = true
-				}
-				break
-			}
-			inlinePages++
-			allInline = append(allInline, inlineOut.PolicyNames...)
-			if inlineOut.IsTruncated {
-				inlineMarker = inlineOut.Marker
-			} else {
-				break
-			}
-		}
+		allUsers, membersComplete, memberErr := iamGroupUsers(ctx, getGroupAPI, groupName)
+		allAttached, attachedComplete, attachedErr := iamGroupAttachedPolicies(ctx, attachedPoliciesAPI, groupName)
+		allInline, inlineComplete, inlineErr := iamGroupInlinePolicies(ctx, inlinePoliciesAPI, groupName)
+		memberTruncated, attachedTruncated, inlineTruncated := !membersComplete, !attachedComplete, !inlineComplete
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -168,8 +70,8 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			markUninspected(&result, r.ID, CheckCap)
 		}
 
-		// If any first call failed, we have no data at all — skip findings for this group.
-		if memberFirstCallErrd || attachedFirstCallErrd || inlineFirstCallErrd {
+		// A walk that failed before reading anything left no data — skip findings for this group.
+		if (memberErr != nil && len(allUsers) == 0) || (attachedErr != nil && len(allAttached) == 0) || (inlineErr != nil && len(allInline) == 0) {
 			return
 		}
 

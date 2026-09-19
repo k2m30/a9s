@@ -244,7 +244,7 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | --- | --- | --- |
 | kms | KMS Key | no |
 | alarm | CloudWatch Alarms | yes |
-| lambda | Lambda Functions | no |
+| lambda | Lambda Functions | yes |
 | kinesis | Kinesis Streams | no |
 | backup | Backup Plans | yes |
 | logs | Log Groups | yes |

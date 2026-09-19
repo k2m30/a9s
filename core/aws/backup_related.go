@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
@@ -26,21 +27,25 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, ca
 	if !cok || c == nil || c.Backup == nil {
 		return resource.UnknownRelated("role")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
-		return c.Backup.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
+	sels, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]backuptypes.BackupSelectionsListMember, *string, error) {
+		out, err := c.Backup.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
 			BackupPlanId: &planID,
+			NextToken:    token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.BackupSelectionsList, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
 	var refs []string
-	for _, sel := range out.BackupSelectionsList {
-		if sel.IamRoleArn != nil && *sel.IamRoleArn != "" {
-			refs = append(refs, *sel.IamRoleArn)
-		}
+	for _, sel := range sels {
+		refs = append(refs, aws.ToString(sel.IamRoleArn))
 	}
-	return relatedRefs("role", refs, refContext(clients, cache, "role"))
+	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
+	return relatedResultTrunc("role", ids, dropped || !complete)
 }
 
 // checkBackupKMS resolves the KMS key(s) encrypting this plan's target
@@ -52,7 +57,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("kms")
 	}
 	if len(vaults) == 0 {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "vaults")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
@@ -86,7 +91,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("sns")
 	}
 	if len(vaults) == 0 {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "vaults")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
@@ -125,7 +130,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		if aggErr != nil {
 			return resource.ErrorRelated("sns", aggErr)
 		}
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "topicARNs")
 	}
 
 	ids, dropped := resolveRefs("sns", topicARNs, refContext(clients, cache, "sns"))

@@ -26,7 +26,7 @@ import (
 func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "repoURI")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -58,7 +58,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := res.Fields["uri"]
 	if repoURI == "" {
-		return resource.KnownRelated("cb", nil, false)
+		return resource.ProvenZero("cb", "repoURI")
 	}
 
 	cbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cb")
@@ -91,7 +91,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("cfn", err)
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -159,7 +159,7 @@ func checkECRKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "repo.EncryptionConfiguration.KmsKey")
 	}
 	keyID := kmsRefFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -179,7 +179,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "repoName")
 	}
 	repoARN := ""
 	if repo.RepositoryArn != nil {

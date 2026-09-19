@@ -61,41 +61,22 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
 		}
 
-		var allMountTargets []efstypes.MountTargetDescription
-		var mtMarker *string
-		mtPages := 0
-		mtTruncated := false
-		pageFailed := false
-		var pageErr error
-		for {
-			if mtPages >= PerParentPageCap {
-				mtTruncated = true
-				break
-			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeMountTargetsOutput, error) {
-				return clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
-					FileSystemId: aws.String(fsID),
-					Marker:       mtMarker,
-				})
+		allMountTargets, complete, pageErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]efstypes.MountTargetDescription, *string, error) {
+			out, err := clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
+				FileSystemId: aws.String(fsID),
+				Marker:       marker,
 			})
-			mtPages++
 			if err != nil {
-				pageFailed = true
-				pageErr = err
-				break
+				return nil, nil, err
 			}
-			allMountTargets = append(allMountTargets, out.MountTargets...)
-			if out.NextMarker == nil {
-				break
-			}
-			mtMarker = out.NextMarker
-		}
+			return out.MountTargets, out.NextMarker, nil
+		})
 
-		if mtTruncated || pageFailed {
+		if !complete {
 			mu.Lock()
 			defer mu.Unlock()
 			truncated = true
-			if pageFailed {
+			if pageErr != nil {
 				MarkSkipped(&result, r.ID, &failures, pageErr)
 			}
 			// A page cap is not a failed call and not a coverage gap on the

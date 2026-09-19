@@ -166,7 +166,7 @@ iam-user — SECURITY & IAM. Status key: `risk` — the key the status cell read
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| iam-group | IAM Groups | no |
-| policy | IAM Policies | no |
+| iam-group | IAM Groups | yes |
+| policy | IAM Policies | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

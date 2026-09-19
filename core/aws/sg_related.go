@@ -18,9 +18,9 @@ import (
 func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "vpcID")
 	}
-	return relatedResult("vpc", []string{vpcID})
+	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
 
 // checkSGEC2 scans the EC2 cache for instances whose SecurityGroups slice
@@ -28,7 +28,7 @@ func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -60,7 +60,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -92,7 +92,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -124,9 +124,9 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
-	return relatedResult("cfn", []string{stackName})
+	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
 // checkSGSG scans the SG cache for other security groups whose IpPermissions or
@@ -135,7 +135,7 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
@@ -167,7 +167,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")

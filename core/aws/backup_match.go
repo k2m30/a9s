@@ -151,6 +151,11 @@ func backupPlansCovering(plans []resource.Resource, t backupTarget) (ids []strin
 // known to cover the resource and something might. An empty ARN decides
 // nothing unless there is no plan to decide against.
 func backupPivot(plans []resource.Resource, truncated bool, t backupTarget) resource.RelatedCheckResult {
+	// A nil list is a list nobody read: whether a plan covers the target is
+	// unanswered, not answered "none".
+	if plans == nil {
+		return resource.UnknownRelated("backup")
+	}
 	if t.arn == "" && len(plans) > 0 {
 		return resource.UnknownRelated("backup")
 	}

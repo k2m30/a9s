@@ -18,7 +18,7 @@ import (
 func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	username := res.Fields["user"]
 	if username == "" {
-		return resource.KnownRelated("iam-user", nil, false)
+		return resource.ProvenZero("iam-user", "username")
 	}
 
 	userList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "iam-user")
@@ -46,7 +46,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	candidates := ctEventsRoleCandidates(res, refContext(clients, cache, "role"))
 	if len(candidates) == 0 {
-		return unreadZero(res, resource.KnownRelated("role", nil, false))
+		return unreadZero(res, resource.ProvenZero("role", "candidates"))
 	}
 	return unreadZero(res, ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates}))
 }
@@ -288,7 +288,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "ec2", ids)
@@ -317,7 +317,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "s3", ids)
@@ -349,7 +349,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "lambda", ids)
@@ -385,7 +385,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("dbi", nil, false)
+		return resource.ProvenZero("dbi", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "dbi", ids)
@@ -418,7 +418,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "kms", ids)
@@ -447,7 +447,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "secrets", ids)
@@ -472,7 +472,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("vpce", nil, false)
+		return resource.ProvenZero("vpce", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "vpce", ids)
@@ -501,7 +501,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "sg", ids)
@@ -530,7 +530,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("ddb", nil, false)
+		return resource.ProvenZero("ddb", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "ddb", ids)
@@ -555,11 +555,11 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 	ui, _ := parsed["userIdentity"].(map[string]any)
 	uiType, _ := ui["type"].(string)
 	if uiType == "Root" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "uiType")
 	}
 	accessKeyID, _ := ui["accessKeyId"].(string)
 	if accessKeyID == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "accessKeyID")
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"AccessKeyId": accessKeyID})
 }
@@ -570,7 +570,7 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 func checkCtEventsPivotByUsername(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	username := res.Fields["user"]
 	if username == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "username")
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"Username": username})
 }
@@ -583,7 +583,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 		eventName = res.Name
 	}
 	if eventName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "eventName")
 	}
 	return resource.DeferredRelated("ct-events", map[string]string{"EventName": eventName})
 }
@@ -594,7 +594,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 // same API call.
 func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["_ct.cross_account"] != "true" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "res.Fields[_ct.cross_account]")
 	}
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
@@ -615,7 +615,7 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 	if event.EventId != nil && *event.EventId != "" {
 		return resource.DeferredRelated("ct-events", map[string]string{"EventId": *event.EventId})
 	}
-	return resource.KnownRelated("ct-events", nil, false)
+	return resource.ProvenZero("ct-events", "the lookup completed")
 }
 
 // checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail
@@ -648,7 +648,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("trail", nil, false)
+		return resource.ProvenZero("trail", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "trail", ids)
@@ -682,7 +682,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if len(ids) == 0 {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "ids")
 	}
 
 	return ctEventsMatchTarget(ctx, clients, cache, "cfn", ids)

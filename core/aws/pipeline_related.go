@@ -17,7 +17,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -120,7 +119,7 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("cb", mapKeys(seen))
+	return relatedResultTrunc("cb", mapKeys(seen), false)
 }
 
 // checkPipelineRole returns the pipeline's service role (Pipeline.RoleArn) and
@@ -158,28 +157,7 @@ func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("cfn", mapKeys(seen))
-}
-
-// checkPipelineCodeartifact resolves CodeArtifact repositories referenced in source actions.
-// Provider=CodeStarSourceConnection with Repository/Owner pointing at CodeCommit/GitHub
-// is common; CodeArtifact as a direct Source provider is rare but possible.
-// Configuration["RepositoryName"] is inspected for CodeArtifact providers.
-func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
-	if err != nil {
-		return pipelineRelatedOnErr("codeartifact", err)
-	}
-	seen := map[string]struct{}{}
-	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if actionProvider(a) != "CodeArtifact" {
-			return
-		}
-		if name := a.Configuration["RepositoryName"]; name != "" {
-			seen[name] = struct{}{}
-		}
-	})
-	return relatedResult("codeartifact", mapKeys(seen))
+	return relatedResultTrunc("cfn", mapKeys(seen), false)
 }
 
 // checkPipelineECR resolves ECR repositories referenced as Source action inputs.
@@ -198,7 +176,7 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("ecr", mapKeys(seen))
+	return relatedResultTrunc("ecr", mapKeys(seen), false)
 }
 
 // checkPipelineECSSvc resolves ECS services deployed by this pipeline.
@@ -219,7 +197,7 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("ecs-svc", mapKeys(seen))
+	return relatedResultTrunc("ecs-svc", mapKeys(seen), false)
 }
 
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey
@@ -258,7 +236,7 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("lambda", mapKeys(seen))
+	return relatedResultTrunc("lambda", mapKeys(seen), false)
 }
 
 // checkPipelineS3 resolves the S3 artifact bucket(s) for this pipeline.
@@ -288,7 +266,7 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 			seen[name] = struct{}{}
 		}
 	})
-	return relatedResult("s3", mapKeys(seen))
+	return relatedResultTrunc("s3", mapKeys(seen), false)
 }
 
 // checkPipelineSNS resolves SNS approval topics configured on Approval actions.
@@ -304,7 +282,7 @@ func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _
 			seen[arn] = struct{}{}
 		}
 	})
-	return relatedResult("sns", mapKeys(seen))
+	return relatedResultTrunc("sns", mapKeys(seen), false)
 }
 
 // mapKeys returns the keys of a map[string]struct{} as a slice (order-independent —
@@ -319,21 +297,7 @@ func mapKeys(m map[string]struct{}) []string {
 func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	pipelineARN := res.Fields["arn"]
 	if pipelineARN == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "pipelineARN")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.EventBridge == nil {
-		return resource.UnknownRelated("eb-rule")
-	}
-	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
-	if !ok {
-		return resource.UnknownRelated("eb-rule")
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
-		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &pipelineARN})
-	})
-	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
-	}
-	return relatedResult("eb-rule", out.RuleNames)
+	return ebRulesTargeting(ctx, clients, pipelineARN)
 }

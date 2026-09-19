@@ -156,7 +156,7 @@ backup — BACKUP. Status key: `status` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| role | IAM Roles | no |
+| role | IAM Roles | yes |
 | kms | KMS Keys | no |
 | sns | SNS Topics | yes |
 | ct-events | CloudTrail Events | no |

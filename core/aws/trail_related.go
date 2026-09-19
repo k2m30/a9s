@@ -19,7 +19,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("s3")
 		}
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "trail.S3BucketName")
 	}
 	bucketName := *trail.S3BucketName
 
@@ -49,7 +49,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("logs")
 		}
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "trail.CloudWatchLogsLogGroupArn")
 	}
 
 	logGroupName, local := resource.ResolveRef("logs", *trail.CloudWatchLogsLogGroupArn, refContext(clients, cache, "logs"))
@@ -82,7 +82,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("sns")
 		}
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "trail.SnsTopicARN")
 	}
 	topicARN := *trail.SnsTopicARN
 
@@ -110,7 +110,7 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "trail.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*trail.KmsKeyId})
 }
@@ -123,7 +123,7 @@ func checkTrailRole(_ context.Context, clients any, res resource.Resource, cache
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("role")
 		}
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "trail.CloudWatchLogsRoleArn")
 	}
 	return relatedRefs("role", arnsOnly([]string{*trail.CloudWatchLogsRoleArn}), refContext(clients, cache, "role"))
 }

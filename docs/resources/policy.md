@@ -147,8 +147,8 @@ policy — SECURITY & IAM. Status key: `risk` — the key the status cell reads,
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| role | IAM Roles | no |
-| iam-user | IAM Users | no |
-| iam-group | IAM Groups | no |
+| role | IAM Roles | yes |
+| iam-user | IAM Users | yes |
+| iam-group | IAM Groups | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

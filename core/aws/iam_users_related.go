@@ -6,8 +6,10 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -21,21 +23,26 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.KnownRelated("iam-group", nil, false)
+		return resource.ProvenZero("iam-group", "userName")
 	}
-	out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
-		UserName: &userName,
+	groups, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Group, *string, error) {
+		out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
+			UserName: &userName,
+			Marker:   marker,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Groups, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("iam-group", err)
 	}
 	var ids []string
-	for _, g := range out.Groups {
-		if g.GroupName != nil {
-			ids = append(ids, *g.GroupName)
-		}
+	for _, g := range groups {
+		ids = append(ids, aws.ToString(g.GroupName))
 	}
-	return relatedResult("iam-group", ids)
+	return relatedResultTrunc("iam-group", ids, !complete)
 }
 
 // checkUserPolicy uses the IAM ListAttachedUserPolicies API to return the
@@ -47,16 +54,13 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.KnownRelated("policy", nil, false)
+		return resource.ProvenZero("policy", "userName")
 	}
-	out, err := c.IAM.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
-		UserName: &userName,
-	})
+	attached, complete, err := listAttachedUserPolicies(ctx, c.IAM, userName)
 	if err != nil {
 		return resource.ErrorRelated("policy", err)
 	}
-	ids := attachedPolicyNames(out.AttachedPolicies)
-	return relatedResult("policy", ids)
+	return relatedResultTrunc("policy", attachedPolicyNames(attached), !complete)
 }
 
 // checkIAMUserCtEvents scans the ct-events cache for CloudTrail events where
@@ -64,7 +68,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	userName := res.ID
 	if userName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "userName")
 	}
 
 	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
@@ -93,5 +97,5 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 		// Cache is partial — the filtered fetch will determine the real count.
 		return resource.DeferredRelated("ct-events", fetchFilter)
 	}
-	return relatedResult("ct-events", ids).WithFetchFilter(fetchFilter)
+	return relatedResultTrunc("ct-events", ids, false).WithFetchFilter(fetchFilter)
 }

@@ -212,12 +212,12 @@ apigw — DNS & CDN. Status key: `state` — the column naming it is the status 
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | logs | Log Groups | yes |
-| lambda | Lambda Functions | no |
-| acm | ACM Certificates | no |
+| lambda | Lambda Functions | yes |
+| acm | ACM Certificates | yes |
 | alarm | CloudWatch Alarms | yes |
 | cf | CloudFront | yes |
 | elb | Load Balancers | yes |
-| kms | KMS Keys | no |
-| role | IAM Role | no |
+| kms | KMS Keys | yes |
+| role | IAM Role | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

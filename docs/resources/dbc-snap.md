@@ -222,7 +222,7 @@ dbc-snap — DATABASES & STORAGE. Status key: `status` — the key the status ce
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| dbc | DocumentDB Cluster | no |
+| dbc | DocumentDB Cluster | yes |
 | kms | KMS Key | no |
 | vpc | VPC | no |
 | backup | Backup Plans | yes |

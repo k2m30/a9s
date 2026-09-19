@@ -320,7 +320,7 @@ func TestRelatedPanel_NoExcludedPairsRegistered(t *testing.T) {
 	for _, targets := range excluded {
 		total += len(targets)
 	}
-	const wantTotal = 81
+	const wantTotal = 83
 	if total != wantTotal {
 		t.Errorf("Explicitly excluded section has %d entries, want %d — was a pair accidentally added or removed from docs/related-resources.md?", total, wantTotal)
 	}

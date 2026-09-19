@@ -26,9 +26,9 @@ func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("acm")
 	}
 	if server.Certificate == nil || *server.Certificate == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "server.Certificate")
 	}
-	return relatedResult("acm", []string{*server.Certificate})
+	return relatedResultTrunc("acm", []string{*server.Certificate}, false)
 }
 
 // checkTransferLambda reads IdentityProviderDetails.Function directly
@@ -41,7 +41,7 @@ func checkTransferLambda(_ context.Context, clients any, res resource.Resource, 
 	}
 	if server.IdentityProviderType != transfertypes.IdentityProviderTypeAwsLambda ||
 		server.IdentityProviderDetails == nil || server.IdentityProviderDetails.Function == nil {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "IdentityProviderDetails.Function")
 	}
 	return relatedRefs("lambda", []string{*server.IdentityProviderDetails.Function}, refContext(clients, cache, "lambda"))
 }
@@ -62,7 +62,7 @@ func checkTransferRole(_ context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("role")
 	}
 	if server.LoggingRole == nil || *server.LoggingRole == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "server.LoggingRole")
 	}
 	return relatedRefs("role", []string{*server.LoggingRole}, refContext(clients, cache, "role"))
 }
@@ -75,9 +75,9 @@ func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ reso
 		return resource.UnknownRelated("subnet")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.SubnetIds) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "server.EndpointDetails.SubnetIds")
 	}
-	return relatedResult("subnet", server.EndpointDetails.SubnetIds)
+	return relatedResultTrunc("subnet", server.EndpointDetails.SubnetIds, false)
 }
 
 // checkTransferEIP reads EndpointDetails.AddressAllocationIds directly
@@ -90,9 +90,9 @@ func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("eip")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.AddressAllocationIds) == 0 {
-		return resource.KnownRelated("eip", nil, false)
+		return resource.ProvenZero("eip", "server.EndpointDetails.AddressAllocationIds")
 	}
-	return relatedResult("eip", server.EndpointDetails.AddressAllocationIds)
+	return relatedResultTrunc("eip", server.EndpointDetails.AddressAllocationIds, false)
 }
 
 // checkTransferVPC reads EndpointDetails.VpcId directly (Pattern F);
@@ -103,9 +103,9 @@ func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 		return resource.UnknownRelated("vpc")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcId == nil || *server.EndpointDetails.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "server.EndpointDetails.VpcId")
 	}
-	return relatedResult("vpc", []string{*server.EndpointDetails.VpcId})
+	return relatedResultTrunc("vpc", []string{*server.EndpointDetails.VpcId}, false)
 }
 
 // checkTransferVPCE reads EndpointDetails.VpcEndpointId directly (Pattern
@@ -117,7 +117,7 @@ func checkTransferVPCE(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("vpce")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcEndpointId == nil || *server.EndpointDetails.VpcEndpointId == "" {
-		return resource.KnownRelated("vpce", nil, false)
+		return resource.ProvenZero("vpce", "server.EndpointDetails.VpcEndpointId")
 	}
-	return relatedResult("vpce", []string{*server.EndpointDetails.VpcEndpointId})
+	return relatedResultTrunc("vpce", []string{*server.EndpointDetails.VpcEndpointId}, false)
 }

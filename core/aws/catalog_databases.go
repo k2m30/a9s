@@ -109,8 +109,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
-			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true, Truncated: true},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
@@ -242,7 +242,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS, NeedsTargetCache: false},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets, NeedsTargetCache: true, Truncated: true},
@@ -422,7 +422,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda, Truncated: true},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDdbBackup, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs, NeedsTargetCache: true, Truncated: true},
@@ -764,7 +764,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"snapshot_create_time", "storage_type", "storage_encrypted",
 		},
 		Related: []domain.RelatedDef{
-			{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true},
+			{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup, Truncated: true},

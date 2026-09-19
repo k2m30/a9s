@@ -114,7 +114,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 
-		attachedUser, aerr := listAttachedUserPolicies(ctx, clients.IAM, userName)
+		attachedUser, _, aerr := listAttachedUserPolicies(ctx, clients.IAM, userName)
 		adminPolicy := adminAttachedPolicyName(attachedUser)
 		if aerr != nil {
 			mu.Lock()

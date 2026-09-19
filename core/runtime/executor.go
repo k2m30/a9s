@@ -920,7 +920,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					// error (listed-but-denied resources). Seed whatever rows
 					// came — a partially-visible target cache beats an unknown
 					// "?" row.
-					isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+					isTrunc := awsclient.FetchIsPartial(fr, err)
 					if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
 						isTrunc = true
 					}

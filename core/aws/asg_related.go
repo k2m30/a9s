@@ -9,8 +9,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -29,9 +31,9 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "ids")
 	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, false)
 }
 
 // checkASGAlarm searches the alarm cache for alarms with an "AutoScalingGroupName" dimension
@@ -45,7 +47,7 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgName := res.ID
 	if asgName == "" {
-		return resource.KnownRelated("ng", nil, false)
+		return resource.ProvenZero("ng", "asgName")
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
@@ -90,21 +92,14 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
-			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
-				LaunchConfigurationNames: []string{*asg.LaunchConfigurationName},
-			})
-		})
+		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
 		if err != nil {
 			return resource.ErrorRelated("ami", err)
 		}
-		if len(out.LaunchConfigurations) > 0 && out.LaunchConfigurations[0].ImageId != nil {
-			imageID := *out.LaunchConfigurations[0].ImageId
-			if imageID != "" {
-				return relatedResult("ami", []string{imageID})
-			}
+		if len(lcs) > 0 && aws.ToString(lcs[0].ImageId) != "" {
+			return relatedResultTrunc("ami", []string{*lcs[0].ImageId}, false)
 		}
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "LaunchConfiguration.ImageId")
 	}
 
 	ltSpec := asg.LaunchTemplate
@@ -112,29 +107,19 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "ltSpec.LaunchTemplateId")
 	}
 
-	version := aws.String("$Latest")
-	if ltSpec.Version != nil && *ltSpec.Version != "" {
-		version = ltSpec.Version
-	}
-
-	ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-		return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-			LaunchTemplateId: ltSpec.LaunchTemplateId,
-			Versions:         []string{*version},
-		})
-	})
+	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
 	if err != nil {
 		return resource.ErrorRelated("ami", err)
 	}
-	for _, v := range ltOut.LaunchTemplateVersions {
+	for _, v := range versions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedResult("ami", []string{*v.LaunchTemplateData.ImageId})
+			return relatedResultTrunc("ami", []string{*v.LaunchTemplateData.ImageId}, false)
 		}
 	}
-	return resource.KnownRelated("ami", nil, false)
+	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")
 }
 
 // checkASGELB resolves the ALB/NLB behind this ASG's TargetGroupARNs via
@@ -146,25 +131,31 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("elb")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "asg.TargetGroupARNs")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.UnknownRelated("elb")
 	}
-	tgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetGroupsOutput, error) {
-		return c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
+	tgs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.TargetGroup, *string, error) {
+		out, err := c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
 			TargetGroupArns: asg.TargetGroupARNs,
+			Marker:          marker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.TargetGroups, out.NextMarker, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
 	var refs []string
-	for _, tg := range tgOut.TargetGroups {
+	for _, tg := range tgs {
 		refs = append(refs, tg.LoadBalancerArns...)
 	}
-	return relatedRefs("elb", refs, refContext(clients, cache, "elb"))
+	ids, dropped := resolveRefs("elb", refs, refContext(clients, cache, "elb"))
+	return relatedResultTrunc("elb", ids, dropped || !complete)
 }
 
 // checkASGRole resolves IAM roles associated with this ASG.
@@ -220,19 +211,15 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 // count a lower bound, the second makes it exact.
 func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgtypes.AutoScalingGroup) (profile string, checked bool) {
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
-			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
-				LaunchConfigurationNames: []string{*asg.LaunchConfigurationName},
-			})
-		})
+		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
 		// The caller turns false into a lower-bound count or UnknownRelated,
 		// so the role pivot never claims an exact number it did not read.
 		// no finding: false is the record.
-		if err != nil || len(out.LaunchConfigurations) == 0 {
+		if err != nil || len(lcs) == 0 {
 			return "", false
 		}
-		if out.LaunchConfigurations[0].IamInstanceProfile != nil {
-			return *out.LaunchConfigurations[0].IamInstanceProfile, true
+		if lcs[0].IamInstanceProfile != nil {
+			return *lcs[0].IamInstanceProfile, true
 		}
 		// no finding: the launch configuration was read and names no instance
 		// profile, which is an answer.
@@ -249,23 +236,14 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 		return "", true
 	}
 
-	version := aws.String("$Latest")
-	if ltSpec.Version != nil && *ltSpec.Version != "" {
-		version = ltSpec.Version
-	}
-	ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-		return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-			LaunchTemplateId: ltSpec.LaunchTemplateId,
-			Versions:         []string{*version},
-		})
-	})
+	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
 	// As in the launch-configuration arm above, the caller renders the pivot
 	// as a lower bound or as unknown.
 	// no finding: false is the record.
-	if err != nil || len(ltOut.LaunchTemplateVersions) == 0 {
+	if err != nil || len(versions) == 0 {
 		return "", false
 	}
-	ltData := ltOut.LaunchTemplateVersions[0].LaunchTemplateData
+	ltData := versions[0].LaunchTemplateData
 	if ltData == nil || ltData.IamInstanceProfile == nil {
 		// no finding: the template version was read and declares no instance
 		// profile, which is an answer.
@@ -305,4 +283,40 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 		}
 	}
 	return roleARNs, true
+}
+
+// launchConfigurations reads the named launch configuration.
+func launchConfigurations(ctx context.Context, api ASGDescribeLaunchConfigurationsAPI, name string) ([]asgtypes.LaunchConfiguration, error) {
+	lcs, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.LaunchConfiguration, *string, error) {
+		out, err := api.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
+			LaunchConfigurationNames: []string{name},
+			NextToken:                token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.LaunchConfigurations, out.NextToken, nil
+	})
+	return lcs, err
+}
+
+// launchTemplateVersions reads one version of a launch template; an empty
+// version is $Latest.
+func launchTemplateVersions(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, id, version *string) ([]ec2types.LaunchTemplateVersion, error) {
+	v := aws.ToString(version)
+	if v == "" {
+		v = "$Latest"
+	}
+	versions, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.LaunchTemplateVersion, *string, error) {
+		out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+			LaunchTemplateId: id,
+			Versions:         []string{v},
+			NextToken:        token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.LaunchTemplateVersions, out.NextToken, nil
+	})
+	return versions, err
 }

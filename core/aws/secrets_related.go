@@ -25,7 +25,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("kms", nil, false)
 	}
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "secret.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*secret.KmsKeyId})
 }
@@ -42,7 +42,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		return resource.KnownRelated("lambda", nil, false)
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "secret.RotationLambdaARN")
 	}
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
@@ -61,7 +61,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := secretsCFNStackName(res)
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -112,7 +112,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		secretARN = res.Fields["arn"]
 	}
 	if secretARN == "" {
-		return resource.KnownRelated("dbi", nil, false)
+		return resource.ProvenZero("dbi", "secretARN")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")

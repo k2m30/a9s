@@ -178,33 +178,6 @@ func pipelineDeclarationWithCFNAction(pipelineName, stackName string) *cptypes.P
 	}
 }
 
-// pipelineDeclarationWithCodeArtifactAction builds a minimal PipelineDeclaration
-// referencing a CodeArtifact repository name.
-func pipelineDeclarationWithCodeArtifactAction(pipelineName, repoName string) *cptypes.PipelineDeclaration {
-	return &cptypes.PipelineDeclaration{
-		Name: aws.String(pipelineName),
-		Stages: []cptypes.StageDeclaration{
-			{
-				Name: aws.String("Source"),
-				Actions: []cptypes.ActionDeclaration{
-					{
-						Name: aws.String("CodeArtifactSource"),
-						ActionTypeId: &cptypes.ActionTypeId{
-							Category: cptypes.ActionCategorySource,
-							Owner:    cptypes.ActionOwnerAws,
-							Provider: aws.String("CodeArtifact"),
-							Version:  aws.String("1"),
-						},
-						Configuration: map[string]string{
-							"RepositoryName": repoName,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 // pipelineDeclarationWithECSSvcAction builds a minimal PipelineDeclaration
 // referencing an ECS service name in a deploy action.
 func pipelineDeclarationWithECSSvcAction(pipelineName, serviceName string) *cptypes.PipelineDeclaration {

@@ -18,7 +18,7 @@ import (
 func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	name := res.ID
 	if name == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "name")
 	}
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {

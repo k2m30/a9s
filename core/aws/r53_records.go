@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -160,23 +161,27 @@ var errRecordPagesCapped = errors.New("record listing stopped at the page cap")
 // the zone truncated: what a short walk cannot say is that the rest of the
 // zone is clean.
 func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, err error) {
+	// Route 53 resumes from a three-part cursor carried in input between
+	// pages; the token handed back only marks that another page follows.
 	input := &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID}
-	for range PerParentPageCap {
-		out, pageErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
-			return api.ListResourceRecordSets(ctx, input)
-		})
-		if pageErr != nil {
-			return records, pageErr
+	records, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, _ *string) ([]r53types.ResourceRecordSet, *string, error) {
+		out, callErr := api.ListResourceRecordSets(ctx, input)
+		if callErr != nil {
+			return nil, nil, callErr
 		}
-		records = append(records, out.ResourceRecordSets...)
 		if !out.IsTruncated {
-			return records, nil
+			return out.ResourceRecordSets, nil, nil
 		}
 		input.StartRecordName = out.NextRecordName
 		input.StartRecordType = out.NextRecordType
 		input.StartRecordIdentifier = out.NextRecordIdentifier
+		return out.ResourceRecordSets, aws.String("more"), nil
+	})
+	if err != nil {
+		return records, err
 	}
-	// The page cap stopped the walk: the records read are real, but the zone
-	// was not seen whole.
-	return records, errRecordPagesCapped
+	if !complete {
+		return records, errRecordPagesCapped
+	}
+	return records, nil
 }

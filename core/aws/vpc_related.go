@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -18,7 +19,7 @@ import (
 func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -43,7 +44,7 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
@@ -68,7 +69,7 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -93,7 +94,7 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -123,7 +124,7 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("nat", nil, false)
+		return resource.ProvenZero("nat", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -148,7 +149,7 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("igw", nil, false)
+		return resource.ProvenZero("igw", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "igw")
@@ -173,7 +174,7 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("rtb", nil, false)
+		return resource.ProvenZero("rtb", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -198,7 +199,7 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("vpce", nil, false)
+		return resource.ProvenZero("vpce", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
@@ -226,9 +227,9 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
-	return relatedResult("cfn", []string{stackName})
+	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
 // checkVPCENI searches the eni cache for network interfaces whose vpc_id
@@ -236,7 +237,7 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -266,38 +267,33 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.KnownRelated("tgw", nil, false)
+		return resource.ProvenZero("tgw", "vpcID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
 		return resource.UnknownRelated("tgw")
 	}
-	resIDName := "resource-id"
-	resTypeName := "resource-type"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
-		return c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
+	atts, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayAttachment, *string, error) {
+		out, err := c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
 			Filters: []ec2types.Filter{
-				{Name: &resIDName, Values: []string{vpcID}},
-				{Name: &resTypeName, Values: []string{"vpc"}},
+				{Name: aws.String("resource-id"), Values: []string{vpcID}},
+				{Name: aws.String("resource-type"), Values: []string{"vpc"}},
 			},
+			NextToken: token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.TransitGatewayAttachments, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("tgw", err)
 	}
-	seen := make(map[string]bool)
 	var ids []string
-	for _, att := range out.TransitGatewayAttachments {
-		if att.TransitGatewayId == nil || *att.TransitGatewayId == "" {
-			continue
-		}
-		if seen[*att.TransitGatewayId] {
-			continue
-		}
-		seen[*att.TransitGatewayId] = true
-		ids = append(ids, *att.TransitGatewayId)
+	for _, att := range atts {
+		ids = append(ids, aws.ToString(att.TransitGatewayId))
 	}
-	return relatedResult("tgw", ids)
+	return relatedResultTrunc("tgw", ids, !complete)
 }
 
 // vpcIDFromResource extracts the VPC ID from a VPC resource.

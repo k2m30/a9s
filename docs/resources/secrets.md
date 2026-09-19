@@ -41,7 +41,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 
 - **Why related**: CodeArtifact authorization tokens are commonly stashed in Secrets Manager; operators diagnosing package-pull failures want the linked repository.
 - **How discovered**: Heuristic — secret `Name` or `Tags` contain the string `codeartifact` (no direct AWS cross-reference exists).
-- **Count shown**: yes.
+- **Count shown**: no — for a secret that names CodeArtifact the repositories are candidates (heuristic coverage), rendered as a blank, navigable row. A secret whose name, description and tags say nothing about CodeArtifact has none: the row is the dimmed `(0)` dead end.
 
 ### `dbi`
 
@@ -76,8 +76,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `logs`
 
 - **Why related**: When rotation is broken, the first thing an operator opens is the rotation Lambda's log group.
-- **How discovered**: Resolve `RotationLambdaARN` → `lambda:GetFunction` → `FunctionConfiguration.LoggingConfig.LogGroup` (fall back to the default `/aws/lambda/<name>` when unset).
-- **Count shown**: yes.
+- **How discovered**: Resolve `RotationLambdaARN` → `lambda:GetFunction` → `FunctionConfiguration.LoggingConfig.LogGroup`, or the default `/aws/lambda/<name>` when it is unset.
+- **Count shown**: yes when the function's configuration was read; when `GetFunction` did not answer, the default name is a candidate (heuristic coverage) and the row renders blank.
 
 ### `role`
 
@@ -246,8 +246,8 @@ secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell r
 | codeartifact | CodeArtifact Domains | no |
 | eb | Elastic Beanstalk | yes |
 | ecs-task | ECS Tasks | yes |
-| logs | Log Groups | no |
-| role | IAM Roles | no |
+| logs | Log Groups | yes |
+| role | IAM Roles | yes |
 | sns | SNS Topics | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

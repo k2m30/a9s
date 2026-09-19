@@ -279,7 +279,7 @@ redis — DATABASES & STORAGE. Status key: `status` — the key the status cell 
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
 | cfn | CloudFormation | yes |
-| ct-events | CloudTrail Events | no |
+| ct-events | CloudTrail Events | yes |
 | kms | KMS Key | no |
 | logs | Log Groups | yes |
 | secrets | Secrets Manager | yes |

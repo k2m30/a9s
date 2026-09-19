@@ -105,31 +105,17 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 	apiID := r.ID
 	row := newRowResult()
 	var rowFailures []Failure
-	var stages []apigatewayv2types.Stage
-	stagesTruncated := false
-	var stagesNextToken *string
-	stagePages := 0
-	var fetchErr error
-	for {
-		if stagePages >= PerParentPageCap {
-			stagesTruncated = true
-			break
-		}
+	stages, complete, fetchErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigatewayv2types.Stage, *string, error) {
 		out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
 			ApiId:     aws.String(apiID),
-			NextToken: stagesNextToken,
+			NextToken: token,
 		})
-		stagePages++
 		if err != nil {
-			fetchErr = err
-			break
+			return nil, nil, err
 		}
-		stages = append(stages, out.Items...)
-		if out.NextToken == nil {
-			break
-		}
-		stagesNextToken = out.NextToken
-	}
+		return out.Items, out.NextToken, nil
+	})
+	stagesTruncated := !complete
 
 	stagesCountStr := resource.FormatExact(len(stages))
 	if stagesTruncated || fetchErr != nil {

@@ -42,7 +42,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(buckets) == 0 {
-		return resource.KnownRelated("s3", nil, cfgErr != nil)
+		return relatedResultTrunc("s3", nil, cfgErr != nil)
 	}
 
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
@@ -81,7 +81,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("elb")
 	}
 	if dist.Origins == nil {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "dist.Origins")
 	}
 
 	elbDomains := make(map[string]struct{})
@@ -94,7 +94,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(elbDomains) == 0 {
-		return resource.KnownRelated("elb", nil, false)
+		return resource.ProvenZero("elb", "elbDomains")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -123,7 +123,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("waf")
 	}
 	if dist.WebACLId == nil || *dist.WebACLId == "" {
-		return resource.KnownRelated("waf", nil, false)
+		return resource.ProvenZero("waf", "dist.WebACLId")
 	}
 	webACLID := *dist.WebACLId
 
@@ -152,7 +152,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("acm")
 	}
 	if dist.ViewerCertificate == nil || dist.ViewerCertificate.ACMCertificateArn == nil || *dist.ViewerCertificate.ACMCertificateArn == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "dist.ViewerCertificate.ACMCertificateArn")
 	}
 	certARN := *dist.ViewerCertificate.ACMCertificateArn
 
@@ -194,7 +194,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 	// Fallback: parse Fields["aliases"] (comma-joined in the fetcher).
 	aliases := extractCfAliases(res)
 	if len(aliases) == 0 {
-		return resource.KnownRelated("r53", nil, false)
+		return resource.ProvenZero("r53", "aliases")
 	}
 
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
@@ -279,7 +279,7 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("lambda", err)
 	}
 	if cfg == nil {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "cfg")
 	}
 	var arns []string
 	collect := func(lfa *cftypes.LambdaFunctionAssociations) {

@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `cfn`
 
 - **Why related**: CloudFormation stack that created the cluster — jump to the stack for change history and drift context.
-- **How discovered**: read `Cluster.Tags[]` for the AWS-injected tag `aws:cloudformation:stack-name`; cross-reference the already-loaded `cfn` list by stack name.
+- **How discovered**: read `Cluster.Tags[]` for the AWS-injected tag `aws:cloudformation:stack-name`, which `DescribeClusters` returns only when the fetch names `TAGS` in `Include`; cross-reference the already-loaded `cfn` list by stack name.
 - **Count shown**: yes.
 
 ### `ec2`
@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `kms`
 
 - **Why related**: `ExecuteCommandConfiguration.KmsKeyId` — the key that encrypts the `ecs exec` session stream. A key in `PendingDeletion` breaks `ecs exec` for everyone on the cluster.
-- **How discovered**: read `Cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId`; cross-reference the already-loaded `kms` list by key ID/ARN.
+- **How discovered**: read `Cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId`, which `DescribeClusters` returns only when the fetch names `CONFIGURATIONS` in `Include`; cross-reference the already-loaded `kms` list by key ID/ARN.
 - **Count shown**: yes (0 or 1).
 
 ### `logs`
@@ -199,7 +199,7 @@ ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | kms | KMS Key | no |
 | asg | Auto Scaling Groups | yes |
 | ec2 | EC2 Instances | yes |
-| ct-events | CloudTrail Events | no |
+| ct-events | CloudTrail Events | yes |
 | ecs-task | ECS Tasks | yes |
 | logs | Log Groups | yes |
 <!-- END GENERATED: related -->

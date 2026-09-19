@@ -156,7 +156,7 @@ athena — DATA & ANALYTICS. Status key: `state` — the key the status cell rea
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | s3 | S3 Buckets (results) | no |
-| kms | KMS Keys | no |
+| kms | KMS Keys | yes |
 | logs | Log Groups | no |
 | role | IAM Roles | no |
 | ct-events | CloudTrail Events | no |

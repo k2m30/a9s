@@ -129,37 +129,32 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	// behind a pending token below — mark the groups that referenced it, so
 	// none of them reads "nothing to report" for a posture nobody looked at.
 	const op = "DescribeLaunchConfigurations"
-	var configs []asgtypes.LaunchConfiguration
-	var nextToken *string
-	for range PerParentPageCap {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
-			return clients.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
-				LaunchConfigurationNames: names,
-				NextToken:                nextToken,
-			})
+	configs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.LaunchConfiguration, *string, error) {
+		out, err := clients.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
+			LaunchConfigurationNames: names,
+			NextToken:                token,
 		})
 		if err != nil {
-			// Any page failing leaves the whole batch uninspected: pages read
-			// before it are dropped rather than applied, so no group reports a
-			// clean posture on a partial read.
-			var failures []Failure
-			groups := 0
-			for _, name := range names {
-				for _, id := range groupsByLC[name] {
-					MarkSkipped(result, id, &failures, err)
-					groups++
-				}
+			return nil, nil, err
+		}
+		return out.LaunchConfigurations, out.NextToken, nil
+	})
+	if err != nil {
+		// Any page failing leaves the whole batch uninspected: pages read
+		// before it are dropped rather than applied, so no group reports a
+		// clean posture on a partial read.
+		var failures []Failure
+		groups := 0
+		for _, name := range names {
+			for _, id := range groupsByLC[name] {
+				MarkSkipped(result, id, &failures, err)
+				groups++
 			}
-			// One failure per group, so the aggregate's total counts groups
-			// too: several groups can share a launch configuration, and
-			// len(names) would read "8 of 5".
-			return Finish(result, failures, groups, op)
 		}
-		configs = append(configs, out.LaunchConfigurations...)
-		nextToken = out.NextToken
-		if aws.ToString(nextToken) == "" {
-			break
-		}
+		// One failure per group, so the aggregate's total counts groups
+		// too: several groups can share a launch configuration, and
+		// len(names) would read "8 of 5".
+		return Finish(result, failures, groups, op)
 	}
 
 	// A token still pending means the cap fell through, not the pages: the
@@ -167,7 +162,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	// as uninspected as a group behind a failed page. Only those groups are
 	// marked — a group whose configuration DID arrive was inspected, and
 	// hiding its finding behind a "?" would lose a real one.
-	if aws.ToString(nextToken) != "" {
+	if !complete {
 		SetTruncated(result, true)
 		read := make(map[string]bool, len(configs))
 		for _, lc := range configs {

@@ -20,7 +20,7 @@ func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("kms")
 	}
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "table.SSEDescription.KMSMasterKeyArn")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*table.SSEDescription.KMSMasterKeyArn})
 }
@@ -30,7 +30,7 @@ func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "tableName")
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -60,7 +60,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if truncated {
 		return truncatedResultDDB("alarm", ids)
 	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, false)
 }
 
 // checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
@@ -70,7 +70,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
-		return resource.KnownRelated("backup", nil, false)
+		return resource.ProvenZero("backup", "tableARN")
 	}
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
@@ -88,7 +88,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return resource.KnownRelated("kinesis", nil, false)
+		return resource.ProvenZero("kinesis", "tableName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
@@ -131,7 +131,7 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if table.LatestStreamArn == nil || *table.LatestStreamArn == "" {
 		// Streams not enabled on this table — no Lambda triggers are possible.
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "table.LatestStreamArn")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *table.LatestStreamArn, cache)
 }

@@ -201,6 +201,36 @@ func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckR
 	return domain.KnownRelated(targetType, ids, truncated)
 }
 
+// RelatedCoverage states how far a related lookup searched. Declaration lives
+// in core/domain/contracts.go; this alias re-exports it.
+type RelatedCoverage = domain.RelatedCoverage
+
+// Coverage values; see domain.RelatedCoverage.
+const (
+	CoverageComplete  = domain.CoverageComplete
+	CoveragePartial   = domain.CoveragePartial
+	CoverageNoPath    = domain.CoverageNoPath
+	CoverageHeuristic = domain.CoverageHeuristic
+)
+
+// ProvenZero is the only result that reports a complete zero; see
+// domain.ProvenZero.
+func ProvenZero(targetType, evidence string) RelatedCheckResult {
+	return domain.ProvenZero(targetType, evidence)
+}
+
+// NoDiscoveryPath is the result of a pivot AWS records no link for; see
+// domain.NoDiscoveryPath.
+func NoDiscoveryPath(targetType string) RelatedCheckResult {
+	return domain.NoDiscoveryPath(targetType)
+}
+
+// HeuristicRelated is the result of a pivot that matches by a shared
+// property; see domain.HeuristicRelated.
+func HeuristicRelated(targetType string, ids []string) RelatedCheckResult {
+	return domain.HeuristicRelated(targetType, ids)
+}
+
 // IsRelatedActionable is the single source of truth for "can the user drill into
 // this related-resource pivot". It is consumed by the TUI right column
 // (isActionableRow), the headless controller (ActionRelatedSelect +

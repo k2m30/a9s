@@ -31,7 +31,7 @@ func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("kms")
 	}
 	if env.KmsKey == nil || *env.KmsKey == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "env.KmsKey")
 	}
 	return kmsRelated(ctx, clients, cache, []string{kmsRefFromField(*env.KmsKey, res.Type)})
 }
@@ -44,7 +44,7 @@ func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("logs")
 	}
 	if env.LoggingConfiguration == nil {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "env.LoggingConfiguration")
 	}
 	var ids []string
 	for _, m := range []*mwaatypes.ModuleLoggingConfiguration{
@@ -68,7 +68,7 @@ func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("role")
 	}
 	if env.ExecutionRoleArn == nil || *env.ExecutionRoleArn == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "env.ExecutionRoleArn")
 	}
 	return relatedRefs("role", []string{*env.ExecutionRoleArn}, refContext(clients, cache, "role"))
 }
@@ -80,13 +80,13 @@ func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("s3")
 	}
 	if env.SourceBucketArn == nil || *env.SourceBucketArn == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "env.SourceBucketArn")
 	}
 	a, ok := ARNForService(*env.SourceBucketArn, "s3")
 	if !ok || a.Resource == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "a.Resource")
 	}
-	return relatedResult("s3", []string{a.Resource})
+	return relatedResultTrunc("s3", []string{a.Resource}, false)
 }
 
 // checkMWAASG reads NetworkConfiguration.SecurityGroupIds directly.
@@ -96,9 +96,9 @@ func checkMWAASG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("sg")
 	}
 	if env.NetworkConfiguration == nil || len(env.NetworkConfiguration.SecurityGroupIds) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "env.NetworkConfiguration.SecurityGroupIds")
 	}
-	return relatedResult("sg", env.NetworkConfiguration.SecurityGroupIds)
+	return relatedResultTrunc("sg", env.NetworkConfiguration.SecurityGroupIds, false)
 }
 
 // checkMWAASubnet reads NetworkConfiguration.SubnetIds directly.
@@ -108,7 +108,7 @@ func checkMWAASubnet(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if env.NetworkConfiguration == nil || len(env.NetworkConfiguration.SubnetIds) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "env.NetworkConfiguration.SubnetIds")
 	}
-	return relatedResult("subnet", env.NetworkConfiguration.SubnetIds)
+	return relatedResultTrunc("subnet", env.NetworkConfiguration.SubnetIds, false)
 }

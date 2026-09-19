@@ -23,7 +23,7 @@ import (
 func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "svcName")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -53,7 +53,7 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "svcName")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -83,7 +83,7 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("subnet")
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "raw.NetworkConfiguration.AwsvpcConfiguration")
 	}
 	var ids []string
 	for _, s := range raw.NetworkConfiguration.AwsvpcConfiguration.Subnets {
@@ -91,7 +91,7 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 			ids = append(ids, s)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkECSSvcVPC derives the VPC from the service's subnets. Pattern C:
@@ -105,11 +105,11 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "raw.NetworkConfiguration.AwsvpcConfiguration")
 	}
 	subnetIDs := raw.NetworkConfiguration.AwsvpcConfiguration.Subnets
 	if len(subnetIDs) == 0 {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "subnetIDs")
 	}
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
@@ -145,7 +145,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := res.ID
 	if svcName == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "svcName")
 	}
 	clusterName := res.Fields["cluster"]
 
@@ -232,7 +232,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("ecr")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.KnownRelated("ecr", nil, false)
+		return resource.ProvenZero("ecr", "raw.TaskDefinition")
 	}
 	taskDefARN := *raw.TaskDefinition
 
@@ -276,7 +276,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("secrets")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "raw.TaskDefinition")
 	}
 	taskDefARN := *raw.TaskDefinition
 
@@ -339,12 +339,12 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("sfn")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("sfn", "raw.TaskDefinition"))
 	}
 
 	family := taskDefFamily(*raw.TaskDefinition)
 	if family == "" {
-		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("sfn", "family"))
 	}
 
 	entry, ok := cache["sfn"]

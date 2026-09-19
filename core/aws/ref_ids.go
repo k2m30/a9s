@@ -68,7 +68,7 @@ func grantedPrincipalRefs(policy, kind string) (refs []string, ok bool) {
 // local row is left out and makes the count a lower bound.
 func relatedRefs(target string, refs []string, rc domain.RefContext) resource.RelatedCheckResult {
 	ids, dropped := resolveRefs(target, refs, rc)
-	return resource.KnownRelated(target, ids, dropped)
+	return relatedResultTrunc(target, ids, dropped)
 }
 
 // resolveRefs is relatedRefs for a checker that has a truncation of its own
@@ -320,7 +320,7 @@ func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, 
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
-	return resource.KnownRelated("kms", ids, lowerBound)
+	return relatedResultTrunc("kms", ids, lowerBound)
 }
 
 // isKMSKeyID reports whether s has the shape of a key ID: a UUID, or

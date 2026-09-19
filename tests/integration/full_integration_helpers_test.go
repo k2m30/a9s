@@ -493,6 +493,14 @@ func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expect
 			t.Fatalf("%s: missing related result %q; got %v", context, name, gotByName)
 		}
 		t.Logf("%s related result %s: actual=%d expected=%d", context, name, rr.Count(), want)
+		// A result that searched nothing (no discovery path, or nothing to
+		// search with) or that holds heuristic candidates renders as a blank
+		// row: the panel shows no number for it.
+		if cov := rr.Coverage(); cov == resource.CoverageNoPath || cov == resource.CoverageHeuristic {
+			coldUnknown[name] = true
+			t.Logf("%s: related %q answered coverage %v; the row renders blank, oracle counted %d", context, name, cov, want)
+			continue
+		}
 		// A deferred/unknown/loading result carries no authoritative count —
 		// State marks it, not Count. When the def registers no target prefetch,
 		// the view could not resolve it from its own cache while the oracle did

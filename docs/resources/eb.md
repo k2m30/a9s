@@ -249,9 +249,9 @@ eb — MESSAGING. Status key: `status` — the key the status cell reads, and th
 | ec2 | EC2 Instances | yes |
 | alarm | CloudWatch Alarms | yes |
 | elb | Load Balancers | no |
-| tg | Target Groups | no |
+| tg | Target Groups | yes |
 | sg | Security Groups | no |
-| role | IAM Role | no |
-| s3 | S3 Buckets | no |
+| role | IAM Role | yes |
+| s3 | S3 Buckets | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

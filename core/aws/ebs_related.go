@@ -15,16 +15,16 @@ import (
 func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.Fields["attached_to"]
 	if instanceID == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "instanceID")
 	}
-	return relatedResult("ec2", []string{instanceID})
+	return relatedResultTrunc("ec2", []string{instanceID}, false)
 }
 
 // checkEBSSnap searches the ebs-snap cache for snapshots of this volume (Pattern C).
 func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return resource.KnownRelated("ebs-snap", nil, false)
+		return resource.ProvenZero("ebs-snap", "volID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
@@ -51,7 +51,7 @@ func checkEBSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("kms")
 	}
 	if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "vol.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*vol.KmsKeyId})
 }
@@ -81,7 +81,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -113,7 +113,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return unreadZero(res, resource.KnownRelated("backup", nil, false))
+		return unreadZero(res, resource.ProvenZero("backup", "volID"))
 	}
 	tags, tagsKnown := ebsVolumeTags(res)
 

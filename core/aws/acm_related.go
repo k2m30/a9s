@@ -29,7 +29,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if certARN == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "certARN")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -142,7 +142,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		certARN = *raw.CertificateArn
 	}
 	if certARN == "" {
-		return unreadZero(res, resource.KnownRelated("r53", nil, false))
+		return unreadZero(res, resource.ProvenZero("r53", "certARN"))
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ACM == nil {
@@ -155,7 +155,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("r53", err)
 	}
 	if out.Certificate == nil {
-		return unreadZero(res, resource.KnownRelated("r53", nil, false))
+		return unreadZero(res, resource.ProvenZero("r53", "out.Certificate"))
 	}
 	var recordNames []string
 	for _, dvo := range out.Certificate.DomainValidationOptions {
@@ -164,7 +164,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(recordNames) == 0 {
-		return unreadZero(res, resource.KnownRelated("r53", nil, false))
+		return unreadZero(res, resource.ProvenZero("r53", "recordNames"))
 	}
 	zoneList, truncated, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
 	if zoneList == nil {

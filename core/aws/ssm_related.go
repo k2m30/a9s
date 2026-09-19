@@ -22,11 +22,11 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 
 	if param.Type != ssmtypes.ParameterTypeSecureString {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "param.Type")
 	}
 
 	if param.KeyId == nil || *param.KeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "param.KeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*param.KeyId})
 }

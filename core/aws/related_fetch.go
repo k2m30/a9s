@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -37,7 +38,7 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 		if resources == nil {
 			resources = []resource.Resource{}
 		}
-		return resources, entry.IsTruncated, nil
+		return resources, entry.IsTruncated || anyDegraded(resources), nil
 	}
 	pf := resource.GetPaginatedFetcher(target)
 	if pf == nil {
@@ -47,13 +48,26 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 	if err != nil && len(result.Resources) == 0 {
 		return nil, false, err
 	}
-	// Rows returned beside an error are a per-item partial failure (the
-	// fetcher already kept the degraded rows): a proven subset, answered as
-	// truncated rather than thrown away.
-	isTruncated := err != nil || (result.Pagination != nil && result.Pagination.IsTruncated)
+	isTruncated := FetchIsPartial(result, err)
 	resources := result.Resources
 	if resources == nil {
 		resources = []resource.Resource{}
 	}
 	return resources, isTruncated, nil
+}
+
+// FetchIsPartial reports whether a fetcher's answer is a subset of the list
+// it was asked for. A page that ended with a continuation token, an error
+// returned beside rows (a per-item failure the fetcher kept the rest of), and
+// a row whose details could not be read each leave a match possibly unseen,
+// so a count over the rows is a lower bound.
+func FetchIsPartial(result resource.FetchResult, err error) bool {
+	return err != nil || (result.Pagination != nil && result.Pagination.IsTruncated) || anyDegraded(result.Resources)
+}
+
+// anyDegraded reports whether list holds a row whose details could not be
+// read: such a row may be the one that matches, so a scan over list is a
+// lower bound.
+func anyDegraded(list []resource.Resource) bool {
+	return slices.ContainsFunc(list, func(r resource.Resource) bool { return r.Fields[DegradedFindingField] != "" })
 }

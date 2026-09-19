@@ -25,7 +25,7 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.KnownRelated("role", nil, false)
 	}
 	if stack.RoleARN == nil || *stack.RoleARN == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "stack.RoleARN")
 	}
 	// In-body: the stack's service RoleARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
@@ -108,19 +108,18 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "ids")
 	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, false)
 }
 
-// cfnStackResourcesByType calls cloudformation:ListStackResources(stack) and
+// cfnStackResourcesByType walks cloudformation:ListStackResources(stack) and
 // returns the PhysicalResourceIds whose ResourceType matches the given value
-// (e.g. "AWS::S3::Bucket"). Only the first page is read, to honor the
-// 1-call budget.
+// (e.g. "AWS::S3::Bucket").
 //
-// truncated reports that the page carried a NextToken: resources of the wanted
-// type may sit on pages nobody read, so the count the caller renders is a
-// lower bound and never an exact figure.
+// truncated reports that the walk stopped at the page cap: resources of the
+// wanted type may sit on pages nobody read, so the count the caller renders
+// is a lower bound and never an exact figure.
 func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resourceType string) (ids []string, truncated, ok bool) {
 	if stackName == "" {
 		return nil, false, true
@@ -129,16 +128,23 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 	if !isClients || c == nil || c.CloudFormation == nil {
 		return nil, false, false
 	}
-	out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
-		StackName: aws.String(stackName),
+	summaries, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cfntypes.StackResourceSummary, *string, error) {
+		out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
+			StackName: aws.String(stackName),
+			NextToken: token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.StackResourceSummaries, out.NextToken, nil
 	})
 	// Both checkCfn* callers turn false into UnknownRelated, so the pivot
 	// renders "?" rather than claiming the stack holds no such resources.
 	// no finding: false is the answer this helper exists to give.
-	if err != nil || out == nil {
+	if err != nil {
 		return nil, false, false
 	}
-	for _, r := range out.StackResourceSummaries {
+	for _, r := range summaries {
 		if r.ResourceType == nil || *r.ResourceType != resourceType {
 			continue
 		}
@@ -147,7 +153,7 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 		}
 		ids = append(ids, *r.PhysicalResourceId)
 	}
-	return ids, aws.ToString(out.NextToken) != "", true
+	return ids, !complete, true
 }
 
 // checkCfnS3 calls ListStackResources and returns S3 buckets created by the

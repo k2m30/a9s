@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -39,7 +38,7 @@ func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn
 func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sfnName := res.ID
 	if sfnName == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "sfnName")
 	}
 
 	expectedLogGroup := "/aws/vendedlogs/states/" + sfnName
@@ -99,7 +98,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -109,7 +108,7 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("role")
 	}
 	if out.RoleArn == nil || *out.RoleArn == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "out.RoleArn")
 	}
 	return relatedRefs("role", []string{*out.RoleArn}, refContext(clients, cache, "role"))
 }
@@ -119,7 +118,7 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -130,7 +129,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.KmsKeyId == nil ||
 		*out.EncryptionConfiguration.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "out")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*out.EncryptionConfiguration.KmsKeyId})
 }
@@ -141,7 +140,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -151,7 +150,7 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("lambda")
 	}
 	if out.Definition == nil || *out.Definition == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "out.Definition")
 	}
 
 	var refs []string
@@ -193,21 +192,7 @@ func sfnCollectLambdaRefs(def []byte, refs *[]string) {
 func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sfnARN := res.Fields["arn"]
 	if sfnARN == "" {
-		return resource.KnownRelated("eb-rule", nil, false)
+		return resource.ProvenZero("eb-rule", "sfnARN")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.EventBridge == nil {
-		return resource.UnknownRelated("eb-rule")
-	}
-	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
-	if !ok {
-		return resource.UnknownRelated("eb-rule")
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
-		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &sfnARN})
-	})
-	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
-	}
-	return relatedResult("eb-rule", out.RuleNames)
+	return ebRulesTargeting(ctx, clients, sfnARN)
 }

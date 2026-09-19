@@ -25,7 +25,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `cfn`, `codeartifact`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `cfn`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events`. There is no `codeartifact` pivot: CodePipeline has no CodeArtifact action provider, so no action names a CodeArtifact repository (`docs/related-resources.md` § Explicitly excluded).
 
 ### `cb`
 
@@ -37,12 +37,6 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 
 - **Why related**: CloudFormation stacks this pipeline deploys — `docs/related-resources.md` § Per-type contract `pipeline`.
 - **How discovered**: call `GetPipeline`, walk `PipelineDeclaration.Stages[].Actions[]` and keep actions where `ActionTypeId.Category == Deploy` AND `ActionTypeId.Provider == CloudFormation`; read `Configuration["StackName"]` for each match; cross-reference the already-loaded `cfn` list by stack name — a9s-devops: CloudFormation deploy actions always carry `StackName` in the action `Configuration`; this is the only field that identifies the target stack.
-- **Count shown**: yes.
-
-### `codeartifact`
-
-- **Why related**: CodeArtifact repository used as a pipeline source — `docs/related-resources.md` § Per-type contract `pipeline`.
-- **How discovered**: call `GetPipeline`, walk `PipelineDeclaration.Stages[].Actions[]` and keep actions where `ActionTypeId.Category == Source` AND `ActionTypeId.Provider == CodeCommit` is excluded — target is `Provider == CodeStarSourceConnection` with a CodeArtifact ARN in `Configuration`, or a direct CodeArtifact-backed source — a9s-devops: CodeArtifact as a first-class pipeline source is rare in practice; most teams consume CodeArtifact via a CodeBuild action's install step, which is invisible to `GetPipeline`. When a direct source action is present, `Configuration["RepositoryName"]` and `Configuration["DomainName"]` identify the CodeArtifact repository and can be cross-referenced against the loaded `codeartifact` list by `name`. When no direct source action exists this target legitimately shows 0.
 - **Count shown**: yes.
 
 ### `eb-rule`
@@ -164,21 +158,20 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 ## 6. Citations
 
-- pipeline related-panel targets `cb`, `cfn`, `codeartifact`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `pipeline`.
+- pipeline related-panel targets `cb`, `cfn`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events` — `docs/related-resources.md` § Per-type contract, row `pipeline`.
 - pipeline has no Wave 1 signals (`ListPipelines` is config-only) — `docs/attention-signals.md § Signals § CI/CD` row `pipeline`.
 - pipeline Wave 2 signals (`Failed` / `Stopped` / `Cancelled` and `InProgress >2h`) use `GetPipelineState` per pipeline — `docs/attention-signals.md § Signals § CI/CD` row `pipeline`.
 - pipeline Wave 3 items (`ListPipelineExecutions` trend, dormant-pipeline detection) are out of scope — `docs/attention-signals.md § Not yet implemented`.
 - `PipelineSummary` fields returned by `ListPipelines` are `Name`, `Version`, `Created`, `Updated`, `ExecutionMode`, `PipelineType` (no health fields) — `AWS SDK Go v2 — service/codepipeline/types.PipelineSummary`.
 - `PipelineDeclaration.RoleArn` is required; `PipelineDeclaration.ArtifactStore` / `ArtifactStores` carry encryption and location — `AWS SDK Go v2 — service/codepipeline/types.PipelineDeclaration § RoleArn, ArtifactStore, ArtifactStores`.
 - `ArtifactStore.Location` (bucket name) and `ArtifactStore.EncryptionKey` (optional KMS) drive `s3` and `kms` discovery — `AWS SDK Go v2 — service/codepipeline/types.ArtifactStore § Location, EncryptionKey`; `types.EncryptionKey § Id, Type`.
-- `ActionDeclaration.ActionTypeId` (Category/Owner/Provider) + `ActionDeclaration.Configuration` drive every action-based target (`cb`, `cfn`, `ecs-svc`, `ecr`, `lambda`, `sns`, `codeartifact`, `s3` secondary) — `AWS SDK Go v2 — service/codepipeline/types.ActionDeclaration § ActionTypeId, Configuration`; `types.ActionTypeId § Category, Owner, Provider`.
+- `ActionDeclaration.ActionTypeId` (Category/Owner/Provider) + `ActionDeclaration.Configuration` drive every action-based target (`cb`, `cfn`, `ecs-svc`, `ecr`, `lambda`, `sns`, `s3` secondary) — `AWS SDK Go v2 — service/codepipeline/types.ActionDeclaration § ActionTypeId, Configuration`; `types.ActionTypeId § Category, Owner, Provider`.
 - `StageState.LatestExecution.Status` is the field driving all Wave 2 findings; `StageExecutionStatus` SDK note on `Cancelled` explains the "definition updated mid-run" semantics — `AWS SDK Go v2 — service/codepipeline/types.StageState § LatestExecution`; `types.StageExecution § Status`.
 - `ActionState.LatestExecution.Token` present indicates a manual approval is pending — `AWS SDK Go v2 — service/codepipeline/types.ActionExecution § Token`.
 - `ct-events` universal pivot applied to every registered type — `docs/related-resources.md` § Policy, rule 4.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
 - `cb` discovery via `Provider==CodeBuild` action with `Configuration["ProjectName"]` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Configuration map is the sole source of provider-specific params for action targets; ProjectName is the only CodeBuild linkage.`
 - `cfn` discovery via `Provider==CloudFormation` deploy action with `Configuration["StackName"]` — `a9s-devops (2026-04-20): possible=yes, worth=yes. StackName is the canonical link.`
-- `codeartifact` discovery via direct source actions only; indirect CodeBuild usage invisible — `a9s-devops (2026-04-20): possible=yes (when direct), worth=yes. Rare in practice but idiomatic; 0-count when no direct action is not a gap.`
 - `eb-rule` discovery via reverse-scan of loaded rule targets by pipeline ARN — `a9s-devops (2026-04-20): possible=yes, worth=yes. EventBridge target wiring lives on the rule, not on the pipeline. Pipeline V2 Triggers[] covers Git-tag/branch only.`
 - `ecr` discovery via `Provider==ECR` source actions; push side lives on CodeBuild project — `a9s-devops (2026-04-20): possible=yes (sources only), worth=yes. GetPipeline doesn't see ECR push sinks; operator reaches them via the cb pivot.`
 - `ecs-svc` discovery via `Provider in {ECS, ECSBlueGreen, CodeDeployToECS}` deploy actions with `Configuration["ClusterName"]` + `Configuration["ServiceName"]` — `a9s-devops (2026-04-20): possible=yes, worth=yes. These three providers cover both stock and blue/green ECS deploy.`
@@ -205,8 +198,7 @@ pipeline — CI/CD. Status key: `last_status` — the key the status cell reads,
 | cb | CodeBuild Projects | no |
 | role | IAM Roles | no |
 | cfn | CloudFormation | no |
-| codeartifact | CodeArtifact | no |
-| eb-rule | EventBridge Rules | no |
+| eb-rule | EventBridge Rules | yes |
 | ecr | ECR Repositories | no |
 | ecs-svc | ECS Services | no |
 | kms | KMS Key | no |

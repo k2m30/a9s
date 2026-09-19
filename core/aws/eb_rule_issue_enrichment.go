@@ -59,35 +59,21 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		eventBus := r.Fields["event_bus"]
 		state := strings.ToUpper(r.Fields["state"])
 
-		var targets []eventbridgetypes.Target
-		targetsTruncated := false
-		var targetsNextToken *string
-		targetPages := 0
-		var fetchErr error
-		for {
-			if targetPages >= PerParentPageCap {
-				targetsTruncated = true
-				break
-			}
+		targets, complete, fetchErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Target, *string, error) {
 			pageInput := &eventbridge.ListTargetsByRuleInput{
 				Rule:      aws.String(ruleName),
-				NextToken: targetsNextToken,
+				NextToken: token,
 			}
 			if eventBus != "" {
 				pageInput.EventBusName = aws.String(eventBus)
 			}
 			out, err := clients.EventBridge.ListTargetsByRule(ctx, pageInput)
-			targetPages++
 			if err != nil {
-				fetchErr = err
-				break
+				return nil, nil, err
 			}
-			targets = append(targets, out.Targets...)
-			if out.NextToken == nil {
-				break
-			}
-			targetsNextToken = out.NextToken
-		}
+			return out.Targets, out.NextToken, nil
+		})
+		targetsTruncated := !complete && fetchErr == nil
 
 		targetCountStr := resource.FormatExact(len(targets))
 		if targetsTruncated {

@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -22,9 +23,9 @@ func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if len(vpce.SubnetIds) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "vpce.SubnetIds")
 	}
-	return relatedResult("subnet", vpce.SubnetIds)
+	return relatedResultTrunc("subnet", vpce.SubnetIds, false)
 }
 
 // checkVPCESG reads Groups[].GroupId from the VpcEndpoint RawStruct directly.
@@ -41,9 +42,9 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ids")
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkVPCERTB reads RouteTableIds from the VpcEndpoint RawStruct directly.
@@ -54,9 +55,9 @@ func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		return resource.UnknownRelated("rtb")
 	}
 	if len(vpce.RouteTableIds) == 0 {
-		return resource.KnownRelated("rtb", nil, false)
+		return resource.ProvenZero("rtb", "vpce.RouteTableIds")
 	}
-	return relatedResult("rtb", vpce.RouteTableIds)
+	return relatedResultTrunc("rtb", vpce.RouteTableIds, false)
 }
 
 // checkVPCEENI reads NetworkInterfaceIds from the VpcEndpoint RawStruct directly.
@@ -67,9 +68,9 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		return resource.UnknownRelated("eni")
 	}
 	if len(vpce.NetworkInterfaceIds) == 0 {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "vpce.NetworkInterfaceIds")
 	}
-	return relatedResult("eni", vpce.NetworkInterfaceIds)
+	return relatedResultTrunc("eni", vpce.NetworkInterfaceIds, false)
 }
 
 // checkVPCEVPC returns the VPC this endpoint is attached to (Pattern F).
@@ -77,9 +78,9 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "vpcID")
 	}
-	return relatedResult("vpc", []string{vpcID})
+	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
 
 // checkVPCEAlarm reports CloudWatch alarms on this VPC endpoint.
@@ -96,25 +97,27 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpceID := res.ID
 	if vpceID == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "vpceID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
 		return resource.UnknownRelated("logs")
 	}
-	filterName := "resource-id"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeFlowLogsOutput, error) {
-		return c.EC2.DescribeFlowLogs(ctx, &ec2.DescribeFlowLogsInput{
-			Filter: []ec2types.Filter{
-				{Name: &filterName, Values: []string{vpceID}},
-			},
+	flowLogs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.FlowLog, *string, error) {
+		out, err := c.EC2.DescribeFlowLogs(ctx, &ec2.DescribeFlowLogsInput{
+			Filter:    []ec2types.Filter{{Name: aws.String("resource-id"), Values: []string{vpceID}}},
+			NextToken: token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.FlowLogs, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
 	var refs []string
-	for _, fl := range out.FlowLogs {
+	for _, fl := range flowLogs {
 		switch {
 		case fl.LogGroupName != nil && *fl.LogGroupName != "":
 			refs = append(refs, *fl.LogGroupName)
@@ -124,7 +127,8 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	return relatedRefs("logs", refs, refContext(clients, cache, "logs"))
+	ids, dropped := resolveRefs("logs", refs, refContext(clients, cache, "logs"))
+	return relatedResultTrunc("logs", ids, dropped || !complete)
 }
 
 // checkVPCER53 reports Route 53 private hosted zones associated with this VPC
@@ -138,7 +142,7 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if vpcID == "" {
-		return resource.KnownRelated("r53", nil, false)
+		return resource.ProvenZero("r53", "vpcID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -152,23 +156,24 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache
 	if region == "" {
 		region = GetDefaultRegion("", "")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListHostedZonesByVPCOutput, error) {
-		return api.ListHostedZonesByVPC(ctx, &route53.ListHostedZonesByVPCInput{
+	zones, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]r53types.HostedZoneSummary, *string, error) {
+		out, err := api.ListHostedZonesByVPC(ctx, &route53.ListHostedZonesByVPCInput{
 			VPCId:     &vpcID,
 			VPCRegion: r53types.VPCRegion(region),
+			NextToken: token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.HostedZoneSummaries, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("r53", err)
 	}
-	if out == nil || len(out.HostedZoneSummaries) == 0 {
-		return resource.KnownRelated("r53", nil, false)
+	var refs []string
+	for _, z := range zones {
+		refs = append(refs, aws.ToString(z.HostedZoneId))
 	}
-	var ids []string
-	for _, z := range out.HostedZoneSummaries {
-		if z.HostedZoneId != nil {
-			ids = append(ids, *z.HostedZoneId)
-		}
-	}
-	return relatedRefs("r53", ids, refContext(clients, cache, "r53"))
+	ids, dropped := resolveRefs("r53", refs, refContext(clients, cache, "r53"))
+	return relatedResultTrunc("r53", ids, dropped || !complete)
 }

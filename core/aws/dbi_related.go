@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -28,9 +29,9 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ids")
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkDbiKMS reads the KmsKeyId ARN from the DBInstance RawStruct and extracts the UUID suffix.
@@ -40,11 +41,11 @@ func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("kms")
 	}
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "db.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*db.KmsKeyId, res.Type)
 	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -56,7 +57,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if db.DBSubnetGroup == nil || len(db.DBSubnetGroup.Subnets) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "db.DBSubnetGroup.Subnets")
 	}
 	var ids []string
 	for _, subnet := range db.DBSubnetGroup.Subnets {
@@ -65,9 +66,9 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "ids")
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkDbiAlarm searches the alarm cache for alarms with a "DBInstanceIdentifier" dimension
@@ -80,7 +81,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 // DB instance.
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.KnownRelated("dbi-snap", nil, false)
+		return resource.ProvenZero("dbi-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi-snap")
@@ -109,7 +110,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "dbID")
 	}
 
 	prefix := "/aws/rds/instance/" + dbID + "/"
@@ -146,7 +147,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("secrets", nil, false)
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "db.MasterUserSecret.SecretArn")
 	}
 	secretARN := *db.MasterUserSecret.SecretArn
 
@@ -178,9 +179,9 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("vpc")
 		}
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "inst.DBSubnetGroup.VpcId")
 	}
-	return relatedResult("vpc", []string{*inst.DBSubnetGroup.VpcId})
+	return relatedResultTrunc("vpc", []string{*inst.DBSubnetGroup.VpcId}, false)
 }
 
 // checkDbiDBC returns the Aurora/RDS cluster this DB instance belongs to, if
@@ -195,10 +196,10 @@ func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.KnownRelated("dbc", nil, false)
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
-		return resource.KnownRelated("dbc", nil, false)
+		return resource.ProvenZero("dbc", "db.DBClusterIdentifier")
 	}
 	// In-body: DBClusterIdentifier IS the cluster's resource id (dbc keyed by identifier).
-	return relatedResult("dbc", []string{*db.DBClusterIdentifier})
+	return relatedResultTrunc("dbc", []string{*db.DBClusterIdentifier}, false)
 }
 
 // checkDbiRole extracts IAM role ARNs from the DBInstance's AssociatedRoles
@@ -237,7 +238,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "sgIDs")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EC2 == nil {
@@ -246,24 +247,27 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 	descName := "description"
 	descVal := "RDSNetworkInterface"
 	groupName := "group-id"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeNetworkInterfacesOutput, error) {
-		return c.EC2.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
+	ids, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, err := c.EC2.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{
 			Filters: []ec2types.Filter{
 				{Name: &descName, Values: []string{descVal}},
 				{Name: &groupName, Values: sgIDs},
 			},
+			NextToken: token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		var ids []string
+		for _, ni := range out.NetworkInterfaces {
+			ids = append(ids, aws.ToString(ni.NetworkInterfaceId))
+		}
+		return ids, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
-	var ids []string
-	for _, ni := range out.NetworkInterfaces {
-		if ni.NetworkInterfaceId != nil && *ni.NetworkInterfaceId != "" {
-			ids = append(ids, *ni.NetworkInterfaceId)
-		}
-	}
-	return relatedResult("eni", ids)
+	return heuristicResult("eni", ids, !complete)
 }
 
 // checkDbiCTEvents checks cached CloudTrail events for references to the DB instance.
@@ -272,7 +276,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "dbID")
 	}
 	fetchFilter := map[string]string{"ResourceName": dbID}
 	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")

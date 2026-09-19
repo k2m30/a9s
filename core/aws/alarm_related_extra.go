@@ -36,14 +36,14 @@ func alarmTarget(clients any, cache resource.ResourceCache, res resource.Resourc
 		return resource.UnknownRelated(target)
 	}
 	if len(namespaces) > 0 && !slices.Contains(namespaces, aws.ToString(alarm.Namespace)) {
-		return resource.KnownRelated(target, nil, false)
+		return resource.ProvenZero(target, "the alarm namespace")
 	}
 	for _, dim := range dims {
 		if v := alarmDimension(alarm, dim); v != "" {
 			return relatedRefs(target, []string{v}, refContext(clients, cache, target))
 		}
 	}
-	return resource.KnownRelated(target, nil, false)
+	return resource.ProvenZero(target, "the alarm dimensions")
 }
 
 func checkAlarmAPIGW(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -99,7 +99,7 @@ func checkAlarmWAF(_ context.Context, clients any, res resource.Resource, cache 
 func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	name := res.ID
 	if name == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "name")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {

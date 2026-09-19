@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
@@ -181,23 +182,25 @@ func isDDBPolicyAbsent(err error) bool {
 // as unreadable rather than as carrying only the tags read so far, which would
 // let a selection on a later tag read as no selection at all.
 func dynamoDBTagsForARN(ctx context.Context, api DynamoDBListTagsOfResourceAPI, arn string) (map[string]string, error) {
-	tags := map[string]string{}
-	var token *string
-	for range PerParentPageCap {
+	list, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ddbtypes.Tag, *string, error) {
 		out, err := api.ListTagsOfResource(ctx, &dynamodb.ListTagsOfResourceInput{
 			ResourceArn: aws.String(arn),
 			NextToken:   token,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		for _, t := range out.Tags {
-			tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
-		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			return tags, nil
-		}
-		token = out.NextToken
+		return out.Tags, out.NextToken, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("ListTagsOfResource: more than %d pages of tags for %s", PerParentPageCap, arn)
+	if !complete {
+		return nil, fmt.Errorf("ListTagsOfResource: more than %d pages of tags for %s", PerParentPageCap, arn)
+	}
+	tags := make(map[string]string, len(list))
+	for _, t := range list {
+		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+	}
+	return tags, nil
 }

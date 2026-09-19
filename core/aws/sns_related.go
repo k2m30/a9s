@@ -108,7 +108,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
@@ -116,7 +116,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	keyID := attrs["KmsMasterKeyId"]
 	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -129,7 +129,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
@@ -137,7 +137,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	policy := attrs["Policy"]
 	if policy == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "policy")
 	}
 	rc := policyRefContext(clients, cache, "role", topicARN)
 	refs, ok := grantedPrincipalRefs(policy, "role/")

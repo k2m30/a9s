@@ -24,7 +24,7 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	functionName := logGroupOwner(logGroupName, "/aws/lambda/")
 	if functionName == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "functionName")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -58,7 +58,7 @@ func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "lg.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*lg.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -70,11 +70,11 @@ func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache
 func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.KnownRelated("apigw", nil, false)
+		return resource.ProvenZero("apigw", "logGroupName")
 	}
 	apiID := logGroupOwner(logGroupName, "API-Gateway-Execution-Logs_")
 	if apiID == "" {
-		return resource.KnownRelated("apigw", nil, false)
+		return resource.ProvenZero("apigw", "apiID")
 	}
 
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
@@ -98,11 +98,11 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "logGroupName")
 	}
 	family := logGroupOwner(logGroupName, "/ecs/")
 	if family == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "family")
 	}
 
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
@@ -129,44 +129,43 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 // when the client/interface isn't wired, (nil, err) when the call itself
 // failed, and (filters, nil) — possibly an empty slice — on success, so
 // callers can tell "genuinely no filters" apart from "could not check".
-func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName string) ([]cloudwatchlogstypes.SubscriptionFilter, error) {
+func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName string) (filters []cloudwatchlogstypes.SubscriptionFilter, complete bool, err error) {
 	if logGroupName == "" {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudWatchLogs == nil {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
 	filterAPI, ok := c.CloudWatchLogs.(CWLogsDescribeSubscriptionFiltersAPI)
 	if !ok {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error) {
-		return filterAPI.DescribeSubscriptionFilters(ctx, &cloudwatchlogs.DescribeSubscriptionFiltersInput{
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.SubscriptionFilter, *string, error) {
+		out, err := filterAPI.DescribeSubscriptionFilters(ctx, &cloudwatchlogs.DescribeSubscriptionFiltersInput{
 			LogGroupName: aws.String(logGroupName),
+			NextToken:    token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.SubscriptionFilters, out.NextToken, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	if out == nil {
-		return nil, nil
-	}
-	return out.SubscriptionFilters, nil
 }
 
 // checkLogsKinesis calls cloudwatchlogs:DescribeSubscriptionFilters and
 // returns the Kinesis stream names whose ARNs appear as subscription-filter
 // destinations on this log group.
 func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
+	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("kinesis")
 		}
 		return resource.ErrorRelated("kinesis", err)
 	}
-	return relatedRefs("kinesis", destinationARNs(filters, "kinesis"), refContext(clients, cache, "kinesis"))
+	ids, dropped := resolveRefs("kinesis", destinationARNs(filters, "kinesis"), refContext(clients, cache, "kinesis"))
+	return relatedResultTrunc("kinesis", ids, dropped || !complete)
 }
 
 // checkLogsS3 calls cloudwatchlogs:DescribeSubscriptionFilters and returns S3
@@ -174,14 +173,15 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, c
 // Firehose delivery stream that fans out to S3, or direct S3 destination for
 // newer filter features).
 func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
+	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return resource.UnknownRelated("s3")
 		}
 		return resource.ErrorRelated("s3", err)
 	}
-	return relatedRefs("s3", destinationARNs(filters, "s3"), refContext(clients, cache, "s3"))
+	ids, dropped := resolveRefs("s3", destinationARNs(filters, "s3"), refContext(clients, cache, "s3"))
+	return relatedResultTrunc("s3", ids, dropped || !complete)
 }
 
 // destinationARNs returns the subscription-filter destinations that are ARNs

@@ -27,7 +27,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		tgwID = *raw.TransitGatewayId
 	}
 	if tgwID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -37,24 +37,31 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return resource.UnknownRelated("vpc")
 	}
-	filterName := "transit-gateway-id"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
-		return api.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-			Filters: []ec2types.Filter{
-				{Name: &filterName, Values: []string{tgwID}},
-			},
-		})
-	})
+	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
 	var ids []string
-	for _, att := range out.TransitGatewayVpcAttachments {
+	for _, att := range atts {
 		if att.VpcId != nil && *att.VpcId != "" {
 			ids = append(ids, *att.VpcId)
 		}
 	}
-	return relatedResult("vpc", ids)
+	return relatedResultTrunc("vpc", ids, !complete)
+}
+
+// tgwVpcAttachments walks the VPC attachments of one transit gateway.
+func tgwVpcAttachments(ctx context.Context, api EC2DescribeTransitGatewayVpcAttachmentsAPI, tgwID string) ([]ec2types.TransitGatewayVpcAttachment, bool, error) {
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayVpcAttachment, *string, error) {
+		out, err := api.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+			Filters:   []ec2types.Filter{{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}}},
+			NextToken: token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.TransitGatewayVpcAttachments, out.NextToken, nil
+	})
 }
 
 // checkTGWRTB checks the rtb cache for route tables that have routes
@@ -62,7 +69,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.KnownRelated("rtb", nil, false)
+		return resource.ProvenZero("rtb", "tgwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -115,14 +122,15 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 	})
 	if err != nil {
 		if ErrCodeIs(err, "NoSuchEntity") {
-			return resource.KnownRelated("role", nil, false)
+			return resource.ProvenZero("role", "the API answered that none is configured")
 		}
 		return resource.ErrorRelated("role", err)
 	}
 	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "out.Role.Arn")
 	}
-	return relatedRefs("role", []string{*out.Role.Arn}, refContext(clients, cache, "role"))
+	ids, dropped := resolveRefs("role", []string{*out.Role.Arn}, refContext(clients, cache, "role"))
+	return heuristicResult("role", ids, dropped)
 }
 
 // checkTGWSubnet reports subnets this transit gateway is attached to via VPC
@@ -131,7 +139,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -141,20 +149,13 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 	if !ok {
 		return resource.UnknownRelated("subnet")
 	}
-	filterName := "transit-gateway-id"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
-		return api.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-			Filters: []ec2types.Filter{
-				{Name: &filterName, Values: []string{tgwID}},
-			},
-		})
-	})
+	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
 	if err != nil {
 		return resource.ErrorRelated("subnet", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string
-	for _, att := range out.TransitGatewayVpcAttachments {
+	for _, att := range atts {
 		for _, sID := range att.SubnetIds {
 			if sID == "" || seen[sID] {
 				continue
@@ -163,5 +164,5 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 			ids = append(ids, sID)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, !complete)
 }

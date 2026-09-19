@@ -256,26 +256,26 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 // the first; the walk is bounded by PerParentPageCap like every other
 // per-parent sweep.
 func allELBListeners(ctx context.Context, api ELBv2DescribeListenersAPI, lbARN string) ([]elbtypes.Listener, error) {
-	var out []elbtypes.Listener
-	token := ""
-	for range PerParentPageCap {
-		page, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (resource.FetchResult, error) {
-			return FetchELBListeners(ctx, api, map[string]string{"load_balancer_arn": lbARN}, token)
-		})
+	listeners, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]elbtypes.Listener, *string, error) {
+		page, err := FetchELBListeners(ctx, api, map[string]string{"load_balancer_arn": lbARN}, aws.ToString(token))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		var out []elbtypes.Listener
 		for _, lr := range page.Resources {
 			if listener, ok := assertStruct[elbtypes.Listener](lr.RawStruct); ok {
 				out = append(out, listener)
 			}
 		}
-		if page.Pagination == nil || page.Pagination.NextToken == "" {
-			break
+		if page.Pagination == nil {
+			return out, nil, nil
 		}
-		token = page.Pagination.NextToken
+		return out, &page.Pagination.NextToken, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return listeners, nil
 }
 
 // elbOffendingListener pairs a listener's port with the row that describes it,

@@ -8,9 +8,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
-
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -62,7 +59,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		if truncated {
 			return relatedResultTrunc("sns", nil, true)
 		}
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "topicSet")
 	}
 
 	var ids []string
@@ -205,25 +202,9 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	queueARN := row.Attributes["QueueArn"]
 	if queueARN == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "queueARN")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("lambda")
-	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		EventSourceArn: &queueARN,
-	})
-	if err != nil {
-		return resource.ErrorRelated("lambda", err)
-	}
-	var arns []string
-	for _, m := range out.EventSourceMappings {
-		if m.FunctionArn != nil {
-			arns = append(arns, *m.FunctionArn)
-		}
-	}
-	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
+	return lambdaEventSourceMappingLambdaCheck(ctx, clients, queueARN, cache)
 }
 
 // checkSQSKMS returns the key in the queue's KmsMasterKeyId attribute
@@ -231,7 +212,7 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkSQSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := res.Fields["kms_key_id"]
 	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -246,21 +227,7 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 		queueARN = raw.Attributes["QueueArn"]
 	}
 	if queueARN == "" {
-		return unreadZero(res, resource.KnownRelated("eb-rule", nil, false))
+		return unreadZero(res, resource.ProvenZero("eb-rule", "queueARN"))
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.EventBridge == nil {
-		return resource.UnknownRelated("eb-rule")
-	}
-	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
-	if !ok {
-		return resource.UnknownRelated("eb-rule")
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
-		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &queueARN})
-	})
-	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
-	}
-	return unreadZero(res, relatedResult("eb-rule", out.RuleNames))
+	return unreadZero(res, ebRulesTargeting(ctx, clients, queueARN))
 }

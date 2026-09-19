@@ -9,8 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -25,7 +25,7 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if cluster.ResourcesVpcConfig == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "cluster.ResourcesVpcConfig")
 	}
 	var ids []string
 	for _, s := range cluster.ResourcesVpcConfig.SubnetIds {
@@ -33,14 +33,14 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 			ids = append(ids, s)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkEKSASG — ASGs are owned by NodeGroups; derive by scanning ng cache.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "clusterName")
 	}
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
@@ -77,7 +77,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "clusterName")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -107,30 +107,19 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
-// listClusterNodegroups walks every ListNodegroups page for one cluster. A
-// cluster whose node groups do not fit in one page is exactly the cluster whose
-// related panel matters, and a single unpaged call reports the first page as
-// the whole truth.
-func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) ([]string, error) {
-	var names []string
-	var token *string
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
-			return api.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-				ClusterName: aws.String(clusterName),
-				NextToken:   token,
-			})
+// listClusterNodegroups walks the ListNodegroups pages of one cluster.
+// complete is false when the walk stopped at the page cap.
+func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) (names []string, complete bool, err error) {
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, err := api.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+			ClusterName: aws.String(clusterName),
+			NextToken:   token,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		names = append(names, out.Nodegroups...)
-		if aws.ToString(out.NextToken) == "" {
-			break
-		}
-		token = out.NextToken
-	}
-	return names, nil
+		return out.Nodegroups, out.NextToken, nil
+	})
 }
 
 // checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.
@@ -147,7 +136,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -155,7 +144,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ami")
 	}
 
-	ngNames, err := listClusterNodegroups(ctx, c.EKS, clusterName)
+	ngNames, ngComplete, err := listClusterNodegroups(ctx, c.EKS, clusterName)
 	if err != nil {
 		return resource.ErrorRelated("ami", err)
 	}
@@ -182,16 +171,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			continue
 		}
 
-		version := aws.String("$Latest")
-		if ng.LaunchTemplate.Version != nil && *ng.LaunchTemplate.Version != "" {
-			version = ng.LaunchTemplate.Version
-		}
-		ltOut, ltErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-			return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-				LaunchTemplateId: ng.LaunchTemplate.Id,
-				Versions:         []string{*version},
-			})
-		})
+		versions, ltErr := launchTemplateVersions(ctx, c.EC2, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
 		if ltErr != nil {
 			// Soft-skip when the launch template has been deleted upstream:
 			// AWS returns InvalidLaunchTemplateId.NotFound, which is a true
@@ -202,7 +182,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			failures = append(failures, FailedCall(ngName+"/lt", ltErr))
 			continue
 		}
-		for _, v := range ltOut.LaunchTemplateVersions {
+		for _, v := range versions {
 			if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
 				amiSet[*v.LaunchTemplateData.ImageId] = struct{}{}
 			}
@@ -221,13 +201,13 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		if aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngNames)); aggErr != nil {
 			return resource.ErrorRelated("ami", aggErr)
 		}
-		return relatedResultTrunc("ami", nil, false)
+		return relatedResultTrunc("ami", nil, !ngComplete)
 	}
 	// Some DescribeNodegroup/DescribeLaunchTemplateVersions calls may have
 	// failed: ids is a proven subset, not necessarily exhaustive. Truncated
 	// (not Errored) keeps the row actionable rather than discarding confirmed
 	// matches as a dead end.
-	return relatedResultTrunc("ami", ids, len(failures) > 0)
+	return relatedResultTrunc("ami", ids, len(failures) > 0 || !ngComplete)
 }
 
 // asgNamesPerDescribe is the maximum number of names DescribeAutoScalingGroups
@@ -248,7 +228,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -256,7 +236,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ec2")
 	}
 
-	ngNames, err := listClusterNodegroups(ctx, c.EKS, clusterName)
+	ngNames, ngComplete, err := listClusterNodegroups(ctx, c.EKS, clusterName)
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -290,7 +270,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		if ngAggErr != nil {
 			return resource.ErrorRelated("ec2", ngAggErr)
 		}
-		return resource.KnownRelated("ec2", nil, false)
+		return relatedResultTrunc("ec2", nil, !ngComplete)
 	}
 	if c.AutoScaling == nil {
 		// ASG names are known but cannot be resolved to instances without an
@@ -301,16 +281,23 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	seen := make(map[string]struct{})
+	complete := ngComplete
 	for batch := range slices.Chunk(asgNames, asgNamesPerDescribe) {
-		asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
-			return c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
+		asgs, batchComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.AutoScalingGroup, *string, error) {
+			out, err := c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
 				AutoScalingGroupNames: batch,
+				NextToken:             token,
 			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.AutoScalingGroups, out.NextToken, nil
 		})
 		if err != nil {
 			return resource.ErrorRelated("ec2", err)
 		}
-		for _, asg := range asgOut.AutoScalingGroups {
+		complete = complete && batchComplete
+		for _, asg := range asgs {
 			for _, inst := range asg.Instances {
 				if inst.InstanceId != nil && *inst.InstanceId != "" {
 					seen[*inst.InstanceId] = struct{}{}
@@ -326,7 +313,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	// the cluster's EC2 instances, not necessarily exhaustive. Truncated (not
 	// Errored) keeps the row actionable rather than discarding confirmed
 	// matches as a dead end.
-	return relatedResultTrunc("ec2", ids, ngAggErr != nil)
+	return relatedResultTrunc("ec2", ids, ngAggErr != nil || !complete)
 }
 
 // Keeps the ec2types import in use.

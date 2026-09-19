@@ -41,7 +41,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: DB instances back onto ENIs — reachability problems (SG rule changes, subnet route changes, AZ failures) manifest at the ENI level, and operators need to see which ENI is attached where.
 - **How discovered**: `DescribeNetworkInterfaces(Filters=[{Name=requester-id,Values=amazon-rds}, {Name=vpc-id,Values=<DBSubnetGroup.VpcId>}])`, then filter client-side where `Description` begins with `RDSNetworkInterface` for this instance identifier — a9s-devops: RDS-owned ENIs are not referenced by field on `DBInstance`; the service-owned filter + description-prefix match is the documented workflow; possible=yes, worth=yes because ENI disappearance is a common root cause for "DB unreachable".
-- **Count shown**: yes — typically 1 for single-AZ, N for multi-AZ where N = subnet count.
+- **Count shown**: no — the matches are candidates (heuristic coverage): an ENI records no DB instance, and another instance sharing a security group shares its ENIs. Rendered as a blank, navigable row.
 
 ### `kms`
 
@@ -343,6 +343,6 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | secrets | Secrets Manager | yes |
 | dbc | RDS Clusters | no |
 | role | IAM Roles | no |
-| eni | Network Interfaces | no |
-| ct-events | CloudTrail Events | no |
+| eni | Network Interfaces | yes |
+| ct-events | CloudTrail Events | yes |
 <!-- END GENERATED: related -->

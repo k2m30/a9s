@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -22,7 +23,7 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		return resource.UnknownRelated("subnet")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "asg.VPCZoneIdentifier")
 	}
 	parts := strings.Split(*asg.VPCZoneIdentifier, ",")
 	var ids []string
@@ -33,9 +34,9 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "ids")
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkASGTG checks the cache for target groups referencing this ASG via TargetGroupARNs.
@@ -45,7 +46,7 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("tg")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
-		return resource.KnownRelated("tg", nil, false)
+		return resource.ProvenZero("tg", "asg.TargetGroupARNs")
 	}
 
 	arnSet := map[string]bool{}
@@ -89,18 +90,14 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 	var ids []string
 
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
-			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
-				LaunchConfigurationNames: []string{*asg.LaunchConfigurationName},
-			})
-		})
+		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
 		if err != nil {
 			return resource.ErrorRelated("sg", err)
 		}
-		if len(out.LaunchConfigurations) > 0 {
-			ids = append(ids, out.LaunchConfigurations[0].SecurityGroups...)
+		if len(lcs) > 0 {
+			ids = append(ids, lcs[0].SecurityGroups...)
 		}
-		return relatedResult("sg", ids)
+		return relatedResultTrunc("sg", ids, false)
 	}
 
 	ltSpec := asg.LaunchTemplate
@@ -108,23 +105,14 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ltSpec.LaunchTemplateId")
 	}
 
-	version := aws.String("$Latest")
-	if ltSpec.Version != nil && *ltSpec.Version != "" {
-		version = ltSpec.Version
-	}
-	ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-		return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-			LaunchTemplateId: ltSpec.LaunchTemplateId,
-			Versions:         []string{*version},
-		})
-	})
+	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
-	for _, v := range ltOut.LaunchTemplateVersions {
+	for _, v := range versions {
 		if v.LaunchTemplateData == nil {
 			continue
 		}
@@ -133,7 +121,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 			ids = append(ids, ni.Groups...)
 		}
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkASGSNS resolves SNS topics associated with this ASG via notification and lifecycle hook configurations.
@@ -152,7 +140,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		asgName = res.ID
 	}
 	if asgName == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "asgName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -162,15 +150,20 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	var ids []string
 
-	notifOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeNotificationConfigurationsOutput, error) {
-		return c.AutoScaling.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
+	notifs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.NotificationConfiguration, *string, error) {
+		out, err := c.AutoScaling.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
 			AutoScalingGroupNames: []string{asgName},
+			NextToken:             token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.NotificationConfigurations, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
-	for _, n := range notifOut.NotificationConfigurations {
+	for _, n := range notifs {
 		if n.TopicARN != nil && *n.TopicARN != "" {
 			ids = append(ids, *n.TopicARN)
 		}
@@ -193,7 +186,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, !complete)
 }
 
 // checkASGVPC resolves VPCs associated with this ASG via VPCZoneIdentifier.
@@ -205,7 +198,7 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("vpc")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "asg.VPCZoneIdentifier")
 	}
 	var subnetIDs []string
 	for s := range strings.SplitSeq(*asg.VPCZoneIdentifier, ",") {
@@ -215,7 +208,7 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "subnetIDs")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -223,17 +216,21 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("vpc")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSubnetsOutput, error) {
-		return c.EC2.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{SubnetIds: subnetIDs})
+	subnets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
+		out, err := c.EC2.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{SubnetIds: subnetIDs, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Subnets, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
 	var vpcIDs []string
-	for _, sn := range out.Subnets {
+	for _, sn := range subnets {
 		if sn.VpcId != nil && *sn.VpcId != "" {
 			vpcIDs = append(vpcIDs, *sn.VpcId)
 		}
 	}
-	return relatedResult("vpc", vpcIDs)
+	return relatedResultTrunc("vpc", vpcIDs, !complete)
 }

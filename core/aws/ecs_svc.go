@@ -14,9 +14,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchECSServicesPage fetches one page of ECS clusters using the continuationToken,
-// then for each cluster in that page fetches all services via ListServices+DescribeServices.
-// IsTruncated reflects whether ListClusters has more pages beyond this one.
+// FetchECSServicesPage fetches one page of ECS services: ListClusters, every
+// ListServices page of each cluster, and DescribeServices for at most 10
+// services a call, through parentChildWalk.
 func FetchECSServicesPage(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,
@@ -24,113 +24,96 @@ func FetchECSServicesPage(
 	describeServicesAPI ECSDescribeServicesAPI,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	input := &ecs.ListClustersInput{}
-	if continuationToken != "" {
-		input.NextToken = &continuationToken
-	}
-
-	listOutput, err := listClustersAPI.ListClusters(ctx, input)
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("listing ECS clusters: %w", err)
-	}
-
-	var resources []resource.Resource
-
-	for _, clusterArn := range listOutput.ClusterArns {
-		svcListOutput, err := listServicesAPI.ListServices(ctx, &ecs.ListServicesInput{
-			Cluster: aws.String(clusterArn),
-		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing ECS services: %w", err)
-		}
-
-		if len(svcListOutput.ServiceArns) == 0 {
-			continue
-		}
-
-		descOutput, err := describeServicesAPI.DescribeServices(ctx, &ecs.DescribeServicesInput{
-			Cluster:  aws.String(clusterArn),
-			Services: svcListOutput.ServiceArns,
-		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing ECS services: %w", err)
-		}
-
-		for _, svc := range descOutput.Services {
-			serviceName := ""
-			if svc.ServiceName != nil {
-				serviceName = *svc.ServiceName
+	walk := parentChildWalk{
+		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
+			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
+			if err != nil {
+				return nil, nil, fmt.Errorf("listing ECS clusters: %w", err)
 			}
-
-			clusterName := ""
-			if svc.ClusterArn != nil {
-				arn := *svc.ClusterArn
-				if idx := strings.LastIndex(arn, "/"); idx >= 0 {
-					clusterName = arn[idx+1:]
-				} else {
-					clusterName = arn
-				}
-			}
-
-			status := ""
-			if svc.Status != nil {
-				status = *svc.Status
-			}
-
-			desiredCount := fmt.Sprintf("%d", svc.DesiredCount)
-			runningCount := fmt.Sprintf("%d", svc.RunningCount)
-			launchType := string(svc.LaunchType)
-
-			taskDefinition := ""
-			if svc.TaskDefinition != nil {
-				taskDefinition = *svc.TaskDefinition
-			}
-
-			arn := ""
-			if svc.ServiceArn != nil {
-				arn = *svc.ServiceArn
-			}
-
-			// Fields["status"] stays populated for the structural Color fallback.
-			findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
-
-			r := resource.Resource{
-				ID:   serviceName,
-				Name: serviceName,
-				Fields: map[string]string{
-					"service_name":    serviceName,
-					"cluster":         clusterName,
-					"status":          status,
-					"desired_count":   desiredCount,
-					"running_count":   runningCount,
-					"launch_type":     launchType,
-					"task_definition": taskDefinition,
-					"arn":             arn,
-				},
-				Findings:  findings,
-				RawStruct: svc,
-			}
-
-			resources = append(resources, r)
-		}
-	}
-
-	nextToken := ""
-	isTruncated := false
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
-		isTruncated = true
-	}
-
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
-			PageSize:    len(resources),
-			TotalHint:   -1,
+			return out.ClusterArns, out.NextToken, nil
 		},
-	}, nil
+		listChildren: func(ctx context.Context, clusterArn string, token *string) ([]string, *string, error) {
+			out, err := listServicesAPI.ListServices(ctx, &ecs.ListServicesInput{
+				Cluster:    aws.String(clusterArn),
+				MaxResults: aws.Int32(100),
+				NextToken:  token,
+			})
+			if err != nil {
+				return nil, nil, fmt.Errorf("listing ECS services: %w", err)
+			}
+			return out.ServiceArns, out.NextToken, nil
+		},
+		describe: func(ctx context.Context, clusterArn string, serviceArns []string) ([]resource.Resource, error) {
+			descOutput, err := describeServicesAPI.DescribeServices(ctx, &ecs.DescribeServicesInput{
+				Cluster:  aws.String(clusterArn),
+				Services: serviceArns,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("describing ECS services: %w", err)
+			}
+			resources := make([]resource.Resource, 0, len(descOutput.Services))
+			for _, svc := range descOutput.Services {
+				serviceName := ""
+				if svc.ServiceName != nil {
+					serviceName = *svc.ServiceName
+				}
+
+				clusterName := ""
+				if svc.ClusterArn != nil {
+					arn := *svc.ClusterArn
+					if idx := strings.LastIndex(arn, "/"); idx >= 0 {
+						clusterName = arn[idx+1:]
+					} else {
+						clusterName = arn
+					}
+				}
+
+				status := ""
+				if svc.Status != nil {
+					status = *svc.Status
+				}
+
+				desiredCount := fmt.Sprintf("%d", svc.DesiredCount)
+				runningCount := fmt.Sprintf("%d", svc.RunningCount)
+				launchType := string(svc.LaunchType)
+
+				taskDefinition := ""
+				if svc.TaskDefinition != nil {
+					taskDefinition = *svc.TaskDefinition
+				}
+
+				arn := ""
+				if svc.ServiceArn != nil {
+					arn = *svc.ServiceArn
+				}
+
+				// Fields["status"] stays populated for the structural Color fallback.
+				findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
+
+				r := resource.Resource{
+					ID:   serviceName,
+					Name: serviceName,
+					Fields: map[string]string{
+						"service_name":    serviceName,
+						"cluster":         clusterName,
+						"status":          status,
+						"desired_count":   desiredCount,
+						"running_count":   runningCount,
+						"launch_type":     launchType,
+						"task_definition": taskDefinition,
+						"arn":             arn,
+					},
+					Findings:  findings,
+					RawStruct: svc,
+				}
+
+				resources = append(resources, r)
+			}
+			return resources, nil
+		},
+		batch: 10,
+	}
+	return walk.page(ctx, continuationToken)
 }
 
 // ecsSvcFindings is the one predicate for a service's health: its lifecycle

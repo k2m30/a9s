@@ -21,9 +21,9 @@ func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("ami")
 	}
 	if raw.ImageId == nil || *raw.ImageId == "" {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "raw.ImageId")
 	}
-	return relatedResult("ami", []string{*raw.ImageId})
+	return relatedResultTrunc("ami", []string{*raw.ImageId}, false)
 }
 
 // checkEC2ENI extracts network interface IDs from the EC2 Instance's
@@ -39,7 +39,7 @@ func checkEC2ENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *eni.NetworkInterfaceId)
 		}
 	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, false)
 }
 
 // checkEC2Subnet returns the subnet this EC2 instance runs in (Pattern F).
@@ -50,9 +50,9 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "raw.SubnetId")
 	}
-	return relatedResult("subnet", []string{*raw.SubnetId})
+	return relatedResultTrunc("subnet", []string{*raw.SubnetId}, false)
 }
 
 // checkEC2KMS returns the KMS keys encrypting any EBS volumes attached to this
@@ -61,7 +61,7 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "instanceID")
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
@@ -105,7 +105,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "instanceID")
 	}
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
@@ -131,7 +131,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return unreadZero(res, resource.KnownRelated("backup", nil, false))
+		return unreadZero(res, resource.ProvenZero("backup", "instanceID"))
 	}
 
 	tags := map[string]string{}

@@ -27,7 +27,7 @@ func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, 
 		return resource.UnknownRelated("logs")
 	}
 	if len(domain.LogPublishingOptions) == 0 {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "domain.LogPublishingOptions")
 	}
 
 	var arns []string
@@ -47,7 +47,7 @@ func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("sg")
 	}
 	if domain.VPCOptions == nil {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "domain.VPCOptions")
 	}
 	var ids []string
 	for _, sgID := range domain.VPCOptions.SecurityGroupIds {
@@ -55,7 +55,7 @@ func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resour
 			ids = append(ids, sgID)
 		}
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkOpenSearchVPC returns the VPC this OpenSearch domain is attached to.
@@ -67,9 +67,9 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 		return resource.UnknownRelated("vpc")
 	}
 	if domain.VPCOptions == nil || domain.VPCOptions.VPCId == nil || *domain.VPCOptions.VPCId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "domain.VPCOptions.VPCId")
 	}
-	return relatedResult("vpc", []string{*domain.VPCOptions.VPCId})
+	return relatedResultTrunc("vpc", []string{*domain.VPCOptions.VPCId}, false)
 }
 
 // checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
@@ -87,7 +87,7 @@ func checkOpenSearchKMS(ctx context.Context, clients any, res resource.Resource,
 		domain.EncryptionAtRestOptions.KmsKeyId == nil ||
 		*domain.EncryptionAtRestOptions.KmsKeyId == "" {
 		// Legitimately no KMS key configured (encryption-off) — 0 is correct.
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "EncryptionAtRestOptions.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*domain.EncryptionAtRestOptions.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -101,7 +101,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("cfn")
 	}
 	if domain.ARN == nil || *domain.ARN == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "domain.ARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.OpenSearch == nil {
@@ -125,7 +125,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -156,7 +156,7 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 		return resource.UnknownRelated("subnet")
 	}
 	if domain.VPCOptions == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "domain.VPCOptions")
 	}
 	var ids []string
 	for _, id := range domain.VPCOptions.SubnetIds {
@@ -164,7 +164,7 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 			ids = append(ids, id)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkOpenSearchACM calls opensearch:DescribeDomainConfig and returns the
@@ -177,7 +177,7 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
 	if domainName == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "domainName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.OpenSearch == nil {
@@ -197,11 +197,11 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 		out.DomainConfig.DomainEndpointOptions == nil ||
 		out.DomainConfig.DomainEndpointOptions.Options == nil ||
 		out.DomainConfig.DomainEndpointOptions.Options.CustomEndpointCertificateArn == nil {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "the API answered that none is configured")
 	}
 	arn := *out.DomainConfig.DomainEndpointOptions.Options.CustomEndpointCertificateArn
 	if arn == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "arn")
 	}
 
 	// Reverse-scan the acm cache for a cert whose RawStruct.CertificateArn
@@ -219,11 +219,11 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 			continue
 		}
 		if cert.CertificateArn != nil && *cert.CertificateArn == arn {
-			return relatedResult("acm", []string{acmRes.ID})
+			return relatedResultTrunc("acm", []string{acmRes.ID}, false)
 		}
 	}
 	if truncated {
 		return relatedResultTrunc("acm", nil, true)
 	}
-	return resource.KnownRelated("acm", nil, false)
+	return resource.ProvenZero("acm", "the complete acm list")
 }

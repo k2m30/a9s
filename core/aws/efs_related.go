@@ -31,7 +31,7 @@ func checkEFSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("kms")
 	}
 	if fs.KmsKeyId == nil || *fs.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "fs.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*fs.KmsKeyId})
 }
@@ -41,7 +41,7 @@ func checkEFSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := efsCFNStackName(res)
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -86,7 +86,7 @@ func efsCFNStackName(res resource.Resource) string {
 func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -125,7 +125,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -167,7 +167,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "fsID")
 	}
 
 	c, cok := clients.(*ServiceClients)
@@ -175,23 +175,28 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("lambda")
 	}
 
-	apOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
-		return c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
+	aps, apsComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]efstypes.AccessPointDescription, *string, error) {
+		out, err := c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
 			FileSystemId: &fsID,
+			NextToken:    token,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.AccessPoints, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
 	apARNs := make(map[string]struct{})
-	for _, ap := range apOut.AccessPoints {
+	for _, ap := range aps {
 		if ap.AccessPointArn != nil && *ap.AccessPointArn != "" {
 			apARNs[*ap.AccessPointArn] = struct{}{}
 		}
 	}
 	if len(apARNs) == 0 {
 		// No access points exist for this filesystem — no Lambda can mount it.
-		return resource.KnownRelated("lambda", nil, false)
+		return relatedResultTrunc("lambda", nil, !apsComplete)
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -218,7 +223,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	return relatedResultTrunc("lambda", ids, truncated)
+	return relatedResultTrunc("lambda", ids, truncated || !apsComplete)
 }
 
 // checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
@@ -230,7 +235,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.KnownRelated("ecs-task", nil, false)
+		return resource.ProvenZero("ecs-task", "fsID")
 	}
 
 	entry, ok := cache["ecs-task"]

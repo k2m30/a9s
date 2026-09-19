@@ -39,9 +39,9 @@ func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	}
 	imageID := aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId)
 	if !strings.HasPrefix(imageID, "ami-") {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "imageID")
 	}
-	return relatedResult("ami", []string{imageID})
+	return relatedResultTrunc("ami", []string{imageID}, false)
 }
 
 // checkLTKMS reads DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.KmsKeyId
@@ -81,7 +81,7 @@ func checkLTSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	for _, ni := range data.NetworkInterfaces {
 		ids = append(ids, ni.Groups...)
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkLTSubnet reads DefaultVersion.LaunchTemplateData.NetworkInterfaces[].SubnetId
@@ -98,7 +98,7 @@ func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 			ids = append(ids, *ni.SubnetId)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkLTASG scans the already-loaded "asg" cache for groups referencing

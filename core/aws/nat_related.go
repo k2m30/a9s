@@ -22,11 +22,11 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	if raw.VpcId == nil || *raw.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "raw.VpcId")
 	}
 	// The NAT gateway's own VpcId is the related VPC; it resolves by
 	// identity.
-	return relatedResult("vpc", []string{*raw.VpcId})
+	return relatedResultTrunc("vpc", []string{*raw.VpcId}, false)
 }
 
 // checkNATSubnet extracts SubnetId from the NAT Gateway RawStruct and searches
@@ -40,10 +40,10 @@ func checkNATSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.KnownRelated("subnet", nil, false)
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "raw.SubnetId")
 	}
 	// The NAT gateway's own SubnetId is the related subnet.
-	return relatedResult("subnet", []string{*raw.SubnetId})
+	return relatedResultTrunc("subnet", []string{*raw.SubnetId}, false)
 }
 
 // checkNATRTB searches the rtb cache for route tables that contain a route
@@ -55,7 +55,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		natID = *raw.NatGatewayId
 	}
 	if natID == "" {
-		return resource.KnownRelated("rtb", nil, false)
+		return resource.ProvenZero("rtb", "natID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -100,7 +100,7 @@ func checkNATEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *addr.AllocationId)
 		}
 	}
-	return relatedResult("eip", ids)
+	return relatedResultTrunc("eip", ids, false)
 }
 
 // checkNATENI extracts NetworkInterfaceId values from the NAT gateway's
@@ -120,7 +120,7 @@ func checkNATENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *addr.NetworkInterfaceId)
 		}
 	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, false)
 }
 
 // checkNATAlarm reports CloudWatch alarms for this NAT Gateway.

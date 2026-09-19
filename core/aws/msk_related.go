@@ -28,13 +28,13 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "cluster.Provisioned.BrokerNodeGroupInfo")
 	}
 	ids := cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups
 	if len(ids) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "ids")
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkMSKLambda calls lambda:ListEventSourceMappings with the EventSourceArn
@@ -48,7 +48,7 @@ func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cac
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("lambda")
 		}
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "ClusterArn")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *cluster.ClusterArn, cache)
 }
@@ -63,7 +63,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	stackName := cluster.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -96,10 +96,10 @@ func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("subnet")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "cluster.Provisioned.BrokerNodeGroupInfo")
 	}
 	ids := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkMSKVPC returns the VPC that hosts the cluster's broker subnets by
@@ -110,11 +110,11 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("vpc")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "cluster.Provisioned.BrokerNodeGroupInfo")
 	}
 	subnets := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
 	if len(subnets) == 0 {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "subnets")
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
@@ -134,14 +134,14 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		if !snOk || sn.VpcId == nil || *sn.VpcId == "" {
 			continue
 		}
-		return relatedResult("vpc", []string{*sn.VpcId})
+		return relatedResultTrunc("vpc", []string{*sn.VpcId}, false)
 	}
 	if truncated {
 		// Subnet cache is truncated — the cluster's client subnet may be on a
 		// dropped page; answer is unknown rather than a definitive non-match.
 		return resource.UnknownRelated("vpc")
 	}
-	return resource.KnownRelated("vpc", nil, false)
+	return resource.ProvenZero("vpc", "the complete subnet list")
 }
 
 // checkMSKLogs resolves the CloudWatch log group configured for broker
@@ -157,13 +157,13 @@ func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs == nil {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "BrokerLogs.CloudWatchLogs")
 	}
 	cw := cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs
 	if cw.Enabled == nil || !*cw.Enabled || cw.LogGroup == nil || *cw.LogGroup == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "cw.LogGroup")
 	}
-	return relatedResult("logs", []string{*cw.LogGroup})
+	return relatedResultTrunc("logs", []string{*cw.LogGroup}, false)
 }
 
 // checkMSKS3 extracts the S3 bucket configured for broker log delivery in
@@ -177,13 +177,13 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.S3 == nil {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "BrokerLogs.S3")
 	}
 	s3Log := cluster.Provisioned.LoggingInfo.BrokerLogs.S3
 	if s3Log.Enabled == nil || !*s3Log.Enabled || s3Log.Bucket == nil || *s3Log.Bucket == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "s3Log.Bucket")
 	}
-	return relatedResult("s3", []string{*s3Log.Bucket})
+	return relatedResultTrunc("s3", []string{*s3Log.Bucket}, false)
 }
 
 // checkMSKSecrets calls kafka:ListScramSecrets(clusterArn) and returns the
@@ -194,7 +194,7 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("secrets")
 		}
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "ClusterArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.MSK == nil {
@@ -204,13 +204,21 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return resource.UnknownRelated("secrets")
 	}
-	out, err := scramAPI.ListScramSecrets(ctx, &kafka.ListScramSecretsInput{
-		ClusterArn: aws.String(*cluster.ClusterArn),
+	arns, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, err := scramAPI.ListScramSecrets(ctx, &kafka.ListScramSecretsInput{
+			ClusterArn: aws.String(*cluster.ClusterArn),
+			NextToken:  token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.SecretArnList, out.NextToken, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
-	return relatedRefs("secrets", out.SecretArnList, refContext(clients, cache, "secrets"))
+	ids, dropped := resolveRefs("secrets", arns, refContext(clients, cache, "secrets"))
+	return relatedResultTrunc("secrets", ids, dropped || !complete)
 }
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's
@@ -225,7 +233,7 @@ func checkMSKKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "EncryptionAtRest.DataVolumeKMSKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }

@@ -179,10 +179,10 @@ eb-rule — MESSAGING. Status key: `state` — the key the status cell reads, an
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | role | IAM Role | no |
-| kinesis | Kinesis (targets) | no |
-| lambda | Lambda (targets) | no |
-| logs | Log Groups (targets) | no |
-| sfn | Step Functions (targets) | no |
+| kinesis | Kinesis (targets) | yes |
+| lambda | Lambda (targets) | yes |
+| logs | Log Groups (targets) | yes |
+| sfn | Step Functions (targets) | yes |
 | sns | SNS (targets) | no |
 | sqs | SQS (targets) | no |
 | ct-events | CloudTrail Events | no |

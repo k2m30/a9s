@@ -50,7 +50,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	if rgID == "" && len(memberSet) == 0 {
-		return unreadZero(res, resource.KnownRelated("alarm", nil, false))
+		return unreadZero(res, resource.ProvenZero("alarm", "memberSet"))
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -89,7 +89,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	if truncated {
 		return unreadZeroScanned(res, len(alarmList), truncatedResultRedis("alarm", ids))
 	}
-	return unreadZeroScanned(res, len(alarmList), relatedResult("alarm", ids))
+	return unreadZeroScanned(res, len(alarmList), relatedResultTrunc("alarm", ids, false))
 }
 
 // checkRedisCFN resolves CloudFormation stack ownership via a single
@@ -103,7 +103,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		// A group that carries no ARN cannot be passed to ListTagsForResource,
 		// so no stack can own it.
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "rg.ARN")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
@@ -126,7 +126,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -153,7 +153,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	if truncated {
 		return truncatedResultRedis("cfn", ids)
 	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, false)
 }
 
 // checkRedisCtEvents scans the ct-events cache for CloudTrail events whose
@@ -175,7 +175,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "rgID")
 	}
 
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
@@ -210,7 +210,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 	if truncated {
 		return truncatedResultRedis("ct-events", ids)
 	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, false)
 }
 
 // checkRedisKMS reads KmsKeyId directly from the ReplicationGroup RawStruct.
@@ -225,7 +225,7 @@ func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.KnownRelated("kms", nil, false)
 	}
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "rg.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*rg.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -255,7 +255,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(names) == 0 {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "names")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -286,7 +286,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 	if truncated {
 		return truncatedResultRedis("logs", ids)
 	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, false)
 }
 
 // checkRedisSecrets scans the loaded secrets cache for secrets whose name
@@ -305,7 +305,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "rgID")
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -341,7 +341,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 	if truncated {
 		return truncatedResultRedis("secrets", ids)
 	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, false)
 }
 
 // checkRedisSG resolves the security groups for the replication group by calling
@@ -353,11 +353,14 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		return relatedFromErr("sg", err)
 	}
 	if cc == nil {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "cc")
 	}
 	sgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
+	}
+	if sgList == nil {
+		return resource.UnknownRelated("sg")
 	}
 
 	var sgIDs []string
@@ -367,7 +370,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "sgIDs")
 	}
 
 	wantedSet := make(map[string]struct{}, len(sgIDs))
@@ -386,7 +389,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 	if truncated {
 		return truncatedResultRedis("sg", ids)
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkRedisSNS extracts the SNS topic ARN from the member cluster's
@@ -398,10 +401,10 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return relatedFromErr("sns", err)
 	}
 	if cc == nil {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "cc")
 	}
 	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "cc.NotificationConfiguration.TopicArn")
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 
@@ -432,12 +435,15 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "sng")
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("subnet", err)
+	}
+	if subnetList == nil {
+		return resource.UnknownRelated("subnet")
 	}
 
 	var subnetIDs []string
@@ -447,7 +453,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "subnetIDs")
 	}
 
 	wantedSet := make(map[string]struct{}, len(subnetIDs))
@@ -466,7 +472,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 	if truncated {
 		return truncatedResultRedis("subnet", ids)
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkRedisVPC resolves the VPC for the replication group via the same
@@ -477,12 +483,12 @@ func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ re
 		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "sng")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "sng.VpcId")
 	}
-	return relatedResult("vpc", []string{*sng.VpcId})
+	return relatedResultTrunc("vpc", []string{*sng.VpcId}, false)
 }
 
 // redisMemberCluster calls DescribeCacheClusters on MemberClusters[0] of the
@@ -506,19 +512,23 @@ func redisMemberCluster(ctx context.Context, clients any, res resource.Resource)
 		return nil, errRedisNoGroupDetail
 	}
 	memberID := rg.MemberClusters[0]
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheClustersOutput, error) {
-		return c.ElastiCache.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
+	clusters, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elasticachetypes.CacheCluster, *string, error) {
+		out, err := c.ElastiCache.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
 			CacheClusterId: &memberID,
+			Marker:         marker,
 		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.CacheClusters, out.Marker, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing member cluster %s: %w", memberID, err)
 	}
-	if out == nil || len(out.CacheClusters) == 0 {
+	if len(clusters) == 0 {
 		return nil, nil
 	}
-	cc := out.CacheClusters[0]
-	return &cc, nil
+	return &clusters[0], nil
 }
 
 // redisSubnetGroup performs the two-step resolution:
@@ -543,19 +553,23 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 		return nil, errRedisNoGroupDetail
 	}
 	name := *cc.CacheSubnetGroupName
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheSubnetGroupsOutput, error) {
-		return c.ElastiCache.DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{
+	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elasticachetypes.CacheSubnetGroup, *string, error) {
+		out, callErr := c.ElastiCache.DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{
 			CacheSubnetGroupName: &name,
+			Marker:               marker,
 		})
+		if callErr != nil {
+			return nil, nil, callErr
+		}
+		return out.CacheSubnetGroups, out.Marker, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
-	if out == nil || len(out.CacheSubnetGroups) == 0 {
+	if len(groups) == 0 {
 		return nil, nil
 	}
-	sng := out.CacheSubnetGroups[0]
-	return &sng, nil
+	return &groups[0], nil
 }
 
 // truncatedResultRedis returns a RelatedCheckResult with Truncated=true when the

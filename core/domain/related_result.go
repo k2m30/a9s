@@ -18,8 +18,9 @@ import "sort"
 // result — there is no constructor that accepts both ids and an error — so
 // the row stays actionable ("N+") instead of collapsing to a dead end via
 // EffectiveState. An empty ids with truncated == true ("(0+)") is the honest
-// "scanned one page/call, found none yet, more may exist" — distinct from a
-// proven zero (truncated == false), which is a dead end.
+// "scanned one page/call, found none yet, more may exist". An empty ids with
+// truncated == false searched nothing (CoverageNoPath); a searched zero is
+// ProvenZero.
 func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckResult {
 	set := make(map[string]struct{}, len(ids))
 	uniq := make([]string, 0, len(ids))
@@ -34,12 +35,48 @@ func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckR
 		uniq = append(uniq, id)
 	}
 	sort.Strings(uniq)
+	coverage := CoverageComplete
+	if len(uniq) == 0 {
+		coverage = CoverageNoPath
+	}
 	return RelatedCheckResult{
 		targetType:  targetType,
 		count:       len(uniq),
 		resourceIDs: uniq,
 		truncated:   truncated,
+		coverage:    coverage,
 	}
+}
+
+// ProvenZero is the only result that reports a complete zero: the lookup read
+// every place the relation is recorded and found none. evidence names the
+// field read or the walk completed.
+func ProvenZero(targetType, evidence string) RelatedCheckResult {
+	_ = evidence
+	return RelatedCheckResult{targetType: targetType}
+}
+
+// NoDiscoveryPath is the result of a pivot AWS records no link for: nothing
+// can be searched, so it renders as a blank, navigable row.
+func NoDiscoveryPath(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{targetType: targetType, state: RelatedUnknown, coverage: CoverageNoPath}
+}
+
+// HeuristicRelated is the result of a pivot that matches by a shared property
+// rather than a recorded link: ids are candidates, rendered blank and
+// navigable, never as a count.
+func HeuristicRelated(targetType string, ids []string) RelatedCheckResult {
+	r := KnownRelated(targetType, ids, false)
+	r.coverage = CoverageHeuristic
+	return r
+}
+
+// PartialScan returns a copy of r whose ids are what a scan that stopped
+// short found: more may exist. What the ids are — a recorded link, a
+// heuristic match — is unchanged.
+func (r RelatedCheckResult) PartialScan() RelatedCheckResult {
+	r.truncated = true
+	return r
 }
 
 // UnknownRelated returns a RelatedCheckResult representing "the checker

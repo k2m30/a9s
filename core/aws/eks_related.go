@@ -19,7 +19,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 		clusterName = res.Fields["cluster_name"]
 	}
 	if clusterName == "" {
-		return resource.KnownRelated("ng", nil, false)
+		return resource.ProvenZero("ng", "clusterName")
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
@@ -58,7 +58,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		stackName = raw.Tags["aws:cloudformation:stack-name"]
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -88,7 +88,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "clusterName")
 	}
 
 	expectedLogGroup := "/aws/eks/" + clusterName + "/cluster"
@@ -119,7 +119,7 @@ func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		return resource.UnknownRelated("sg")
 	}
 	if raw.ResourcesVpcConfig == nil {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "raw.ResourcesVpcConfig")
 	}
 	var ids []string
 	if raw.ResourcesVpcConfig.ClusterSecurityGroupId != nil && *raw.ResourcesVpcConfig.ClusterSecurityGroupId != "" {
@@ -130,7 +130,7 @@ func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 			ids = append(ids, sgID)
 		}
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkEKSVPC returns the VPC this EKS cluster runs in (Pattern R).
@@ -141,9 +141,9 @@ func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.UnknownRelated("vpc")
 	}
 	if raw.ResourcesVpcConfig == nil || raw.ResourcesVpcConfig.VpcId == nil || *raw.ResourcesVpcConfig.VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "raw.ResourcesVpcConfig.VpcId")
 	}
-	return relatedResult("vpc", []string{*raw.ResourcesVpcConfig.VpcId})
+	return relatedResultTrunc("vpc", []string{*raw.ResourcesVpcConfig.VpcId}, false)
 }
 
 // checkEKSKMS extracts the KMS key ID from the EKS Cluster's EncryptionConfig.
@@ -158,7 +158,7 @@ func checkEKSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("kms")
 		}
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "EncryptionConfig.Provider.KeyArn")
 	}
 	keyID := kmsRefFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -171,7 +171,7 @@ func checkEKSRole(_ context.Context, clients any, res resource.Resource, cache r
 		if res.RawStruct == nil {
 			return resource.UnknownRelated("role")
 		}
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "raw.RoleArn")
 	}
 	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
 }

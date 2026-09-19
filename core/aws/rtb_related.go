@@ -31,7 +31,7 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 			ids = append(ids, *assoc.SubnetId)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.
@@ -56,7 +56,7 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *route.NatGatewayId)
 		}
 	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, false)
 }
 
 // checkRTBIGW searches the igw cache for Internet Gateways referenced in this route table's routes.
@@ -80,7 +80,7 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *route.GatewayId)
 		}
 	}
-	return relatedResult("igw", ids)
+	return relatedResultTrunc("igw", ids, false)
 }
 
 // checkRTBCFN checks EC2 RouteTable tags for aws:cloudformation:stack-name
@@ -88,7 +88,7 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := rtbCFNStackName(res)
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
@@ -128,9 +128,9 @@ func rtbCFNStackName(res resource.Resource) string {
 func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "vpcID")
 	}
-	return relatedResult("vpc", []string{vpcID})
+	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
 
 // checkRTBENI searches the eni cache for interfaces referenced by this route
@@ -154,7 +154,7 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *route.NetworkInterfaceId)
 		}
 	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, false)
 }
 
 // checkRTBTGW searches the tgw cache for transit gateways referenced by this
@@ -178,7 +178,7 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 			ids = append(ids, *route.TransitGatewayId)
 		}
 	}
-	return relatedResult("tgw", ids)
+	return relatedResultTrunc("tgw", ids, false)
 }
 
 // checkRTBVPCE searches the vpce cache for Gateway-type VPC endpoints that
@@ -186,7 +186,7 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtbID := res.ID
 	if rtbID == "" {
-		return resource.KnownRelated("vpce", nil, false)
+		return resource.ProvenZero("vpce", "rtbID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

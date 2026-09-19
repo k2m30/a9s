@@ -4,10 +4,11 @@ package unit_test
 // reporting a lower bound when ListStackResources answered with more pages to
 // come.
 //
-// The pivot reads one page to stay inside its one-call budget. A NextToken on
-// that page means resources of the wanted type may sit on pages nobody read,
-// so an exact count is a claim the call did not make: a stack whose buckets
-// all live on page two renders a dead-end "(0)" the operator cannot drill.
+// The pivot walks ListStackResources up to the page cap. A NextToken still
+// pending at the cap means resources of the wanted type may sit on pages
+// nobody read, so an exact count is a claim the walk did not make: a stack
+// whose buckets all live past the cap renders a dead-end "(0)" the operator
+// cannot drill.
 
 import (
 	"context"
@@ -24,9 +25,9 @@ import (
 
 const row5StackName = "acme-web"
 
-// row5CFNFake answers ListStackResources with one page and records how many
-// times it was called, so the one-call budget stays pinned alongside the
-// truncation contract.
+// row5CFNFake answers every ListStackResources call with the same page and
+// records how many times it was called: with a token set the list never ends,
+// so the walk runs to the page cap.
 type row5CFNFake struct {
 	awsclient.CFNAPI
 	summaries []cfntypes.StackResourceSummary
@@ -96,8 +97,12 @@ func TestS3_0916_Row5_StackResourcePivotsReportALowerBound(t *testing.T) {
 					t.Errorf("ResourceIDs = %v, want [%s]", ids, c.physicalID)
 				}
 			}
-			if fake.calls != 1 {
-				t.Errorf("ListStackResources calls = %d, want 1 — the pivot's call budget is one page", fake.calls)
+			wantCalls := 1
+			if c.nextToken != "" {
+				wantCalls = awsclient.PerParentPageCap
+			}
+			if fake.calls != wantCalls {
+				t.Errorf("ListStackResources calls = %d, want %d — a pending token is walked to the page cap", fake.calls, wantCalls)
 			}
 		})
 	}

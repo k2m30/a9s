@@ -30,7 +30,7 @@ func kmsKeyID(res resource.Resource) string {
 func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.KnownRelated("ebs", nil, false)
+		return resource.ProvenZero("ebs", "keyID")
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
@@ -64,7 +64,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.KnownRelated("dbi", nil, false)
+		return resource.ProvenZero("dbi", "keyID")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -99,7 +99,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "keyID")
 	}
 
 	secretsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -156,7 +156,7 @@ func kmsRefNames(ref, keyID string, rc domain.RefContext) (match, unknown bool) 
 func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "keyID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.KMS == nil {
@@ -195,35 +195,25 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 
-	grantsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListGrantsOutput, error) {
-		return grantsAPI.ListGrants(ctx, &kms.ListGrantsInput{KeyId: &keyID})
+	grants, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]kmstypes.GrantListEntry, *string, error) {
+		out, callErr := grantsAPI.ListGrants(ctx, &kms.ListGrantsInput{KeyId: &keyID, Marker: marker})
+		if callErr != nil {
+			return nil, nil, callErr
+		}
+		return out.Grants, out.NextMarker, nil
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
 		return resource.ErrorRelated("role", err)
 	}
-	if grantsOut != nil {
-		for _, g := range grantsOut.Grants {
-			for _, p := range []string{
-				func() string {
-					if g.GranteePrincipal != nil {
-						return *g.GranteePrincipal
-					}
-					return ""
-				}(),
-				func() string {
-					if g.RetiringPrincipal != nil {
-						return *g.RetiringPrincipal
-					}
-					return ""
-				}(),
-			} {
-				if p != "" && strings.Contains(p, ":role/") {
-					refs = append(refs, p)
-				}
+	for _, g := range grants {
+		for _, p := range []string{aws.ToString(g.GranteePrincipal), aws.ToString(g.RetiringPrincipal)} {
+			if strings.Contains(p, ":role/") {
+				refs = append(refs, p)
 			}
 		}
 	}
 
-	return relatedRefs("role", refs, rc)
+	ids, dropped := resolveRefs("role", refs, rc)
+	return relatedResultTrunc("role", ids, dropped || !complete)
 }

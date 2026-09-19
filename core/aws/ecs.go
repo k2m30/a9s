@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -36,8 +37,12 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 	// skipped, not made with a possibly-empty ClusterArns, when this page found
 	// no cluster ARNs to describe.
 	if len(listOutput.ClusterArns) > 0 {
+		// Configuration and Tags are returned only when named in Include; the
+		// related checkers read the execute-command key and the
+		// CloudFormation stack tag from them.
 		descOutput, err := describeAPI.DescribeClusters(ctx, &ecs.DescribeClustersInput{
 			Clusters: listOutput.ClusterArns,
+			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldTags},
 		})
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("describing ECS clusters: %w", err)

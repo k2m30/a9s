@@ -25,7 +25,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -67,7 +67,7 @@ func checkAMIKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkAMING(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.KnownRelated("ng", nil, false)
+		return resource.ProvenZero("ng", "amiID")
 	}
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {

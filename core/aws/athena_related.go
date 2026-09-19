@@ -42,7 +42,7 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("s3")
 	}
 	if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.OutputLocation == nil {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "cfg.ResultConfiguration.OutputLocation")
 	}
 	return relatedRefs("s3", []string{*cfg.ResultConfiguration.OutputLocation}, refContext(clients, cache, "s3"))
 }
@@ -58,7 +58,7 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cac
 		cfg.ResultConfiguration.EncryptionConfiguration == nil ||
 		cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == nil ||
 		*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "cfg")
 	}
 	keyID := kmsRefFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -74,12 +74,12 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 		return resource.UnknownRelated("logs")
 	}
 	if cfg.PublishCloudWatchMetricsEnabled == nil || !*cfg.PublishCloudWatchMetricsEnabled {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "cfg.PublishCloudWatchMetricsEnabled")
 	}
 	// Athena publishes metrics but the log group is implicit (/aws/athena/<WG>).
 	// Emit the conventional log-group name so detail-view drill-through works.
 	lg := "/aws/athena/" + res.ID
-	return relatedResult("logs", []string{lg})
+	return relatedResultTrunc("logs", []string{lg}, false)
 }
 
 // checkAthenaRole calls athena:GetWorkGroup and extracts the ExecutionRole for
@@ -90,7 +90,7 @@ func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("role")
 	}
 	if cfg.ExecutionRole == nil || *cfg.ExecutionRole == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "cfg.ExecutionRole")
 	}
 	return relatedRefs("role", []string{*cfg.ExecutionRole}, refContext(clients, cache, "role"))
 }

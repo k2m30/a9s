@@ -233,7 +233,7 @@ vpce — NETWORKING. Status key: `state` — the key the status cell reads, and 
 | eni | Network Interfaces | no |
 | vpc | VPC | no |
 | alarm | CloudWatch Alarms | yes |
-| logs | Log Groups | no |
-| r53 | Route 53 Zones | no |
+| logs | Log Groups | yes |
+| r53 | Route 53 Zones | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

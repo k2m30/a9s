@@ -180,7 +180,7 @@ kinesis — MESSAGING. Status key: `status` — the key the status cell reads, a
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
-| lambda | Lambda Functions | no |
+| lambda | Lambda Functions | yes |
 | cfn | CloudFormation | yes |
 | ddb | DynamoDB Streams | yes |
 | kms | KMS Key | no |

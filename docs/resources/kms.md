@@ -198,6 +198,6 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 | ebs | EBS Volumes | yes |
 | dbi | RDS Instances | yes |
 | secrets | Secrets Manager | yes |
-| role | IAM Roles (grants) | no |
+| role | IAM Roles (grants) | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

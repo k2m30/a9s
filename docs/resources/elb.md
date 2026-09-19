@@ -228,7 +228,7 @@ elb — NETWORKING. Status key: `state` — the key the status cell reads, and t
 | sg | Security Groups | no |
 | vpc | VPC | no |
 | cfn | CloudFormation | no |
-| acm | ACM Certificates | no |
+| acm | ACM Certificates | yes |
 | cf | CloudFront | yes |
 | eni | Network Interfaces | yes |
 | s3 | S3 Buckets | no |

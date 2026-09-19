@@ -28,7 +28,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return resource.ProvenZero("lambda", "streamARN")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
 }
@@ -38,7 +38,7 @@ func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -62,7 +62,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if stackName == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
@@ -90,7 +90,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -107,7 +107,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("kms", err)
 	}
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "out.StreamDescriptionSummary.KeyId")
 	}
 	keyID := kmsRefFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -120,7 +120,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.KnownRelated("ddb", nil, false)
+		return resource.ProvenZero("ddb", "streamARN")
 	}
 
 	c, ok := clients.(*ServiceClients)

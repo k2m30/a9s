@@ -20,7 +20,7 @@ func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("role")
 	}
 	if rule.RoleArn == nil || *rule.RoleArn == "" {
-		return resource.KnownRelated("role", nil, false)
+		return resource.ProvenZero("role", "rule.RoleArn")
 	}
 	return relatedRefs("role", []string{*rule.RoleArn}, refContext(clients, cache, "role"))
 }
@@ -35,15 +35,22 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 	if !ok || c == nil || c.EventBridge == nil {
 		return resource.UnknownRelated(target)
 	}
-	out, err := c.EventBridge.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{
-		Rule: aws.String(ruleName),
+	targets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Target, *string, error) {
+		out, err := c.EventBridge.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{
+			Rule:      aws.String(ruleName),
+			NextToken: token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Targets, out.NextToken, nil
 	})
 	// no finding: the pivot shows "?" rather than a target count nobody read.
-	if err != nil || out == nil {
+	if err != nil {
 		return resource.UnknownRelated(target)
 	}
 	var arns []string
-	for _, t := range out.Targets {
+	for _, t := range targets {
 		if t.Arn == nil {
 			continue
 		}
@@ -51,7 +58,8 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 			arns = append(arns, *t.Arn)
 		}
 	}
-	return relatedRefs(target, arns, refContext(clients, cache, target))
+	ids, dropped := resolveRefs(target, arns, refContext(clients, cache, target))
+	return relatedResultTrunc(target, ids, dropped || !complete)
 }
 
 func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -76,4 +84,28 @@ func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, cac
 
 func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return ebRuleTargets(ctx, clients, cache, res.ID, "sqs", "sqs")
+}
+
+// ebRulesTargeting is the eb-rule pivot of a resource EventBridge rules can
+// target: the rules events:ListRuleNamesByTarget names for targetARN.
+func ebRulesTargeting(ctx context.Context, clients any, targetARN string) resource.RelatedCheckResult {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return resource.UnknownRelated("eb-rule")
+	}
+	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
+	if !ok {
+		return resource.UnknownRelated("eb-rule")
+	}
+	names, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, err := api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &targetARN, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.RuleNames, out.NextToken, nil
+	})
+	if err != nil {
+		return resource.ErrorRelated("eb-rule", err)
+	}
+	return relatedResultTrunc("eb-rule", names, !complete)
 }

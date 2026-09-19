@@ -24,7 +24,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envID == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "envID")
 	}
 
 	envIDPrefix := "awseb-" + envID
@@ -59,7 +59,7 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if envName == "" {
-		return resource.KnownRelated("logs", nil, false)
+		return resource.ProvenZero("logs", "envName")
 	}
 
 	prefix := "/aws/elasticbeanstalk/" + envName + "/"
@@ -91,7 +91,7 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "envName")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -130,7 +130,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "envName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -166,7 +166,7 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if envName == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "envName")
 	}
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {

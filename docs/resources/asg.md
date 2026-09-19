@@ -241,10 +241,10 @@ asg — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | alarm | CloudWatch Alarms | yes |
 | ng | EKS Node Groups | yes |
 | ami | AMI | no |
-| elb | Load Balancers | no |
-| role | IAM Roles | no |
+| elb | Load Balancers | yes |
+| role | IAM Roles | yes |
 | sg | Security Groups | no |
-| sns | SNS Topics | no |
-| vpc | VPCs | no |
+| sns | SNS Topics | yes |
+| vpc | VPCs | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

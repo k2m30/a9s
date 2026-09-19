@@ -21,7 +21,7 @@ import (
 func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	taskID := res.ID
 	if taskID == "" {
-		return resource.KnownRelated("alarm", nil, false)
+		return resource.ProvenZero("alarm", "taskID")
 	}
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
@@ -53,7 +53,7 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	taskID := res.ID
 	if taskID == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "taskID")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -87,7 +87,7 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("ec2")
 	}
 	if task.ContainerInstanceArn == nil || *task.ContainerInstanceArn == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "task.ContainerInstanceArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -113,7 +113,7 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	ids, dropped := resolveRefs("ec2", ids, refContext(clients, cache, "ec2"))
-	return resource.KnownRelated("ec2", ids, dropped || len(out.Failures) > 0)
+	return relatedResultTrunc("ec2", ids, dropped || len(out.Failures) > 0)
 }
 
 // checkECSTaskECR reads the ECR repositories of the task's container image
@@ -149,9 +149,9 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "ids")
 	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, false)
 }
 
 // checkECSTaskSecrets reads Fields["secret_arns"] (a comma-joined list of
@@ -163,7 +163,7 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	joined := res.Fields["secret_arns"]
 	if joined == "" {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "joined")
 	}
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
@@ -185,7 +185,7 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	joined := res.Fields["ssm_param_names"]
 	if joined == "" {
-		return resource.KnownRelated("ssm", nil, false)
+		return resource.ProvenZero("ssm", "joined")
 	}
 	nameSet := make(map[string]struct{})
 	for name := range strings.SplitSeq(joined, ",") {
@@ -194,7 +194,7 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(nameSet) == 0 {
-		return resource.KnownRelated("ssm", nil, false)
+		return resource.ProvenZero("ssm", "nameSet")
 	}
 
 	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
@@ -239,7 +239,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(eniIDs) == 0 {
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "eniIDs")
 	}
 
 	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -269,7 +269,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 		if eniTruncated {
 			return resource.UnknownRelated("sg")
 		}
-		return resource.KnownRelated("sg", nil, false)
+		return resource.ProvenZero("sg", "sgIDSet")
 	}
 
 	sgList, sgTruncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
@@ -286,7 +286,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, sgRes.ID)
 		}
 	}
-	return relatedResultTrunc("sg", ids, sgTruncated)
+	return relatedResultTrunc("sg", ids, sgTruncated || eniTruncated)
 }
 
 // checkECSTaskSubnet extracts subnet IDs from task.Attachments (awsvpc). Pattern F.
@@ -310,7 +310,7 @@ func checkECSTaskSubnet(_ context.Context, _ any, res resource.Resource, _ resou
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "ids")
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }

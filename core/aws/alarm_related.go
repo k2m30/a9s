@@ -28,13 +28,13 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	}
 
 	if len(arnSet) == 0 {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "arnSet")
 	}
 	ids := make([]string, 0, len(arnSet))
 	for arn := range arnSet {
 		ids = append(ids, arn)
 	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, false)
 }
 
 // checkAlarmASG checks whether this alarm targets an Auto Scaling Group via its
@@ -57,7 +57,7 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if asgName == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "asgName")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")

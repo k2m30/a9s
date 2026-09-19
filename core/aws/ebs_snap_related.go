@@ -19,7 +19,7 @@ var ebsSnapCreateImageRe = regexp.MustCompile(`Created by CreateImage\((i-[a-zA-
 func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
-		return resource.KnownRelated("ami", nil, false)
+		return resource.ProvenZero("ami", "snapID")
 	}
 
 	amiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ami")
@@ -49,7 +49,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
 func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !ebsSnapParentIsLocal(res.RawStruct) {
-		return resource.KnownRelated("ebs", nil, false)
+		return resource.ProvenZero("ebs", "snap.VolumeId")
 	}
 	return relatedRefs("ebs", []string{res.Fields["volume_id"]}, refContext(clients, cache, "ebs"))
 }
@@ -60,7 +60,7 @@ func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cach
 func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	matches := ebsSnapCreateImageRe.FindStringSubmatch(res.Fields["description"])
 	if len(matches) < 2 {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "matches")
 	}
 	entry, ok := cache["ec2"]
 	if !ok {
@@ -80,7 +80,7 @@ func checkEBSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.KnownRelated("kms", nil, false)
+		return resource.ProvenZero("kms", "snap.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*snap.KmsKeyId})
 }
@@ -110,7 +110,7 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	if !isBackupCreated {
 		// No Backup signature in Description/Tags — the parent's own fields
 		// rule out coverage; not a truncated-cache situation.
-		return unreadZero(res, resource.KnownRelated("backup", nil, false))
+		return unreadZero(res, resource.ProvenZero("backup", "isBackupCreated"))
 	}
 	if sourceARN == "" {
 		// Backup-created signature confirmed via Description alone, but no

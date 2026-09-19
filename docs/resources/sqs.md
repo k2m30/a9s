@@ -212,11 +212,11 @@ sqs — MESSAGING. Status key: `state` — the column naming it is the status co
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CloudWatch Alarms | yes |
-| lambda | Lambda Functions | no |
+| lambda | Lambda Functions | yes |
 | sqs | Dead Letter Queues | yes |
 | sns-sub | SNS Subscriptions | yes |
 | sns | SNS Topics | yes |
-| eb-rule | EventBridge Rules | no |
+| eb-rule | EventBridge Rules | yes |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -16,7 +16,6 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -29,7 +28,7 @@ func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 		return resource.UnknownRelated("subnet")
 	}
 	if fn.VpcConfig == nil {
-		return resource.KnownRelated("subnet", nil, false)
+		return resource.ProvenZero("subnet", "fn.VpcConfig")
 	}
 	var ids []string
 	for _, s := range fn.VpcConfig.SubnetIds {
@@ -37,7 +36,7 @@ func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 			ids = append(ids, s)
 		}
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkLambdaEFS reads the file systems behind Lambda FileSystemConfigs: each
@@ -64,7 +63,7 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("apigw", nil, false)
+		return resource.ProvenZero("apigw", "fnName")
 	}
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
 	if err != nil {
@@ -105,7 +104,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 		fnARN = *fn.FunctionArn
 	}
 	if fnARN == "" {
-		return unreadZero(res, resource.KnownRelated("cf", nil, false))
+		return unreadZero(res, resource.ProvenZero("cf", "fnARN"))
 	}
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
@@ -137,19 +136,13 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("ddb", nil, false)
+		return resource.ProvenZero("ddb", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("ddb")
 	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		FunctionName: &fnName,
-	})
-	if err != nil {
-		return resource.ErrorRelated("ddb", err)
-	}
-	return relatedRefs("ddb", eventSourceARNs(out.EventSourceMappings, ":dynamodb:"), refContext(clients, cache, "ddb"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "ddb", ":dynamodb:", refContext(clients, cache, "ddb"))
 }
 
 // checkLambdaKinesis scans this Lambda's event source mappings for Kinesis
@@ -157,19 +150,13 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("kinesis", nil, false)
+		return resource.ProvenZero("kinesis", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("kinesis")
 	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		FunctionName: &fnName,
-	})
-	if err != nil {
-		return resource.ErrorRelated("kinesis", err)
-	}
-	return relatedRefs("kinesis", eventSourceARNs(out.EventSourceMappings, ":kinesis:"), refContext(clients, cache, "kinesis"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "kinesis", ":kinesis:", refContext(clients, cache, "kinesis"))
 }
 
 // checkLambdaMSK scans this Lambda's event source mappings for MSK cluster
@@ -177,19 +164,13 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("msk", nil, false)
+		return resource.ProvenZero("msk", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("msk")
 	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		FunctionName: &fnName,
-	})
-	if err != nil {
-		return resource.ErrorRelated("msk", err)
-	}
-	return relatedRefs("msk", eventSourceARNs(out.EventSourceMappings, ":kafka:"), refContext(clients, cache, "msk"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "msk", ":kafka:", refContext(clients, cache, "msk"))
 }
 
 // checkLambdaCTEvents scans the ct-events cache for events whose Resources
@@ -197,7 +178,7 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+		return resource.ProvenZero("ct-events", "fnName")
 	}
 	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
@@ -245,7 +226,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.KnownRelated("tg", nil, false)
+		return resource.ProvenZero("tg", "fnName")
 	}
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
@@ -265,7 +246,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 		if truncated {
 			return relatedResultTrunc("tg", nil, true)
 		}
-		return resource.KnownRelated("tg", nil, false)
+		return resource.ProvenZero("tg", "lambdaTGs")
 	}
 
 	c, sok := clients.(*ServiceClients)
@@ -331,7 +312,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.ProvenZero("sns", "fnName")
 	}
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
@@ -372,7 +353,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.KnownRelated("sns-sub", nil, false)
+		return resource.ProvenZero("sns-sub", "fnName")
 	}
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
@@ -405,7 +386,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	fnName := res.ID
 	if fnARN == "" && fnName == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "fnName")
 	}
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
@@ -447,7 +428,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "fnName")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
@@ -486,7 +467,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 		return resource.KnownRelated("secrets", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "fn.Environment.Variables")
 	}
 	arnSet := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -495,7 +476,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(arnSet) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
+		return resource.ProvenZero("secrets", "arnSet")
 	}
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
@@ -531,7 +512,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("ssm", nil, false)
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.KnownRelated("ssm", nil, false)
+		return resource.ProvenZero("ssm", "fn.Environment.Variables")
 	}
 	candidates := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -540,7 +521,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(candidates) == 0 {
-		return resource.KnownRelated("ssm", nil, false)
+		return resource.ProvenZero("ssm", "candidates")
 	}
 	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {

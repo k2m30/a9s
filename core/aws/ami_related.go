@@ -16,7 +16,7 @@ import (
 func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.KnownRelated("ec2", nil, false)
+		return resource.ProvenZero("ec2", "amiID")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -51,9 +51,9 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 		}
 	}
 	if len(ids) == 0 {
-		return resource.KnownRelated("ebs-snap", nil, false)
+		return resource.ProvenZero("ebs-snap", "ids")
 	}
-	return relatedResult("ebs-snap", ids)
+	return relatedResultTrunc("ebs-snap", ids, false)
 }
 
 // checkAMIASG scans the asg cache for Auto Scaling Groups whose currently
@@ -67,7 +67,7 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.KnownRelated("asg", nil, false)
+		return resource.ProvenZero("asg", "amiID")
 	}
 
 	asgList, asgTruncated, err := relatedResourcesFor(ctx, clients, cache, "asg")

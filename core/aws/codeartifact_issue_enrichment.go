@@ -75,39 +75,27 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		// upstream-connected repos materialize external packages as consumers pull
 		// them, so an account with a heavily-used upstream repo can walk indefinitely.
 		if listPkgAPI, ok := clients.CodeArtifact.(CodeArtifactListPackagesAPI); ok {
-			total := 0
-			pkgTruncated := false
-			var nextToken *string
-			for pages := 0; ; pages++ {
+			pkgs, complete, pkgErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]codeartifacttypes.PackageSummary, *string, error) {
 				pkgInput := &codeartifact.ListPackagesInput{
 					Domain:     aws.String(domainName),
 					Repository: aws.String(repoName),
-					NextToken:  nextToken,
+					NextToken:  token,
 				}
 				if domainOwner != "" {
 					pkgInput.DomainOwner = aws.String(domainOwner)
 				}
-				pkgOut, pkgErr := listPkgAPI.ListPackages(ctx, pkgInput)
-				if pkgErr != nil {
-					total = -1 // signal partial
-					break
+				out, err := listPkgAPI.ListPackages(ctx, pkgInput)
+				if err != nil {
+					return nil, nil, err
 				}
-				total += len(pkgOut.Packages)
-				if pkgOut.NextToken == nil || *pkgOut.NextToken == "" {
-					break
-				}
-				if pages+1 >= PerParentPageCap {
-					pkgTruncated = true
-					break
-				}
-				nextToken = pkgOut.NextToken
-			}
-			if total >= 0 {
-				count := resource.FormatExact(total)
-				if pkgTruncated {
+				return out.Packages, out.NextToken, nil
+			})
+			if pkgErr == nil {
+				count := resource.FormatExact(len(pkgs))
+				if !complete {
 					// A page cap on an informational count, not a failed call:
 					// the "+" is where the cap is reported.
-					count = resource.FormatTruncated(total)
+					count = resource.FormatTruncated(len(pkgs))
 				}
 				mu.Lock()
 				result.FieldUpdates[key] = map[string]string{"package_count": count}

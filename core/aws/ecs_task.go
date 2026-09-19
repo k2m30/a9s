@@ -15,13 +15,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// fetchECSTasksPageWithJoin fetches one page of ECS clusters using the
-// continuationToken, then for each cluster in that page fetches all tasks via
-// ListTasks+DescribeTasks. IsTruncated reflects whether ListClusters has more
-// pages beyond this one. describeTaskDefAPI may be nil; in that case the EFS
-// volume join is skipped and Fields["efs_file_system_ids"] is always "". This
-// is the full implementation registered as the ecs-task catalog Fetcher (see
-// catalog_compute.go) and used by the SetPaginatedForTest closure in init().
+// fetchECSTasksPageWithJoin fetches one page of ECS tasks: ListClusters,
+// every ListTasks page of each cluster, and DescribeTasks for at most 100
+// tasks a call, through parentChildWalk. describeTaskDefAPI may be nil; in
+// that case the EFS volume join is skipped and Fields["efs_file_system_ids"]
+// is always "". This is the full implementation registered as the ecs-task
+// catalog Fetcher (see catalog_compute.go).
 func fetchECSTasksPageWithJoin(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,
@@ -30,149 +29,132 @@ func fetchECSTasksPageWithJoin(
 	describeTaskDefAPI ECSDescribeTaskDefinitionAPI,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	input := &ecs.ListClustersInput{}
-	if continuationToken != "" {
-		input.NextToken = &continuationToken
-	}
-
-	listOutput, err := listClustersAPI.ListClusters(ctx, input)
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("listing ECS clusters: %w", err)
-	}
-
-	var resources []resource.Resource
-
-	// Memoize DescribeTaskDefinition results across all clusters in this page.
+	// Memoize DescribeTaskDefinition results across every cluster of the page.
 	seenTaskDefs := make(map[string]*ecstypes.TaskDefinition)
-
-	for _, clusterArn := range listOutput.ClusterArns {
-		taskListOutput, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
-			Cluster: aws.String(clusterArn),
-		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks: %w", err)
-		}
-
-		if len(taskListOutput.TaskArns) == 0 {
-			continue
-		}
-
-		descOutput, err := describeTasksAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-			Cluster: aws.String(clusterArn),
-			Tasks:   taskListOutput.TaskArns,
-		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing ECS tasks: %w", err)
-		}
-
-		for _, task := range descOutput.Tasks {
-			taskID := ""
-			taskArn := ""
-			if task.TaskArn != nil {
-				taskArn = *task.TaskArn
-				parts := strings.Split(taskArn, "/")
-				taskID = parts[len(parts)-1]
+	walk := parentChildWalk{
+		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
+			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
+			if err != nil {
+				return nil, nil, fmt.Errorf("listing ECS clusters: %w", err)
 			}
-
-			clusterName := ""
-			if task.ClusterArn != nil {
-				clusterName = *task.ClusterArn
-			}
-
-			status := ""
-			if task.LastStatus != nil {
-				status = *task.LastStatus
-			}
-
-			taskDefinition := ""
-			if task.TaskDefinitionArn != nil {
-				taskDefinition = *task.TaskDefinitionArn
-			}
-
-			launchType := string(task.LaunchType)
-
-			cpu := ""
-			if task.Cpu != nil {
-				cpu = *task.Cpu
-			}
-
-			memory := ""
-			if task.Memory != nil {
-				memory = *task.Memory
-			}
-
-			stopCode := string(task.StopCode)
-			healthStatus := ecsTaskHealthWords(task.HealthStatus)
-
-			var images []string
-			for _, container := range task.Containers {
-				if container.Image != nil && *container.Image != "" {
-					images = append(images, *container.Image)
-				}
-			}
-			containerImages := strings.Join(images, ",")
-
-			// Join task definition to extract EFS file-system IDs, IAM
-			// roles, and Secrets Manager / SSM ValueFrom references.
-			// Skipped gracefully when describeTaskDefAPI is nil. A join
-			// failure is recorded as a per-task
-			// Fields["task_def_join_error"]="true" so reverse-scan checkers
-			// (e.g. checkEFSECSTask) can report Truncated without the
-			// fetcher lying about pagination truncation (which would
-			// misleadingly surface "m: load more").
-			taskDefJoin, joinErr := ecsJoinTaskDefinition(ctx, task, seenTaskDefs, describeTaskDefAPI)
-
-			fields := map[string]string{
-				"task_id":             taskID,
-				"cluster":             clusterName,
-				"status":              status,
-				"stop_code":           stopCode,
-				"health_status":       healthStatus,
-				"task_definition":     taskDefinition,
-				"launch_type":         launchType,
-				"cpu":                 cpu,
-				"memory":              memory,
-				"efs_file_system_ids": taskDefJoin.efsFileSystemIDs,
-				"task_role":           taskDefJoin.taskRoleARN,
-				"execution_role":      taskDefJoin.executionRoleARN,
-				"secret_arns":         taskDefJoin.secretARNs,
-				"ssm_param_names":     taskDefJoin.ssmParamNames,
-				"container_images":    containerImages,
-				"arn":                 taskArn,
-			}
-			if joinErr != nil {
-				fields["task_def_join_error"] = "true"
-			}
-
-			findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
-
-			r := resource.Resource{
-				ID:        taskID,
-				Name:      taskID,
-				Fields:    fields,
-				Findings:  findings,
-				RawStruct: task,
-			}
-
-			resources = append(resources, r)
-		}
-	}
-
-	nextToken := ""
-	isTruncated := false
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
-		isTruncated = true
-	}
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
-			PageSize:    len(resources),
-			TotalHint:   -1,
+			return out.ClusterArns, out.NextToken, nil
 		},
-	}, nil
+		listChildren: func(ctx context.Context, clusterArn string, token *string) ([]string, *string, error) {
+			out, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
+				Cluster:    aws.String(clusterArn),
+				MaxResults: aws.Int32(100),
+				NextToken:  token,
+			})
+			if err != nil {
+				return nil, nil, fmt.Errorf("listing ECS tasks: %w", err)
+			}
+			return out.TaskArns, out.NextToken, nil
+		},
+		describe: func(ctx context.Context, clusterArn string, taskArns []string) ([]resource.Resource, error) {
+			descOutput, err := describeTasksAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+				Cluster: aws.String(clusterArn),
+				Tasks:   taskArns,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("describing ECS tasks: %w", err)
+			}
+			resources := make([]resource.Resource, 0, len(descOutput.Tasks))
+			for _, task := range descOutput.Tasks {
+				taskID := ""
+				taskArn := ""
+				if task.TaskArn != nil {
+					taskArn = *task.TaskArn
+					parts := strings.Split(taskArn, "/")
+					taskID = parts[len(parts)-1]
+				}
+
+				clusterName := ""
+				if task.ClusterArn != nil {
+					clusterName = *task.ClusterArn
+				}
+
+				status := ""
+				if task.LastStatus != nil {
+					status = *task.LastStatus
+				}
+
+				taskDefinition := ""
+				if task.TaskDefinitionArn != nil {
+					taskDefinition = *task.TaskDefinitionArn
+				}
+
+				launchType := string(task.LaunchType)
+
+				cpu := ""
+				if task.Cpu != nil {
+					cpu = *task.Cpu
+				}
+
+				memory := ""
+				if task.Memory != nil {
+					memory = *task.Memory
+				}
+
+				stopCode := string(task.StopCode)
+				healthStatus := ecsTaskHealthWords(task.HealthStatus)
+
+				var images []string
+				for _, container := range task.Containers {
+					if container.Image != nil && *container.Image != "" {
+						images = append(images, *container.Image)
+					}
+				}
+				containerImages := strings.Join(images, ",")
+
+				// Join task definition to extract EFS file-system IDs, IAM
+				// roles, and Secrets Manager / SSM ValueFrom references.
+				// Skipped gracefully when describeTaskDefAPI is nil. A join
+				// failure is recorded as a per-task
+				// Fields["task_def_join_error"]="true" so reverse-scan checkers
+				// (e.g. checkEFSECSTask) can report Truncated without the
+				// fetcher lying about pagination truncation (which would
+				// misleadingly surface "m: load more").
+				taskDefJoin, joinErr := ecsJoinTaskDefinition(ctx, task, seenTaskDefs, describeTaskDefAPI)
+
+				fields := map[string]string{
+					"task_id":             taskID,
+					"cluster":             clusterName,
+					"status":              status,
+					"stop_code":           stopCode,
+					"health_status":       healthStatus,
+					"task_definition":     taskDefinition,
+					"launch_type":         launchType,
+					"cpu":                 cpu,
+					"memory":              memory,
+					"efs_file_system_ids": taskDefJoin.efsFileSystemIDs,
+					"task_role":           taskDefJoin.taskRoleARN,
+					"execution_role":      taskDefJoin.executionRoleARN,
+					"secret_arns":         taskDefJoin.secretARNs,
+					"ssm_param_names":     taskDefJoin.ssmParamNames,
+					"container_images":    containerImages,
+					"arn":                 taskArn,
+				}
+				if joinErr != nil {
+					fields["task_def_join_error"] = "true"
+				}
+
+				findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
+
+				r := resource.Resource{
+					ID:        taskID,
+					Name:      taskID,
+					Fields:    fields,
+					Findings:  findings,
+					RawStruct: task,
+				}
+
+				resources = append(resources, r)
+			}
+			return resources, nil
+		},
+		batch: 100,
+	}
+	return walk.page(ctx, continuationToken)
 }
 
 // taskDefJoinFields holds the per-task fields resolved by ecsJoinTaskDefinition

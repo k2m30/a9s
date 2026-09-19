@@ -27,7 +27,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if elbARN == "" {
-		return resource.KnownRelated("tg", nil, false)
+		return resource.ProvenZero("tg", "elbARN")
 	}
 
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
@@ -79,7 +79,7 @@ func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 			ids = append(ids, sgID)
 		}
 	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, false)
 }
 
 // checkELBVPC returns the VPC this load balancer runs in (Pattern F).
@@ -87,9 +87,9 @@ func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "vpcID")
 	}
-	return relatedResult("vpc", []string{vpcID})
+	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
 
 // checkELBCFN reports the CloudFormation stack owning this ELB via the
@@ -104,7 +104,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.KnownRelated("cfn", nil, false)
+		return resource.ProvenZero("cfn", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -123,11 +123,11 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 	for _, td := range out.TagDescriptions {
 		for _, tag := range td.Tags {
 			if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil && *tag.Value != "" {
-				return relatedResult("cfn", []string{*tag.Value})
+				return relatedResultTrunc("cfn", []string{*tag.Value}, false)
 			}
 		}
 	}
-	return resource.KnownRelated("cfn", nil, false)
+	return resource.ProvenZero("cfn", "the aws:cloudformation:stack-name tag")
 }
 
 // checkELBACM reports ACM certificates attached to this ELB's HTTPS/TLS
@@ -142,21 +142,25 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.KnownRelated("acm", nil, false)
+		return resource.ProvenZero("acm", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
 		return resource.UnknownRelated("acm")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeListenersOutput, error) {
-		return c.ELBv2.DescribeListeners(ctx, &elbv2.DescribeListenersInput{LoadBalancerArn: &elbARN})
+	listeners, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.Listener, *string, error) {
+		out, err := c.ELBv2.DescribeListeners(ctx, &elbv2.DescribeListenersInput{LoadBalancerArn: &elbARN, Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Listeners, out.NextMarker, nil
 	})
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
 	}
 	var ids []string
 	seen := make(map[string]bool)
-	for _, ls := range out.Listeners {
+	for _, ls := range listeners {
 		for _, cert := range ls.Certificates {
 			if cert.CertificateArn == nil || *cert.CertificateArn == "" {
 				continue
@@ -169,7 +173,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 			ids = append(ids, arn)
 		}
 	}
-	return relatedResult("acm", ids)
+	return relatedResultTrunc("acm", ids, !complete)
 }
 
 // checkELBCF reports CloudFront distributions using this ELB as an origin.
@@ -177,7 +181,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dnsName := res.Fields["dns_name"]
 	if dnsName == "" {
-		return resource.KnownRelated("cf", nil, false)
+		return resource.ProvenZero("cf", "dnsName")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -213,7 +217,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		lbName = res.Name
 	}
 	if lbName == "" {
-		return resource.KnownRelated("eni", nil, false)
+		return resource.ProvenZero("eni", "lbName")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -255,7 +259,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	if elbARN == "" {
-		return resource.KnownRelated("s3", nil, false)
+		return resource.ProvenZero("s3", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -273,7 +277,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 			ids = append(ids, *a.Value)
 		}
 	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, false)
 }
 
 // checkELBSubnet extracts subnet IDs from the LB's AvailabilityZones slice.
@@ -294,7 +298,7 @@ func checkELBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		seen[*az.SubnetId] = true
 		ids = append(ids, *az.SubnetId)
 	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, false)
 }
 
 // checkELBWAF reports the WAF Web ACL attached to this ELB.
@@ -317,7 +321,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.KnownRelated("waf", nil, false)
+		return resource.ProvenZero("waf", "elbARN")
 	}
 	lbType := res.Fields["type"]
 	if lbType == "" {
@@ -326,7 +330,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if lbType == "network" || lbType == "gateway" {
-		return resource.KnownRelated("waf", nil, false)
+		return resource.ProvenZero("waf", "lbType")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -343,7 +347,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("waf", err)
 	}
 	if out.WebACL == nil {
-		return resource.KnownRelated("waf", nil, false)
+		return resource.ProvenZero("waf", "out.WebACL")
 	}
 	id := ""
 	if out.WebACL.Id != nil {
@@ -353,7 +357,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		id = *out.WebACL.ARN
 	}
 	if id == "" {
-		return resource.KnownRelated("waf", nil, false)
+		return resource.ProvenZero("waf", "id")
 	}
-	return relatedResult("waf", []string{id})
+	return relatedResultTrunc("waf", []string{id}, false)
 }

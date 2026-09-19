@@ -22,10 +22,10 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.KnownRelated("vpc", nil, false)
 	}
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
-		return resource.KnownRelated("vpc", nil, false)
+		return resource.ProvenZero("vpc", "raw.Attachments[0].VpcId")
 	}
 	// The IGW's own Attachments[0].VpcId is the attached VPC.
-	return relatedResult("vpc", []string{*raw.Attachments[0].VpcId})
+	return relatedResultTrunc("vpc", []string{*raw.Attachments[0].VpcId}, false)
 }
 
 // checkIGWRTB searches the rtb cache for route tables that contain a route
@@ -37,7 +37,7 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		igwID = *raw.InternetGatewayId
 	}
 	if igwID == "" {
-		return resource.KnownRelated("rtb", nil, false)
+		return resource.ProvenZero("rtb", "igwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
