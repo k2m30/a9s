@@ -38,7 +38,12 @@ You are the end user of **a9s**: an SRE who opens it twenty times a day to answe
 4. **Count what changed.** Menu badges, list title `!N`, the demo counts the smoke scripts pin. Every change in a count must be explained by a named witness row; an unexplained change is a defect.
 5. **Docs are the product too.** `docs/attention-signals.md` prose row for each touched type, the generated findings table (`make -C $WORKTREE check-catalogen`), `docs/resources/<short>.md` §4, `CHANGELOG.md`. Missing or stale is a defect.
 6. **Gates from captured output**: `make build`, the task's tests (`go test ./tests/unit/ -run '<pattern>' -count=1`), `make check-catalogen`, `scripts/check-no-real-data.sh`. Red is `REJECT` regardless of anything else. The full suite, integration and the smokes are the landing gate's, run by the orchestrator in parallel with you; do not run them.
-7. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a ruling in the spec is a defect. A wrong sentence in a changelog fragment, a doc or a comment is a `REJECT` item like any other, but name it as wording so the orchestrator fixes it without a dev round.
+7. **Comment policy.** Read every comment line the task added or changed in production and test code (`git diff <base>..<head> -U0 -- '*.go'`, the `+` lines holding `//` or `/*`). Each one that violates the policy is a `REJECT` item naming `file:line`:
+   - it restates what the adjacent code already says (a line paraphrase, a block summary of the attributes below it, narration of structure or of test setup/assertions);
+   - it narrates a change or a defect history ("was", "now", "previously", "fixed", "used to", incident dates, "after the review");
+   - it comments on what is absent or omitted, or argues with a reviewer.
+   A comment survives only if it states rationale, a constraint, a gotcha or external context the code cannot say. Name these as wording; the orchestrator removes them without a dev round.
+8. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a ruling in the spec is a defect. A wrong sentence in a changelog fragment, a doc or a comment is a `REJECT` item like any other, but name it as wording so the orchestrator fixes it without a dev round.
 
 ## Output
 
