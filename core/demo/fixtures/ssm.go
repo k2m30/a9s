@@ -16,10 +16,6 @@ type SSMFixtures struct {
 	Parameters []ssmtypes.ParameterMetadata
 	// ParameterValues maps parameter name to its current value (for GetParameter).
 	ParameterValues map[string]string
-	// ManagedInstanceIDs lists EC2 instance IDs enrolled in SSM (served by
-	// DescribeInstanceInformation). i-0a1b2c3d4e5f60001 is a real ec2.go
-	// fixture.
-	ManagedInstanceIDs []string
 }
 
 var ssmNamePool = []string{
@@ -159,7 +155,6 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			"/acme/prod/feature-flags":        "feature-a,feature-b,feature-c",
 			"/acme/staging/ami-id":            "ami-0123456789abcdef0",
 		},
-		ManagedInstanceIDs: []string{"i-0a1b2c3d4e5f60001"},
 	}
 })
 

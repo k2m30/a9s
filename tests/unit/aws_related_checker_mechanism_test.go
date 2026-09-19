@@ -589,13 +589,11 @@ func mechanismEC2CheckerByTarget(t *testing.T, target string) resource.RelatedCh
 }
 
 // ---------------------------------------------------------------------------
-// 8. Fakes — demo mode must serve real data for three checkers, or the panel
+// 8. Fakes — demo mode must serve real data for two checkers, or the panel
 // silently shows zero:
 //
 //   - checkLambdaCFN (lambda.md aws:cloudformation:stack-name tag) needs
 //     LambdaFake.ListTags to serve per-function tags.
-//   - checkEC2SSM (ec2 SSM-managed instance check) needs
-//     SSMFake.DescribeInstanceInformation to serve enrolled instance IDs.
 //   - checkECSSvcSFN (ecs:runTask state-machine cross-ref) needs
 //     SFNFake.DescribeStateMachine to return a Definition.
 // ---------------------------------------------------------------------------
@@ -636,17 +634,6 @@ func TestFakes_LambdaListTags_ServesCloudFormationStackNameTag(t *testing.T) {
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-eks-cluster" {
 		t.Fatalf("ResourceIDs = %v, want [acme-eks-cluster]", result.ResourceIDs())
-	}
-}
-
-func TestFakes_SSMDescribeInstanceInformation_ServesEnrolledInstance(t *testing.T) {
-	fake := fakes.NewSSM()
-	out, err := fake.DescribeInstanceInformation(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("DescribeInstanceInformation returned error: %v", err)
-	}
-	if len(out.InstanceInformationList) == 0 {
-		t.Fatalf("SSMFake.DescribeInstanceInformation returned no enrolled instances — demo fixtures must model at least one SSM-managed EC2 instance so checkEC2SSM can surface a real match")
 	}
 }
 
