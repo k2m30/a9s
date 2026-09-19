@@ -115,7 +115,7 @@ Lenses, used as tools:
 - `arch-review` skill — architecture checklist for size ≥ `M`.
 - `/ponytail-review` on the integrated diff — over-engineering only; it does not hunt correctness. Inside the team loop every dev and QA round already ran it on its own diff and recorded the outcome on the round entry's `simplified:` line, so the integrated pass is the second look, not the first.
 
-External passes, batched — one per phase boundary or pre-tag, never per fix: the `a9s-reviewer` agent (Claude Opus, xhigh effort, read-only) dispatched on the committed range `<base>..<head>`, and CodeRabbit:
+External passes, batched — one per phase boundary or pre-tag, never per fix: the area review — a `general-purpose` agent on model `opus` per concern the change touches, reviewing all code in that area, with the prompt in [`review-prompt.md`](review-prompt.md) — and CodeRabbit:
 
 ```bash
 coderabbit review --plain --type committed --base-commit <base>
@@ -124,7 +124,7 @@ coderabbit review --plain --type committed --base-commit <base>
 A reviewer's suggested patch is a proposal, not verified code: read every snippet against the actual file before applying it. Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved with `file:line` evidence, not filed and not waved off.
 
 - **Exit**: every external finding resolved or disproved on the record.
-- **Anti-pattern**: running `a9s-reviewer` per fix. Treating a reviewer's patch as compiling code.
+- **Anti-pattern**: running the area review per fix. Treating a reviewer's patch as compiling code.
 
 **Deleted symbols are swept out of the live docs only.** When a symbol, file or flag is deleted, every page that names it is corrected — `docs/*.md`, `docs/resources/`, `docs/shared/`, `website/`, `README.md`, `CLAUDE.md`. `docs/historical/` is **exempt from that sweep**: those pages are the record of a world that existed before a refactor, and editing them to name today's symbols destroys the traceability they are kept for. A historical page that has gone wrong about the past is a bug in the record; a historical page that names a symbol which no longer exists is the record working. The same exemption is why `make mdlint` skips `docs/historical/refactor/`.
 
@@ -190,7 +190,7 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 - **Release path** (when cutting a tagged version):
   1. `make ready-to-release PROFILE=<readonly-profile> REGION=<region>` — ADDITIVE on top of Stage 6, it does NOT re-run the push gate: prerequisite is a green `make ready-to-push` on this same tree, and this target adds only the live read-only smokes `smoke-live` and `smoke-related-live`. All green. Requires read-only AWS credentials and tmux; the live smokes require an explicit `PROFILE`/`REGION` (no default) and refuse any profile whose name is not `*readonly*`.
   2. `CHANGELOG.md` updated with a Keep-a-Changelog entry; `releases/vX.Y.Z.md` written.
-  2b. CodeRabbit and `a9s-reviewer` resolved on the committed range being tagged. Never tag without both.
+  2b. CodeRabbit and the area review resolved on the committed range being tagged. Never tag without both.
   3. `docs/architecture.md` aligned with the codebase. Outdated architecture docs are a release blocker.
   4. **Busywork audit**: every test added or modified in the release is reviewed and deleted if it is a tautology, a mock asserting its own input, a struct-shape pin instead of a behavior pin, or duplicate coverage. Coverage earned by busywork is a liability.
   5. The real-AWS pass is now a mandatory automated gate, not a manual step: the live read-only smokes run as part of `ready-to-release` (step 1) and must be green against a real account before the tag is cut.
