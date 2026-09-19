@@ -808,7 +808,11 @@ func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
 		clients := &awsclient.ServiceClients{DynamoDB: rvDDBFake{policies: map[string]string{namedARN: rvOwnRolePolicy}}}
 		clients.SetIdentityStore(unknown)
 
-		res, _ := awsclient.EnrichDynamoDBPITR(context.Background(), clients, rows, nil) //nolint:errcheck // judged by its marks
+		// A loaded, empty plan list: backup coverage answers "no plan" for
+		// both tables, so the only check that can leave a mark is the
+		// cross-account one under test.
+		backupLoaded := resource.ResourceCache{"backup": {Resources: []resource.Resource{}}}
+		res, _ := awsclient.EnrichDynamoDBPITR(context.Background(), clients, rows, backupLoaded) //nolint:errcheck // judged by its marks
 
 		if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
 			t.Errorf("own account unknown: the table whose policy names a 12-digit principal is not marked — an earlier cross-account finding clears without a \"?\"")
