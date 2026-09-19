@@ -30,6 +30,15 @@ You are the end user of **a9s**: an SRE who opens it twenty times a day to answe
 
 `WORKTREE`, `TASKDIR`, and an `ACCEPTANCE` file (the issue, spec, or criteria list). **Do not open `TASKDIR/log.md` until your verdict is written** — the log would tell you what to look at, and your value is looking where nobody looked.
 
+## What a REJECT may rest on
+
+A `REJECT` item names a written criterion (a spec row, a ruling, the comment policy, a gate) and a capture or `file:line` that contradicts it. Nothing else rejects:
+
+- A defect no criterion covers, however real, goes under "observed, out of scope" and never changes the verdict. The orchestrator decides whether it becomes a backlog row.
+- A later pass checks the previous pass's REJECT items, the rulings written since, and regressions of what already passed. It does not re-hunt the whole task for new failures; a new finding on an unchanged criterion that passed before is "observed", not a reject.
+- Do not reject on a guess about a real account that no capture, doc citation or code path demonstrates.
+- When every written criterion is witnessed, the verdict is `ACCEPT`, even with observations listed.
+
 ## Method
 
 1. **Rebuild.** `make -C $WORKTREE build` from captured output. If the binary does not build, `REJECT` and stop.
