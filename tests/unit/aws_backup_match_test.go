@@ -3,74 +3,65 @@ package unit
 import (
 	"testing"
 
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-func TestBackupPlanCoversARN(t *testing.T) {
+func TestBackupSelectionCovers_NotResources(t *testing.T) {
 	cases := []struct {
-		name            string
-		resourcesCSV    string
-		notResourcesCSV string
-		targetARN       string
-		want            bool
+		name         string
+		resources    []string
+		notResources []string
+		targetARN    string
+		want         bool
 	}{
 		{
-			name:            "resources-only match returns true",
-			resourcesCSV:    "arn:aws:dynamodb:*:*:table/*",
-			notResourcesCSV: "",
-			targetARN:       "arn:aws:dynamodb:us-east-1:123:table/orders",
-			want:            true,
+			name:      "resources-only match returns true",
+			resources: []string{"arn:aws:dynamodb:*:*:table/*"},
+			targetARN: "arn:aws:dynamodb:us-east-1:123:table/orders",
+			want:      true,
 		},
 		{
-			name:            "NotResources exact match excludes target",
-			resourcesCSV:    "arn:aws:dynamodb:*:*:table/*",
-			notResourcesCSV: "arn:aws:dynamodb:us-east-1:123:table/audit-log",
-			targetARN:       "arn:aws:dynamodb:us-east-1:123:table/audit-log",
-			want:            false,
+			name:         "NotResources exact match excludes target",
+			resources:    []string{"arn:aws:dynamodb:*:*:table/*"},
+			notResources: []string{"arn:aws:dynamodb:us-east-1:123:table/audit-log"},
+			targetARN:    "arn:aws:dynamodb:us-east-1:123:table/audit-log",
+			want:         false,
 		},
 		{
-			name:            "NotResources wildcard excludes matching target",
-			resourcesCSV:    "arn:aws:s3:::*",
-			notResourcesCSV: "arn:aws:s3:::quarantine-*",
-			targetARN:       "arn:aws:s3:::quarantine-x",
-			want:            false,
+			name:         "NotResources wildcard excludes matching target",
+			resources:    []string{"arn:aws:s3:::*"},
+			notResources: []string{"arn:aws:s3:::quarantine-*"},
+			targetARN:    "arn:aws:s3:::quarantine-x",
+			want:         false,
 		},
 		{
-			name:            "NotResources defined but non-matching allows coverage",
-			resourcesCSV:    "arn:aws:s3:::*",
-			notResourcesCSV: "arn:aws:s3:::quarantine-*",
-			targetARN:       "arn:aws:s3:::prod",
-			want:            true,
+			name:         "NotResources defined but non-matching allows coverage",
+			resources:    []string{"arn:aws:s3:::*"},
+			notResources: []string{"arn:aws:s3:::quarantine-*"},
+			targetARN:    "arn:aws:s3:::prod",
+			want:         true,
 		},
 		{
-			name:            "empty resources always returns false",
-			resourcesCSV:    "",
-			notResourcesCSV: "",
-			targetARN:       "arn:aws:s3:::any-bucket",
-			want:            false,
+			name:      "empty selection takes every resource",
+			targetARN: "arn:aws:s3:::any-bucket",
+			want:      true,
 		},
 		{
-			name:            "empty targetARN always returns false",
-			resourcesCSV:    "arn:aws:s3:::*",
-			notResourcesCSV: "",
-			targetARN:       "",
-			want:            false,
-		},
-		{
-			name:            "whitespace trimmed around CSV entries",
-			resourcesCSV:    " arn:aws:s3:::x , arn:aws:s3:::y ",
-			notResourcesCSV: "",
-			targetARN:       "arn:aws:s3:::y",
-			want:            true,
+			name:      "empty targetARN never matches a pattern",
+			resources: []string{"arn:aws:s3:::*"},
+			targetARN: "",
+			want:      false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := awsclient.BackupPlanCoversARN(tc.resourcesCSV, tc.notResourcesCSV, tc.targetARN)
-			if got != tc.want {
-				t.Errorf("BackupPlanCoversARN(%q, %q, %q) = %v, want %v",
-					tc.resourcesCSV, tc.notResourcesCSV, tc.targetARN, got, tc.want)
+			sel := backuptypes.BackupSelection{Resources: tc.resources, NotResources: tc.notResources}
+			if got := awsclient.BackupSelectionCovers(sel, tc.targetARN, nil); got != tc.want {
+				t.Errorf("BackupSelectionCovers(%v minus %v, %q) = %v, want %v",
+					tc.resources, tc.notResources, tc.targetARN, got, tc.want)
 			}
 		})
 	}

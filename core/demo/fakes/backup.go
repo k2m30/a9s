@@ -112,6 +112,11 @@ func (f *BackupFake) GetBackupSelection(_ context.Context, input *backup.GetBack
 	return &backup.GetBackupSelectionOutput{}, nil
 }
 
+// DescribeRegionSettings returns the fixture Region's resource-type opt-in.
+func (f *BackupFake) DescribeRegionSettings(_ context.Context, _ *backup.DescribeRegionSettingsInput, _ ...func(*backup.Options)) (*backup.DescribeRegionSettingsOutput, error) {
+	return &backup.DescribeRegionSettingsOutput{ResourceTypeOptInPreference: f.fix.RegionOptIn}, nil
+}
+
 func selectionIDFor(planID string, idx int) string {
 	// Deterministic synthetic selection ID — stable across calls so
 	// ListBackupSelections summaries round-trip to GetBackupSelection.

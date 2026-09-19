@@ -1034,13 +1034,14 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	// The enricher sees only the lists its registration declares, so a read
 	// it does not declare comes back empty in every session rather than only
 	// in the ones that never loaded that list. A declared list this session
-	// has not observed — a list opened before any sweep — is fetched here,
-	// first page only, the way RunRelatedDef prefetches a NeedsTargetCache
-	// target; one that cannot be fetched stays absent and its rows are marked.
+	// has not observed — a list opened before any sweep — or holds only as
+	// disk rows without their SDK struct is fetched here, first page only, the
+	// way RunRelatedDef prefetches a NeedsTargetCache target; one that cannot
+	// be fetched stays absent and its rows are marked.
 	loaded := c.BuildResourceCacheSnapshot()
 	cacheSnap := make(resource.ResourceCache, len(e.Reads))
 	for _, name := range e.Reads {
-		if entry, ok := loaded[name]; ok {
+		if entry, ok := loaded[name]; ok && !entry.FieldsOnly {
 			cacheSnap[name] = entry
 			continue
 		}

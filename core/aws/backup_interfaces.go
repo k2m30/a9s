@@ -54,18 +54,26 @@ type BackupListRecoveryPointsByResourceAPI interface {
 }
 
 // BackupGetBackupSelectionAPI defines the interface for the Backup
-// GetBackupSelection operation. Used by the backup fetcher to enumerate the
-// resource ARNs each selection covers, populated into Fields["resources"]
-// so sibling pivots like s3→backup can resolve via cache scan.
+// GetBackupSelection operation. Used by the backup fetcher to read each
+// selection whole onto the plan row, so the coverage join and every backup
+// pivot can evaluate it from the cache.
 type BackupGetBackupSelectionAPI interface {
 	GetBackupSelection(ctx context.Context, params *backup.GetBackupSelectionInput, optFns ...func(*backup.Options)) (*backup.GetBackupSelectionOutput, error)
 }
 
+// BackupDescribeRegionSettingsAPI defines the interface for the Backup
+// DescribeRegionSettings operation: the Region's per-resource-type opt-in,
+// which decides whether a selection by "*", by service name or by tags alone
+// includes a resource.
+type BackupDescribeRegionSettingsAPI interface {
+	DescribeRegionSettings(ctx context.Context, params *backup.DescribeRegionSettingsInput, optFns ...func(*backup.Options)) (*backup.DescribeRegionSettingsOutput, error)
+}
+
 // BackupAPI is the aggregate interface covering all Backup operations used by
 // a9s fetchers. *backup.Client structurally satisfies this interface.
-// BackupGetBackupSelectionAPI sits outside the aggregate: fetchers that need
-// it type-assert on the concrete client at call time, so a fake implementing
-// only the aggregate still satisfies it.
+// BackupGetBackupSelectionAPI and BackupDescribeRegionSettingsAPI sit outside
+// the aggregate: fetchers that need them type-assert on the concrete client at
+// call time, so a fake implementing only the aggregate still satisfies it.
 type BackupAPI interface {
 	BackupListBackupPlansAPI
 	BackupListBackupJobsAPI

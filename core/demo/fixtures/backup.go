@@ -50,6 +50,12 @@ const (
 	FleetWidePlanID  = "99999999-9999-9999-9999-999999999999"
 	FleetWidePlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:99999999-9999-9999-9999-999999999999"
 
+	// FleetWideReselectedTableARN is excluded by the fleet-wide plan's first
+	// selection and taken back in by its second, and no other plan names it:
+	// an exclusion holds within its own selection only, so the table stays
+	// covered.
+	FleetWideReselectedTableARN = ddbDeletionProtectionOffARN
+
 	BackupDefaultVaultName = "acme-default-vault"
 	BackupProdVaultName    = "acme-prod-vault"
 
@@ -76,8 +82,8 @@ type BackupFixtures struct {
 	RecoveryPoints map[string][]backuptypes.RecoveryPointByResource
 	// Selections maps plan ID → list of full BackupSelection objects (each
 	// already carries SelectionId + IamRoleArn + Resources). The fetcher
-	// reads these to populate Fields["resources"] so sibling pivots (s3,
-	// ddb, efs, …) can match via cache scan.
+	// keeps them on the plan row so sibling pivots (s3, ddb, efs, …) can
+	// match via cache scan.
 	Selections map[string][]backuptypes.BackupSelection
 	// Jobs is the account-wide list returned by ListBackupJobs.
 	// The enricher filters this by CreatedBy.BackupPlanId and timestamp window.
@@ -93,6 +99,8 @@ type BackupFixtures struct {
 	// Vaults absent from this map return ResourceNotFoundException on
 	// GetBackupVaultNotifications, matching the real AWS Backup API behaviour.
 	VaultSNSTopics map[string]string
+	// RegionOptIn is DescribeRegionSettings' ResourceTypeOptInPreference.
+	RegionOptIn map[string]bool
 }
 
 func mustParseBackupTime(s string) time.Time {
@@ -106,9 +114,6 @@ func mustParseBackupTime(s string) time.Time {
 func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResource {
 	efsARN := "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a"
 	return map[string][]backuptypes.RecoveryPointByResource{
-		// S3 healthy-bucket recovery point (checkS3Backup pivot).
-		// checkS3Backup reads bk.Fields["resource_arn"] (emitted by the backup
-		// fetcher); this recovery point is pre-set so the demo related graph renders.
 		HealthyBucketARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-s3-daily-20260416"),
@@ -389,13 +394,13 @@ func buildBackupJobs() []backuptypes.BackupJob {
 
 // buildBackupSelections returns the selections map used by ListBackupSelections / GetBackupSelection.
 // Keyed by plan ID. The role related-checker reads IamRoleArn from these.
-// The fetcher reads Resources to populate Fields["resources"] for sibling pivots (s3, efs).
+// The fetcher keeps each selection on the plan row for sibling pivots (s3, efs).
 func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 	return map[string][]backuptypes.BackupSelection{
 		// plan-healthy-daily: selects healthy S3 bucket, the shared
 		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
 		// table — backs the s3→backup, efs→backup, and ddb→backup pivots via
-		// cache scan of Fields["resources"]. Also includes the Aurora parent DB
+		// cache scan of the plan's selections. Also includes the Aurora parent DB
 		// (ProdDbiAuroraARN) so the dbi-snap→backup pivot resolves Count ≥ 2
 		// for snapshots whose parent is that DB (this plan + ProdDatabasePlanID
 		// below).  AWS Backup selects parent DB instances, not individual
@@ -460,7 +465,9 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 
 		// plan-fleet-wide: one wildcard selection per service the coverage
 		// join reads, minus the four uncovered resources, so every other demo
-		// resource is covered by a plan.
+		// resource is covered by a plan. The table a second selection takes
+		// back in and a DocumentDB instance, which AWS Backup protects through
+		// its cluster, are excluded as well.
 		FleetWidePlanID: {
 			{
 				SelectionName: aws.String("acme-fleet-wide-selection"),
@@ -476,7 +483,14 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					DBINotInBackupPlanARN,
 					DBCNotInBackupPlanARN,
 					DDBNotInBackupPlanARN,
+					FleetWideReselectedTableARN,
+					DBIDocDBMemberARN,
 				},
+			},
+			{
+				SelectionName: aws.String("acme-fleet-wide-reselect"),
+				IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
+				Resources:     []string{FleetWideReselectedTableARN},
 			},
 		},
 
@@ -516,7 +530,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			{
 				SelectionName: aws.String("acme-dev-sporadic-selection"),
 				IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
-				Resources:     []string{"arn:aws:s3:::acme-dev-bucket"},
+				Resources:     []string{S3OtherRegionBucketARN},
 			},
 		},
 	}
@@ -531,6 +545,14 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 		PlanRules:           buildBackupPlanRules(),
 		VaultEncryptionKeys: buildBackupVaultEncryptionKeys(),
 		VaultSNSTopics:      buildBackupVaultSNSTopics(),
+		// EFS is opted out: a file system only an exact ARN names is still
+		// backed up, and one selected by tag alone (EFSNoBackupPolicy) is not.
+		RegionOptIn: map[string]bool{
+			"Aurora": true, "CloudFormation": true, "DocumentDB": true, "DynamoDB": true, "EBS": true,
+			"EC2": true, "EFS": false, "FSx": true, "Neptune": true, "RDS": true, "Redshift": true,
+			"S3": true, "SAP HANA on Amazon EC2": true, "Storage Gateway": true, "Timestream": true,
+			"VirtualMachine": true,
+		},
 		Plans: []backuptypes.BackupPlansListMember{
 			// plan-fleet-wide: the blanket selection behind the coverage join.
 			{

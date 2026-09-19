@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -74,9 +75,12 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheReturnsUnknown(t *testing.T) {
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:     "plan-aaa",
-					Name:   "plan-aaa",
-					Fields: map[string]string{"resources": "arn:aws:rds:us-east-1:123456789012:cluster:some-cluster"},
+					ID:   "plan-aaa",
+					Name: "plan-aaa",
+					RawStruct: BackupPlanRow{
+						Selections:         []backuptypes.BackupSelection{{Resources: []string{"arn:aws:rds:us-east-1:123456789012:cluster:some-cluster"}}},
+						selectionsComplete: true,
+					},
 				},
 			},
 			IsTruncated: false,
@@ -126,9 +130,13 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:     planID,
-					Name:   planID,
-					Fields: map[string]string{"resources": parentARN},
+					ID:   planID,
+					Name: planID,
+					RawStruct: BackupPlanRow{
+						Selections:         []backuptypes.BackupSelection{{Resources: []string{parentARN}}},
+						selectionsComplete: true,
+						optIn:              map[string]bool{"Aurora": true, "DocumentDB": true, "Neptune": true, "RDS": true},
+					},
 				},
 			},
 			IsTruncated: false,

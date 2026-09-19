@@ -14,7 +14,8 @@ import (
 // RDSFixtures holds all RDS domain objects served by the fake.
 type RDSFixtures struct {
 	// DBInstances is the full list returned by DescribeDBInstances.
-	// Sources: NewDBIFixtures().Instances (canonical fixtures) + a bulk-generated pool.
+	// Sources: NewDBIFixtures().Instances (canonical fixtures), a bulk-generated
+	// pool, and DBIDocDBMember.
 	DBInstances []rdstypes.DBInstance
 	// DBSnapshots is the full list returned by DescribeDBSnapshots.
 	DBSnapshots []rdstypes.DBSnapshot
@@ -38,7 +39,7 @@ var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        append(dbi.Instances, normalizeRDSInstancePosture(legacy)...),
+		DBInstances:        append(append(dbi.Instances, normalizeRDSInstancePosture(legacy)...), dbiDocDBClusterMember()),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
 		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
@@ -705,7 +706,7 @@ func buildRDSEvents() []rdstypes.Event {
 func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
-	Register(Pin{ShortName: "dbi", Rows: 51, Issues: 29, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 52, Issues: 29, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 12, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.

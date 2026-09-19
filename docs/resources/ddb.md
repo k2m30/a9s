@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: AWS Backup recovery points — the restore surface when PITR isn't enough or the table has been deleted.
-- **How discovered**: Reverse-scan the already-loaded `backup` list. For each plan, check whether the table's ARN is covered by `BackupSelection.Resources` (with AWS wildcard semantics — e.g. `arn:aws:dynamodb:*:*:table/*`) and not excluded by `BackupSelection.NotResources`. A plan covers this table iff any Resources entry matches AND no NotResources entry matches. — a9s-devops: Backup coverage lives on the plan's selection, not on the table; reverse-scan against the already-loaded `backup` list is the cheapest approach. AWS Backup's `ListRecoveryPointsByResource(ResourceArn=<table ARN>)` is a per-table Wave 2 call and is out of scope for the panel.
+- **How discovered**: Reverse-scan the already-loaded `backup` list. A plan covers the table's ARN iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics (e.g. `arn:aws:dynamodb:*:*:table/*`). The table row carries no tags, so a plan whose verdict turns on a tag clause, or whose selections were not all read, makes the count unknown. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. — a9s-devops: Backup coverage lives on the plan's selection, not on the table; reverse-scan against the already-loaded `backup` list is the cheapest approach. AWS Backup's `ListRecoveryPointsByResource(ResourceArn=<table ARN>)` is a per-table Wave 2 call and is out of scope for the panel.
 - **Count shown**: yes.
 
 ### `kinesis`
@@ -138,7 +138,7 @@ One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` 
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: no backup plan selection matches this table.
+- **Signal**: no backup plan selection matches this table. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a table whose ARN was not returned — is marked not inspected, naming the check that stopped it.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -231,7 +231,7 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | ddb.deletion-protection-off | deletion protection off | warn | wave1 | A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step. |
 | ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |
 | ddb.public-policy | resource policy open to anyone | broken | wave2 | The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access. |
-| ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan backs up this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by its ARN or by the DynamoDB table resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once DynamoDB is opted in under this Region's AWS Backup service opt-in. |
 | ddb.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | ddb.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->

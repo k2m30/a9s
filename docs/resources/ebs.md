@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: Which AWS Backup plan(s) cover this volume — answers "is this volume protected before we touch it?". Cited in `docs/related-resources.md` §`ebs` as "Volumes covered by AWS Backup".
-- **How discovered**: cross-reference the already-loaded `backup` list by resource-selection tag matching, or (more reliable) resolve the volume's ARN against `ListProtectedResources` output if cached. — a9s-devops (persona): AWS Backup selection is either tag-based (plan `ResourceSelection.Conditions`) or resource-type blanket; there is no per-volume `BackupPlanId` field on `Volume`, so the pivot requires either a pre-loaded backup-plan list (sibling cross-ref) or an extra API. Practical answer: sibling-list cross-ref when `backup` list is loaded, otherwise the panel renders an empty "backup" group.
+- **How discovered**: Reverse-scan the already-loaded `backup` list with the volume's ARN (built from the session's Region and account) and its `Volume.Tags[]`. A plan covers the volume iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. A plan whose selections were not all read makes the count a lower bound, or unknown when no plan is known to cover the volume.
 - **Count shown**: yes.
 
 ### `cfn`
@@ -107,7 +107,7 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
   - **API call**: `DescribeVolumeStatus` — same call.
   - **Cost shape**: account-wide.
 
-- **Signal**: no backup plan selection matches this volume.
+- **Signal**: no backup plan selection matches this volume. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a session whose own account is unknown, so the volume ARN cannot be built — is marked not inspected, naming the check that stopped it.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -196,7 +196,7 @@ ebs — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ebs.orphan-unattached | orphan: unattached <N>d | warn | wave1 | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | ebs.encryption.disabled | unencrypted | warn | wave1 | The volume's data is written to disk unencrypted, and encryption cannot be turned on in place. Snapshot it, copy the snapshot with a KMS key, and restore that copy over the volume at the next window you can take. |
 | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 | AWS reports this volume's I/O as degraded or its data as potentially inconsistent, so reads may return stale or corrupt blocks. Take a snapshot while you still can, then restore onto a fresh volume and check the filesystem before trusting it. |
-| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| ebs.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan backs up this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by its ARN or by the EBS volume resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once EBS is opted in under this Region's AWS Backup service opt-in. |
 | ebs.no-snapshot | no snapshot exists | warn | wave2 | This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will. |
 <!-- END GENERATED: findings -->
 

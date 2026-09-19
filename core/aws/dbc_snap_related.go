@@ -151,13 +151,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("backup")
 	}
 
-	var ids []string
-	for _, planRes := range planList {
-		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], parentARN) {
-			ids = append(ids, planRes.ID)
-		}
-	}
-	return unreadZeroScanned(res, len(planList), relatedResultTrunc("backup", ids, truncated))
+	return unreadZeroScanned(res, len(planList), backupPivot(planList, truncated, backupTarget{arn: parentARN, engine: res.Fields["engine"], unread: "ListTagsForResource"}))
 }
 
 // dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a

@@ -172,7 +172,7 @@ One bullet per distinct signal.
   - **API call**: `DescribePendingMaintenanceActions` — one account-wide call (shared with `dbi`), bucket results by `ResourceIdentifier` (cluster ARN).
   - **Cost shape**: account-wide.
 
-- **Signal**: no backup plan selection matches this cluster.
+- **Signal**: no backup plan selection matches this cluster. Aurora, DocumentDB and Neptune share the `arn:aws:rds:*:*:cluster:*` format and each has its own Region opt-in, which AWS Backup requires however a plan names the cluster (Getting started, Service Opt-in): every match, the exact cluster ARN included, counts only when the cluster's engine type is opted in. A MySQL or PostgreSQL Multi-AZ DB cluster is an Amazon RDS resource type: a match on its exact ARN or the cluster type pattern counts regardless, and one on `*`, a service name or tags alone only when RDS is opted in. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value — is marked not inspected, naming the check that stopped it.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -267,7 +267,7 @@ dbc — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself. |
 | dbc.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |
 | dbc.default-master-user | default master username | warn | wave1 | The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one. |
-| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this cluster, so its retention is whatever the cluster's own automated backups happen to be. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
+| dbc.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan backs up this cluster, so its retention is whatever the cluster's own automated backups happen to be. An Aurora, DocumentDB or Neptune cluster is backed up only while its engine type is opted in under this Region's AWS Backup service opt-in, however a plan names it: add it to a plan and keep that type opted in. A Multi-AZ DB cluster: add it by its ARN or by the cluster resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once its type is opted in there. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

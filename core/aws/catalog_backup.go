@@ -44,10 +44,8 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchBackupPlansPage(ctx, c.Backup, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichBackupJobs, Priority: 100},
-		// selection_tags — required for the ec2:backup and ebs:backup
-		// related-panel pivots (tag-based selection cross-ref).
-		FieldKeys: []string{"plan_name", "plan_id", "creation_date", "last_execution", "resources", "not_resources", "selection_tags"},
+		Wave2:     IssueEnricher{Fn: EnrichBackupJobs, Priority: 100},
+		FieldKeys: []string{"plan_name", "plan_id", "creation_date", "last_execution"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkBackupKMS},

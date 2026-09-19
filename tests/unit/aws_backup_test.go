@@ -3,7 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
-	"strings"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -116,11 +116,9 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 			t.Fatalf("Fields[last_execution] must be formatted '2006-01-02 15:04': got %q", r.Fields["last_execution"])
 		}
 
-		if r.Fields["resources"] == "" {
-			t.Fatal("Fields[resources] must be non-empty — fetcher enumerates plan selections")
-		}
-		if !strings.Contains(r.Fields["resources"], fixtures.HealthyBucketARN) {
-			t.Fatalf("Fields[resources] must contain HealthyBucketARN from the plan's selection: got %q", r.Fields["resources"])
+		sels, complete := awsclient.BackupPlanSelections(r)
+		if !complete || len(sels) == 0 || !slices.Contains(sels[0].Resources, fixtures.HealthyBucketARN) {
+			t.Fatalf("BackupPlanSelections = %+v (complete %v), want the plan's selection naming HealthyBucketARN", sels, complete)
 		}
 
 		if r.RawStruct == nil {
@@ -276,8 +274,9 @@ func (m *backupFullMock) GetBackupSelection(_ context.Context, _ *backup.GetBack
 }
 
 // TestBackup_EnumerateSelection_FailClosedOnGetError verifies that when
-// GetBackupSelection returns an error for any selection, Fields["resources"]
-// and Fields["not_resources"] are both empty strings ("fail-closed").
+// GetBackupSelection returns an error for a selection, the plan row says its
+// selections are incomplete, so no reader takes it for a plan that selects
+// nothing.
 func TestBackup_EnumerateSelection_FailClosedOnGetError(t *testing.T) {
 	selID := "sel-abc123"
 	mock := &backupFullMock{
@@ -309,22 +308,15 @@ func TestBackup_EnumerateSelection_FailClosedOnGetError(t *testing.T) {
 		t.Fatalf("one plan must still be returned: got %d", len(resources))
 	}
 
-	r := resources[0]
-	if r.Fields["resources"] != "" {
-		t.Errorf("Fields[resources] must be empty string when GetBackupSelection fails (fail-closed): got %q",
-			r.Fields["resources"])
-	}
-	if r.Fields["not_resources"] != "" {
-		t.Errorf("Fields[not_resources] must be empty string when GetBackupSelection fails (fail-closed): got %q",
-			r.Fields["not_resources"])
+	if sels, complete := awsclient.BackupPlanSelections(resources[0]); complete || len(sels) != 0 {
+		t.Errorf("BackupPlanSelections = %d selections, complete %v; want none read and incomplete", len(sels), complete)
 	}
 }
 
-// TestBackup_EnumerateSelection_SuccessReturnsBothCSVs verifies that when all
-// GetBackupSelection calls succeed, Fields["resources"] contains the included
-// ARNs and Fields["not_resources"] contains the excluded ARNs — both as
-// comma-separated strings.
-func TestBackup_EnumerateSelection_SuccessReturnsBothCSVs(t *testing.T) {
+// TestBackup_EnumerateSelection_SuccessKeepsBothLists verifies that when all
+// GetBackupSelection calls succeed, the plan row's selection carries both its
+// included and its excluded ARNs.
+func TestBackup_EnumerateSelection_SuccessKeepsBothLists(t *testing.T) {
 	includeARN := "arn:aws:s3:::acme-backups"
 	excludeARN := "arn:aws:s3:::acme-temp"
 	selID := "sel-xyz789"
@@ -364,13 +356,11 @@ func TestBackup_EnumerateSelection_SuccessReturnsBothCSVs(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 
-	r := resources[0]
-	if r.Fields["resources"] != includeARN {
-		t.Errorf("Fields[resources] must contain the ARN from BackupSelection.Resources: got %q, want %q",
-			r.Fields["resources"], includeARN)
+	sels, complete := awsclient.BackupPlanSelections(resources[0])
+	if !complete || len(sels) != 1 {
+		t.Fatalf("BackupPlanSelections = %d selections, complete %v; want 1, complete", len(sels), complete)
 	}
-	if r.Fields["not_resources"] != excludeARN {
-		t.Errorf("Fields[not_resources] must contain the ARN from BackupSelection.NotResources: got %q, want %q",
-			r.Fields["not_resources"], excludeARN)
+	if !slices.Equal(sels[0].Resources, []string{includeARN}) || !slices.Equal(sels[0].NotResources, []string{excludeARN}) {
+		t.Errorf("selection Resources/NotResources = %v/%v, want [%s]/[%s]", sels[0].Resources, sels[0].NotResources, includeARN, excludeARN)
 	}
 }

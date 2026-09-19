@@ -161,6 +161,11 @@ func NewEFSFixtures() *EFSFixtures {
 }
 
 func buildEFSFileSystems() []efstypes.FileSystemDescription {
+	// The Region has EFS opted out of AWS Backup (backup.go RegionOptIn), so
+	// acme-daily-backup's tag selection does not take this file system in.
+	noBackupPolicy := efsPostureWitness(EFSNoBackupPolicy, "no-backup-policy-efs", true)
+	noBackupPolicy.Tags = append(noBackupPolicy.Tags, efstypes.Tag{Key: aws.String("backup"), Value: aws.String("daily")})
+
 	return []efstypes.FileSystemDescription{
 		// prod-efs-app-data — graph-root, healthy.
 		{
@@ -357,7 +362,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 
 		efsPostureWitness(EFSUnencrypted, "unencrypted-legacy-efs", false),
 		efsPostureWitness(EFSPublicPolicy, "public-policy-efs", true),
-		efsPostureWitness(EFSNoBackupPolicy, "no-backup-policy-efs", true),
+		noBackupPolicy,
 	}
 }
 

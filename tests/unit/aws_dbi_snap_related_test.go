@@ -5,11 +5,13 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 func dbiSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -284,30 +286,9 @@ func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 		},
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "plan-covers-parent-A",
-					Name: "covers-parent-A",
-					Fields: map[string]string{
-						"resources":     parentDBARN,
-						"not_resources": "",
-					},
-				},
-				{
-					ID:   "plan-covers-parent-B",
-					Name: "covers-parent-B",
-					Fields: map[string]string{
-						"resources":     parentDBARN,
-						"not_resources": "",
-					},
-				},
-				{
-					ID:   "plan-other-target",
-					Name: "other",
-					Fields: map[string]string{
-						"resources":     "arn:aws:s3:::unrelated",
-						"not_resources": "",
-					},
-				},
+				unit.BackupPlanRow(t, "plan-covers-parent-A", backuptypes.BackupSelection{Resources: []string{parentDBARN}}),
+				unit.BackupPlanRow(t, "plan-covers-parent-B", backuptypes.BackupSelection{Resources: []string{parentDBARN}}),
+				unit.BackupPlanRow(t, "plan-other-target", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::unrelated"}}),
 			},
 		},
 	}

@@ -29,6 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -752,7 +753,8 @@ func TestS3Backup_BucketARNCarriesTheSessionPartition(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := checker(context.Background(), parseClients(tc.region),
-				resource.Resource{ID: "acme-assets", Name: "acme-assets"},
+				resource.Resource{ID: "acme-assets", Name: "acme-assets",
+					RawStruct: s3types.Bucket{Name: aws.String("acme-assets"), BucketRegion: aws.String(tc.region)}},
 				w7CacheWith(w7Plan(tc.planARN, "", "")))
 			if result.Count() != tc.wantCount {
 				t.Errorf("Count = %d, want %d (ids %v)", result.Count(), tc.wantCount, result.ResourceIDs())

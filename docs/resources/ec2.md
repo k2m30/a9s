@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: Backup plans that protect this instance.
-- **How discovered**: cross-reference the already-loaded `backup` list; match by backup-plan selection tags present on `Instance.Tags[]` or by ARN via `backup:ListProtectedResources` — a9s-devops: AWS Backup couples plans to resources through tag-based selections; scanning the loaded plan list for matching selection tags surfaces coverage without an extra API call. When live-lookup is required, `ListProtectedResources` is the authoritative API.
+- **How discovered**: Reverse-scan the already-loaded `backup` list with the instance's ARN and its `Instance.Tags[]`. A plan covers the instance iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. A plan whose selections were not all read makes the count a lower bound, or unknown when no plan is known to cover the instance.
 - **Count shown**: yes.
 
 ### `cfn`

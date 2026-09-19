@@ -105,11 +105,9 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("vpc", ids, truncated)
 }
 
-// checkEFSBackup resolves AWS Backup PLANS that protect this EFS file system.
-// The backup fetcher (backup.go) indexes Resource.ID by BackupPlanId and
-// carries the plan's selected resource ARNs in Fields["resources"] as a CSV,
-// so this checker reverse-scans the backup cache for plans whose resources
-// CSV contains the EFS ARN.
+// checkEFSBackup resolves AWS Backup PLANS that protect this EFS file system
+// by reverse-scanning the backup cache through BackupPlanCovers, with the file
+// system's own tags for the selections' tag clauses.
 func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
@@ -127,13 +125,13 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
-	var ids []string
-	for _, plan := range plans {
-		if BackupPlanCoversARN(plan.Fields["resources"], plan.Fields["not_resources"], fsARN) {
-			ids = append(ids, plan.ID)
+	tags := make(map[string]string, len(fs.Tags))
+	for _, t := range fs.Tags {
+		if t.Key != nil && t.Value != nil {
+			tags[*t.Key] = *t.Value
 		}
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return backupPivot(plans, truncated, backupTarget{arn: fsARN, tags: tags})
 }
 
 // keep lambdatypes imported (used by checkEFSLambda in efs_related.go).

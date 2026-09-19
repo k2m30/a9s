@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Backup coverage reads each backup selection on its own, as AWS Backup
+  does: an exclusion in one selection no longer hides a resource another
+  selection of the same plan takes in, a selection's tag conditions now
+  narrow its resource list instead of widening it, and the EBS snapshot
+  Backup panel matches wildcard selections. A plan whose selections could
+  not all be read, or whose verdict turns on tags a9s could not read, shows
+  the Backup Plans count as unknown and raises no "not covered by a backup
+  plan" warning.
+- Backup coverage follows what AWS Backup actually protects: an Aurora,
+  DocumentDB or Neptune instance is judged by its cluster, a bucket in
+  another Region is covered by none of the session's plans, and a match on
+  `*`, a service name or tags alone counts only for resource types the
+  Region has opted in to AWS Backup; an Aurora, DocumentDB or Neptune
+  cluster counts as covered only while its engine is opted in, however a
+  plan names it. A row the coverage check cannot decide is marked
+  `not inspected` with the check that stopped it, and a backup list restored
+  from disk is read live before the check runs.
 - A row that the attention checks could only partly answer keeps what they
   did prove: the finding shows in the list, colours the row and counts in the
   menu badge, beside the `not inspected` mark for the check that did not

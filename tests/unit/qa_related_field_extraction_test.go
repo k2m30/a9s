@@ -18,6 +18,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // checkerCache holds related checkers captured the first time
@@ -962,16 +963,16 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenARNHasNoSlash(t *testi
 	}
 }
 
-// checkEC2Backup matches on selection_tags (the backup fetcher's
-// BackupSelection.ListOfTags join) or the ARN pattern
-// (Fields["resources"]/["not_resources"]), per docs/resources/ec2.md.
+// checkEC2Backup matches a plan's selection by its ListOfTags against the
+// instance tags or by its ARN patterns, per docs/resources/ec2.md.
 
 // TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag verifies that
-// a backup plan's Fields["selection_tags"] matching the instance's own
-// Tags[] counts as related, independent of the ARN-pattern signal.
+// a backup plan's ListOfTags matching the instance's own Tags[] counts as
+// related, independent of the ARN-pattern signal.
 func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 	res := resource.Resource{
-		ID: "i-0abc123def456",
+		ID:     "i-0abc123def456",
+		Fields: map[string]string{"arn": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"},
 		RawStruct: ec2types.Instance{
 			Tags: []ec2types.Tag{
 				{Key: aws.String("backup-tier"), Value: aws.String("prod")},
@@ -980,11 +981,7 @@ func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 	}
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{
-				ID:     "plan-tag-selected",
-				Name:   "plan-tag-selected",
-				Fields: map[string]string{"selection_tags": "backup-tier=prod"},
-			},
+			unit.BackupPlanRow(t, "plan-tag-selected", unit.BackupTagSelection("backup-tier", "prod")),
 		}},
 	}
 	checker := fieldExtractionChecker(t, "ec2", "backup")
@@ -1002,7 +999,8 @@ func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 // a mismatched selection tag value does not count.
 func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
 	res := resource.Resource{
-		ID: "i-0abc123def456",
+		ID:     "i-0abc123def456",
+		Fields: map[string]string{"arn": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"},
 		RawStruct: ec2types.Instance{
 			Tags: []ec2types.Tag{
 				{Key: aws.String("backup-tier"), Value: aws.String("dev")},
@@ -1011,11 +1009,7 @@ func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
 	}
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{
-				ID:     "plan-tag-selected",
-				Name:   "plan-tag-selected",
-				Fields: map[string]string{"selection_tags": "backup-tier=prod"},
-			},
+			unit.BackupPlanRow(t, "plan-tag-selected", unit.BackupTagSelection("backup-tier", "prod")),
 		}},
 	}
 	checker := fieldExtractionChecker(t, "ec2", "backup")

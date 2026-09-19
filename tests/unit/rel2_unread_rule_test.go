@@ -14,10 +14,14 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // rel2WarmEBSRow is a volume as a disk-cache replay produces it: identity and
@@ -29,6 +33,16 @@ func rel2WarmEBSRow() resource.Resource {
 		Type:   "ebs",
 		Fields: map[string]string{"state": "in-use"},
 	}
+}
+
+// rel2BackupClients is a session with the region and account the ebs backup
+// pivot builds the volume's ARN from.
+func rel2BackupClients() *awsclient.ServiceClients {
+	clients := &awsclient.ServiceClients{Region: "us-east-1"}
+	store := session.NewIdentityStore()
+	store.Set("123456789012", nil)
+	clients.SetIdentityStore(store)
+	return clients
 }
 
 // TestRel2UnreadZeroKeepsAProvenZeroOverAnEmptyPopulation pins the exception
@@ -57,12 +71,11 @@ func TestRel2UnreadZeroKeepsAProvenZeroOverAnEmptyPopulation(t *testing.T) {
 func TestRel2UnreadZeroOverRealRowsIsUnknown(t *testing.T) {
 	checker := rel2CheckerFor(t, "ebs", "backup")
 	cache := resource.ResourceCache{
-		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{{
-			ID:     "acme-daily-plan",
-			Fields: map[string]string{"selection_tags": "Backup=daily"},
-		}}},
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			unit.BackupPlanRow(t, "acme-daily-plan", unit.BackupTagSelection("Backup", "daily")),
+		}},
 	}
-	result := checker(context.Background(), nil, rel2WarmEBSRow(), cache)
+	result := checker(context.Background(), rel2BackupClients(), rel2WarmEBSRow(), cache)
 
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("State = %v, Count = %d; want Unknown: a plan exists and the tags that would "+
@@ -75,18 +88,22 @@ func TestRel2UnreadZeroOverRealRowsIsUnknown(t *testing.T) {
 // lower bound — "(0+)" — and it must stay one even when the source row was
 // never read, because the "+" is a fact about the list, not about the row.
 // Collapsing it to "?" would lose the one thing the scan did establish.
+//
+// The plan names another volume by ARN: a tag selection over the unread row's
+// tags is unknown, not unmatched.
 func TestRel2LowerBoundSurvivesTheUnreadRule(t *testing.T) {
 	checker := rel2CheckerFor(t, "ebs", "backup")
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{{
-				ID:     "acme-daily-plan",
-				Fields: map[string]string{"selection_tags": "Backup=daily"},
-			}},
+			Resources: []resource.Resource{
+				unit.BackupPlanRow(t, "acme-daily-plan", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f69999"},
+				}),
+			},
 			IsTruncated: true,
 		},
 	}
-	result := checker(context.Background(), nil, rel2WarmEBSRow(), cache)
+	result := checker(context.Background(), rel2BackupClients(), rel2WarmEBSRow(), cache)
 
 	if result.State() != domain.RelatedResolved || result.Count() != 0 || !result.Truncated() {
 		t.Errorf("State = %v, Count = %d, Truncated = %v; want Resolved 0 truncated: "+

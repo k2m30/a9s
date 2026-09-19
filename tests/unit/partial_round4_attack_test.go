@@ -34,18 +34,16 @@ func partialR4Tag(key, value string) backuptypes.Condition {
 	}
 }
 
-// TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides pins the
-// abstention's limit. The abstention buys correctness by giving up an answer, so
-// it has to stay narrow: ListOfTags is an OR of its entries and the flat list
-// is an OR, so any number of them folds exactly and must keep deciding. Only
-// the Conditions block — an AND — can force the abstention.
+// TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides pins that
+// ListOfTags is an OR of its entries and keeps deciding, that a clause AWS
+// returned half-filled cannot be evaluated and abstains, and that a Conditions
+// block is evaluated whole as the AND it is.
 func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		listOfTags  []backuptypes.Condition
 		conditions  *backuptypes.Conditions
 		tags        map[string]string
-		wantPartial bool
 		wantWarning bool
 	}{
 		{
@@ -58,7 +56,6 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 				partialR4Tag("tier", "critical"),
 			},
 			tags:        map[string]string{"tier": "critical"},
-			wantPartial: false,
 			wantWarning: false,
 		},
 		{
@@ -68,7 +65,6 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 				partialR4Tag("tier", "critical"),
 			},
 			tags:        map[string]string{"environment": "production"},
-			wantPartial: false,
 			wantWarning: true,
 		},
 		{
@@ -81,21 +77,18 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 				{ConditionType: backuptypes.ConditionTypeStringequals, ConditionKey: aws.String("aws:ResourceTag/backup")},
 			},
 			tags:        map[string]string{"backup": "nightly"},
-			wantPartial: true,
 			wantWarning: false,
 		},
 		{
-			// An empty block asks for nothing, so it is representable and the
-			// plan decides on its other selections — here, none.
-			name:        "an empty Conditions block is representable",
-			conditions:  &backuptypes.Conditions{},
-			tags:        map[string]string{"environment": "production"},
-			wantPartial: false,
-			wantWarning: true,
+			// An empty block asks for nothing, and a selection with no
+			// Resources and no ListOfTags takes every resource.
+			name:       "an empty Conditions block is representable",
+			conditions: &backuptypes.Conditions{},
+			tags:       map[string]string{"environment": "production"},
 		},
 		{
-			// The two shapes on one selection: the OR half folds exactly, and
-			// the AND half is what forces the abstention.
+			// The two shapes on one selection: the volume matches neither the
+			// ListOfTags entry nor the AND.
 			name: "an unrepresentable block taints a selection that also uses ListOfTags",
 			listOfTags: []backuptypes.Condition{
 				partialR4Tag("backup", "nightly"),
@@ -107,16 +100,13 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 				},
 			},
 			tags:        map[string]string{"owner": "platform"},
-			wantPartial: true,
-			wantWarning: false,
+			wantWarning: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan, plans := partialSelectionPlan(t, partialR4Selection(tc.listOfTags, tc.conditions))
-
-			if gotPartial := plan.Fields["selections_partial"] != ""; gotPartial != tc.wantPartial {
-				t.Errorf("plan row selections_partial = %q, want partial = %v; selection_tags folded to %q",
-					plan.Fields["selections_partial"], tc.wantPartial, plan.Fields["selection_tags"])
+			if _, complete := awsclient.BackupPlanSelections(plan); !complete {
+				t.Error("plan row marked incomplete, want complete: its one selection was read")
 			}
 
 			res := w7EnrichEBS(t, []resource.Resource{partialRow10Volume(tc.tags)}, plans)
@@ -130,13 +120,9 @@ func TestPartialR4Backup_WhatTheFlatListDoesRepresentStillDecides(t *testing.T) 
 	}
 }
 
-// TestPartialR4Backup_AbstainingStillFeedsTheRelatedPivot pins the related
-// pivot's read of selection_tags. selection_tags is read twice: by the
-// join, which abstains on an unrepresentable block, and by the ebs and
-// ec2 related panels, which list the plans a resource's tags match. The
-// abstention is about not asserting "not covered"; it is not a reason to stop
-// showing an operator the plan their volume is tagged for, so the positive
-// parameters keep folding and the pivot keeps its match.
+// TestPartialR4Backup_AbstainingStillFeedsTheRelatedPivot pins that the ebs
+// related panel applies a Conditions block the way the coverage join does: the
+// block is an AND, so the plan is listed only when the volume carries both tags.
 func TestPartialR4Backup_AbstainingStillFeedsTheRelatedPivot(t *testing.T) {
 	sel := partialBackupSelection(nil, &backuptypes.Conditions{
 		StringEquals: []backuptypes.ConditionParameter{
@@ -146,14 +132,12 @@ func TestPartialR4Backup_AbstainingStillFeedsTheRelatedPivot(t *testing.T) {
 	})
 	plan, plans := partialSelectionPlan(t, sel)
 
-	if plan.Fields["selections_partial"] == "" {
-		t.Fatal("precondition failed: the plan is not marked partial, so this proves nothing about an abstaining plan")
+	if got := partialR4EBSBackupPivot(t, partialRow10Volume(map[string]string{"backup": "nightly"}), plans); len(got) != 0 {
+		t.Errorf("the ebs→backup panel lists %v, want none: the volume lacks tier=critical", got)
 	}
-
-	volume := partialRow10Volume(map[string]string{"backup": "nightly"})
-	got := partialR4EBSBackupPivot(t, volume, plans)
-	if len(got) != 1 || got[0] != plan.ID {
-		t.Errorf("the ebs→backup panel lists %v, want [%s]: the volume carries the tag the plan selects on",
+	both := partialRow10Volume(map[string]string{"backup": "nightly", "tier": "critical"})
+	if got := partialR4EBSBackupPivot(t, both, plans); len(got) != 1 || got[0] != plan.ID {
+		t.Errorf("the ebs→backup panel lists %v, want [%s]: the volume carries both tags the plan selects on",
 			got, plan.ID)
 	}
 }
@@ -169,7 +153,7 @@ func partialR4EBSBackupPivot(t *testing.T, volume resource.Resource, cache resou
 		if def.Checker == nil {
 			t.Fatal("the ebs→backup related checker is registered but nil")
 		}
-		return def.Checker(context.Background(), &awsclient.ServiceClients{}, volume, cache).ResourceIDs()
+		return def.Checker(context.Background(), bk551Clients(), volume, cache).ResourceIDs()
 	}
 	t.Fatal("no ebs→backup related checker in the registry")
 	return nil
@@ -188,9 +172,9 @@ func TestPartialR4Backup_AParameterAWSDidNotFillIsNotAnEmptySelection(t *testing
 		}},
 	}))
 
-	if plan.Fields["selections_partial"] == "" {
-		t.Errorf("plan row selections_partial = %q, want it marked partial; the selection named a condition a9s could not read, and selection_tags folded to %q",
-			plan.Fields["selections_partial"], plan.Fields["selection_tags"])
+	// The evaluator abstains on a clause with no value; the plan row stays complete.
+	if _, complete := awsclient.BackupPlanSelections(plan); !complete {
+		t.Error("plan row marked incomplete, want complete: its one selection was read")
 	}
 
 	res := w7EnrichEBS(t, []resource.Resource{partialRow10Volume(map[string]string{"backup": "nightly"})}, plans)

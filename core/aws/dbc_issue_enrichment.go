@@ -53,8 +53,8 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 	}
-	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
-	addBackupCoverage(cache, "dbc", CodeDBCNotInBackupPlan, resources, arnAndTags, &result)
+	targetOf, tagErr := backupTagsAccessor(ctx, cache, resources, backupTargetFromFields("DescribeDBClusters"), tagRead, &result, "ListTagsForResource")
+	addBackupCoverage(cache, CodeDBCNotInBackupPlan, resources, targetOf, &result)
 
 	if clients == nil || clients.DocDB == nil {
 		return result, tagErr

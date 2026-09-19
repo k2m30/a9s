@@ -46,8 +46,8 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 	}
-	arnAndTags, tagErr := backupTagsAccessor(ctx, cache, resources, tagRead, &result, "ListTagsForResource")
-	addBackupCoverage(cache, "dbi", CodeDBINotInBackupPlan, resources, arnAndTags, &result)
+	targetOf, tagErr := backupTagsAccessor(ctx, cache, resources, dbiBackupTarget, tagRead, &result, "ListTagsForResource")
+	addBackupCoverage(cache, CodeDBINotInBackupPlan, resources, targetOf, &result)
 
 	if clients == nil || clients.RDS == nil {
 		return result, tagErr
@@ -212,4 +212,25 @@ func rdsTagsForARN(ctx context.Context, api RDSListTagsForResourceAPI, arn strin
 		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
 	}
 	return tags, nil
+}
+
+// dbiBackupTarget is what a backup selection has to name for the instance to
+// be backed up. AWS Backup protects an Aurora, DocumentDB or Neptune instance
+// through its cluster ("arn:aws:rds:*:*:db:*" selects none of them), so a
+// cluster member is judged by the cluster's ARN, tags and engine. A row
+// without its DBInstance cannot say which cluster an engine that always runs
+// in one belongs to.
+func dbiBackupTarget(r resource.Resource) backupTarget {
+	t := backupTargetFromFields("DescribeDBInstances")(r)
+	db, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
+	if !ok {
+		if rdsClusterOptInType(t.engine) != "" {
+			return backupTarget{unread: "DescribeDBInstances"}
+		}
+		return t
+	}
+	if prefix, _, found := strings.Cut(t.arn, ":db:"); found && db.DBClusterIdentifier != nil {
+		t.arn = prefix + ":cluster:" + *db.DBClusterIdentifier
+	}
+	return t
 }

@@ -12,6 +12,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 func dbcSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -66,9 +67,9 @@ func TestRelated_DbcSnap_Registered(t *testing.T) {
 }
 
 // The dbc-snap → backup pivot resolves the snapshot's parent cluster ARN via
-// the dbc cache, then scans the backup plan cache for plans whose
-// Fields["resources"] cover that ARN. It returns plan IDs, not recovery-point
-// ARNs, so drill-through lands on the backup-plan list.
+// the dbc cache, then scans the backup plan cache for plans whose selections
+// cover that ARN. It returns plan IDs, not recovery-point ARNs, so drill-through
+// lands on the backup-plan list.
 
 const dbcSnapTestClusterID = "acme-docdb-prod"
 const dbcSnapTestClusterARN = "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod"
@@ -85,7 +86,7 @@ func dbcSnapBackupSrcResource() resource.Resource {
 	}
 }
 
-func dbcSnapBackupCache(planResources string) resource.ResourceCache {
+func dbcSnapBackupCache(t *testing.T, planResources string) resource.ResourceCache {
 	dbcParent := docdbtypes.DBCluster{
 		DBClusterIdentifier: aws.String(dbcSnapTestClusterID),
 		DBClusterArn:        aws.String(dbcSnapTestClusterARN),
@@ -102,20 +103,10 @@ func dbcSnapBackupCache(planResources string) resource.ResourceCache {
 		},
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "plan-aaa",
-					Name: "plan-aaa",
-					Fields: map[string]string{
-						"resources": planResources,
-					},
-				},
-				{
-					ID:   "plan-bbb",
-					Name: "plan-bbb",
-					Fields: map[string]string{
-						"resources": "arn:aws:rds:us-east-1:123456789012:cluster:other-cluster",
-					},
-				},
+				unit.BackupPlanRow(t, "plan-aaa", backuptypes.BackupSelection{Resources: []string{planResources}}),
+				unit.BackupPlanRow(t, "plan-bbb", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:rds:us-east-1:123456789012:cluster:other-cluster"},
+				}),
 			},
 		},
 	}
@@ -123,7 +114,7 @@ func dbcSnapBackupCache(planResources string) resource.ResourceCache {
 
 func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 	res := dbcSnapBackupSrcResource()
-	cache := dbcSnapBackupCache(dbcSnapTestClusterARN)
+	cache := dbcSnapBackupCache(t, dbcSnapTestClusterARN)
 
 	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)
@@ -138,7 +129,7 @@ func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 
 func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
 	res := dbcSnapBackupSrcResource()
-	cache := dbcSnapBackupCache("arn:aws:rds:us-east-1:123456789012:cluster:unrelated")
+	cache := dbcSnapBackupCache(t, "arn:aws:rds:us-east-1:123456789012:cluster:unrelated")
 
 	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)

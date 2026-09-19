@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -16,6 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // efsCheckerByTarget is shared with aws_efs_related_extra_test.go,
@@ -229,27 +231,15 @@ func TestRelated_EFS_Backup_GraphRoot(t *testing.T) {
 
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{
-				ID:   fixtures.HealthyDailyPlanID,
-				Name: "plan-healthy-daily",
-				Fields: map[string]string{
-					"resources": fixtures.HealthyBucketARN + "," + fixtures.ProdEFSARN + "," + fixtures.OrdersProdARN,
-				},
-			},
-			{
-				ID:   fixtures.AppDataPlanID,
-				Name: "plan-warning-partial",
-				Fields: map[string]string{
-					"resources": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-app-sessions," + fixtures.ProdEFSARN,
-				},
-			},
-			{
-				ID:   fixtures.ProdCriticalPlanID,
-				Name: "plan-broken-1failed",
-				Fields: map[string]string{
-					"resources": "arn:aws:rds:us-east-1:123456789012:db:acme-prod-secondary",
-				},
-			},
+			unit.BackupPlanRow(t, fixtures.HealthyDailyPlanID, backuptypes.BackupSelection{
+				Resources: []string{fixtures.HealthyBucketARN, fixtures.ProdEFSARN, fixtures.OrdersProdARN},
+			}),
+			unit.BackupPlanRow(t, fixtures.AppDataPlanID, backuptypes.BackupSelection{
+				Resources: []string{"arn:aws:dynamodb:us-east-1:123456789012:table/acme-app-sessions", fixtures.ProdEFSARN},
+			}),
+			unit.BackupPlanRow(t, fixtures.ProdCriticalPlanID, backuptypes.BackupSelection{
+				Resources: []string{"arn:aws:rds:us-east-1:123456789012:db:acme-prod-secondary"},
+			}),
 		}},
 	}
 

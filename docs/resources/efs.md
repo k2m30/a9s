@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: AWS Backup recovery points for this file system — the only place operators recover from accidental deletion or corruption, since EFS itself has no snapshot surface.
-- **How discovered**: call `backup:ListRecoveryPointsByResource(ResourceArn=FileSystemArn)` — a9s-devops: the FS ARN (`FileSystemDescription.FileSystemArn`) is the exact key Backup indexes recovery points by; one bounded call per FS detail view.
+- **How discovered**: Reverse-scan the already-loaded `backup` list with `FileSystemDescription.FileSystemArn` and the file system's own `Tags`. A plan covers the file system iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. A plan whose selections were not all read makes the count a lower bound, or unknown when no plan is known to cover the file system.
 - **Count shown**: yes.
 
 ### `cfn`

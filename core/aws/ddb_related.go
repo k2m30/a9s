@@ -64,12 +64,9 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
-// reverse-scanning the already-loaded backup list cache. For each cached plan,
-// Fields["resources"] contains a comma-separated list of resource ARNs or
-// wildcard patterns (e.g. arn:aws:dynamodb:*:*:table/*); Fields["not_resources"]
-// contains exclusion patterns with the same wildcard semantics. A plan covers
-// this table iff any Resources entry matches the table's ARN AND no NotResources
-// entry matches. No live API call is made — this is a pure cache scan.
+// reverse-scanning the already-loaded backup list cache through
+// BackupPlanCovers. The row carries no tags, so a plan whose verdict turns on
+// a tag clause leaves the answer undecided. No live API call is made.
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
@@ -82,19 +79,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	if backupList == nil {
 		return resource.UnknownRelated("backup")
 	}
-	var ids []string
-	for _, planRes := range backupList {
-		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], tableARN) {
-			ids = append(ids, planRes.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("backup", nil, true)
-	}
-	if truncated {
-		return truncatedResultDDB("backup", ids)
-	}
-	return relatedResult("backup", ids)
+	return backupPivot(backupList, truncated, backupTarget{arn: tableARN, unread: "ListTagsOfResource"})
 }
 
 // checkDdbKinesis resolves Kinesis Data Streams connected to this DynamoDB table

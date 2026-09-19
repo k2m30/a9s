@@ -122,13 +122,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("backup")
 	}
 
-	var ids []string
-	for _, planRes := range planList {
-		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], parentARN) {
-			ids = append(ids, planRes.ID)
-		}
-	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return backupPivot(planList, truncated, backupTarget{arn: parentARN, unread: "ListTagsForResource"})
 }
 
 // checkDBISnapCTEvents looks up cached CloudTrail events for the snapshot's

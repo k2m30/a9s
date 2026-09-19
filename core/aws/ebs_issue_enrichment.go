@@ -33,9 +33,16 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 	// snapshot of it exists.
 	account := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	region := sessionRegion(clients)
-	addBackupCoverage(cache, "ebs", CodeEBSNotInBackupPlan, resources, func(r resource.Resource) (string, map[string]string, bool) {
+	addBackupCoverage(cache, CodeEBSNotInBackupPlan, resources, func(r resource.Resource) backupTarget {
 		tags, known := ebsVolumeTags(r)
-		return ebsVolumeARN(r, region, account), tags, known
+		t := backupTarget{arn: ebsVolumeARN(r, region, account), tags: tags}
+		switch {
+		case account == "":
+			t.unread = CheckOwnAccountUnknown
+		case !known:
+			t.unread = "DescribeVolumes"
+		}
+		return t
 	}, &result)
 	addEBSSnapshotCoverage(cache, resources, &result)
 
@@ -116,10 +123,26 @@ func ebsVolumeARN(r resource.Resource, region, account string) string {
 	if volumeID == "" {
 		volumeID = r.ID
 	}
-	if account == "" || volumeID == "" || region == "" {
+	return ec2ARN(region, account, "volume", volumeID)
+}
+
+// ec2ARN builds an EC2 resource ARN from the session's region and caller
+// account, or "" when any part is unknown.
+func ec2ARN(region, account, kind, id string) string {
+	if account == "" || id == "" || region == "" {
 		return ""
 	}
-	return "arn:" + PartitionForRegion(region) + ":ec2:" + region + ":" + account + ":volume/" + volumeID
+	return "arn:" + PartitionForRegion(region) + ":ec2:" + region + ":" + account + ":" + kind + "/" + id
+}
+
+// sessionEC2ARN is ec2ARN for a related checker, which holds the session's
+// clients rather than its region and account.
+func sessionEC2ARN(ctx context.Context, clients any, kind, id string) string {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return ""
+	}
+	return ec2ARN(sessionRegion(c), accountIDFromClients(ctx, c, c.IdentityStore()), kind, id)
 }
 
 // ebsVolumeTags reads the volume's own tags, which a backup selection may

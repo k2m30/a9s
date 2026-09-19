@@ -54,6 +54,12 @@ const (
 	DBINotInBackupPlan    = "sandbox-db-02"
 	DBINotInBackupPlanARN = "arn:aws:rds:us-east-1:123456789012:db:sandbox-db-02"
 
+	// DBIDocDBMember is a DocumentDB instance of acme-docdb-prod whose own
+	// ARN acme-fleet-wide excludes. AWS Backup protects it through its
+	// cluster, which acme-prod-db names, so it is covered.
+	DBIDocDBMember    = ProdDbcID + "-01"
+	DBIDocDBMemberARN = "arn:aws:rds:us-east-1:123456789012:db:" + DBIDocDBMember
+
 	// warn-dbi-public — Warning (CIS RDS.2)
 	WarnDbiPublicID  = "warn-dbi-public"
 	WarnDbiPublicARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-public"
@@ -371,6 +377,15 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		caCertUrgent,
 		engineDeprecated,
 	}
+}
+
+func dbiDocDBClusterMember() rdstypes.DBInstance {
+	db := dbiBaselineHealthy(DBIDocDBMember, DBIDocDBMemberARN)
+	db.Engine = aws.String("docdb")
+	db.EngineVersion = aws.String("5.0.0")
+	db.DBClusterIdentifier = aws.String(ProdDbcID)
+	db.Endpoint.Port = aws.Int32(27017)
+	return db
 }
 
 func buildDBIPendingMaintenance() []rdstypes.ResourcePendingMaintenanceActions {

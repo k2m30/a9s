@@ -106,25 +106,16 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("cfn", ids, truncated)
 }
 
-// checkEBSBackup scans the backup cache for backup plans whose selection
-// tags (BackupSelection.ListOfTags, joined into Fields["selection_tags"] by
-// the backup fetcher) match this volume's own tags. Zero extra calls — a
-// pure cross-reference of the already-loaded backup cache, per
-// docs/resources/ebs.md ("sibling-list cross-ref when backup list is loaded,
-// otherwise the panel renders an empty backup group").
+// checkEBSBackup scans the backup cache for backup plans that cover this
+// volume through BackupPlanCovers, with the ARN the coverage join builds and
+// the volume's own tags. Zero extra calls — a pure cross-reference of the
+// already-loaded backup cache, per docs/resources/ebs.md.
 func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
 		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
-	tags := map[string]string{}
-	if vol, ok := assertStruct[ec2types.Volume](res.RawStruct); ok {
-		for _, t := range vol.Tags {
-			if t.Key != nil && t.Value != nil {
-				tags[*t.Key] = *t.Value
-			}
-		}
-	}
+	tags, tagsKnown := ebsVolumeTags(res)
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
@@ -134,11 +125,9 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("backup")
 	}
 
-	var ids []string
-	for _, planRes := range backupList {
-		if backupSelectionTagsMatch(planRes.Fields["selection_tags"], tags) {
-			ids = append(ids, planRes.ID)
-		}
+	target := backupTarget{arn: sessionEC2ARN(ctx, clients, "volume", volID), tags: tags}
+	if !tagsKnown {
+		target.unread = "DescribeVolumes"
 	}
-	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
+	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, target))
 }

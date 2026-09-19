@@ -5,16 +5,19 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 func s3CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -48,14 +51,16 @@ func healthyBucketResource() resource.Resource {
 			"notification_sns":    "arn:aws:sns:us-east-1:123456789012:" + fixtures.S3EventsTopicName,
 			"notification_sqs":    "arn:aws:sqs:us-east-1:123456789012:" + fixtures.S3DLQueueName,
 		},
+		RawStruct: s3types.Bucket{Name: aws.String(fixtures.HealthyBucketName), BucketRegion: aws.String("us-east-1")},
 	}
 }
 
 func emptyBucketResource(name string) resource.Resource {
 	return resource.Resource{
-		ID:     name,
-		Name:   name,
-		Fields: map[string]string{"name": name},
+		ID:        name,
+		Name:      name,
+		Fields:    map[string]string{"name": name},
+		RawStruct: s3types.Bucket{Name: aws.String(name), BucketRegion: aws.String("us-east-1")},
 	}
 }
 
@@ -461,11 +466,7 @@ func TestS3_Related_Backup_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:     "plan-other",
-					Name:   "plan-other",
-					Fields: map[string]string{"resource_arn": "arn:aws:s3:::other-bucket"},
-				},
+				unit.BackupPlanRow(t, "plan-other", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::other-bucket"}}),
 			},
 		},
 	}
@@ -481,11 +482,7 @@ func TestS3_Related_Backup_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:     "plan-s3",
-					Name:   "plan-s3",
-					Fields: map[string]string{"resource_arn": bucketARN},
-				},
+				unit.BackupPlanRow(t, "plan-s3", backuptypes.BackupSelection{Resources: []string{bucketARN}}),
 			},
 		},
 	}
@@ -683,18 +680,12 @@ func s3ContainsID(ids []string, id string) bool {
 
 func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 	plans := []resource.Resource{
-		{ID: "plan-prefix", Fields: map[string]string{
-			"resources":     "arn:aws:s3:::prod-*",
-			"not_resources": "",
-		}},
-		{ID: "plan-catchall-except-quarantine", Fields: map[string]string{
-			"resources":     "arn:aws:s3:::*",
-			"not_resources": "arn:aws:s3:::quarantine-*",
-		}},
-		{ID: "plan-specific", Fields: map[string]string{
-			"resources":     "arn:aws:s3:::specific-bucket",
-			"not_resources": "",
-		}},
+		unit.BackupPlanRow(t, "plan-prefix", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::prod-*"}}),
+		unit.BackupPlanRow(t, "plan-catchall-except-quarantine", backuptypes.BackupSelection{
+			Resources:    []string{"arn:aws:s3:::*"},
+			NotResources: []string{"arn:aws:s3:::quarantine-*"},
+		}),
+		unit.BackupPlanRow(t, "plan-specific", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::specific-bucket"}}),
 	}
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
@@ -707,9 +698,10 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 	t.Run("prod-logs covered by plan-prefix and plan-catchall-except-quarantine", func(t *testing.T) {
 		// S3 checker derives bucket ARN as "arn:aws:s3:::"+bucket.ID
 		res := resource.Resource{
-			ID:     "prod-logs",
-			Name:   "prod-logs",
-			Fields: map[string]string{"name": "prod-logs"},
+			ID:        "prod-logs",
+			Name:      "prod-logs",
+			Fields:    map[string]string{"name": "prod-logs"},
+			RawStruct: s3types.Bucket{Name: aws.String("prod-logs"), BucketRegion: aws.String("us-east-1")},
 		}
 		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 2 {
@@ -725,9 +717,10 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 
 	t.Run("staging-data covered only by plan-catchall-except-quarantine", func(t *testing.T) {
 		res := resource.Resource{
-			ID:     "staging-data",
-			Name:   "staging-data",
-			Fields: map[string]string{"name": "staging-data"},
+			ID:        "staging-data",
+			Name:      "staging-data",
+			Fields:    map[string]string{"name": "staging-data"},
+			RawStruct: s3types.Bucket{Name: aws.String("staging-data"), BucketRegion: aws.String("us-east-1")},
 		}
 		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 1 {
@@ -740,9 +733,10 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 
 	t.Run("quarantine-pii excluded from all plans", func(t *testing.T) {
 		res := resource.Resource{
-			ID:     "quarantine-pii",
-			Name:   "quarantine-pii",
-			Fields: map[string]string{"name": "quarantine-pii"},
+			ID:        "quarantine-pii",
+			Name:      "quarantine-pii",
+			Fields:    map[string]string{"name": "quarantine-pii"},
+			RawStruct: s3types.Bucket{Name: aws.String("quarantine-pii"), BucketRegion: aws.String("us-east-1")},
 		}
 		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 0 {
@@ -752,9 +746,10 @@ func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 
 	t.Run("specific-bucket covered by plan-catchall-except-quarantine and plan-specific", func(t *testing.T) {
 		res := resource.Resource{
-			ID:     "specific-bucket",
-			Name:   "specific-bucket",
-			Fields: map[string]string{"name": "specific-bucket"},
+			ID:        "specific-bucket",
+			Name:      "specific-bucket",
+			Fields:    map[string]string{"name": "specific-bucket"},
+			RawStruct: s3types.Bucket{Name: aws.String("specific-bucket"), BucketRegion: aws.String("us-east-1")},
 		}
 		result := checker(context.Background(), s3BackupSession(), res, cache)
 		if result.Count() != 2 {

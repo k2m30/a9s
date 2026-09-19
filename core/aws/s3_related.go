@@ -16,6 +16,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -300,16 +301,9 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("glue", ids, truncated)
 }
 
-// checkS3Backup scans the backup cache for plans that cover this bucket.
-// Two matching paths are applied per cached plan:
-//   - Exact: Fields["resource_arn"] equals the bucket ARN
-//     (recovery-point-shaped cache entries; unrelated to BackupSelection).
-//   - Selection: BackupPlanCoversARN checks Fields["resources"] (may contain
-//     wildcard patterns such as arn:aws:s3:::*) and Fields["not_resources"]
-//     (exclusion list). A plan covers this bucket iff any Resources entry
-//     matches AND no NotResources entry matches.
-//
-// Reads the cache only.
+// checkS3Backup scans the backup cache for plans that cover this bucket,
+// through BackupPlanCovers. The row carries no tags, so a plan whose verdict
+// turns on a tag clause leaves the answer undecided.
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -331,13 +325,17 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	if bkList == nil {
 		return resource.UnknownRelated("backup")
 	}
-	var ids []string
-	for _, bk := range bkList {
-		if bk.Fields["resource_arn"] == bucketARN || BackupPlanCoversARN(bk.Fields["resources"], bk.Fields["not_resources"], bucketARN) {
-			ids = append(ids, bk.ID)
-		}
+	// A plan backs up only buckets in its own Region, and ListBuckets returns
+	// buckets from every Region.
+	b, _ := assertStruct[s3types.Bucket](res.RawStruct)
+	switch bucketRegion := aws.ToString(b.BucketRegion); {
+	case len(bkList) == 0:
+	case bucketRegion == "":
+		return resource.UnknownRelated("backup")
+	case bucketRegion != region:
+		return relatedResultTrunc("backup", nil, false)
 	}
-	return relatedResultTrunc("backup", ids, truncated)
+	return backupPivot(bkList, truncated, backupTarget{arn: bucketARN, unread: "GetBucketTagging"})
 }
 
 // checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters

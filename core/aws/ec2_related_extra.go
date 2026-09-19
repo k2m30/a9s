@@ -125,14 +125,9 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkEC2Backup scans the backup cache for backup plans that cover this
-// instance, matching on two independent signals with zero extra calls: (1)
-// the plan's selection tags (BackupSelection.ListOfTags, joined into
-// Fields["selection_tags"] by the backup fetcher) against this instance's
-// own tags, and (2) the plan's selection ARN list/wildcards
-// (Fields["resources"]/Fields["not_resources"]) against this instance's ARN,
-// via the same BackupPlanCoversARN helper checkS3Backup and other ARN-based
-// backup pivots already use. Per docs/resources/ec2.md: "match by
-// backup-plan selection tags present on Instance.Tags[] or by ARN".
+// instance through BackupPlanCovers, with the instance's ARN and its own tags,
+// zero extra calls. Per docs/resources/ec2.md: "match by backup-plan selection
+// tags present on Instance.Tags[] or by ARN".
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
@@ -140,15 +135,20 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	tags := map[string]string{}
-	if inst, ok := assertStruct[ec2types.Instance](res.RawStruct); ok {
-		for _, t := range inst.Tags {
-			if t.Key != nil && t.Value != nil {
-				tags[*t.Key] = *t.Value
-			}
+	inst, tagsKnown := assertStruct[ec2types.Instance](res.RawStruct)
+	for _, t := range inst.Tags {
+		if t.Key != nil && t.Value != nil {
+			tags[*t.Key] = *t.Value
 		}
 	}
 
-	instanceARN := res.Fields["arn"]
+	target := backupTarget{arn: res.Fields["arn"], tags: tags}
+	if !tagsKnown {
+		target.unread = "DescribeInstances"
+	}
+	if target.arn == "" {
+		target.arn = sessionEC2ARN(ctx, clients, "instance", instanceID)
+	}
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
@@ -158,12 +158,5 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("backup")
 	}
 
-	var ids []string
-	for _, planRes := range backupList {
-		if backupSelectionTagsMatch(planRes.Fields["selection_tags"], tags) ||
-			BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], instanceARN) {
-			ids = append(ids, planRes.ID)
-		}
-	}
-	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
+	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, target))
 }

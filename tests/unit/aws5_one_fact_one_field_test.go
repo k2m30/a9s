@@ -216,10 +216,9 @@ func aws5RelatedChecker(t *testing.T, sourceType, target string) resource.Relate
 // China or GovCloud bucket read as a proven "not backed up".
 func TestS3BackupPivot_DeclinesWhenTheSessionHasNoRegion(t *testing.T) {
 	cache := resource.ResourceCache{
-		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{{
-			ID:     "plan-s3",
-			Fields: map[string]string{"resource_arn": "arn:aws:s3:::acme-app-state"},
-		}}},
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			BackupPlanRow(t, "plan-s3", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::acme-app-state"}}),
+		}},
 	}
 	bucket := resource.Resource{ID: "acme-app-state", Name: "acme-app-state"}
 	result := aws5RelatedChecker(t, "s3", "backup")(
@@ -240,12 +239,12 @@ func TestS3BackupPivot_NamesTheSessionsPartition(t *testing.T) {
 	} {
 		t.Run(tc.region, func(t *testing.T) {
 			cache := resource.ResourceCache{
-				"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{{
-					ID:     "plan-s3",
-					Fields: map[string]string{"resource_arn": tc.arn},
-				}}},
+				"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+					BackupPlanRow(t, "plan-s3", backuptypes.BackupSelection{Resources: []string{tc.arn}}),
+				}},
 			}
-			bucket := resource.Resource{ID: "acme-app-state", Name: "acme-app-state"}
+			bucket := resource.Resource{ID: "acme-app-state", Name: "acme-app-state",
+				RawStruct: s3types.Bucket{Name: aws.String("acme-app-state"), BucketRegion: aws.String(tc.region)}}
 			result := aws5RelatedChecker(t, "s3", "backup")(
 				context.Background(), &awsclient.ServiceClients{Region: tc.region}, bucket, cache)
 			if result.Count() != 1 {

@@ -135,30 +135,6 @@ func kmsRefFromField(raw, srcType string) string {
 	return raw
 }
 
-// backupSelectionTagsMatch parses a comma-joined "k=v" selection-tags string
-// (as emitted by the backup fetcher's Fields["selection_tags"], one entry per
-// BackupSelection.ListOfTags condition) and reports whether any condition
-// matches one of the given resource tags. AWS Backup's ListOfTags conditions
-// are OR'd together (a resource is selected if ANY condition matches), so a
-// single match is sufficient.
-func backupSelectionTagsMatch(selectionTagsCSV string, resourceTags map[string]string) bool {
-	if selectionTagsCSV == "" || len(resourceTags) == 0 {
-		return false
-	}
-	for cond := range strings.SplitSeq(selectionTagsCSV, ",") {
-		key, value, ok := strings.Cut(cond, "=")
-		if !ok {
-			continue
-		}
-		// StringLike conditions carry `*`, and backupARNPatternMatches is the
-		// same glob the ARN selection lists are read with.
-		if v, present := resourceTags[key]; present && backupARNPatternMatches(value, v) {
-			return true
-		}
-	}
-	return false
-}
-
 func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 	return resource.KnownRelated(target, ids, false)
 }

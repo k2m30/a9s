@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -47,20 +48,27 @@ const (
 	w7DBCARN    = "arn:aws:rds:us-east-1:123456789012:cluster:acme-orders-cluster"
 )
 
-// w7Plan builds a backup plan row the way FetchBackupPlansPage does: the
-// selection's ARNs, its exclusions and its tag conditions all ride on Fields.
+// w7Plan fetches a backup plan row with one selection: it names the
+// comma-separated resources, excludes the comma-separated notResources, and
+// selects by the comma-separated "k=v" selectionTags.
 func w7Plan(resources, notResources, selectionTags string) resource.Resource {
-	return resource.Resource{
-		ID:   "plan-0a1b2c3d",
-		Name: "acme-nightly",
-		Fields: map[string]string{
-			"plan_name":      "acme-nightly",
-			"plan_id":        "plan-0a1b2c3d",
-			"resources":      resources,
-			"not_resources":  notResources,
-			"selection_tags": selectionTags,
-		},
+	list := func(csv string) []string {
+		if csv == "" {
+			return nil
+		}
+		return strings.Split(csv, ",")
 	}
+	sel := backuptypes.BackupSelection{Resources: list(resources), NotResources: list(notResources)}
+	for _, kv := range list(selectionTags) {
+		k, v, _ := strings.Cut(kv, "=")
+		sel.ListOfTags = append(sel.ListOfTags, BackupTagSelection(k, v).ListOfTags...)
+	}
+	res, err := awsclient.FetchBackupPlansPage(context.Background(),
+		&plan551Fake{id: "plan-0a1b2c3d", name: "acme-nightly", selections: []backuptypes.BackupSelection{sel}}, "")
+	if err != nil || len(res.Resources) != 1 {
+		panic(fmt.Sprintf("FetchBackupPlansPage = %d plans, %v", len(res.Resources), err))
+	}
+	return res.Resources[0]
 }
 
 // w7CacheWith returns a cache holding one whole backup list.
@@ -660,12 +668,19 @@ func TestW7Tags_NoCallWhenThePlanListIsUnusable(t *testing.T) {
 
 // TestW7Tags_ClientWithoutTheTagCallJudgesOnARNsAlone pins the type assertion
 // at the call site. A client that does not implement the narrow tag interface
-// must fall back to ARN matching rather than panicking or reporting nothing.
+// must not panic, and still judges every table whose verdict no tag decides.
+//
+// Where the plan's tag selection could still take the table in, unread tags
+// leave the verdict unknown and the join reports nothing.
 func TestW7Tags_ClientWithoutTheTagCallJudgesOnARNsAlone(t *testing.T) {
 	res := w7EnrichDDB(t,
 		[]resource.Resource{w7Row("acme-orders", w7TableARN)},
 		w7CacheWith(w7Plan("arn:aws:dynamodb:us-east-1:123456789012:table/other", "", "backup=nightly")))
+	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
 
+	res = w7EnrichDDB(t,
+		[]resource.Resource{w7Row("acme-orders", w7TableARN)},
+		w7CacheWith(w7Plan("arn:aws:dynamodb:us-east-1:123456789012:table/other", "", "")))
 	w4AssertFinding(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan,
 		"not covered by a backup plan", domain.SevWarn, "wave2")
 }
@@ -756,7 +771,12 @@ func TestW7Bench_FleetWidePlanExcludesEveryWitness(t *testing.T) {
 		t.Fatalf("the demo backup list has no plan %s", fixtures.FleetWidePlanID)
 	}
 
-	excluded := strings.Split(plan.Fields["not_resources"], ",")
+	sels, _ := awsclient.BackupPlanSelections(*plan)
+	var excluded, selected []string
+	for _, sel := range sels {
+		excluded = append(excluded, sel.NotResources...)
+		selected = append(selected, sel.Resources...)
+	}
 	for _, want := range []string{
 		fixtures.EBSNotInBackupPlanARN,
 		fixtures.DBINotInBackupPlanARN,
@@ -770,7 +790,7 @@ func TestW7Bench_FleetWidePlanExcludesEveryWitness(t *testing.T) {
 
 	// And it still covers by wildcard, or the exclusions above would be moot.
 	for _, want := range []string{"arn:aws:ec2:*:*:volume/*", "arn:aws:dynamodb:*:*:table/*"} {
-		if !strings.Contains(plan.Fields["resources"], want) {
+		if !slices.Contains(selected, want) {
 			t.Errorf("the fleet-wide plan no longer selects %s, so every row of that type reads uncovered", want)
 		}
 	}

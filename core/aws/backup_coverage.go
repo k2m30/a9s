@@ -7,8 +7,7 @@ package aws
 import (
 	"context"
 	"errors"
-	"regexp"
-	"strings"
+	"slices"
 	"sync"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -24,42 +23,42 @@ import (
 // account with no plans covers nothing, and that is knowledge rather than a
 // gap.
 //
-// arnAndTags gives the resource's ARN and the tags a selection may condition
-// on. Its third value is false when those tags could not be read. Unknown tags
-// only silence the finding where they could change it — when some plan selects
-// by tag; where every selection names ARNs, tags decide nothing and the
-// verdict stands.
-//
-// A plan whose own selection list could not be read to the end is the same
-// gap one level up: it may select anything, so nothing in the account can be
-// called uncovered while it is in the cache.
+// targetOf gives what a selection is evaluated against for each row. A row
+// no plan covers and some plan might is marked not inspected, naming the check
+// that could still decide it.
 func addBackupCoverage(
 	cache resource.ResourceCache,
-	shortName string,
 	code domain.FindingCode,
 	resources []resource.Resource,
-	arnAndTags func(resource.Resource) (string, map[string]string, bool),
+	targetOf func(resource.Resource) backupTarget,
 	result *IssueEnricherResult,
 ) {
 	entry, ok := cache["backup"]
-	if !ok || entry.IsTruncated || backupPlansIncomplete(entry.Resources) {
+	if !ok || entry.IsTruncated {
 		for _, r := range resources {
 			markUninspected(result, r.ID, checkListIncomplete("backup"))
 		}
 		return
 	}
-	tagsDecide := backupPlansSelectByTag(entry.Resources)
 	for _, r := range resources {
 		if r.ID == "" {
 			continue
 		}
-		arn, tags, known := arnAndTags(r)
-		// A row the fetcher gave no ARN cannot be matched against a selection,
-		// so it is not evidence either way.
-		if arn == "" || (!known && tagsDecide) || backupPlansCover(entry.Resources, arn, tags) {
+		t := targetOf(r)
+		if t.arn == "" {
+			if len(entry.Resources) > 0 {
+				markUninspected(result, r.ID, t.unread)
+			}
 			continue
 		}
-		setWave2Finding(result, r.ID, code, []domain.DetailRow{{Label: "Backup plans", Value: "0"}})
+		ids, undecided := backupPlansCovering(entry.Resources, t)
+		switch {
+		case len(ids) > 0:
+		case undecided == "":
+			setWave2Finding(result, r.ID, code, []domain.DetailRow{{Label: "Backup plans", Value: "0"}})
+		default:
+			markUninspected(result, r.ID, undecided)
+		}
 	}
 }
 
@@ -67,39 +66,44 @@ func addBackupCoverage(
 // types whose list call does not return them.
 type backupTagReader func(ctx context.Context, arn string) (map[string]string, error)
 
-// backupTagsAccessor builds the coverage join's accessor for a type whose rows
-// carry an ARN but no tags.
+// backupTagsAccessor builds the coverage join's targetOf for a type whose rows
+// carry an ARN but no tags; op is the call read performs.
 //
-// It reads tags only where they can change the answer: when no cached plan
-// selects by tag, when a plan's own selection list could not be read to the
-// end (addBackupCoverage marks every row in that case), and for every
-// resource a selection's ARNs already take in, the read is skipped. The rest
-// are read one call each, in parallel, up to EnrichmentCap. A resource whose
-// read fails or falls outside the cap has unknown tags, which the join leaves
-// alone.
+// It reads tags only where they can change the answer: when a plan's own
+// selection list could not be read to the end (no tag read can then prove a
+// resource uncovered), and for every resource whose verdict no selection's tag
+// clause decides, the read is skipped. The rest are read one call each, in
+// parallel, up to EnrichmentCap. A resource whose tags were not read names op
+// as its unread check.
 func backupTagsAccessor(
 	ctx context.Context,
 	cache resource.ResourceCache,
 	resources []resource.Resource,
+	targetOf func(resource.Resource) backupTarget,
 	read backupTagReader,
 	result *IssueEnricherResult,
 	op string,
-) (func(resource.Resource) (string, map[string]string, bool), error) {
+) (func(resource.Resource) backupTarget, error) {
+	untagged := func(r resource.Resource) backupTarget {
+		t := targetOf(r)
+		if t.arn != "" {
+			t.unread = op
+		}
+		return t
+	}
 	entry, ok := cache["backup"]
-	if !ok || entry.IsTruncated || read == nil ||
-		backupPlansIncomplete(entry.Resources) || !backupPlansSelectByTag(entry.Resources) {
-		return backupARNFromField, nil
+	if !ok || entry.IsTruncated || read == nil || backupPlansIncomplete(entry.Resources) {
+		return untagged, nil
 	}
 
 	tags := make(map[string]map[string]string, len(resources))
 	var pending []resource.Resource
 	for _, r := range resources {
-		arn := r.Fields["arn"]
-		if r.ID == "" || arn == "" {
+		t := untagged(r)
+		if r.ID == "" || t.arn == "" {
 			continue
 		}
-		if backupPlansCover(entry.Resources, arn, nil) {
-			tags[r.ID] = nil
+		if ids, undecided := backupPlansCovering(entry.Resources, t); len(ids) > 0 || undecided == "" {
 			continue
 		}
 		pending = append(pending, r)
@@ -112,7 +116,7 @@ func backupTagsAccessor(
 	walkErr := ForEachRow(ctx, result, resourceIDs(pending), EnrichmentParallelism, func(i int) {
 		r := pending[i]
 		t, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (map[string]string, error) {
-			return read(ctx, r.Fields["arn"])
+			return read(ctx, targetOf(r).arn)
 		})
 		mu.Lock()
 		defer mu.Unlock()
@@ -123,86 +127,33 @@ func backupTagsAccessor(
 		tags[r.ID] = t
 	})
 
-	return func(r resource.Resource) (string, map[string]string, bool) {
-		t, known := tags[r.ID]
-		return r.Fields["arn"], t, known
+	return func(r resource.Resource) backupTarget {
+		t := untagged(r)
+		if read, ok := tags[r.ID]; ok {
+			t.tags, t.unread = read, ""
+		}
+		return t
 	}, errors.Join(walkErr, AggregateFailures(op, failures, n))
 }
 
-// backupPlansIncomplete reports whether any plan's selection enumeration
-// stopped short of the whole list. The plan row then names some of what the
-// plan protects and no way to tell how much is missing, so it cannot support
-// "not covered" for anything.
+// backupPlansIncomplete reports whether any plan's selections were not all
+// read. Such a plan may select anything, so it cannot support "not covered".
 func backupPlansIncomplete(plans []resource.Resource) bool {
-	for _, plan := range plans {
-		if plan.Fields[backupSelectionsPartialField] != "" {
-			return true
+	return slices.ContainsFunc(plans, func(plan resource.Resource) bool {
+		_, complete := BackupPlanSelections(plan)
+		return !complete
+	})
+}
+
+// backupTargetFromFields is targetOf for every type whose fetcher puts the
+// ARN, and for a cluster the engine, on the row; describe is the call that
+// returns the ARN.
+func backupTargetFromFields(describe string) func(resource.Resource) backupTarget {
+	return func(r resource.Resource) backupTarget {
+		t := backupTarget{arn: r.Fields["arn"], engine: r.Fields["engine"]}
+		if t.arn == "" {
+			t.unread = describe
 		}
+		return t
 	}
-	return false
-}
-
-// backupPlansSelectByTag reports whether any plan chooses resources by tag.
-func backupPlansSelectByTag(plans []resource.Resource) bool {
-	for _, plan := range plans {
-		if plan.Fields["selection_tags"] != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// backupPlansCover reports whether any plan's selection takes in the resource.
-func backupPlansCover(plans []resource.Resource, arn string, tags map[string]string) bool {
-	for _, plan := range plans {
-		if backupPlanCovers(plan, arn, tags) {
-			return true
-		}
-	}
-	return false
-}
-
-// backupPlanCovers applies one plan's selection: an ARN the include list takes
-// in, or a tag condition the resource satisfies, minus anything the exclude
-// list names.
-func backupPlanCovers(plan resource.Resource, arn string, tags map[string]string) bool {
-	if backupARNListMatches(plan.Fields["not_resources"], arn) {
-		return false
-	}
-	if backupARNListMatches(plan.Fields["resources"], arn) {
-		return true
-	}
-	return backupSelectionTagsMatch(plan.Fields["selection_tags"], tags)
-}
-
-// backupARNListMatches reports whether any pattern in a comma-separated
-// selection list takes in the ARN.
-func backupARNListMatches(list, arn string) bool {
-	for pattern := range strings.SplitSeq(list, ",") {
-		if pattern = strings.TrimSpace(pattern); pattern != "" && backupARNPatternMatches(pattern, arn) {
-			return true
-		}
-	}
-	return false
-}
-
-// backupARNPatternMatches applies one selection pattern, where `*` stands for
-// any run of characters and everything else is literal. `?`, `[` and `]` are
-// every character AWS Backup gives a meaning the join does not model, and a
-// pattern using one is matched as covering, so an unfamiliar shape never
-// invents a finding.
-func backupARNPatternMatches(pattern, arn string) bool {
-	if strings.ContainsAny(pattern, "?[]") {
-		return true
-	}
-	if !strings.Contains(pattern, "*") {
-		return pattern == arn
-	}
-	return regexp.MustCompile("^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$").MatchString(arn)
-}
-
-// backupARNFromField is the accessor for every type whose fetcher already puts
-// an ARN on the row and whose tags no selection needs read.
-func backupARNFromField(r resource.Resource) (string, map[string]string, bool) {
-	return r.Fields["arn"], nil, true
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -275,24 +276,14 @@ func TestDDB_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	}
 }
 
-func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
+func TestDDB_Related_Backup_MatchesByARNInSelection(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "backup")
 
-	matchingPlan := resource.Resource{
-		ID:   "acme-weekly-full-backup",
-		Name: "acme-weekly-full-backup",
-		Fields: map[string]string{
-			"resources": fixtures.OrdersProdARN + ",arn:aws:s3:::acme-data",
-		},
-	}
-	decoyPlan := resource.Resource{
-		ID:   "unrelated-backup-plan",
-		Name: "unrelated-backup-plan",
-		Fields: map[string]string{
-			"resources": "arn:aws:s3:::other-bucket",
-		},
-	}
+	matchingPlan := BackupPlanRow(t, "acme-weekly-full-backup",
+		backuptypes.BackupSelection{Resources: []string{fixtures.OrdersProdARN, "arn:aws:s3:::acme-data"}})
+	decoyPlan := BackupPlanRow(t, "unrelated-backup-plan",
+		backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::other-bucket"}})
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{matchingPlan, decoyPlan},
@@ -317,10 +308,7 @@ func TestDDB_Related_Backup_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:     "other-plan",
-					Fields: map[string]string{"resources": "arn:aws:s3:::irrelevant"},
-				},
+				BackupPlanRow(t, "other-plan", backuptypes.BackupSelection{Resources: []string{"arn:aws:s3:::irrelevant"}}),
 			},
 		},
 	}
@@ -729,18 +717,12 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 
 func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 	plans := []resource.Resource{
-		{ID: "plan-explicit", Fields: map[string]string{
-			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders",
-			"not_resources": "",
-		}},
-		{ID: "plan-wildcard", Fields: map[string]string{
-			"resources":     "arn:aws:dynamodb:*:*:table/*",
-			"not_resources": "",
-		}},
-		{ID: "plan-wildcard-excluded", Fields: map[string]string{
-			"resources":     "arn:aws:dynamodb:*:*:table/*",
-			"not_resources": "arn:aws:dynamodb:us-east-1:123:table/audit-log",
-		}},
+		BackupPlanRow(t, "plan-explicit", backuptypes.BackupSelection{Resources: []string{"arn:aws:dynamodb:us-east-1:123:table/orders"}}),
+		BackupPlanRow(t, "plan-wildcard", backuptypes.BackupSelection{Resources: []string{"arn:aws:dynamodb:*:*:table/*"}}),
+		BackupPlanRow(t, "plan-wildcard-excluded", backuptypes.BackupSelection{
+			Resources:    []string{"arn:aws:dynamodb:*:*:table/*"},
+			NotResources: []string{"arn:aws:dynamodb:us-east-1:123:table/audit-log"},
+		}),
 	}
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
@@ -818,14 +800,9 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 		},
 	}
 
-	matchingPlan := resource.Resource{
-		ID:   "weekly-backup-plan",
-		Name: "weekly-backup-plan",
-		Fields: map[string]string{
-			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders,arn:aws:s3:::other",
-			"not_resources": "",
-		},
-	}
+	matchingPlan := BackupPlanRow(t, "weekly-backup-plan", backuptypes.BackupSelection{
+		Resources: []string{"arn:aws:dynamodb:us-east-1:123:table/orders", "arn:aws:s3:::other"},
+	})
 
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
@@ -863,14 +840,9 @@ func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testin
 		},
 	}
 
-	nonMatchingPlan := resource.Resource{
-		ID:   "s3-only-plan",
-		Name: "s3-only-plan",
-		Fields: map[string]string{
-			"resources":     "arn:aws:s3:::completely-different",
-			"not_resources": "",
-		},
-	}
+	nonMatchingPlan := BackupPlanRow(t, "s3-only-plan", backuptypes.BackupSelection{
+		Resources: []string{"arn:aws:s3:::completely-different"},
+	})
 
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{

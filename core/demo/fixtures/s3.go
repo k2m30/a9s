@@ -18,6 +18,12 @@ const (
 	HealthyBucketName = "a9s-demo-healthy"
 	// HealthyBucketARN is the ARN for the healthy bucket.
 	HealthyBucketARN = "arn:aws:s3:::a9s-demo-healthy"
+
+	// S3OtherRegionBucketName lives in eu-west-1. acme-dev-sporadic names it,
+	// but a backup plan backs up only buckets in its own Region.
+	S3OtherRegionBucketName = "acme-disaster-recovery"
+	S3OtherRegionBucketARN  = "arn:aws:s3:::" + S3OtherRegionBucketName
+
 	// PartnerSharedBucketName is a bucket in ANOTHER account. It is
 	// deliberately absent from Buckets — ListBuckets returns only this
 	// account's — and present in CrossAccountBuckets, so HeadBucket confirms
@@ -262,10 +268,14 @@ func buildS3Buckets() []s3types.Bucket {
 	// Generated buckets to reach 22+ total.
 	for i, name := range s3NamePool {
 		createDate := time.Date(2025, time.Month(1+(i%12)), 1+i, 8+(i%12), (i*7)%60, 0, 0, time.UTC)
+		region := "us-east-1"
+		if name == S3OtherRegionBucketName {
+			region = "eu-west-1"
+		}
 		buckets = append(buckets, s3types.Bucket{
 			Name:         aws.String(name),
 			BucketArn:    aws.String("arn:aws:s3:::" + name),
-			BucketRegion: aws.String("us-east-1"),
+			BucketRegion: aws.String(region),
 			CreationDate: aws.Time(createDate),
 		})
 	}

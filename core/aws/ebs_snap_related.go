@@ -77,10 +77,8 @@ func checkEBSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 // auto-tag "aws:backup:source-resource", whose value is the source
 // resource's ARN) per docs/resources/ebs-snap.md — no direct field on
 // Snapshot points at a Backup plan. Once the signature is found, the source
-// ARN is cross-referenced against the already-loaded backup cache's
-// Fields["resources"] (the ARN list every plan's selections cover — already
-// joined by the backup fetcher for sibling pivots) to resolve the owning
-// plan(s). Zero extra calls.
+// ARN is evaluated against the already-loaded backup cache through
+// BackupPlanCovers to resolve the owning plan(s). Zero extra calls.
 func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	description := ""
 	sourceARN := ""
@@ -116,14 +114,5 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("backup")
 	}
 
-	var ids []string
-	for _, planRes := range backupList {
-		for arn := range strings.SplitSeq(planRes.Fields["resources"], ",") {
-			if arn != "" && arn == sourceARN {
-				ids = append(ids, planRes.ID)
-				break
-			}
-		}
-	}
-	return unreadZeroScanned(res, len(backupList), relatedResultTrunc("backup", ids, truncated))
+	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, backupTarget{arn: sourceARN, unread: "DescribeVolumes"}))
 }

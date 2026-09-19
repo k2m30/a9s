@@ -8,15 +8,18 @@ package unit_test
 //   - role: role ARNs come from Statement[].Principal.AWS of
 //     s3:GetBucketPolicy; a role's own policies that mention the bucket do not
 //     relate it.
-//   - backup: Fields["resources"] is a comma-joined ARN list, matched on token
-//     boundaries so "prod" does not match "prod-logs".
+//   - backup: a plan's selection lists whole ARNs, so "prod" does not match
+//     "prod-logs".
 
 import (
 	"context"
 	"testing"
 
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // TestS3_Related_R53_RealisticAliasResolves: a hosted zone with a record whose
@@ -148,13 +151,9 @@ func TestS3_Related_Backup_PrefixCollisionDoesNotOvermatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "plan-prod-logs-only",
-					Name: "plan-prod-logs-only",
-					Fields: map[string]string{
-						"resources": "arn:aws:s3:::prod-logs,arn:aws:efs:us-east-1:123:file-system/fs-other",
-					},
-				},
+				unit.BackupPlanRow(t, "plan-prod-logs-only", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:s3:::prod-logs", "arn:aws:efs:us-east-1:123:file-system/fs-other"},
+				}),
 			},
 		},
 	}
@@ -174,13 +173,9 @@ func TestS3_Related_Backup_ExactMatchStillResolves(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "plan-prod-exact",
-					Name: "plan-prod-exact",
-					Fields: map[string]string{
-						"resources": "arn:aws:s3:::prod,arn:aws:efs:us-east-1:123:file-system/fs-other",
-					},
-				},
+				unit.BackupPlanRow(t, "plan-prod-exact", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:s3:::prod", "arn:aws:efs:us-east-1:123:file-system/fs-other"},
+				}),
 			},
 		},
 	}

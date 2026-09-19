@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -17,6 +18,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/resource"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // checkECSSvcELB resolves Service.LoadBalancers[].TargetGroupArn → the tg
@@ -456,9 +458,8 @@ func TestECSTask_Related_SG_ViaTaskENISecurityGroupCrossRef(t *testing.T) {
 	}
 }
 
-// checkEC2Backup matches the loaded backup plans' Fields["resources"] and
-// ["not_resources"] ARN patterns against the instance ARN, with
-// BackupPlanCoversARN semantics.
+// checkEC2Backup matches the loaded backup plans' selections against the
+// instance ARN and tags through BackupPlanCovers.
 
 func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
 	instanceARN := "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"
@@ -471,14 +472,9 @@ func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "plan-prod-ec2",
-					Name: "plan-prod-ec2",
-					Fields: map[string]string{
-						"resources":     "arn:aws:ec2:us-east-1:123456789012:instance/*",
-						"not_resources": "",
-					},
-				},
+				unit.BackupPlanRow(t, "plan-prod-ec2", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:ec2:us-east-1:123456789012:instance/*"},
+				}),
 			},
 		},
 	}
