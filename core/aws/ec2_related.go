@@ -329,17 +329,6 @@ func ec2Tags(res resource.Resource) map[string]string {
 	return tags
 }
 
-// checkEC2SSM has no count to give. The pivot the contract names is the
-// instance's SSM managed-instance registration (docs/resources/ec2.md § ssm),
-// and the ssm list holds Parameter Store parameters: no parameter row stands
-// for an instance, so any ID this returned would drill into nothing.
-func checkEC2SSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if instanceID, _, _ := ec2Identity(res); instanceID == "" {
-		return resource.KnownRelated("ssm", nil, false)
-	}
-	return resource.UnknownRelated("ssm")
-}
-
 func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID string) bool {
 	for _, rr := range event.Resources {
 		if rr.ResourceName != nil && *rr.ResourceName == instanceID {

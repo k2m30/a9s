@@ -25,7 +25,7 @@ import (
 // keeps this checker simple AND lets AWS-managed keys (aws/elasticfilesystem,
 // etc.) drill into a real entry — both the count and the drill land on the
 // same resource.
-func checkEFSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEFSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -33,7 +33,7 @@ func checkEFSKMS(_ context.Context, clients any, res resource.Resource, cache re
 	if fs.KmsKeyId == nil || *fs.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*fs.KmsKeyId}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*fs.KmsKeyId})
 }
 
 // checkEFSCFN checks EFS file system tags for aws:cloudformation:stack-name

@@ -18,15 +18,9 @@ type SSMGetParameterAPI interface {
 	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 }
 
-// SSMDescribeInstanceInformationAPI defines the interface for the SSM DescribeInstanceInformation operation.
-type SSMDescribeInstanceInformationAPI interface {
-	DescribeInstanceInformation(ctx context.Context, params *ssm.DescribeInstanceInformationInput, optFns ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error)
-}
-
 // SSMAPI is the aggregate interface covering all SSM operations used by a9s fetchers.
 // *ssm.Client structurally satisfies this interface.
 type SSMAPI interface {
 	SSMDescribeParametersAPI
 	SSMGetParameterAPI
-	SSMDescribeInstanceInformationAPI
 }

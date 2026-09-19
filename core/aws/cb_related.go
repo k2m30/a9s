@@ -101,7 +101,7 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 // checkCbKMS extracts the KMS key from the CodeBuild Project's EncryptionKey field.
 // EncryptionKey is a KMS key ARN or alias ARN. Returns the key ID (last segment after "/").
 // Pattern F — no cache needed.
-func checkCbKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkCbKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
 		if res.RawStruct == nil {
@@ -110,7 +110,7 @@ func checkCbKMS(_ context.Context, clients any, res resource.Resource, cache res
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*project.EncryptionKey, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkCbSubnet extracts subnet IDs from cbtypes.Project.VpcConfig.Subnets.

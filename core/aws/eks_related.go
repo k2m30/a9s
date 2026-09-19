@@ -149,7 +149,7 @@ func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // checkEKSKMS extracts the KMS key ID from the EKS Cluster's EncryptionConfig.
 // The KeyArn has the form arn:aws:kms::ACCOUNT:key/KEY-ID; the key ID is the
 // last segment after "/". Pattern F — no cache needed.
-func checkEKSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEKSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || len(raw.EncryptionConfig) == 0 ||
 		raw.EncryptionConfig[0].Provider == nil ||
@@ -161,7 +161,7 @@ func checkEKSKMS(_ context.Context, clients any, res resource.Resource, cache re
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkEKSRole returns the IAM role in the EKS Cluster's RoleArn field.

@@ -145,16 +145,9 @@ const (
 	HealthyTGWID = "tgw-0healthy11111111h"
 )
 
-// AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot.
-// checkAMIKMS (core/aws/ami_related_extra.go) passes the raw
-// BlockDeviceMappings[].Ebs.KmsKeyId ARN through as the navigation ID
-// unmodified (unlike checkS3KMS/checkDdbKMS, which strip the ARN to a bare
-// key ID first). Real DescribeKey-by-ARN always reports the true bare KeyId
-// in its response, never the ARN that was searched by — so this AMI cannot
-// share the widely-reused "primary" KMS key (referenced by bare ID from many
-// sibling fixtures); it needs its own key whose KeyId is the ARN string
-// itself, keeping the fake's DescribeKey response self-consistent with what
-// checkAMIKMS looked up. See kms.go for the corresponding fixture entry.
+// AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot: the
+// AMI's BlockDeviceMappings[].Ebs.KmsKeyId is the ARN, and the kms row is
+// keyed by the ID. See kms.go for the corresponding fixture entry.
 const (
 	AMIEBSKmsKeyID  = "ami-ebs-boot-volume-key"
 	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID

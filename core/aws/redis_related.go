@@ -218,7 +218,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 
 // checkRedisKMS reads KmsKeyId directly from the ReplicationGroup RawStruct.
 // No extra API call required — KmsKeyId is on the list-response struct.
-func checkRedisKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
 		// Without RawStruct we cannot read KmsKeyId — report 0 (no known key).
@@ -231,7 +231,7 @@ func checkRedisKMS(_ context.Context, clients any, res resource.Resource, cache 
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*rg.KmsKeyId, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkRedisLogs reads LogDeliveryConfigurations directly from the ReplicationGroup

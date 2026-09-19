@@ -45,26 +45,18 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkAMIKMS extracts KMS key IDs from the AMI's block device mappings
 // (where EBS.KmsKeyId is set).
-func checkAMIKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkAMIKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
 	}
-	seen := make(map[string]struct{})
+	var refs []string
 	for _, bdm := range img.BlockDeviceMappings {
-		if bdm.Ebs == nil || bdm.Ebs.KmsKeyId == nil || *bdm.Ebs.KmsKeyId == "" {
-			continue
+		if bdm.Ebs != nil && bdm.Ebs.KmsKeyId != nil {
+			refs = append(refs, *bdm.Ebs.KmsKeyId)
 		}
-		seen[*bdm.Ebs.KmsKeyId] = struct{}{}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("kms", nil, false)
-	}
-	return relatedResult("kms", ids)
+	return kmsRelated(ctx, clients, cache, refs)
 }
 
 // checkAMING scans EKS node-group cache for node groups using this AMI.

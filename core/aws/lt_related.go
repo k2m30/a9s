@@ -49,7 +49,7 @@ func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 // directly (Pattern F); key-id/ARN forms only — alias forms are detail-only
 // (docs/resources/lt.md §2 kms bullet), so an "alias/..." or ":alias/..."
 // reference is skipped rather than extracted.
-func checkLTKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkLTKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
 		return resource.UnknownRelated("kms")
@@ -65,7 +65,7 @@ func checkLTKMS(_ context.Context, clients any, res resource.Resource, cache res
 		}
 		ids = append(ids, kmsRefFromField(keyRef, "lt"))
 	}
-	return relatedRefs("kms", ids, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, ids)
 }
 
 // checkLTSG unions SecurityGroupIds and NetworkInterfaces[].Groups (Pattern

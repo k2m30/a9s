@@ -76,7 +76,7 @@
 | `athena` | [API_WorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html) | `ct-events`, `kms`, `logs`, `role`, `s3` |
 | `backup` | [API_BackupPlan](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html) | `ct-events`, `kms`, `role`, `sns` |
 | `cb` | [API_Project](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html) | `alarm`, `ct-events`, `ecr`, `kms`, `logs`, `pipeline`, `role`, `s3`, `secrets`, `sg`, `ssm`, `subnet`, `vpc` |
-| `cf` | [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) | `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf` |
+| `cf` | [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) | `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `r53`, `s3`, `waf` |
 | `cfn` | [API_Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html) | `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns` |
 | `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `ct-events`, `kms` |
 | `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
@@ -88,7 +88,7 @@
 | `eb-rule` | [API_Rule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html) | `ct-events`, `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs` |
 | `ebs` | [API_Volume](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms` |
 | `ebs-snap` | [API_Snapshot](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html) | `ami`, `backup`, `ct-events`, `ebs`, `ec2`, `kms` |
-| `ec2` | [API_Instance](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html) | `alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc` |
+| `ec2` | [API_Instance](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html) | `alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `tg`, `vpc` |
 | `ecr` | [API_Repository](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html) | `cb`, `cfn`, `ct-events`, `eb-rule`, `ecs-task`, `kms`, `lambda`, `pipeline`, `role` |
 | `ecs` | [API_Cluster](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `ecs-task`, `kms`, `logs` |
 | `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
@@ -263,9 +263,8 @@ AWS API: <https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distrib
 - **`ct-events`** — Audit trail for distribution changes.
 - **`elb`** — ALB origins.
 - **`lambda`** — Lambda@Edge associations.
-- **`logs`** — Realtime / access logs.
 - **`r53`** — Route 53 alias records pointing here.
-- **`s3`** — S3 origins.
+- **`s3`** — S3 origins and the standard-logging bucket (`DistributionConfig.Logging.Bucket`).
 - **`waf`** — Distribution.WebACLId.
 
 ### `cfn`
@@ -434,7 +433,6 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.ht
 - **`ng`** — Nodegroup owning this instance.
 - **`role`** — IamInstanceProfile → role — permissions the instance operates with.
 - **`sg`** — Instance.SecurityGroups[] — ingress/egress rules; first stop for connectivity issues.
-- **`ssm`** — SSM Managed Instances / Session Manager.
 - **`subnet`** — Instance.SubnetId — primary ENI's subnet; used when diagnosing placement/routing.
 - **`tg`** — Target groups this instance is registered with — traffic routing.
 - **`vpc`** — Instance.VpcId — network parent; pivoted to for VPC-wide troubleshooting.
@@ -1159,7 +1157,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 > for the evidence trail. Re-adding any of these pairs requires new AWS API
 > evidence cited per the Policy section at the top of this file.
 
-### Budget-excluded — structurally uncomputable on any cache state (21)
+### Budget-excluded — structurally uncomputable on any cache state (23)
 
 > These pivots were REMOVED from the registry (not merely marked
 > `budget-excluded` in a per-type row) because their checkers were
@@ -1176,6 +1174,8 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 - `apigw` → `sfn` — Step Functions integration target: the integration URI only reveals the `:states:action/` service slug — the target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri; identifying the state machine requires per-route request-template parsing — checker returns Count -1.
 - `apigw` → `sns` — APIGW -> SNS via integration: the integration URI only reveals `:sns:action/Publish` — the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri; identifying the topic requires per-route request-template parsing — checker returns Count -1.
 - `athena` → `glue` — every Athena workgroup queries the account's default Glue Data Catalog implicitly; no structured "glue job/catalog" field exists on the WorkGroupConfiguration to name a specific Glue resource, so the checker can only ever return Count 0 or Count -1 — never a real count.
+- `cf` → `logs` — [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) has no log-group field: standard logging names an S3 bucket (`DistributionConfig.Logging.Bucket`, counted under `s3`), and real-time logs go to Kinesis Data Streams — no row of the `logs` type is named.
+- `ec2` → `ssm` — the `ssm` type lists Parameter Store parameters ([API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html)); the SSM managed-instance registration of an instance (`DescribeInstanceInformation`) has no a9s type, and no parameter row stands for an instance.
 - `eip` → `logs` — EIPs emit no logs; flow logs on the associated ENI/subnet/VPC are not identifiable from the EIP without per-ENI `DescribeFlowLogs` — checker returns Count -1.
 - `elb` → `r53` — record sets live on per-zone `ListResourceRecordSets` and are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); identifying the aliasing records requires O(N) per-zone record-set queries — checker returns Count -1.
 - `kms` → `s3` — S3 bucket resources assembled by `FetchS3BucketsPage` do not store KMS key info in Fields or RawStruct, so the relationship cannot be determined from cache alone — checker returns Count -1.
@@ -1279,7 +1279,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ec2 | subnet | Subnet | no |
 | ec2 | kms | KMS Keys | yes |
 | ec2 | logs | Log Groups | yes |
-| ec2 | ssm | SSM Parameters | no |
 | ec2 | backup | Backup Plans | yes |
 | ecs-svc | ecs | ECS Clusters | no |
 | ecs-svc | tg | Target Groups | no |
@@ -1765,7 +1764,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | cf | r53 | Route 53 Zones | no |
 | cf | alarm | CloudWatch Alarms | yes |
 | cf | lambda | Lambda@Edge | no |
-| cf | logs | Log Groups | no |
 | cf | ct-events | CloudTrail Events | no |
 | acm | cf | CloudFront Distros | yes |
 | acm | elb | Load Balancers | no |

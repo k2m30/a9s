@@ -217,8 +217,7 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's
 // Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId field.
-// Pattern F — no cache needed.
-func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkMSKKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.Provisioned == nil ||
 		cluster.Provisioned.EncryptionInfo == nil ||
@@ -230,5 +229,5 @@ func checkMSKKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
+	return kmsRelated(ctx, clients, cache, []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }

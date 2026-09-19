@@ -115,7 +115,7 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 // checkLambdaKMS extracts the KMS key ARN from the Lambda FunctionConfiguration
 // KMSKeyArn field (used for environment variable encryption). Pattern F — no
 // cache needed. The ARN last segment after "/" is used as the key ID.
-func checkLambdaKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
 		if res.RawStruct == nil {
@@ -124,7 +124,7 @@ func checkLambdaKMS(_ context.Context, clients any, res resource.Resource, cache
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*fn.KMSKeyArn, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkLambdaSQS finds SQS queues wired to this Lambda as event sources

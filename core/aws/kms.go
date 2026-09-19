@@ -5,6 +5,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -89,7 +91,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		}
 
 		status := string(meta.KeyState)
-		alias := aliasMap[keyID]
+		alias, aliases := kmsAliasFields(aliasMap[keyID])
 
 		resources = append(resources, resource.Resource{
 			ID:       keyID,
@@ -98,6 +100,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"alias":       alias,
+				"aliases":     aliases,
 				"status":      status,
 				"description": description,
 			},
@@ -123,14 +126,15 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 }
 
 // buildKMSAliasMap fully paginates ListAliases and returns the KeyId→
-// AliasName map plus any failures encountered (a ListAliases error, or
+// AliasNames map (a key may carry several aliases, in ListAliases order)
+// plus any failures encountered (a ListAliases error, or
 // a Truncated=true response with no NextMarker — which would otherwise
 // restart the page-1 fetch forever). Shared by FetchKMSKeysPage and
 // FetchKMSKeysByIDs so a future contract tweak (retry policy, the
 // no-marker guard) is applied to both callers, not just one.
-func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string]string, []Failure) {
+func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string][]string, []Failure) {
 	var failures []Failure
-	aliasMap := make(map[string]string)
+	aliasMap := make(map[string][]string)
 	var aliasMarker *string
 	for {
 		aliasOutput, aliasErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
@@ -147,7 +151,7 @@ func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string]string
 		}
 		for _, alias := range aliasOutput.Aliases {
 			if alias.TargetKeyId != nil && alias.AliasName != nil {
-				aliasMap[*alias.TargetKeyId] = *alias.AliasName
+				aliasMap[*alias.TargetKeyId] = append(aliasMap[*alias.TargetKeyId], *alias.AliasName)
 			}
 		}
 		if !aliasOutput.Truncated {
@@ -215,7 +219,13 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			description = *meta.Description
 		}
 		status := string(meta.KeyState)
-		alias := aliasMap[keyID]
+		known := aliasMap[keyID]
+		if requested, isAlias := kmsAliasName(id); isAlias && !slices.Contains(known, requested) {
+			// DescribeKey answered for this alias, so it is one of the key's,
+			// even when ListAliases does not report it yet.
+			known = append(slices.Clone(known), requested)
+		}
+		alias, aliases := kmsAliasFields(known)
 		resources = append(resources, resource.Resource{
 			ID:       keyID,
 			Name:     alias,
@@ -223,6 +233,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"alias":       alias,
+				"aliases":     aliases,
 				"status":      status,
 				"description": description,
 			},
@@ -231,6 +242,22 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 	}
 
 	return resources, AggregateFailures("kms FetchByIDs", failures, len(ids))
+}
+
+// kmsAliasFields returns the alias a row displays, the last one ListAliases
+// reported, and every alias of the key, comma-joined for kmsRefToID.
+func kmsAliasFields(aliases []string) (display, all string) {
+	if len(aliases) > 0 {
+		display = aliases[len(aliases)-1]
+	}
+	return display, strings.Join(aliases, ",")
+}
+
+// kmsAliasName returns the alias name a DescribeKey KeyId names, bare or as
+// an alias ARN.
+func kmsAliasName(keyID string) (string, bool) {
+	res, _, ok := localARN(keyID, domain.RefContext{}, "kms")
+	return res, ok && strings.HasPrefix(res, "alias/")
 }
 
 // kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call

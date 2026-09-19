@@ -37,20 +37,12 @@ const (
 	// S3CFNStackName is the CloudFormation stack that owns the healthy bucket.
 	S3CFNStackName = "a9s-demo-stack"
 	// ManagedKeyBucketName is encrypted with the AWS-managed `aws/s3` default
-	// key, reported by GetBucketEncryption as the full alias ARN
-	// "arn:aws:kms:...:alias/aws/s3" — the shape a naive last-"/" split
-	// would reduce to "s3", the resource's own type name. kmsKeyIDFromField
-	// strips only the region/account ARN prefix up to ":alias/" itself
-	// (keeping the literal ":" separator), so checkS3KMS returns the alias
-	// name whole — AWSManagedS3KeyID below, "alias/aws/s3" — matching real
-	// AWS DescribeKey semantics where an alias-style KeyId is always
-	// prefixed with "alias/".
+	// key, reported by GetBucketEncryption as the alias ARN
+	// "arn:aws:kms:...:alias/aws/s3". Its KMS row counts the key the alias
+	// names (AWSManagedS3KeyID in kms.go), which is not a kms list row.
 	ManagedKeyBucketName = "a9s-demo-managed-kms"
-	// AWSManagedS3KeyID is the alias-style KeyId checkS3KMS returns for the
-	// account's default S3-managed key ("alias/aws/s3"). DescribeKey accepts
-	// this value directly as a KeyId, so the fake's Keys map is indexed by
-	// it verbatim to mirror that AWS behavior.
-	AWSManagedS3KeyID = "alias/aws/s3"
+	// AWSManagedS3KeyAlias is the account's default S3-managed key alias.
+	AWSManagedS3KeyAlias = "alias/aws/s3"
 
 	// One witness bucket per EnrichS3Posture condition. Every other bucket in
 	// the fixture set is healthy for all six, so the demo bench shows exactly
@@ -356,7 +348,7 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 	// the shape a naive last-"/" split in checkS3KMS / kmsKeyIDFromField
 	// would reduce to "s3", the resource's own type name, instead of the
 	// alias-style key ID "alias/aws/s3".
-	managedKeyARN := "arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID
+	managedKeyARN := "arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyAlias
 	managedKeyRule := s3types.ServerSideEncryptionRule{
 		ApplyServerSideEncryptionByDefault: &s3types.ServerSideEncryptionByDefault{
 			SSEAlgorithm:   s3types.ServerSideEncryptionAwsKms,

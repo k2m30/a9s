@@ -119,7 +119,6 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCfR53, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCfAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCfLogs},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cf")},
 		},
 		// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname

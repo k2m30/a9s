@@ -69,7 +69,7 @@ func checkRedshiftRole(_ context.Context, clients any, res resource.Resource, ca
 
 // checkRedshiftKMS extracts the KMS key ID from the Redshift Cluster's KmsKeyId
 // field. Pattern F — no cache needed.
-func checkRedshiftKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRedshiftKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
 		if res.RawStruct == nil {
@@ -78,7 +78,7 @@ func checkRedshiftKMS(_ context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*cluster.KmsKeyId, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkRedshiftCFN checks the Cluster's Tags for aws:cloudformation:stack-name

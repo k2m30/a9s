@@ -67,7 +67,7 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkAthenaLogs calls athena:GetWorkGroup and extracts the CloudWatch log

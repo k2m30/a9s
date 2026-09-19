@@ -229,16 +229,14 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
 }
 
-// checkSQSKMS is a stub. The SQS RawStruct is a flat Fields map (QueueUrl +
-// Attributes string values) — KmsMasterKeyId is embedded in the Attributes
-// string map rather than a typed struct field, so it cannot be extracted via
-// assertStruct. Use res.Fields["kms_key_id"] or KmsMasterKeyId attribute directly.
-func checkSQSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkSQSKMS returns the key in the queue's KmsMasterKeyId attribute
+// (Fields["kms_key_id"]), a key ID or an alias such as alias/aws/sqs.
+func checkSQSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := res.Fields["kms_key_id"]
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{keyID})
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkSQSEbRule resolves EventBridge rules that target this SQS queue.

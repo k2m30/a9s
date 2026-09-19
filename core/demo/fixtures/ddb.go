@@ -72,8 +72,8 @@ const (
 	OrdersProdStreamARN = "arn:aws:dynamodb:us-east-1:123456789012:table/orders-prod/stream/2026-01-01T00:00:00.000"
 
 	// orders-prod KMS key — referenced by kms.go fixture.
-	OrdersProdKMSKeyID  = "orders-prod-cmk-0001"
-	OrdersProdKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/orders-prod-cmk-0001"
+	OrdersProdKMSKeyID  = "7a1c2e3f-4b5d-4e6f-8a9b-0c1d2e3f4a50"
+	OrdersProdKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + OrdersProdKMSKeyID
 
 	// orders-prod Kinesis CDC stream — referenced by kinesis.go fixture.
 	OrdersProdKinesisStream    = "orders-prod-cdc"

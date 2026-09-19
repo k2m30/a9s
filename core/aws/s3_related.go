@@ -198,7 +198,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 		// AWS-managed aliases like "alias/aws/s3"), or a bare ID/alias.
 		ids = append(ids, kmsRefFromField(keyID, res.Type))
 	}
-	return relatedRefs("kms", ids, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, ids)
 }
 
 // checkS3Logs calls s3:GetBucketLogging and returns the destination S3 bucket

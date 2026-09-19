@@ -132,7 +132,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		*out.EncryptionConfiguration.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*out.EncryptionConfiguration.KmsKeyId}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*out.EncryptionConfiguration.KmsKeyId})
 }
 
 // checkSFNLambda parses the state machine's ASL definition JSON (returned by

@@ -26,7 +26,7 @@ func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkMWAAKMS reads Environment.KmsKey directly (Pattern F).
-func checkMWAAKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -34,7 +34,7 @@ func checkMWAAKMS(_ context.Context, clients any, res resource.Resource, cache r
 	if env.KmsKey == nil || *env.KmsKey == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{kmsRefFromField(*env.KmsKey, res.Type)}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{kmsRefFromField(*env.KmsKey, res.Type)})
 }
 
 // checkMWAALogs reads the five LoggingConfiguration CloudWatchLogGroupArn

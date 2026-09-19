@@ -36,7 +36,7 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // checkDbiKMS reads the KmsKeyId ARN from the DBInstance RawStruct and extracts the UUID suffix.
 // Pattern F — no cache needed.
-func checkDbiKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -48,7 +48,7 @@ func checkDbiKMS(_ context.Context, clients any, res resource.Resource, cache re
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkDbiSubnets reads DBSubnetGroup.Subnets from the DBInstance RawStruct and returns their IDs.

@@ -59,7 +59,7 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 // checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId
 // field. The value may be a full ARN (arn:aws:kms:…/key-id) or a plain key ID.
 // Pattern F — no cache needed.
-func checkLogsKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
 	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
 		if res.RawStruct == nil {
@@ -68,7 +68,7 @@ func checkLogsKMS(_ context.Context, clients any, res resource.Resource, cache r
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*lg.KmsKeyId, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkLogsAPIGW matches log groups whose name indicates API Gateway execution

@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
@@ -104,8 +103,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("sns", ids, truncated)
 }
 
-// checkTrailKMS searches the kms cache for the key used by this trail.
-// Pattern C — match KmsKeyId (ARN or alias) against kms cache IDs and key_id field.
+// checkTrailKMS returns the key in the trail's KmsKeyId (a key ARN or alias).
 func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.KmsKeyId == nil || *trail.KmsKeyId == "" {
@@ -114,27 +112,7 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	kmsRef := *trail.KmsKeyId
-
-	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	if kmsList == nil {
-		return resource.UnknownRelated("kms")
-	}
-
-	var ids []string
-	for _, kmsRes := range kmsList {
-		// Match by ID (key UUID), by Fields["key_id"], or by ARN suffix containing the key ID.
-		if kmsRes.ID == kmsRef ||
-			kmsRes.Fields["key_id"] == kmsRef ||
-			strings.Contains(kmsRef, kmsRes.ID) ||
-			strings.Contains(kmsRef, kmsRes.Fields["key_id"]) {
-			ids = append(ids, kmsRes.ID)
-		}
-	}
-	return relatedResultTrunc("kms", ids, truncated)
+	return kmsRelated(ctx, clients, cache, []string{*trail.KmsKeyId})
 }
 
 // checkTrailRole returns the IAM role in the trail's CloudWatchLogsRoleArn.

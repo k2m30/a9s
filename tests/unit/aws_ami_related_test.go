@@ -346,8 +346,10 @@ func TestRelated_AMI_KMS_MatchByARN(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != keyARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), keyARN)
+	// Inverted by #545 row 1: kms keys its rows on the key ID, not the ARN.
+	// Do not restore the ARN.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "mrk-abcd1234" {
+		t.Errorf("ResourceIDs = %v, want [mrk-abcd1234] from %s", result.ResourceIDs(), keyARN)
 	}
 }
 

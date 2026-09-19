@@ -16,7 +16,7 @@ import (
 )
 
 // checkSecretsKMS returns the KMS key used to encrypt this secret (Pattern F).
-// KmsKeyId is read through the kms resolver and matched against the kms cache.
+// KmsKeyId may be a key ID, key ARN or alias.
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
@@ -28,27 +28,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	if kmsList == nil {
-		return resource.UnknownRelated("kms")
-	}
-	rc := refContext(clients, cache, "kms")
-	rc.Targets = kmsList
-	keyID, local := resource.ResolveRef("kms", *secret.KmsKeyId, rc)
-	if !local {
-		return relatedResultTrunc("kms", nil, true)
-	}
-
-	var ids []string
-	for _, kmsRes := range kmsList {
-		if kmsRes.ID == keyID {
-			ids = append(ids, kmsRes.ID)
-		}
-	}
-	return relatedResultTrunc("kms", ids, truncated)
+	return kmsRelated(ctx, clients, cache, []string{*secret.KmsKeyId})
 }
 
 // checkSecretsLambda returns the Lambda rotation function associated with this

@@ -52,7 +52,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 // Extracts UUID after last '/' from the ARN.
 // Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
 // Pattern F — no cache needed.
-func checkDbcSnapKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcSnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var keyID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
@@ -71,7 +71,7 @@ func checkDbcSnapKMS(_ context.Context, clients any, res resource.Resource, cach
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkDbcSnapVPC reads VpcId from the DBClusterSnapshot RawStruct.

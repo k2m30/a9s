@@ -61,7 +61,7 @@ func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource
 }
 
 // checkEBSSnapKMS reads the KMS key from RawStruct.KmsKeyId (Pattern F).
-func checkEBSSnapKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSSnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -69,7 +69,7 @@ func checkEBSSnapKMS(_ context.Context, clients any, res resource.Resource, cach
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*snap.KmsKeyId}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*snap.KmsKeyId})
 }
 
 // checkEBSSnapBackup scans this snapshot's own Description and Tags for the

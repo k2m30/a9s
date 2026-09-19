@@ -5,26 +5,44 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkCfS3 searches the S3 cache for buckets whose names are referenced as
-// origins in this CloudFront distribution. S3 origin domain name formats:
-//   - {bucket}.s3.amazonaws.com
-//   - {bucket}.s3.{region}.amazonaws.com
-//   - {bucket}.s3-{region}.amazonaws.com
+// checkCfS3 reports the S3 buckets this distribution reads from and logs to:
+// the buckets its origins address, and its standard-logging bucket
+// (DistributionConfig.Logging.Bucket, one cloudfront:GetDistributionConfig
+// call). Both are bucket endpoint hosts, read by S3OriginBucket. A config
+// that could not be read leaves the count a lower bound.
 func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("s3")
 	}
-	if dist.Origins == nil {
-		return resource.KnownRelated("s3", nil, false)
+	var hosts []string
+	if dist.Origins != nil {
+		for _, origin := range dist.Origins.Items {
+			hosts = append(hosts, aws.ToString(origin.DomainName))
+		}
+	}
+	cfg, cfgErr := cfDistributionConfig(ctx, clients, res.ID)
+	if cfg != nil && cfg.Logging != nil && aws.ToBool(cfg.Logging.Enabled) {
+		hosts = append(hosts, aws.ToString(cfg.Logging.Bucket))
+	}
+	var buckets []string
+	for _, host := range hosts {
+		if bucket, ok := S3OriginBucket(host); ok {
+			buckets = append(buckets, bucket)
+		}
+	}
+	if len(buckets) == 0 {
+		return resource.KnownRelated("s3", nil, cfgErr != nil)
 	}
 
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
@@ -34,28 +52,24 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 	if s3List == nil {
 		return resource.UnknownRelated("s3")
 	}
+	ids, dropped := listedRefs("s3", buckets, refContext(clients, cache, "s3"), s3List)
+	return relatedResultTrunc("s3", ids, truncated || dropped || cfgErr != nil)
+}
 
-	// Collect bucket names from S3 origin domain names.
-	bucketNames := make(map[string]struct{})
-	for _, origin := range dist.Origins.Items {
-		if origin.DomainName == nil {
-			continue
-		}
-		if bucket, ok := S3OriginBucket(*origin.DomainName); ok {
-			bucketNames[bucket] = struct{}{}
-		}
+// cfDistributionConfig reads the distribution's full config, which the list
+// summary leaves out (Lambda@Edge associations, standard logging).
+func cfDistributionConfig(ctx context.Context, clients any, distID string) (*cftypes.DistributionConfig, error) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudFront == nil {
+		return nil, errClientMissing
 	}
-	if len(bucketNames) == 0 {
-		return resource.KnownRelated("s3", nil, false)
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
+		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	var ids []string
-	for _, s3Res := range s3List {
-		if _, found := bucketNames[s3Res.ID]; found {
-			ids = append(ids, s3Res.ID)
-		}
-	}
-	return relatedResultTrunc("s3", ids, truncated)
+	return out.DistributionConfig, nil
 }
 
 // checkCfELB searches the ELB cache for load balancers whose DNS name is
@@ -257,51 +271,27 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 // checkCfLambda reports Lambda@Edge associations on this distribution.
 // Pattern C: one cloudfront:GetDistributionConfig call; extract
 // LambdaFunctionAssociations across default + ordered cache behaviors.
-func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	distID := res.ID
-	if distID == "" {
+func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
 		return resource.KnownRelated("lambda", nil, false)
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.CloudFront == nil {
+	cfg, err := cfDistributionConfig(ctx, clients, res.ID)
+	if errors.Is(err, errClientMissing) {
 		return resource.UnknownRelated("lambda")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
-		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
-	})
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
-	if out.DistributionConfig == nil {
+	if cfg == nil {
 		return resource.KnownRelated("lambda", nil, false)
 	}
-	cfg := out.DistributionConfig
-
-	seen := make(map[string]bool)
-	var ids []string
+	var arns []string
 	collect := func(lfa *cftypes.LambdaFunctionAssociations) {
 		if lfa == nil {
 			return
 		}
 		for _, item := range lfa.Items {
-			if item.LambdaFunctionARN == nil || *item.LambdaFunctionARN == "" {
-				continue
-			}
-			arn := *item.LambdaFunctionARN
-			name := arn
-			if idx := strings.LastIndex(arn, ":function:"); idx >= 0 {
-				rest := arn[idx+len(":function:"):]
-				if before, _, ok := strings.Cut(rest, ":"); ok {
-					name = before
-				} else {
-					name = rest
-				}
-			}
-			if seen[name] {
-				return
-			}
-			seen[name] = true
-			ids = append(ids, name)
+			arns = append(arns, aws.ToString(item.LambdaFunctionARN))
 		}
 	}
 	if cfg.DefaultCacheBehavior != nil {
@@ -312,16 +302,5 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 			collect(cb.LambdaFunctionAssociations)
 		}
 	}
-	return relatedResult("lambda", ids)
-}
-
-// checkCfLogs has no count to give. A distribution's standard logging
-// config names an S3 bucket, never a log group, and finding the log groups a
-// distribution delivers to needs a per-configuration lookup outside the cf
-// budget (docs/resources/cf.md § logs).
-func checkCfLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	return resource.UnknownRelated("logs")
+	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
 }

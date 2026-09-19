@@ -77,7 +77,11 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 			refs = append(refs, *out.Configuration.KMSKeyArn)
 		}
 	}
-	ids, dropped := resolveRefs("kms", refs, refContext(clients, cache, "kms"))
+	rc, err := kmsRefContext(ctx, clients, cache, refs)
+	if err != nil {
+		return resource.ErrorRelated("kms", err)
+	}
+	ids, dropped := resolveRefs("kms", refs, rc)
 	if len(ids) == 0 {
 		// Nothing was confirmed: any failures are a plain fetch failure, not
 		// a truncation signal (there is no larger population left unseen).

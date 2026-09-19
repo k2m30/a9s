@@ -41,9 +41,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResultTrunc("dbi", ids, truncated)
 }
 
-// checkDBISnapKMS extracts KmsKeyId from the DBSnapshot RawStruct and matches
-// it against the kms cache.
-// Pattern C — needs target cache.
+// checkDBISnapKMS returns the key in the DBSnapshot's KmsKeyId.
 func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
@@ -52,27 +50,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	if kmsList == nil {
-		return resource.UnknownRelated("kms")
-	}
-	rc := refContext(clients, cache, "kms")
-	rc.Targets = kmsList
-	keyID, local := resource.ResolveRef("kms", *snap.KmsKeyId, rc)
-	if !local {
-		return relatedResultTrunc("kms", nil, true)
-	}
-
-	var ids []string
-	for _, kmsRes := range kmsList {
-		if kmsRes.ID == keyID {
-			ids = append(ids, kmsRes.ID)
-		}
-	}
-	return relatedResultTrunc("kms", ids, truncated)
+	return kmsRelated(ctx, clients, cache, []string{*snap.KmsKeyId})
 }
 
 // checkDBISnapBackup resolves AWS Backup PLANS that cover this RDS snapshot's

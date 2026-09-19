@@ -110,7 +110,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkKinesisDDB is a reverse-scan checker for the kinesis→ddb relationship.

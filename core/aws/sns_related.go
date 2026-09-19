@@ -118,7 +118,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkSNSRole extracts IAM role principals from the SNS topic's access policy

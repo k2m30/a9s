@@ -10,8 +10,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkSSMKMS checks the KMS cache for the key used to encrypt this SecureString parameter.
-// Pattern C: extracts KeyId from RawStruct, then scans the kms cache for a match.
+// checkSSMKMS returns the key that encrypts this SecureString parameter, from
+// its KeyId (a key ID or an alias).
 func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	param, ok := assertStruct[ssmtypes.ParameterMetadata](res.RawStruct)
 	if !ok {
@@ -28,22 +28,5 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	if param.KeyId == nil || *param.KeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	if kmsList == nil {
-		return resource.UnknownRelated("kms")
-	}
-	rc := refContext(clients, cache, "kms")
-	rc.Targets = kmsList
-	keyID, local := resource.ResolveRef("kms", *param.KeyId, rc)
-
-	var ids []string
-	for _, kmsRes := range kmsList {
-		if local && kmsRes.ID == keyID {
-			ids = append(ids, kmsRes.ID)
-		}
-	}
-	return relatedResultTrunc("kms", ids, truncated || !local)
+	return kmsRelated(ctx, clients, cache, []string{*param.KeyId})
 }

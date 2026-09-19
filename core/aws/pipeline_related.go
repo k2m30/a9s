@@ -240,7 +240,7 @@ func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, c
 	for _, st := range p.ArtifactStores {
 		addKey(&st)
 	}
-	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, refs)
 }
 
 // checkPipelineLambda resolves Lambda functions invoked by Lambda deploy/invoke actions.

@@ -75,7 +75,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		refs = append(refs, *out.EncryptionKeyArn)
 	}
-	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, refs)
 }
 
 // checkBackupSNS resolves the SNS topic(s) configured for this plan's target

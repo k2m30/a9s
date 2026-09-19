@@ -27,9 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metric namespace, so an EKS alarm no longer shows up as an ECS cluster.
 - A WAF web ACL's Load Balancers row lists load balancers only, and its Log
   Groups row lists CloudWatch log groups only.
+- A KMS row counts the AWS-managed key behind an `alias/aws/...` alias (for
+  example the default SSM or S3 key), and a key named by any of its aliases,
+  not only the one the key list shows; Enter opens that key.
+- A CloudFront distribution's S3 Buckets row counts its standard-logging
+  bucket beside its origin buckets.
+
+### Removed
+
 - The Log Groups row of a CloudFront distribution and the SSM Parameters row
-  of an EC2 instance show that the count is not known instead of a bucket
-  name or the instance itself.
+  of an EC2 instance. A distribution names no log group (its access logs go
+  to S3, now counted under S3 Buckets), and no SSM parameter stands for an
+  instance; both rows showed a count that opened nothing.
 
 ## [3.57.2] - 2026-09-16
 

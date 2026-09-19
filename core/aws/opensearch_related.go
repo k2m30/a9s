@@ -96,7 +96,7 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 
 // checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
 // EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
-func checkOpenSearchKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkOpenSearchKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
 		// Structural assertion failure — RawStruct isn't a DomainStatus. This
@@ -112,7 +112,7 @@ func checkOpenSearchKMS(_ context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*domain.EncryptionAtRestOptions.KmsKeyId, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkOpenSearchCFN calls opensearch:ListTags(ARN=DomainStatus.ARN) and

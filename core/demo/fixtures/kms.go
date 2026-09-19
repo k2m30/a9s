@@ -13,12 +13,11 @@ import (
 // KMSFixtures holds typed fixture data for KMS.
 type KMSFixtures struct {
 	// KeyList is the account's keys in declaration order, one entry per key —
-	// what ListKeys returns. Keys is a lookup index that deliberately holds
-	// each key twice, so listing from it would emit every key twice and in
-	// map order.
+	// what ListKeys returns. Keys is a lookup index that holds each key
+	// under several names, so listing from it would repeat keys in map order.
 	KeyList []*kmstypes.KeyMetadata
-	// Keys maps both the bare key ID and the full key ARN to KeyMetadata
-	// (used by DescribeKey, which accepts either form).
+	// Keys maps the bare key ID, the key ARN, and each alias name and alias
+	// ARN to KeyMetadata (used by DescribeKey, which accepts any of them).
 	Keys map[string]*kmstypes.KeyMetadata
 	// Aliases is the full list of key aliases (returned by ListAliases).
 	Aliases []kmstypes.AliasListEntry
@@ -43,20 +42,24 @@ const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 // either has no policy fixture or names concrete principals.
 const KMSPublicPolicy = "c9d0e1f2-a3b4-6789-01cd-ffaabbccddee"
 
-// SSMDefaultKeyID is the key the alias "alias/aws/ssm" points at — the key SSM
-// encrypts a SecureString parameter with when none is named
-// (/acme/legacy/db/password in ssm.go). The alias makes the ssm KeyId field
-// and its KMS related row resolve to one key. It is listed as a customer key
-// with rotation on because the kms list shows customer-managed keys only.
+// SSMDefaultKeyID is the AWS-managed key the alias "alias/aws/ssm" points at —
+// the key SSM encrypts a SecureString parameter with when none is named
+// (/acme/legacy/db/password in ssm.go). Like every AWS-managed key it is not a
+// row of the kms list (customer keys only); the ssm KeyId field and its KMS
+// related row reach it through the kms by-ID lookup.
 const SSMDefaultKeyID = "e7f8a9b0-c1d2-4e3f-8a9b-0c1d2e3f4a5b"
+
+// AWSManagedS3KeyID is the AWS-managed key behind "alias/aws/s3"
+// (AWSManagedS3KeyAlias in s3.go), the default key of an SSE-KMS bucket that
+// names none.
+const AWSManagedS3KeyID = "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0"
 
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
-		// Rotation enabled (see RotationEnabled below) → with SSMDefaultKeyID,
-		// the only demo CMKs for which EnrichKMSRotation raises no
-		// kms.rotation-disabled finding, letting colorKMS fall through to its
-		// Enabled->Healthy branch.
+		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
+		// which EnrichKMSRotation raises no kms.rotation-disabled finding,
+		// letting colorKMS fall through to its Enabled->Healthy branch.
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -200,7 +203,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
-		// orders-prod-cmk-0001 — DDB→kms pivot: matched by checkDdbKMS stripping the ARN
+		// OrdersProdKMSKeyID — DDB→kms pivot: matched by checkDdbKMS stripping the ARN
 		// suffix from SSEDescription.KMSMasterKeyArn on the orders-prod table.
 		{
 			KeyId:                aws.String(OrdersProdKMSKeyID),
@@ -310,17 +313,9 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
 		// AWS-managed default S3 key (checkS3KMS pivot, ManagedKeyBucketName
-		// in s3.go). GetBucketEncryption reports the full alias ARN
-		// "arn:aws:kms:...:alias/aws/s3" — the shape a naive last-"/" split
-		// would chop down to "s3", the bucket's own resource type, instead of
-		// passing the alias through whole. checkS3KMS returns the alias-style ID
-		// "alias/aws/s3" (AWSManagedS3KeyID) as the navigation ID; real
-		// DescribeKey accepts that as KeyId directly and the KeyMetadata it
-		// returns always carries the true KeyId, so this fixture entry uses
-		// the alias string as its KeyId to keep the fake's DescribeKey
-		// response self-consistent with what was looked up (AWS-managed
-		// keys report a stable, well-known KeyId across all callers; there is
-		// no separate real UUID to reconcile with in this fixture set).
+		// in s3.go). GetBucketEncryption reports the alias ARN
+		// "arn:aws:kms:...:alias/aws/s3"; DescribeKey on that alias answers
+		// with this key.
 		{
 			KeyId:                aws.String(AWSManagedS3KeyID),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + AWSManagedS3KeyID),
@@ -335,13 +330,11 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
 		// AMI EBS boot-volume encryption key — required for ami→kms related-panel
-		// pivot. checkAMIKMS returns the AMI's BlockDeviceMappings[].Ebs.KmsKeyId
-		// verbatim (full ARN, not stripped to a bare ID), so this entry's KeyId
-		// is the ARN string itself (AMIEBSKmsKeyARN in ec2.go) rather than a bare
-		// UUID — see the AMIEBSKmsKeyID doc comment in ec2.go for why this key
-		// cannot share the widely-reused "primary" KMS key.
+		// pivot (the AMI's BlockDeviceMappings[].Ebs.KmsKeyId is its ARN). See
+		// the AMIEBSKmsKeyID doc comment in ec2.go for why this key cannot
+		// share the widely-reused "primary" KMS key.
 		{
-			KeyId:                aws.String(AMIEBSKmsKeyARN),
+			KeyId:                aws.String(AMIEBSKmsKeyID),
 			Arn:                  aws.String(AMIEBSKmsKeyARN),
 			Description:          aws.String("Boot volume encryption key for acme-app-server AMI"),
 			KeyState:             kmstypes.KeyStateEnabled,
@@ -358,7 +351,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + SSMDefaultKeyID),
 			Description:          aws.String("Default key that protects my SSM parameters when no other key is defined"),
 			KeyState:             kmstypes.KeyStateEnabled,
-			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyManager:           kmstypes.KeyManagerTypeAws,
 			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
 			CreationDate:         aws.Time(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			Enabled:              true,
@@ -400,8 +393,8 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		},
 	}
 
-	// Indexed by both bare KeyId and full key ARN, mirroring real DescribeKey,
-	// which accepts either form (plus alias name/ARN, added below) as KeyId.
+	// Indexed by bare KeyId and full key ARN, and below by alias name and alias
+	// ARN, mirroring real DescribeKey, which accepts any of them as KeyId.
 	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata)*2)
 	for _, k := range keyMetadata {
 		keys[*k.KeyId] = k
@@ -470,8 +463,8 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		},
 		// AWS-managed default S3 key alias (ManagedKeyBucketName in s3.go).
 		{
-			AliasName:   aws.String(AWSManagedS3KeyID),
-			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID),
+			AliasName:   aws.String(AWSManagedS3KeyAlias),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyAlias),
 			TargetKeyId: aws.String(AWSManagedS3KeyID),
 		},
 		// Redis prod KMS key alias.
@@ -525,8 +518,12 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		{
 			AliasName:   aws.String("alias/acme-ami-ebs-boot-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-ami-ebs-boot-key"),
-			TargetKeyId: aws.String(AMIEBSKmsKeyARN),
+			TargetKeyId: aws.String(AMIEBSKmsKeyID),
 		},
+	}
+	for _, a := range aliases {
+		keys[*a.AliasName] = keys[*a.TargetKeyId]
+		keys[*a.AliasArn] = keys[*a.TargetKeyId]
 	}
 
 	// KeyPolicies — required for the kms:role related-panel pivot
@@ -538,12 +535,10 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		KMSPublicPolicy:                        `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
 	}
 
-	// RotationEnabled — the primary production key and the SSM default key
-	// have rotation on; every other key defaults to false via the map zero
-	// value.
+	// RotationEnabled — the primary production key has rotation on; every
+	// other key defaults to false via the map zero value.
 	rotationEnabled := map[string]bool{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": true,
-		SSMDefaultKeyID:                        true,
 	}
 
 	return &KMSFixtures{KeyList: keyMetadata, Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}

@@ -45,7 +45,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkEBSKMS returns the KMS key used to encrypt this volume (Pattern F).
-func checkEBSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -53,7 +53,7 @@ func checkEBSKMS(_ context.Context, clients any, res resource.Resource, cache re
 	if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*vol.KmsKeyId}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*vol.KmsKeyId})
 }
 
 // checkEBSAlarm searches the alarm cache for alarms with a VolumeId dimension

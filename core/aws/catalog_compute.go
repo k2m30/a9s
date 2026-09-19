@@ -320,7 +320,6 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "subnet", DisplayName: "Subnet", Checker: checkEC2Subnet},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEC2KMS, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEC2Logs, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true, Truncated: true},
 		},
 		DetailEnrich: enrichEc2,

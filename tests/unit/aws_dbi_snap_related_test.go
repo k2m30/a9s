@@ -192,6 +192,10 @@ func TestRelated_DBISnap_KMS_Found(t *testing.T) {
 	}
 }
 
+// Inverted by #545 facilitator ruling 1 (row 6, lazy-add targets): a key
+// the resource names by ID is counted by that ID whether or not the kms
+// list holds it — AWS-managed keys never are — and the related drill
+// lazy-adds it. Do not restore the list-bound answer.
 func TestRelated_DBISnap_KMS_NotFound(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
 
@@ -221,11 +225,15 @@ func TestRelated_DBISnap_KMS_NotFound(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0", result.Count())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != keyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", ids, keyID)
 	}
 }
 
+// Inverted by #545 facilitator ruling 1 (row 6, lazy-add targets): a key
+// the resource names by ID is counted by that ID whether or not the kms
+// list holds it — AWS-managed keys never are — and the related drill
+// lazy-adds it. Do not restore the list-bound answer.
 func TestRelated_DBISnap_KMS_CacheMissNoClients(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
 	arn := "arn:aws:kms:us-east-1:123456789012:key/" + keyID
@@ -246,8 +254,8 @@ func TestRelated_DBISnap_KMS_CacheMissNoClients(t *testing.T) {
 	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
+	if ids := result.ResourceIDs(); result.State() != domain.RelatedResolved || len(ids) != 1 || ids[0] != keyID {
+		t.Errorf("State = %v, IDs = %v, want resolved [%s] (the key ARN names it without the list)", result.State(), ids, keyID)
 	}
 }
 

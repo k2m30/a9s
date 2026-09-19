@@ -180,7 +180,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 	for _, s := range enc.S3Encryption {
 		addKey(s.KmsKeyArn)
 	}
-	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, refs)
 }
 
 // checkGlueAthena scans the athena cache for workgroups whose enriched

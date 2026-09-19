@@ -92,7 +92,11 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 			refs = append(refs, *vol.KmsKeyId)
 		}
 	}
-	ids, dropped := resolveRefs("kms", refs, refContext(clients, cache, "kms"))
+	rc, err := kmsRefContext(ctx, clients, cache, refs)
+	if err != nil {
+		return resource.ErrorRelated("kms", err)
+	}
+	ids, dropped := resolveRefs("kms", refs, rc)
 	return relatedResultTrunc("kms", ids, truncated || dropped)
 }
 

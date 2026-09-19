@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `r53`, `s3`, `waf`.
 
 ### `acm`
 
@@ -48,12 +48,6 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 - **Why related**: Lambda@Edge / CloudFront Functions attached to cache behaviors. A misbehaving edge function is a common cause of distribution-wide 5xx spikes.
 - **How discovered**: read `Distribution.DefaultCacheBehavior.LambdaFunctionAssociations.Items[].LambdaFunctionARN` plus every `Distribution.CacheBehaviors.Items[].LambdaFunctionAssociations.Items[].LambdaFunctionARN`; deduplicate by function ARN — a9s-devops: ARNs include a function version; pivot targets the function, not the specific version.
 - **Count shown**: yes.
-
-### `logs`
-
-- **Why related**: Access-log or real-time-log destinations for this distribution. Operator opens `logs` to grep recent requests when debugging cache hit/miss or a bad origin response.
-- **How discovered**: TBD — a9s-devops: not directly available from `ListDistributions`. Standard logging targets S3 (`LoggingConfig.Bucket`), not CloudWatch Logs — that surfaces under `s3` below, not `logs`. Real-time log configs (CW Logs destinations) require `GetRealtimeLogConfig` per configuration, which is outside the Wave 2 budget for `cf`. possible=partial, worth=yes in principle but would push cf into N+1 real-time-config fans-out; left as discovery TBD until a bounded mechanism exists.
-- **Count shown**: unknown.
 
 ### `r53`
 
@@ -174,7 +168,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- Real-time log config discovery for `logs` pivot — a9s-devops: not worth per-distribution `GetRealtimeLogConfig` fan-out today; revisit when a bounded batch API exists or when the feature graduates to Wave 2 budget.
+- A `logs` pivot — [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) has no log-group field: standard logging names an S3 bucket (counted under `s3`) and real-time logs go to Kinesis Data Streams (`docs/related-resources.md` § Explicitly excluded).
 
 ## 6. Citations
 
@@ -184,7 +178,6 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — `ct-events` reason — `docs/related-resources.md` § `cf` → `ct-events`.
 - a9s golden doc — `elb` reason — `docs/related-resources.md` § `cf` → `elb` ("ALB origins").
 - a9s golden doc — `lambda` reason — `docs/related-resources.md` § `cf` → `lambda` ("Lambda@Edge associations").
-- a9s golden doc — `logs` reason — `docs/related-resources.md` § `cf` → `logs` ("Realtime / access logs").
 - a9s golden doc — `r53` reason — `docs/related-resources.md` § `cf` → `r53` ("Route 53 alias records pointing here").
 - a9s golden doc — `s3` reason — `docs/related-resources.md` § `cf` → `s3` ("S3 origins").
 - a9s golden doc — `waf` reason — `docs/related-resources.md` § `cf` → `waf` ("Distribution.WebACLId").
@@ -207,7 +200,6 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `lambda` discovery via `LambdaFunctionAssociations` across default + all cache behaviors — a9s-devops (2026-04-20): possible=yes, worth=yes. Dedupe by function ARN since the same function may attach to multiple viewer events.
 - a9s-devops consultation — `r53` discovery via reverse scan of loaded record sets where `AliasTarget.DNSName` matches the distribution's `DomainName` — a9s-devops (2026-04-20): possible=yes, worth=yes. Case-fold the comparison and tolerate trailing dot.
 - a9s-devops consultation — `s3` discovery via `Origins[].DomainName` suffix match plus `LoggingConfig.Bucket` — a9s-devops (2026-04-20): possible=yes, worth=yes. Covers both the OAI/OAC origin case and the standard-log sink.
-- a9s-devops consultation — `logs` discovery left as TBD — a9s-devops (2026-04-20): possible=partial, worth=yes-in-principle. Standard logging goes to S3 not CW Logs; real-time log configs require `GetRealtimeLogConfig` per configuration, which exceeds the bounded Wave 2 budget.
 
 <!-- BEGIN GENERATED: header -->
 cf — DNS & CDN. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
@@ -238,6 +230,5 @@ cf — DNS & CDN. Status key: `status` — the key the status cell reads, and th
 | r53 | Route 53 Zones | yes |
 | alarm | CloudWatch Alarms | yes |
 | lambda | Lambda@Edge | no |
-| logs | Log Groups | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"context"
 	"slices"
 	"strings"
 
@@ -192,8 +193,8 @@ func iamNameRef(ref string, rc domain.RefContext, kind string) (string, bool) {
 }
 
 // kmsRefToID reads a key ARN or bare key ID as the key ID, and an alias (bare
-// or ARN) as the key the loaded key list says it points at. An alias no
-// loaded key carries names no row.
+// or ARN) as the key among rc.Targets that carries it. An alias no target
+// carries names no row; kmsRefContext adds the key a local alias names.
 func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 	res, isARN, ok := localARN(ref, rc, "kms")
 	if !ok {
@@ -208,11 +209,48 @@ func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 		return res, !isARN && isKMSKeyID(res)
 	}
 	for _, t := range rc.Targets {
-		if t.Fields["alias"] == res {
+		// "alias" alone is what a row cached before "aliases" existed carries.
+		if t.Fields["alias"] == res || slices.Contains(strings.Split(t.Fields["aliases"], ","), res) {
 			return t.ID, true
 		}
 	}
 	return "", false
+}
+
+// kmsRefContext is refContext for the kms target, with the key behind every
+// local alias no loaded row carries added to Targets. The kms list holds
+// customer keys only, so an AWS-managed alias (alias/aws/*) is never on it,
+// and an alias may be newer than the list. The keys come from the kms type's
+// own by-ID lookup: DescribeKey accepts an alias name or alias ARN. Another
+// account's alias is never looked up.
+func kmsRefContext(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) (domain.RefContext, error) {
+	rc := refContext(clients, cache, "kms")
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.KMS == nil {
+		return rc, nil
+	}
+	var missing []string
+	for _, ref := range refs {
+		res, _, local := localARN(ref, rc, "kms")
+		if _, known := resource.ResolveRef("kms", ref, rc); local && !known && strings.HasPrefix(res, "alias/") {
+			missing = append(missing, ref)
+		}
+	}
+	if len(missing) == 0 {
+		return rc, nil
+	}
+	rows, err := FetchKMSKeysByIDs(ctx, c, missing)
+	rc.Targets = append(slices.Clone(rc.Targets), rows...)
+	return rc, err
+}
+
+// kmsRelated is relatedRefs for the kms target, through kmsRefContext.
+func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) resource.RelatedCheckResult {
+	rc, err := kmsRefContext(ctx, clients, cache, refs)
+	if err != nil {
+		return resource.ErrorRelated("kms", err)
+	}
+	return relatedRefs("kms", refs, rc)
 }
 
 // isKMSKeyID reports whether s has the shape of a key ID: a UUID, or

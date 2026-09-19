@@ -57,5 +57,5 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*out.Domain.EncryptionKey}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*out.Domain.EncryptionKey})
 }

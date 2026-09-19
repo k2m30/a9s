@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ami`, `asg`, `backup`, `cfn`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `ami`, `asg`, `backup`, `cfn`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `tg`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -107,12 +107,6 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: Ingress/egress rules; first stop for connectivity issues.
 - **How discovered**: read field `Instance.SecurityGroups[].GroupId`; cross-reference the already-loaded `sg` list by `SecurityGroup.GroupId`.
-- **Count shown**: yes.
-
-### `ssm`
-
-- **Why related**: SSM Managed Instance / Session Manager presence on this instance.
-- **How discovered**: call `ssm:DescribeInstanceInformation` filtered by `InstanceIds=[<id>]` — a9s-devops: `ssm` in the contract here is the SSM Managed Instance view (registration/ping status, last-seen, agent version), not Parameter Store. The cheap pivot is a single filtered `DescribeInstanceInformation` call per open; any match means the instance is SSM-enrolled and reachable via Session Manager. Worth=yes for the daily operator because "can I shell in via SSM?" is a common triage question.
 - **Count shown**: yes.
 
 ### `subnet`
@@ -277,6 +271,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - `not-applicable` value on `SystemStatus.Status` / `InstanceStatus.Status` — Healthy, informational only: `docs/attention-signals.md § Signals § COMPUTE` row `ec2` carries no finding for it.
 - Any UI element not listed in §4 — no new columns, no new icons, no new views, no new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
+- An `ssm` pivot — the `ssm` type lists Parameter Store parameters ([API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html)); the SSM managed-instance registration (`DescribeInstanceInformation`) has no a9s type (`docs/related-resources.md` § Explicitly excluded).
 
 ## 6. Citations
 
@@ -287,7 +282,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - a9s golden doc — scheduled retirement/reboot `Events[]` within 7 days → Warning — `docs/attention-signals.md § Signals § COMPUTE` row `ec2`.
 - a9s golden doc — Wave 3 `StatusCheckFailed` + IMDSv1 OUT OF SCOPE — `docs/attention-signals.md § Not yet implemented`.
 - a9s golden doc — related targets contract for `ec2` — `docs/related-resources.md` § Per-type contract / `ec2` row.
-- a9s golden doc — per-target reasoning (`alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`) — `docs/related-resources.md` § Per-target reasoning / `ec2`.
+- a9s golden doc — per-target reasoning (`alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `tg`, `vpc`) — `docs/related-resources.md` § Per-target reasoning / `ec2`.
 - a9s golden doc — `ct-events` as universal pivot — `docs/related-resources.md` § Policy (item 4).
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
 - AWS API Reference — `State.Name`, `StateReason.Code`, `StateReason.Message`, `StateTransitionReason`, `ImageId`, `BlockDeviceMappings`, `NetworkInterfaces`, `SecurityGroups`, `SubnetId`, `VpcId`, `IamInstanceProfile`, `Tags` — `AWS API Reference: API_Instance` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html>).
@@ -296,7 +291,6 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - AWS API Reference — `Address.InstanceId` and `Address.NetworkInterfaceId` (eip pivot) — `AWS API Reference: API_Address` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>).
 - AWS API Reference — `MetricAlarm.Dimensions[]` (alarm pivot) — `AWS API Reference: API_MetricAlarm` (<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html>).
 - AWS API Reference — `TargetHealthDescription.Target.Id` (tg pivot) — `AWS API Reference: API_DescribeTargetHealth` (<https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html>).
-- AWS API Reference — `ssm:DescribeInstanceInformation` filtered by `InstanceIds` (ssm Managed-Instance pivot) — `AWS API Reference: API_DescribeInstanceInformation` (<https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_DescribeInstanceInformation.html>).
 - a9s-devops consultation — `alarm` discovery via `Dimensions{InstanceId,...}` on loaded alarm list — a9s-devops (2026-04-20): possible=yes, worth=yes. Dimensions are the canonical target pointer for CloudWatch alarms; cache-scan is zero-cost when alarms are loaded.
 - a9s-devops consultation — `asg` discovery via `aws:autoscaling:groupName` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. AWS sets the reserved tag on every ASG-launched instance; tag lookup is the cheap pivot.
 - a9s-devops consultation — `backup` discovery via plan-selection tag match / `ListProtectedResources` — a9s-devops (2026-04-20): possible=yes, worth=yes. AWS Backup associates resources by tag-based selections; tag scan is zero-cost, API fallback covers ARN-based selections.
@@ -307,7 +301,6 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - a9s-devops consultation — `logs` discovery via CloudWatch-agent naming / tag convention — a9s-devops (2026-04-20): possible=yes (best-effort), worth=yes. No authoritative AWS link exists; agent-managed groups are the top incident-triage destination so a convention match is still useful.
 - a9s-devops consultation — `ng` discovery via `eks:nodegroup-name` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. EKS stamps the reserved tag on every managed nodegroup instance.
 - a9s-devops consultation — `role` discovery via `Instance.IamInstanceProfile.Arn` with profile-name ≈ role-name assumption and `GetInstanceProfile` fallback — a9s-devops (2026-04-20): possible=yes, worth=yes. Profile vs role name usually match; fallback is cheap.
-- a9s-devops consultation — `ssm` target means Managed-Instance view, not Parameter Store — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeInstanceInformation(InstanceIds=[id])` is the correct, single-call pivot; "can I shell in via SSM?" is a daily triage question.
 - a9s-devops consultation — `tg` discovery via `DescribeTargetHealth` fan-out already performed for the TG list — a9s-devops (2026-04-20): possible=yes, worth=yes. No net-new API call when `tg` Wave 2 has run; avoids duplicating fan-out.
 - a9s-devops consultation — Count shown is `yes` for every target — a9s-devops (2026-04-20): possible=yes, worth=yes. Every pivot above returns a concrete matched set; rendering the count is standard a9s behavior.
 - a9s-devops consultation — Status column wording for `stopped: Server.*` surfaces the raw AWS code — a9s-devops (2026-04-20): possible=yes, worth=yes. `Server.SpotInstanceShutdown`, `Server.InsufficientInstanceCapacity` etc. are already short and industry-known to operators; translating them would lose precision.
@@ -357,6 +350,5 @@ ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | subnet | Subnet | no |
 | kms | KMS Keys | yes |
 | logs | Log Groups | yes |
-| ssm | SSM Parameters | no |
 | backup | Backup Plans | yes |
 <!-- END GENERATED: related -->

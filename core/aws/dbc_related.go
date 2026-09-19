@@ -401,13 +401,13 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 // KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
 // Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 // Pattern F — no cache needed.
-func checkDbcKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
 		return unreadZero(res, resource.KnownRelated("kms", nil, false))
 	}
 	keyID = kmsRefFromField(keyID, res.Type)
-	return unreadZero(res, relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms")))
+	return unreadZero(res, kmsRelated(ctx, clients, cache, []string{keyID}))
 }
 
 // checkDbcCTEvents looks up cached CloudTrail events for the cluster's

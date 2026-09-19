@@ -15,7 +15,7 @@ import (
 
 // checkDdbKMS reads SSEDescription.KMSMasterKeyArn from the TableDescription RawStruct.
 // Pattern F — no cache needed.
-func checkDdbKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -23,7 +23,7 @@ func checkDdbKMS(_ context.Context, clients any, res resource.Resource, cache re
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedRefs("kms", []string{*table.SSEDescription.KMSMasterKeyArn}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{*table.SSEDescription.KMSMasterKeyArn})
 }
 
 // checkDdbAlarm searches the alarm cache for alarms with a "TableName" dimension

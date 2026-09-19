@@ -234,7 +234,9 @@ func TestRelated_Trail_NilClients(t *testing.T) {
 	emptyCache := resource.ResourceCache{}
 	res := trailSrcResource()
 
-	targets := []string{"s3", "logs", "sns", "kms"}
+	// kms is not here: the trail's key ARN names its key by ID without the
+	// list (#545 facilitator ruling 1; TestRelated_Trail_KMS_Match covers it).
+	targets := []string{"s3", "logs", "sns"}
 	for _, target := range targets {
 		checker := trailCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)

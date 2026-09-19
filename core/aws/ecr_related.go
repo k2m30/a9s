@@ -153,7 +153,7 @@ func ecrCFNStackName(ctx context.Context, clients any, res resource.Resource) (s
 // checkECRKMS extracts the KMS key from the ECR Repository's
 // EncryptionConfiguration.KmsKey field. Returns the key ID (last segment after "/").
 // Pattern F — no cache needed.
-func checkECRKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECRKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
 		if res.RawStruct == nil {
@@ -162,7 +162,7 @@ func checkECRKMS(_ context.Context, clients any, res resource.Resource, cache re
 		return resource.KnownRelated("kms", nil, false)
 	}
 	keyID := kmsRefFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)
-	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
+	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
 // checkECREbRule is a reverse-scan checker for the ecr→eb-rule relationship.
