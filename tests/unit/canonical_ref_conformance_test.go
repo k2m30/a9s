@@ -64,12 +64,13 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 
 	checked := 0
 	var bad []string
+	var retired retiredPolicyWitness
 	for _, td := range resource.AllResourceTypes() {
 		for _, def := range resource.GetRelated(td.ShortName) {
 			for _, res := range b.byType[td.ShortName] {
 				for _, id := range def.Checker(ctx, clients, res, b.cache).ResourceIDs() {
 					checked++
-					if !o.opens(def.TargetType, id) {
+					if !o.opens(def.TargetType, id) && !retired.exempt(def.TargetType, id) {
 						bad = append(bad, fmt.Sprintf("%s → %s (%s): source %q returned %q",
 							td.ShortName, def.TargetType, def.DisplayName, res.ID, id))
 					}
@@ -80,6 +81,7 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no related checker returned an ID on the demo bench")
 	}
+	retired.require(t)
 	if len(bad) > 0 {
 		sort.Strings(bad)
 		t.Errorf("%d of %d related IDs open no row of their target type:\n  %s", len(bad), checked, strings.Join(bad, "\n  "))

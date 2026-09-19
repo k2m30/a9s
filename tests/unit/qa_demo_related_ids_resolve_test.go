@@ -129,24 +129,14 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 	}
 
 	var real []string
-	sawRetiredPolicy := false
+	var retired retiredPolicyWitness
 	for _, orphan := range orphans {
-		// The exemption matches the TARGET ID exactly, not the formatted line:
-		// a substring test would also swallow a genuinely broken pivot whose
-		// source id happened to contain the retired policy's name.
-		if orphan.targetType == "policy" && orphan.id == fixtures.RetiredManagedPolicyName {
-			sawRetiredPolicy = true
+		if retired.exempt(orphan.targetType, orphan.id) {
 			continue
 		}
 		real = append(real, orphan.line)
 	}
-
-	if !sawRetiredPolicy {
-		t.Errorf("no witnessed related ID names %s — the demo bench is supposed to carry exactly one "+
-			"policy a role attaches and the account cannot read, so the aggregate's navigation-defect "+
-			"failure is something an operator can actually see (core/demo/fixtures/iam.go)",
-			fixtures.RetiredManagedPolicyName)
-	}
+	retired.require(t)
 
 	if len(real) > 0 {
 		sort.Strings(real)
@@ -180,4 +170,35 @@ func containsResourceID(resolved []resource.Resource, id string) bool {
 		}
 	}
 	return false
+}
+
+// retiredPolicyWitness is the one related ID the demo bench must show and
+// must not resolve: a role's attachment of fixtures.RetiredManagedPolicyName,
+// a policy AWS has retired, so the role still lists it while GetPolicy answers
+// NoSuchEntity. The name is the correct ID and the drill says it cannot read
+// it, which is what an operator should see. Every gate that requires related
+// IDs to open a row reads this exception from here, never from a copy.
+//
+// Callers pass only IDs that opened no row. exempt matches the target and the
+// ID exactly, so a broken pivot whose source merely mentions the name is not
+// swallowed; require fails when the ID was never seen unresolved, which covers
+// both "no longer witnessed" and "now resolves".
+type retiredPolicyWitness struct{ seen bool }
+
+func (w *retiredPolicyWitness) exempt(target, id string) bool {
+	if target == "policy" && id == fixtures.RetiredManagedPolicyName {
+		w.seen = true
+		return true
+	}
+	return false
+}
+
+func (w *retiredPolicyWitness) require(t *testing.T) {
+	t.Helper()
+	if !w.seen {
+		t.Errorf("no related ID names %s without resolving — the demo bench must carry exactly one "+
+			"policy a role attaches and the account cannot read, so the drill's cannot-read error "+
+			"is something an operator can see (core/demo/fixtures/iam.go)",
+			fixtures.RetiredManagedPolicyName)
+	}
 }
