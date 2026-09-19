@@ -48,8 +48,8 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 ### `role`
 
 - **Why related**: IAM roles that the key policy trusts — answers "who can use this key?" during a permissions audit.
-- **How discovered**: requires `GetKeyPolicy` per key and JSON-parsing the `Principal` / `AWS` entries to extract role ARNs, then cross-reference the already-loaded `role` list. No `kms` signal makes that call — key-policy analysis is deferred, `docs/attention-signals.md § Not yet implemented`. **Count unknown** until key-policy enrichment is wired; the panel shows the `role` target label with no number rather than hiding it.
-- **Count shown**: unknown.
+- **How discovered**: `GetKeyPolicy` (default policy) and `ListGrants` per opened key: the roles the key policy grants plus each grant's `GranteePrincipal` and `RetiringPrincipal` roles, cross-referenced against the already-loaded `role` list. Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
+- **Count shown**: yes.
 
 ### `ct-events`
 
@@ -114,6 +114,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **Cost shape**: per-resource.
 
 - **Signal**: Default key policy allows a wildcard principal with no restrictive condition.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.

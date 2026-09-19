@@ -10,7 +10,8 @@ import (
 
 // SQSPublicPolicy names the one demo queue whose access policy grants send
 // or receive to every principal (sqs.public-policy). Every other queue's
-// Policy attribute is either absent or account-scoped.
+// Policy attribute is either absent or, on order-processing-queue, a
+// wildcard grant an explicit Deny fences to the organisation.
 const SQSPublicPolicy = "sqs-public-policy"
 
 // sqsPublicPolicyQueueURL is the same queue addressed the way
@@ -50,6 +51,10 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					// KmsMasterKeyId — required for the sqs:kms related-panel pivot
 					// (checkSQSKMS).
 					"KmsMasterKeyId": OrdersProdKMSKeyID,
+					"Policy": `{"Version":"2012-10-17","Statement":[` +
+						`{"Sid":"AllowOrgProducers","Effect":"Allow","Principal":"*","Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:order-processing-queue"},` +
+						`{"Sid":"DenyOutsideOrg","Effect":"Deny","Principal":"*","Action":"sqs:*","Resource":"arn:aws:sqs:us-east-1:123456789012:order-processing-queue",` +
+						`"Condition":{"StringNotEquals":{"aws:PrincipalOrgID":"o-acme12345"}}}]}`,
 				},
 			},
 			{

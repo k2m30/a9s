@@ -729,12 +729,12 @@ func (rvDDBFake) ListTagsOfResource(context.Context, *dynamodb.ListTagsOfResourc
 	return &dynamodb.ListTagsOfResourceOutput{}, nil
 }
 
-// TestOwnAccountUnknown_CrossAccountCheckIsUninspected: the session could not
-// learn its own account, so a policy naming a 12-digit principal cannot be
-// judged foreign or own. secrets and ddb follow one rule: no cross-account
-// finding, the row marked; a resource with no policy is the counterpart and
-// stays unmarked.
-func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
+// TestOwnAccountFromARN_CrossAccountCheckRunsWithoutSTS: when STS cannot
+// name the session's account, the resource's own ARN names the owning
+// account, so a policy granting only that account's role is read as it is: no
+// cross-account finding and no mark. A resource with no policy stays
+// unmarked.
+func TestOwnAccountFromARN_CrossAccountCheckRunsWithoutSTS(t *testing.T) {
 	unknown := session.NewIdentityStore()
 	unknown.Set("", errors.New("sts:GetCallerIdentity refused"))
 	t.Run("secrets", func(t *testing.T) {
@@ -749,10 +749,10 @@ func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
 		res, _ := awsclient.EnrichSecretsPolicy(context.Background(), clients, rows, nil) //nolint:errcheck // judged by its marks
 
 		if bkHasCode(res.Findings[named], "secrets.cross-account-policy") {
-			t.Errorf("own account unknown, yet the secret naming %s is reported as granting another account", "123456789012")
+			t.Errorf("the secret granting its own account's role is reported as granting another account")
 		}
-		if _, marked := res.TruncatedIDs[named]; !marked {
-			t.Errorf("own account unknown: the secret whose policy names a 12-digit principal is not marked")
+		if mark, marked := res.TruncatedIDs[named]; marked {
+			t.Errorf("the secret whose ARN names its account is marked %q", mark)
 		}
 		if mark, marked := res.TruncatedIDs[bare]; marked {
 			t.Errorf("the secret with no policy is marked %q", mark)
@@ -773,8 +773,11 @@ func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
 		backupLoaded := resource.ResourceCache{"backup": {Resources: []resource.Resource{}}}
 		res, _ := awsclient.EnrichDynamoDBPITR(context.Background(), clients, rows, backupLoaded) //nolint:errcheck // judged by its marks
 
-		if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
-			t.Errorf("own account unknown: the table whose policy names a 12-digit principal is not marked — an earlier cross-account finding clears without a \"?\"")
+		if bkHasCode(res.Findings["acme-orders"], "ddb.cross-account-policy") {
+			t.Errorf("the table granting its own account's role is reported as granting another account")
+		}
+		if mark, marked := res.TruncatedIDs["acme-orders"]; marked {
+			t.Errorf("the table whose ARN names its account is marked %q", mark)
 		}
 		if mark, marked := res.TruncatedIDs["acme-sessions"]; marked {
 			t.Errorf("the table with no policy is marked %q", mark)

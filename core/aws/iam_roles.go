@@ -28,12 +28,6 @@ const (
 	// up to full administrator.
 	roleCodeInlinePrivEsc domain.FindingCode = "role.inline-privilege-escalation"
 
-	// uninspectedPolicyResources is what the policy_resources Field holds
-	// when the role's inline policies could not be read. Empty would read as
-	// "this role's policies name no resources", which is a claim a9s did not
-	// earn; "?" is the same unknown mark every other surface uses.
-	uninspectedPolicyResources = "?"
-
 	// awsServiceRolePathPrefix marks an AWS service-linked role. AWS owns the
 	// trust policy and the attached permissions, so posture findings about
 	// either are not actionable by the operator.
@@ -145,10 +139,8 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		trust := analyseRoleTrust(assumeRolePolicyDoc, path)
 		findings, details := trust.findings, trust.details
 
-		policyResources := ""
 		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
-			var inline inlinePolicyScan
-			policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+			inline := scanRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
 			findings, details = addInlinePrivEsc(findings, details, inline)
 			failures = append(failures, inline.failures...)
 		}
@@ -166,7 +158,6 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"assume_role_policy_document": assumeRolePolicyDoc,
 				"trust_wildcard":              trust.wildcard,
 				"trust_summary":               trust.summary,
-				"policy_resources":            policyResources,
 			},
 			Findings:         findings,
 			AttentionDetails: details,
@@ -293,11 +284,9 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 
 	listPoliciesAPI, okList := api.(IAMListRolePoliciesAPI)
 	getPolicyAPI, okGet := api.(IAMGetRolePolicyAPI)
-	policyResources := ""
 	var failures []Failure
 	if okList && okGet && roleName != "" {
-		var inline inlinePolicyScan
-		policyResources, inline = enumerateRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+		inline := scanRoleInlinePolicies(ctx, listPoliciesAPI, getPolicyAPI, roleName)
 		findings, details = addInlinePrivEsc(findings, details, inline)
 		failures = inline.failures
 	}
@@ -315,7 +304,6 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 			"assume_role_policy_document": assumeRolePolicyDoc,
 			"trust_wildcard":              trust.wildcard,
 			"trust_summary":               trust.summary,
-			"policy_resources":            policyResources,
 		},
 		Findings:         findings,
 		AttentionDetails: details,
@@ -337,19 +325,15 @@ type inlinePolicyScan struct {
 	failures []Failure
 }
 
-// enumerateRoleInlinePolicies walks a role's inline policies once and
-// returns both a comma-separated list of every Statement[].Resource entry
-// across all documents and the privilege-escalation verdict.
-//
-// policy_resources is emitted as a Field so sibling pivots (s3, kms,
-// secrets, …) can scan the list and match by ARN substring.
+// scanRoleInlinePolicies walks a role's inline policies once for the
+// privilege-escalation verdict.
 // Cost: 1 ListRolePolicies + N GetRolePolicy per role.
-func enumerateRoleInlinePolicies(
+func scanRoleInlinePolicies(
 	ctx context.Context,
 	listAPI IAMListRolePoliciesAPI,
 	getAPI IAMGetRolePolicyAPI,
 	roleName string,
-) (string, inlinePolicyScan) {
+) inlinePolicyScan {
 	var scan inlinePolicyScan
 	listOut, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
 		RoleName: aws.String(roleName),
@@ -357,12 +341,11 @@ func enumerateRoleInlinePolicies(
 	switch {
 	case err != nil:
 		scan.failures = append(scan.failures, FailedCall(roleName, err))
-		return uninspectedPolicyResources, scan
+		return scan
 	case listOut == nil:
 		scan.failures = append(scan.failures, UnusableAnswer(roleName, "ListRolePolicies returned no answer"))
-		return uninspectedPolicyResources, scan
+		return scan
 	}
-	var allResources []string
 	for _, policyName := range listOut.PolicyNames {
 		getOut, getErr := getAPI.GetRolePolicy(ctx, &iam.GetRolePolicyInput{
 			RoleName:   aws.String(roleName),
@@ -382,11 +365,6 @@ func enumerateRoleInlinePolicies(
 			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
 			continue
 		}
-		// Read off the document the escalation check below reads, so a policy
-		// written with a bare Statement object yields its resources too.
-		for _, st := range parsed.Statement {
-			allResources = append(allResources, st.Resource...)
-		}
 		if scan.finding != nil {
 			continue
 		}
@@ -398,12 +376,7 @@ func enumerateRoleInlinePolicies(
 				privEscComboRows(combos)...)
 		}
 	}
-	if len(scan.failures) > 0 {
-		// A list assembled from the documents that did answer reads as the
-		// role's whole policy surface. It is not one.
-		return uninspectedPolicyResources, scan
-	}
-	return strings.Join(allResources, ","), scan
+	return scan
 }
 
 // addInlinePrivEsc folds an inline-policy scan into the finding list and

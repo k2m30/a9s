@@ -734,7 +734,7 @@ func TestECR_Related_Role_ReturnsBareRoleNameFromPolicy(t *testing.T) {
 	repo := ecrtypes.Repository{RepositoryName: aws.String("checkout-service")}
 	repoRes := resource.Resource{ID: "checkout-service", Name: "checkout-service", RawStruct: repo}
 
-	policyText := `{"Statement":[{"Principal":{"AWS":"arn:aws:iam::123456789012:role/ci-deploy-role"}}]}`
+	policyText := `{"Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/ci-deploy-role"},"Action":"ecr:BatchGetImage"}]}`
 	fake := &fakeECRGetRepositoryPolicy{policyText: policyText}
 	clients := &awsclient.ServiceClients{ECR: fake}
 
@@ -760,10 +760,10 @@ func TestECR_Related_Role_DropsCrossAccountPrincipal(t *testing.T) {
 	}
 	repoRes := resource.Resource{ID: "checkout-service", Name: "checkout-service", RawStruct: repo}
 
-	policyText := `{"Statement":[{"Principal":{"AWS":[` +
+	policyText := `{"Statement":[{"Effect":"Allow","Principal":{"AWS":[` +
 		`"arn:aws:iam::111111111111:role/local-ci-role",` +
 		`"arn:aws:iam::999999999999:role/foreign-ci-role"` +
-		`]}}]}`
+		`]},"Action":"ecr:BatchGetImage"}]}`
 	fake := &fakeECRGetRepositoryPolicy{policyText: policyText}
 	clients := &awsclient.ServiceClients{ECR: fake}
 

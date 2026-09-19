@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"sync"
@@ -82,12 +83,13 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, perr)
 			return
 		}
-		ex := iampolicy.Evaluate(doc, ownAccount)
+		own := cmp.Or(ownAccount, iampolicy.AccountFromARN(r.Fields["arn"]))
+		ex := iampolicy.Evaluate(doc, own)
 		switch {
 		case ex.Public:
 			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, publicPolicyRows(ex))
 
-		case len(ex.CrossAccount) > 0 && ownAccount == "":
+		case len(ex.CrossAccount) > 0 && own == "":
 			markUninspected(&result, r.ID, CheckOwnAccountUnknown)
 		case len(ex.CrossAccount) > 0:
 			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, crossAccountPolicyRows(ex))

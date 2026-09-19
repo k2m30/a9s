@@ -785,8 +785,7 @@ func TestRelated_Role_IamUser_NoUserPrincipal(t *testing.T) {
 	}
 }
 
-// TestRelated_Role_IamUser_InvalidJSON: malformed trust policy JSON produces
-// Count:0 (parse error is silent, not a crash).
+// A trust policy that cannot be parsed leaves the principal pivots unknown.
 func TestRelated_Role_IamUser_InvalidJSON(t *testing.T) {
 	source := resource.Resource{
 		ID: "broken-role",
@@ -795,13 +794,10 @@ func TestRelated_Role_IamUser_InvalidJSON(t *testing.T) {
 		},
 	}
 
-	checker := roleCheckerByTarget(t, "iam-user")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (invalid JSON should not crash)", result.Count())
-	}
-	if result.Err() != nil {
-		t.Errorf("unexpected error: %v", result.Err())
+	for _, target := range []string{"iam-user", "iam-group"} {
+		result := roleCheckerByTarget(t, target)(context.Background(), nil, source, resource.ResourceCache{})
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("%s: state = %v (count %d), want unknown", target, result.State(), result.Count())
+		}
 	}
 }

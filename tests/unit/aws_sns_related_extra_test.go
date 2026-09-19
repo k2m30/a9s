@@ -369,7 +369,7 @@ func TestRelated_SNS_Role_PrincipalWithUserARNIgnored(t *testing.T) {
 
 func TestRelated_SNS_Role_UsesTopicARNFromID(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
-	policy := `{"Statement": [{"Principal": {"AWS": "arn:aws:iam::123456789012:role/reader"}}]}`
+	policy := `{"Statement": [{"Effect": "Allow", "Principal": {"AWS": "arn:aws:iam::123456789012:role/reader"}, "Action": "SNS:Publish"}]}`
 	source := resource.Resource{
 		ID:     topicARN,
 		Fields: map[string]string{},

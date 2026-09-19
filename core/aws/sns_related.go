@@ -121,9 +121,8 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkSNSRole extracts IAM role principals from the SNS topic's access policy
-// (GetTopicAttributes "Policy"). Pattern C: 1 API call, offline JSON parse of
-// the Principal.AWS values that look like role ARNs.
+// checkSNSRole lists the IAM roles the SNS topic's access policy
+// (GetTopicAttributes "Policy") grants. Pattern C: 1 API call.
 func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
@@ -140,9 +139,12 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 	if policy == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	var arns []string
-	extractPrincipalsByKind([]byte(policy), ":role/", &arns)
-	return relatedRefs("role", arns, refContext(clients, cache, "role"))
+	rc := policyRefContext(clients, cache, "role", topicARN)
+	refs, ok := grantedPrincipalRefs(policy, "role/")
+	if !ok {
+		return resource.UnknownRelated("role")
+	}
+	return relatedRefs("role", refs, rc)
 }
 
 // snsAlarmReferences reports whether any of the alarm's action lists contain

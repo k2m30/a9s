@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -142,7 +143,8 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 			MarkSkipped(result, r.ID, &failures, parseErr)
 			return
 		}
-		ex := iampolicy.Evaluate(doc, ownAccount)
+		own := cmp.Or(ownAccount, iampolicy.AccountFromARN(r.Fields["arn"]))
+		ex := iampolicy.Evaluate(doc, own)
 		if ex.Public {
 			setWave2Finding(result, r.ID, ddbCodePublicPolicy, []domain.DetailRow{
 				{Label: "Principal", Value: "*", Tier: "!"},
@@ -151,10 +153,10 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 
 			return
 		}
-		// Without a resolved own-account ID every principal reads as foreign,
-		// which would report the account's own roles as an outside grant.
+		// Without an own-account ID every principal reads as foreign, which
+		// would report the account's own roles as an outside grant.
 		switch {
-		case len(ex.CrossAccount) > 0 && ownAccount == "":
+		case len(ex.CrossAccount) > 0 && own == "":
 			markUninspected(result, r.ID, CheckOwnAccountUnknown)
 		case len(ex.CrossAccount) > 0:
 			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: tierOf(ddbCodeCrossAccountPolicy)}})

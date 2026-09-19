@@ -6,7 +6,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strings"
 
@@ -307,7 +306,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 }
 
 // checkSecretsRole resolves IAM roles associated with this secret via two paths:
-//  1. secretsmanager:GetResourcePolicy → Statement[].Principal.AWS for role ARNs.
+//  1. secretsmanager:GetResourcePolicy → the roles the resource policy grants.
 //  2. If parent has RotationLambdaARN: lambda:GetFunction → FunctionConfiguration.Role.
 //
 // Deduplicates results.
@@ -331,6 +330,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		return resource.UnknownRelated("role")
 	}
 
+	rc := policyRefContext(clients, cache, "role", secretID)
 	var ids []string
 	// partial tracks whether either independent path below could not be
 	// attempted or failed, so ids (whatever the other path found) is reported
@@ -350,7 +350,9 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		if err != nil {
 			partial = true
 		} else if policyOut != nil && policyOut.ResourcePolicy != nil && *policyOut.ResourcePolicy != "" {
-			ids = append(ids, secretsPolicyRoleARNs(*policyOut.ResourcePolicy)...)
+			refs, parsed := grantedPrincipalRefs(*policyOut.ResourcePolicy, "role/")
+			partial = partial || !parsed
+			ids = append(ids, refs...)
 		}
 	}
 
@@ -374,12 +376,6 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 
-	// ids holds full role ARNs from policy principals (often cross-account) and
-	// the rotation lambda; the secret's own account is the local one.
-	rc := refContext(clients, cache, "role")
-	if acct := arnAccountID(secretID); acct != "" {
-		rc.AccountID = acct
-	}
 	finalIDs, dropped := resolveRefs("role", ids, rc)
 	if len(finalIDs) == 0 && partial {
 		// Neither path could be checked (or both failed): nothing was
@@ -387,36 +383,6 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		return resource.UnknownRelated("role")
 	}
 	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial || dropped))
-}
-
-// secretsPolicyRoleARNs parses a Secrets Manager resource policy JSON and returns
-// all IAM role ARNs found in Statement[].Principal.AWS.
-func secretsPolicyRoleARNs(policyText string) []string {
-	var policy struct {
-		Statement []struct {
-			Principal json.RawMessage `json:"Principal"`
-		} `json:"Statement"`
-	}
-	if err := json.Unmarshal([]byte(policyText), &policy); err != nil {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	for _, stmt := range policy.Statement {
-		if stmt.Principal == nil {
-			continue
-		}
-		var principalObj map[string]json.RawMessage
-		if err := json.Unmarshal(stmt.Principal, &principalObj); err == nil {
-			if awsRaw, ok := principalObj["AWS"]; ok {
-				addRoleARNs(awsRaw, seen)
-			}
-		}
-	}
-	ids := make([]string, 0, len(seen))
-	for arn := range seen {
-		ids = append(ids, arn)
-	}
-	return ids
 }
 
 // checkSecretsSNS checks whether the rotation Lambda for this secret has an SNS

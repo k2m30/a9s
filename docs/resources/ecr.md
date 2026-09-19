@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `role`
 
 - **Why related**: IAM roles with pull/push permissions on this repo — operator auditing access or triaging a "denied" error wants the principals trusted by this repo's policy.
-- **How discovered**: Call `ecr:GetRepositoryPolicy` for this repo (a single per-repo call) and parse the policy document — extract `Statement[].Principal.AWS` ARNs and match them against the already-loaded `role` list. If the repo has no explicit policy (default behavior), IAM-level grants govern access and this pivot is empty. — a9s-devops: repository policy is the authoritative per-repo principal source; walking the full role cache with `GetRolePolicy` per role is Wave 3.
+- **How discovered**: Call `ecr:GetRepositoryPolicy` for this repo (a single per-repo call) and parse the policy document — extract `Statement[].Principal.AWS` ARNs and match them against the already-loaded `role` list. If the repo has no explicit policy (default behavior), IAM-level grants govern access and this pivot is empty. — a9s-devops: repository policy is the authoritative per-repo principal source; walking the full role cache with `GetRolePolicy` per role is Wave 3. Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
 - **Count shown**: yes.
 
 ### `ct-events`
@@ -113,6 +113,7 @@ One bullet per distinct signal.
   - Note: `imageScanFindingsSummary` is present only when a scan has run; if absent, no finding is surfaced for this signal.
 
 - **Signal**: the repository policy grants a wildcard principal.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

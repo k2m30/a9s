@@ -96,6 +96,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: access `Policy` allows a wildcard principal.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

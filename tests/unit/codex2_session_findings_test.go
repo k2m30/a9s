@@ -156,9 +156,6 @@ func TestIAMRoles_DeniedListRolePoliciesIsNotAnEmptyScan(t *testing.T) {
 	if len(res.Resources) != 1 {
 		t.Fatalf("got %d rows, want the role itself to survive the partial failure", len(res.Resources))
 	}
-	if got := res.Resources[0].Fields["policy_resources"]; got != "?" {
-		t.Errorf("policy_resources = %q, want %q — the inline policies were never read", got, "?")
-	}
 }
 
 // One of two GetRolePolicy calls refused leaves the resource list incomplete;
@@ -179,9 +176,6 @@ func TestIAMRoles_DeniedGetRolePolicyIsNotAPartialScan(t *testing.T) {
 	if len(res.Resources) != 1 {
 		t.Fatalf("got %d rows, want 1", len(res.Resources))
 	}
-	if got := res.Resources[0].Fields["policy_resources"]; got != "?" {
-		t.Errorf("policy_resources = %q, want %q — one of the two documents was refused", got, "?")
-	}
 }
 
 func TestIAMRoles_ReadableInlinePoliciesStillReportPrivEsc(t *testing.T) {
@@ -193,9 +187,6 @@ func TestIAMRoles_ReadableInlinePoliciesStillReportPrivEsc(t *testing.T) {
 	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
 	if err != nil {
 		t.Fatalf("FetchIAMRolesPage: unexpected error on a fully readable role: %v", err)
-	}
-	if got := res.Resources[0].Fields["policy_resources"]; got != "*" {
-		t.Errorf("policy_resources = %q, want %q", got, "*")
 	}
 	if !codex2HasCode(res.Resources[0].Findings, "role.inline-privilege-escalation") {
 		t.Errorf("no privilege-escalation finding on a readable escalating policy; findings=%+v",

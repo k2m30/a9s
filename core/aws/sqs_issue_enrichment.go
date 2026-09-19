@@ -95,8 +95,11 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			!strings.EqualFold(out.Attributes["SqsManagedSseEnabled"], "true") {
 			setWave2Finding(&result, r.ID, sqsCodeNoKMS, nil)
 		}
-		if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
-			if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
+		if policy := out.Attributes["Policy"]; policy != "" {
+			doc, parseErr := iampolicy.Parse(policy)
+			if parseErr != nil {
+				MarkSkipped(&result, r.ID, &failures, parseErr)
+			} else if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
 				setWave2Finding(&result, r.ID, sqsCodePublicPolicy, publicPolicyRows(ex))
 			}
 		}

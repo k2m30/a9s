@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resource and trust policies are read the way IAM applies them: an explicit
+  Deny that takes a grant from everyone, or fences it to an account,
+  organisation, VPC endpoint, address range or the principals a NotPrincipal
+  block names, clears the "open to anyone" finding on DynamoDB, SQS, SNS,
+  ECR, EFS, KMS, Secrets Manager, CodeArtifact, API Gateway, OpenSearch and
+  VPC endpoint rows, and a grant only AWS service principals satisfy (`aws:PrincipalIsAWSService`) is no longer public. The
+  role, user and group pivots of roles, SNS topics, KMS keys, ECR
+  repositories, secrets and buckets no longer list a principal the policy
+  denies or match another account's principal to a local row. When STS cannot
+  name the session's account, the resource's ARN supplies it, so a secret or
+  table granting its own account's role is not reported as shared. A policy
+  that does not parse leaves the row or pivot unknown instead of flagged or
+  empty, and an API Gateway REST API's escaped policy is read as the
+  document it encodes.
+- A policy condition that holds for a request without the key
+  (`ForAllValues:`), or that names the resource being called
+  (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`,
+  `s3:ResourceAccount`) on that resource's own policy, no longer hides an
+  "open to anyone" or "anyone can assume this role" finding; a
+  `ForAnyValue:` negated Deny no longer counts as a fence. An API Gateway
+  REST API whose resource policy grants only named principals, only denies,
+  or loses its wildcard grant to a Deny is no longer reported as open to the
+  internet. An IAM policy that allows `*` on `*` beside an unconditional Deny is no longer
+  reported as full administrator, and a Deny with `NotAction` (for example
+  "deny everything but S3 and Logs") now removes the privilege-escalation
+  combinations it covers.
 - Backup coverage reads each backup selection on its own, as AWS Backup
   does: an exclusion in one selection no longer hides a resource another
   selection of the same plan takes in, a selection's tag conditions now

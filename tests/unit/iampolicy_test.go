@@ -341,7 +341,7 @@ func TestIsAdmin_And_PrivilegeEscalation(t *testing.T) {
 		}
 	})
 
-	t.Run("Deny iam:* wins over Allow *, IsAdmin looks at Allow only", func(t *testing.T) {
+	t.Run("Deny iam:* wins over Allow *, and what is left is not every action", func(t *testing.T) {
 		d := mustParse(t, `{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},{"Effect":"Deny","Action":"iam:*","Resource":"*"}]}`)
 		if d.AllowsAction("iam:CreateUser") {
 			t.Errorf("AllowsAction(iam:CreateUser) = true, want false (Deny wins)")
@@ -349,8 +349,8 @@ func TestIsAdmin_And_PrivilegeEscalation(t *testing.T) {
 		if !d.AllowsAction("s3:GetObject") {
 			t.Errorf("AllowsAction(s3:GetObject) = false, want true")
 		}
-		if !d.IsAdmin() {
-			t.Errorf("IsAdmin() = false, want true (looks at the Allow statement only)")
+		if d.IsAdmin() {
+			t.Errorf("IsAdmin() = true, want false (an explicit Deny takes the iam actions away)")
 		}
 	})
 

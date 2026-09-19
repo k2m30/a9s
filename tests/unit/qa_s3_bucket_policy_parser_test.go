@@ -1,10 +1,10 @@
 package unit_test
 
-// Edge-case coverage for
-// extractBucketPolicyAWSPrincipals and the checkS3Role error paths.
+// Edge-case coverage for the checkS3Role bucket-policy read and its error
+// paths.
 //
 // Covers the JSON-shape variation that real bucket policies exhibit:
-//   - malformed JSON (invalid policy) → no principals
+//   - malformed JSON (invalid policy) → unknown
 //   - wildcard Principal (`"*"`) at statement-root → no role ARN
 //   - service principal ({"Service": ...}) → skipped
 //   - mixed AWS principal list (role ARN + user ARN + account root) →
@@ -20,6 +20,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -34,10 +35,9 @@ func s3FakeClientsWithPolicies(policies map[string]string) *awsclient.ServiceCli
 	return &awsclient.ServiceClients{S3: fakes.NewS3FromFixturesForTest(fix)}
 }
 
-// TestS3_Role_MalformedPolicyJSON_Count0 pins the error branch in
-// extractBucketPolicyAWSPrincipals: a policy that isn't valid JSON surfaces as
-// Count=0, not a crash (the call itself succeeded; the parse didn't).
-func TestS3_Role_MalformedPolicyJSON_Count0(t *testing.T) {
+// A bucket policy that cannot be parsed names no one knowably, so the role
+// pivot is unknown.
+func TestS3_Role_MalformedPolicyJSON_Unknown(t *testing.T) {
 	bucket := "mal-json-" + t.Name()
 	clients := s3FakeClientsWithPolicies(map[string]string{
 		bucket: `{"Version":"2012-10-17","Statement":[{NOT JSON`,
@@ -49,9 +49,8 @@ func TestS3_Role_MalformedPolicyJSON_Count0(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, emptyBucketResource(bucket), cache)
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 — malformed bucket-policy JSON must parse to zero principals, not fail the checker",
-			result.Count())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("state = %v (count %d), want unknown", result.State(), result.Count())
 	}
 }
 

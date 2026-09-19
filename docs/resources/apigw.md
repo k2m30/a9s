@@ -105,6 +105,7 @@ No Wave 1 signals — the list API does not return fields usable for attention.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: internet-facing REST API with no authorizer and no scoped resource policy.
+  - **Scoped resource policy**: a policy in which no wildcard grant survives unscoped. That covers a policy that grants only named principals, one with Deny statements only, one whose wildcard grant an unconditional Deny removes, one whose wildcard grant sits under a restrictive condition, and one fenced by a Deny to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. For a method with no IAM authorization, API Gateway admits an anonymous caller only when the policy grants it and no Deny matches. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the API itself (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`), scopes nobody. API Gateway returns the policy JSON-escaped; it is read unescaped. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

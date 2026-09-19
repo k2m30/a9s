@@ -16,10 +16,8 @@ import (
 	"strings"
 )
 
-// Principal is the parsed Principal block of a statement. A NotPrincipal
-// block names who is excluded, not who is granted, so its entries are never
-// stored here; the statement only records that it used one.
-type Principal struct {
+// PrincipalBlock is a parsed Principal or NotPrincipal block of a statement.
+type PrincipalBlock struct {
 	Wildcard      bool
 	AWS           []string
 	Service       []string
@@ -29,10 +27,13 @@ type Principal struct {
 
 // Statement is one entry of a policy's Statement block.
 type Statement struct {
-	Sid          string
-	Effect       string
-	Principal    Principal
-	NotPrincipal bool
+	Sid       string
+	Effect    string
+	Principal PrincipalBlock
+	// NotPrincipal is nil when the statement has no NotPrincipal block. Its
+	// entries name who the statement leaves out: an Allow grants, and a Deny
+	// denies, everyone else.
+	NotPrincipal *PrincipalBlock
 	Action       []string
 	NotAction    []string
 	Resource     []string
@@ -48,16 +49,24 @@ type Document struct {
 	Statement []Statement
 }
 
-// Decode returns the text of a policy document as the IAM APIs hand it over.
+// Decode returns the text of a policy document as the AWS APIs hand it over.
 // A document that already is JSON is used as it stands, so a literal '%'
-// inside a string value survives; only a document that is not JSON is
-// unescaped, once, path-style — a literal '+' inside a policy (a regex, a
-// resource name) must survive, which query-style unescaping would turn into a
-// space. A document that does not unescape comes back unchanged so the
-// caller's JSON parse reports the real problem rather than this function
-// inventing one.
+// inside a string value survives. API Gateway returns a REST API's policy as
+// the body of a JSON string literal (`{\"Version\":...}`), which is read as
+// that string. IAM returns its documents URL-encoded, which is unescaped
+// once, path-style — a literal '+' inside a policy (a regex, a resource name)
+// must survive, which query-style unescaping would turn into a space. A
+// document that does not unescape comes back unchanged so the caller's JSON
+// parse reports the real problem rather than this function inventing one.
 func Decode(doc string) string {
-	if json.Valid([]byte(doc)) || !strings.Contains(doc, "%") {
+	if json.Valid([]byte(doc)) {
+		return doc
+	}
+	var unquoted string
+	if json.Unmarshal([]byte(`"`+doc+`"`), &unquoted) == nil && json.Valid([]byte(unquoted)) {
+		return unquoted
+	}
+	if !strings.Contains(doc, "%") {
 		return doc
 	}
 	if decoded, err := url.PathUnescape(doc); err == nil {
@@ -95,13 +104,16 @@ func parseStatement(s map[string]any) Statement {
 		NotResource: strs(s["NotResource"]),
 		Condition:   parseCondition(s["Condition"]),
 	}
-	_, st.NotPrincipal = s["NotPrincipal"]
+	if np, ok := s["NotPrincipal"]; ok {
+		block := parsePrincipal(np)
+		st.NotPrincipal = &block
+	}
 	st.Principal = parsePrincipal(s["Principal"])
 	return st
 }
 
-func parsePrincipal(v any) Principal {
-	var p Principal
+func parsePrincipal(v any) PrincipalBlock {
+	var p PrincipalBlock
 	switch pv := v.(type) {
 	case string:
 		p.Wildcard = pv == "*"

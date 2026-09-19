@@ -149,8 +149,11 @@ func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *Issue
 		MarkSkipped(result, topicARN, failures, err)
 		return
 	}
-	if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {
-		if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
+	if policy := out.Attributes["Policy"]; policy != "" {
+		doc, parseErr := iampolicy.Parse(policy)
+		if parseErr != nil {
+			MarkSkipped(result, topicARN, failures, parseErr)
+		} else if ex := iampolicy.Evaluate(doc, ownAccount); ex.Public {
 			setWave2Finding(result, topicARN, snsCodePublicPolicy, publicPolicyRows(ex))
 		}
 	}

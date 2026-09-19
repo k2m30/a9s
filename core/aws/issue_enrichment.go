@@ -315,9 +315,9 @@ const CheckDeadline = "stopped at the Wave 2 deadline"
 func checkListIncomplete(shortName string) string { return shortName + " list incomplete" }
 
 // CheckOwnAccountUnknown is what a row records when its policy names an
-// account-shaped principal and the session never learned its own account:
-// whether the grant is foreign cannot be told, so the cross-account check
-// did not run.
+// account-shaped principal and neither the session nor the resource's ARN
+// names the owning account: whether the grant is foreign cannot be told, so
+// the cross-account check did not run.
 const CheckOwnAccountUnknown = "own account unknown"
 
 // markUninspected is the one writer of result.TruncatedIDs. check names what

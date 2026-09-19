@@ -567,10 +567,8 @@ func buildIAMRoles() []iamtypes.Role {
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}}]}`),
 	})
 
-	// S3 healthy-bucket access role (checkS3Role pivot).
-	// checkS3Role matches roles whose policy_resources field contains the bucket ARN.
-	// policy_resources is emitted by the IAM roles fetcher; this role is pre-set
-	// so the demo related graph renders.
+	// S3 healthy-bucket access role: the healthy bucket's policy names it as
+	// a principal (checkS3Role pivot).
 	roles = append(roles, iamtypes.Role{
 		RoleName:                 aws.String("a9s-demo-s3-access-role"),
 		RoleId:                   aws.String("AROAEXAMPLES3ACCESS01"),

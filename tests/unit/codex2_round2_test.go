@@ -75,23 +75,21 @@ func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 	}
 }
 
-// An inline policy's Statement can be a bare object instead of an array; the
-// s3→role pivot reads policy_resources off the same parse the
-// privilege-escalation check uses.
-func TestIAMRoles_InlineResourcesReadOffTheOneParse(t *testing.T) {
-	const doc = `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::acme-reports/*"}}`
+// An inline policy's Statement can be a bare object instead of an array, and
+// the privilege-escalation check reads it as a one-statement list.
+func TestIAMRoles_InlineBareStatementObjectIsRead(t *testing.T) {
+	const doc = `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"iam:CreatePolicyVersion","Resource":"*"}}`
 	fake := &codex2RoleFake{
 		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
-		policies: []string{"reports"},
-		docs:     map[string]string{"reports": doc},
+		policies: []string{"escalate"},
+		docs:     map[string]string{"escalate": doc},
 	}
 	res, err := awsclient.FetchIAMRolesPage(context.Background(), fake, "")
 	if err != nil {
 		t.Fatalf("FetchIAMRolesPage: %v", err)
 	}
-	if got := res.Resources[0].Fields["policy_resources"]; got != "arn:aws:s3:::acme-reports/*" {
-		t.Errorf("policy_resources = %q, want %q — a single-object Statement is as legal as an array",
-			got, "arn:aws:s3:::acme-reports/*")
+	if !codex2HasCode(res.Resources[0].Findings, "role.inline-privilege-escalation") {
+		t.Errorf("no privilege-escalation finding on a single-object Statement; findings=%+v", res.Resources[0].Findings)
 	}
 }
 

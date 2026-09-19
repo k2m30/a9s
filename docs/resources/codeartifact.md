@@ -58,6 +58,7 @@ maxResults=1)` runs once per repository and fills the package count the detail
 view shows. It raises no finding: an empty registry is not reported (see §5).
 
 - **Signal**: the repository permissions policy has an Allow statement that grants to any principal with no restrictive condition → **`public access policy`**. The policy is parsed and evaluated, not string-matched, so a wildcard principal written any legal way is caught and one scoped by a condition is not — `core/iampolicy/evaluate.go`.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged. A grant conditioned on `aws:PrincipalIsAWSService` being true admits AWS service principals only and is not public.
   - **State bucket**: Broken.
   - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `core/aws/codeartifact_issue_enrichment.go:100-132`.
   - **Cost shape**: per-resource.

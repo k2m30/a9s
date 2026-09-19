@@ -46,13 +46,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `iam-group`
 
 - **Why related**: Trust relationships may reference groups (the trust policy's `Principal` list can name groups that can assume this role).
-- **How discovered**: parse the role's URL-decoded `AssumeRolePolicyDocument` (available on `ListRoles`) and match `Statement[].Principal.AWS` ARNs ending in `:group/<name>` against the already-loaded `iam-group` list — a9s-devops: standard trust-policy parse; no extra API call.
+- **How discovered**: parse the role's URL-decoded `AssumeRolePolicyDocument` (available on `ListRoles`) and match `Statement[].Principal.AWS` ARNs ending in `:group/<name>` against the already-loaded `iam-group` list — a9s-devops: standard trust-policy parse; no extra API call. Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
 - **Count shown**: yes.
 
 ### `iam-user`
 
 - **Why related**: Trust may include user principals — named humans who can assume this role.
-- **How discovered**: same `AssumeRolePolicyDocument` parse as `iam-group`, matching `Principal.AWS` ARNs ending in `:user/<name>` against the already-loaded `iam-user` list — a9s-devops: same parse, different principal suffix.
+- **How discovered**: same `AssumeRolePolicyDocument` parse as `iam-group`, matching `Principal.AWS` ARNs ending in `:user/<name>` against the already-loaded `iam-user` list — a9s-devops: same parse, different principal suffix. Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
 - **Count shown**: yes.
 
 ### `lambda`
@@ -88,14 +88,16 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
 ### 3.1 Wave 1 — zero extra API calls
 
 - **Signal**: `AssumeRolePolicyDocument` (URL-encoded JSON on `ListRoles`) contains `Principal:{"AWS":"*"}` without an external-id condition.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody.
   - **State bucket**: Broken.
   - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; search for a `Statement` whose `Effect==Allow` and `Principal.AWS=="*"` with no matching `Condition.StringEquals["sts:ExternalId"]`.
 
-- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping — a condition scopes the trust only when a positive operator (`StringEquals`, `ArnLike` and their `ForAllValues:` / `ForAnyValue:` forms) compares one of those keys against a concrete value; `Null`, a negated operator and an `IfExists` variant leave the trust unscoped.
+- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping — a condition scopes the trust only when a positive operator (`StringEquals`, `ArnLike` and their `ForAnyValue:` forms) compares one of those keys against a concrete value; `Null`, a negated operator, an `IfExists` variant and a `ForAllValues:` form (true for a request without the key) leave the trust unscoped. A service an unconditional Deny removes from the trust is not reported.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: an inline policy grants a known privilege-escalation action combination.
+  - **Explicit Deny**: an action an unconditional Deny covers is not granted; a Deny with `NotAction` covers every action no listed entry overlaps, so Deny NotAction [`s3:*`, `logs:*`] removes every `iam:` action. A conditioned Deny removes nothing.
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 

@@ -138,16 +138,6 @@ func canonicalDNS(s string) string {
 	return strings.TrimSuffix(s, ".")
 }
 
-// arnAccountID returns the account ID an ARN names, or "" when the string is
-// not an ARN.
-func arnAccountID(s string) string {
-	a, err := arn.Parse(s)
-	if err != nil {
-		return ""
-	}
-	return a.AccountID
-}
-
 // elbv2Dimension returns the CloudWatch dimension value ELBv2 metrics carry
 // for an ELBv2 ARN: for a load balancer the resource after "loadbalancer/"
 // ("app/<name>/<id>"), for a target group the resource from "targetgroup/"

@@ -213,6 +213,7 @@ renders green and blank.
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can invoke it.
+  - A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **API call**: `GetPolicy` — one call per function.
   - **Cost shape**: per-resource.

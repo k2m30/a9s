@@ -463,9 +463,6 @@ func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 			t.Fatalf("got %d rows, want the role to survive the partial failure", len(res.Resources))
 		}
 		w4AssertNoCode(t, res.Resources[0].Findings, w4CodeRoleInlinePrivEsc)
-		if got := res.Resources[0].Fields["policy_resources"]; got != "?" {
-			t.Errorf("policy_resources = %q, want %q", got, "?")
-		}
 	})
 }
 

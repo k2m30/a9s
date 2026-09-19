@@ -7,9 +7,8 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
-	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
@@ -52,72 +51,37 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResultTrunc("eks", ids, truncated)
 }
 
-// checkRoleIamGroup extracts IAM group names from this role's AssumeRolePolicy (trust
-// policy) by scanning Principal.AWS ARN entries matching ":group/". The trust
-// document is already fetched + URL-decoded by the role fetcher and lives in
-// Fields["assume_role_policy_document"] — 0 API calls, offline parse.
+// checkRoleIamGroup lists the IAM groups this role's trust policy grants.
+// The trust document is already fetched and URL-decoded by the role fetcher
+// and lives in Fields["assume_role_policy_document"]: 0 API calls.
 func checkRoleIamGroup(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	doc := res.Fields["assume_role_policy_document"]
-	if doc == "" {
-		return resource.KnownRelated("iam-group", nil, false)
-	}
-	var arns []string
-	extractPrincipalsByKind([]byte(doc), ":group/", &arns)
-	return relatedRefs("iam-group", arns, refContext(clients, cache, "iam-group"))
+	return roleTrustPrincipals(clients, res, cache, "iam-group", "group/")
 }
 
-// checkRoleIamUser extracts IAM user names from this role's AssumeRolePolicy trust
-// policy by scanning Principal.AWS ARN entries matching ":user/". 0-call path.
+// checkRoleIamUser lists the IAM users this role's trust policy grants.
+// 0-call path.
 func checkRoleIamUser(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return roleTrustPrincipals(clients, res, cache, "iam-user", "user/")
+}
+
+// roleTrustPrincipals resolves the principals of kind the role's trust
+// policy grants to target rows. A trust policy that does not parse leaves
+// the pivot unknown.
+func roleTrustPrincipals(clients any, res resource.Resource, cache resource.ResourceCache, target, kind string) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
-		return resource.KnownRelated("iam-user", nil, false)
+		return resource.KnownRelated(target, nil, false)
 	}
-	var arns []string
-	extractPrincipalsByKind([]byte(doc), ":user/", &arns)
-	return relatedRefs("iam-user", arns, refContext(clients, cache, "iam-user"))
-}
-
-// extractPrincipalsByKind walks a JSON IAM policy document and appends to arns
-// the Principal.AWS ARN entries whose string contains the given kindMarker
-// (e.g. ":group/", ":user/", ":role/").
-func extractPrincipalsByKind(doc []byte, kindMarker string, arns *[]string) {
-	var raw any
-	if err := json.Unmarshal(doc, &raw); err != nil {
-		return
+	roleARN := ""
+	if raw, ok := assertStruct[iamtypes.Role](res.RawStruct); ok {
+		roleARN = aws.ToString(raw.Arn)
 	}
-	var walk func(v any)
-	walk = func(v any) {
-		switch x := v.(type) {
-		case map[string]any:
-			for k, val := range x {
-				if k == "AWS" {
-					addKindedPrincipal(val, kindMarker, arns)
-				}
-				walk(val)
-			}
-		case []any:
-			for _, item := range x {
-				walk(item)
-			}
-		}
+	rc := policyRefContext(clients, cache, target, roleARN)
+	refs, ok := grantedPrincipalRefs(doc, kind)
+	if !ok {
+		return resource.UnknownRelated(target)
 	}
-	walk(raw)
-}
-
-func addKindedPrincipal(v any, kindMarker string, arns *[]string) {
-	switch x := v.(type) {
-	case string:
-		if strings.Contains(x, kindMarker) {
-			*arns = append(*arns, x)
-		}
-	case []any:
-		for _, it := range x {
-			if s, ok := it.(string); ok && strings.Contains(s, kindMarker) {
-				*arns = append(*arns, s)
-			}
-		}
-	}
+	return relatedRefs(target, refs, rc)
 }
 
 // roleNameFromARN is the role a role reference names (role.ID), or the

@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `role`
 
 - **Why related**: Two role linkages matter: the IAM principals that can read the secret (resource policy) and the execution role of the rotation Lambda. Both appear during access-audit and rotation-debug workflows.
-- **How discovered**: Call `secretsmanager:GetResourcePolicy` → parse `Statement[].Principal.AWS` for role ARNs; additionally resolve `RotationLambdaARN` → `lambda:GetFunction` → `FunctionConfiguration.Role`.
+- **How discovered**: Call `secretsmanager:GetResourcePolicy` → parse `Statement[].Principal.AWS` for role ARNs; additionally resolve `RotationLambdaARN` → `lambda:GetFunction` → `FunctionConfiguration.Role`. Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
 - **Count shown**: yes.
 
 ### `sns`
@@ -136,10 +136,13 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
 One bullet per distinct signal.
 
 - **Signal**: Resource policy allows a wildcard principal with no restrictive condition.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: Resource policy names a principal in another account.
+  - **Own account**: principals of the owning account are not foreign. When STS cannot name the session's account, the owning account is the one the resource's ARN names; only when neither does is the row marked not inspected.
+  - **Explicit Deny**: an account an unconditional Deny takes every granted action from is not counted.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

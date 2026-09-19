@@ -89,9 +89,10 @@ var operatorTable = []condCase{
 		sourceScope: true,
 	},
 	{
-		name:      "ForAllValues:StringEquals on PrincipalOrgID",
-		cond:      `{"ForAllValues:StringEquals":{"aws:PrincipalOrgID":"o-abc123"}}`,
-		restricts: true,
+		// ForAllValues is true when the request does not carry the key, and
+		// an anonymous request carries no aws:PrincipalOrgID.
+		name: "ForAllValues:StringEquals on PrincipalOrgID holds for a request without the key",
+		cond: `{"ForAllValues:StringEquals":{"aws:PrincipalOrgID":"o-abc123"}}`,
 	},
 	{
 		name:      "ForAnyValue:StringEquals on PrincipalOrgID",

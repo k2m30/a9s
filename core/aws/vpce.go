@@ -25,15 +25,10 @@ import (
 // the wildcard principal with a condition is a deliberate grant and is not a
 // finding. An unparseable document is unknown, not open.
 //
-// The statement is evaluated on its own rather than against the aggregate
-// Exposure, because the aggregate merges the actions of every public
-// statement: one statement granting "*" on a bucket beside another granting
-// s3:GetObject on "*" would otherwise add up to a full-access policy neither
-// of them is. Evaluate still owns the "is this principal public, and does a
-// condition scope it" rule, so there is no second reading of it here.
-//
-// ownAccount is empty here: only Exposure.Public is consulted, and that
-// verdict does not depend on which account owns the endpoint.
+// Each Allow statement is evaluated beside the document's Deny statements:
+// the aggregate Exposure merges the actions of every public statement, so one
+// statement granting "*" on a bucket and another granting s3:GetObject on "*"
+// together read as a full-access policy neither of them is.
 func vpcePolicyExposure(policyDocument string) ([]domain.DetailRow, bool) {
 	if policyDocument == "" {
 		return nil, false
@@ -42,11 +37,17 @@ func vpcePolicyExposure(policyDocument string) ([]domain.DetailRow, bool) {
 	if err != nil {
 		return nil, false
 	}
+	var denies []iampolicy.Statement
 	for _, st := range doc.Statement {
-		if !slices.Contains(st.Resource, "*") {
+		if st.Effect == "Deny" {
+			denies = append(denies, st)
+		}
+	}
+	for _, st := range doc.Statement {
+		if st.Effect != "Allow" || !slices.Contains(st.Resource, "*") {
 			continue
 		}
-		ex := iampolicy.Evaluate(iampolicy.Document{Statement: []iampolicy.Statement{st}}, "")
+		ex := iampolicy.EvaluateEndpoint(iampolicy.Document{Statement: append([]iampolicy.Statement{st}, denies...)})
 		if !ex.Public || !slices.ContainsFunc(ex.PublicActions, isWildcardAction) {
 			continue
 		}

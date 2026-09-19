@@ -15,9 +15,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
@@ -85,21 +86,9 @@ func TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch(t *testing.T) {
 // ARNs, not off the role's own inline/attached policies that mention the
 // bucket.
 func TestS3_Related_Role_UsesBucketPolicyPrincipals(t *testing.T) {
-	// The cached role's own policy documents do not reference the bucket
-	// (policy_resources empty); the bucket policy names the role as a principal.
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{
-				{
-					ID:   "a9s-demo-s3-access-role",
-					Name: "a9s-demo-s3-access-role",
-					Fields: map[string]string{
-						// Deliberately empty: role's own policies do not
-						// mention this bucket. Bucket policy does (fixture).
-						"policy_resources": "",
-					},
-				},
-			},
+			Resources: []resource.Resource{s3PivotRoleRow("a9s-demo-s3-access-role", "Lambda execution role")},
 		},
 	}
 	checker := s3CheckerByTarget(t, "role")
@@ -110,32 +99,19 @@ func TestS3_Related_Role_UsesBucketPolicyPrincipals(t *testing.T) {
 	}
 }
 
-// A role whose own policy mentions the bucket but that is not a principal in
-// the bucket policy is not related.
+// A role that names the bucket on its own side but is not a principal in the
+// bucket policy is not related.
 func TestS3_Related_Role_UnrelatedRolePolicyMentioningBucket_DoesNotMatch(t *testing.T) {
-	// We use a bucket that has NO bucket policy in the fixture, so no
-	// role can be a principal. Any role mentioning the bucket in its own
-	// policy must not match — the relationship lives on the bucket side.
+	bucket := "test-only-no-bucket-policy-" + t.Name()
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:   "role-that-mentions-other-bucket",
-					Name: "role-that-mentions-other-bucket",
-					Fields: map[string]string{
-						// Role's policy resources mention the bucket, but
-						// the bucket's own policy does not list this role —
-						// no true relationship.
-						"policy_resources": "arn:aws:s3:::" + fixtures.HealthyBucketName + "/*",
-					},
-				},
+				s3PivotRoleRow("acme-bucket-reader", "Reads arn:aws:s3:::"+bucket+"/*"),
 			},
 		},
 	}
 	checker := s3CheckerByTarget(t, "role")
-	// This bucket has no bucket policy in the fixtures (the fake returns
-	// NoSuchBucketPolicy), so the result is 0.
-	src := emptyBucketResource("test-only-no-bucket-policy-" + t.Name())
+	src := emptyBucketResource(bucket)
 	result := checker(context.Background(), s3FakeClients(), src, cache)
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 — a role whose own policy mentions the bucket must not match when the bucket policy does not list the role as a principal",
@@ -184,5 +160,26 @@ func TestS3_Related_Backup_ExactMatchStillResolves(t *testing.T) {
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want ≥1 — exact ARN match must still resolve after the prefix-collision fix",
 			result.Count())
+	}
+}
+
+// s3PivotRoleRow is a role row as the IAM roles fetcher builds it.
+func s3PivotRoleRow(name, description string) resource.Resource {
+	trust := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`
+	return resource.Resource{
+		ID: name, Name: name, Type: "role",
+		Fields: map[string]string{
+			"role_name":                   name,
+			"path":                        "/",
+			"description":                 description,
+			"assume_role_policy_document": trust,
+		},
+		RawStruct: iamtypes.Role{
+			RoleName:                 aws.String(name),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + name),
+			Path:                     aws.String("/"),
+			Description:              aws.String(description),
+			AssumeRolePolicyDocument: aws.String(trust),
+		},
 	}
 }

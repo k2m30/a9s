@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `role`
 
 - **Why related**: IAM principals granted publish/subscribe/manage permissions by the topic's resource policy — `GetTopicAttributes` returns the access-control document in `Attributes["Policy"]` as JSON, whose `Statement[].Principal` commonly lists role ARNs (docs/related-resources.md §`sns`; SDK `sns.GetTopicAttributesOutput` § `Attributes["Policy"]`) — a9s-devops: used during IAM audits to answer "who can publish to this topic?"; the 1/6-audit rationale in the golden doc is weak but the workflow is real.
-- **How discovered**: parse `Attributes["Policy"]` JSON from `GetTopicAttributes` (Wave 2), extract each `Statement[].Principal.AWS` ARN whose ARN type is `role`, and cross-reference against the loaded `role` list — a9s-devops: JSON parse is cheap; skip silently if policy is absent (no statement → no principals → empty list).
+- **How discovered**: parse `Attributes["Policy"]` JSON from `GetTopicAttributes` (Wave 2), extract each `Statement[].Principal.AWS` ARN whose ARN type is `role`, and cross-reference against the loaded `role` list — a9s-devops: JSON parse is cheap; skip silently if policy is absent (no statement → no principals → empty list). Principals are those the policy's Allow statements grant, less any an unconditional Deny takes away; another account's principal is never matched against a local row, and a policy that does not parse leaves the pivot unknown.
 - **Count shown**: unknown — `docs/related-resources.md` § `sns` does not specify.
 
 ### `sns-sub`
@@ -82,6 +82,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: access `Policy` allows a wildcard principal.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

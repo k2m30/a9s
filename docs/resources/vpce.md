@@ -118,6 +118,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `State` field on the list-response endpoint (interface endpoint with some AZ ENIs failed to provision — subset of expected ENIs came up).
 
 - **Signal**: `PolicyDocument` grants a wildcard action — `*` or a service-wide `s3:*` — to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint).
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator) scopes nobody; one that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`) scopes the endpoint to those resources.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 

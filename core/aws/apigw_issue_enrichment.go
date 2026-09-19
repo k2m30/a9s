@@ -214,9 +214,10 @@ type apigwV1API interface {
 	APIGatewayV1GetStagesAPI
 }
 
-// apigwRESTFindings evaluates the REST posture rules for one API. It returns true
-// when the stage listing failed, so the caller marks the row truncated rather
-// than reporting an API whose posture it could not read as clean.
+// apigwRESTFindings evaluates the REST posture rules for one API. It returns
+// the error of a call that failed or of a resource policy that does not
+// parse, so the caller marks the row truncated rather than reporting an API
+// whose posture it could not read as clean.
 func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
 	apiID := r.ID
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
@@ -229,15 +230,22 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 	if err != nil {
 		return err
 	}
+	var policyErr error
 	if len(authorizers.Items) == 0 {
 		endpoint := strings.ToLower(r.Fields["endpoint"])
-		// A resource policy that grants under a condition is a real control;
-		// one open to everyone is not, and the API stays exposed.
+		// A method with no IAM authorization admits an anonymous caller only
+		// when the resource policy grants it and no Deny matches, so the API
+		// is scoped unless an unscoped wildcard grant survives.
 		scoped := false
-		if doc, perr := iampolicy.Parse(apigwRESTPolicy(r)); perr == nil {
-			scoped = iampolicy.Evaluate(doc, ownAccount).Conditioned
+		if policy := apigwRESTPolicy(r); policy != "" {
+			var doc iampolicy.Document
+			if doc, policyErr = iampolicy.Parse(policy); policyErr == nil {
+				scoped = !iampolicy.Evaluate(doc, ownAccount).Public
+			}
 		}
 		switch {
+		case policyErr != nil:
+			// A policy that cannot be read leaves the exposure unknown.
 		case scoped:
 			// guarded by the policy — no finding
 		case endpoint == "":
@@ -276,7 +284,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
 		}
 	}
-	return nil
+	return policyErr
 }
 
 // apigwRESTPolicy returns the API's resource policy document, which the

@@ -5,12 +5,13 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
@@ -148,52 +149,10 @@ func kmsRefNames(ref, keyID string, rc domain.RefContext) (match, unknown bool) 
 	return false, local && strings.HasPrefix(res, "alias/")
 }
 
-// kmsIAMPolicyDoc is a minimal IAM policy document used for parsing Principal.AWS fields.
-type kmsIAMPolicyDoc struct {
-	Statement []struct {
-		Principal struct {
-			AWS any `json:"AWS"` // may be string or []string
-		} `json:"Principal"`
-	} `json:"Statement"`
-}
-
-// kmsRoleARNsFromPolicyJSON extracts IAM role ARNs from an IAM policy JSON string.
-// Handles Principal.AWS as either a plain string or a JSON array of strings.
-// Only entries matching arn:aws:iam::*:role/* are extracted.
-func kmsRoleARNsFromPolicyJSON(policyJSON string) []string {
-	if policyJSON == "" {
-		return nil
-	}
-	var doc kmsIAMPolicyDoc
-	if err := json.Unmarshal([]byte(policyJSON), &doc); err != nil {
-		return nil
-	}
-	var arns []string
-	for _, stmt := range doc.Statement {
-		var principals []string
-		switch v := stmt.Principal.AWS.(type) {
-		case string:
-			principals = []string{v}
-		case []any:
-			for _, item := range v {
-				if s, ok := item.(string); ok {
-					principals = append(principals, s)
-				}
-			}
-		}
-		for _, p := range principals {
-			if strings.Contains(p, ":role/") {
-				arns = append(arns, p)
-			}
-		}
-	}
-	return arns
-}
-
-// checkKMSRole resolves IAM roles that have access to this KMS key.
-// It calls kms:GetKeyPolicy (default policy) to parse Principal.AWS
-// role ARNs from the policy JSON, and kms:ListGrants to collect GranteePrincipal
-// and RetiringPrincipal role ARNs. Results are deduplicated.
+// checkKMSRole resolves IAM roles that have access to this KMS key: the
+// roles its default key policy (kms:GetKeyPolicy) grants, and the
+// GranteePrincipal and RetiringPrincipal roles of its grants
+// (kms:ListGrants). Results are deduplicated.
 func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
@@ -212,6 +171,11 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("role")
 	}
 
+	keyARN := ""
+	if meta, isMeta := assertStruct[kmstypes.KeyMetadata](res.RawStruct); isMeta {
+		keyARN = aws.ToString(meta.Arn)
+	}
+	rc := policyRefContext(clients, cache, "role", keyARN)
 	var refs []string
 	policyName := "default"
 
@@ -226,7 +190,9 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("role", err)
 	}
 	if policyOut != nil && policyOut.Policy != nil {
-		refs = kmsRoleARNsFromPolicyJSON(*policyOut.Policy)
+		if refs, ok = grantedPrincipalRefs(*policyOut.Policy, "role/"); !ok {
+			return resource.UnknownRelated("role")
+		}
 	}
 
 	grantsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListGrantsOutput, error) {
@@ -259,5 +225,5 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 
-	return relatedRefs("role", refs, refContext(clients, cache, "role"))
+	return relatedRefs("role", refs, rc)
 }

@@ -4,10 +4,11 @@
 package aws
 
 import (
+	"cmp"
 	"context"
-	"encoding/json"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -144,9 +145,8 @@ func ecrPipelineHasRepo(stages []cptypes.StageDeclaration, repoName string) bool
 	return false
 }
 
-// checkECRRole resolves IAM roles from the ECR repository's resource-based policy.
-// Pattern F+forward: calls ecr:GetRepositoryPolicy and parses Statement[].Principal.AWS
-// for role ARNs matching arn:aws:iam::*:role/*.
+// checkECRRole resolves the IAM roles the ECR repository's resource-based
+// policy grants. Pattern F+forward: calls ecr:GetRepositoryPolicy.
 func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
@@ -187,65 +187,10 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 
 	// repo.RegistryId is the owning account, the one whose roles are local.
 	rc := refContext(clients, cache, "role")
-	if repo.RegistryId != nil && *repo.RegistryId != "" {
-		rc.AccountID = *repo.RegistryId
+	rc.AccountID = cmp.Or(aws.ToString(repo.RegistryId), rc.AccountID)
+	refs, ok := grantedPrincipalRefs(*out.PolicyText, "role/")
+	if !ok {
+		return resource.UnknownRelated("role")
 	}
-	return relatedRefs("role", ecrPolicyRoleARNs(*out.PolicyText), rc)
-}
-
-// ecrPolicyRoleARNs parses an IAM policy JSON document and returns all IAM role
-// ARNs found in Statement[].Principal.AWS. Both string and []string Principal.AWS
-// values are handled.
-func ecrPolicyRoleARNs(policyText string) []string {
-	var policy struct {
-		Statement []struct {
-			Principal json.RawMessage `json:"Principal"`
-		} `json:"Statement"`
-	}
-	if err := json.Unmarshal([]byte(policyText), &policy); err != nil {
-		return nil
-	}
-
-	seen := map[string]struct{}{}
-	for _, stmt := range policy.Statement {
-		if stmt.Principal == nil {
-			continue
-		}
-		var principalObj map[string]json.RawMessage
-		if err := json.Unmarshal(stmt.Principal, &principalObj); err == nil {
-			if awsRaw, ok := principalObj["AWS"]; ok {
-				addRoleARNs(awsRaw, seen)
-			}
-		}
-	}
-	ids := make([]string, 0, len(seen))
-	for arn := range seen {
-		ids = append(ids, arn)
-	}
-	return ids
-}
-
-// addRoleARNs extracts role ARNs from a JSON value that is either a string or
-// []string and adds any matching arn:aws:iam::*:role/* entries to seen.
-func addRoleARNs(raw json.RawMessage, seen map[string]struct{}) {
-	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
-		if isRoleARN(single) {
-			seen[single] = struct{}{}
-		}
-		return
-	}
-	var multi []string
-	if err := json.Unmarshal(raw, &multi); err == nil {
-		for _, s := range multi {
-			if isRoleARN(s) {
-				seen[s] = struct{}{}
-			}
-		}
-	}
-}
-
-// isRoleARN returns true if s is an IAM role ARN (arn:aws:iam::*:role/*).
-func isRoleARN(s string) bool {
-	return strings.HasPrefix(s, "arn:") && strings.Contains(s, ":role/")
+	return relatedRefs("role", refs, rc)
 }

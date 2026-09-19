@@ -83,7 +83,6 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		FieldKeys: []string{
 			"role_name", "role_id", "path", "create_date", "description",
 			"assume_role_policy_document", "trust_wildcard", "trust_summary",
-			"policy_resources",
 		},
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)

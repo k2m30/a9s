@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -410,11 +409,10 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResultTrunc("r53", ids, truncated)
 }
 
-// checkS3Role resolves roles named as AWS principals in the bucket's
-// resource policy: the Statement[].Principal.AWS entries of s3:GetBucketPolicy
-// that are IAM role ARNs, looked up in the already-loaded `role` list. This
-// is the canonical direction of the relationship — the access grant lives
-// on the bucket side, not on the role's own policies.
+// checkS3Role resolves the roles the bucket's resource policy
+// (s3:GetBucketPolicy) grants, looked up in the already-loaded `role` list.
+// This is the canonical direction of the relationship — the access grant
+// lives on the bucket side, not on the role's own policies.
 //
 // Wildcards, service principals, and cross-account role ARNs that do
 // not resolve in the local `role` cache are ignored: we only surface
@@ -453,8 +451,14 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.KnownRelated("role", nil, false)
 	}
 
-	principalARNs := extractBucketPolicyAWSPrincipals(*out.Policy)
-	if len(principalARNs) == 0 {
+	// A bucket ARN names no account, so only the session's can tell a
+	// foreign role from a local one.
+	rc := refContext(clients, cache, "role")
+	roleARNs, ok := grantedPrincipalRefs(*out.Policy, "role/")
+	if !ok {
+		return resource.UnknownRelated("role")
+	}
+	if len(roleARNs) == 0 {
 		return resource.KnownRelated("role", nil, false)
 	}
 
@@ -466,66 +470,8 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("role")
 	}
 
-	// Match the role principals against the loaded role cache — the pivot is
-	// "navigate to this role in the list". Wildcards, account roots and
-	// services are not roles; a role of another account is a role this
-	// count leaves out.
-	var roleARNs []string
-	for _, p := range principalARNs {
-		if strings.Contains(p, ":role/") {
-			roleARNs = append(roleARNs, p)
-		}
-	}
-	ids, dropped := listedRefs("role", roleARNs, refContext(clients, cache, "role"), roleList)
+	ids, dropped := listedRefs("role", roleARNs, rc, roleList)
 	return relatedResultTrunc("role", ids, truncated || dropped)
-}
-
-// extractBucketPolicyAWSPrincipals parses a bucket-policy JSON document
-// and returns every concrete Statement[].Principal.AWS role-ARN it names.
-// Accepts the AWS-canonical shapes (string, []string) and filters to
-// entries that look like IAM role ARNs; wildcards ("*"), service
-// principals ({Service: ...}), and malformed entries are dropped.
-func extractBucketPolicyAWSPrincipals(doc string) []string {
-	var parsed struct {
-		Statement []struct {
-			Principal any `json:"Principal"`
-		} `json:"Statement"`
-	}
-	if err := json.Unmarshal([]byte(doc), &parsed); err != nil {
-		return nil
-	}
-	var arns []string
-	for _, stmt := range parsed.Statement {
-		// Principal may be a string "*" or a map {"AWS": ..., "Service": ...}.
-		m, ok := stmt.Principal.(map[string]any)
-		if !ok {
-			continue
-		}
-		aws := m["AWS"]
-		switch v := aws.(type) {
-		case string:
-			if isIAMRoleARN(v) {
-				arns = append(arns, v)
-			}
-		case []any:
-			for _, item := range v {
-				if s, ok := item.(string); ok && isIAMRoleARN(s) {
-					arns = append(arns, s)
-				}
-			}
-		}
-	}
-	return arns
-}
-
-// isIAMRoleARN reports whether s names an IAM role
-// (arn:<partition>:iam::<account>:role/<name>). Rejects wildcards,
-// account-root ARNs, user ARNs and STS assumed-role sessions — the role pivot
-// only surfaces role principals. The partition is the account's own and is
-// never compared.
-func isIAMRoleARN(s string) bool {
-	a, ok := ARNForService(s, "iam")
-	return ok && strings.HasPrefix(a.Resource, "role/")
 }
 
 // checkS3Trail searches the trail cache for trails whose S3BucketName matches
