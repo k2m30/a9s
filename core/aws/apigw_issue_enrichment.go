@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
@@ -61,11 +62,13 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	}
 	v1, hasV1 := clients.APIGatewayV1.(apigwV1API)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return r.Fields["protocol"] != "REST" || hasV1
+	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		apiID := r.ID
 		if apiID == "" {
@@ -74,9 +77,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		// The REST lane is a different API with different calls. An account
 		// with no REST client still gets its HTTP APIs enriched.
 		if r.Fields["protocol"] == "REST" {
-			if !hasV1 {
-				return
-			}
 			row, rowFailures := apigwRESTRow(ctx, v1, r, ownAccount)
 			mergeRowResult(&mu, &result, &failures, row, rowFailures)
 			return
@@ -84,7 +84,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		row, rowFailures := apigwHTTPRow(ctx, clients, r)
 		mergeRowResult(&mu, &result, &failures, row, rowFailures)
 	})
-	return result, AggregateFailures("authorizers and stages", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("authorizers and stages", failures, n))
 }
 
 // apigwRESTRow evaluates one REST API into a result of its own, which the
@@ -184,9 +184,8 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 		MarkSkipped(&row, r.ID, &rowFailures, fetchErr)
 	}
 	// A stage-count page cap is not a coverage gap on the row: the "+" on
-	// stages_count is where it is reported. Marking the ID truncated would
-	// make FoldWave2Rows skip the row, dropping the authorizer verdict
-	// above — a separate call the stage walk says nothing about.
+	// stages_count is where it is reported, and the authorizer verdict above
+	// is a separate call the stage walk says nothing about.
 	row.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
 
 	stagesCount := len(stages)

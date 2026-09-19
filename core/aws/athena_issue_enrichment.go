@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,11 +44,11 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 	if clients.Athena == nil {
 		return result, nil
 	}
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		wgName := r.Fields["workgroup_name"]
 		if wgName == "" {
@@ -91,7 +92,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("GetWorkGroup", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("GetWorkGroup", failures, n))
 }
 
 // resultOutputLocation returns the workgroup's configured result location, or

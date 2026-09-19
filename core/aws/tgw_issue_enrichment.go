@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -40,10 +41,9 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		tgwID := r.ID
 		if tgwID == "" {
@@ -144,6 +144,5 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 	})
 
 	SetTruncated(&result, truncated)
-	return result,
-		AggregateFailures("DescribeTransitGatewayAttachments", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeTransitGatewayAttachments", failures, total))
 }

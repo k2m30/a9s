@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -44,10 +45,9 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		// DescribeClusterV2 requires the cluster ARN. The msk fetcher (msk.go)
 		// sets ID = cluster name and stores the ARN in Fields["cluster_arn"].
@@ -113,8 +113,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 
-	return result,
-		AggregateFailures("DescribeClusterV2", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeClusterV2", failures, total))
 }
 
 // mskPublicAccessOn is the one PublicAccess.Type value that means the brokers

@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -36,11 +37,11 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	if clients.EC2 == nil {
 		return result, nil
 	}
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		vpcID := r.ID
 		if vpcID == "" {
@@ -109,5 +110,5 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		}
 	})
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("DescribeFlowLogs", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeFlowLogs", failures, n))
 }

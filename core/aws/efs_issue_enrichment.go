@@ -51,10 +51,9 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	var failures []Failure
 	var policyFailures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		fsID := r.ID
 		if fsID == "" {
@@ -112,9 +111,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			// A page cap is not a failed call and not a coverage gap on the
 			// row: the mount-target findings below need a complete walk and
 			// are skipped, but the policy checks above already answered from
-			// their own call. Marking the id uninspected would make
-			// FoldWave2Rows skip the row and drop them — which is exactly what
-			// running them first was meant to prevent.
+			// their own call.
 			return
 		}
 
@@ -165,6 +162,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	// N file systems it could not answer for, and folding them into one
 	// tally would report more failures than there were file systems.
 	return result, errors.Join(
+		loopErr,
 		AggregateFailures("DescribeMountTargets", failures, total),
 		AggregateFailures("file system and backup policy", policyFailures, total),
 	)

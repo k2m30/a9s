@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -41,21 +42,19 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	if !ok {
 		return result, nil
 	}
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return !strings.HasPrefix(r.Fields["path"], awsServiceRolePathPrefix)
+	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		roleName := r.Fields["role_name"]
 		if roleName == "" {
 			roleName = r.ID
 		}
 		if roleName == "" {
-			return
-		}
-		// Skip AWS service-linked roles.
-		if strings.HasPrefix(r.Fields["path"], awsServiceRolePathPrefix) {
 			return
 		}
 		attachedRole, aerr := listAttachedRolePolicies(ctx, clients.IAM, roleName)
@@ -95,5 +94,5 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	// After MarkInformationalOnly, which owns the aggregate Truncated flag for
 	// this "~"-only enricher: the composite error is a separate answer, and
 	// dropping it told the operator nothing about a refused call.
-	return result, AggregateFailures("role last-used", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("role last-used", failures, n))
 }

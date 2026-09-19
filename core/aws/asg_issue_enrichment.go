@@ -40,10 +40,9 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -94,7 +93,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	SetTruncated(&result, truncated)
 	activitiesErr := AggregateFailures("DescribeScalingActivities", failures, total)
 	lcErr := asgLaunchConfigurationPosture(ctx, clients, &result, resources)
-	return result, errors.Join(activitiesErr, lcErr)
+	return result, errors.Join(loopErr, activitiesErr, lcErr)
 }
 
 // asgLaunchConfigurationPosture describes the launch configurations the
@@ -122,7 +121,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	names = capAtEnrichmentCap(result, names, func(n string) []string { return groupsByLC[n] })
+	names = capAtEnrichmentCap(result, names, nil, func(n string) []string { return groupsByLC[n] })
 
 	// DescribeLaunchConfigurations pages: asking for EnrichmentCap names fits
 	// one page only because the API's default page size happens to match. Both

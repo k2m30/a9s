@@ -46,18 +46,17 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return !resourceIsTearingDown(r.RawStruct)
+	}, resourceIDsOf)
 	n := len(resources)
-	if n < len(resources) {
-		SetTruncated(&result, true)
-	}
 	var failures []Failure
 	var mu sync.Mutex
 	var requireSSLByGroup redshiftParamGroupCache
 
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		if r.ID == "" || resourceIsTearingDown(r.RawStruct) {
+		if r.ID == "" {
 			return
 		}
 		logging, logErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeLoggingStatusOutput, error) {
@@ -98,7 +97,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 
-	err := Finish(&result, failures, n, "cluster posture")
+	err := errors.Join(loopErr, Finish(&result, failures, n, "cluster posture"))
 	return result, err
 }
 

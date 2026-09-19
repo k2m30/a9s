@@ -6,6 +6,7 @@ package aws
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -145,10 +146,12 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	}
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return r.Fields["load_balancer_arn"] != ""
+	}, resourceIDsOf)
+	ids := resourceIDs(resources)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	attrErr := ForEachRow(ctx, &result, ids, EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -207,7 +210,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 	// Listener posture needs a second read per load balancer, so it runs as
 	// its own pass rather than serialising behind the attributes call.
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	listenerErr := ForEachRow(ctx, &result, ids, EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		lbARN := r.Fields["load_balancer_arn"]
 		if r.ID == "" || lbARN == "" {
@@ -245,7 +248,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("load balancer attributes and listeners", failures, total)
+	return result, errors.Join(attrErr, listenerErr, AggregateFailures("load balancer attributes and listeners", failures, total))
 }
 
 // allELBListeners reads a balancer's listeners to the end. DescribeListeners

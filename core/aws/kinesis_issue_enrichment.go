@@ -49,20 +49,18 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	}
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		// Rule 4: a stream being torn down has no posture worth reporting.
+		return r.Fields["stream_status"] != string(kinesistypes.StreamStatusDeleting)
+	}, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		name := r.Fields["stream_name"]
 		if name == "" {
 			name = r.ID
 		}
 		if name == "" {
-			return
-		}
-		// Rule 4: a stream being torn down has no posture worth reporting.
-		if r.Fields["stream_status"] == string(kinesistypes.StreamStatusDeleting) {
 			return
 		}
 		mu.Lock()
@@ -104,7 +102,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	})
 
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("DescribeStreamSummary", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeStreamSummary", failures, total))
 }
 
 // isKinesisStreamGone reports whether err is Kinesis saying the stream no

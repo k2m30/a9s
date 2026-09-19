@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
@@ -43,10 +44,9 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		queueURL := r.Fields["queue_url"]
 		if queueURL == "" {
@@ -103,6 +103,5 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 
-	return result,
-		AggregateFailures("GetQueueAttributes", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("GetQueueAttributes", failures, total))
 }

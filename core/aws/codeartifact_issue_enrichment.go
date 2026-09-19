@@ -44,11 +44,11 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	truncated := false
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		// Support both "repo_name" (fetcher canonical) and "repository_name" (legacy/test alias).
 		repoName := r.Fields["repo_name"]
@@ -108,10 +108,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				count := resource.FormatExact(total)
 				if pkgTruncated {
 					// A page cap on an informational count, not a failed call:
-					// the "+" is where the cap is reported. Marking the ID
-					// truncated would make FoldWave2Rows skip the row, and the
-					// permissions-policy verdict below — a separate call the
-					// count says nothing about — would never reach it.
+					// the "+" is where the cap is reported.
 					count = resource.FormatTruncated(total)
 				}
 				mu.Lock()
@@ -154,5 +151,5 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("GetRepositoryPermissionsPolicy", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("GetRepositoryPermissionsPolicy", failures, n))
 }

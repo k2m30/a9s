@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -58,11 +59,11 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 	keyLastUsedAPI, _ := clients.IAM.(IAMGetAccessKeyLastUsedAPI)
 	truncated := false
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		userName := r.Fields["user_name"]
 		if userName == "" {
@@ -213,7 +214,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("user credentials", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("user credentials", failures, n))
 }
 
 // isNoSuchEntity reports the IAM "this entity does not exist" error, which

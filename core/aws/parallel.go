@@ -57,3 +57,23 @@ func ForEachParallel(ctx context.Context, n, limit int, fn func(i int)) error {
 		return nil
 	}
 }
+
+// ForEachRow is ForEachParallel over one row per index: ids[i] is the row
+// fn(i) answers for. A row whose fn never started — the loop stopped at the
+// Wave 2 deadline first — is marked CheckDeadline, since it has no answer and
+// without the mark renders as inspected-and-healthy. It returns the context
+// error, which the caller hands back with its own.
+func ForEachRow(ctx context.Context, result *IssueEnricherResult, ids []string, limit int, fn func(i int)) error {
+	started := make([]bool, len(ids))
+	err := ForEachParallel(ctx, len(ids), limit, func(i int) {
+		started[i] = true
+		fn(i)
+	})
+	for i, id := range ids {
+		if !started[i] {
+			markUninspected(result, id, CheckDeadline)
+			SetTruncated(result, true)
+		}
+	}
+	return err
+}

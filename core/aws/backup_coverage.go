@@ -100,12 +100,12 @@ func backupTagsAccessor(
 		}
 		pending = append(pending, r)
 	}
-	pending = capAtEnrichmentCap(result, pending, resourceIDsOf)
+	pending = capAtEnrichmentCap(result, pending, nil, resourceIDsOf)
 	n := len(pending)
 
 	var mu sync.Mutex
 	var failures []Failure
-	walkErr := ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	walkErr := ForEachRow(ctx, result, resourceIDs(pending), EnrichmentParallelism, func(i int) {
 		r := pending[i]
 		t, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (map[string]string, error) {
 			return read(ctx, r.Fields["arn"])

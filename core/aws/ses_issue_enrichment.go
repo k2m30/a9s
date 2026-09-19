@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 
@@ -78,11 +79,13 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 // reports a domain that does not sign its outbound mail. A single verified
 // address cannot carry DKIM at all, so only domains are checked.
 func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) error {
-	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		return r.Fields["identity_type"] != sesIdentityTypeEmailAddress
+	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -106,7 +109,7 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		}
 		setWave2Finding(result, r.ID, sesCodeDKIMOff, []domain.DetailRow{{Label: "DKIM signing", Value: "disabled", Tier: tierOf(sesCodeDKIMOff)}})
 	})
-	return AggregateFailures("GetEmailIdentity", failures, n)
+	return errors.Join(loopErr, AggregateFailures("GetEmailIdentity", failures, n))
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.

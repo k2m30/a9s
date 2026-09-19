@@ -19,6 +19,7 @@ package runtime
 
 import (
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/cache"
@@ -754,8 +755,8 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// every cached row of this type, using allFindings — every
 		// independently-evaluated Wave-2 condition per resource — so a
 		// multi-condition resource keeps every Finding on its cached row.
-		// TruncatedIDs are the rows this probe could not inspect — it did not
-		// answer for them, so their existing Wave-2 findings stand. The same
+		// TruncatedIDs are the rows this probe could not fully inspect — what
+		// it proved for them lands and their other Wave-2 findings stand. The same
 		// set rides out on the ListEnrichmentPatch below, so the rows on
 		// screen keep exactly what the stored rows keep.
 		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails, msg.TruncatedIDs)
@@ -800,7 +801,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			// and FieldUpdates onto, so this aggregation is over the freshest
 			// per-type row state this call produced.
 			rows, _ := c.ProbeResources(msg.ResourceType)
-			unified = unifiedIssueCount(rows, *td, allFindings)
+			unified = unifiedIssueCount(rows, *td)
 		}
 
 		// Truncation precedence (behavior-preserving with the deleted
@@ -1000,33 +1001,20 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
-// unifiedIssueCount returns the distinct count of resource IDs with ≥1
+// unifiedIssueCount returns the distinct count of resources with ≥1
 // SevBroken-equivalent issue: a Wave-1 structural/wave1-Finding color of
-// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding —
-// from findings[id]'s slice, or already folded onto the row itself — so a
-// resource counts once even when it carries more than one
+// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding folded
+// onto the row — so a resource counts once even when it carries more than one
 // independently-evaluated Wave-2 condition. Never a SevWarn Wave-2 finding.
 //
 // The single counter behind every issue number the operator can see or
 // reload: the menu badge, the list title, and the count each save projects
-// onto disk. Reading the row's own Wave-2 findings, not only the live map,
-// is what lets the save lanes (which hold enriched rows but no findings map)
-// share it instead of re-deriving the split and drifting — a Wave-2 warning
-// persisted as an issue was exactly that drift.
-func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string][]domain.Finding) int {
+// onto disk. It reads the rows' own Wave-2 findings and nothing else, so the
+// badge counts exactly what the list renders: a finding a result carried but
+// the fold did not land on a row is a finding no row shows.
+func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
-	}
-	hasBroken := func(fs []domain.Finding, wave2Only bool) bool {
-		for _, f := range fs {
-			if f.Severity != domain.SevBroken {
-				continue
-			}
-			if !wave2Only || f.IsWave2Sourced() {
-				return true
-			}
-		}
-		return false
 	}
 	// Count per resource, not per ID: two DISTINCT resources that share an ID
 	// (e.g. two ACM certs for one domain — ACM keys on the domain name) must
@@ -1040,7 +1028,9 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 			continue
 		}
 		// A Wave-2 "!"-severity finding bumps the badge; "~" (SevWarn) never does.
-		if hasBroken(findings[r.ID], false) || hasBroken(r.Findings, true) {
+		if slices.ContainsFunc(r.Findings, func(f domain.Finding) bool {
+			return f.Severity == domain.SevBroken && f.IsWave2Sourced()
+		}) {
 			count++
 		}
 	}

@@ -76,7 +76,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	})
 
 	rows, _ := c.ProbeResources(canon)
-	unified := unifiedIssueCount(rows, *td, nil)
+	unified := unifiedIssueCount(rows, *td)
 	// Rows the sweep still has not inspected keep the badge a lower bound.
 	truncated := len(c.session.EnrichmentTruncatedIDs[canon]) > 0
 	if tr := c.session.RowStore.Snapshot(canon); tr.Pagination != nil && tr.Pagination.IsTruncated {

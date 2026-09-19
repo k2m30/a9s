@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -48,16 +49,13 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	var failures []Failure
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return r.Fields["status"] != "DELETED"
+	}, resourceIDsOf)
 	n := len(resources)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		// A secret already scheduled for deletion is on its way out; the
-		// operator's move is to wait or restore, not to edit its policy.
-		if r.Fields["status"] == "DELETED" {
-			return
-		}
 		secretID := r.Fields["arn"]
 		if secretID == "" {
 			secretID = r.ID
@@ -94,6 +92,6 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 
 		}
 	})
-	err := Finish(&result, failures, n, "secrets-policy")
+	err := errors.Join(loopErr, Finish(&result, failures, n, "secrets-policy"))
 	return result, err
 }

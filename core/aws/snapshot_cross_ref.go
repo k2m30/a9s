@@ -246,14 +246,19 @@ func enrichSnapshotPublicShare(
 	if cfg.PublicAttr == nil || clients == nil {
 		return nil
 	}
-	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	// An automated snapshot cannot be shared (AWS shares only a manual copy),
+	// so it has no share attribute to ask about.
+	resources = capAtEnrichmentCap(result, resources, func(res resource.Resource) bool {
+		if cfg.GetSnapshotType == nil {
+			return true
+		}
+		snapType, ok := cfg.GetSnapshotType(res.RawStruct)
+		return !ok || snapType != "automated"
+	}, resourceIDsOf)
 	n := len(resources)
-	if n < len(resources) {
-		SetTruncated(result, true)
-	}
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		res := resources[i]
 		if res.ID == "" {
 			return
@@ -276,5 +281,5 @@ func enrichSnapshotPublicShare(
 		setWave2Finding(result, res.ID, cfg.PublicCode, []domain.DetailRow{{Label: "Restore", Value: "all", Tier: tierOf(cfg.PublicCode)}})
 
 	})
-	return Finish(result, failures, n, "snapshot share attributes")
+	return errors.Join(loopErr, Finish(result, failures, n, "snapshot share attributes"))
 }

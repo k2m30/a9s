@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,10 +36,9 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.Name == "" {
 			return
@@ -100,6 +100,5 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	})
 
 	SetTruncated(&result, truncated)
-	return result,
-		AggregateFailures("GetPipelineState", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("GetPipelineState", failures, total))
 }

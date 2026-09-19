@@ -6,6 +6,7 @@ package aws
 import (
 	"cmp"
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -46,11 +47,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		return result, nil
 	}
 
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		groupName := r.Fields["group_name"]
 		if groupName == "" {
@@ -217,5 +218,5 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 	MarkInformationalOnly(&result)
 	// See EnrichIAMRoleLastUsed: the flag and the composite error are two
 	// answers, and this lane was returning only the first.
-	return result, AggregateFailures("group membership", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("group membership", failures, n))
 }

@@ -50,11 +50,11 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	if clients.ElasticBeanstalk == nil {
 		return result, nil
 	}
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		name := r.Name
 		if name == "" {
@@ -90,7 +90,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	})
 	settingsErr := ebConfigurationPosture(ctx, clients, &result, resources)
 	MarkInformationalOnly(&result)
-	return result, errors.Join(AggregateFailures("DescribeEnvironmentHealth", failures, n), settingsErr)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeEnvironmentHealth", failures, n), settingsErr)
 }
 
 // ebConfigurationPosture reads DescribeConfigurationSettings once per
@@ -102,11 +102,15 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 	if !ok {
 		return nil
 	}
-	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		// Rule 4: an environment being torn down has no posture worth
+		// reporting, and its settings are about to stop existing.
+		return !ebLifecycleEnded(r.Fields["status"])
+	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		name := r.Name
 		if name == "" {
@@ -114,11 +118,6 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 		}
 		app := r.Fields["application_name"]
 		if name == "" || app == "" {
-			return
-		}
-		// Rule 4: an environment being torn down has no posture worth
-		// reporting, and its settings are about to stop existing.
-		if ebLifecycleEnded(r.Fields["status"]) {
 			return
 		}
 		key := r.ID
@@ -154,7 +153,7 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 			setWave2Finding(result, key, ebCodeCWLogsOff, nil)
 		}
 	})
-	return AggregateFailures("DescribeConfigurationSettings", failures, n)
+	return errors.Join(loopErr, AggregateFailures("DescribeConfigurationSettings", failures, n))
 }
 
 // ebOptionValue finds one option by namespace AND name, reporting whether

@@ -247,7 +247,9 @@ func mergeRowResult(mu *sync.Mutex, shared *IssueEnricherResult, sharedFailures 
 			shared.Findings[id] = append(shared.Findings[id], f)
 		}
 	}
-	maps.Copy(shared.TruncatedIDs, row.TruncatedIDs)
+	for id, check := range row.TruncatedIDs {
+		markUninspected(shared, id, check)
+	}
 	if len(row.FieldUpdates) > 0 && shared.FieldUpdates == nil {
 		shared.FieldUpdates = make(map[string]map[string]string)
 	}
@@ -303,6 +305,10 @@ func checkOf(err error) string {
 // opening such a row's detail runs its checks on demand (KindEnrichRow),
 // since nothing but a9s's own bound stood between the row and an answer.
 const CheckCap = "stopped at the inspection cap"
+
+// CheckDeadline is what a row records when the Wave 2 deadline stopped the
+// loop before the row's check was sent: nothing refused, and nothing looked.
+const CheckDeadline = "stopped at the Wave 2 deadline"
 
 // markUninspected is the one writer of result.TruncatedIDs. check names what
 // did not answer for this row — the failing API call, or CheckCap when a9s's
@@ -378,14 +384,35 @@ func MarkInformationalOnly(result *IssueEnricherResult) {
 // of resources, where inspecting one item decides exactly its own row.
 func resourceIDsOf(r resource.Resource) []string { return []string{r.ID} }
 
-// capAtEnrichmentCap trims a per-item work list to EnrichmentCap and records
-// every row the dropped items would have answered for as uninspected. A cap is
-// a limit on what a9s looked at, so the rows past it are "?" and never clean.
+// resourceIDs is ForEachRow's ids for a work list of resources.
+func resourceIDs(resources []resource.Resource) []string {
+	ids := make([]string, len(resources))
+	for i, r := range resources {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// capAtEnrichmentCap keeps the items the check applies to, trims them to
+// EnrichmentCap and records every row the dropped eligible items would have
+// answered for as uninspected. A cap is a limit on what a9s looked at, so the
+// rows past it are "?" and never clean. Filtering comes first so the cap is
+// spent on rows the check can answer for; an ineligible item has no answer to
+// give and is neither returned nor marked. A nil eligible keeps every item.
 //
 // idsOf maps one work item to the resource IDs its inspection decides, which is
 // the item's own ID for a list of resources and every task on a definition for
 // a list grouped by a shared key.
-func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf func(T) []string) []T {
+func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, eligible func(T) bool, idsOf func(T) []string) []T {
+	if eligible != nil {
+		kept := make([]T, 0, len(items))
+		for _, item := range items {
+			if eligible(item) {
+				kept = append(kept, item)
+			}
+		}
+		items = kept
+	}
 	if len(items) <= EnrichmentCap {
 		return items
 	}
@@ -396,6 +423,13 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf fun
 	}
 	SetTruncated(result, true)
 	return items[:EnrichmentCap]
+}
+
+// fieldOnlyCap bounds a pass that fills a list column and decides no finding.
+// The rows past the cap show an empty column and are not marked: none of their
+// checks went unrun, so "not inspected" would be false.
+func fieldOnlyCap[T any](items []T) []T {
+	return items[:min(len(items), EnrichmentCap)]
 }
 
 // Finish folds a Wave 2 enricher's accumulated per-batch failures into result
@@ -612,9 +646,15 @@ func walkAccountPages[T any](
 			return items, pages, false, nil
 		}
 	}
+	// A walk a refused page ended names that call; only a walk that ran out
+	// of page budget stopped at a9s's own bound.
+	check := CheckCap
+	if err != nil {
+		check = checkOf(err)
+	}
 	for _, r := range resources {
 		if rule == manyItemsPerRow || !seen[r.ID] {
-			markUninspected(result, r.ID, CheckCap)
+			markUninspected(result, r.ID, check)
 		}
 	}
 	return items, pages, true, err

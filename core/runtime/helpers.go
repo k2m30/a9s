@@ -11,6 +11,8 @@ package runtime
 // both.
 
 import (
+	"slices"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -34,8 +36,8 @@ import (
 // freeze guards against is exactly what Amend exists to remove — see
 // RowStore.Amend's doc comment.
 // uninspected names the rows this result could not speak for — the
-// enricher's own TruncatedIDs. Threaded to FoldWave2Rows, which leaves those
-// rows the Wave-2 state they already have.
+// enricher's own TruncatedIDs. Threaded to FoldWave2Rows, which lands what the
+// result proved for those rows and keeps the rest of their Wave-2 state.
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,
@@ -62,10 +64,12 @@ func (c *Core) applyEnrichment(
 	})
 }
 
-// FoldWave2Rows folds one Wave-2 result onto rows, in place, skipping every
-// row the result did not answer for: an id in uninspected (the enricher's
-// TruncatedIDs) keeps the Wave-2 state it already has, because a row nobody
-// looked at is not a clean row (C1: stale-until-replaced, never
+// FoldWave2Rows folds one Wave-2 result onto rows, in place. A row the result
+// answered for takes the result's Wave-2 state whole. A row it marked not
+// inspected (an id in uninspected, the enricher's TruncatedIDs) was answered
+// only in part: every finding the result did prove for it lands, and every
+// earlier Wave-2 finding the result says nothing about stays, because a check
+// that did not answer is not a clean check (C1: stale-until-replaced, never
 // blank-until-replaced). A nil uninspected folds every row — the plain
 // full-result case, and the deliberate clear paths.
 //
@@ -87,10 +91,11 @@ func FoldWave2Rows(
 	uninspected map[string]string,
 ) {
 	for i := range rows {
-		if _, skip := uninspected[rows[i].ID]; skip {
+		_, partial := uninspected[rows[i].ID]
+		if partial && len(findings[rows[i].ID]) == 0 {
 			continue
 		}
-		ApplyWave2ToRow(&rows[i], td, findings, attentionDetails)
+		foldWave2(&rows[i], td, findings, attentionDetails, partial)
 	}
 }
 
@@ -107,9 +112,22 @@ func ApplyWave2ToRow(
 	findings map[string][]domain.Finding,
 	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
 ) {
+	foldWave2(r, td, findings, attentionDetails, false)
+}
+
+// foldWave2 is ApplyWave2ToRow with one switch: partial strips only the
+// Wave-2 codes the result carries for the row, keeping the rest.
+func foldWave2(
+	r *domain.Resource,
+	td resource.ResourceTypeDef,
+	findings map[string][]domain.Finding,
+	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
+	partial bool,
+) {
 	if r == nil {
 		return
 	}
+	fs := findings[r.ID]
 	// Strip any existing wave2 entries; fetchers write wave1 Findings directly.
 	// Builds a NEW backing array rather than compacting r.Findings in
 	// place (r.Findings[n] = f) — applyEnrichment's row copy is shallow, so an
@@ -118,7 +136,7 @@ func ApplyWave2ToRow(
 	out := make([]domain.Finding, 0, len(r.Findings))
 	stale := make(map[domain.FindingCode]bool, len(r.Findings))
 	for _, f := range r.Findings {
-		if f.IsWave2Sourced() {
+		if f.IsWave2Sourced() && (!partial || slices.ContainsFunc(fs, func(g domain.Finding) bool { return g.Code == f.Code })) {
 			stale[f.Code] = true
 			continue
 		}
@@ -132,7 +150,6 @@ func ApplyWave2ToRow(
 	// reason the findings slice is: applyEnrichment's row copy is shallow.
 	r.AttentionDetails = keepingCodes(r.AttentionDetails, stale)
 
-	fs := findings[r.ID]
 	if len(fs) == 0 {
 		return
 	}

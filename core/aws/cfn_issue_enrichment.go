@@ -5,8 +5,7 @@ package aws
 
 import (
 	"context"
-	"fmt"
-	"maps"
+	"errors"
 	"strings"
 	"sync"
 
@@ -39,10 +38,9 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		stackName := r.Fields["stack_name"]
 		if stackName == "" {
@@ -87,14 +85,15 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			if ev.ResourceStatusReason != nil {
 				reason = *ev.ResourceStatusReason
 			}
-			label := resourceType
-			if label == "" {
-				label = logicalID
+			name := resourceType
+			if name == "" {
+				name = logicalID
 			} else if logicalID != "" {
-				label = resourceType + "/" + logicalID
+				name = resourceType + "/" + logicalID
 			}
-			row := domain.DetailRow{Label: label, Value: status, Tier: "!"}
-			failedRows = append(failedRows, row)
+			failedRows = append(failedRows,
+				domain.DetailRow{Label: "Failed resource", Value: name, Tier: "!"},
+				domain.DetailRow{Label: "Status", Value: domain.HumanizeStatusPhrase(status), Tier: "!"})
 			if reason != "" {
 				failedRows = append(failedRows, domain.DetailRow{Label: "Reason", Value: reason, Tier: "~"})
 			}
@@ -111,57 +110,25 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("DescribeStackEvents", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeStackEvents", failures, total))
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
 // CFNStackEvents provides "!" findings for recent resource failures; EnrichCFNDrift
-// adds "~" findings for stacks that have drifted from their template.
-// On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
-// Truncated = either truncated.
+// adds "~" findings for stacks that have drifted from their template. Both
+// fold through mergeRowResult, so a stack that failed and drifted keeps both
+// findings, events first.
 // Partial findings from each sub-enricher are preserved even when they return an error (E5).
 func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources, nil)
 	driftResult, driftErr := EnrichCFNDrift(ctx, clients, resources, nil)
 
-	// Combine sub-enricher errors; partial findings are preserved below (E5).
-	var combinedErr error
-	switch {
-	case eventsErr != nil && driftErr != nil:
-		combinedErr = fmt.Errorf("%v; %v", eventsErr, driftErr)
-	case eventsErr != nil:
-		combinedErr = eventsErr
-	case driftErr != nil:
-		combinedErr = driftErr
-	}
-
-	merged := make(map[string][]domain.Finding, len(eventsResult.Findings)+len(driftResult.Findings))
-	// Drift findings go in first; stack-events findings overwrite on conflict.
-	maps.Copy(merged, driftResult.Findings)
-	maps.Copy(merged, eventsResult.Findings)
-	// Merge field updates from both sub-enrichers (drift wins on conflict since
-	// it writes drift_status; stack-events doesn't write field updates).
-	mergedUpdates := make(map[string]map[string]string)
-	for id, kvMap := range driftResult.FieldUpdates {
-		mergedUpdates[id] = make(map[string]string, len(kvMap))
-		maps.Copy(mergedUpdates[id], kvMap)
-	}
-	for id, kvMap := range eventsResult.FieldUpdates {
-		if mergedUpdates[id] == nil {
-			mergedUpdates[id] = make(map[string]string, len(kvMap))
-		}
-		maps.Copy(mergedUpdates[id], kvMap)
-	}
-	// Merge TruncatedIDs: union of both sub-enricher maps.
-	mergedTruncatedIDs := make(map[string]string, len(eventsResult.TruncatedIDs)+len(driftResult.TruncatedIDs))
-	maps.Copy(mergedTruncatedIDs, eventsResult.TruncatedIDs)
-	maps.Copy(mergedTruncatedIDs, driftResult.TruncatedIDs)
-	return IssueEnricherResult{
-		Truncated:    eventsResult.Truncated || driftResult.Truncated,
-		TruncatedIDs: mergedTruncatedIDs,
-		Findings:     merged,
-		FieldUpdates: mergedUpdates,
-	}, combinedErr
+	merged := newRowResult()
+	var mu sync.Mutex
+	var failures []Failure
+	mergeRowResult(&mu, &merged, &failures, eventsResult, nil)
+	mergeRowResult(&mu, &merged, &failures, driftResult, nil)
+	return merged, errors.Join(eventsErr, driftErr)
 }
 
 // EnrichCFNDrift calls DescribeStacks per stack (up to EnrichmentCap stacks) to
@@ -179,10 +146,9 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		stackName := r.Fields["stack_name"]
 		if stackName == "" {
@@ -229,5 +195,5 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("DescribeStacks", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeStacks", failures, total))
 }

@@ -298,22 +298,14 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 	if !ok {
 		return nil
 	}
-	var targets []resource.Resource
-	for _, r := range resources {
-		if r.ID == "" {
-			continue
-		}
-		if ec2InstanceGone(r.Fields["state"]) {
-			continue
-		}
-		targets = append(targets, r)
-	}
-	targets = capAtEnrichmentCap(result, targets, resourceIDsOf)
+	targets := capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		return r.ID != "" && !ec2InstanceGone(r.Fields["state"])
+	}, resourceIDsOf)
 
 	const op = "DescribeInstanceAttribute(userData)"
 	var mu sync.Mutex
 	var failures []Failure
-	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, result, resourceIDs(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeInstanceAttributeOutput, error) {
 			return api.DescribeInstanceAttribute(ctx, &ec2svc.DescribeInstanceAttributeInput{
@@ -338,5 +330,5 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 
 	})
 
-	return Finish(result, failures, len(targets), op)
+	return errors.Join(loopErr, Finish(result, failures, len(targets), op))
 }

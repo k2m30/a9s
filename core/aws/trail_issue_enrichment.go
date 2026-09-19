@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -44,9 +45,9 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 
 	var failures []Failure
 	var mu sync.Mutex
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		bucket := r.Fields["s3_bucket"]
 		if bucket == "" {
@@ -83,5 +84,5 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 			setWave2Finding(&result, r.ID, CodeTrailLogBucketNoAccessLogging, []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: tierOf(CodeTrailLogBucketNoAccessLogging)}})
 		}
 	})
-	return result, AggregateFailures("log bucket posture", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("log bucket posture", failures, n))
 }

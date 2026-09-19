@@ -730,7 +730,7 @@ func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated
 	}
 	known = wave2Answered || c.session.EnrichmentRanGet(rt) || !c.HasIssueEnricher(rt)
 	if known {
-		issues = unifiedIssueCount(rows, *td, nil)
+		issues = unifiedIssueCount(rows, *td)
 	}
 	return issues, known, pageTruncated
 }

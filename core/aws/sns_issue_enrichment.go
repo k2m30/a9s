@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,11 +41,11 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		return result, nil
 	}
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -52,7 +53,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		row, rowFailures := snsTopicRow(ctx, clients, r, ownAccount)
 		mergeRowResult(&mu, &result, &failures, row, rowFailures)
 	})
-	return result, AggregateFailures("topic posture and subscriptions", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("topic posture and subscriptions", failures, n))
 }
 
 // snsTopicRow evaluates one topic — its subscription walk and its posture —
@@ -98,9 +99,7 @@ func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resour
 	if pageCapped {
 		// A page cap, not a failed call: there is no error to record, and
 		// the row is not uninspected either — the "+" on the count is
-		// where the cap is reported. Marking the ID truncated would make
-		// FoldWave2Rows skip the row entirely, dropping the posture
-		// findings below with it.
+		// where the cap is reported.
 		count = resource.FormatTruncated(len(subs))
 	}
 	row.FieldUpdates[r.ID] = map[string]string{"subs_count": count}

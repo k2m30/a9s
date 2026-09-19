@@ -140,21 +140,23 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 // of calls — and emits the deprecated-engine finding for every instance on a
 // version AWS no longer lists as available.
 func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
-	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		_, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
+		return ok && !resourceIsTearingDown(r.RawStruct)
+	}, resourceIDsOf)
 
 	type enginePair struct{ engine, version string }
 	deprecatedByPair := map[enginePair]bool{}
 	var failures []Failure
 
-	for i := range resources {
+	// Sequential: the per-pair cache that keeps the walk to a handful of calls
+	// is read and written without a lock.
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), 1, func(i int) {
 		r := resources[i]
-		db, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
-		if !ok || resourceIsTearingDown(r.RawStruct) {
-			continue
-		}
+		db, _ := assertStruct[rdstypes.DBInstance](r.RawStruct)
 		pair := enginePair{engine: aws.ToString(db.Engine), version: aws.ToString(db.EngineVersion)}
 		if pair.engine == "" || pair.version == "" {
-			continue
+			return
 		}
 		deprecated, known := deprecatedByPair[pair]
 		if !known {
@@ -170,20 +172,19 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 			})
 			if err != nil {
 				MarkSkipped(result, r.ID, &failures, err)
-				continue
+				return
 			}
 			deprecated = isDeprecatedEngineVersion(out.DBEngineVersions)
 			deprecatedByPair[pair] = deprecated
 		}
 		if !deprecated {
-			continue
+			return
 		}
 		setWave2Finding(result, r.ID, dbiCodeEngineDeprecated, []domain.DetailRow{{Label: "Engine", Value: pair.engine + " " + pair.version, Tier: tierOf(dbiCodeEngineDeprecated)}})
-
-	}
+	})
 
 	SetTruncated(result, len(failures) > 0)
-	return AggregateFailures("DescribeDBEngineVersions", failures, len(resources))
+	return errors.Join(loopErr, AggregateFailures("DescribeDBEngineVersions", failures, len(resources)))
 }
 
 // isDeprecatedEngineVersion reads the DescribeDBEngineVersions answer for one

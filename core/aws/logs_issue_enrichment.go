@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -24,7 +25,7 @@ const (
 
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
 // (capped at EnrichmentCap) to detect audit log groups without metric filters.
-// It also writes last_event_at for all log groups via DescribeLogStreams.
+// It also writes last_event_at for up to EnrichmentCap log groups via DescribeLogStreams.
 //
 // Findings:
 //   - CloudTrail log group (prefix "/aws/cloudtrail/") with no metric filters → "~"
@@ -50,59 +51,50 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
 	var failures []Failure
-	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
-		r := resources[i]
-		logGroupName := r.Fields["log_group_name"]
-		if logGroupName == "" {
-			logGroupName = r.ID
-		}
-		if logGroupName == "" {
-			return
-		}
-		mu.Lock()
-		total++
-		mu.Unlock()
 
-		// Compute last_event_at by fetching the most-recently-written stream.
-		// safeDescribeLogStreams is best-effort — errors (including panic-recoveries from
-		// test fakes) are silently skipped so the metric filter check below still runs.
-		if hasStreams {
-			streamsOut, streamsErr := safeDescribeLogStreams(ctx, logStreamsAPI, logGroupName)
-			if streamsErr == nil && len(streamsOut.LogStreams) > 0 {
-				s := streamsOut.LogStreams[0]
-				if s.LastEventTimestamp != nil {
-					t := time.UnixMilli(*s.LastEventTimestamp)
-					dur := time.Since(t)
-					var rel string
-					switch {
-					case dur < time.Hour:
-						rel = fmt.Sprintf("%dm ago", int(dur.Minutes()))
-					case dur < 24*time.Hour:
-						rel = fmt.Sprintf("%dh ago", int(dur.Hours()))
-					case dur < 7*24*time.Hour:
-						rel = fmt.Sprintf("%dd ago", int(dur.Hours()/24))
-					default:
-						rel = t.Format("2006-01-02")
-					}
-					mu.Lock()
-					if result.FieldUpdates[r.ID] == nil {
-						result.FieldUpdates[r.ID] = make(map[string]string)
-					}
-					result.FieldUpdates[r.ID]["last_event_at"] = rel
-					mu.Unlock()
-				}
+	var streamsErr error
+	if hasStreams {
+		groups := fieldOnlyCap(resources)
+		streamsErr = ForEachParallel(ctx, len(groups), EnrichmentParallelism, func(i int) {
+			r := groups[i]
+			name := logGroupNameOf(r)
+			if name == "" {
+				return
 			}
-		}
+			out, err := safeDescribeLogStreams(ctx, logStreamsAPI, name)
+			// no finding: last_event_at is a column, left empty when the read fails or the group has no stream.
+			if err != nil || len(out.LogStreams) == 0 || out.LogStreams[0].LastEventTimestamp == nil {
+				return
+			}
+			t := time.UnixMilli(*out.LogStreams[0].LastEventTimestamp)
+			var rel string
+			switch dur := time.Since(t); {
+			case dur < time.Hour:
+				rel = fmt.Sprintf("%dm ago", int(dur.Minutes()))
+			case dur < 24*time.Hour:
+				rel = fmt.Sprintf("%dh ago", int(dur.Hours()))
+			case dur < 7*24*time.Hour:
+				rel = fmt.Sprintf("%dd ago", int(dur.Hours()/24))
+			default:
+				rel = t.Format("2006-01-02")
+			}
+			mu.Lock()
+			if result.FieldUpdates[r.ID] == nil {
+				result.FieldUpdates[r.ID] = make(map[string]string)
+			}
+			result.FieldUpdates[r.ID]["last_event_at"] = rel
+			mu.Unlock()
+		})
+	}
 
-		// Only inspect audit (CloudTrail) log groups for metric filter findings.
-		if !strings.HasPrefix(logGroupName, "/aws/cloudtrail/") {
-			return
-		}
-
+	// Only audit (CloudTrail) log groups are inspected for metric filters.
+	audit := capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		return strings.HasPrefix(logGroupNameOf(r), "/aws/cloudtrail/")
+	}, resourceIDsOf)
+	loopErr := ForEachRow(ctx, &result, resourceIDs(audit), EnrichmentParallelism, func(i int) {
+		r := audit[i]
+		logGroupName := logGroupNameOf(r)
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cwlogssvc.DescribeMetricFiltersOutput, error) {
 			return metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
 				LogGroupName: aws.String(logGroupName),
@@ -123,12 +115,18 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			{Label: "Log Group", Value: logGroupName, Tier: "~"},
 			{Label: "Metric Filters", Value: "none", Tier: "~"},
 		})
-
 	})
 
 	MarkInformationalOnly(&result)
-	return result,
-		AggregateFailures("DescribeMetricFilters", failures, total)
+	return result, errors.Join(streamsErr, loopErr, AggregateFailures("DescribeMetricFilters", failures, len(audit)))
+}
+
+// logGroupNameOf is the name the CloudWatch Logs calls take for a row.
+func logGroupNameOf(r resource.Resource) string {
+	if name := r.Fields["log_group_name"]; name != "" {
+		return name
+	}
+	return r.ID
 }
 
 // safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic

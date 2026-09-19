@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -39,11 +40,11 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	}
 	keyPolicyAPI, _ := clients.KMS.(KMSGetKeyPolicyAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		keyID := r.ID
 		if keyID == "" {
@@ -83,7 +84,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, nil)
 		}
 	})
-	return result, AggregateFailures("key policy and rotation", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("key policy and rotation", failures, n))
 }
 
 // kmsKeyPolicyIsPublic reads a key's default policy and returns the exposure

@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -39,12 +40,12 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	}
 
 	truncated := false
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
 
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 
 		ruleName := r.Fields["name"]
@@ -95,7 +96,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		var rows []domain.DetailRow
 
 		// ENABLED rule with no targets → rule fires but goes nowhere.
-		noTargets := state == "ENABLED" && len(targets) == 0 && !targetsTruncated
+		noTargets := fetchErr == nil && state == "ENABLED" && len(targets) == 0 && !targetsTruncated
 
 		// DISABLED rule still has targets → probable drift/oversight.
 		if state == "DISABLED" && len(targets) > 0 {
@@ -133,10 +134,9 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			// A page cap, not a failed call, and not a coverage gap on the
 			// row: the "+" on target_count is where it is reported. The rows
 			// below name targets the walk really did see — a target without a
-			// dead-letter config is a fact whatever lies on page 11 — and
-			// marking the id uninspected would make FoldWave2Rows drop every
-			// one of them. Only noTargets, which needs a complete walk, is
-			// suppressed, by its own !targetsTruncated guard above.
+			// dead-letter config is a fact whatever lies on page 11. Only
+			// noTargets, which needs a complete walk, is suppressed, by its
+			// own !targetsTruncated guard above.
 		}
 		result.FieldUpdates[ruleName] = map[string]string{
 			"target_count": targetCountStr,
@@ -154,5 +154,5 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("ListTargetsByRule", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("ListTargetsByRule", failures, n))
 }

@@ -40,7 +40,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	clusterNames = capAtEnrichmentCap(&result, clusterNames, func(n string) []string { return []string{n} })
+	clusterNames = capAtEnrichmentCap(&result, clusterNames, nil, func(n string) []string { return []string{n} })
 
 	// DescribeClusters accepts up to 100 cluster names per call.
 	const descBatch = 100

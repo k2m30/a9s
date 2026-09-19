@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A row that the attention checks could only partly answer keeps what they
+  did prove: the finding shows in the list, colours the row and counts in the
+  menu badge, beside the `not inspected` mark for the check that did not
+  answer.
+- A row whose check was never sent because the Wave 2 deadline passed is
+  marked `not inspected: stopped at the Wave 2 deadline` instead of looking
+  clean, and the enrichment reports the timeout.
+- An EventBridge rule whose target list could not be read no longer shows
+  "enabled rule has no targets".
+- An account-wide check stopped by a refused or throttled call names that
+  call on the rows it never reached instead of "stopped at the inspection
+  cap".
+- The 50-resource inspection cap is spent only on resources a check applies
+  to: SES email addresses no longer crowd out domains for the DKIM check,
+  Lambda log groups no longer crowd out CloudTrail log groups for the
+  metric-filter check, and automated RDS snapshots no longer crowd out manual
+  ones for the public-share check. Resources a check never applies to are no
+  longer marked `not inspected`.
+- A CloudFormation stack that both failed and drifted shows both findings.
+- A CodeBuild project whose latest build could not be read is marked
+  `not inspected` instead of looking clean.
 - A related-resources row that shows a count now opens the resources it
   counted. Every type reads the references other resources hold to it the
   same way, whether the reference is a full ARN, a qualified Lambda ARN, a KMS

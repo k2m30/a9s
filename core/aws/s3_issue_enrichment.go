@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,10 +94,10 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 	}
 	truncated := false
 	var failures []Failure
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	total := len(resources)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, total, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		bucketName := r.Name
 		if bucketName == "" {
@@ -140,7 +141,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("bucket posture", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("bucket posture", failures, total))
 }
 
 // s3PostureFinding is one emitted condition, held until the shared result

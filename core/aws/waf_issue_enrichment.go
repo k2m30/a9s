@@ -46,10 +46,9 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	}
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		arn := r.Fields["arn"]
 		if arn == "" {
@@ -166,6 +165,5 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 
 	// All WAF logging findings are severity "~" (informational).
 	MarkInformationalOnly(&result)
-	return result,
-		AggregateFailures("web ACL logging and associations", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("web ACL logging and associations", failures, total))
 }

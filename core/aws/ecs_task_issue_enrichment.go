@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -65,7 +66,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	// deterministic (grouping first made it depend on map order) while
 	// recording every dropped row as uninspected. Resource.ID IS the task ID
 	// (core/aws/ecs_task.go), which is also how TruncatedIDs is keyed below.
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 
 	// Group task ARNs by cluster ARN.
 	clusterTasks := make(map[string][]string)
@@ -185,12 +186,15 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 		defARNs = append(defARNs, arn)
 	}
 	sort.Strings(defARNs)
-	defARNs = capAtEnrichmentCap(result, defARNs, func(arn string) []string { return tasksByDef[arn] })
+	defARNs = capAtEnrichmentCap(result, defARNs, nil, func(arn string) []string { return tasksByDef[arn] })
 
 	const op = "DescribeTaskDefinition"
 	var mu sync.Mutex
 	var failures []Failure
-	_ = ForEachParallel(ctx, len(defARNs), EnrichmentParallelism, func(i int) {
+	// One definition answers for every task running it, so the deadline marks
+	// ForEachRow records per definition are carried over to those tasks.
+	unstarted := newRowResult()
+	loopErr := ForEachRow(ctx, &unstarted, defARNs, EnrichmentParallelism, func(i int) {
 		defARN := defARNs[i]
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
 			return clients.ECS.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
@@ -219,8 +223,14 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 			applyTaskDefinitionFindings(result, taskID, *out.TaskDefinition)
 		}
 	})
+	for defARN, check := range unstarted.TruncatedIDs {
+		for _, taskID := range tasksByDef[defARN] {
+			markUninspected(result, taskID, check)
+		}
+	}
+	SetTruncated(result, unstarted.Truncated)
 
-	return Finish(result, failures, len(defARNs), op)
+	return errors.Join(loopErr, Finish(result, failures, len(defARNs), op))
 }
 
 // applyTaskDefinitionFindings evaluates every task-definition posture rule

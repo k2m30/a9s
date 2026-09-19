@@ -78,10 +78,9 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		repoName := r.Name
 		if repoName == "" {
@@ -190,7 +189,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("repository posture", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("repository posture", failures, total))
 }
 
 // ecrRepositoryExposure evaluates a repository's resource policy through the

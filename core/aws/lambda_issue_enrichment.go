@@ -7,6 +7,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -53,19 +54,13 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		return result, nil
 	}
 
-	targets := make([]resource.Resource, 0, len(resources))
-	for _, r := range resources {
-		if r.ID != "" {
-			targets = append(targets, r)
-		}
-	}
-	targets = capAtEnrichmentCap(&result, targets, resourceIDsOf)
+	targets := capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool { return r.ID != "" }, resourceIDsOf)
 
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	const op = "function policy and URL posture"
 	var mu sync.Mutex
 	var failures []Failure
-	_ = ForEachParallel(ctx, len(targets), EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
 		policyRows, policyPublic, policyErr := lambdaPolicyExposure(ctx, api, r.ID, ownAccount)
 		urlRows, urlPublic, urlErr := lambdaFunctionURLExposure(ctx, api, r.ID)
@@ -113,7 +108,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 
-	err := Finish(&result, failures, len(targets), op)
+	err := errors.Join(loopErr, Finish(&result, failures, len(targets), op))
 	return result, err
 }
 

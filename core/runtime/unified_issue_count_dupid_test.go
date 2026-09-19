@@ -31,7 +31,7 @@ func TestUnifiedIssueCount_DistinctResourcesSharingID_CountEach(t *testing.T) {
 		{ID: "artifacts.example.com", Name: "cert-expired-2023"},
 		{ID: "artifacts.example.com", Name: "cert-active-2026"},
 	}
-	if got := unifiedIssueCount(resources, alwaysBrokenTD(), nil); got != 2 {
+	if got := unifiedIssueCount(resources, alwaysBrokenTD()); got != 2 {
 		t.Errorf("unifiedIssueCount with two distinct same-ID issue resources = %d, want 2 (each counts, matching the list title)", got)
 	}
 }
@@ -40,11 +40,9 @@ func TestUnifiedIssueCount_DistinctResourcesSharingID_CountEach(t *testing.T) {
 // dedup the fix must preserve: a single resource flagged by BOTH its Wave-1
 // color AND a Wave-2 "!" finding counts once, never twice.
 func TestUnifiedIssueCount_SameResourceBothWaves_CountsOnce(t *testing.T) {
-	resources := []resource.Resource{{ID: "i-solo", Name: "one"}}
-	findings := map[string][]domain.Finding{
-		"i-solo": {{Severity: domain.SevBroken, Source: "wave2:dupidtest"}},
-	}
-	if got := unifiedIssueCount(resources, alwaysBrokenTD(), findings); got != 1 {
+	resources := []resource.Resource{{ID: "i-solo", Name: "one",
+		Findings: []domain.Finding{{Severity: domain.SevBroken, Source: "wave2:dupidtest"}}}}
+	if got := unifiedIssueCount(resources, alwaysBrokenTD()); got != 1 {
 		t.Errorf("unifiedIssueCount same resource in both waves = %d, want 1 (no double-count)", got)
 	}
 }

@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 
@@ -45,11 +46,11 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		return result, nil
 	}
 	truncated := false
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		// Resolve the policy ARN — prefer RawStruct, fall back to r.ID when it is an ARN.
 		policyARN, ok := extractIAMPolicyARN(r)
@@ -101,7 +102,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, AggregateFailures("GetPolicyVersion", failures, n)
+	return result, errors.Join(loopErr, AggregateFailures("GetPolicyVersion", failures, n))
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy

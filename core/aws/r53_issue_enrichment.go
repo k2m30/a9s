@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"net/netip"
@@ -151,10 +152,9 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	held := heldPublicAddresses(cache)
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		zoneID := r.Fields["zone_id"]
 		if zoneID == "" {
@@ -170,8 +170,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		mergeRowResult(&mu, &result, &failures, row, rowFailures)
 	})
 
-	return result,
-		AggregateFailures("hosted zone posture and records", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("hosted zone posture and records", failures, total))
 }
 
 // r53ZoneRow evaluates one hosted zone into a result of its own; the caller

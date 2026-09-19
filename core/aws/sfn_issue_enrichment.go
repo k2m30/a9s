@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -42,10 +43,9 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -124,8 +124,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	})
 
 	SetTruncated(&result, truncated)
-	return result,
-		AggregateFailures("state machine executions and configuration", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("state machine executions and configuration", failures, total))
 }
 
 // sfnConfigurationPosture reads DescribeStateMachine and records the three

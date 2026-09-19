@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -42,10 +43,9 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	truncated := false
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
-	n := len(resources)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.ID == "" {
 			return
@@ -144,6 +144,5 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	})
 
 	SetTruncated(&result, truncated)
-	return result,
-		AggregateFailures("DescribeTargetHealth", failures, total)
+	return result, errors.Join(loopErr, AggregateFailures("DescribeTargetHealth", failures, total))
 }

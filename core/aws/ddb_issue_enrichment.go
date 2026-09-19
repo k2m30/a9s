@@ -51,11 +51,11 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	if clients.DynamoDB == nil {
 		return result, tagErr
 	}
-	resources = capAtEnrichmentCap(&result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var pitrFailures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		name := r.Name
 		if name == "" {
@@ -95,7 +95,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 
 	pitrErr := AggregateFailures("DescribeContinuousBackups", pitrFailures, n)
 	err := enrichDDBResourcePolicies(ctx, clients, resources, &result)
-	return result, errors.Join(tagErr, pitrErr, err)
+	return result, errors.Join(tagErr, loopErr, pitrErr, err)
 }
 
 // enrichDDBResourcePolicies reads each table's resource policy (cap
@@ -104,20 +104,19 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 // A table with no policy at all is the common case and is not a finding.
 func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	resources = capAtEnrichmentCap(result, resources, resourceIDsOf)
+	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		return !resourceIsTearingDown(r.RawStruct)
+	}, resourceIDsOf)
 	n := len(resources)
-	if n < len(resources) {
-		SetTruncated(result, true)
-	}
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		name := r.Name
 		if name == "" {
 			name = r.ID
 		}
-		if name == "" || resourceIsTearingDown(r.RawStruct) {
+		if name == "" {
 			return
 		}
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.GetResourcePolicyOutput, error) {
@@ -161,7 +160,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 
 		}
 	})
-	return Finish(result, failures, n, "GetResourcePolicy")
+	return errors.Join(loopErr, Finish(result, failures, n, "GetResourcePolicy"))
 }
 
 // isDDBPolicyAbsent reports whether err is DynamoDB's way of saying the table

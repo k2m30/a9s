@@ -47,10 +47,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	}
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
-	names = capAtEnrichmentCap(&result, names, func(n string) []string { return []string{n} })
+	names = capAtEnrichmentCap(&result, names, nil, func(n string) []string { return []string{n} })
 	var failures []Failure
 	var mu sync.Mutex
-	_ = ForEachParallel(ctx, len(names), EnrichmentParallelism, func(i int) {
+	loopErr := ForEachRow(ctx, &result, names, EnrichmentParallelism, func(i int) {
 		name := names[i]
 		out, err := clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
 			ProjectName: aws.String(name),
@@ -69,7 +69,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			buildIDToProject[id] = name
 		}
 	})
-	listErr := AggregateFailures("ListBuildsForProject", failures, len(names))
+	listErr := errors.Join(loopErr, AggregateFailures("ListBuildsForProject", failures, len(names)))
 	if len(buildIDs) == 0 {
 		return result, listErr
 	}
@@ -77,7 +77,12 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		Ids: buildIDs,
 	})
 	if err != nil {
-		return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, errors.Join(listErr, err)
+		var batchFailures []Failure
+		for _, project := range buildIDToProject {
+			MarkSkipped(&result, project, &batchFailures, err)
+		}
+		err = errors.Join(listErr, Finish(&result, batchFailures, len(buildIDToProject), "BatchGetBuilds"))
+		return result, err
 	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
