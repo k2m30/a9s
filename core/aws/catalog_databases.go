@@ -65,6 +65,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "DB Instances",
 		ShortName:     "dbi",
+		RefToID:       dbiRefToID,
 		Aliases:       []string{"dbi", "rds", "databases", "db-instances"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:Fields.arn",
@@ -146,6 +147,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "S3 Buckets",
 		ShortName:     "s3",
+		RefToID:       s3RefToID,
 		LifecycleKey:  "status",
 		Aliases:       []string{"s3", "buckets"},
 		Category:      "DATABASES & STORAGE",
@@ -587,6 +589,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "EFS File Systems",
 		ShortName:     "efs",
+		RefToID:       efsRefToID,
 		Aliases:       []string{"efs", "file-systems"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",

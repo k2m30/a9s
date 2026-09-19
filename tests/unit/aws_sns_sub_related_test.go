@@ -86,9 +86,11 @@ func TestRelated_SNSSub_Lambda_Match(t *testing.T) {
 			"endpoint":  lambdaARN,
 		},
 	}
+	// Inverted by #545 row 1: lambda keys its rows on the function name.
+	// Do not restore the ARN as the row ID.
 	cache := resource.ResourceCache{
 		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: lambdaARN},
+			{ID: "my-function"},
 		}},
 	}
 
@@ -98,8 +100,8 @@ func TestRelated_SNSSub_Lambda_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != lambdaARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), lambdaARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-function" {
+		t.Errorf("ResourceIDs = %v, want [my-function] for %s", result.ResourceIDs(), lambdaARN)
 	}
 }
 

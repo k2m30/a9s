@@ -9,8 +9,11 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -266,11 +269,13 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkR53ACM reports ACM certificates whose DNS validation CNAME records
-// (pattern "_<hex>.<domain>") live in this zone. Pattern C: one
-// ListResourceRecordSets call; count CNAME records whose name starts with
-// "_" and whose value ends with ".acm-validations.aws." — the ACM validation
-// record contract.
-func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// (pattern "_<token>.<domain>") live in this zone. Pattern C: one
+// ListResourceRecordSets call; a CNAME whose name starts with "_" and whose
+// value ends with ".acm-validations.aws." — the ACM validation record
+// contract — validates <domain>, and a certificate in the acm list whose
+// domain or alternative name is <domain> (or its wildcard) is the one it
+// validates.
+func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
 		return resource.KnownRelated("acm", nil, false)
@@ -282,33 +287,42 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return resource.ErrorRelated("acm", err)
 	}
-	var ids []string
+	validated := map[string]bool{}
 	for _, r := range sets {
-		if r.Type != r53types.RRTypeCname {
-			continue
-		}
-		name := ""
-		if r.Name != nil {
-			name = *r.Name
-		}
-		if !strings.HasPrefix(name, "_") {
+		name := canonicalDNS(aws.ToString(r.Name))
+		token, domain, ok := strings.Cut(name, ".")
+		if r.Type != r53types.RRTypeCname || !ok || !strings.HasPrefix(token, "_") {
 			continue
 		}
 		for _, rr := range r.ResourceRecords {
-			if rr.Value == nil {
-				continue
-			}
-			v := canonicalDNS(*rr.Value)
-			if strings.HasSuffix(v, ".acm-validations.aws") {
-				// The validation record name itself identifies the cert domain
-				// being validated; we treat each unique validation record as
-				// one cert.
-				ids = append(ids, strings.TrimSuffix(name, "."))
+			if rr.Value != nil && strings.HasSuffix(canonicalDNS(*rr.Value), ".acm-validations.aws") {
+				validated[domain] = true
 				break
 			}
 		}
 	}
-	return relatedResultTrunc("acm", ids, recordsTruncated)
+	if len(validated) == 0 {
+		return relatedResultTrunc("acm", nil, recordsTruncated)
+	}
+	certs, certsTruncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
+	if err != nil {
+		return resource.ErrorRelated("acm", err)
+	}
+	if certs == nil {
+		return resource.UnknownRelated("acm")
+	}
+	var ids []string
+	for _, cert := range certs {
+		sum, ok := assertStruct[acmtypes.CertificateSummary](cert.RawStruct)
+		if !ok {
+			continue
+		}
+		names := append([]string{aws.ToString(sum.DomainName)}, sum.SubjectAlternativeNameSummaries...)
+		if slices.ContainsFunc(names, func(n string) bool { return validated[strings.TrimPrefix(canonicalDNS(n), "*.")] }) {
+			ids = append(ids, cert.ID)
+		}
+	}
+	return relatedResultTrunc("acm", ids, recordsTruncated || certsTruncated)
 }
 
 // checkR53Logs reports CloudWatch log groups receiving query-log traffic for

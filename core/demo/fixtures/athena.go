@@ -17,6 +17,10 @@ import (
 // both explicitly to the healthy value.
 const AthenaGovernanceMisconfigured = "acme-ungoverned-queries"
 
+// AthenaSparkWorkgroup is the Spark workgroup that publishes CloudWatch
+// metrics, and so writes to /aws/athena/<workgroup>.
+const AthenaSparkWorkgroup = "acme-spark-analytics"
+
 // AthenaFixtures holds typed fixture data for Athena.
 type AthenaFixtures struct {
 	WorkGroups       []athenatypes.WorkGroupSummary
@@ -82,7 +86,7 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 			// (ExecutionRole, PublishCloudWatchMetricsEnabled,
 			// EncryptionConfiguration.KmsKey) via GetWorkGroup.
 			{
-				Name:         aws.String("acme-spark-analytics"),
+				Name:         aws.String(AthenaSparkWorkgroup),
 				State:        athenatypes.WorkGroupStateEnabled,
 				Description:  aws.String("PySpark workgroup for ad-hoc analytics notebooks"),
 				CreationTime: aws.Time(mustParseAthenaTime("2025-05-12T09:00:00+00:00")),
@@ -218,9 +222,9 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					},
 				},
 			},
-			"acme-spark-analytics": {
+			AthenaSparkWorkgroup: {
 				WorkGroup: &athenatypes.WorkGroup{
-					Name:  aws.String("acme-spark-analytics"),
+					Name:  aws.String(AthenaSparkWorkgroup),
 					State: athenatypes.WorkGroupStateEnabled,
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						EngineVersion: &athenatypes.EngineVersion{

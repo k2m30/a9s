@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A related-resources row that shows a count now opens the resources it
+  counted. Every type reads the references other resources hold to it the
+  same way, whether the reference is a full ARN, a qualified Lambda ARN, a KMS
+  alias, a secret ARN with its random suffix or a container's JSON-key tail,
+  an EFS access point, or a Route 53 zone ID. Before, API Gateway
+  certificates, ECS task secrets, SSM parameter keys and several other rows
+  showed a count and opened an empty list.
+- A field in the detail view that names another resource opens the same
+  resource its related row counts. Target group load balancers, secrets,
+  internet gateways and peering connections now open; a gateway value of
+  `local` is no longer offered.
+- A reference to a resource in another account or region is no longer
+  counted as the local resource with the same name, and the count is marked
+  as a lower bound.
+- CloudWatch alarms count an ECS or EKS cluster only under that service's
+  metric namespace, so an EKS alarm no longer shows up as an ECS cluster.
+- A WAF web ACL's Load Balancers row lists load balancers only, and its Log
+  Groups row lists CloudWatch log groups only.
+- The Log Groups row of a CloudFront distribution and the SSM Parameters row
+  of an EC2 instance show that the count is not known instead of a bucket
+  name or the instance itself.
+
 ## [3.57.2] - 2026-09-16
 
 ### Added

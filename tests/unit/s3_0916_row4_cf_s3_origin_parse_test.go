@@ -19,6 +19,7 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -127,23 +128,23 @@ func row4LoggingClients(host string) *awsclient.ServiceClients {
 	}}
 }
 
+// TestS3_0916_Row4_LoggingBucketIsTheParsedName pins that the logging bucket
+// never reaches the Log Groups row, whatever its host reads as. Inverted by
+// #545 row 6: a bucket name drills into no log group, so the row stays
+// unknown (docs/resources/cf.md § logs). Do not restore the bucket as a
+// log-group ID.
 func TestS3_0916_Row4_LoggingBucketIsTheParsedName(t *testing.T) {
 	checker := checkerByTarget(t, "cf", "logs")
 	dist := resource.Resource{ID: row4DistID, Name: row4DistID}
 
-	t.Run("dotted bucket", func(t *testing.T) {
-		got := checker(context.Background(), row4LoggingClients("logs.acme.s3.amazonaws.com"), dist, resource.ResourceCache{})
-		if ids := got.ResourceIDs(); len(ids) != 1 || ids[0] != "logs.acme" {
-			t.Fatalf("ResourceIDs = %v, want [logs.acme]", ids)
-		}
-	})
-
-	t.Run("bucket whose own name carries an s3 label", func(t *testing.T) {
-		got := checker(context.Background(), row4LoggingClients("acme.s3-archive.s3.amazonaws.com"), dist, resource.ResourceCache{})
-		if ids := got.ResourceIDs(); len(ids) != 1 || ids[0] != "acme.s3-archive" {
-			t.Fatalf("ResourceIDs = %v, want [acme.s3-archive] — the endpoint marker is the last s3 label, not the first", ids)
-		}
-	})
+	for _, host := range []string{"logs.acme.s3.amazonaws.com", "acme.s3-archive.s3.amazonaws.com"} {
+		t.Run(host, func(t *testing.T) {
+			got := checker(context.Background(), row4LoggingClients(host), dist, resource.ResourceCache{})
+			if got.State() != domain.RelatedUnknown {
+				t.Fatalf("State = %v (IDs %v), want RelatedUnknown", got.State(), got.ResourceIDs())
+			}
+		})
+	}
 
 	t.Run("host that is not an S3 endpoint", func(t *testing.T) {
 		got := checker(context.Background(), row4LoggingClients(row4ProxyHost), dist, resource.ResourceCache{})

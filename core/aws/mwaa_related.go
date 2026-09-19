@@ -10,7 +10,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
@@ -27,7 +26,7 @@ func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkMWAAKMS reads Environment.KmsKey directly (Pattern F).
-func checkMWAAKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkMWAAKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -35,13 +34,12 @@ func checkMWAAKMS(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	if env.KmsKey == nil || *env.KmsKey == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{kmsKeyIDFromField(*env.KmsKey, res.Type)})
+	return relatedRefs("kms", []string{kmsRefFromField(*env.KmsKey, res.Type)}, refContext(clients, cache, "kms"))
 }
 
 // checkMWAALogs reads the five LoggingConfiguration CloudWatchLogGroupArn
-// fields directly (Pattern F) and converts each to the bare log-group name
-// the logs type indexes on (mwaaLogGroupNameFromARN, mwaa.go).
-func checkMWAALogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// fields directly (Pattern F).
+func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
@@ -57,16 +55,15 @@ func checkMWAALogs(_ context.Context, _ any, res resource.Resource, _ resource.R
 		env.LoggingConfiguration.WorkerLogs,
 		env.LoggingConfiguration.TaskLogs,
 	} {
-		if name := mwaaLogGroup(m); name != "" {
-			ids = append(ids, name)
+		if m != nil && m.CloudWatchLogGroupArn != nil {
+			ids = append(ids, *m.CloudWatchLogGroupArn)
 		}
 	}
-	return relatedResult("logs", ids)
+	return relatedRefs("logs", ids, refContext(clients, cache, "logs"))
 }
 
-// checkMWAARole extracts the bare role name from ExecutionRoleArn
-// (Pattern F).
-func checkMWAARole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkMWAARole returns the role in ExecutionRoleArn (Pattern F).
+func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -74,8 +71,7 @@ func checkMWAARole(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if env.ExecutionRoleArn == nil || *env.ExecutionRoleArn == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	roleARN := *env.ExecutionRoleArn
-	return relatedResult("role", []string{roleARN[strings.LastIndex(roleARN, "/")+1:]})
+	return relatedRefs("role", []string{*env.ExecutionRoleArn}, refContext(clients, cache, "role"))
 }
 
 // checkMWAAS3 extracts the bare bucket name from SourceBucketArn

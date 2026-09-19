@@ -676,6 +676,36 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		})
 	}
 
+	// The functions an EventBridge rule and a Secrets Manager rotation invoke
+	// (eventbridge.go, secrets.go).
+	for _, fn := range []struct{ name, desc string }{
+		{"db-backup-trigger", "Starts the nightly database backup"},
+		{"daily-report-generator", "Generates and emails the daily ops report"},
+		{"rotate-api-key", "Rotates the prod/app API key secret"},
+	} {
+		fns = append(fns, lambdatypes.FunctionConfiguration{
+			FunctionName:     aws.String(fn.name),
+			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + fn.name),
+			Role:             aws.String(lambdaProdRoleARN),
+			Runtime:          lambdatypes.RuntimePython312,
+			MemorySize:       aws.Int32(256),
+			Timeout:          aws.Int32(60),
+			Handler:          aws.String("handler.main"),
+			Description:      aws.String(fn.desc),
+			LastModified:     aws.String("2026-02-20T09:00:00+00:00"),
+			CodeSize:         524288,
+			State:            lambdatypes.StateActive,
+			PackageType:      lambdatypes.PackageTypeZip,
+			Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+			EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+			TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+			},
+			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+		})
+	}
+
 	return fns
 }
 
@@ -736,5 +766,5 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 }
 
 func init() {
-	Register(Pin{ShortName: "lambda", Rows: 36, Issues: 16})
+	Register(Pin{ShortName: "lambda", Rows: 39, Issues: 16})
 }

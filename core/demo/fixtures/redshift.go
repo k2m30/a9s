@@ -128,6 +128,20 @@ var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {
 	}
 })
 
+// RedshiftCloudWatchLogExports is what each demo cluster's audit logging
+// exports to CloudWatch Logs (DescribeLoggingStatus.LogExports); nil for a
+// cluster that logs to S3 or not at all. The Redshift fake answers from it
+// and cwlogs.go holds one log group per export.
+func RedshiftCloudWatchLogExports(clusterID string) []string {
+	switch clusterID {
+	case AcmeWarehouseID:
+		return []string{"connectionlog", "userlog", "useractivitylog"}
+	case AcmeReportingID, RedshiftAuditLoggingOff:
+		return nil
+	}
+	return []string{"connectionlog", "userlog"}
+}
+
 func NewRedshiftFixtures() *RedshiftFixtures {
 	return sharedRedshiftFixtures()
 }

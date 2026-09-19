@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -13,9 +12,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkEbRuleRole reads RoleArn from the Rule RawStruct and extracts the role name.
+// checkEbRuleRole reads RoleArn from the Rule RawStruct.
 // Pattern F — no cache needed.
-func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rule, ok := assertStruct[eventbridgetypes.Rule](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -23,127 +22,58 @@ func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource
 	if rule.RoleArn == nil || *rule.RoleArn == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	arn := *rule.RoleArn
-	idx := strings.LastIndex(arn, "/")
-	if idx < 0 || idx == len(arn)-1 {
-		return resource.KnownRelated("role", nil, false)
-	}
-	roleName := arn[idx+1:]
-	return relatedResult("role", []string{roleName})
+	return relatedRefs("role", []string{*rule.RoleArn}, refContext(clients, cache, "role"))
 }
 
-// ebRuleTargetsByService calls events:ListTargetsByRule(rule) and returns the
-// target resource IDs whose ARN carries the given service prefix (e.g.
-// "kinesis"). Name extraction:
-//   - kinesis: after ":stream/"
-//   - lambda:  after ":function:"
-//   - logs:    after ":log-group:"  (trim trailing ":*")
-//   - states:  after ":stateMachine:" (SFN)
-//   - sns:     after last ":"
-//   - sqs:     after last ":"
-func ebRuleTargetsByService(ctx context.Context, clients any, ruleName string, service string) ([]string, bool) {
+// ebRuleTargets calls events:ListTargetsByRule(rule) and returns, as target,
+// the targets whose ARN is one of service's (e.g. "states" for sfn).
+func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCache, ruleName, target, service string) resource.RelatedCheckResult {
 	if ruleName == "" {
-		return nil, true // genuinely empty → Count: 0, not -1
+		return resource.KnownRelated(target, nil, false)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return nil, false
+		return resource.UnknownRelated(target)
 	}
 	out, err := c.EventBridge.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{
 		Rule: aws.String(ruleName),
 	})
-	// Every checkEbRule* caller renders false as UnknownRelated.
 	// no finding: the pivot shows "?" rather than a target count nobody read.
 	if err != nil || out == nil {
-		return nil, false
+		return resource.UnknownRelated(target)
 	}
-	var ids []string
+	var arns []string
 	for _, t := range out.Targets {
 		if t.Arn == nil {
 			continue
 		}
-		if _, ok := ARNForService(*t.Arn, service); !ok {
-			continue
-		}
-		arn := *t.Arn
-		name := ""
-		switch service {
-		case "kinesis":
-			if _, after, ok := strings.Cut(arn, ":stream/"); ok {
-				name = after
-			}
-		case "lambda":
-			if _, after, ok := strings.Cut(arn, ":function:"); ok {
-				if before, _, hasSep := strings.Cut(after, ":"); hasSep {
-					name = before // strip :version
-				} else {
-					name = after
-				}
-			}
-		case "logs":
-			if _, after, ok := strings.Cut(arn, ":log-group:"); ok {
-				name = strings.TrimSuffix(after, ":*")
-			}
-		case "states":
-			if _, after, ok := strings.Cut(arn, ":stateMachine:"); ok {
-				name = after
-			}
-		case "sns", "sqs":
-			if i := strings.LastIndex(arn, ":"); i >= 0 {
-				name = arn[i+1:]
-			}
-		}
-		if name != "" {
-			ids = append(ids, name)
+		if _, ok := ARNForService(*t.Arn, service); ok {
+			arns = append(arns, *t.Arn)
 		}
 	}
-	return ids, true
+	return relatedRefs(target, arns, refContext(clients, cache, target))
 }
 
-func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "kinesis")
-	if !ok {
-		return resource.UnknownRelated("kinesis")
-	}
-	return relatedResult("kinesis", ids)
+func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "kinesis", "kinesis")
 }
 
-func checkEbRuleLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "lambda")
-	if !ok {
-		return resource.UnknownRelated("lambda")
-	}
-	return relatedResult("lambda", ids)
+func checkEbRuleLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "lambda", "lambda")
 }
 
-func checkEbRuleLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "logs")
-	if !ok {
-		return resource.UnknownRelated("logs")
-	}
-	return relatedResult("logs", ids)
+func checkEbRuleLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "logs", "logs")
 }
 
-func checkEbRuleSFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "states")
-	if !ok {
-		return resource.UnknownRelated("sfn")
-	}
-	return relatedResult("sfn", ids)
+func checkEbRuleSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "sfn", "states")
 }
 
-func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "sns")
-	if !ok {
-		return resource.UnknownRelated("sns")
-	}
-	return relatedResult("sns", ids)
+func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "sns", "sns")
 }
 
-func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "sqs")
-	if !ok {
-		return resource.UnknownRelated("sqs")
-	}
-	return relatedResult("sqs", ids)
+func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return ebRuleTargets(ctx, clients, cache, res.ID, "sqs", "sqs")
 }

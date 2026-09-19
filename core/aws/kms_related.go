@@ -13,6 +13,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -47,7 +48,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 		if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*vol.KmsKeyId, keyID) {
+		if kmsIDMatches(*vol.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
 			ids = append(ids, ebsRes.ID)
 		}
 	}
@@ -78,7 +79,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 		if db.KmsKeyId == nil || *db.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*db.KmsKeyId, keyID) {
+		if kmsIDMatches(*db.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
 			ids = append(ids, dbiRes.ID)
 		}
 	}
@@ -110,26 +111,18 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*secret.KmsKeyId, keyID) {
+		if kmsIDMatches(*secret.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
 			ids = append(ids, secretRes.ID)
 		}
 	}
 	return relatedResultTrunc("secrets", ids, truncated)
 }
 
-// kmsIDMatches reports whether a KMS reference value (full ARN, bare key UUID,
-// or alias ARN) contains the given bare key UUID.
-// A full ARN has the form arn:aws:kms:region:account:key/{uuid}.
-func kmsIDMatches(ref, keyID string) bool {
-	if ref == keyID {
-		return true
-	}
-	// Extract the UUID suffix after the last "/" for ARN-style references.
-	idx := strings.LastIndex(ref, "/")
-	if idx >= 0 && idx < len(ref)-1 {
-		return ref[idx+1:] == keyID
-	}
-	return false
+// kmsIDMatches reports whether a KMS reference value (key ARN, bare key ID,
+// alias or alias ARN) names the key keyID.
+func kmsIDMatches(ref, keyID string, rc domain.RefContext) bool {
+	id, ok := resource.ResolveRef("kms", ref, rc)
+	return ok && id == keyID
 }
 
 // kmsIAMPolicyDoc is a minimal IAM policy document used for parsing Principal.AWS fields.
@@ -141,11 +134,10 @@ type kmsIAMPolicyDoc struct {
 	} `json:"Statement"`
 }
 
-// kmsRoleNamesFromPolicyJSON extracts IAM role names from an IAM policy JSON string.
+// kmsRoleARNsFromPolicyJSON extracts IAM role ARNs from an IAM policy JSON string.
 // Handles Principal.AWS as either a plain string or a JSON array of strings.
-// Only entries matching arn:aws:iam::*:role/* are extracted; the role name is
-// the last "/" segment.
-func kmsRoleNamesFromPolicyJSON(policyJSON string) []string {
+// Only entries matching arn:aws:iam::*:role/* are extracted.
+func kmsRoleARNsFromPolicyJSON(policyJSON string) []string {
 	if policyJSON == "" {
 		return nil
 	}
@@ -153,7 +145,7 @@ func kmsRoleNamesFromPolicyJSON(policyJSON string) []string {
 	if err := json.Unmarshal([]byte(policyJSON), &doc); err != nil {
 		return nil
 	}
-	seen := make(map[string]struct{})
+	var arns []string
 	for _, stmt := range doc.Statement {
 		var principals []string
 		switch v := stmt.Principal.AWS.(type) {
@@ -168,21 +160,18 @@ func kmsRoleNamesFromPolicyJSON(policyJSON string) []string {
 		}
 		for _, p := range principals {
 			if strings.Contains(p, ":role/") {
-				name := arnRoleName(p)
-				if name != "" {
-					seen[name] = struct{}{}
-				}
+				arns = append(arns, p)
 			}
 		}
 	}
-	return mapKeys(seen)
+	return arns
 }
 
 // checkKMSRole resolves IAM roles that have access to this KMS key.
 // Pattern C: calls kms:GetKeyPolicy (default policy) to parse Principal.AWS
 // role ARNs from the policy JSON, and kms:ListGrants to collect GranteePrincipal
 // and RetiringPrincipal role ARNs. Results are deduplicated.
-func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
 		return resource.KnownRelated("role", nil, false)
@@ -200,7 +189,7 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.UnknownRelated("role")
 	}
 
-	seen := make(map[string]struct{})
+	var refs []string
 	policyName := "default"
 
 	// --- GetKeyPolicy: parse Principal.AWS role ARNs ---
@@ -215,9 +204,7 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.ErrorRelated("role", err)
 	}
 	if policyOut != nil && policyOut.Policy != nil {
-		for _, name := range kmsRoleNamesFromPolicyJSON(*policyOut.Policy) {
-			seen[name] = struct{}{}
-		}
+		refs = kmsRoleARNsFromPolicyJSON(*policyOut.Policy)
 	}
 
 	// --- ListGrants: collect role ARNs from GranteePrincipal / RetiringPrincipal ---
@@ -245,11 +232,11 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 				}(),
 			} {
 				if p != "" && strings.Contains(p, ":role/") {
-					seen[arnRoleName(p)] = struct{}{}
+					refs = append(refs, p)
 				}
 			}
 		}
 	}
 
-	return relatedResult("role", mapKeys(seen))
+	return relatedRefs("role", refs, refContext(clients, cache, "role"))
 }

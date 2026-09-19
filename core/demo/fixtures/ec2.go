@@ -203,7 +203,7 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f.TransitGateways = buildTransitGateways()
 	f.TGWAttachments = buildTGWAttachments()
 	f.VpcEndpoints = buildVpcEndpoints()
-	f.NetworkInterfaces = buildNetworkInterfaces(f.SecurityGroups)
+	f.NetworkInterfaces = buildNetworkInterfaces(f.SecurityGroups, f.VpcEndpoints)
 	f.Volumes = buildVolumes()
 	f.VolumeStatuses = buildVolumeStatuses()
 	f.Snapshots = buildSnapshots()
@@ -1555,6 +1555,36 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 		},
 	})
 
+	// The groups the web ASG's launch config, the EKS cluster and node group,
+	// and the API Gateway VPC link's NLB (asg.go, eks.go, apigw.go) attach.
+	for _, g := range []struct{ id, name, desc string }{
+		{"sg-0web111111111111w", "acme-web-instances-sg", "Web tier instances behind the prod ALB"},
+		{"sg-0eks111111111111e", "acme-eks-cluster-sg", "EKS control plane and node communication"},
+		{APIGWVpcLinkSecurityGroupID, "acme-vpc-link-sg", "API Gateway VPC link to the internal NLB"},
+	} {
+		sgs = append(sgs, ec2types.SecurityGroup{
+			GroupId:          aws.String(g.id),
+			GroupName:        aws.String(g.name),
+			VpcId:            aws.String(fixtProdVPCID),
+			Description:      aws.String(g.desc),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + g.id),
+			IpPermissions: []ec2types.IpPermission{{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(443),
+				ToPort:     aws.Int32(443),
+				IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.0.0.0/16"), Description: aws.String("HTTPS from the VPC")}},
+			}},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String(g.name)},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		})
+	}
+
 	vpcIDs := []string{fixtProdVPCID, fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	sgNames := []string{"app-sg", "cache-sg", "worker-sg", "monitoring-sg", "lambda-sg", "batch-sg", "data-sg", "analytics-sg", "admin-sg", "internal-sg"}
 	sgDescs := []string{"Application tier", "Cache tier", "Worker tier", "Monitoring", "Lambda functions", "Batch jobs", "Data pipeline", "Analytics", "Admin access", "Internal services"}
@@ -2890,9 +2920,37 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 // sg.unused signal has exactly one witness (SGUnused) instead of firing on
 // every group whose owning service the fixtures model without its ENIs.
 // Default groups are skipped: AWS creates one per VPC and it is exempt from
-// the check.
-func buildNetworkInterfaces(sgs []ec2types.SecurityGroup) []ec2types.NetworkInterface {
+// the check. Every interface an endpoint names and no hand-written one is gets
+// the endpoint-owned interface AWS creates for it, so the endpoint's
+// interfaces are rows of the eni list.
+func buildNetworkInterfaces(sgs []ec2types.SecurityGroup, vpces []ec2types.VpcEndpoint) []ec2types.NetworkInterface {
 	enis := namedNetworkInterfaces()
+	have := make(map[string]bool, len(enis))
+	for _, eni := range enis {
+		have[aws.ToString(eni.NetworkInterfaceId)] = true
+	}
+	for _, vpce := range vpces {
+		for i, id := range vpce.NetworkInterfaceIds {
+			if have[id] {
+				continue
+			}
+			have[id] = true
+			eni := ec2types.NetworkInterface{
+				NetworkInterfaceId: aws.String(id),
+				Status:             ec2types.NetworkInterfaceStatusInUse,
+				InterfaceType:      ec2types.NetworkInterfaceTypeVpcEndpoint,
+				VpcId:              vpce.VpcId,
+				Description:        aws.String("VPC Endpoint Interface " + aws.ToString(vpce.VpcEndpointId)),
+				OwnerId:            aws.String("123456789012"),
+				RequesterManaged:   aws.Bool(true),
+				SourceDestCheck:    aws.Bool(true),
+			}
+			if len(vpce.SubnetIds) > 0 {
+				eni.SubnetId = aws.String(vpce.SubnetIds[i%len(vpce.SubnetIds)])
+			}
+			enis = append(enis, eni)
+		}
+	}
 	referenced := make(map[string]bool, len(sgs))
 	for _, eni := range enis {
 		for _, g := range eni.Groups {
@@ -3671,11 +3729,11 @@ func init() {
 	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 9, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
-	Register(Pin{ShortName: "eni", Rows: 48, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "eni", Rows: 55, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "igw", Rows: 5, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})
 	Register(Pin{ShortName: "rtb", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "sg", Rows: 42, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sg", Rows: 45, Issues: 6, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "subnet", Rows: 38, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
 	Register(Pin{ShortName: "vpc", Rows: 8, Issues: 1, CoverageGaps: []string{"broken", "dim"}})

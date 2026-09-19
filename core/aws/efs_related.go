@@ -18,15 +18,14 @@ import (
 )
 
 // checkEFSKMS returns the KMS key used to encrypt this EFS file system (Pattern F).
-// KmsKeyId may be either a full ARN (arn:aws:kms:...:key/{id}) or a bare key ID.
 //
-// The checker emits the key ID blindly; the related-check orchestrator's
+// The checker emits the key blindly; the related-check orchestrator's
 // lazy-add path (SetFetchByIDsForTest for "kms") fetches the key metadata on
 // demand when the ID is not already in the customer-managed kms cache. That
 // keeps this checker simple AND lets AWS-managed keys (aws/elasticfilesystem,
 // etc.) drill into a real entry — both the count and the drill land on the
 // same resource.
-func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEFSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -34,18 +33,7 @@ func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if fs.KmsKeyId == nil || *fs.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	val := *fs.KmsKeyId
-	idx := strings.LastIndex(val, "/")
-	var keyID string
-	switch {
-	case idx < 0:
-		keyID = val
-	case idx == len(val)-1:
-		return resource.KnownRelated("kms", nil, false)
-	default:
-		keyID = val[idx+1:]
-	}
-	return relatedResult("kms", []string{keyID})
+	return relatedRefs("kms", []string{*fs.KmsKeyId}, refContext(clients, cache, "kms"))
 }
 
 // checkEFSCFN checks EFS file system tags for aws:cloudformation:stack-name

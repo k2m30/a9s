@@ -303,19 +303,11 @@ func mwaaLogGroup(m *mwaatypes.ModuleLoggingConfiguration) string {
 	return mwaaLogGroupNameFromARN(aws.ToString(m.CloudWatchLogGroupArn))
 }
 
-// mwaaLogGroupNameFromARN extracts the bare log group name from a CloudWatch
-// Logs log-group ARN (arn:aws:logs:region:account:log-group:NAME:*),
-// mirroring opensearch_related.go's checkOpenSearchLogs extraction. Returns
-// "" for an empty or malformed input.
+// mwaaLogGroupNameFromARN is the log group a CloudWatch Logs log-group ARN
+// names, or "" for an empty or malformed input.
 func mwaaLogGroupNameFromARN(arn string) string {
-	if arn == "" {
-		return ""
-	}
-	_, name, ok := strings.Cut(arn, ":log-group:")
-	if !ok {
-		return ""
-	}
-	return strings.TrimSuffix(name, ":*")
+	name, _ := logsRefToID(arn, domain.RefContext{})
+	return name
 }
 
 // mwaaInt32ToStr renders an *int32 field as a decimal string, "" for nil.

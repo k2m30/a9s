@@ -170,8 +170,10 @@ func TestRelated_ACM_ELB_NonLBARNSkipped(t *testing.T) {
 // checkACMAPIGW — domainnames and restapis ARN parsing
 // ---------------------------------------------------------------------------
 
-// TestRelated_ACM_APIGW_DomainnamesARN: an InUseBy ARN containing
-// /domainnames/ yields the domain name (last segment after final "/").
+// TestRelated_ACM_APIGW_DomainnamesARN: an InUseBy ARN naming an API
+// Gateway custom domain is not counted — a domain name is no apigw row — and
+// the count says it left one out. Inverted by #545 row 6: a domain name drills into
+// no apigw row, so it is never the ID. Do not restore it.
 func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
 	const certARN = "arn:aws:acm:us-east-1:111122223333:certificate/abc-apigw"
 	source := resource.Resource{
@@ -188,11 +190,11 @@ func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
 	checker := acmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (domainnames ARN in InUseBy)", result.Count())
+	if result.Count() != 0 {
+		t.Errorf("Count = %d (IDs %v), want 0 (a custom domain is no apigw row)", result.Count(), result.ResourceIDs())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "api.example.com" {
-		t.Errorf("ResourceIDs = %v, want [api.example.com]", result.ResourceIDs())
+	if !result.Truncated() {
+		t.Error("Truncated = false, want true: the domain reference was left out")
 	}
 }
 

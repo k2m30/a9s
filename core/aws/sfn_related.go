@@ -96,7 +96,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 // checkSFNRole resolves the IAM execution role for this state machine via
 // DescribeStateMachine (Pattern C: 1 API call, RoleArn → role name).
-func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
 		return resource.KnownRelated("role", nil, false)
@@ -111,12 +111,12 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if out.RoleArn == nil || *out.RoleArn == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	return relatedResult("role", []string{arnRoleName(*out.RoleArn)})
+	return relatedRefs("role", []string{*out.RoleArn}, refContext(clients, cache, "role"))
 }
 
 // checkSFNKMS resolves the state machine's encryption KMS key via DescribeStateMachine
 // (Pattern C: 1 API call, EncryptionConfiguration.KmsKeyId → key ID).
-func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
 		return resource.KnownRelated("kms", nil, false)
@@ -132,13 +132,13 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 		*out.EncryptionConfiguration.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{arnLastSegment(*out.EncryptionConfiguration.KmsKeyId)})
+	return relatedRefs("kms", []string{*out.EncryptionConfiguration.KmsKeyId}, refContext(clients, cache, "kms"))
 }
 
 // checkSFNLambda parses the state machine's ASL definition JSON (returned by
 // DescribeStateMachine) and extracts Lambda function ARNs referenced as Task
 // Resource values. Pattern C: 1 API call, offline JSON walk.
-func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
 		return resource.KnownRelated("lambda", nil, false)
@@ -154,19 +154,16 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.KnownRelated("lambda", nil, false)
 	}
 
-	seen := map[string]struct{}{}
-	sfnCollectLambdaRefs([]byte(*out.Definition), seen)
-	names := make([]string, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
-	}
-	return relatedResult("lambda", names)
+	var refs []string
+	sfnCollectLambdaRefs([]byte(*out.Definition), &refs)
+	return relatedRefs("lambda", refs, refContext(clients, cache, "lambda"))
 }
 
-// sfnCollectLambdaRefs walks an ASL definition JSON and records lambda function
-// names found in Resource / Parameters.FunctionName fields. Function names are
-// extracted from Lambda ARNs (arn:aws:lambda:...:function:NAME[:alias]).
-func sfnCollectLambdaRefs(def []byte, seen map[string]struct{}) {
+// sfnCollectLambdaRefs walks an ASL definition JSON and appends to refs the
+// Lambda function references found in Resource (a function ARN; a service
+// integration such as arn:aws:states:::lambda:invoke names no function) and
+// Parameters.FunctionName fields.
+func sfnCollectLambdaRefs(def []byte, refs *[]string) {
 	var raw any
 	if err := json.Unmarshal(def, &raw); err != nil {
 		return
@@ -176,17 +173,8 @@ func sfnCollectLambdaRefs(def []byte, seen map[string]struct{}) {
 		switch x := v.(type) {
 		case map[string]any:
 			for k, val := range x {
-				if k == "Resource" {
-					if s, ok := val.(string); ok {
-						if name := lambdaFuncNameFromARN(s); name != "" {
-							seen[name] = struct{}{}
-						}
-					}
-				}
-				if k == "FunctionName" {
-					if s, ok := val.(string); ok && s != "" {
-						seen[lambdaFuncNameFromARN(s)] = struct{}{}
-					}
+				if s, ok := val.(string); ok && (k == "FunctionName" || k == "Resource" && strings.Contains(s, ":function:")) {
+					*refs = append(*refs, s)
 				}
 				walk(val)
 			}
@@ -197,24 +185,6 @@ func sfnCollectLambdaRefs(def []byte, seen map[string]struct{}) {
 		}
 	}
 	walk(raw)
-}
-
-// lambdaFuncNameFromARN extracts the function name from a Lambda ARN. Returns
-// the input if it does not look like a Lambda ARN.
-func lambdaFuncNameFromARN(s string) string {
-	if !strings.HasPrefix(s, "arn:") {
-		return s
-	}
-	// arn:aws:lambda:REGION:ACCT:function:NAME or arn:aws:states:::lambda:invoke
-	parts := strings.Split(s, ":")
-	if len(parts) < 6 {
-		return ""
-	}
-	// Only treat as Lambda if "lambda" is the service and the 5th slot is "function"
-	if parts[2] == "lambda" && len(parts) >= 7 && parts[5] == "function" {
-		return parts[6]
-	}
-	return ""
 }
 
 // checkSFNEbRule resolves EventBridge rules that target this state machine.

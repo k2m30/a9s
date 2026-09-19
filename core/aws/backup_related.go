@@ -18,7 +18,7 @@ import (
 // a single backup:ListBackupSelections call (Pattern C). Each
 // BackupSelectionsListMember exposes IamRoleArn directly — the role the
 // Backup service assumes to protect the selection's resources.
-func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkBackupRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	planID := res.ID
 	if planID == "" {
 		return resource.UnknownRelated("role")
@@ -35,30 +35,19 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
-	seen := make(map[string]struct{})
-	var ids []string
+	var refs []string
 	for _, sel := range out.BackupSelectionsList {
-		if sel.IamRoleArn == nil || *sel.IamRoleArn == "" {
-			continue
+		if sel.IamRoleArn != nil && *sel.IamRoleArn != "" {
+			refs = append(refs, *sel.IamRoleArn)
 		}
-		arn := *sel.IamRoleArn
-		name := arn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			name = arn[idx+1:]
-		}
-		if _, dup := seen[name]; dup {
-			continue
-		}
-		seen[name] = struct{}{}
-		ids = append(ids, name)
 	}
-	return relatedResult("role", ids)
+	return relatedRefs("role", refs, refContext(clients, cache, "role"))
 }
 
 // checkBackupKMS resolves the KMS key(s) encrypting this plan's target
 // vaults via backup:GetBackupPlan → backup:DescribeBackupVault (Pattern C,
 // bounded N+1 where N = unique vaults referenced by plan rules, typically 1).
-func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
 		return resource.UnknownRelated("kms")
@@ -70,8 +59,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 	if !cok || c == nil || c.Backup == nil {
 		return resource.UnknownRelated("kms")
 	}
-	seen := make(map[string]struct{})
-	var ids []string
+	var refs []string
 	for _, v := range vaults {
 		name := v
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.DescribeBackupVaultOutput, error) {
@@ -85,18 +73,9 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 		if out == nil || out.EncryptionKeyArn == nil || *out.EncryptionKeyArn == "" {
 			continue
 		}
-		arn := *out.EncryptionKeyArn
-		keyID := arn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			keyID = arn[idx+1:]
-		}
-		if _, dup := seen[keyID]; dup {
-			continue
-		}
-		seen[keyID] = struct{}{}
-		ids = append(ids, keyID)
+		refs = append(refs, *out.EncryptionKeyArn)
 	}
-	return relatedResult("kms", ids)
+	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
 }
 
 // checkBackupSNS resolves the SNS topic(s) configured for this plan's target

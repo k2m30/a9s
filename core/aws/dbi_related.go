@@ -36,7 +36,7 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // checkDbiKMS reads the KmsKeyId ARN from the DBInstance RawStruct and extracts the UUID suffix.
 // Pattern F — no cache needed.
-func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -44,11 +44,11 @@ func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*db.KmsKeyId, res.Type)
+	keyID := kmsRefFromField(*db.KmsKeyId, res.Type)
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{keyID})
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkDbiSubnets reads DBSubnetGroup.Subnets from the DBInstance RawStruct and returns their IDs.
@@ -209,34 +209,22 @@ func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 
 // checkDbiRole extracts IAM role ARNs from the DBInstance's AssociatedRoles
 // and MonitoringRoleArn fields. Each DBInstanceRole has a RoleArn; we extract
-// the role name (last segment after "/"). MonitoringRoleArn is the enhanced
-// monitoring role.
-func checkDbiRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// the role. MonitoringRoleArn is the enhanced monitoring role.
+func checkDbiRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
 	}
-	var ids []string
+	var refs []string
 	for _, r := range db.AssociatedRoles {
-		if r.RoleArn == nil || *r.RoleArn == "" {
-			continue
-		}
-		arn := *r.RoleArn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			ids = append(ids, arn[idx+1:])
-		} else {
-			ids = append(ids, arn)
+		if r.RoleArn != nil && *r.RoleArn != "" {
+			refs = append(refs, *r.RoleArn)
 		}
 	}
 	if db.MonitoringRoleArn != nil && *db.MonitoringRoleArn != "" {
-		arn := *db.MonitoringRoleArn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			ids = append(ids, arn[idx+1:])
-		} else {
-			ids = append(ids, arn)
-		}
+		refs = append(refs, *db.MonitoringRoleArn)
 	}
-	return relatedResult("role", ids)
+	return relatedRefs("role", refs, refContext(clients, cache, "role"))
 }
 
 // checkDbiENI resolves the ENIs that RDS provisions for this DB instance via

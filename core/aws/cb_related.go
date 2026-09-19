@@ -26,7 +26,7 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	// In-body: the project's ServiceRole ARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
-	return relatedResult("role", []string{roleNameFromARN(*project.ServiceRole)})
+	return relatedRefs("role", []string{*project.ServiceRole}, refContext(clients, cache, "role"))
 }
 
 // checkCbLogs searches the logs cache for the CloudWatch log group associated
@@ -101,7 +101,7 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 // checkCbKMS extracts the KMS key from the CodeBuild Project's EncryptionKey field.
 // EncryptionKey is a KMS key ARN or alias ARN. Returns the key ID (last segment after "/").
 // Pattern F — no cache needed.
-func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkCbKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
 		if res.RawStruct == nil {
@@ -109,8 +109,8 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*project.EncryptionKey, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*project.EncryptionKey, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkCbSubnet extracts subnet IDs from cbtypes.Project.VpcConfig.Subnets.
@@ -140,21 +140,13 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 
 // checkCbECR maps the CodeBuild project's build image to an ECR repository when the
 // Environment.Image references an ECR URI. Pattern F+C.
-//
-// ECR URIs look like: {account}.dkr.ecr.{region}.amazonaws.com/{repo}[:tag|@sha256:...]
 func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ecr")
 	}
 
-	candidates := map[string]struct{}{}
-	if project.Environment != nil && project.Environment.Image != nil {
-		if name := cbRepoNameFromImage(*project.Environment.Image); name != "" {
-			candidates[name] = struct{}{}
-		}
-	}
-	if len(candidates) == 0 {
+	if project.Environment == nil || project.Environment.Image == nil || !strings.Contains(*project.Environment.Image, ".dkr.ecr.") {
 		return resource.KnownRelated("ecr", nil, false)
 	}
 
@@ -165,34 +157,8 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 	if ecrList == nil {
 		return resource.UnknownRelated("ecr")
 	}
-	var ids []string
-	for _, r := range ecrList {
-		if _, hit := candidates[r.ID]; hit {
-			ids = append(ids, r.ID)
-			continue
-		}
-		if _, hit := candidates[r.Name]; hit {
-			ids = append(ids, r.ID)
-		}
-	}
-	return relatedResultTrunc("ecr", ids, truncated)
-}
-
-// cbRepoNameFromImage parses an ECR image URI and returns the repo name.
-// Returns "" if the image does not appear to reference ECR.
-func cbRepoNameFromImage(img string) string {
-	if !strings.Contains(img, ".dkr.ecr.") {
-		return ""
-	}
-	slash := strings.Index(img, "/")
-	if slash < 0 || slash == len(img)-1 {
-		return ""
-	}
-	tail := img[slash+1:]
-	if colon := strings.IndexAny(tail, ":@"); colon > 0 {
-		tail = tail[:colon]
-	}
-	return tail
+	ids, dropped := listedRefs("ecr", []string{*project.Environment.Image}, refContext(clients, cache, "ecr"), ecrList)
+	return relatedResultTrunc("ecr", ids, truncated || dropped)
 }
 
 // checkCbS3 scans Artifacts/SecondaryArtifacts/Source for S3 bucket locations and

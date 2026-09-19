@@ -31,10 +31,6 @@ import (
 // navigable. Set by core/resource.init().
 var NavFieldsProvider func(shortName string) []domain.NavigableField
 
-// NavIDProvider resolves an ARN/value to a bare resource ID for navigation.
-// Set by core/resource.init().
-var NavIDProvider func(targetType, value string) string
-
 // FieldAliasProvider normalises a Fields map by adding PascalCase aliases for
 // the snake_case keys produced by fetchers. Set by core/resource.init().
 var FieldAliasProvider func(shortName string, fields map[string]string) map[string]string
@@ -222,6 +218,17 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 		hasDash := strings.HasPrefix(trimmed, "- ")
 		trimmed = strings.TrimPrefix(trimmed, "- ")
+		// An entry of a list of scalars ("- arn:aws:...") has no key: the colons
+		// inside an ARN are not YAML separators, which are ": " or a trailing ":".
+		if hasDash && !strings.Contains(trimmed, ": ") && !strings.HasSuffix(trimmed, ":") {
+			if tt, ok := navMap[listPath(item.Path, level, ancestorByLevel)]; ok {
+				items[i].IsNavigable = true
+				items[i].TargetType = tt
+				items[i].Key = ""
+				items[i].Value = "- " + trimmed
+			}
+			continue
+		}
 		subKey, subVal, hasSep := strings.Cut(trimmed, ":")
 		if !hasSep {
 			continue
@@ -233,14 +240,7 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 				delete(ancestorByLevel, depth)
 			}
 		}
-		pathParts := []string{item.Path}
-		for depth := 0; depth < level; depth++ {
-			if ancestor, ok := ancestorByLevel[depth]; ok && ancestor != "" {
-				pathParts = append(pathParts, ancestor)
-			}
-		}
-		pathParts = append(pathParts, subKey)
-		composedPath := strings.Join(pathParts, ".")
+		composedPath := listPath(item.Path, level, ancestorByLevel) + "." + subKey
 
 		// The item keeps the path this walk just worked out — where the
 		// subfield actually sits — instead of its parent's: anything keyed by
@@ -257,11 +257,6 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
-			if NavIDProvider != nil {
-				if navID := NavIDProvider(tt, subVal); navID != "" && navID != subVal {
-					items[i].NavID = navID
-				}
-			}
 			if hasDash {
 				items[i].Key = "- " + subKey
 			} else {
@@ -274,18 +269,19 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 	}
 
-	// Apply NavIDFromValue to top-level scalar navigable items.
-	if NavIDProvider != nil {
-		for i, item := range items {
-			if item.IsNavigable && !item.IsSubField && item.TargetType != "" && item.Value != "" {
-				if navID := NavIDProvider(item.TargetType, item.Value); navID != "" && navID != item.Value {
-					items[i].NavID = navID
-				}
-			}
+	return items
+}
+
+// listPath composes the path of a line at level under root from the keys of
+// the lines that opened each enclosing level.
+func listPath(root string, level int, ancestorByLevel map[int]string) string {
+	parts := []string{root}
+	for depth := range level {
+		if ancestor, ok := ancestorByLevel[depth]; ok && ancestor != "" {
+			parts = append(parts, ancestor)
 		}
 	}
-
-	return items
+	return strings.Join(parts, ".")
 }
 
 // groupIntoSections converts a []fieldpath.FieldItem into []domain.Section.

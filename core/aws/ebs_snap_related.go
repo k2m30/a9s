@@ -46,12 +46,8 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
-func checkEBSSnapEBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	volumeID := res.Fields["volume_id"]
-	if volumeID == "" {
-		return resource.KnownRelated("ebs", nil, false)
-	}
-	return relatedResult("ebs", []string{volumeID})
+func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return relatedRefs("ebs", []string{res.Fields["volume_id"]}, refContext(clients, cache, "ebs"))
 }
 
 // checkEBSSnapEC2 parses the snapshot Description for "Created by CreateImage(i-xxx)" (Pattern F).
@@ -64,9 +60,8 @@ func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("ec2", []string{matches[1]})
 }
 
-// checkEBSSnapKMS extracts the KMS key ID from RawStruct.KmsKeyId (Pattern F).
-// Handles both full ARN format (arn:aws:kms:…/key-id) and bare key ID.
-func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEBSSnapKMS reads the KMS key from RawStruct.KmsKeyId (Pattern F).
+func checkEBSSnapKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -74,15 +69,7 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	val := *snap.KmsKeyId
-	keyID := val
-	if idx := strings.LastIndex(val, "/"); idx >= 0 && idx < len(val)-1 {
-		keyID = val[idx+1:]
-	}
-	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
-	}
-	return relatedResult("kms", []string{keyID})
+	return relatedRefs("kms", []string{*snap.KmsKeyId}, refContext(clients, cache, "kms"))
 }
 
 // checkEBSSnapBackup scans this snapshot's own Description and Tags for the

@@ -1189,8 +1189,9 @@ func TestRelated_EC2_CTEvents_EmptySourceID(t *testing.T) {
 // checkEC2SSM — Pattern C: live SSM:DescribeInstanceInformation API call
 // ---------------------------------------------------------------------------
 
-// TestRelated_EC2_SSM_Match verifies that an EC2 instance managed by SSM
-// returns Count=1 with the instance ID in ResourceIDs.
+// TestRelated_EC2_SSM_Match pins that an SSM-managed instance has no count
+// on the SSM Parameters row. Inverted by #545 row 6: the instance ID it used
+// to return is no ssm row, so the drill opened nothing. Do not restore it.
 func TestRelated_EC2_SSM_Match(t *testing.T) {
 	src := resource.Resource{
 		ID: "i-0abc1234",
@@ -1210,11 +1211,8 @@ func TestRelated_EC2_SSM_Match(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ssm")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0abc1234" {
-		t.Errorf("ResourceIDs = %v, want [i-0abc1234]", result.ResourceIDs())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v (IDs %v), want RelatedUnknown", result.State(), result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())

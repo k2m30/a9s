@@ -123,26 +123,24 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 	return relatedResult("cb", mapKeys(seen))
 }
 
-// checkPipelineRole returns the pipeline's service role by extracting the role name
-// from Pipeline.RoleArn. Pattern C: GetPipeline + ARN last-segment extraction.
-func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkPipelineRole returns the pipeline's service role (Pipeline.RoleArn) and
+// any per-action role overrides. Pattern C: GetPipeline.
+func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
 		return pipelineRelatedOnErr("role", err)
 	}
 	var names []string
 	if p.RoleArn != nil && *p.RoleArn != "" {
-		names = append(names, arnRoleName(*p.RoleArn))
+		names = append(names, *p.RoleArn)
 	}
 	// Also include any per-action RoleArn overrides.
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if a.RoleArn != nil && *a.RoleArn != "" {
-			if n := arnRoleName(*a.RoleArn); n != "" {
-				names = append(names, n)
-			}
+		if a.RoleArn != nil {
+			names = append(names, *a.RoleArn)
 		}
 	})
-	return relatedResult("role", names)
+	return relatedRefs("role", names, refContext(clients, cache, "role"))
 }
 
 // checkPipelineCFN resolves CloudFormation stacks deployed by this pipeline.
@@ -227,25 +225,22 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey
 // (or per-region ArtifactStores) carries the key ARN/alias.
-func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
 		return pipelineRelatedOnErr("kms", err)
 	}
-	seen := map[string]struct{}{}
+	var refs []string
 	addKey := func(st *cptypes.ArtifactStore) {
-		if st == nil || st.EncryptionKey == nil {
-			return
-		}
-		if st.EncryptionKey.Id != nil && *st.EncryptionKey.Id != "" {
-			seen[arnLastSegment(*st.EncryptionKey.Id)] = struct{}{}
+		if st != nil && st.EncryptionKey != nil && st.EncryptionKey.Id != nil {
+			refs = append(refs, *st.EncryptionKey.Id)
 		}
 	}
 	addKey(p.ArtifactStore)
 	for _, st := range p.ArtifactStores {
 		addKey(&st)
 	}
-	return relatedResult("kms", mapKeys(seen))
+	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
 }
 
 // checkPipelineLambda resolves Lambda functions invoked by Lambda deploy/invoke actions.
@@ -312,14 +307,6 @@ func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _
 		}
 	})
 	return relatedResult("sns", mapKeys(seen))
-}
-
-// arnRoleName extracts the role name from an IAM role ARN
-// (arn:aws:iam::acct:role/path/Name → Name), or returns the input as-is.
-// Thin alias over roleNameFromARN so ARN→name parsing (assumed-role forms
-// included) lives in exactly one place.
-func arnRoleName(a string) string {
-	return roleNameFromARN(a)
 }
 
 // mapKeys returns the keys of a map[string]struct{} as a slice (order-independent —

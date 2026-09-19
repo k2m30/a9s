@@ -44,6 +44,15 @@ type ChildViewDef struct {
 
 // ─── Related types ─────────────────────────────────────────────────────────
 
+// RefContext is what a target type's reference resolver may consult besides
+// the reference itself. An empty AccountID or Region means "not known yet",
+// never "foreign". Targets are the target type's cached rows, nil when the
+// list has not been loaded.
+type RefContext struct {
+	AccountID, Region string
+	Targets           []Resource
+}
+
 // RelatedDef defines one related resource class for a given resource type.
 type RelatedDef struct {
 	TargetType       string // target resource short name (e.g., "tg", "alarm")

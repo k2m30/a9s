@@ -53,6 +53,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:          "IAM Roles",
 		ShortName:     "role",
+		RefToID:       roleRefToID,
 		Aliases:       []string{"role", "roles", "iam-roles", "iam_roles"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "_localfield.role_name:Fields.role_name",
@@ -217,6 +218,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:          "IAM Users",
 		ShortName:     "iam-user",
+		RefToID:       iamUserRefToID,
 		LifecycleKey:  "risk",
 		Aliases:       []string{"iam-user", "iam-users", "users", "iam_users"},
 		Category:      "SECURITY & IAM",
@@ -261,6 +263,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:          "IAM Groups",
 		ShortName:     "iam-group",
+		RefToID:       iamGroupRefToID,
 		Aliases:       []string{"iam-group", "iam-groups", "groups", "iam_groups"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
@@ -302,6 +305,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:           "WAF Web ACLs",
 		ShortName:      "waf",
+		RefToID:        wafRefToID,
 		HumanizeFields: []string{"scope"},
 		Aliases:        []string{"waf", "webacl", "web-acl"},
 		Category:       "SECURITY & IAM",

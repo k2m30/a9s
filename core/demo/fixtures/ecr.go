@@ -170,6 +170,23 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-02-05T11:15:00+00:00")),
 		},
 	}
+	// The repositories the demo ECS services' task definitions pull from
+	// (ecs.go), healthy like acme/internal-tools.
+	for _, name := range ecsServiceRepos {
+		repos = append(repos, ecrtypes.Repository{
+			RepositoryName:             aws.String(name),
+			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + name),
+			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + name),
+			RegistryId:                 aws.String("123456789012"),
+			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
+			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
+			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
+				EncryptionType: ecrtypes.EncryptionTypeKms,
+				KmsKey:         aws.String(prodKMSKeyID),
+			},
+			CreatedAt: aws.Time(mustParseECRTime("2025-04-01T09:00:00+00:00")),
+		})
+	}
 
 	images := map[string][]ecrtypes.ImageDetail{
 		ECRHighVulnerabilities: {
@@ -239,6 +256,9 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 		"acme/internal-tools":  expireUntagged,
 		ECRHighVulnerabilities: expireUntagged,
 	}
+	for _, name := range ecsServiceRepos {
+		lifecyclePolicies[name] = expireUntagged
+	}
 
 	return &ECRFixtures{
 		Repositories:      repos,
@@ -249,10 +269,14 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 	}
 })
 
+// ecsServiceRepos are the repositories only the demo ECS task definitions
+// name.
+var ecsServiceRepos = []string{"acme/web-frontend", "acme/order-worker", "acme/batch-etl", "acme/degraded", "acme/stalled"}
+
 func NewECRFixtures() *ECRFixtures {
 	return sharedECRFixtures()
 }
 
 func init() {
-	Register(Pin{ShortName: "ecr", Rows: 7, Issues: 2, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecr", Rows: 12, Issues: 2, CoverageGaps: []string{"dim"}})
 }

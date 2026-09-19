@@ -147,7 +147,7 @@ func ecrPipelineHasRepo(stages []cptypes.StageDeclaration, repoName string) bool
 // checkECRRole resolves IAM roles from the ECR repository's resource-based policy.
 // Pattern F+forward: calls ecr:GetRepositoryPolicy and parses Statement[].Principal.AWS
 // for role ARNs matching arn:aws:iam::*:role/*.
-func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -185,15 +185,12 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.KnownRelated("role", nil, false)
 	}
 
-	roleARNs := ecrPolicyRoleARNs(*out.PolicyText)
-	// role.ID is a bare RoleName; drop foreign-account principals (a
-	// cross-account role is not fetchable via iam:GetRole here). repo.RegistryId
-	// is the owning account; when absent, keep all (best effort).
-	ownerAccount := ""
-	if repo.RegistryId != nil {
-		ownerAccount = *repo.RegistryId
+	// repo.RegistryId is the owning account, the one whose roles are local.
+	rc := refContext(clients, cache, "role")
+	if repo.RegistryId != nil && *repo.RegistryId != "" {
+		rc.AccountID = *repo.RegistryId
 	}
-	return relatedResult("role", sameAccountRoleNames(roleARNs, ownerAccount))
+	return relatedRefs("role", ecrPolicyRoleARNs(*out.PolicyText), rc)
 }
 
 // ecrPolicyRoleARNs parses an IAM policy JSON document and returns all IAM role

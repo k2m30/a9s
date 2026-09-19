@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -992,8 +993,26 @@ func TestRelated_R53_CF_NilClients(t *testing.T) {
 // checkR53ACM tests
 // ---------------------------------------------------------------------------
 
+// r53ACMCache holds one loaded certificate per domain, keyed on its ARN as
+// the acm list keys its rows.
+func r53ACMCache(domains ...string) (resource.ResourceCache, []string) {
+	var rows []resource.Resource
+	var arns []string
+	for i, d := range domains {
+		arn := "arn:aws:acm:us-east-1:123456789012:certificate/0000000" + string(rune('1'+i))
+		arns = append(arns, arn)
+		rows = append(rows, resource.Resource{ID: arn, RawStruct: acmtypes.CertificateSummary{
+			CertificateArn: aws.String(arn),
+			DomainName:     aws.String(d),
+		}})
+	}
+	return resource.ResourceCache{"acm": resource.ResourceCacheEntry{Resources: rows}}, arns
+}
+
 // TestRelated_R53_ACM_Match verifies that a CNAME record starting with "_" whose
-// value ends with ".acm-validations.aws" is counted as an ACM validation record.
+// value ends with ".acm-validations.aws" counts the certificate for the domain
+// it validates. Inverted by #545 row 6: the record name is no acm row, so the
+// ID is the certificate ARN. Do not restore the record name.
 func TestRelated_R53_ACM_Match(t *testing.T) {
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
@@ -1011,9 +1030,11 @@ func TestRelated_R53_ACM_Match(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
+	cache, arns := r53ACMCache("example.com", "other.example.org")
+
 	checker := r53CheckerByTarget(t, "acm")
 	source := resource.Resource{ID: "ZACM001", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.TargetType() != "acm" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "acm")
@@ -1021,14 +1042,14 @@ func TestRelated_R53_ACM_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// The record name (minus trailing dot) is used as the ID.
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "_acmchallenge.example.com" {
-		t.Errorf("ResourceIDs = %v, want [_acmchallenge.example.com]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != arns[0] {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), arns[0])
 	}
 }
 
 // TestRelated_R53_ACM_MultipleValidationRecords verifies that two CNAME validation
-// records for two certificates in one zone both produce IDs.
+// records for two certificates in one zone both produce IDs. Inverted by #545
+// row 6, as in TestRelated_R53_ACM_Match: the IDs are the certificates' ARNs.
 func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
@@ -1041,7 +1062,7 @@ func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 					},
 				},
 				{
-					Name: aws.String("_cert2.example.com."),
+					Name: aws.String("_cert2.www.example.com."),
 					Type: r53types.RRTypeCname,
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String("_token2.acm-validations.aws.")},
@@ -1052,9 +1073,11 @@ func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
+	cache, arns := r53ACMCache("example.com", "www.example.com")
+
 	checker := r53CheckerByTarget(t, "acm")
 	source := resource.Resource{ID: "ZACM002", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2 (two distinct validation records)", result.Count())
@@ -1063,11 +1086,10 @@ func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 	for _, id := range result.ResourceIDs() {
 		seen[id] = true
 	}
-	if !seen["_cert1.example.com"] {
-		t.Errorf("ResourceIDs missing _cert1.example.com; got %v", result.ResourceIDs())
-	}
-	if !seen["_cert2.example.com"] {
-		t.Errorf("ResourceIDs missing _cert2.example.com; got %v", result.ResourceIDs())
+	for _, arn := range arns {
+		if !seen[arn] {
+			t.Errorf("ResourceIDs missing %s; got %v", arn, result.ResourceIDs())
+		}
 	}
 }
 

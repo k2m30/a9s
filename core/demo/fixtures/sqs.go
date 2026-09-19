@@ -113,6 +113,18 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"SqsManagedSseEnabled":                  "true",
 				},
 			},
+			// The dead-letter queue two EventBridge rules name (eventbridge.go).
+			{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/scheduled-tasks-dlq",
+				QueueName: "scheduled-tasks-dlq",
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "0",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"MessageRetentionPeriod":                "1209600",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq",
+					"SqsManagedSseEnabled":                  "true",
+				},
+			},
 			// S3 healthy-bucket dead-letter queue (checkS3SQS pivot).
 			{
 				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + S3DLQueueName,
@@ -133,5 +145,5 @@ func NewSQSFixtures() *SQSFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "sqs", Rows: 7, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sqs", Rows: 8, Issues: 0, CoverageGaps: []string{"dim"}})
 }

@@ -16,8 +16,7 @@ import (
 )
 
 // checkSecretsKMS returns the KMS key used to encrypt this secret (Pattern F).
-// KmsKeyId is a full ARN (arn:aws:kms:region:account:key/{uuid}); we extract the
-// UUID after the last "/" and search the kms cache for a matching resource ID.
+// KmsKeyId is read through the kms resolver and matched against the kms cache.
 func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
@@ -29,25 +28,18 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 	if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	val := *secret.KmsKeyId
-	idx := strings.LastIndex(val, "/")
-	var keyID string
-	switch {
-	case idx < 0:
-		// Bare key ID (no ARN prefix)
-		keyID = val
-	case idx == len(val)-1:
-		return resource.KnownRelated("kms", nil, false)
-	default:
-		keyID = val[idx+1:]
-	}
-
 	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
 		return resource.UnknownRelated("kms")
+	}
+	rc := refContext(clients, cache, "kms")
+	rc.Targets = kmsList
+	keyID, local := resource.ResolveRef("kms", *secret.KmsKeyId, rc)
+	if !local {
+		return relatedResultTrunc("kms", nil, true)
 	}
 
 	var ids []string

@@ -59,23 +59,28 @@ func secretsSourceWithRotation(secretARN, secretName, rotationLambdaARN string) 
 // secrets→codeartifact (heuristic: secret name contains "codeartifact")
 // ---------------------------------------------------------------------------
 
-// TestRelated_Secrets_CodeArtifact_MatchByName verifies that checkSecretsCodeArtifact
-// returns Count=1 when the secret name contains "codeartifact".
+// TestRelated_Secrets_CodeArtifact_MatchByName verifies that a secret whose
+// name says codeartifact counts the loaded repository its name names.
+// Inverted by #545 row 6: the secret's own name is no codeartifact row, so
+// it is never the ID. Do not restore it.
 func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 	source := resource.Resource{
-		ID:   "prod/codeartifact/token",
-		Name: "prod/codeartifact/token",
+		ID:   "prod/codeartifact/acme-npm/token",
+		Name: "prod/codeartifact/acme-npm/token",
 		RawStruct: smtypes.SecretListEntry{
-			Name: aws.String("prod/codeartifact/token"),
-			ARN:  aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/codeartifact/token"),
+			Name: aws.String("prod/codeartifact/acme-npm/token"),
+			ARN:  aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/codeartifact/acme-npm/token-AbCdEf"),
 		},
 	}
+	cache := resource.ResourceCache{"codeartifact": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "acme-npm"}, {ID: "acme-pypi"},
+	}}}
 
 	checker := secretsCheckerByTarget(t, "codeartifact")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (name contains 'codeartifact')", result.Count())
+	if result.Count() != 1 || result.ResourceIDs()[0] != "acme-npm" {
+		t.Errorf("Count = %d, IDs %v, want [acme-npm]", result.Count(), result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())

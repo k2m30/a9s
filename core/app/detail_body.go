@@ -216,6 +216,7 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 		humanized = td.HumanizedFields()
 	}
 	content := sectionsToFieldItemsDetail(sections, humanized)
+	c.resolveNavIDs(content)
 	attention, keys := buildAttentionSectionDetail(ds, td, c.detailNotInspected(ds))
 	built := detailItems{
 		items:   append(attention, content...),
@@ -238,6 +239,32 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 		built.keys = append(built.keys, key)
 	}
 	return built
+}
+
+// resolveNavIDs reads every navigable row's value through the target type's
+// resolver, as the related panel reads the same reference, and against the
+// rows loaded now — so a key list that lands after the detail opened is used
+// on the next build. A value that names no row of the target stops being
+// navigable. Rows a projector already gave a NavID keep it.
+func (c *Controller) resolveNavIDs(items []fieldpath.FieldItem) {
+	accountID := ""
+	if c.identityResult != nil {
+		accountID = c.identityResult.AccountID
+	}
+	for i, it := range items {
+		if !it.IsNavigable || it.NavID != "" {
+			continue
+		}
+		rc := domain.RefContext{AccountID: accountID, Region: c.core.Region(), Targets: c.cachedResources(it.TargetType)}
+		id := resource.NavIDFromValue(it.TargetType, strings.TrimPrefix(strings.TrimSpace(it.Value), "- "), rc)
+		switch {
+		case id == "":
+			items[i].IsNavigable = false
+			items[i].TargetType = ""
+		case id != it.Value:
+			items[i].NavID = id
+		}
+	}
 }
 
 // relocateDetailCursor returns the index the cursor takes in a freshly built

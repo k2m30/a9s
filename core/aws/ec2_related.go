@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"sort"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -16,8 +15,6 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -332,38 +329,15 @@ func ec2Tags(res resource.Resource) map[string]string {
 	return tags
 }
 
-// checkEC2SSM checks whether this EC2 instance is managed by SSM by calling
-// ssm:DescribeInstanceInformation filtered by InstanceIds (Pattern C: 1 API call).
-// If the response contains at least one entry the instance is SSM-managed and
-// the instance ID is returned as the single resource ID.
-func checkEC2SSM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	instanceID, _, _ := ec2Identity(res)
-	if instanceID == "" {
+// checkEC2SSM has no count to give. The pivot the contract names is the
+// instance's SSM managed-instance registration (docs/resources/ec2.md § ssm),
+// and the ssm list holds Parameter Store parameters: no parameter row stands
+// for an instance, so any ID this returned would drill into nothing.
+func checkEC2SSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if instanceID, _, _ := ec2Identity(res); instanceID == "" {
 		return resource.KnownRelated("ssm", nil, false)
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.SSM == nil {
-		return resource.UnknownRelated("ssm")
-	}
-	api, ok := c.SSM.(SSMDescribeInstanceInformationAPI)
-	if !ok {
-		return resource.UnknownRelated("ssm")
-	}
-	filterKey := "InstanceIds"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ssm.DescribeInstanceInformationOutput, error) {
-		return api.DescribeInstanceInformation(ctx, &ssm.DescribeInstanceInformationInput{
-			Filters: []ssmtypes.InstanceInformationStringFilter{
-				{Key: &filterKey, Values: []string{instanceID}},
-			},
-		})
-	})
-	if err != nil {
-		return resource.ErrorRelated("ssm", err)
-	}
-	if len(out.InstanceInformationList) == 0 {
-		return resource.KnownRelated("ssm", nil, false)
-	}
-	return relatedResult("ssm", []string{instanceID})
+	return resource.UnknownRelated("ssm")
 }
 
 func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID string) bool {
@@ -430,12 +404,10 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 		}
 		return resource.KnownRelated("role", nil, false)
 	}
-	arn := *inst.IamInstanceProfile.Arn
-	idx := strings.LastIndex(arn, "/")
-	if idx < 0 || idx >= len(arn)-1 {
+	profileName := instanceProfileName(*inst.IamInstanceProfile.Arn)
+	if profileName == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	profileName := arn[idx+1:]
 
 	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {

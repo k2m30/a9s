@@ -230,9 +230,9 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 
 // checkECSSvcECR resolves ECR repositories used by this ECS service.
 // Pattern A: calls ecs:DescribeTaskDefinition for the service's current task
-// definition and extracts ECR repository names from ContainerDefinitions[].Image.
+// definition and reads the ECR repositories of ContainerDefinitions[].Image.
 // NeedsTargetCache: false.
-func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ecr")
@@ -262,39 +262,13 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.ErrorRelated("ecr", err)
 	}
 
-	seen := make(map[string]struct{})
-	for _, c := range out.TaskDefinition.ContainerDefinitions {
-		if c.Image == nil || *c.Image == "" {
-			continue
-		}
-		img := *c.Image
-		// ECR image URI: {account}.dkr.ecr.{region}.amazonaws.com/{repo}[:{tag}|@{digest}]
-		if !strings.Contains(img, ".dkr.ecr.") {
-			continue
-		}
-		_, repo, hasSep := strings.Cut(img, "/")
-		if !hasSep {
-			continue
-		}
-		if before, _, hasSep := strings.Cut(repo, ":"); hasSep {
-			repo = before
-		}
-		if before, _, hasSep := strings.Cut(repo, "@"); hasSep {
-			repo = before
-		}
-		if repo != "" {
-			seen[repo] = struct{}{}
+	var images []string
+	for _, cd := range out.TaskDefinition.ContainerDefinitions {
+		if cd.Image != nil && strings.Contains(*cd.Image, ".dkr.ecr.") {
+			images = append(images, *cd.Image)
 		}
 	}
-
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("ecr", nil, false)
-	}
-	return relatedResult("ecr", ids)
+	return relatedRefs("ecr", images, refContext(clients, cache, "ecr"))
 }
 
 // checkECSSvcSecrets resolves Secrets Manager secrets referenced by this ECS service.
@@ -302,7 +276,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 // ContainerDefinitions[].Secrets[].ValueFrom for secretsmanager ARNs, plus
 // ContainerDefinitions[].RepositoryCredentials.CredentialsParameter.
 // NeedsTargetCache: false.
-func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("secrets")
@@ -333,7 +307,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		return resource.ErrorRelated("secrets", err)
 	}
 
-	seen := make(map[string]struct{})
+	var refs []string
 	for _, cd := range out.TaskDefinition.ContainerDefinitions {
 		// Secrets[].ValueFrom — secretsmanager ARNs
 		for _, s := range cd.Secrets {
@@ -342,26 +316,19 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 			}
 			v := *s.ValueFrom
 			if isSecret(v) {
-				seen[v] = struct{}{}
+				refs = append(refs, v)
 			}
 		}
 		// RepositoryCredentials.CredentialsParameter — may be a Secrets Manager ARN
 		if cd.RepositoryCredentials != nil && cd.RepositoryCredentials.CredentialsParameter != nil {
 			cp := *cd.RepositoryCredentials.CredentialsParameter
 			if isSecret(cp) {
-				seen[cp] = struct{}{}
+				refs = append(refs, cp)
 			}
 		}
 	}
 
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
-	}
-	return relatedResult("secrets", ids)
+	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
 }
 
 // checkECSSvcSFN is a reverse-scan checker for the ecs-svc→sfn relationship.
@@ -382,13 +349,8 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
 	}
 
-	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
-	taskDefARN := *raw.TaskDefinition
-	taskDefFamily := arnLastSegment(taskDefARN)
-	if idx := strings.LastIndex(taskDefFamily, ":"); idx >= 0 {
-		taskDefFamily = taskDefFamily[:idx]
-	}
-	if taskDefFamily == "" {
+	family := taskDefFamily(*raw.TaskDefinition)
+	if family == "" {
 		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
 	}
 
@@ -412,7 +374,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		if sm == nil || sm.Definition == nil || *sm.Definition == "" {
 			continue
 		}
-		if sfnASLHasECSFamily(*sm.Definition, taskDefFamily) {
+		if sfnASLHasECSFamily(*sm.Definition, family) {
 			ids = append(ids, sfnRes.ID)
 		}
 	}
@@ -431,8 +393,8 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 
 // sfnASLHasECSFamily walks an ASL definition JSON and returns true if any Task state
 // has Resource starting with "arn:aws:states:::ecs:runTask" and
-// Parameters.TaskDefinition containing taskDefFamily.
-func sfnASLHasECSFamily(definition, taskDefFamily string) bool {
+// Parameters.TaskDefinition containing family.
+func sfnASLHasECSFamily(definition, family string) bool {
 	var raw any
 	if err := json.Unmarshal([]byte(definition), &raw); err != nil {
 		return false
@@ -458,14 +420,14 @@ func sfnASLHasECSFamily(definition, taskDefFamily string) bool {
 				// Check Parameters.TaskDefinition
 				if params, ok := m["Parameters"].(map[string]any); ok {
 					if td, ok := params["TaskDefinition"].(string); ok {
-						if strings.Contains(td, taskDefFamily) {
+						if strings.Contains(td, family) {
 							found = true
 							return
 						}
 					}
 					// Also check "TaskDefinition.$" (reference)
 					if td, ok := params["TaskDefinition.$"].(string); ok {
-						if strings.Contains(td, taskDefFamily) {
+						if strings.Contains(td, family) {
 							found = true
 							return
 						}

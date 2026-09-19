@@ -9,7 +9,7 @@ import (
 // WireProjection wires the resource-registry callbacks into the generic
 // projectors so that projection.GenericWithConfig and
 // projection.GenericWithConfigAndNavProvider can access navigable-field
-// definitions, ID resolvers, and field-alias normalisers without importing
+// definitions and field-alias normalisers without importing
 // core/resource (which would create an import cycle).
 //
 // `core/resource/` deliberately contains zero `func init()`.
@@ -23,7 +23,6 @@ func WireProjection() {
 	// A mutable global default would let one test's registration leak into
 	// the next.
 	projection.NavFieldsProvider = GetDefaultNavFields
-	projection.NavIDProvider = NavIDFromValue
 	projection.FieldAliasProvider = ApplyFieldAliases
 	projection.FieldKeysProvider = GetFieldKeys
 }

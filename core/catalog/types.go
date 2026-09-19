@@ -121,6 +121,13 @@ type ResourceTypeDef struct {
 	Related []domain.RelatedDef
 	// Navigable associates detail-view field paths with target resource types.
 	Navigable []domain.NavigableField
+	// RefToID converts any AWS reference to this type (an ARN, an alias, a
+	// qualified or suffixed name) into the ID its rows are keyed by. ok is
+	// false when the reference names no row of this account and region. nil
+	// means the type's references already are its row IDs. Every related
+	// count and every navigable field reads a reference through here
+	// (resource.ResolveRef), so the badge and the drill cannot disagree.
+	RefToID func(ref string, rc domain.RefContext) (id string, ok bool)
 	// Children defines child views that can be drilled into from the list view.
 	Children []domain.ChildViewDef
 	// Reveal is the fetcher for secret/reveal values (e.g. Secrets Manager).

@@ -4,10 +4,11 @@ package aws
 
 import (
 	"context"
-	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"net/url"
 	"strings"
 	"time"
+
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -46,6 +47,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "Secrets Manager",
 		ShortName:      "secrets",
+		RefToID:        secretsRefToID,
 		LifecycleKey:   "status",
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"secrets", "secretsmanager", "sm"},
@@ -142,6 +144,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "KMS Keys",
 		ShortName:      "kms",
+		RefToID:        kmsRefToID,
 		HumanizeFields: []string{"status", "KeyManager", "KeySpec", "KeyState", "KeyUsage", "Origin"},
 		Aliases:        []string{"kms", "keys"},
 		Category:       "SECRETS & CONFIG",

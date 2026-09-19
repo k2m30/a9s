@@ -10,8 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws/arn"
-
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -25,95 +23,25 @@ type RelatedDef = domain.RelatedDef
 // existing consumers compiling.
 type NavigableField = domain.NavigableField
 
-// NavIDFromValue returns the bare resource ID suitable for target lookup,
-// given a raw field value. When the value is an AWS ARN and the target
-// resource type indexes on a bare name/UUID (not the ARN), this extracts
-// the correct lookup key so Enter navigation lands on the matching row.
-//
-// When no extractor is registered for the target type, or the value is
-// already bare (no "/" or ":" segment to strip), the value is returned
-// unchanged — the caller should fall back to the raw value.
-//
-// Registered extractors cover the target types where AWS consistently
-// emits ARNs in describe-response fields but a9s indexes on the bare
-// id/name. For target types whose IDs ARE ARNs (sns, for example), no
-// extractor is registered — navigation works directly.
-func NavIDFromValue(targetType, value string) string {
-	if value == "" {
+// ResolveRef reads ref — any AWS reference to targetType — as the ID the
+// target's rows are keyed by, through the target's own RefToID. ok is false
+// when ref names no row of this account and region. A type without a
+// resolver keys its rows on the reference itself.
+func ResolveRef(targetType, ref string, rc domain.RefContext) (string, bool) {
+	if td := TypeDef(targetType); td != nil && td.RefToID != nil {
+		return td.RefToID(ref, rc)
+	}
+	return ref, ref != ""
+}
+
+// NavIDFromValue is the ID Enter on a navigable field opens: ResolveRef's
+// reading of value, or "" when value names no row of targetType.
+func NavIDFromValue(targetType, value string, rc domain.RefContext) string {
+	id, ok := ResolveRef(targetType, value, rc)
+	if !ok {
 		return ""
 	}
-	if f, ok := navIDExtractors[targetType]; ok {
-		if extracted := f(value); extracted != "" {
-			return extracted
-		}
-	}
-	return value
-}
-
-// navIDExtractors maps target resource types to extractors that derive
-// the bare lookup ID from a raw field value (typically an ARN).
-var navIDExtractors = map[string]func(string) string{
-	"kms":      arnLastSlashSegment,
-	"role":     arnLastSlashSegment,
-	"ecs":      arnLastSlashSegment,
-	"logs":     arnLastColonSegment,
-	"s3":       s3BucketFromARN,
-	"iam-user": arnLastSlashSegment,
-	"lambda":   LambdaNameFromARN,
-}
-
-// arnLastSlashSegment returns the substring after the last "/".
-// Example: "arn:aws:kms:us-east-1:123:key/UUID" → "UUID".
-// Returns "" if the input has no "/" or if "/" is the final character.
-func arnLastSlashSegment(s string) string {
-	i := strings.LastIndex(s, "/")
-	if i < 0 || i == len(s)-1 {
-		return ""
-	}
-	return s[i+1:]
-}
-
-// arnLastColonSegment returns the substring after the last ":".
-// Example: "arn:aws:logs:us-east-1:123:log-group:/aws/lambda/fn" → "/aws/lambda/fn".
-// Returns "" if the input has no ":" or if ":" is the final character.
-func arnLastColonSegment(s string) string {
-	i := strings.LastIndex(s, ":")
-	if i < 0 || i == len(s)-1 {
-		return ""
-	}
-	return s[i+1:]
-}
-
-// LambdaNameFromARN extracts the bare function name from a Lambda ARN — the
-// canonical ":function:" split with the trailing version/alias segment
-// stripped. Example: "arn:aws:lambda:us-east-1:123:function:fn:v1" → "fn".
-// Returns "" when the value carries no ":function:" marker (a plain bare
-// name), so NavIDFromValue's caller falls back to the raw value unchanged.
-func LambdaNameFromARN(s string) string {
-	const marker = ":function:"
-	_, tail, found := strings.Cut(s, marker)
-	if !found {
-		return ""
-	}
-	if colon := strings.Index(tail, ":"); colon >= 0 {
-		tail = tail[:colon]
-	}
-	return tail
-}
-
-// s3BucketFromARN extracts the bucket name from an S3 bucket ARN.
-// Example: "arn:aws:s3:::my-bucket" → "my-bucket". The partition is parsed
-// rather than assumed, so a China or GovCloud ARN yields its bucket too.
-// Anything that is not an S3 ARN is returned unchanged, so a bare bucket
-// name (the common case) passes through.
-func s3BucketFromARN(s string) string {
-	if a, err := arn.Parse(s); err == nil {
-		if a.Service == "s3" {
-			return a.Resource
-		}
-		return s
-	}
-	return s
+	return id
 }
 
 // RelatedCheckResult is returned by a RelatedChecker and carries all state

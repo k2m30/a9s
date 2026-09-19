@@ -22,7 +22,7 @@ import (
 // we follow Lambda integrations as a best effort.
 // Pattern C: one GetIntegrations call + per-Lambda-target GetFunction call.
 // Extracts KMSKeyArn from each Lambda integration's FunctionConfiguration.
-func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return resource.KnownRelated("kms", nil, false)
@@ -42,7 +42,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 	if !ok {
 		return resource.UnknownRelated("kms")
 	}
-	seen := make(map[string]struct{})
+	var refs []string
 	var failures []Failure
 	total := 0
 	for _, item := range items {
@@ -74,10 +74,10 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 			continue
 		}
 		if out.Configuration.KMSKeyArn != nil && *out.Configuration.KMSKeyArn != "" {
-			seen[arnLastSegment(*out.Configuration.KMSKeyArn)] = struct{}{}
+			refs = append(refs, *out.Configuration.KMSKeyArn)
 		}
 	}
-	ids := mapKeys(seen)
+	ids, dropped := resolveRefs("kms", refs, refContext(clients, cache, "kms"))
 	if len(ids) == 0 {
 		// Nothing was confirmed: any failures are a plain fetch failure, not
 		// a truncation signal (there is no larger population left unseen).
@@ -88,7 +88,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 	// Some GetFunction calls may have failed: ids is a proven subset, not
 	// necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("kms", ids, len(failures) > 0)
+	return relatedResultTrunc("kms", ids, dropped || len(failures) > 0)
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this
@@ -196,7 +196,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 // Enumerates GetDomainNames, then per domain calls GetApiMappings to check if the
 // domain maps to this API. For matching domains, harvests CertificateArn from each
 // DomainNameConfiguration.
-func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return resource.KnownRelated("acm", nil, false)
@@ -220,7 +220,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
 	}
-	seen := make(map[string]struct{})
+	var refs []string
 	var failures []Failure
 	total := 0
 	for _, d := range dn.Items {
@@ -252,11 +252,11 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 		// Harvest CertificateArn from each domain configuration.
 		for _, dcfg := range d.DomainNameConfigurations {
 			if dcfg.CertificateArn != nil && *dcfg.CertificateArn != "" {
-				seen[arnLastSegment(*dcfg.CertificateArn)] = struct{}{}
+				refs = append(refs, *dcfg.CertificateArn)
 			}
 		}
 	}
-	ids := mapKeys(seen)
+	ids, dropped := resolveRefs("acm", refs, refContext(clients, cache, "acm"))
 	if len(ids) == 0 {
 		// Nothing was confirmed: any failures are a plain fetch failure, not
 		// a truncation signal (there is no larger population left unseen).
@@ -267,7 +267,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 	// Some GetApiMappings calls may have failed: ids is a proven subset, not
 	// necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("acm", ids, len(failures) > 0)
+	return relatedResultTrunc("acm", ids, dropped || len(failures) > 0)
 }
 
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
@@ -442,13 +442,14 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 // made by the lambda/kms/sfn/sns pivots, plus one apigatewayv2:GetAuthorizers
 // call (Authorizer.AuthorizerCredentialsArn) — role ARNs reduced to bare
 // RoleName so the role cache's FetchByIDs resolves them.
-func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
 
-	seen := make(map[string]struct{})
+	var refs []string
+	rc := refContext(clients, cache, "role")
 
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil && !errors.Is(err, errClientMissing) {
@@ -456,25 +457,27 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	for _, item := range items {
 		if item.CredentialsArn != nil && *item.CredentialsArn != "" {
-			seen[arnRoleName(*item.CredentialsArn)] = struct{}{}
+			refs = append(refs, *item.CredentialsArn)
 		}
 	}
 
 	// Every branch below that bails out with only the CredentialsArn-derived
-	// seen set (never having reached GetAuthorizers) reports it as a
+	// refs (never having reached GetAuthorizers) reports it as a
 	// truncated lower bound, not an exact count: authorizer-credential roles
 	// may still exist and were never checked.
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		if len(seen) > 0 {
-			return relatedResultTrunc("role", mapKeys(seen), true)
+		if len(refs) > 0 {
+			ids, _ := resolveRefs("role", refs, rc)
+			return relatedResultTrunc("role", ids, true)
 		}
 		return resource.UnknownRelated("role")
 	}
 	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
 	if !ok {
-		if len(seen) > 0 {
-			return relatedResultTrunc("role", mapKeys(seen), true)
+		if len(refs) > 0 {
+			ids, _ := resolveRefs("role", refs, rc)
+			return relatedResultTrunc("role", ids, true)
 		}
 		return resource.UnknownRelated("role")
 	}
@@ -482,18 +485,19 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 		return authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID})
 	})
 	if authErr != nil {
-		if len(seen) > 0 {
-			return relatedResultTrunc("role", mapKeys(seen), true)
+		if len(refs) > 0 {
+			ids, _ := resolveRefs("role", refs, rc)
+			return relatedResultTrunc("role", ids, true)
 		}
 		return resource.ErrorRelated("role", authErr)
 	}
 	if authOut != nil {
 		for _, a := range authOut.Items {
 			if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {
-				seen[arnRoleName(*a.AuthorizerCredentialsArn)] = struct{}{}
+				refs = append(refs, *a.AuthorizerCredentialsArn)
 			}
 		}
 	}
 
-	return relatedResult("role", mapKeys(seen))
+	return relatedRefs("role", refs, rc)
 }

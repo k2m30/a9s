@@ -772,8 +772,10 @@ func TestRelated_ECSSvc_Secrets_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != secretARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), secretARN)
+	// Inverted by #545 row 1: secrets keys its rows on the secret name,
+	// without the "-XXXXXX" the ARN carries. Do not restore the ARN.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-db-password" {
+		t.Errorf("ResourceIDs = %v, want [my-db-password]", result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
@@ -805,8 +807,9 @@ func TestRelated_ECSSvc_Secrets_RepositoryCredentials(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != credARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), credARN)
+	// Inverted by #545 row 1, as in TestRelated_ECSSvc_Secrets_Match.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ecr-creds" {
+		t.Errorf("ResourceIDs = %v, want [ecr-creds]", result.ResourceIDs())
 	}
 }
 

@@ -250,12 +250,7 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 	if taskDefARN == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
-	family := arnLastSegment(taskDefARN)
-	// Remove revision suffix (e.g. "family:5" -> "family")
-	if idx := strings.LastIndex(family, ":"); idx >= 0 {
-		family = family[:idx]
-	}
+	family := taskDefFamily(taskDefARN)
 	if family == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
@@ -298,10 +293,8 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return relatedResult("sg", ids)
 }
 
-// checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
-// The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
-// the last segment after "/".
-func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkECSSvcRole returns the IAM role in the ECS Service's RoleArn field.
+func checkECSSvcRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
 		if res.RawStruct == nil {
@@ -309,9 +302,5 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 		return resource.KnownRelated("role", nil, false)
 	}
-	arn := *raw.RoleArn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		return relatedResult("role", []string{arn[idx+1:]})
-	}
-	return resource.KnownRelated("role", nil, false)
+	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
 }

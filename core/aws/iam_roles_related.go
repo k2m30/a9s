@@ -17,6 +17,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -55,40 +56,32 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 // policy) by scanning Principal.AWS ARN entries matching ":group/". The trust
 // document is already fetched + URL-decoded by the role fetcher and lives in
 // Fields["assume_role_policy_document"] — 0 API calls, offline parse.
-func checkRoleIamGroup(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkRoleIamGroup(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
 		return resource.KnownRelated("iam-group", nil, false)
 	}
-	seen := map[string]struct{}{}
-	extractPrincipalsByKind([]byte(doc), ":group/", seen)
-	names := make([]string, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
-	}
-	return relatedResult("iam-group", names)
+	var arns []string
+	extractPrincipalsByKind([]byte(doc), ":group/", &arns)
+	return relatedRefs("iam-group", arns, refContext(clients, cache, "iam-group"))
 }
 
 // checkRoleIamUser extracts IAM user names from this role's AssumeRolePolicy trust
 // policy by scanning Principal.AWS ARN entries matching ":user/". 0-call path.
-func checkRoleIamUser(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkRoleIamUser(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
 		return resource.KnownRelated("iam-user", nil, false)
 	}
-	seen := map[string]struct{}{}
-	extractPrincipalsByKind([]byte(doc), ":user/", seen)
-	names := make([]string, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
-	}
-	return relatedResult("iam-user", names)
+	var arns []string
+	extractPrincipalsByKind([]byte(doc), ":user/", &arns)
+	return relatedRefs("iam-user", arns, refContext(clients, cache, "iam-user"))
 }
 
-// extractPrincipalsByKind walks a JSON IAM policy document and records the
-// last-segment name (after the final "/") from Principal.AWS ARN entries whose
-// string contains the given kindMarker (e.g. ":group/", ":user/", ":role/").
-func extractPrincipalsByKind(doc []byte, kindMarker string, seen map[string]struct{}) {
+// extractPrincipalsByKind walks a JSON IAM policy document and appends to arns
+// the Principal.AWS ARN entries whose string contains the given kindMarker
+// (e.g. ":group/", ":user/", ":role/").
+func extractPrincipalsByKind(doc []byte, kindMarker string, arns *[]string) {
 	var raw any
 	if err := json.Unmarshal(doc, &raw); err != nil {
 		return
@@ -99,7 +92,7 @@ func extractPrincipalsByKind(doc []byte, kindMarker string, seen map[string]stru
 		case map[string]any:
 			for k, val := range x {
 				if k == "AWS" {
-					addKindedPrincipal(val, kindMarker, seen)
+					addKindedPrincipal(val, kindMarker, arns)
 				}
 				walk(val)
 			}
@@ -112,41 +105,26 @@ func extractPrincipalsByKind(doc []byte, kindMarker string, seen map[string]stru
 	walk(raw)
 }
 
-func addKindedPrincipal(v any, kindMarker string, seen map[string]struct{}) {
+func addKindedPrincipal(v any, kindMarker string, arns *[]string) {
 	switch x := v.(type) {
 	case string:
 		if strings.Contains(x, kindMarker) {
-			seen[arnRoleName(x)] = struct{}{}
+			*arns = append(*arns, x)
 		}
 	case []any:
 		for _, it := range x {
 			if s, ok := it.(string); ok && strings.Contains(s, kindMarker) {
-				seen[arnRoleName(s)] = struct{}{}
+				*arns = append(*arns, s)
 			}
 		}
 	}
 }
 
-// roleNameFromARN extracts the role name from a role ARN or returns the input as-is
-// if it's not an ARN. Works for role ARNs (last path segment) and STS
-// assumed-role ARNs (the role segment, NOT the trailing session name):
-//
-//	"arn:aws:iam::123456789012:role/service-role/my-role" → "my-role"
-//	"arn:aws:iam::123456789012:role/my-role" → "my-role"
-//	"arn:aws:sts::123456789012:assumed-role/my-role/session-abc" → "my-role"
-//	"my-role" → "my-role"
+// roleNameFromARN is the role a role reference names (role.ID), or the
+// reference itself when it names none.
 func roleNameFromARN(s string) string {
-	// STS assumed-role ARN: ".../assumed-role/<role>/<session>". CloudTrail
-	// records this form on AssumeRole* events; a plain last-segment trim would
-	// yield the session name, which is not a GetRole-resolvable role.
-	if _, rest, ok := strings.Cut(s, ":assumed-role/"); ok {
-		if role, _, ok := strings.Cut(rest, "/"); ok {
-			return role
-		}
-		return rest
-	}
-	if idx := strings.LastIndex(s, "/"); idx >= 0 && idx < len(s)-1 {
-		return s[idx+1:]
+	if id, ok := resource.ResolveRef("role", s, domain.RefContext{}); ok {
+		return id
 	}
 	return s
 }
@@ -160,35 +138,6 @@ func arnAccountID(arn string) string {
 		return ""
 	}
 	return parts[4]
-}
-
-// sameAccountRoleNames normalizes IAM role ARNs to role names (== role.ID) and
-// keeps only roles owned by ownerAccount. Cross-account role ARNs are dropped:
-// iam:GetRole resolves only within the caller's account, so a foreign-account
-// role is not fetchable here — counting it would dead-end the drill or
-// false-match a same-named local role. A blank ownerAccount keeps every role
-// (best effort when the owner cannot be determined). Results are de-duplicated
-// by name in first-seen order; relatedResult sorts for final stability.
-func sameAccountRoleNames(arns []string, ownerAccount string) []string {
-	seen := make(map[string]struct{}, len(arns))
-	names := make([]string, 0, len(arns))
-	for _, arn := range arns {
-		if ownerAccount != "" {
-			if acct := arnAccountID(arn); acct != "" && acct != ownerAccount {
-				continue
-			}
-		}
-		name := roleNameFromARN(arn)
-		if name == "" {
-			continue
-		}
-		if _, dup := seen[name]; dup {
-			continue
-		}
-		seen[name] = struct{}{}
-		names = append(names, name)
-	}
-	return names
 }
 
 // checkRoleLambda searches the lambda cache for functions whose Role ARN references
@@ -346,8 +295,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		if inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil {
 			continue
 		}
-		profileARN := *inst.IamInstanceProfile.Arn
-		if roleNameFromARN(profileARN) == roleName {
+		if instanceProfileName(*inst.IamInstanceProfile.Arn) == roleName {
 			ids = append(ids, ec2Res.ID)
 		}
 	}

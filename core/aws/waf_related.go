@@ -19,8 +19,8 @@ import (
 )
 
 // checkWAFELB calls wafv2:ListResourcesForWebACL with ALB resource type and
-// returns matching load balancer names (Pattern A — direct API call).
-func checkWAFELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// returns the load balancers it names (Pattern A — direct API call).
+func checkWAFELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
 		return resource.UnknownRelated("elb")
@@ -36,14 +36,7 @@ func checkWAFELB(ctx context.Context, clients any, res resource.Resource, _ reso
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
-	var ids []string
-	for _, arn := range out.ResourceArns {
-		// Extract LB name from ARN: arn:aws:elasticloadbalancing:...:loadbalancer/app/NAME/hash
-		if parts := strings.Split(arn, "/"); len(parts) >= 3 {
-			ids = append(ids, parts[len(parts)-2])
-		}
-	}
-	return relatedResult("elb", ids)
+	return relatedRefs("elb", out.ResourceArns, refContext(clients, cache, "elb"))
 }
 
 // checkWAFAlarm reports CloudWatch alarms on this Web ACL's metrics. WAF
@@ -59,10 +52,11 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return alarmIDsByDimension(ctx, clients, cache, "", "WebACL", name)
 }
 
-// checkWAFLogs reports log destinations (CloudWatch Logs group or Firehose
-// stream) configured for this Web ACL. Pattern C: one wafv2:GetLoggingConfiguration
-// call returning LogDestinationConfigs (ARNs of the log destinations).
-func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkWAFLogs reports the CloudWatch log groups among the log destinations
+// configured for this Web ACL (a Firehose stream or S3 bucket destination is
+// no log group). Pattern C: one wafv2:GetLoggingConfiguration call returning
+// LogDestinationConfigs (ARNs of the log destinations).
+func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
 		return resource.KnownRelated("logs", nil, false)
@@ -84,31 +78,13 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 	if out.LoggingConfiguration == nil {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	var ids []string
+	var groups []string
 	for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
-		if d == "" {
-			continue
+		if _, ok := ARNForService(d, "logs"); ok {
+			groups = append(groups, d)
 		}
-		// Extract log-group name from CW Logs ARN:
-		//   arn:aws:logs:REGION:ACCT:log-group:NAME:*
-		if strings.Contains(d, ":log-group:") {
-			parts := strings.Split(d, ":log-group:")
-			if len(parts) == 2 {
-				name := parts[1]
-				if colon := strings.Index(name, ":"); colon >= 0 {
-					name = name[:colon]
-				}
-				if name != "" {
-					ids = append(ids, name)
-					continue
-				}
-			}
-		}
-		// Firehose / S3 destinations: pass through full ARN so the finding
-		// carries the destination identity.
-		ids = append(ids, d)
 	}
-	return relatedResult("logs", ids)
+	return relatedRefs("logs", groups, refContext(clients, cache, "logs"))
 }
 
 // checkWAFCF reports CloudFront distributions associated with this Web ACL.

@@ -463,11 +463,13 @@ func TestRelated_MSK_Secrets_Found(t *testing.T) {
 	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2", result.Count())
 	}
-	if result.ResourceIDs()[0] != "AmazonMSK_kafka-scram-secret-abc123" {
-		t.Errorf("ResourceIDs[0] = %q, want AmazonMSK_kafka-scram-secret-abc123", result.ResourceIDs()[0])
+	// Inverted by #545 row 1: secret names without the ARN's "-XXXXXX".
+	// Do not restore the suffix.
+	if result.ResourceIDs()[0] != "AmazonMSK_kafka-scram-secret" {
+		t.Errorf("ResourceIDs[0] = %q, want AmazonMSK_kafka-scram-secret", result.ResourceIDs()[0])
 	}
-	if result.ResourceIDs()[1] != "AmazonMSK_kafka-user2-xyz456" {
-		t.Errorf("ResourceIDs[1] = %q, want AmazonMSK_kafka-user2-xyz456", result.ResourceIDs()[1])
+	if result.ResourceIDs()[1] != "AmazonMSK_kafka-user2" {
+		t.Errorf("ResourceIDs[1] = %q, want AmazonMSK_kafka-user2", result.ResourceIDs()[1])
 	}
 }
 

@@ -14,6 +14,10 @@ import (
 // internet (msk.public-access), and MSKUnauthenticated the one cluster
 // accepting clients with no credentials (msk.unauthenticated). Every other
 // cluster keeps public access off and unauthenticated access disabled.
+// MSKBrokerLogGroup is the CloudWatch log group acme-events-prod delivers its
+// broker logs to.
+const MSKBrokerLogGroup = "/aws/msk/acme-events-prod"
+
 const (
 	MSKPublic          = "msk-public"
 	MSKUnauthenticated = "msk-unauthenticated"
@@ -75,7 +79,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 						BrokerLogs: &kafkatypes.BrokerLogs{
 							CloudWatchLogs: &kafkatypes.CloudWatchLogs{
 								Enabled:  aws.Bool(true),
-								LogGroup: aws.String("/aws/msk/acme-events-prod"),
+								LogGroup: aws.String(MSKBrokerLogGroup),
 							},
 							S3: &kafkatypes.S3{
 								Enabled: aws.Bool(true),
@@ -177,7 +181,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-12-01T10:00:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
@@ -203,7 +207,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-07-15T14:30:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
@@ -226,7 +230,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-05-02T09:15:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
@@ -245,7 +249,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-08-11T13:45:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
@@ -265,7 +269,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-10-01T02:00:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
@@ -284,7 +288,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-11-18T20:30:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						ClientSubnets: []string{fixtProdPrivateSubnetA},
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),

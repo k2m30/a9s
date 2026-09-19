@@ -315,8 +315,11 @@ func TestRelated_EbRule_SNS_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "my-alerts-topic" {
-		t.Errorf("ResourceIDs = %v, want [my-alerts-topic]", result.ResourceIDs())
+	// Inverted by #545 row 1: sns keys its rows on the topic ARN. Do not
+	// restore the name.
+	const topicARN = "arn:aws:sns:us-east-1:123456789012:my-alerts-topic"
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != topicARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), topicARN)
 	}
 }
 

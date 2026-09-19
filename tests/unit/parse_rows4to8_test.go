@@ -761,20 +761,28 @@ func TestS3BucketPolicyRoles_RolePrincipalsInEveryPartitionAreCounted(t *testing
 // the secret-ARN question, the one the first sweep left behind while
 // converting the other three. A Glue job names its secrets in the job
 // arguments AWS returned.
+//
+// Inverted by #545 rows 1 and 5: the ID is the secret's name without the
+// "-XXXXXX" Secrets Manager appends in the ARN, and each partition's secret
+// is read from a session in its own region, since a secret in another
+// region is no row of the local list. Do not restore the suffixed ID or the
+// single us-east-1 session.
 func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 	checker := parseCheckerFor(t, "glue", "secrets")
-	const secretName = "acme/db-AbCdEf"
+	const secretName = "acme/db"
+	const arnName = secretName + "-AbCdEf"
 
 	tests := []struct {
 		name    string
+		region  string
 		value   string
 		wantIDs []string
 	}{
-		{name: "commercial secret", value: "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
-		{name: "China secret", value: "arn:aws-cn:secretsmanager:cn-north-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
-		{name: "GovCloud secret", value: "arn:aws-us-gov:secretsmanager:us-gov-west-1:123456789012:secret:" + secretName, wantIDs: []string{secretName}},
-		{name: "an ssm parameter is not a secret", value: "arn:aws-cn:ssm:cn-north-1:123456789012:parameter/acme/db"},
-		{name: "a plain argument is not a secret", value: "--enable-metrics"},
+		{name: "commercial secret", region: "us-east-1", value: "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + arnName, wantIDs: []string{secretName}},
+		{name: "China secret", region: "cn-north-1", value: "arn:aws-cn:secretsmanager:cn-north-1:123456789012:secret:" + arnName, wantIDs: []string{secretName}},
+		{name: "GovCloud secret", region: "us-gov-west-1", value: "arn:aws-us-gov:secretsmanager:us-gov-west-1:123456789012:secret:" + arnName, wantIDs: []string{secretName}},
+		{name: "an ssm parameter is not a secret", region: "cn-north-1", value: "arn:aws-cn:ssm:cn-north-1:123456789012:parameter/acme/db"},
+		{name: "a plain argument is not a secret", region: "us-east-1", value: "--enable-metrics"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -782,7 +790,7 @@ func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 				Name:             aws.String("acme-etl-job"),
 				DefaultArguments: map[string]string{"--db-secret": tc.value},
 			}}
-			got := checker(context.Background(), parseClients("us-east-1"), res, resource.ResourceCache{})
+			got := checker(context.Background(), parseClients(tc.region), res, resource.ResourceCache{})
 			if got.Count() != len(tc.wantIDs) {
 				t.Fatalf("Count = %d, want %d (ids %v)", got.Count(), len(tc.wantIDs), got.ResourceIDs())
 			}

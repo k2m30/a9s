@@ -1073,8 +1073,11 @@ func TestRelated_CF_Lambda_APIError(t *testing.T) {
 // checkCfLogs — fake client tests (GetDistributionConfig → Logging path)
 // ---------------------------------------------------------------------------
 
-// TestRelated_CF_Logs_LoggingEnabled: Logging.Enabled=true, bucket set →
-// bucket name is extracted (stripping ".s3..." suffix).
+// TestRelated_CF_Logs_LoggingEnabled: standard logging names an S3 bucket,
+// which is no log group, so the Log Groups row has no count to give
+// (docs/resources/cf.md § logs: "Count shown: unknown"). Inverted by #545
+// row 6: a bucket name drills into no log group, so it is never the ID. Do
+// not restore it.
 func TestRelated_CF_Logs_LoggingEnabled(t *testing.T) {
 	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
 		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
@@ -1091,15 +1094,14 @@ func TestRelated_CF_Logs_LoggingEnabled(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "cf-access-logs" {
-		t.Errorf("ResourceIDs = %v, want [cf-access-logs]", result.ResourceIDs())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v (IDs %v), want RelatedUnknown", result.State(), result.ResourceIDs())
 	}
 }
 
-// TestRelated_CF_Logs_LoggingDisabled: Logging.Enabled=false → Count: 0.
+// TestRelated_CF_Logs_LoggingDisabled: standard logging off says nothing
+// about log groups — real-time log configs are read elsewhere — so the count
+// stays unknown. Inverted by #545 row 6 with LoggingEnabled above.
 func TestRelated_CF_Logs_LoggingDisabled(t *testing.T) {
 	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
 		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
@@ -1116,12 +1118,13 @@ func TestRelated_CF_Logs_LoggingDisabled(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (logging disabled)", result.Count())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (logging disabled)", result.State())
 	}
 }
 
-// TestRelated_CF_Logs_NilLoggingConfig: Logging is nil → Count: 0.
+// TestRelated_CF_Logs_NilLoggingConfig: no standard logging config → still
+// unknown, for the reason LoggingDisabled gives. Inverted by #545 row 6.
 func TestRelated_CF_Logs_NilLoggingConfig(t *testing.T) {
 	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
 		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
@@ -1133,8 +1136,8 @@ func TestRelated_CF_Logs_NilLoggingConfig(t *testing.T) {
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (nil Logging)", result.Count())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil Logging)", result.State())
 	}
 }
 

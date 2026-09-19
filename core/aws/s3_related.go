@@ -53,8 +53,9 @@ func s3BenignAbsenceErr(err error, code string) bool {
 // shape that would navigate nowhere.
 func s3NotificationRelated(
 	target, field string,
+	clients any,
 	res resource.Resource,
-	idOf func(string) (string, bool),
+	cache resource.ResourceCache,
 ) resource.RelatedCheckResult {
 	if msg := res.Fields["notification_error"]; msg != "" {
 		return resource.ErrorRelated(target, errors.New(msg))
@@ -62,53 +63,25 @@ func s3NotificationRelated(
 	if res.Fields["notification_truncated"] == "true" {
 		return relatedResultTrunc(target, nil, true)
 	}
-	var ids []string
-	for arn := range strings.SplitSeq(res.Fields[field], ",") {
-		if id, ok := idOf(arn); ok {
-			ids = append(ids, id)
-		}
-	}
-	return relatedResult(target, ids)
+	return relatedRefs(target, arnsOnly(strings.Split(res.Fields[field], ",")), refContext(clients, cache, target))
 }
 
 // checkS3Lambda returns the Lambda functions this bucket's notification
 // configuration targets.
-func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return s3NotificationRelated("lambda", "notification_lambda", res, func(arn string) (string, bool) {
-		// arn:aws:lambda:region:account:function:NAME[:VERSION]
-		parts := strings.Split(arn, ":")
-		if len(parts) < 7 || parts[6] == "" {
-			return "", false
-		}
-		return parts[6], true
-	})
+func checkS3Lambda(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return s3NotificationRelated("lambda", "notification_lambda", clients, res, cache)
 }
 
 // checkS3SNS returns the SNS topics this bucket's notification configuration
-// targets. The SNS fetcher indexes Resource.ID by full topic ARN (sns.go —
-// TopicArn), so this checker returns the ARN unchanged: stripping to the bare
-// topic name breaks drill-through.
-func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return s3NotificationRelated("sns", "notification_sns", res, func(arn string) (string, bool) {
-		// arn:aws:sns:region:account:TopicName
-		if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
-			return "", false
-		}
-		return arn, true
-	})
+// targets.
+func checkS3SNS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return s3NotificationRelated("sns", "notification_sns", clients, res, cache)
 }
 
 // checkS3SQS returns the SQS queues this bucket's notification configuration
 // targets.
-func checkS3SQS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	return s3NotificationRelated("sqs", "notification_sqs", res, func(arn string) (string, bool) {
-		// arn:aws:sqs:region:account:QueueName
-		parts := strings.Split(arn, ":")
-		if len(parts) < 6 || parts[5] == "" {
-			return "", false
-		}
-		return parts[5], true
-	})
+func checkS3SQS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return s3NotificationRelated("sqs", "notification_sqs", clients, res, cache)
 }
 
 // checkS3CFN calls s3:GetBucketTagging to read the bucket's tags and looks up
@@ -177,7 +150,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 // checkS3KMS calls s3:GetBucketEncryption and returns the KMS key ID configured
 // for server-side encryption (if SSEAlgorithm is aws:kms). Pattern C — single
 // per-bucket API call.
-func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
 		return resource.KnownRelated("kms", nil, false)
@@ -223,10 +196,9 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 		// KMSMasterKeyID may be a full key ARN, a full alias ARN (including
 		// AWS-managed aliases like "alias/aws/s3"), or a bare ID/alias.
-		keyID = kmsKeyIDFromField(keyID, res.Type)
-		ids = append(ids, keyID)
+		ids = append(ids, kmsRefFromField(keyID, res.Type))
 	}
-	return relatedResult("kms", ids)
+	return relatedRefs("kms", ids, refContext(clients, cache, "kms"))
 }
 
 // checkS3Logs calls s3:GetBucketLogging and returns the destination S3 bucket
@@ -491,23 +463,18 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("role")
 	}
 
-	// Match role ARNs against the loaded role cache. Anything that
-	// doesn't resolve locally (wildcards, cross-account, services) is
-	// dropped — the pivot is "navigate to this role in the list".
-	var ids []string
-	for _, principalARN := range principalARNs {
-		name := roleNameFromARN(principalARN)
-		if name == "" {
-			continue
-		}
-		for _, roleRes := range roleList {
-			if roleRes.ID == name || roleRes.Name == name {
-				ids = append(ids, roleRes.ID)
-				break
-			}
+	// Match the role principals against the loaded role cache — the pivot is
+	// "navigate to this role in the list". Wildcards, account roots and
+	// services are not roles; a role of another account is a role this
+	// count leaves out.
+	var roleARNs []string
+	for _, p := range principalARNs {
+		if strings.Contains(p, ":role/") {
+			roleARNs = append(roleARNs, p)
 		}
 	}
-	return relatedResultTrunc("role", ids, truncated)
+	ids, dropped := listedRefs("role", roleARNs, refContext(clients, cache, "role"), roleList)
+	return relatedResultTrunc("role", ids, truncated || dropped)
 }
 
 // extractBucketPolicyAWSPrincipals parses a bucket-policy JSON document

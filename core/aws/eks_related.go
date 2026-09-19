@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -150,7 +149,7 @@ func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // checkEKSKMS extracts the KMS key ID from the EKS Cluster's EncryptionConfig.
 // The KeyArn has the form arn:aws:kms::ACCOUNT:key/KEY-ID; the key ID is the
 // last segment after "/". Pattern F — no cache needed.
-func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEKSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || len(raw.EncryptionConfig) == 0 ||
 		raw.EncryptionConfig[0].Provider == nil ||
@@ -161,14 +160,12 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
-// checkEKSRole extracts the IAM role name from the EKS Cluster's RoleArn field.
-// The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
-// the last segment after "/".
-func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEKSRole returns the IAM role in the EKS Cluster's RoleArn field.
+func checkEKSRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
 		if res.RawStruct == nil {
@@ -176,9 +173,5 @@ func checkEKSRole(_ context.Context, _ any, res resource.Resource, _ resource.Re
 		}
 		return resource.KnownRelated("role", nil, false)
 	}
-	arn := *raw.RoleArn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		return relatedResult("role", []string{arn[idx+1:]})
-	}
-	return resource.KnownRelated("role", nil, false)
+	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
 }

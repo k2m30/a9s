@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -191,7 +190,7 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 // checkMSKSecrets calls kafka:ListScramSecrets(clusterArn) and returns the
 // Secrets Manager secret names associated with this cluster's SCRAM auth.
 // Pattern C — single API call per checker.
-func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
 		if res.RawStruct == nil {
@@ -213,15 +212,7 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
-	var ids []string
-	for _, arn := range out.SecretArnList {
-		// Secret ARN: arn:aws:secretsmanager:REGION:ACCOUNT:secret:NAME-suffix
-		// The cache key is the secret name (last segment after ":secret:").
-		if _, name, ok := strings.Cut(arn, ":secret:"); ok && name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("secrets", ids)
+	return relatedRefs("secrets", out.SecretArnList, refContext(clients, cache, "secrets"))
 }
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's

@@ -23,9 +23,8 @@ import (
 // checkCodeartifactKMS resolves the KMS encryption key for this repository's
 // domain via codeartifact:DescribeDomain (Pattern C: 1 API call).
 // RepositorySummary.DomainName is used as the domain identifier.
-// DomainDescription.EncryptionKey holds the KMS key ARN (bare UUID extracted
-// from the last "/" segment).
-func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// DomainDescription.EncryptionKey holds the KMS key ARN.
+func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[catypes.RepositorySummary](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -58,6 +57,5 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := arnLastSegment(*out.Domain.EncryptionKey)
-	return relatedResult("kms", []string{keyID})
+	return relatedRefs("kms", []string{*out.Domain.EncryptionKey}, refContext(clients, cache, "kms"))
 }

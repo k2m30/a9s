@@ -3,6 +3,8 @@
 package fixtures
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -363,6 +365,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		})
 	}
 
+	logGroups = append(logGroups, derivedLogGroups(logGroups)...)
+
 	logGroups = append(logGroups, cwlogstypes.LogGroup{
 		LogGroupName:    aws.String(LogGroupNoKMS),
 		Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupNoKMS + ":*"),
@@ -621,7 +625,56 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 41
+const LogGroupsPageSize = 176
+
+// derivedLogGroups returns a log group for every one the other demo fixtures
+// name and have does not hold yet: each MWAA environment's component groups,
+// each Redshift cluster's CloudWatch audit exports, the MSK broker log group,
+// the Athena Spark workgroup's group, the WAF log group, and the Secrets Manager rotation
+// functions' groups. Deriving them from the fixtures that name them keeps
+// every related log-group row a row of this list.
+func derivedLogGroups(have []cwlogstypes.LogGroup) []cwlogstypes.LogGroup {
+	seen := make(map[string]bool, len(have))
+	for _, g := range have {
+		seen[aws.ToString(g.LogGroupName)] = true
+	}
+	var names []string
+	add := func(name string) {
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	envs := NewMWAAFixtures().Environments
+	for _, env := range slices.Sorted(maps.Keys(envs)) {
+		for _, component := range []string{"DAGProcessing", "Scheduler", "WebServer", "Worker", "Task"} {
+			add(mwaaLogGroupName(env, component))
+		}
+	}
+	for _, c := range NewRedshiftFixtures().Clusters {
+		id := aws.ToString(c.ClusterIdentifier)
+		for _, export := range RedshiftCloudWatchLogExports(id) {
+			add("/aws/redshift/cluster/" + id + "/" + export)
+		}
+	}
+	add(MSKBrokerLogGroup)
+	add("/aws/athena/" + AthenaSparkWorkgroup)
+	add(WAFProdAPILogGroup)
+	for _, fn := range []string{"rotate-api-key", "rotate-rds-credentials", "rotate-docdb-credentials"} {
+		add("/aws/lambda/" + fn)
+	}
+	groups := make([]cwlogstypes.LogGroup, 0, len(names))
+	for _, name := range names {
+		groups = append(groups, cwlogstypes.LogGroup{
+			LogGroupName:    aws.String(name),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + name + ":*"),
+			StoredBytes:     aws.Int64(1048576),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		})
+	}
+	return groups
+}
 
 func NewCWLogsFixtures() *CWLogsFixtures {
 	return sharedCWLogsFixtures()
@@ -653,5 +706,5 @@ const demoLogsKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 41, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 176, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

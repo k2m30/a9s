@@ -4,7 +4,7 @@ package aws
 
 import (
 	"context"
-	"strings"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -146,7 +146,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 // checkASGELB resolves load balancers associated with this ASG.
 // Classic ELB names come directly from parent.LoadBalancerNames.
 // ALB/NLB ARNs are resolved from parent.TargetGroupARNs via elbv2:DescribeTargetGroups.LoadBalancerArns.
-func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("elb")
@@ -155,9 +155,8 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.KnownRelated("elb", nil, false)
 	}
 
-	var ids []string
-	// Classic ELB names are direct IDs
-	ids = append(ids, asg.LoadBalancerNames...)
+	rc := refContext(clients, cache, "elb")
+	ids, _ := resolveRefs("elb", asg.LoadBalancerNames, rc)
 
 	// Resolve ALB/NLB from TG ARNs. Bailing out here still reports the classic
 	// ELB names already collected, but as a truncated lower bound — the
@@ -182,36 +181,35 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 			}
 			return resource.ErrorRelated("elb", err)
 		}
+		refs := slices.Clone(asg.LoadBalancerNames)
 		for _, tg := range tgOut.TargetGroups {
-			ids = append(ids, tg.LoadBalancerArns...)
+			refs = append(refs, tg.LoadBalancerArns...)
 		}
+		return relatedRefs("elb", refs, rc)
 	}
-	return relatedResult("elb", ids)
+	return relatedRefs("elb", asg.LoadBalancerNames, rc)
 }
 
 // checkASGRole resolves IAM roles associated with this ASG.
 // Sources: ServiceLinkedRoleARN (direct), LaunchConfig.IamInstanceProfile, LaunchTemplate.IamInstanceProfile.
 // Instance profile names are resolved to role ARNs via iam:GetInstanceProfile.
-func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
 	}
 
-	var ids []string
-
-	// ServiceLinkedRoleARN is directly a role ARN — strip to the bare
-	// RoleName so the role cache's FetchByIDs (keyed on RoleName) resolves it,
-	// mirroring the ec2_related.go precedent for role-ARN-to-name reduction.
+	var refs []string
 	if asg.ServiceLinkedRoleARN != nil && *asg.ServiceLinkedRoleARN != "" {
-		ids = append(ids, arnRoleName(*asg.ServiceLinkedRoleARN))
+		refs = append(refs, *asg.ServiceLinkedRoleARN)
 	}
+	rc := refContext(clients, cache, "role")
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		// Without clients, the instance-profile role path was never checked —
 		// ids (if any) is a lower bound, not the exhaustive answer.
-		if len(ids) > 0 {
+		if ids, _ := resolveRefs("role", refs, rc); len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
 		}
 		return resource.UnknownRelated("role")
@@ -224,9 +222,10 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 	profileNameOrARN, checked := asgResolveInstanceProfile(ctx, c, asg)
 	if checked && profileNameOrARN != "" {
 		roleARNs, resolved := asgInstanceProfileToRoles(ctx, c, profileNameOrARN)
-		ids = append(ids, roleARNs...)
+		refs = append(refs, roleARNs...)
 		checked = resolved
 	}
+	ids, dropped := resolveRefs("role", refs, rc)
 	if !checked {
 		if len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
@@ -234,7 +233,7 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.UnknownRelated("role")
 	}
 
-	return relatedResult("role", ids)
+	return relatedResultTrunc("role", ids, dropped)
 }
 
 // asgResolveInstanceProfile reads the IamInstanceProfile from the ASG's launch config or launch template.
@@ -312,14 +311,7 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 // iam:GetInstanceProfile. resolved is false when the call did not answer, so
 // the caller can say its role count is a lower bound rather than exact.
 func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNameOrARN string) (roles []string, resolved bool) {
-	// Extract name from ARN if needed (arn:aws:iam::<acct>:instance-profile/<name>)
-	profileName := profileNameOrARN
-	if strings.Contains(profileNameOrARN, ":instance-profile/") {
-		parts := strings.SplitN(profileNameOrARN, ":instance-profile/", 2)
-		if len(parts) == 2 {
-			profileName = parts[1]
-		}
-	}
+	profileName := instanceProfileName(profileNameOrARN)
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
 		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
@@ -334,7 +326,7 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 	var roleARNs []string
 	for _, r := range out.InstanceProfile.Roles {
 		if r.Arn != nil && *r.Arn != "" {
-			roleARNs = append(roleARNs, arnRoleName(*r.Arn))
+			roleARNs = append(roleARNs, *r.Arn)
 		}
 	}
 	return roleARNs, true

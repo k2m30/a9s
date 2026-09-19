@@ -311,9 +311,5 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 	if !ok || task.ClusterArn == nil || *task.ClusterArn == "" {
 		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
 	}
-	clusterName := arnLastSegment(*task.ClusterArn)
-	if clusterName == "" {
-		return unreadZero(res, resource.KnownRelated("ecs", nil, false))
-	}
-	return unreadZero(res, relatedResult("ecs", []string{clusterName}))
+	return unreadZero(res, relatedRefs("ecs", []string{*task.ClusterArn}, refContext(clients, cache, "ecs")))
 }

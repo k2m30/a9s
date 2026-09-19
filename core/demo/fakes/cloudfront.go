@@ -53,7 +53,7 @@ func (f *CloudFrontFake) ListDistributionsByWebACLId(_ context.Context, input *c
 
 // GetDistributionConfig returns a config carrying the Lambda@Edge
 // associations and access-log destination for known demo distributions
-// (backing checkCfLambda / checkCfLogs), and an empty config for everything
+// (backing checkCfLambda), and an empty config for everything
 // else so Wave 2 enrichment (viewer/origin protocol policy checks) produces
 // no findings for those distributions in demo mode.
 func (f *CloudFrontFake) GetDistributionConfig(_ context.Context, input *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {

@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -55,7 +56,10 @@ func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([
 	}
 }
 
-// FetchEFSFileSystemsPage fetches a single page of EFS file systems.
+// FetchEFSFileSystemsPage fetches a single page of EFS file systems. When api
+// can also describe access points, each file system carries the IDs of its
+// access points (Fields["access_point_ids"]): a Lambda mounts an access point,
+// and only the file system's row can say which one is its own.
 func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &efs.DescribeFileSystemsInput{
 		MaxItems: aws.Int32(DefaultPageSize),
@@ -72,6 +76,8 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 	}
 
 	var resources []resource.Resource
+	var failures []Failure
+	apAPI, listsAccessPoints := api.(EFSDescribeAccessPointsAPI)
 
 	for _, fs := range output.FileSystems {
 		fsID := ""
@@ -115,6 +121,14 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			AttentionDetails: attentionDetails,
 		}
 
+		if listsAccessPoints && fsID != "" {
+			ids, err := efsAccessPointIDs(ctx, apAPI, fsID)
+			if err != nil {
+				failures = append(failures, FailedCall(fsID, err))
+			}
+			r.Fields["access_point_ids"] = strings.Join(ids, ",")
+		}
+
 		resources = append(resources, r)
 	}
 
@@ -138,5 +152,29 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("efs: DescribeAccessPoints", failures, len(output.FileSystems))
+}
+
+// efsAccessPointIDs returns the IDs of fsID's access points, every page of
+// them.
+func efsAccessPointIDs(ctx context.Context, api EFSDescribeAccessPointsAPI, fsID string) ([]string, error) {
+	var ids []string
+	input := &efs.DescribeAccessPointsInput{FileSystemId: &fsID}
+	for {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
+			return api.DescribeAccessPoints(ctx, input)
+		})
+		if err != nil {
+			return ids, err
+		}
+		for _, ap := range out.AccessPoints {
+			if ap.AccessPointId != nil {
+				ids = append(ids, *ap.AccessPointId)
+			}
+		}
+		if out.NextToken == nil || *out.NextToken == "" {
+			return ids, nil
+		}
+		input.NextToken = out.NextToken
+	}
 }

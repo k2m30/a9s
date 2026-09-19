@@ -86,7 +86,7 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 
 // checkACMELB reports load balancers using this certificate via
 // acm:DescribeCertificate.InUseBy filtered to elbv2:loadbalancer ARNs.
-func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
 		return unreadZero(res, resource.KnownRelated("elb", nil, false))
 	}
@@ -97,27 +97,18 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return resource.ErrorRelated("elb", err)
 	}
-	var ids []string
+	var refs []string
 	for _, arn := range arns {
-		if !strings.Contains(arn, ":loadbalancer/") {
-			continue
-		}
-		parts := strings.Split(arn, "/")
-		// ALB/NLB ARN shape: ":loadbalancer/app/<name>/<id>"  → parts ends [..., "app", name, id]
-		// Classic ELB shape: ":loadbalancer/<name>"           → parts ends [..., "loadbalancer", name]
-		switch {
-		case len(parts) >= 4 && (parts[len(parts)-3] == "app" || parts[len(parts)-3] == "net" || parts[len(parts)-3] == "gateway"):
-			ids = append(ids, parts[len(parts)-2])
-		case len(parts) >= 2 && strings.HasSuffix(parts[len(parts)-2], ":loadbalancer"):
-			ids = append(ids, parts[len(parts)-1])
+		if strings.Contains(arn, ":loadbalancer/") {
+			refs = append(refs, arn)
 		}
 	}
-	return unreadZero(res, relatedResult("elb", ids))
+	return unreadZero(res, relatedRefs("elb", refs, refContext(clients, cache, "elb")))
 }
 
 // checkACMAPIGW reports API Gateway custom domains using this certificate
 // via acm:DescribeCertificate.InUseBy filtered to apigateway domain ARNs.
-func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
 		return unreadZero(res, resource.KnownRelated("apigw", nil, false))
 	}
@@ -128,23 +119,13 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 		}
 		return resource.ErrorRelated("apigw", err)
 	}
-	var ids []string
+	var refs []string
 	for _, arn := range arns {
-		if strings.Contains(arn, "/domainnames/") {
-			if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-				ids = append(ids, arn[idx+1:])
-			}
-		} else if strings.Contains(arn, "/restapis/") {
-			parts := strings.Split(arn, "/")
-			for i, p := range parts {
-				if p == "restapis" && i+1 < len(parts) {
-					ids = append(ids, parts[i+1])
-					break
-				}
-			}
+		if strings.Contains(arn, ":apigateway:") {
+			refs = append(refs, arn)
 		}
 	}
-	return unreadZero(res, relatedResult("apigw", ids))
+	return unreadZero(res, relatedRefs("apigw", refs, refContext(clients, cache, "apigw")))
 }
 
 // checkACMR53 reports Route 53 hosted zones containing DNS validation

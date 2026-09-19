@@ -1240,7 +1240,9 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{ID: "Z1234567890ABC", Name: "internal.acme.local."},
+				// Inverted by #545 row 1: r53 keys its rows on the
+				// "/hostedzone/" form. Do not restore the bare zone ID.
+				{ID: "/hostedzone/Z1234567890ABC", Name: "internal.acme.local."},
 			},
 		},
 	}
@@ -1258,8 +1260,8 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 	if result.Count() < 1 {
 		t.Fatalf("Count = %d, want >=1 (spec — one ListHostedZonesByVPC call per open endpoint, matched against the r53 cache)", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "Z1234567890ABC" {
-		t.Fatalf("ResourceIDs = %v, want [Z1234567890ABC]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/hostedzone/Z1234567890ABC" {
+		t.Fatalf("ResourceIDs = %v, want [/hostedzone/Z1234567890ABC]", result.ResourceIDs())
 	}
 }
 

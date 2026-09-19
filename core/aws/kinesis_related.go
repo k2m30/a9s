@@ -87,7 +87,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkKinesisKMS calls kinesis:DescribeStreamSummary and returns the KeyId
 // configured for KMS-at-rest encryption. Pattern C.
-func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
 		return resource.KnownRelated("kms", nil, false)
@@ -109,8 +109,8 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkKinesisDDB is a reverse-scan checker for the kinesis→ddb relationship.

@@ -144,7 +144,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ re
 // checkVPCER53 reports Route 53 private hosted zones associated with this VPC
 // endpoint's VPC. Pattern C: one route53:ListHostedZonesByVPC call for the
 // endpoint's VpcId.
-func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
 		if vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct); ok && vpce.VpcId != nil {
@@ -180,9 +180,9 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	var ids []string
 	for _, z := range out.HostedZoneSummaries {
-		if z.HostedZoneId != nil && *z.HostedZoneId != "" {
+		if z.HostedZoneId != nil {
 			ids = append(ids, *z.HostedZoneId)
 		}
 	}
-	return relatedResult("r53", ids)
+	return relatedRefs("r53", ids, refContext(clients, cache, "r53"))
 }

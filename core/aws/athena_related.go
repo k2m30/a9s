@@ -55,7 +55,7 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ re
 
 // checkAthenaKMS calls athena:GetWorkGroup and extracts the KMS key ID from
 // Configuration.ResultConfiguration.EncryptionConfiguration.KmsKey. Pattern C.
-func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
 		return resource.UnknownRelated("kms")
@@ -66,8 +66,8 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ r
 		*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkAthenaLogs calls athena:GetWorkGroup and extracts the CloudWatch log
@@ -90,7 +90,7 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 
 // checkAthenaRole calls athena:GetWorkGroup and extracts the ExecutionRole for
 // Spark workgroups from Configuration.ExecutionRole. Pattern C.
-func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
 		return resource.UnknownRelated("role")
@@ -98,12 +98,7 @@ func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, _ 
 	if cfg.ExecutionRole == nil || *cfg.ExecutionRole == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	roleARN := *cfg.ExecutionRole
-	roleName := roleARN
-	if idx := strings.LastIndex(roleARN, "/"); idx >= 0 && idx < len(roleARN)-1 {
-		roleName = roleARN[idx+1:]
-	}
-	return relatedResult("role", []string{roleName})
+	return relatedRefs("role", []string{*cfg.ExecutionRole}, refContext(clients, cache, "role"))
 }
 
 // bucketFromS3URI extracts the bucket name from an s3:// URI.

@@ -439,6 +439,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Clusters",
 		ShortName:      "ecs",
+		RefToID:        ecsRefToID,
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"ecs", "ecs-clusters"},
 		Category:       "COMPUTE",
@@ -557,6 +558,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "Lambda Functions",
 		ShortName:      "lambda",
+		RefToID:        lambdaRefToID,
 		HumanizeFields: []string{"last_update_status"},
 		Aliases:        []string{"lambda", "functions"},
 		Category:       "COMPUTE",
@@ -705,6 +707,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:          "EBS Volumes",
 		ShortName:     "ebs",
+		RefToID:       ebsRefToID,
 		Aliases:       []string{"ebs", "volumes", "ebs-vol"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",

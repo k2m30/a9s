@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -120,47 +121,18 @@ func findEmbeddedStruct[T any](rv reflect.Value) (T, bool) {
 	return zero, false
 }
 
-// kmsKeyIDFromField extracts a DescribeKey-compatible identifier from an AWS
-// field that references a KMS key, for a checker whose source resource has
-// type srcType. AWS returns this reference in one of four shapes — key ARN
-// (arn:aws:kms:region:account:key/UUID), bare key UUID, alias ARN
-// (arn:aws:kms:region:account:alias/NAME, where NAME frequently contains its
-// own "/" as in the AWS-managed "aws/s3", "aws/rds", etc.), or bare alias
-// name ("alias/NAME"). Splitting on the LAST "/" is correct for the
-// key/UUID shape but wrong for any alias, since it discards the "alias/aws/"
-// prefix and returns just the trailing service-name segment (e.g. "s3"),
-// which DescribeKey/FetchByIDs then rejects as an invalid key ID. This is
-// the single extraction seam: it
-// strips only a recognized "key/" or "alias/" ARN prefix, preserving the
-// full alias name (including embedded slashes) instead of trimming to the
-// last path segment.
-//
-// It also guards against the degenerate case a live incident surfaced: a
-// thin, cache-seeded source resource with no real encryption data can hand a
-// checker a bare, non-ARN field value that happens to collide with the
-// source's own resource-type short name (e.g. an s3 bucket's "KMSMasterKeyID"
-// resolving to the literal string "s3"). No AWS-assigned key ID, key ARN,
-// alias name, or alias ARN is ever equal to a bare a9s type short name, so
-// any extracted value matching srcType is treated as fabricated/garbage and
-// dropped (returns "") rather than handed to DescribeKey/FetchByIDs.
-//
-// Returns "" for an empty input, or when the extracted value equals srcType.
-// Returns the input unchanged if it matches neither ARN shape (already-bare
-// UUID or alias).
-func kmsKeyIDFromField(raw, srcType string) string {
-	if raw == "" {
+// kmsRefFromField returns the KMS key reference a source field holds, for
+// relatedRefs to read. A thin, cache-seeded source resource with no real
+// encryption data can hand a checker a bare value that collides with the
+// source's own resource-type short name (an s3 bucket's "KMSMasterKeyID"
+// reading "s3"); no key ID, key ARN, alias name or alias ARN is ever a bare
+// a9s type short name, so such a value is dropped ("") rather than handed on
+// to DescribeKey/FetchByIDs.
+func kmsRefFromField(raw, srcType string) string {
+	if srcType != "" && raw == srcType {
 		return ""
 	}
-	keyID := raw
-	if idx := strings.Index(keyID, ":key/"); idx >= 0 {
-		keyID = keyID[idx+len(":key/"):]
-	} else if idx := strings.Index(keyID, ":alias/"); idx >= 0 {
-		keyID = keyID[idx+len(":"):]
-	}
-	if srcType != "" && keyID == srcType {
-		return ""
-	}
-	return keyID
+	return raw
 }
 
 // backupSelectionTagsMatch parses a comma-joined "k=v" selection-tags string
@@ -277,16 +249,7 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 // EventSourceArn (one call per open resource — budget rule 7 in
 // docs/related-resources.md) is itself the authoritative mechanism per
 // kinesis.md/msk.md §2 — its FunctionArn values are the definitive answer,
-// and every FunctionArn in the response resolves to exactly one counted ID.
-// The already-loaded lambda cache, when present, only enriches: for a
-// FunctionArn the cache has, it resolves to the cached Resource.ID (the bare
-// function name the lambda drill/detail view navigates by — see
-// FetchLambdaFunctionsPage); for any FunctionArn the cache
-// lacks (stale/incomplete cache — a cache miss must never drop a
-// API-confirmed mapping), the bare name is instead parsed out of the
-// FunctionArn (arn:aws:lambda:region:account:function:name[:qualifier]). The
-// two resolutions are unioned per-arn, so cache presence never changes the
-// count — only which ID string represents an already-cached function.
+// each read as the function name the lambda list is keyed by.
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -306,34 +269,23 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.ErrorRelated("lambda", err)
 	}
 
-	functionArns := make(map[string]struct{}, len(out.EventSourceMappings))
+	var functionArns []string
 	for _, m := range out.EventSourceMappings {
 		if m.FunctionArn != nil && *m.FunctionArn != "" {
-			functionArns[*m.FunctionArn] = struct{}{}
+			functionArns = append(functionArns, *m.FunctionArn)
 		}
 	}
-	if len(functionArns) == 0 {
-		return resource.KnownRelated("lambda", nil, false)
-	}
+	return relatedRefs("lambda", functionArns, refContext(clients, cache, "lambda"))
+}
 
-	arnToID := make(map[string]string, len(functionArns))
-	if entry, cacheOK := cache["lambda"]; cacheOK {
-		for _, fn := range entry.Resources {
-			if arn := fn.Fields["arn"]; arn != "" && fn.ID != "" {
-				arnToID[arn] = fn.ID
-			}
+// eventSourceARNs returns the EventSourceArn of every mapping whose source is
+// the service marked by service (":sqs:", ":kinesis:", ":kafka:").
+func eventSourceARNs(mappings []lambdatypes.EventSourceMappingConfiguration, service string) []string {
+	var arns []string
+	for _, m := range mappings {
+		if m.EventSourceArn != nil && strings.Contains(*m.EventSourceArn, service) {
+			arns = append(arns, *m.EventSourceArn)
 		}
 	}
-
-	ids := make([]string, 0, len(functionArns))
-	for arn := range functionArns {
-		if id, matched := arnToID[arn]; matched {
-			ids = append(ids, id)
-			continue
-		}
-		if name := resource.LambdaNameFromARN(arn); name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("lambda", ids)
+	return arns
 }

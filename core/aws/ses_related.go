@@ -230,20 +230,6 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("eb-rule", ids)
 }
 
-// extractEventBusName extracts the bus name from an EventBridge event bus ARN.
-// ARN format: arn:aws:events:REGION:ACCOUNT:event-bus/NAME
-// If the input contains no "/", it is returned as-is (handles already-extracted names).
-// Returns "" for empty input.
-func extractEventBusName(arn string) string {
-	if arn == "" {
-		return ""
-	}
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 {
-		return arn[idx+1:]
-	}
-	return arn
-}
-
 // sesRuleAppliesToIdentity reports whether a receipt rule should be considered
 // when computing related resources for the given SES identity.
 //
@@ -323,12 +309,10 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 // checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt
 // rules that apply to the given identity. Calls ses:DescribeActiveReceiptRuleSet
 // (SES v1) once per fetch batch, filters by Recipients scoping, then walks
-// Rules[].Actions[].LambdaAction.FunctionArn and extracts the function name
-// (the segment after ":function:") so the returned IDs match the lambda
-// resource type's ID format (function names, not ARNs). Returns Count: 0 for
+// Rules[].Actions[].LambdaAction.FunctionArn. Returns Count: 0 for
 // accounts with no active receipt rule set (pure outbound SES) — operator-honest
 // absence.
-func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.UnknownRelated("lambda")
@@ -347,8 +331,7 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ r
 			filtered = append(filtered, rule)
 		}
 	}
-	names := sesLambdaNamesFromRules(filtered)
-	return relatedResult("lambda", names)
+	return relatedRefs("lambda", sesLambdaARNsFromRules(filtered), refContext(clients, cache, "lambda"))
 }
 
 // checkSESS3 discovers S3 buckets where SES v1 inbound receipt rules deposit
@@ -379,33 +362,18 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	return relatedResult("s3", buckets)
 }
 
-// sesLambdaNamesFromRules walks ReceiptRule actions, extracts the function name
-// from each LambdaAction.FunctionArn, and returns deduplicated function names.
-// Function names (not ARNs) are returned so they match the lambda resource
-// type's ID format.
-func sesLambdaNamesFromRules(rules []sestypes.ReceiptRule) []string {
-	seen := map[string]struct{}{}
-	var names []string
+// sesLambdaARNsFromRules walks ReceiptRule actions and collects
+// LambdaAction.FunctionArn values.
+func sesLambdaARNsFromRules(rules []sestypes.ReceiptRule) []string {
+	var arns []string
 	for _, rule := range rules {
 		for _, action := range rule.Actions {
-			if action.LambdaAction == nil || action.LambdaAction.FunctionArn == nil {
-				continue
-			}
-			arn := *action.LambdaAction.FunctionArn
-			if arn == "" {
-				continue
-			}
-			name := resource.LambdaNameFromARN(arn)
-			if name == "" {
-				continue
-			}
-			if _, exists := seen[name]; !exists {
-				seen[name] = struct{}{}
-				names = append(names, name)
+			if action.LambdaAction != nil && action.LambdaAction.FunctionArn != nil && *action.LambdaAction.FunctionArn != "" {
+				arns = append(arns, *action.LambdaAction.FunctionArn)
 			}
 		}
 	}
-	return names
+	return arns
 }
 
 // sesS3BucketsFromRules walks ReceiptRule actions and collects S3Action.BucketName values.

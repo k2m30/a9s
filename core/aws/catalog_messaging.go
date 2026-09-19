@@ -195,6 +195,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "SQS Queues",
 		ShortName:     "sqs",
+		RefToID:       sqsRefToID,
 		Aliases:       []string{"sqs", "queues"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:Fields.arn",
@@ -244,6 +245,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "SNS Topics",
 		ShortName:     "sns",
+		RefToID:       snsRefToID,
 		Aliases:       []string{"sns", "topics"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
@@ -449,6 +451,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "Kinesis Streams",
 		ShortName:      "kinesis",
+		RefToID:        kinesisRefToID,
 		HumanizeFields: []string{"stream_mode", "StreamModeDetails.StreamMode", "stream_status"},
 		Aliases:        []string{"kinesis", "streams"},
 		Category:       "MESSAGING",
@@ -488,6 +491,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "MSK Clusters",
 		ShortName:      "msk",
+		RefToID:        mskRefToID,
 		HumanizeFields: []string{"cluster_type", "state"},
 		Aliases:        []string{"msk", "kafka"},
 		Category:       "MESSAGING",
@@ -544,6 +548,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "Step Functions",
 		ShortName:      "sfn",
+		RefToID:        sfnRefToID,
 		HumanizeFields: []string{"type"},
 		Aliases:        []string{"sfn", "stepfunctions", "state-machines"},
 		Category:       "MESSAGING",

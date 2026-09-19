@@ -30,7 +30,7 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	// In-body: the stack's service RoleARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
-	return relatedResult("role", []string{roleNameFromARN(*stack.RoleARN)})
+	return relatedRefs("role", []string{*stack.RoleARN}, refContext(clients, cache, "role"))
 }
 
 // checkCFNCFN finds related CloudFormation stacks — parent and child (nested) stacks.

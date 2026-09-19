@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -29,7 +28,7 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	// In-body: the job's Role ARN normalizes to the role name (== the role's
 	// Resource.ID). Resolve by identity — no role-list fetch.
-	return relatedResult("role", []string{roleNameFromARN(*job.Role)})
+	return relatedRefs("role", []string{*job.Role}, refContext(clients, cache, "role"))
 }
 
 // checkGlueAlarms searches the alarm cache for alarms with a "JobName" dimension
@@ -140,7 +139,7 @@ func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // and extracts the KMS key ARNs from the encryption blocks (S3/CloudWatch/
 // JobBookmarks). Pattern C — single API call per checker. When the job has
 // no SecurityConfiguration, Count: 0.
-func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -166,16 +165,11 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.KnownRelated("kms", nil, false)
 	}
 	enc := out.SecurityConfiguration.EncryptionConfiguration
-	seen := make(map[string]struct{})
+	var refs []string
 	addKey := func(arn *string) {
-		if arn == nil || *arn == "" {
-			return
+		if arn != nil {
+			refs = append(refs, *arn)
 		}
-		val := *arn
-		if idx := strings.LastIndex(val, "/"); idx >= 0 && idx < len(val)-1 {
-			val = val[idx+1:]
-		}
-		seen[val] = struct{}{}
 	}
 	if enc.CloudWatchEncryption != nil {
 		addKey(enc.CloudWatchEncryption.KmsKeyArn)
@@ -186,11 +180,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 	for _, s := range enc.S3Encryption {
 		addKey(s.KmsKeyArn)
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	return relatedResult("kms", ids)
+	return relatedRefs("kms", refs, refContext(clients, cache, "kms"))
 }
 
 // checkGlueAthena scans the athena cache for workgroups whose enriched
@@ -222,7 +212,7 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 // checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
 // values that look like Secrets Manager references (arn:aws:secretsmanager:
 // prefix). Uses res.RawStruct — no cache needed.
-func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkGlueSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("secrets")
@@ -230,23 +220,11 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 	if len(job.DefaultArguments) == 0 {
 		return resource.KnownRelated("secrets", nil, false)
 	}
-	seen := make(map[string]struct{})
-	var ids []string
+	var refs []string
 	for _, v := range job.DefaultArguments {
-		a, isSecretARN := ARNForService(v, "secretsmanager")
-		if !isSecretARN {
-			continue
+		if isSecret(v) {
+			refs = append(refs, v)
 		}
-		// The resource is "secret:NAME-suffix".
-		name, ok := strings.CutPrefix(a.Resource, "secret:")
-		if !ok || name == "" {
-			continue
-		}
-		if _, dup := seen[name]; dup {
-			continue
-		}
-		seen[name] = struct{}{}
-		ids = append(ids, name)
 	}
-	return relatedResult("secrets", ids)
+	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
 }

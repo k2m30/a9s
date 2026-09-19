@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -43,7 +42,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkDBISnapKMS extracts KmsKeyId from the DBSnapshot RawStruct and matches
-// it against the kms cache. Handles full ARN format (arn:aws:kms:…/key-id).
+// it against the kms cache.
 // Pattern C — needs target cache.
 func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
@@ -53,21 +52,18 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	val := *snap.KmsKeyId
-	keyID := val
-	if idx := strings.LastIndex(val, "/"); idx >= 0 && idx < len(val)-1 {
-		keyID = val[idx+1:]
-	}
-	if keyID == "" {
-		return resource.KnownRelated("kms", nil, false)
-	}
-
 	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
 		return resource.UnknownRelated("kms")
+	}
+	rc := refContext(clients, cache, "kms")
+	rc.Targets = kmsList
+	keyID, local := resource.ResolveRef("kms", *snap.KmsKeyId, rc)
+	if !local {
+		return relatedResultTrunc("kms", nil, true)
 	}
 
 	var ids []string

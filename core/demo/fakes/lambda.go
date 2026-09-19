@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -30,18 +31,24 @@ func (f *LambdaFake) ListFunctions(_ context.Context, _ *lambda.ListFunctionsInp
 }
 
 func (f *LambdaFake) ListEventSourceMappings(_ context.Context, input *lambda.ListEventSourceMappingsInput, _ ...func(*lambda.Options)) (*lambda.ListEventSourceMappingsOutput, error) {
-	if input.EventSourceArn == nil {
-		return &lambda.ListEventSourceMappingsOutput{EventSourceMappings: f.fix.EventSourceMappings}, nil
+	if input.EventSourceArn != nil {
+		if err := validateARN(*input.EventSourceArn); err != nil {
+			return nil, err
+		}
 	}
-	if err := validateARN(*input.EventSourceArn); err != nil {
-		return nil, err
-	}
-	arn := aws.ToString(input.EventSourceArn)
+	// Like the real API, FunctionName takes a name or an ARN and narrows the
+	// list to that function's mappings.
+	source, fn := aws.ToString(input.EventSourceArn), aws.ToString(input.FunctionName)
 	var filtered []lambdatypes.EventSourceMappingConfiguration
 	for _, m := range f.fix.EventSourceMappings {
-		if aws.ToString(m.EventSourceArn) == arn {
-			filtered = append(filtered, m)
+		arn := aws.ToString(m.FunctionArn)
+		if source != "" && aws.ToString(m.EventSourceArn) != source {
+			continue
 		}
+		if fn != "" && arn != fn && !strings.HasSuffix(arn, ":function:"+fn) {
+			continue
+		}
+		filtered = append(filtered, m)
 	}
 	return &lambda.ListEventSourceMappingsOutput{EventSourceMappings: filtered}, nil
 }

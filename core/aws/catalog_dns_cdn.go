@@ -36,6 +36,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:          "Route 53 Hosted Zones",
 		ShortName:     "r53",
+		RefToID:       r53RefToID,
 		Aliases:       []string{"r53", "route53", "dns", "hosted-zones"},
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
@@ -140,6 +141,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:           "ACM Certificates",
 		ShortName:      "acm",
+		RefToID:        acmRefToID,
 		HumanizeFields: []string{"Type", "RenewalEligibility"},
 		Aliases:        []string{"acm", "certificates", "certs"},
 		Category:       "DNS & CDN",
@@ -187,6 +189,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:           "API Gateways",
 		ShortName:      "apigw",
+		RefToID:        apigwRefToID,
 		HumanizeFields: []string{"protocol"},
 		Aliases:        []string{"apigw", "apigateway", "api-gateway"},
 		Category:       "DNS & CDN",

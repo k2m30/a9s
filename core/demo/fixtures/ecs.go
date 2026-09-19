@@ -833,14 +833,16 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 					},
 					// Secrets — required for the ecs-task:secrets and
 					// ecs-task:ssm related-panel pivot witnesses. DB_PASSWORD
-					// and API_KEY are Secrets Manager ARNs (secrets.go
-					// fixtures prod/database/primary and prod/api/gateway-key);
+					// injects the "password" JSON key of the Secrets Manager
+					// secret prod/database/primary (the ARN carries a
+					// ":<json-key>:<stage>:<version>" tail); API_KEY is the
+					// whole prod/api/gateway-key secret (secrets.go fixtures);
 					// CONFIG_PARAM is an SSM parameter ARN (ssm.go fixture
 					// /acme/prod/app/config).
 					Secrets: []ecstypes.Secret{
 						{
 							Name:      aws.String("DB_PASSWORD"),
-							ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"),
+							ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf:password::"),
 						},
 						{
 							Name:      aws.String("API_KEY"),

@@ -4,6 +4,7 @@ package app
 
 import (
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ApplyResourcesLoaded is a test-support seam that seeds the controller's
@@ -39,6 +40,12 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	// saves under the raw incoming typeName.
 	canon := resource.CanonicalShortName(typeName)
 	ls := c.topListState()
+	if ls == nil {
+		// No list screen owns the result: the real lane
+		// (handleResourcesLoadedEvent) hands a canonical one to the store.
+		c.core.ObserveRows(canon, resources, pagination, session.OriginFetch, appendPage)
+		return
+	}
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
 	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, appendPage, topLevelCanonical, nil, 0)
 	if topLevelCanonical && len(c.stack) > 0 {

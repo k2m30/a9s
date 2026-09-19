@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -46,7 +45,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkEBSKMS returns the KMS key used to encrypt this volume (Pattern F).
-func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEBSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -54,12 +53,7 @@ func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	arn := *vol.KmsKeyId
-	idx := strings.LastIndex(arn, "/")
-	if idx < 0 || idx == len(arn)-1 {
-		return resource.KnownRelated("kms", nil, false)
-	}
-	return relatedResult("kms", []string{arn[idx+1:]})
+	return relatedRefs("kms", []string{*vol.KmsKeyId}, refContext(clients, cache, "kms"))
 }
 
 // checkEBSAlarm searches the alarm cache for alarms with a VolumeId dimension

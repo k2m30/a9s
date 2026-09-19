@@ -42,32 +42,20 @@ func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 	return relatedResult("subnet", ids)
 }
 
-// checkLambdaEFS extracts EFS access-point ARNs from Lambda FileSystemConfigs
-// and returns the filesystem IDs. The Arn points to an access point
-// (arn:aws:elasticfilesystem:region:account:access-point/fsap-xxx) which
-// itself references a filesystem; without a live efs:DescribeAccessPoints
-// call we cannot resolve fsap→fs-id, so we return the access-point IDs here.
-// Downstream routing can translate fsap→fs via the access-point cache if it
-// exists; otherwise these IDs at least surface the link.
-func checkLambdaEFS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkLambdaEFS reads the file systems behind Lambda FileSystemConfigs: each
+// Arn names an access point, which the efs resolver maps to its file system.
+func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("efs")
 	}
-	var ids []string
+	var refs []string
 	for _, cfg := range fn.FileSystemConfigs {
-		if cfg.Arn == nil || *cfg.Arn == "" {
-			continue
-		}
-		arn := *cfg.Arn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			ids = append(ids, arn[idx+1:])
+		if cfg.Arn != nil {
+			refs = append(refs, *cfg.Arn)
 		}
 	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("efs", nil, false)
-	}
-	return relatedResult("efs", ids)
+	return relatedRefs("efs", refs, refContext(clients, cache, "efs"))
 }
 
 // --- Reverse cache scans (target cache references this Lambda) ---
@@ -195,7 +183,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ r
 
 // checkLambdaKinesis scans this Lambda's event source mappings for Kinesis
 // stream ARNs. Pattern A — live API.
-func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
 		return resource.KnownRelated("kinesis", nil, false)
@@ -210,29 +198,12 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 	if err != nil {
 		return resource.ErrorRelated("kinesis", err)
 	}
-	seen := make(map[string]struct{})
-	for _, m := range out.EventSourceMappings {
-		if m.EventSourceArn == nil {
-			continue
-		}
-		arn := *m.EventSourceArn
-		if !strings.Contains(arn, ":kinesis:") {
-			continue
-		}
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			seen[arn[idx+1:]] = struct{}{}
-		}
-	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	return relatedResult("kinesis", ids)
+	return relatedRefs("kinesis", eventSourceARNs(out.EventSourceMappings, ":kinesis:"), refContext(clients, cache, "kinesis"))
 }
 
 // checkLambdaMSK scans this Lambda's event source mappings for MSK cluster
 // ARNs. Pattern A — live API.
-func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
 		return resource.KnownRelated("msk", nil, false)
@@ -247,26 +218,7 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, _ r
 	if err != nil {
 		return resource.ErrorRelated("msk", err)
 	}
-	seen := make(map[string]struct{})
-	for _, m := range out.EventSourceMappings {
-		if m.EventSourceArn == nil {
-			continue
-		}
-		arn := *m.EventSourceArn
-		if !strings.Contains(arn, ":kafka:") {
-			continue
-		}
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			seen[arn[idx+1:]] = struct{}{}
-		} else {
-			seen[arn] = struct{}{}
-		}
-	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	return relatedResult("msk", ids)
+	return relatedRefs("msk", eventSourceARNs(out.EventSourceMappings, ":kafka:"), refContext(clients, cache, "msk"))
 }
 
 // checkLambdaCTEvents scans the ct-events cache for events whose Resources

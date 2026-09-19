@@ -9,14 +9,13 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // checkDdbKMS reads SSEDescription.KMSMasterKeyArn from the TableDescription RawStruct.
 // Pattern F — no cache needed.
-func checkDdbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDdbKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -24,13 +23,7 @@ func checkDdbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	arn := *table.SSEDescription.KMSMasterKeyArn
-	idx := strings.LastIndex(arn, "/")
-	if idx < 0 || idx == len(arn)-1 {
-		return resource.KnownRelated("kms", nil, false)
-	}
-	keyID := arn[idx+1:]
-	return relatedResult("kms", []string{keyID})
+	return relatedRefs("kms", []string{*table.SSEDescription.KMSMasterKeyArn}, refContext(clients, cache, "kms"))
 }
 
 // checkDdbAlarm searches the alarm cache for alarms with a "TableName" dimension
@@ -155,7 +148,7 @@ func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult
 // the table's LatestStreamArn. Lambda FunctionConfiguration does not embed
 // event-source info, so there is no cache-only path. Returns an unknown
 // result when no live clients are available.
-func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("lambda")
@@ -164,27 +157,5 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ r
 		// Streams not enabled on this table — no Lambda triggers are possible.
 		return resource.KnownRelated("lambda", nil, false)
 	}
-	streamARN := *table.LatestStreamArn
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("lambda")
-	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		EventSourceArn: &streamARN,
-	})
-	if err != nil {
-		return resource.ErrorRelated("lambda", err)
-	}
-	var ids []string
-	for _, m := range out.EventSourceMappings {
-		if m.FunctionArn == nil {
-			continue
-		}
-		parts := strings.Split(*m.FunctionArn, ":")
-		name := parts[len(parts)-1]
-		if name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("lambda", ids)
+	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *table.LatestStreamArn, cache)
 }

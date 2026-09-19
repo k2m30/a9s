@@ -37,6 +37,13 @@ const SNSDemoKMSKeyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 // subscription uses https, sqs, lambda or email.
 const SNSSubPlainHTTP = SNSPublicPolicyARN + ":9f8e7d6c-5b4a-3210-9876-543210fedcba"
 
+// OpsAlertsTopicARN and OpsCriticalTopicARN are the on-call topics the demo
+// alarms and their siblings notify.
+const (
+	OpsAlertsTopicARN   = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+	OpsCriticalTopicARN = "arn:aws:sns:us-east-1:123456789012:ops-critical"
+)
+
 // SNSFixtures holds typed fixture data for SNS.
 type SNSFixtures struct {
 	Topics        []snstypes.Topic
@@ -80,6 +87,10 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		{TopicArn: aws.String(SNSPublicPolicyARN)},
 		// SNSNoKMS: the only topic served without a KmsMasterKeyId.
 		{TopicArn: aws.String(SNSNoKMSARN)},
+		// The on-call topics the demo alarms, ASG, stack, pipeline and secret
+		// rotation notify (cloudwatch.go and siblings).
+		{TopicArn: aws.String(OpsAlertsTopicARN)},
+		{TopicArn: aws.String(OpsCriticalTopicARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{
@@ -167,6 +178,8 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 	subsByTopic["arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName] = minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler")
 	subsByTopic[BackupAlertsSNSTopicARN] = minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com")
 	subsByTopic[SNSNoKMSARN] = minimalSubscriptions(SNSNoKMSARN, "sqs", "arn:aws:sqs:us-east-1:123456789012:acme-alerts-queue")
+	subsByTopic[OpsAlertsTopicARN] = minimalSubscriptions(OpsAlertsTopicARN, "email", "ops@acme-corp.com")
+	subsByTopic[OpsCriticalTopicARN] = minimalSubscriptions(OpsCriticalTopicARN, "email", "oncall@acme-corp.com")
 
 	// TopicAttributes — required for the sns:kms and sns:role related-panel
 	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
@@ -199,8 +212,10 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		BackupAlertsSNSTopicARN: "Backup Vault Alerts",
 		"arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts":       "Staging Deploy Alerts",
 		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": "Webhook Integration (Pending)",
-		SNSPublicPolicyARN: "Public Order Events",
-		SNSNoKMSARN:        "Unencrypted Alerts",
+		SNSPublicPolicyARN:  "Public Order Events",
+		SNSNoKMSARN:         "Unencrypted Alerts",
+		OpsAlertsTopicARN:   "Ops Alerts",
+		OpsCriticalTopicARN: "Ops Critical",
 	}
 	for arn, displayName := range topicDisplayNames {
 		confirmed, pending, deleted := 0, 0, 0
@@ -261,6 +276,6 @@ func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscr
 }
 
 func init() {
-	Register(Pin{ShortName: "sns", Rows: 11, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sns", Rows: 13, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "sns-sub", Rows: 7, Issues: 2, CoverageGaps: []string{"broken"}})
 }

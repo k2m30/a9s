@@ -16,7 +16,7 @@ import (
 // checkLambdaRole extracts the Role ARN from the Lambda FunctionConfiguration RawStruct.
 // It extracts the role name from the last path segment of the ARN (after the last "/")
 // and searches the role cache by name.
-func checkLambdaRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
 		if res.RawStruct == nil {
@@ -30,7 +30,7 @@ func checkLambdaRole(_ context.Context, _ any, res resource.Resource, _ resource
 	// In-body: the execution Role ARN normalizes to the role name, which IS the
 	// role's Resource.ID (roles keyed by name; role FetchByIDs drives the drill).
 	// Resolve by identity — no role-list fetch.
-	return relatedResult("role", []string{roleNameFromARN(*fn.Role)})
+	return relatedRefs("role", []string{*fn.Role}, refContext(clients, cache, "role"))
 }
 
 // checkLambdaAlarms searches the alarm cache for alarms with a "FunctionName" dimension
@@ -115,7 +115,7 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 // checkLambdaKMS extracts the KMS key ARN from the Lambda FunctionConfiguration
 // KMSKeyArn field (used for environment variable encryption). Pattern F — no
 // cache needed. The ARN last segment after "/" is used as the key ID.
-func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
 		if res.RawStruct == nil {
@@ -123,8 +123,8 @@ func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*fn.KMSKeyArn, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkLambdaSQS finds SQS queues wired to this Lambda as event sources
@@ -132,7 +132,7 @@ func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.
 // function and extracts SQS queue names from the returned EventSourceArn values.
 // Returns an unknown result when no live clients are available, since the
 // Lambda FunctionConfiguration struct does not embed event source mappings.
-func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	functionName := res.ID
 	if functionName == "" {
 		functionName = res.Name
@@ -152,22 +152,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 	if err != nil {
 		return resource.ErrorRelated("sqs", err)
 	}
-	var ids []string
-	for _, m := range out.EventSourceMappings {
-		if m.EventSourceArn == nil {
-			continue
-		}
-		arn := *m.EventSourceArn
-		if !strings.Contains(arn, ":sqs:") {
-			continue
-		}
-		parts := strings.Split(arn, ":")
-		name := parts[len(parts)-1]
-		if name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("sqs", ids)
+	return relatedRefs("sqs", eventSourceARNs(out.EventSourceMappings, ":sqs:"), refContext(clients, cache, "sqs"))
 }
 
 // checkLambdaCFN finds the CloudFormation stack that owns this Lambda by reading
@@ -218,9 +203,8 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 // the lambda fetcher). The image URI is only returned by GetFunction's
 // Code.ImageUri — never by ListFunctions/FunctionConfiguration — so this
 // checker calls GetFunction for this one function (in budget: one call per
-// open Image-package function, per docs/resources/lambda.md). ECR image URIs
-// follow the pattern <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>].
-func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// open Image-package function, per docs/resources/lambda.md).
+func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["package_type"] != "Image" {
 		return resource.KnownRelated("ecr", nil, false)
 	}
@@ -244,25 +228,7 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ r
 	if out == nil || out.Code == nil || out.Code.ImageUri == nil || *out.Code.ImageUri == "" {
 		return resource.UnknownRelated("ecr")
 	}
-	imageURI := *out.Code.ImageUri
-	// URI form: <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>]
-	// We need the <repo> portion — everything after the hostname "/" and before ":" or "@".
-	slashIdx := strings.Index(imageURI, "/")
-	if slashIdx < 0 || slashIdx == len(imageURI)-1 {
-		return resource.UnknownRelated("ecr")
-	}
-	repoAndTag := imageURI[slashIdx+1:]
-	// Strip tag/digest suffix.
-	if idx := strings.Index(repoAndTag, ":"); idx >= 0 {
-		repoAndTag = repoAndTag[:idx]
-	}
-	if idx := strings.Index(repoAndTag, "@"); idx >= 0 {
-		repoAndTag = repoAndTag[:idx]
-	}
-	if repoAndTag == "" {
-		return resource.UnknownRelated("ecr")
-	}
-	return relatedResult("ecr", []string{repoAndTag})
+	return relatedRefs("ecr", []string{*out.Code.ImageUri}, refContext(clients, cache, "ecr"))
 }
 
 // checkLambdaEBRule finds EventBridge rules that target this Lambda

@@ -43,12 +43,20 @@ const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 // either has no policy fixture or names concrete principals.
 const KMSPublicPolicy = "c9d0e1f2-a3b4-6789-01cd-ffaabbccddee"
 
+// SSMDefaultKeyID is the key the alias "alias/aws/ssm" points at — the key SSM
+// encrypts a SecureString parameter with when none is named
+// (/acme/legacy/db/password in ssm.go). The alias makes the ssm KeyId field
+// and its KMS related row resolve to one key. It is listed as a customer key
+// with rotation on because the kms list shows customer-managed keys only.
+const SSMDefaultKeyID = "e7f8a9b0-c1d2-4e3f-8a9b-0c1d2e3f4a5b"
+
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
-		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
-		// which EnrichKMSRotation raises no kms.rotation-disabled finding,
-		// letting colorKMS fall through to its Enabled->Healthy branch.
+		// Rotation enabled (see RotationEnabled below) → with SSMDefaultKeyID,
+		// the only demo CMKs for which EnrichKMSRotation raises no
+		// kms.rotation-disabled finding, letting colorKMS fall through to its
+		// Enabled->Healthy branch.
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -345,6 +353,19 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		{
+			KeyId:                aws.String(SSMDefaultKeyID),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + SSMDefaultKeyID),
+			Description:          aws.String("Default key that protects my SSM parameters when no other key is defined"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// legacy-prod-cmk-deleted — required for ddb→kms related-panel pivot on
 		// legacy-kms-lost (INACCESSIBLE_ENCRYPTION_CREDENTIALS). Modeled as
 		// PendingDeletion rather than fully absent: a real deleted CMK stops
@@ -495,6 +516,11 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-opensearch-key"),
 			TargetKeyId: aws.String(OpenSearchKMSKeyID),
 		},
+		{
+			AliasName:   aws.String("alias/aws/ssm"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/aws/ssm"),
+			TargetKeyId: aws.String(SSMDefaultKeyID),
+		},
 		// AMI EBS boot-volume encryption key alias.
 		{
 			AliasName:   aws.String("alias/acme-ami-ebs-boot-key"),
@@ -512,10 +538,12 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		KMSPublicPolicy:                        `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowAnyoneToDecrypt","Effect":"Allow","Principal":"*","Action":["kms:Decrypt","kms:DescribeKey"],"Resource":"*"}]}`,
 	}
 
-	// RotationEnabled — the primary production key is the sole demo CMK with
-	// rotation on; every other key defaults to false via the map zero value.
+	// RotationEnabled — the primary production key and the SSM default key
+	// have rotation on; every other key defaults to false via the map zero
+	// value.
 	rotationEnabled := map[string]bool{
 		"a1b2c3d4-5678-90ab-cdef-111111111111": true,
+		SSMDefaultKeyID:                        true,
 	}
 
 	return &KMSFixtures{KeyList: keyMetadata, Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}

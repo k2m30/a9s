@@ -29,34 +29,15 @@ func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ reso
 	return relatedResult("ecs-svc", []string{serviceName})
 }
 
-// checkECSTaskCluster returns the ECS cluster this task belongs to (Pattern F).
-// Extracts the cluster name from ClusterArn (last segment after "/"), falling
-// back to Fields["cluster"] if ClusterArn is nil.
-func checkECSTaskCluster(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
-	if ok && raw.ClusterArn != nil && *raw.ClusterArn != "" {
-		clusterName := arnLastSegment(*raw.ClusterArn)
-		if clusterName != "" {
-			return relatedResult("ecs", []string{clusterName})
-		}
+// checkECSTaskCluster returns the ECS cluster this task belongs to (Pattern F):
+// ClusterArn, falling back to Fields["cluster"] (the fetcher stores the full
+// ClusterArn there) when the RawStruct carries none.
+func checkECSTaskCluster(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	cluster := res.Fields["cluster"]
+	if raw, ok := assertStruct[ecstypes.Task](res.RawStruct); ok && raw.ClusterArn != nil && *raw.ClusterArn != "" {
+		cluster = *raw.ClusterArn
 	}
-	// Fallback: use Fields["cluster"] set by the fetcher (stores full ClusterArn)
-	clusterField := res.Fields["cluster"]
-	if clusterField == "" {
-		return resource.KnownRelated("ecs", nil, false)
-	}
-	clusterName := arnLastSegment(clusterField)
-	if clusterName == "" {
-		clusterName = clusterField
-	}
-	return relatedResult("ecs", []string{clusterName})
-}
-
-// arnLastSegment extracts the last segment after "/" from an ARN or any
-// slash-delimited string. Returns the input unchanged if there is no "/".
-func arnLastSegment(arn string) string {
-	parts := strings.Split(arn, "/")
-	return parts[len(parts)-1]
+	return relatedRefs("ecs", []string{cluster}, refContext(clients, cache, "ecs"))
 }
 
 // checkECSTaskLogs searches the logs cache for log groups matching the task's
@@ -74,12 +55,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 	if taskDefARN == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	// Extract task def family from ARN: arn:aws:ecs:region:account:task-definition/family:revision
-	family := arnLastSegment(taskDefARN)
-	// Remove revision suffix (e.g. "family:5" -> "family")
-	if idx := strings.LastIndex(family, ":"); idx >= 0 {
-		family = family[:idx]
-	}
+	family := taskDefFamily(taskDefARN)
 	if family == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
@@ -122,20 +98,6 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("role", nil, false)
 	}
 
-	names := make(map[string]struct{}, len(arns))
-	for _, arn := range arns {
-		name := arn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			name = arn[idx+1:]
-		}
-		if name != "" {
-			names[name] = struct{}{}
-		}
-	}
-	if len(names) == 0 {
-		return resource.KnownRelated("role", nil, false)
-	}
-
 	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {
 		return resource.ErrorRelated("role", err)
@@ -143,16 +105,6 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 	if roleList == nil {
 		return resource.UnknownRelated("role")
 	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if _, match := names[roleRes.Name]; match {
-			ids = append(ids, roleRes.ID)
-			continue
-		}
-		if _, match := names[roleRes.Fields["role_name"]]; match {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	return relatedResultTrunc("role", ids, truncated)
+	ids, dropped := listedRefs("role", arns, refContext(clients, cache, "role"), roleList)
+	return relatedResultTrunc("role", ids, truncated || dropped)
 }

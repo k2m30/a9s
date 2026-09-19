@@ -543,8 +543,10 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tgARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tgARN)
+	// Inverted by #545 row 1: tg keys its rows on the target group name.
+	// Do not restore the ARN.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "awseb-AWSEBTA-ABCDEF123456" {
+		t.Errorf("ResourceIDs = %v, want [awseb-AWSEBTA-ABCDEF123456]", result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())

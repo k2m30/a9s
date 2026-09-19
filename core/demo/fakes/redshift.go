@@ -49,7 +49,7 @@ func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.Des
 		return &redshift.DescribeLoggingStatusOutput{
 			LoggingEnabled:     aws.Bool(true),
 			LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
-			LogExports:         []string{"connectionlog", "userlog", "useractivitylog"},
+			LogExports:         fixtures.RedshiftCloudWatchLogExports(clusterID),
 		}, nil
 	case fixtures.AcmeReportingID:
 		return &redshift.DescribeLoggingStatusOutput{
@@ -66,7 +66,7 @@ func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.Des
 		return &redshift.DescribeLoggingStatusOutput{
 			LoggingEnabled:     aws.Bool(true),
 			LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
-			LogExports:         []string{"connectionlog", "userlog"},
+			LogExports:         fixtures.RedshiftCloudWatchLogExports(clusterID),
 		}, nil
 	}
 }

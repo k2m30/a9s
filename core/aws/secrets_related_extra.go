@@ -7,8 +7,10 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ecspkg "github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -17,52 +19,43 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkSecretsCodeArtifact checks whether this secret is linked to CodeArtifact.
-// Weak pair (3-sometimes/2-no). Heuristic: name/tag match for CodeArtifact linkage.
-// No AWS call — inspects secret Name and Tags only.
-func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkSecretsCodeArtifact reports the CodeArtifact repositories this secret
+// is for. Weak pair (3-sometimes/2-no), no AWS call: a secret is linked to
+// CodeArtifact when its name or a tag says so, and the repositories it is for
+// are the loaded ones its name, description or tag values name.
+func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("codeartifact")
 	}
-	// Check name contains "codeartifact" (case-insensitive)
-	name := ""
-	if secret.Name != nil {
-		name = strings.ToLower(*secret.Name)
-	}
-	if strings.Contains(name, "codeartifact") {
-		ids := []string{}
-		if secret.Name != nil {
-			ids = append(ids, *secret.Name)
-		}
-		return relatedResult("codeartifact", ids)
-	}
-	// Check tags for codeartifact key or CodeArtifact ARN value
+	text := []string{aws.ToString(secret.Name), aws.ToString(secret.Description)}
+	linked := strings.Contains(strings.ToLower(text[0]), "codeartifact")
 	for _, tag := range secret.Tags {
-		key := ""
-		if tag.Key != nil {
-			key = strings.ToLower(*tag.Key)
-		}
-		val := ""
-		if tag.Value != nil {
-			val = *tag.Value
-		}
-		if strings.Contains(key, "codeartifact") {
-			match := val
-			if match == "" && tag.Key != nil {
-				match = *tag.Key
-			}
-			return relatedResult("codeartifact", []string{match})
-		}
-		// Value contains a CodeArtifact ARN pattern
-		if strings.Contains(val, "codeartifact") || strings.Contains(val, ":codeartifact:") {
-			return relatedResult("codeartifact", []string{val})
+		key, val := aws.ToString(tag.Key), aws.ToString(tag.Value)
+		linked = linked || strings.Contains(strings.ToLower(key), "codeartifact") || strings.Contains(val, ":codeartifact:")
+		text = append(text, val)
+	}
+	if !linked {
+		return resource.KnownRelated("codeartifact", nil, false)
+	}
+	repos, truncated, err := relatedResourcesFor(ctx, clients, cache, "codeartifact")
+	if err != nil {
+		return resource.ErrorRelated("codeartifact", err)
+	}
+	if repos == nil {
+		return resource.UnknownRelated("codeartifact")
+	}
+	var ids []string
+	for _, repo := range repos {
+		if slices.ContainsFunc(text, func(t string) bool { return strings.Contains(t, repo.ID) }) {
+			ids = append(ids, repo.ID)
 		}
 	}
-	return resource.KnownRelated("codeartifact", nil, false)
+	return relatedResultTrunc("codeartifact", ids, truncated)
 }
 
 // checkSecretsEB is a reverse-scan checker for the secrets→eb relationship.
@@ -224,7 +217,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		if tdOut == nil || tdOut.TaskDefinition == nil {
 			continue
 		}
-		if secretsECSTaskRefsSecret(*tdOut.TaskDefinition, secretARN) {
+		if secretsECSTaskRefsSecret(*tdOut.TaskDefinition, res, refContext(clients, nil, "")) {
 			ids = append(ids, taskRes.ID)
 		}
 	}
@@ -242,18 +235,22 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
 }
 
-// secretsECSTaskRefsSecret returns true if the TaskDefinition references the given
-// secret ARN via ContainerDefinitions[].Secrets[].ValueFrom or
-// ContainerDefinitions[].RepositoryCredentials.CredentialsParameter.
-func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secretARN string) bool {
+// secretsECSTaskRefsSecret returns true if the TaskDefinition references the
+// secret row via ContainerDefinitions[].Secrets[].ValueFrom (which may carry a
+// json-key tail) or ContainerDefinitions[].RepositoryCredentials.CredentialsParameter.
+func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secret resource.Resource, rc domain.RefContext) bool {
+	rc.Targets = []resource.Resource{secret}
+	names := func(ref *string) bool {
+		id, ok := resource.ResolveRef("secrets", aws.ToString(ref), rc)
+		return ok && id == secret.ID
+	}
 	for _, c := range td.ContainerDefinitions {
 		for _, s := range c.Secrets {
-			if s.ValueFrom != nil && *s.ValueFrom == secretARN {
+			if names(s.ValueFrom) {
 				return true
 			}
 		}
-		if c.RepositoryCredentials != nil && c.RepositoryCredentials.CredentialsParameter != nil &&
-			*c.RepositoryCredentials.CredentialsParameter == secretARN {
+		if c.RepositoryCredentials != nil && names(c.RepositoryCredentials.CredentialsParameter) {
 			return true
 		}
 	}
@@ -317,7 +314,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _
 //  2. If parent has RotationLambdaARN: lambda:GetFunction → FunctionConfiguration.Role.
 //
 // Deduplicates results.
-func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_, secretName := secretIdentifiers(res)
 	secretID := res.Fields["arn"]
 	if secretID == "" {
@@ -381,16 +378,18 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 	}
 
 	// ids holds full role ARNs from policy principals (often cross-account) and
-	// the rotation lambda. role.ID is a bare RoleName, so normalize and drop
-	// foreign-account principals — a cross-account or full-ARN id fails
-	// iam:GetRole on drill.
-	finalIDs := sameAccountRoleNames(ids, arnAccountID(secretID))
+	// the rotation lambda; the secret's own account is the local one.
+	rc := refContext(clients, cache, "role")
+	if acct := arnAccountID(secretID); acct != "" {
+		rc.AccountID = acct
+	}
+	finalIDs, dropped := resolveRefs("role", ids, rc)
 	if len(finalIDs) == 0 && partial {
 		// Neither path could be checked (or both failed): nothing was
 		// confirmed, so this is unresolved, not a proven zero or a lower bound.
 		return resource.UnknownRelated("role")
 	}
-	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial))
+	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial || dropped))
 }
 
 // secretsPolicyRoleARNs parses a Secrets Manager resource policy JSON and returns

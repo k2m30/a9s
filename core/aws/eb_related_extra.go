@@ -60,7 +60,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 // elasticbeanstalk:DescribeEnvironmentResources returns LoadBalancers[].Name (not ARN).
 // elbv2:DescribeListeners requires an ARN, so we first resolve name→ARN via
 // elbv2:DescribeLoadBalancers(Names=[name]), then call DescribeListeners with the ARN.
-func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("tg")
@@ -155,7 +155,8 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 	// Some DescribeListeners calls may have failed: tgARNs is a proven subset,
 	// not necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("tg", tgARNs, len(failures) > 0)
+	ids, dropped := resolveRefs("tg", tgARNs, refContext(clients, cache, "tg"))
+	return relatedResultTrunc("tg", ids, dropped || len(failures) > 0)
 }
 
 // checkEbSG resolves security groups configured for this EB environment via configuration settings.
@@ -235,7 +236,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 // elasticbeanstalk:DescribeConfigurationSettings OptionSettings:
 //   - aws:autoscaling:launchconfiguration / IamInstanceProfile → iam:GetInstanceProfile → roles
 //   - aws:elasticbeanstalk:environment / ServiceRole → direct role ARN or name
-func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -271,7 +272,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("role", err)
 	}
 
-	var ids []string
+	var refs []string
 	// resolved stays true until a profile lookup does not answer; the same
 	// rule the ASG role pivot follows, because it is the same call.
 	resolved := true
@@ -296,21 +297,21 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 			case ns == "aws:autoscaling:launchconfiguration" && name == "IamInstanceProfile":
 				// Resolve instance profile to role ARNs
 				roleARNs, answered := asgInstanceProfileToRoles(ctx, c, val)
-				ids = append(ids, roleARNs...)
+				refs = append(refs, roleARNs...)
 				resolved = resolved && answered
 			case ns == "aws:elasticbeanstalk:environment" && name == "ServiceRole":
-				// ServiceRole may be a role ARN or a role name
-				ids = append(ids, val)
+				refs = append(refs, val)
 			}
 		}
 	}
+	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
 	if !resolved {
 		if len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
 		}
 		return resource.UnknownRelated("role")
 	}
-	return relatedResult("role", ids)
+	return relatedResultTrunc("role", ids, dropped)
 }
 
 // checkEbS3 resolves S3 buckets referenced by application versions for this EB environment.

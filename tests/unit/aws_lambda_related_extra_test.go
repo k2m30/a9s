@@ -157,13 +157,19 @@ func TestRelated_Lambda_EFS_WithAccessPoints(t *testing.T) {
 			},
 		},
 	}
+	// Inverted by #545 row 1: efs keys its rows on the file system, so both
+	// access points resolve to the one file system the list says holds them.
+	// Do not restore the access point IDs.
+	cache := resource.ResourceCache{"efs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "fs-0aaa111", Fields: map[string]string{"access_point_ids": "fsap-aaa111,fsap-bbb222"}},
+	}}}
 	checker := lambdaExtraCheckerByTarget(t, "efs")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2", result.Count())
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 2 {
-		t.Errorf("ResourceIDs = %v, want [fsap-aaa111 fsap-bbb222]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "fs-0aaa111" {
+		t.Errorf("ResourceIDs = %v, want [fs-0aaa111]", result.ResourceIDs())
 	}
 }
 
@@ -1410,8 +1416,10 @@ func TestRelated_Lambda_MSK_FoundViaKafkaARN(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (MSK cluster name extracted)", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abc-def-ghi" {
-		t.Errorf("ResourceIDs = %v, want [abc-def-ghi]", result.ResourceIDs())
+	// Inverted by #545 row 1: msk keys its rows on the cluster name, not
+	// the ARN's trailing UUID. Do not restore it.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-msk-cluster" {
+		t.Errorf("ResourceIDs = %v, want [my-msk-cluster]", result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())

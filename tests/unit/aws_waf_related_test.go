@@ -460,8 +460,9 @@ func TestRelated_WAF_Logs_CWLogGroupNameExtracted(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Logs_FirehoseARNPassthrough verifies that non-CW-Logs ARNs
-// (e.g. Firehose) are passed through as-is.
+// TestRelated_WAF_Logs_FirehoseARNPassthrough: a Firehose destination is no
+// log group and is not counted. Inverted by #545 row 6: a stream ARN drills into
+// no log group, so it is never the ID. Do not restore it.
 func TestRelated_WAF_Logs_FirehoseARNPassthrough(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -485,11 +486,8 @@ func TestRelated_WAF_Logs_FirehoseARNPassthrough(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != firehoseARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), firehoseARN)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d (IDs %v), want 0: %s is no log group", result.Count(), result.ResourceIDs(), firehoseARN)
 	}
 }
 

@@ -111,6 +111,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "CloudWatch Log Groups",
 		ShortName:      "logs",
+		RefToID:        logsRefToID,
 		HumanizeFields: []string{"DataProtectionStatus", "LogGroupClass"},
 		Aliases:        []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
 		Category:       "MONITORING",

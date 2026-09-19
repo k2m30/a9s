@@ -1220,8 +1220,10 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (one ALB from TG ARN)", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != lbARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), lbARN)
+	// Inverted by #545 row 1: elb keys its rows on the load balancer name.
+	// Do not restore the ARN.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
+		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
@@ -1264,7 +1266,8 @@ func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2 (classic + ALB)", result.Count())
 	}
-	found := map[string]bool{classicName: false, lbARN: false}
+	// Inverted by #545 row 1: the ALB is counted by its name, the elb row ID.
+	found := map[string]bool{classicName: false, "my-alb": false}
 	for _, id := range result.ResourceIDs() {
 		found[id] = true
 	}

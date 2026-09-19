@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
@@ -50,9 +49,8 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 }
 
 // checkRedshiftRole extracts IAM role ARNs from the Redshift Cluster's IamRoles slice.
-// Each ClusterIamRole has an IamRoleArn field; we extract the role name (last segment after "/").
 // Pattern F — no cache needed.
-func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkRedshiftRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -60,24 +58,18 @@ func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resour
 	if len(cluster.IamRoles) == 0 {
 		return resource.KnownRelated("role", nil, false)
 	}
-	var ids []string
+	var refs []string
 	for _, r := range cluster.IamRoles {
-		if r.IamRoleArn == nil || *r.IamRoleArn == "" {
-			continue
-		}
-		arn := *r.IamRoleArn
-		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-			ids = append(ids, arn[idx+1:])
-		} else {
-			ids = append(ids, arn)
+		if r.IamRoleArn != nil {
+			refs = append(refs, *r.IamRoleArn)
 		}
 	}
-	return relatedResult("role", ids)
+	return relatedRefs("role", refs, refContext(clients, cache, "role"))
 }
 
 // checkRedshiftKMS extracts the KMS key ID from the Redshift Cluster's KmsKeyId
 // field. Pattern F — no cache needed.
-func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkRedshiftKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
 		if res.RawStruct == nil {
@@ -85,8 +77,8 @@ func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resourc
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*cluster.KmsKeyId, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*cluster.KmsKeyId, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkRedshiftCFN checks the Cluster's Tags for aws:cloudformation:stack-name

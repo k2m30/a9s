@@ -59,7 +59,7 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	// In-body: the node group's NodeRole ARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
-	return relatedResult("role", []string{roleNameFromARN(*ng.NodeRole)})
+	return relatedRefs("role", []string{*ng.NodeRole}, refContext(clients, cache, "role"))
 }
 
 // checkNGASG extracts Resources.AutoScalingGroups from the Node Group RawStruct

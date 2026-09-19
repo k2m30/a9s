@@ -315,34 +315,13 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 	return relatedResult("lambda", ids)
 }
 
-// checkCfLogs reports the S3 bucket receiving access logs for this
-// distribution (CloudFront writes access logs to S3, not CW Logs).
-// Pattern C: one cloudfront:GetDistributionConfig call; read Logging.Bucket.
-func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	distID := res.ID
-	if distID == "" {
+// checkCfLogs has no count to give. A distribution's standard logging
+// config names an S3 bucket, never a log group, and finding the log groups a
+// distribution delivers to needs a per-configuration lookup outside the cf
+// budget (docs/resources/cf.md § logs).
+func checkCfLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.ID == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.CloudFront == nil {
-		return resource.UnknownRelated("logs")
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
-		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
-	})
-	if err != nil {
-		return resource.ErrorRelated("logs", err)
-	}
-	if out.DistributionConfig == nil || out.DistributionConfig.Logging == nil {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	lg := out.DistributionConfig.Logging
-	if lg.Enabled == nil || !*lg.Enabled || lg.Bucket == nil || *lg.Bucket == "" {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	bucket, ok := S3OriginBucket(*lg.Bucket)
-	if !ok {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	return relatedResult("logs", []string{bucket})
+	return resource.UnknownRelated("logs")
 }

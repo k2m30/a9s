@@ -72,7 +72,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("kms")
 	}
 
-	keySet := make(map[string]struct{})
+	var refs []string
 	for _, ebsRes := range ebsList {
 		vol, ok := assertStruct[ec2types.Volume](ebsRes.RawStruct)
 		if !ok {
@@ -88,20 +88,12 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 		if !attachedHere {
 			continue
 		}
-		if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
-			continue
+		if vol.KmsKeyId != nil {
+			refs = append(refs, *vol.KmsKeyId)
 		}
-		keyID := *vol.KmsKeyId
-		if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-			keyID = keyID[idx+1:]
-		}
-		keySet[keyID] = struct{}{}
 	}
-	var ids []string
-	for id := range keySet {
-		ids = append(ids, id)
-	}
-	return relatedResultTrunc("kms", ids, truncated)
+	ids, dropped := resolveRefs("kms", refs, refContext(clients, cache, "kms"))
+	return relatedResultTrunc("kms", ids, truncated || dropped)
 }
 
 // checkEC2Logs searches the logs cache for log groups matching this EC2

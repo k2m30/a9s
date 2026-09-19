@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -103,7 +102,7 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkSNSKMS resolves the KMS key used for at-rest encryption of this SNS topic
 // via GetTopicAttributes (Pattern C: 1 API call, attribute "KmsMasterKeyId").
-func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
 		topicARN = res.ID
@@ -119,13 +118,13 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	if keyID == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	return relatedResult("kms", []string{arnLastSegment(keyID)})
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }
 
 // checkSNSRole extracts IAM role principals from the SNS topic's access policy
-// (GetTopicAttributes "Policy"). Pattern C: 1 API call, offline JSON parse. Role
-// names are extracted from Principal.AWS values that look like role ARNs.
-func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// (GetTopicAttributes "Policy"). Pattern C: 1 API call, offline JSON parse of
+// the Principal.AWS values that look like role ARNs.
+func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
 		topicARN = res.ID
@@ -141,57 +140,9 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if policy == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	seen := map[string]struct{}{}
-	extractRoleNamesFromPolicy([]byte(policy), seen)
-	names := make([]string, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
-	}
-	return relatedResult("role", names)
-}
-
-// extractRoleNamesFromPolicy walks a JSON IAM policy and records role names from
-// Principal.AWS entries whose value looks like an IAM role ARN
-// (arn:aws:iam::ACCT:role/NAME).
-func extractRoleNamesFromPolicy(doc []byte, seen map[string]struct{}) {
-	var raw any
-	if err := json.Unmarshal(doc, &raw); err != nil {
-		return
-	}
-	var walk func(v any)
-	walk = func(v any) {
-		switch x := v.(type) {
-		case map[string]any:
-			for k, val := range x {
-				if k == "AWS" {
-					addPolicyPrincipal(val, seen)
-				}
-				walk(val)
-			}
-		case []any:
-			for _, item := range x {
-				walk(item)
-			}
-		}
-	}
-	walk(raw)
-}
-
-// addPolicyPrincipal handles Principal.AWS which can be a string or a []string.
-// Only role ARNs (":role/") are recorded.
-func addPolicyPrincipal(v any, seen map[string]struct{}) {
-	switch x := v.(type) {
-	case string:
-		if strings.Contains(x, ":role/") {
-			seen[arnRoleName(x)] = struct{}{}
-		}
-	case []any:
-		for _, it := range x {
-			if s, ok := it.(string); ok && strings.Contains(s, ":role/") {
-				seen[arnRoleName(s)] = struct{}{}
-			}
-		}
-	}
+	var arns []string
+	extractPrincipalsByKind([]byte(policy), ":role/", &arns)
+	return relatedRefs("role", arns, refContext(clients, cache, "role"))
 }
 
 // snsAlarmReferences reports whether any of the alarm's action lists contain

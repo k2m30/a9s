@@ -48,8 +48,7 @@ func (f *SSMFake) GetParameter(_ context.Context, input *ssm.GetParameterInput, 
 }
 
 // DescribeInstanceInformation serves fixture-enrolled SSM managed-instance
-// IDs, filtered by the InstanceIds filter when present — required for the
-// ec2:ssm related-panel pivot witness (checkEC2SSM).
+// IDs, filtered by the InstanceIds filter when present.
 func (f *SSMFake) DescribeInstanceInformation(_ context.Context, input *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
 	wanted := make(map[string]struct{}, len(f.fix.ManagedInstanceIDs))
 	for _, id := range f.fix.ManagedInstanceIDs {

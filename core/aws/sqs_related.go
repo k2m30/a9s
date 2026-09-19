@@ -201,7 +201,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
 // triggered by this SQS queue (Pattern A — direct API call).
-func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	row, ok := res.RawStruct.(SQSQueueAttributesRow)
 	if !ok {
 		return resource.UnknownRelated("lambda")
@@ -220,15 +220,13 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
-	var ids []string
+	var arns []string
 	for _, m := range out.EventSourceMappings {
 		if m.FunctionArn != nil {
-			// Extract function name from ARN (last segment after ":")
-			parts := strings.Split(*m.FunctionArn, ":")
-			ids = append(ids, parts[len(parts)-1])
+			arns = append(arns, *m.FunctionArn)
 		}
 	}
-	return relatedResult("lambda", ids)
+	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
 }
 
 // checkSQSKMS is a stub. The SQS RawStruct is a flat Fields map (QueueUrl +

@@ -9,7 +9,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
@@ -34,8 +33,8 @@ func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resourc
 
 // checkTransferLambda reads IdentityProviderDetails.Function directly
 // (Pattern F) when IdentityProviderType == AWS_LAMBDA — the custom
-// authorizer. ARN→bare-name extraction reuses resource.LambdaNameFromARN.
-func checkTransferLambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// authorizer.
+func checkTransferLambda(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("lambda")
@@ -44,30 +43,20 @@ func checkTransferLambda(_ context.Context, _ any, res resource.Resource, _ reso
 		server.IdentityProviderDetails == nil || server.IdentityProviderDetails.Function == nil {
 		return resource.KnownRelated("lambda", nil, false)
 	}
-	return relatedResult("lambda", []string{resource.LambdaNameFromARN(*server.IdentityProviderDetails.Function)})
+	return relatedRefs("lambda", []string{*server.IdentityProviderDetails.Function}, refContext(clients, cache, "lambda"))
 }
 
-// checkTransferLogs reads StructuredLogDestinations directly (Pattern F)
-// and converts each ARN to the bare log-group name the logs type indexes
-// on, reusing mwaaLogGroupNameFromARN (mwaa.go) — the same extraction the
-// mwaa related checkers already use for the identical ARN shape.
-func checkTransferLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkTransferLogs reads StructuredLogDestinations directly (Pattern F).
+func checkTransferLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
 	}
-	var ids []string
-	for _, arn := range server.StructuredLogDestinations {
-		if name := mwaaLogGroupNameFromARN(arn); name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("logs", ids)
+	return relatedRefs("logs", server.StructuredLogDestinations, refContext(clients, cache, "logs"))
 }
 
-// checkTransferRole extracts the bare role name from LoggingRole (Pattern
-// F), mirroring checkMWAARole's LastIndex "/" extraction.
-func checkTransferRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkTransferRole returns the role in LoggingRole (Pattern F).
+func checkTransferRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("role")
@@ -75,8 +64,7 @@ func checkTransferRole(_ context.Context, _ any, res resource.Resource, _ resour
 	if server.LoggingRole == nil || *server.LoggingRole == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	roleARN := *server.LoggingRole
-	return relatedResult("role", []string{roleARN[strings.LastIndex(roleARN, "/")+1:]})
+	return relatedRefs("role", []string{*server.LoggingRole}, refContext(clients, cache, "role"))
 }
 
 // checkTransferSubnet reads EndpointDetails.SubnetIds directly (Pattern F);

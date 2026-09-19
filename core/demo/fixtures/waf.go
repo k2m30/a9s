@@ -20,6 +20,10 @@ const WAFNoRules = "acme-empty-waf"
 // ResourcesByWebACL with at least one associated resource.
 const WAFOrphan = "acme-unattached-waf"
 
+// WAFProdAPILogGroup is the CloudWatch log group acme-prod-api-waf logs to;
+// every other logging ACL delivers to a Firehose stream.
+const WAFProdAPILogGroup = "aws-waf-logs-acme-prod-api"
+
 // WAFFixtures holds typed fixture data for WAFv2.
 type WAFFixtures struct {
 	// WebACLSummaries holds REGIONAL-scope Web ACLs (served by ListWebACLs
@@ -93,7 +97,7 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 			// Associated, so the empty ACL carries the no-rules finding
 			// alone rather than also reading as an orphan.
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444": {
-				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/internal-api-alb/6666666666bbbbbb",
+				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-internal-api/0987654321fedcba",
 			},
 		},
 	}

@@ -99,45 +99,20 @@ func checkECSTaskEC2(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("ec2", []string{name})
 }
 
-// checkECSTaskECR extracts ECR repository names from the task's container
-// image URIs. Pattern F — requires Containers[].Image to be populated in Task.
-func checkECSTaskECR(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkECSTaskECR reads the ECR repositories of the task's container image
+// URIs. Pattern F — requires Containers[].Image to be populated in Task.
+func checkECSTaskECR(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ecr")
 	}
-	seen := make(map[string]struct{})
+	var images []string
 	for _, c := range task.Containers {
-		if c.Image == nil || *c.Image == "" {
-			continue
-		}
-		img := *c.Image
-		// ECR image URI: {account}.dkr.ecr.{region}.amazonaws.com/{repo}:tag
-		if !strings.Contains(img, ".dkr.ecr.") {
-			continue
-		}
-		_, repo, ok := strings.Cut(img, "/")
-		if !ok {
-			continue
-		}
-		if before, _, hasSep := strings.Cut(repo, ":"); hasSep {
-			repo = before
-		}
-		if before, _, hasSep := strings.Cut(repo, "@"); hasSep {
-			repo = before
-		}
-		if repo != "" {
-			seen[repo] = struct{}{}
+		if c.Image != nil && strings.Contains(*c.Image, ".dkr.ecr.") {
+			images = append(images, *c.Image)
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("ecr", nil, false)
-	}
-	return relatedResult("ecr", ids)
+	return relatedRefs("ecr", images, refContext(clients, cache, "ecr"))
 }
 
 // checkECSTaskENI extracts ENI IDs from task.Attachments (awsvpc mode). Pattern F.
@@ -167,22 +142,12 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 // ContainerDefinitions[].Secrets[].ValueFrom and
 // ContainerDefinitions[].RepositoryCredentials.CredentialsParameter, filtered
 // to the secretsmanager ARN prefix) and cross-references the already-loaded
-// secrets cache by ARN, per docs/resources/ecs-task.md.
+// secrets cache, per docs/resources/ecs-task.md.
 func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	joined := res.Fields["secret_arns"]
 	if joined == "" {
 		return resource.KnownRelated("secrets", nil, false)
 	}
-	arnSet := make(map[string]struct{})
-	for arn := range strings.SplitSeq(joined, ",") {
-		if arn != "" {
-			arnSet[arn] = struct{}{}
-		}
-	}
-	if len(arnSet) == 0 {
-		return resource.KnownRelated("secrets", nil, false)
-	}
-
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
@@ -191,19 +156,8 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 		return resource.UnknownRelated("secrets")
 	}
 
-	var ids []string
-	for _, sRes := range secretList {
-		if _, match := arnSet[sRes.ID]; match {
-			ids = append(ids, sRes.ID)
-			continue
-		}
-		if arn := sRes.Fields["arn"]; arn != "" {
-			if _, match := arnSet[arn]; match {
-				ids = append(ids, sRes.ID)
-			}
-		}
-	}
-	return relatedResultTrunc("secrets", ids, truncated)
+	ids, dropped := listedRefs("secrets", strings.Split(joined, ","), refContext(clients, cache, "secrets"), secretList)
+	return relatedResultTrunc("secrets", ids, truncated || dropped)
 }
 
 // checkECSTaskSSM reads Fields["ssm_param_names"] (a comma-joined list of SSM

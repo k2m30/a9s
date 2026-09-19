@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -41,7 +42,18 @@ func (f *WAFFake) ListResourcesForWebACL(_ context.Context, input *wafv2.ListRes
 	if err := validateARN(*input.WebACLArn); err != nil {
 		return nil, err
 	}
-	arns := f.fix.ResourcesByWebACL[*input.WebACLArn]
+	// A named type answers only resources of that type; an unnamed one
+	// answers every association.
+	marker := map[wafv2types.ResourceType]string{
+		wafv2types.ResourceTypeApplicationLoadBalancer: ":loadbalancer/app/",
+		wafv2types.ResourceTypeApiGateway:              ":apigateway:",
+	}[input.ResourceType]
+	var arns []string
+	for _, arn := range f.fix.ResourcesByWebACL[*input.WebACLArn] {
+		if marker == "" || strings.Contains(arn, marker) {
+			arns = append(arns, arn)
+		}
+	}
 	return &wafv2.ListResourcesForWebACLOutput{ResourceArns: arns}, nil
 }
 
@@ -126,10 +138,14 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 			Message: aws.String("The referenced item doesn't exist"),
 		}
 	}
+	dest := "arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-acme"
+	if strings.Contains(*input.ResourceArn, "/webacl/acme-prod-api-waf/") {
+		dest = "arn:aws:logs:us-east-1:123456789012:log-group:" + fixtures.WAFProdAPILogGroup
+	}
 	return &wafv2.GetLoggingConfigurationOutput{
 		LoggingConfiguration: &wafv2types.LoggingConfiguration{
 			ResourceArn:           input.ResourceArn,
-			LogDestinationConfigs: []string{"arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-acme"},
+			LogDestinationConfigs: []string{dest},
 		},
 	}, nil
 }

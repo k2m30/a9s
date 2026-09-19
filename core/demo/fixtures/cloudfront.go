@@ -15,8 +15,8 @@ type CloudFrontFixtures struct {
 	Distributions []cftypes.DistributionSummary
 	// DistributionConfigs maps a distribution ID to the config returned by
 	// cloudfront:GetDistributionConfig. Backs the cf→lambda (Lambda@Edge
-	// associations) and cf→logs (access-log S3 destination) related-panel
-	// pivots (checkCfLambda / checkCfLogs), which call this API directly.
+	// associations) related-panel pivot (checkCfLambda), which calls this
+	// API directly.
 	DistributionConfigs map[string]*cftypes.DistributionConfig
 }
 
@@ -311,9 +311,9 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 				LastModifiedTime: aws.Time(time.Date(2026, 2, 20, 11, 0, 0, 0, time.UTC)),
 			},
 		},
-		// DistributionConfigs — backs the cf→lambda and cf→logs related-panel
-		// pivots (checkCfLambda / checkCfLogs), which call
-		// cloudfront:GetDistributionConfig directly. E1A2B3C4D5E6F7 mirrors
+		// DistributionConfigs — backs the cf→lambda related-panel pivot
+		// (checkCfLambda), which calls cloudfront:GetDistributionConfig
+		// directly. E1A2B3C4D5E6F7 mirrors
 		// the Lambda@Edge association already on its DistributionSummary and
 		// adds an access-log destination pointing at the a9s-demo-logs bucket
 		// (s3.go LogsBucketName).
@@ -430,7 +430,7 @@ func cfHealthyConfig(originID, originDomain, alias string) *cftypes.Distribution
 // root object, which would colour every row instead of the named witnesses.
 func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	cfgs := map[string]*cftypes.DistributionConfig{
-		// Healthy, and the carrier for the cf→lambda and cf→logs pivots.
+		// Healthy, and the carrier for the cf→lambda pivot.
 		"E1A2B3C4D5E6F7": cfHealthyConfig("s3-static-assets", "webapp-assets-prod.s3.amazonaws.com", "www.acme-corp.com"),
 		CFDeprecatedTLS:  cfHealthyConfig("alb-legacy-api", "legacy-api.acme-corp.com", "legacy.acme-corp.com"),
 		// Enabled=false on the summary makes this the dim row; its config is

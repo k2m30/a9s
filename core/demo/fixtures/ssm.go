@@ -17,8 +17,7 @@ type SSMFixtures struct {
 	// ParameterValues maps parameter name to its current value (for GetParameter).
 	ParameterValues map[string]string
 	// ManagedInstanceIDs lists EC2 instance IDs enrolled in SSM (served by
-	// DescribeInstanceInformation) — required for the ec2:ssm related-panel
-	// pivot witness (checkEC2SSM). i-0a1b2c3d4e5f60001 is a real ec2.go
+	// DescribeInstanceInformation). i-0a1b2c3d4e5f60001 is a real ec2.go
 	// fixture.
 	ManagedInstanceIDs []string
 }

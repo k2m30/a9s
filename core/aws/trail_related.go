@@ -43,8 +43,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 
 // checkTrailLogs searches the logs cache for the CloudWatch log group associated
 // with this trail via CloudWatchLogsLogGroupArn.
-// Pattern C — parse log group name from ARN, match against logs cache IDs.
-// ARN format: arn:aws:logs:REGION:ACCOUNT:log-group:NAME:*
+// Pattern C — the log group the ARN names, matched against logs cache IDs.
 func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsLogGroupArn == nil || *trail.CloudWatchLogsLogGroupArn == "" {
@@ -54,9 +53,9 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("logs", nil, false)
 	}
 
-	logGroupName := parseTrailLogGroupName(*trail.CloudWatchLogsLogGroupArn)
-	if logGroupName == "" {
-		return resource.KnownRelated("logs", nil, false)
+	logGroupName, local := resource.ResolveRef("logs", *trail.CloudWatchLogsLogGroupArn, refContext(clients, cache, "logs"))
+	if !local {
+		return relatedResultTrunc("logs", nil, true)
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -138,10 +137,9 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("kms", ids, truncated)
 }
 
-// checkTrailRole extracts the IAM role name from the trail's CloudWatchLogsRoleArn.
-// ARN format: arn:aws:iam::ACCOUNT:role/ROLE-NAME
+// checkTrailRole returns the IAM role in the trail's CloudWatchLogsRoleArn.
 // Pattern F — no cache needed.
-func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkTrailRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsRoleArn == nil || *trail.CloudWatchLogsRoleArn == "" {
 		if res.RawStruct == nil {
@@ -149,25 +147,5 @@ func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.
 		}
 		return resource.KnownRelated("role", nil, false)
 	}
-	arn := *trail.CloudWatchLogsRoleArn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		return relatedResult("role", []string{arn[idx+1:]})
-	}
-	return resource.KnownRelated("role", nil, false)
-}
-
-// parseTrailLogGroupName extracts the log group name from a CloudWatch Logs ARN.
-// Expected format: arn:aws:logs:REGION:ACCOUNT:log-group:NAME:*
-// Returns the NAME portion, or empty string if parsing fails.
-func parseTrailLogGroupName(arn string) string {
-	const prefix = "log-group:"
-	_, rest, found := strings.Cut(arn, prefix)
-	if !found {
-		return ""
-	}
-	// Strip trailing ":*" or ":log-stream:..." suffix
-	if name, _, ok := strings.Cut(rest, ":"); ok {
-		return name
-	}
-	return rest
+	return relatedRefs("role", arnsOnly([]string{*trail.CloudWatchLogsRoleArn}), refContext(clients, cache, "role"))
 }

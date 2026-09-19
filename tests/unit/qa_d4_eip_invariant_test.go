@@ -207,7 +207,7 @@ func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 	}
 
 	// Row counts on the sibling lists the reshuffle touched.
-	for short, n := range map[string]int{"eni": 48, "ec2": 41, "nat": 6} {
+	for short, n := range map[string]int{"eni": 55, "ec2": 41, "nat": 6} {
 		if got := len(d4Rows(t, short)); got != n {
 			t.Errorf("demo %s list = %d rows, want %d", short, got, n)
 		}

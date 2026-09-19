@@ -89,6 +89,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Load Balancers",
 		ShortName:     "elb",
+		RefToID:       elbRefToID,
 		Aliases:       []string{"elb", "alb", "nlb", "loadbalancers", "load-balancers"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -152,6 +153,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Target Groups",
 		ShortName:      "tg",
+		RefToID:        tgRefToID,
 		LifecycleKey:   "health_summary",
 		HumanizeFields: []string{"protocol", "ProtocolVersion"},
 		Aliases:        []string{"tg", "targetgroups", "target-groups"},
@@ -298,6 +300,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Subnets",
 		ShortName:     "subnet",
+		RefToID:       subnetRefToID,
 		Aliases:       []string{"subnet", "subnets"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -385,7 +388,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Routes.GatewayId", TargetType: "igw"},
 			{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
 			{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
-			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
+			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc-peer"},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "A route in this table points at a gateway or interface that no longer exists, so traffic matching it is dropped silently — from the instance's side it looks like a firewall problem. Repoint the route at a live target or remove it."},
@@ -440,6 +443,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Internet Gateways",
 		ShortName:     "igw",
+		RefToID:       igwRefToID,
 		Aliases:       []string{"igw", "internetgateways", "internet-gateways"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",

@@ -6,8 +6,10 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -23,145 +25,73 @@ func alarmDimension(alarm cwtypes.MetricAlarm, name string) string {
 	return ""
 }
 
-func checkAlarmAPIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// alarmTarget is the result of an alarm pivot whose target the alarm names in
+// the first of dims it carries, read through the target's resolver. When
+// namespaces is non-empty the dimension names the target only in those metric
+// namespaces: "ClusterName" names an ECS cluster in one and an EKS cluster in
+// another.
+func alarmTarget(clients any, cache resource.ResourceCache, res resource.Resource, target string, namespaces []string, dims ...string) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("apigw")
+		return resource.UnknownRelated(target)
 	}
-	if v := alarmDimension(alarm, "ApiName"); v != "" {
-		return relatedResult("apigw", []string{v})
+	if len(namespaces) > 0 && !slices.Contains(namespaces, aws.ToString(alarm.Namespace)) {
+		return resource.KnownRelated(target, nil, false)
 	}
-	if v := alarmDimension(alarm, "ApiId"); v != "" {
-		return relatedResult("apigw", []string{v})
-	}
-	return resource.KnownRelated("apigw", nil, false)
-}
-
-func checkAlarmCB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("cb")
-	}
-	if v := alarmDimension(alarm, "ProjectName"); v != "" {
-		return relatedResult("cb", []string{v})
-	}
-	return resource.KnownRelated("cb", nil, false)
-}
-
-func checkAlarmDBI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("dbi")
-	}
-	if v := alarmDimension(alarm, "DBInstanceIdentifier"); v != "" {
-		return relatedResult("dbi", []string{v})
-	}
-	return resource.KnownRelated("dbi", nil, false)
-}
-
-func checkAlarmEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("ec2")
-	}
-	if v := alarmDimension(alarm, "InstanceId"); v != "" {
-		return relatedResult("ec2", []string{v})
-	}
-	return resource.KnownRelated("ec2", nil, false)
-}
-
-func checkAlarmECS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("ecs")
-	}
-	if v := alarmDimension(alarm, "ClusterName"); v != "" {
-		return relatedResult("ecs", []string{v})
-	}
-	return resource.KnownRelated("ecs", nil, false)
-}
-
-func checkAlarmEKS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("eks")
-	}
-	if v := alarmDimension(alarm, "ClusterName"); v != "" {
-		// AWS/EKS namespace — differentiate from AWS/ECS via namespace check.
-		if alarm.Namespace != nil && (strings.Contains(*alarm.Namespace, "EKS") || strings.Contains(*alarm.Namespace, "ContainerInsights")) {
-			return relatedResult("eks", []string{v})
+	for _, dim := range dims {
+		if v := alarmDimension(alarm, dim); v != "" {
+			return relatedRefs(target, []string{v}, refContext(clients, cache, target))
 		}
 	}
-	return resource.KnownRelated("eks", nil, false)
+	return resource.KnownRelated(target, nil, false)
 }
 
-func checkAlarmKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("kms")
-	}
-	if v := alarmDimension(alarm, "KeyId"); v != "" {
-		return relatedResult("kms", []string{v})
-	}
-	return resource.KnownRelated("kms", nil, false)
+func checkAlarmAPIGW(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "apigw", nil, "ApiName", "ApiId")
 }
 
-func checkAlarmLambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("lambda")
-	}
-	if v := alarmDimension(alarm, "FunctionName"); v != "" {
-		return relatedResult("lambda", []string{v})
-	}
-	return resource.KnownRelated("lambda", nil, false)
+func checkAlarmCB(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "cb", nil, "ProjectName")
 }
 
-func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("logs")
-	}
-	if v := alarmDimension(alarm, "LogGroupName"); v != "" {
-		return relatedResult("logs", []string{v})
-	}
-	return resource.KnownRelated("logs", nil, false)
+func checkAlarmDBI(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "dbi", nil, "DBInstanceIdentifier")
 }
 
-func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("s3")
-	}
-	if v := alarmDimension(alarm, "BucketName"); v != "" {
-		return relatedResult("s3", []string{v})
-	}
-	return resource.KnownRelated("s3", nil, false)
+func checkAlarmEC2(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "ec2", nil, "InstanceId")
 }
 
-func checkAlarmSFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("sfn")
-	}
-	if v := alarmDimension(alarm, "StateMachineArn"); v != "" {
-		if idx := strings.LastIndex(v, ":"); idx >= 0 && idx < len(v)-1 {
-			return relatedResult("sfn", []string{v[idx+1:]})
-		}
-		return relatedResult("sfn", []string{v})
-	}
-	return resource.KnownRelated("sfn", nil, false)
+func checkAlarmECS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "ecs", []string{"AWS/ECS", "ECS/ContainerInsights"}, "ClusterName")
 }
 
-func checkAlarmWAF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("waf")
-	}
-	if v := alarmDimension(alarm, "WebACL"); v != "" {
-		return relatedResult("waf", []string{v})
-	}
-	return resource.KnownRelated("waf", nil, false)
+func checkAlarmEKS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "eks", []string{"AWS/EKS", "ContainerInsights"}, "ClusterName")
+}
+
+func checkAlarmKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "kms", nil, "KeyId")
+}
+
+func checkAlarmLambda(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "lambda", nil, "FunctionName")
+}
+
+func checkAlarmLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "logs", nil, "LogGroupName")
+}
+
+func checkAlarmS3(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "s3", nil, "BucketName")
+}
+
+func checkAlarmSFN(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "sfn", nil, "StateMachineArn")
+}
+
+func checkAlarmWAF(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmTarget(clients, cache, res, "waf", nil, "WebACL")
 }
 
 // checkAlarmCTEvents scans the ct-events cache for events that reference this

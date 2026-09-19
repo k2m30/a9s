@@ -97,7 +97,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 // checkECSKMS extracts the KMS key from the ECS Cluster's
 // Configuration.ExecuteCommandConfiguration.KmsKeyId field.
 // Returns the key ID (last segment after "/"). Pattern F — no cache needed.
-func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
 	if !ok || cluster.Configuration == nil ||
 		cluster.Configuration.ExecuteCommandConfiguration == nil ||
@@ -108,6 +108,6 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyID := kmsKeyIDFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)
-	return relatedResult("kms", []string{keyID})
+	keyID := kmsRefFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)
+	return relatedRefs("kms", []string{keyID}, refContext(clients, cache, "kms"))
 }

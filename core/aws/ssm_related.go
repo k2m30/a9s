@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
@@ -29,8 +28,6 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	if param.KeyId == nil || *param.KeyId == "" {
 		return resource.KnownRelated("kms", nil, false)
 	}
-	keyRef := *param.KeyId
-
 	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
@@ -38,38 +35,15 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	if kmsList == nil {
 		return resource.UnknownRelated("kms")
 	}
+	rc := refContext(clients, cache, "kms")
+	rc.Targets = kmsList
+	keyID, local := resource.ResolveRef("kms", *param.KeyId, rc)
 
 	var ids []string
 	for _, kmsRes := range kmsList {
-		if matchesKMSKeyRef(kmsRes, keyRef) {
+		if local && kmsRes.ID == keyID {
 			ids = append(ids, kmsRes.ID)
 		}
 	}
-	return relatedResultTrunc("kms", ids, truncated)
-}
-
-// matchesKMSKeyRef returns true if the given KMS resource matches the key reference.
-// keyRef may be a key ID, key ARN, alias name (e.g. "alias/aws/ssm"), or alias ARN.
-func matchesKMSKeyRef(kmsRes resource.Resource, keyRef string) bool {
-	if kmsRes.ID == keyRef {
-		return true
-	}
-	if kmsRes.Fields["key_id"] == keyRef {
-		return true
-	}
-	if arn, ok := kmsRes.Fields["arn"]; ok && arn != "" {
-		if arn == keyRef || strings.HasSuffix(arn, "/"+keyRef) {
-			return true
-		}
-	}
-	if alias, ok := kmsRes.Fields["alias"]; ok && alias != "" {
-		if alias == keyRef {
-			return true
-		}
-	}
-	// keyRef is an ARN containing the key ID (e.g. "arn:aws:kms:...:key/<id>")
-	if strings.Contains(keyRef, "/") && strings.HasSuffix(keyRef, "/"+kmsRes.ID) {
-		return true
-	}
-	return false
+	return relatedResultTrunc("kms", ids, truncated || !local)
 }

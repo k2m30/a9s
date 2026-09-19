@@ -357,8 +357,10 @@ func TestCheckApigwACM_ResolvesCertArn(t *testing.T) {
 	if len(result.ResourceIDs()) != 1 {
 		t.Fatalf("ResourceIDs = %v, want 1 entry", result.ResourceIDs())
 	}
-	if result.ResourceIDs()[0] != "cert-A" {
-		t.Errorf("ResourceIDs[0] = %q, want \"cert-A\" (last ARN segment)", result.ResourceIDs()[0])
+	// Inverted by #545 row 1: acm keys its rows on the full certificate ARN,
+	// so the ARN is the ID. Do not restore the last-segment reading.
+	if result.ResourceIDs()[0] != certARNa {
+		t.Errorf("ResourceIDs[0] = %q, want %q (the certificate ARN)", result.ResourceIDs()[0], certARNa)
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
