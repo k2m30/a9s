@@ -130,29 +130,39 @@ func TestEnrichKMSRotation_EnabledProducesNoFinding(t *testing.T) {
 	}
 }
 
-// TestEnrichKMSRotation_AWSManagedKeySkippedSilently verifies that
-// AccessDeniedException (returned for AWS-managed keys) is silently skipped —
-// no finding is produced and Truncated remains false.
-func TestEnrichKMSRotation_AWSManagedKeySkippedSilently(t *testing.T) {
+// TestEnrichKMSRotation_DeniedRotationReadMarksTheKey: the fetcher lists only
+// customer-managed keys, so a denied GetKeyRotationStatus is a missing
+// permission on a key the operator owns, not an AWS-managed key. The key is
+// marked not inspected, the denial is reported, and no finding is claimed.
+//
+// Inverted by #549 area-review ruling P2-4: this test used to pin that the
+// denial was skipped silently, which left the key looking clean. Do not
+// restore the old assertion.
+func TestEnrichKMSRotation_DeniedRotationReadMarksTheKey(t *testing.T) {
 	fake := &kmsFake{
 		perKey: map[string]*kmsRotationResponse{
-			"aws-managed-key": {err: accessDeniedErr()},
-			"key-enabled-1":   {enabled: true},
-			"key-enabled-2":   {enabled: true},
+			"denied-key":    {err: accessDeniedErr()},
+			"key-enabled-1": {enabled: true},
+			"key-enabled-2": {enabled: true},
 		},
 	}
 	clients := &awsclient.ServiceClients{KMS: fake}
-	resources := makeKMSResources("aws-managed-key", "key-enabled-1", "key-enabled-2")
+	resources := makeKMSResources("denied-key", "key-enabled-1", "key-enabled-2")
 
 	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Error("a denied rotation read returned no error — the reason never reaches the log")
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
-	if result.Truncated {
-		t.Error("Truncated must be false when only AccessDeniedException errors are seen (AWS-managed keys)")
+	if _, marked := result.TruncatedIDs["denied-key"]; !marked {
+		t.Error("the key whose rotation read was denied is not marked not inspected")
+	}
+	for _, id := range []string{"key-enabled-1", "key-enabled-2"} {
+		if mark, marked := result.TruncatedIDs[id]; marked {
+			t.Errorf("%s answered, yet is marked %q", id, mark)
+		}
 	}
 }
 

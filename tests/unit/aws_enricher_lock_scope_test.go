@@ -135,6 +135,10 @@ func (f *lockScopeR53Fake) ListQueryLoggingConfigs(_ context.Context, _ *route53
 	return &route53.ListQueryLoggingConfigsOutput{}, nil
 }
 
+func (f *lockScopeR53Fake) ListResourceRecordSets(context.Context, *route53.ListResourceRecordSetsInput, ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error) {
+	return &route53.ListResourceRecordSetsOutput{}, nil
+}
+
 func TestEnrichRoute53Zone_QueryLoggingReadsOverlap(t *testing.T) {
 	const zoneA = "Z0A1B2C3D4E5F6G7H8I0"
 	const zoneB = "Z0A1B2C3D4E5F6G7H8I1"
@@ -149,7 +153,10 @@ func TestEnrichRoute53Zone_QueryLoggingReadsOverlap(t *testing.T) {
 		zones = append(zones, r)
 	}
 
-	res, err := w2Enricher(t, "r53")(context.Background(), &awsclient.ServiceClients{Route53: fake}, zones, nil)
+	// The address lists are loaded (#549 area-review ruling P2-6), so a mark on
+	// a zone comes from the reads this test overlaps.
+	addressesLoaded := resource.ResourceCache{"eip": {Resources: []resource.Resource{}}, "ec2": {Resources: []resource.Resource{}}}
+	res, err := w2Enricher(t, "r53")(context.Background(), &awsclient.ServiceClients{Route53: fake}, zones, addressesLoaded)
 	if err != nil {
 		t.Fatalf("EnrichRoute53Zone: %v", err)
 	}

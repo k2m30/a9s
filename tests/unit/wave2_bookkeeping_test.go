@@ -773,7 +773,10 @@ func TestDBISnapShareCap_AutomatedSnapshotsDoNotSpendTheCap(t *testing.T) {
 	}
 	fake := &bkRDSFake{asked: map[string]bool{}}
 
-	res, _ := enricher.Fn(context.Background(), &awsclient.ServiceClients{RDS: fake}, rows, nil) //nolint:errcheck // judged by its findings and marks
+	// The parent instance list is loaded (#549 area-review ruling P2-6), so a
+	// mark here can only come from the share-attribute cap under test.
+	dbiLoaded := resource.ResourceCache{"dbi": {Resources: []resource.Resource{}}}
+	res, _ := enricher.Fn(context.Background(), &awsclient.ServiceClients{RDS: fake}, rows, dbiLoaded) //nolint:errcheck // judged by its findings and marks
 	td := resource.FindResourceType("dbi-snap")
 	if td == nil {
 		t.Fatal("dbi-snap is not registered")

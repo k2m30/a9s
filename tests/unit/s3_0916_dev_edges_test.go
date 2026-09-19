@@ -244,10 +244,15 @@ func (f *row1DeniedBlockFake) GetPublicAccessBlock(
 	return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "not authorized to perform: s3:GetBucketPublicAccessBlock"}
 }
 
-// TestS3_0916_Dev_Row1_RefusedBlockDoesNotDisarmTheGrant pins the conservative
-// read when the setting that would neutralise a grant could not be inspected:
-// the grant is reported, because the alternative is a silently public bucket.
-func TestS3_0916_Dev_Row1_RefusedBlockDoesNotDisarmTheGrant(t *testing.T) {
+// TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged: the public access
+// block that would neutralise the grant could not be read, so whether S3
+// honours the grant is unknown. The bucket is marked not inspected and no
+// s3.public is claimed.
+//
+// Inverted by #549 area-review ruling P3-5: this test used to pin that the
+// grant was reported anyway, which turned an unread setting into a "!"
+// finding. Do not restore the old assertion.
+func TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged(t *testing.T) {
 	fake := &row1DeniedBlockFake{row1S3Fake{
 		grants: []s3types.Grant{row1GroupGrant(row1AllUsers, s3types.PermissionRead)},
 	}}
@@ -255,8 +260,11 @@ func TestS3_0916_Dev_Row1_RefusedBlockDoesNotDisarmTheGrant(t *testing.T) {
 	res := []resource.Resource{{ID: row1Bucket, Name: row1Bucket, Fields: map[string]string{"name": row1Bucket}}}
 
 	got, _ := awsclient.EnrichS3Posture(context.Background(), clients, res, nil)
-	if _, ok := row1Finding(got, row1CodePublic); !ok {
-		t.Fatalf("findings = %v, want %s", got.Findings[row1Bucket], row1CodePublic)
+	if _, ok := row1Finding(got, row1CodePublic); ok {
+		t.Errorf("findings = %v, want no %s while the block is unread", got.Findings[row1Bucket], row1CodePublic)
+	}
+	if _, marked := got.TruncatedIDs[row1Bucket]; !marked {
+		t.Error("the bucket whose public access block was refused is not marked not inspected")
 	}
 }
 

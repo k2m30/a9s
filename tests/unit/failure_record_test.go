@@ -375,7 +375,10 @@ func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
 		{ID: "acme-orders", Name: "acme-orders", Type: "ddb", Fields: map[string]string{"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders"}},
 	}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
+	// The backup plan list is loaded (#549 area-review ruling P2-6), so the
+	// only thing that could mark the table is the policy read under test.
+	backupLoaded := resource.ResourceCache{"backup": {Resources: []resource.Resource{}}}
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, backupLoaded)
 	if err != nil {
 		t.Errorf("a table with no resource policy reported a failure: %v", err)
 	}
