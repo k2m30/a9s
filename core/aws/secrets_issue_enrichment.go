@@ -87,9 +87,10 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		case ex.Public:
 			setWave2Finding(&result, r.ID, secretsCodePublicPolicy, publicPolicyRows(ex))
 
+		case len(ex.CrossAccount) > 0 && ownAccount == "":
+			markUninspected(&result, r.ID, CheckOwnAccountUnknown)
 		case len(ex.CrossAccount) > 0:
 			setWave2Finding(&result, r.ID, secretsCodeCrossAccountPolicy, crossAccountPolicyRows(ex))
-
 		}
 	})
 	err := errors.Join(loopErr, Finish(&result, failures, n, "secrets-policy"))

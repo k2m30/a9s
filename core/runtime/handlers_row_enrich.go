@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"maps"
+	"slices"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -77,11 +78,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 
 	rows, _ := c.ProbeResources(canon)
 	unified := unifiedIssueCount(rows, *td)
-	// Rows the sweep still has not inspected keep the badge a lower bound.
-	truncated := len(c.session.EnrichmentTruncatedIDs[canon]) > 0
-	if tr := c.session.RowStore.Snapshot(canon); tr.Pagination != nil && tr.Pagination.IsTruncated {
-		truncated = true
-	}
+	truncated := issueLowerBound(canon, c.pageTruncated(canon), c.session.EnrichmentCutGet(canon), unified > 0 || slices.ContainsFunc(rows, func(r resource.Resource) bool { return rowHasWave2Finding(r.Findings) }), len(c.session.EnrichmentTruncatedIDs[canon]))
 	// Saved the way the sweep's answer is, with the set as it now stands.
 	var tasks []TaskRequest
 	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {

@@ -804,22 +804,8 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			unified = unifiedIssueCount(rows, *td)
 		}
 
-		// Truncation precedence (behavior-preserving with the deleted
-		// app_handlers_availability.go:475-478 block):
-		//   1. start from Wave-2 truncated signal,
-		//   2. clear to false when no issues at all are observed,
-		//   3. force true when Wave-1 saw a truncated availability scan —
-		//      that lower-bound signal is authoritative even when the visible
-		//      subset shows zero issues, so the badge must remain truncated.
-		issueTruncated := msg.Truncated
-		if unified == 0 && len(allFindings) == 0 {
-			issueTruncated = false
-		}
-		// The per-type truncation signal is RowStore's own Pagination for this
-		// type, set by this same probe cycle's ObserveRows/AmendRows write.
-		if tr := c.session.RowStore.Snapshot(msg.ResourceType); tr.Pagination != nil && tr.Pagination.IsTruncated {
-			issueTruncated = true
-		}
+		c.session.EnrichmentCutSet(msg.ResourceType, msg.Truncated)
+		issueTruncated := issueLowerBound(msg.ResourceType, c.pageTruncated(msg.ResourceType), msg.Truncated, unified > 0 || len(allFindings) > 0, len(msg.TruncatedIDs))
 
 		// Emit menu issue badge update.
 		intents = append(intents, PatchMenu{
@@ -1060,4 +1046,38 @@ func Wave1Only(r resource.Resource) resource.Resource {
 	}
 	r.Findings = kept
 	return r
+}
+
+// issueLowerBound is the one rule for whether a type's issue badge may be
+// short, used by the sweep, the on-demand row check and the type file alike.
+// A truncated page always leaves the count open. Otherwise the count can be
+// short only when something went unchecked and the type has a Wave-2 check
+// that raises an issue at all, since an unchecked "~" check hides none. Rows
+// marked not inspected are unchecked whatever was counted. A cut the enricher
+// reports without marking a row only opens a count it produced: when it found
+// nothing and left no row unanswered there is no count to be short (CR273).
+func issueLowerBound(shortName string, pageTruncated, enricherCut, found bool, uninspected int) bool {
+	if pageTruncated {
+		return true
+	}
+	if uninspected == 0 && (!enricherCut || !found) {
+		return false
+	}
+	td := resource.FindResourceType(shortName)
+	if td == nil {
+		return true
+	}
+	for _, f := range td.Findings {
+		if f.Source == "wave2" && f.Severity == domain.SevBroken {
+			return true
+		}
+	}
+	return false
+}
+
+// pageTruncated reports whether the row store holds only part of the type's
+// list, per the Pagination its last observation recorded.
+func (c *Core) pageTruncated(shortName string) bool {
+	tr := c.session.RowStore.Snapshot(shortName)
+	return tr.Pagination != nil && tr.Pagination.IsTruncated
 }

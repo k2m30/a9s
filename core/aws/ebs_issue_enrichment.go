@@ -147,15 +147,14 @@ func ebsVolumeTags(r resource.Resource) (map[string]string, bool) {
 }
 
 // addEBSSnapshotCoverage reports every attached volume the snapshot list holds
-// no snapshot of. Like the backup join it answers from the cache alone, so an
-// unfetched or cut-short snapshot list reports nothing: the snapshot may be on
-// a page nobody read. A volume that is not attached is left alone — there is
-// nothing running to lose.
+// no snapshot of. Like the backup join it answers from the cache alone, so with
+// an unfetched or cut-short snapshot list a volume none of the read pages
+// covers is marked not inspected: its snapshot may be on a page nobody read.
+// A volume that is not attached is left alone — there is nothing running to
+// lose.
 func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.Resource, result *IssueEnricherResult) {
 	entry, ok := cache["ebs-snap"]
-	if !ok || entry.IsTruncated {
-		return
-	}
+	listed := ok && !entry.IsTruncated
 	snapshotted := make(map[string]bool, len(entry.Resources))
 	for _, snap := range entry.Resources {
 		if v := snap.Fields["volume_id"]; v != "" {
@@ -168,6 +167,10 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 			volumeID = r.ID
 		}
 		if volumeID == "" || r.Fields["state"] != string(ec2types.VolumeStateInUse) || snapshotted[volumeID] {
+			continue
+		}
+		if !listed {
+			markUninspected(result, r.ID, checkListIncomplete("ebs-snap"))
 			continue
 		}
 		setWave2Finding(result, r.ID, CodeEBSNoSnapshot, []domain.DetailRow{{Label: "Snapshots", Value: "0"}})

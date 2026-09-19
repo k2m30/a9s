@@ -84,6 +84,17 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		err = errors.Join(listErr, Finish(&result, batchFailures, len(buildIDToProject), "BatchGetBuilds"))
 		return result, err
 	}
+	returned := make(map[string]bool, len(builds.Builds))
+	for _, b := range builds.Builds {
+		returned[aws.ToString(b.Id)] = true
+	}
+	// no finding: a build the answer left out (BuildsNotFound) was deleted
+	// after the list call; its project was not inspected, and nothing failed.
+	for id, project := range buildIDToProject {
+		if !returned[id] {
+			markUninspected(&result, project, "BatchGetBuilds")
+		}
+	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
 			continue

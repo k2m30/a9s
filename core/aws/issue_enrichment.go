@@ -36,9 +36,8 @@ type IssueEnricher struct {
 	Fn       IssueEnricherFunc
 	Priority int // lower runs first; default 100
 	// Reads names the resource types whose ResourceCache this enricher scans.
-	// An enricher that scans a cache nobody loaded emits nothing and says
-	// nothing about it, so whatever arranges the caches has to be told; this
-	// is the one place it is told, beside the Fn it describes.
+	// Dispatch (Core.probeEnrichmentRows) hands it those entries and no
+	// others, so this is the one place a cross-cache read is declared.
 	Reads []string
 }
 
@@ -292,7 +291,14 @@ func newRowResult() IssueEnricherResult {
 // rather than repeated at each of the seventy-odd mark sites. Returns "" when
 // the error names no operation — a row whose check has no name is still
 // uninspected, and every surface says so without the ": <check>" half.
+//
+// A call the Wave 2 deadline cut off names the deadline, not the operation:
+// nothing refused it, and the row reads the way ForEachRow marks one it never
+// started.
 func checkOf(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return CheckDeadline
+	}
 	if opErr, ok := errors.AsType[*smithy.OperationError](err); ok {
 		return opErr.OperationName
 	}
@@ -310,6 +316,17 @@ const CheckCap = "stopped at the inspection cap"
 // loop before the row's check was sent: nothing refused, and nothing looked.
 const CheckDeadline = "stopped at the Wave 2 deadline"
 
+// checkListIncomplete names the check a row did not get because the sibling
+// list its rule joins against is not loaded, or not loaded in full: the rule
+// cannot tell "absent" from "on a page nobody read", so it did not run.
+func checkListIncomplete(shortName string) string { return shortName + " list incomplete" }
+
+// CheckOwnAccountUnknown is what a row records when its policy names an
+// account-shaped principal and the session never learned its own account:
+// whether the grant is foreign cannot be told, so the cross-account check
+// did not run.
+const CheckOwnAccountUnknown = "own account unknown"
+
 // markUninspected is the one writer of result.TruncatedIDs. check names what
 // did not answer for this row — the failing API call, or CheckCap when a9s's
 // own bound is what stopped short. Every other recorder in this file routes
@@ -319,12 +336,14 @@ const CheckDeadline = "stopped at the Wave 2 deadline"
 //
 // A row already carrying a named check keeps it: the first check to refuse is
 // the one the operator chases, and a later cap on the same row would otherwise
-// overwrite a real denial with a bound.
+// overwrite a real denial with a bound. The one exception is an incomplete
+// sibling list: it names no call, and a call that refused on the same row is
+// what the operator can act on.
 func markUninspected(result *IssueEnricherResult, id, check string) {
 	if id == "" {
 		return
 	}
-	if prev, ok := result.TruncatedIDs[id]; ok && prev != "" {
+	if prev, ok := result.TruncatedIDs[id]; ok && prev != "" && !strings.HasSuffix(prev, checkListIncomplete("")) {
 		return
 	}
 	result.TruncatedIDs[id] = check
@@ -510,8 +529,8 @@ type IssueEnricherResult struct {
 // The TUI dispatcher (internal/tui/probe_adapter.go probeEnrichment tea.Cmd wrapper)
 // invokes (*Core).ProbeEnrichment, which builds the cache once at dispatch time via
 // (*Core).BuildResourceCacheSnapshot in core/runtime/probes.go and passes the
-// resulting map by value. The map and its ResourceCacheEntry structs are
-// freshly allocated, but the .Resources slice header is COPIED — its backing
+// entries its IssueEnricher.Reads names, in a fresh map, by value. The map
+// and its ResourceCacheEntry structs are freshly allocated, but the .Resources slice header is COPIED — its backing
 // array is shared with the live m.resourceCache / m.probeResources / m.lazyResourceCache
 // state. Enrichers MUST treat the cache as read-only:
 //   - DO NOT append to cache[k].Resources (would mutate the shared backing array

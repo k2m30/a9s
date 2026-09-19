@@ -126,7 +126,7 @@ func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, own
 	}
 	doc, parseErr := iampolicy.Parse(*out.Policy)
 	if parseErr != nil {
-		return nil, false, nil
+		return nil, false, parseErr
 	}
 	ex := iampolicy.Evaluate(doc, ownAccount)
 	if !ex.Public {

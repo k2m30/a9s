@@ -28,6 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metric-filter check, and automated RDS snapshots no longer crowd out manual
   ones for the public-share check. Resources a check never applies to are no
   longer marked `not inspected`.
+- A check that joins against another list (backup plans, snapshots,
+  security groups, network interfaces, route tables, AMIs, buckets,
+  addresses) marks the rows it could not judge `not inspected: <list> list
+  incomplete` when that list is not loaded or not loaded in full, instead of
+  clearing their earlier findings.
+- A KMS key whose rotation status was refused, a Lambda function whose
+  policy could not be parsed, a bucket whose public access block could not be
+  read, a CloudFront origin bucket whose HeadBucket did not answer, a resource
+  policy naming an account while the session's own account is unknown, and an
+  ECS or CodeBuild item a batch describe did not return are all marked
+  `not inspected` instead of looking clean.
+- The menu issue badge reads `N+` by one rule on the startup sweep, after a
+  single-row check and after a restart: only when a check that can raise a
+  `!` issue did not answer. Types whose checks raise only `~` findings, such
+  as Redshift, keep an exact count.
 - A CloudFormation stack that both failed and drifted shows both findings.
 - A CodeBuild project whose latest build could not be read is marked
   `not inspected` instead of looking clean.

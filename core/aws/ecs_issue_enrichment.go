@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -62,6 +63,18 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 				MarkSkipped(&result, name, &failures, err)
 			}
 			continue
+		}
+
+		returned := make(map[string]bool, len(out.Clusters))
+		for _, cluster := range out.Clusters {
+			returned[aws.ToString(cluster.ClusterName)] = true
+		}
+		// no finding: a cluster the answer left out went away after the list
+		// call (Failures "MISSING"); it was not inspected, and nothing failed.
+		for _, name := range batch {
+			if !returned[name] {
+				markUninspected(&result, name, "DescribeClusters")
+			}
 		}
 
 		for _, cluster := range out.Clusters {

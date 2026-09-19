@@ -19,9 +19,10 @@ import (
 //
 // It answers from the cached backup list, so it inherits that list's states: a
 // list nobody fetched and a list cut short both mean a plan this resource
-// matches may sit on a page nobody read, so neither reports anything. A list
-// read to the end reports, including when it is empty — an account with no
-// plans covers nothing, and that is knowledge rather than a gap.
+// matches may sit on a page nobody read, so every row is marked not inspected
+// instead. A list read to the end reports, including when it is empty — an
+// account with no plans covers nothing, and that is knowledge rather than a
+// gap.
 //
 // arnAndTags gives the resource's ARN and the tags a selection may condition
 // on. Its third value is false when those tags could not be read. Unknown tags
@@ -42,6 +43,9 @@ func addBackupCoverage(
 ) {
 	entry, ok := cache["backup"]
 	if !ok || entry.IsTruncated || backupPlansIncomplete(entry.Resources) {
+		for _, r := range resources {
+			markUninspected(result, r.ID, checkListIncomplete("backup"))
+		}
 		return
 	}
 	tagsDecide := backupPlansSelectByTag(entry.Resources)
@@ -68,7 +72,7 @@ type backupTagReader func(ctx context.Context, arn string) (map[string]string, e
 //
 // It reads tags only where they can change the answer: when no cached plan
 // selects by tag, when a plan's own selection list could not be read to the
-// end (addBackupCoverage reports nothing at all in that case), and for every
+// end (addBackupCoverage marks every row in that case), and for every
 // resource a selection's ARNs already take in, the read is skipped. The rest
 // are read one call each, in parallel, up to EnrichmentCap. A resource whose
 // read fails or falls outside the cap has unknown tags, which the join leaves

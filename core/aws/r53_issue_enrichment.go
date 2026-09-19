@@ -212,15 +212,16 @@ func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resourc
 // r53PublicZoneFindings evaluates the two public-zone rows: query logging, and
 // records pointing at addresses the account has released.
 //
-// The dangling check is skipped when held is nil — an absent or truncated
+// The dangling check does not run when held is nil — an absent or truncated
 // address cache cannot distinguish a released address from an unloaded page,
-// and calling that a takeover sends an operator chasing a healthy record. A
-// zone whose records cannot be listed is marked truncated rather than reported
-// clean.
+// and calling that a takeover sends an operator chasing a healthy record — and
+// the zone is marked not inspected for it. A zone whose records cannot be
+// listed is marked the same way rather than reported clean.
 func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, zoneID string, held map[string]string) {
 	r53QueryLoggingFinding(ctx, clients, result, failures, r, zoneID)
 
 	if held == nil {
+		markUninspected(result, r.ID, checkListIncomplete("address"))
 		return
 	}
 	records, recordsErr := listAllR53Records(ctx, clients.Route53, zoneID)

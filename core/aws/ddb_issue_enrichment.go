@@ -155,9 +155,11 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		}
 		// Without a resolved own-account ID every principal reads as foreign,
 		// which would report the account's own roles as an outside grant.
-		if ownAccount != "" && len(ex.CrossAccount) > 0 {
+		switch {
+		case len(ex.CrossAccount) > 0 && ownAccount == "":
+			markUninspected(result, r.ID, CheckOwnAccountUnknown)
+		case len(ex.CrossAccount) > 0:
 			setWave2Finding(result, r.ID, ddbCodeCrossAccountPolicy, []domain.DetailRow{{Label: "Accounts", Value: strings.Join(ex.CrossAccount, ", "), Tier: tierOf(ddbCodeCrossAccountPolicy)}})
-
 		}
 	})
 	return errors.Join(loopErr, Finish(result, failures, n, "GetResourcePolicy"))

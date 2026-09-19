@@ -38,8 +38,9 @@ import (
 // ImageId against the already-loaded "ami" cache: an ami-prefixed id whose
 // cached AMI has a past DeprecationTime is a "deprecated AMI" Warning. Zero
 // AWS API calls. Skip rule: when the "ami" list has not been loaded this
-// session, the cache entry is absent and the enricher is a no-op — mirrors
-// EnrichSnapshotCrossRef's "requires the parent list to be loaded" contract.
+// session, the check does not run and every template on an ami- image is
+// marked not inspected — EnrichSnapshotCrossRef's "requires the parent list to
+// be loaded" contract.
 func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
@@ -73,6 +74,12 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 
 	amiEntry, amiLoaded := cache["ami"]
 	if !amiLoaded {
+		for _, res := range resources {
+			if raw, ok := assertStruct[LTRaw](res.RawStruct); ok && raw.DefaultVersion.LaunchTemplateData != nil &&
+				strings.HasPrefix(aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId), "ami-") {
+				markUninspected(&result, res.ID, checkListIncomplete("ami"))
+			}
+		}
 		return result, nil
 	}
 

@@ -187,13 +187,14 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 
 	// Whether the bucket's own block makes S3 disregard the public grants its
 	// ACL already carries; read here, used by the ACL condition below.
-	ignorePublicACLs := false
+	ignorePublicACLs, pabRead := false, false
 
 	pabOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
 		return api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
 	})
 	switch {
 	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
+		pabRead = true
 		if pabOut != nil && pabOut.PublicAccessBlockConfiguration != nil {
 			ignorePublicACLs = aws.ToBool(pabOut.PublicAccessBlockConfiguration.IgnorePublicAcls)
 		}
@@ -233,8 +234,10 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	case err == nil:
 		// The same code as the policy route: one bucket reachable from the
 		// internet is one condition, however many ways in it has, and
-		// setWave2Finding merges the supporting rows under it.
-		if rows := s3ACLPublicRows(aclOut, ignorePublicACLs); rows != nil {
+		// setWave2Finding merges the supporting rows under it. A grant is
+		// judged only against a block that was read: an unread block may be
+		// the one ignoring it.
+		if rows := s3ACLPublicRows(aclOut, ignorePublicACLs); pabRead && rows != nil {
 			add(s3CodePublic, rows)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):

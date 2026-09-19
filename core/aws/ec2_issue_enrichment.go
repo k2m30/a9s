@@ -208,12 +208,10 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 // reachable from the internet on the ports that verdict names. It makes NO
 // API call and re-derives nothing — the sensitive-port set and the exposure
 // rules stay owned by sg.go, this pass only joins them to the instance.
-// An unloaded "sg" cache is silence, not a clean bill of health.
+// An unloaded "sg" cache is not a clean bill of health: every instance the
+// join would judge is marked not inspected instead.
 func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) {
-	sgEntry, ok := cache["sg"]
-	if !ok {
-		return
-	}
+	sgEntry, sgLoaded := cache["sg"]
 	type sgRisk struct {
 		wideOpen bool
 		ports    string
@@ -229,6 +227,10 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 	for _, r := range resources {
 		publicIP := r.Fields["public_ip"]
 		if publicIP == "" || r.Fields["state"] != "running" {
+			continue
+		}
+		if !sgLoaded {
+			markUninspected(result, r.ID, checkListIncomplete("sg"))
 			continue
 		}
 		inst, ok := assertStruct[ec2types.Instance](r.RawStruct)

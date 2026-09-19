@@ -27,8 +27,7 @@ const (
 // and returns a Finding when key rotation is not enabled.
 // Severity is "~" (informational) — rotation-disabled is an informational
 // finding, not a "!" issue.
-// AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
-// silently skipped without marking Truncated. Other per-key errors set Truncated=true.
+// AWS-managed keys are not asked. A per-key error marks the key not inspected.
 func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -40,7 +39,11 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	}
 	keyPolicyAPI, _ := clients.KMS.(KMSGetKeyPolicyAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
+		// AWS owns an AWS-managed key's policy and rotation; neither is the
+		// operator's to change.
+		return !kmsKeyIsAWSManaged(r)
+	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
@@ -66,10 +69,6 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			if IsAccessDenied(err) {
-				// AWS-managed keys: skip silently without marking truncated
-				return
-			}
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}

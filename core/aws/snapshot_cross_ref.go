@@ -144,9 +144,15 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		publicErr := enrichSnapshotPublicShare(ctx, cfg, clients, resources, &result)
 
 		// Skip rule per spec §3.1: the cross-ref enricher requires the parent
-		// list to be loaded. If absent, both rules silently skip.
+		// list to be loaded. If absent, both rules skip, and every snapshot
+		// with a parent is marked: neither rule was judged for it.
 		parentEntry, parentLoaded := cache[cfg.ParentShortName]
 		if !parentLoaded {
+			for _, res := range resources {
+				if parentID, ok := cfg.GetParentID(res.RawStruct); ok && parentID != "" {
+					markUninspected(&result, res.ID, checkListIncomplete(cfg.ParentShortName))
+				}
+			}
 			return result, publicErr
 		}
 
@@ -172,8 +178,9 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			case !parentFound:
 				// Orphan rule: when the cache is truncated AND the parent
 				// isn't in the visible window, absence is non-definitive —
-				// skip rather than emit a false positive.
+				// skip rather than emit a false positive, and say so.
 				if parentEntry.IsTruncated {
+					markUninspected(&result, res.ID, checkListIncomplete(cfg.ParentShortName))
 					continue
 				}
 				code = cfg.OrphanCode

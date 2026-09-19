@@ -110,6 +110,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				continue
 			}
 
+			returned := make(map[string]bool, len(out.Tasks))
 			for _, task := range out.Tasks {
 				// Identify the resource by task ID (last segment of ARN).
 				taskID := ""
@@ -120,6 +121,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				if taskID == "" {
 					continue
 				}
+				returned[taskID] = true
 				if arn := aws.ToString(task.TaskDefinitionArn); arn != "" && !ecsTaskGone(aws.ToString(task.LastStatus)) {
 					taskDefByTaskID[taskID] = arn
 				}
@@ -159,6 +161,13 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				}
 
 				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, rows)
+			}
+			// no finding: a task the answer left out was gone by the describe
+			// (Failures "MISSING"); it was not inspected, and nothing failed.
+			for _, taskID := range batch {
+				if !returned[taskID] {
+					markUninspected(&result, taskID, op)
+				}
 			}
 		}
 	}

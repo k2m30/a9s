@@ -31,7 +31,8 @@ const (
 // fires "route to peer blackholed" (blackhole takes precedence when a
 // connection has both a blackholed route and no other route). Zero AWS API
 // calls. Guards: the rtb cache must be present AND not truncated — otherwise
-// this is a no-op, never a guess (docs/resources/vpc-peer.md §3.2).
+// every active connection is marked not inspected, never guessed
+// (docs/resources/vpc-peer.md §3.2).
 func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
@@ -40,9 +41,7 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 	}
 
 	rtbList, truncated, ok := cachedTypedRows[ec2types.RouteTable](cache, "rtb")
-	if !ok || truncated {
-		return result, nil
-	}
+	complete := ok && !truncated
 
 	blackholed := make(map[string]bool)
 	routed := make(map[string]bool)
@@ -66,12 +65,13 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 			continue
 		}
 		switch {
+		case !complete:
+			markUninspected(&result, res.ID, checkListIncomplete("rtb"))
 		case blackholed[res.ID]:
 			setWave2Finding(&result, res.ID, vpcPeerCodeRouteBlackholed, nil)
-
-		case !routed[res.ID]:
+		case routed[res.ID]:
+		default:
 			setWave2Finding(&result, res.ID, vpcPeerCodeNoLocalRoute, nil)
-
 		}
 	}
 

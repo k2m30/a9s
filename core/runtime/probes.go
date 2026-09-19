@@ -463,7 +463,7 @@ func (c *Core) saveAvailabilityCache(
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
-				tf.IssuesTruncated = badgeLowerBound(tf, issueTruncated[rawName])
+				tf.IssuesTruncated = c.badgeLowerBound(name, tf, issueTruncated[rawName])
 			} else {
 				tf.Issues = existing.Issues
 				tf.IssuesKnown = existing.IssuesKnown
@@ -751,7 +751,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true
-			tf.IssuesTruncated = badgeLowerBound(tf, content.IssuesTruncated)
+			tf.IssuesTruncated = c.badgeLowerBound(canon, tf, content.IssuesTruncated)
 		} else {
 			tf.Issues = existing.Issues
 			tf.IssuesKnown = existing.IssuesKnown
@@ -1004,20 +1004,18 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	return c.probeEnrichmentRows(ctx, clients, shortName, resources)
 }
 
-// badgeLowerBound is the sweep's own menu rule for the badge a type file
-// carries: a truncated page keeps the count open, and so do rows nobody
-// could inspect while something is wrong. The marks are read from the rows
-// about to be written, under the store lock every writer holds.
-func badgeLowerBound(tf cache.TypeFile, pageTruncated bool) bool {
-	if pageTruncated || tf.Issues == 0 {
-		return pageTruncated
-	}
+// badgeLowerBound is issueLowerBound for a type file about to be written: the
+// rows' own not-inspected marks, read under the store lock every writer holds,
+// and the enricher's cut flag from the session.
+func (c *Core) badgeLowerBound(shortName string, tf cache.TypeFile, pageTruncated bool) bool {
+	marked, found := 0, tf.Issues > 0
 	for _, row := range tf.Rows {
 		if row.Uninspected != nil {
-			return true
+			marked++
 		}
+		found = found || rowHasWave2Finding(row.Findings)
 	}
-	return false
+	return issueLowerBound(shortName, pageTruncated, c.session.EnrichmentCutGet(shortName), found, marked)
 }
 
 // probeEnrichmentRows runs shortName's Wave-2 enricher over exactly the rows
@@ -1033,17 +1031,33 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
-	cacheSnap := c.BuildResourceCacheSnapshot()
+	// The enricher sees only the lists its registration declares, so a read
+	// it does not declare comes back empty in every session rather than only
+	// in the ones that never loaded that list.
+	loaded := c.BuildResourceCacheSnapshot()
+	cacheSnap := make(resource.ResourceCache, len(e.Reads))
+	for _, name := range e.Reads {
+		if entry, ok := loaded[name]; ok {
+			cacheSnap[name] = entry
+		}
+	}
 
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	// RetryOnThrottle hands back a zero result once its retries run out or the
+	// deadline passes in a backoff; the last attempt's partial answer — the
+	// findings it did establish and the rows it marked — is what the runtime
+	// is owed instead (partial-success contract: never-silent-skip).
+	var last awsclient.IssueEnricherResult
 	result, err := awsclient.RetryOnThrottle(probeCtx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
-		return e.Fn(probeCtx, clients, resources, cacheSnap)
+		r, err := e.Fn(probeCtx, clients, resources, cacheSnap)
+		last = r
+		return r, err
 	})
-	// Always populate fields from result regardless of err. RetryOnThrottle
-	// preserves partial result on non-retryable errors (partial-success
-	// contract: never-silent-skip).
+	if err != nil {
+		result = last
+	}
 	return ProbeEnrichmentResult{
 		ResourceType:     shortName,
 		Truncated:        result.Truncated,

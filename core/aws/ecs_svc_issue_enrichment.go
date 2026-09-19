@@ -126,6 +126,19 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				continue
 			}
 
+			returned := make(map[string]bool, len(out.Services))
+			for _, svc := range out.Services {
+				returned[aws.ToString(svc.ServiceName)] = true
+			}
+			// no finding: a service the answer left out went away after the
+			// list call (Failures "MISSING"); it was not inspected, and
+			// nothing failed.
+			for _, svcName := range batch {
+				if r, ok := resourceByService[svcName]; ok && !returned[svcName] {
+					markUninspected(&result, r.ID, op)
+				}
+			}
+
 			now := time.Now()
 			for _, svc := range out.Services {
 				svcName := ""

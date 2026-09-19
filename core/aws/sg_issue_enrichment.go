@@ -24,11 +24,11 @@ const sgUnusedPhrase = "not attached to anything"
 // records group membership, and it is already fetched for its own type.
 //
 // Absence is only provable from a complete list: when the "eni" list has not
-// been loaded this session, or was truncated at the first page, the enricher
-// is a no-op rather than reporting every group as unused. Default groups are
-// exempt — AWS creates one per VPC and it cannot be deleted, so "unattached"
-// is its normal state, not a finding (sgCodeDefaultWithRules is the signal
-// that applies to those).
+// been loaded this session, or was truncated at the first page, a group none of
+// the read interfaces references is marked not inspected rather than reported
+// unused. Default groups are exempt — AWS creates one per VPC and it cannot be
+// deleted, so "unattached" is its normal state, not a finding
+// (sgCodeDefaultWithRules is the signal that applies to those).
 func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
@@ -37,9 +37,7 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 	}
 
 	eniEntry, eniLoaded := cache["eni"]
-	if !eniLoaded || eniEntry.IsTruncated {
-		return result, nil
-	}
+	complete := eniLoaded && !eniEntry.IsTruncated
 
 	referenced := make(map[string]bool)
 	for _, eni := range eniEntry.Resources {
@@ -53,6 +51,10 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 
 	for _, r := range resources {
 		if r.ID == "" || referenced[r.ID] || r.Fields["group_name"] == "default" {
+			continue
+		}
+		if !complete {
+			markUninspected(&result, r.ID, checkListIncomplete("eni"))
 			continue
 		}
 		setWave2Finding(&result, r.ID, sgCodeUnused, []domain.DetailRow{{Label: "Network interfaces referencing", Value: "0", Tier: tierOf(sgCodeUnused)}})
