@@ -229,7 +229,7 @@ var navigableContracts = []navContract{
 	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html", fieldPath: "Routes.GatewayId", targetType: "igw", reasoning: "RouteTable.Routes[].GatewayId — IGW target."},
 	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html", fieldPath: "Routes.NetworkInterfaceId", targetType: "eni", reasoning: "RouteTable.Routes[].NetworkInterfaceId — ENI target (e.g. a firewall instance)."},
 	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html", fieldPath: "Routes.TransitGatewayId", targetType: "tgw", reasoning: "RouteTable.Routes[].TransitGatewayId — TGW target."},
-	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html", fieldPath: "Routes.VpcPeeringConnectionId", targetType: "vpc", reasoning: "RouteTable.Routes[].VpcPeeringConnectionId — peer VPC target (navigates to vpc)."},
+	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html", fieldPath: "Routes.VpcPeeringConnectionId", targetType: "vpc-peer", reasoning: "RouteTable.Routes[].VpcPeeringConnectionId is a pcx- ID, the key of the vpc-peer list; the vpc list holds no row by that ID, so pointing the field there opened nothing."},
 
 	// secrets — Secrets Manager
 	{shortName: "secrets", apiDoc: "https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "SecretListEntry.KmsKeyId — KMS key used to encrypt the secret."},

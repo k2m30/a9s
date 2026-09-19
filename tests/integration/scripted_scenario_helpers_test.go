@@ -16,6 +16,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -1233,7 +1234,7 @@ func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resourc
 			fieldPath, s.currentResource.ID, s.currentResourceType, s.currentResource.RawStruct)
 	}
 
-	targetID := resource.NavIDFromValue(nf.TargetType, rawValue)
+	targetID := resource.NavIDFromValue(nf.TargetType, rawValue, domain.RefContext{Region: s.region})
 	if targetID == "" {
 		s.failf("FollowNavigableField(%q): NavIDFromValue(targetType=%q, value=%q) returned empty string",
 			fieldPath, nf.TargetType, rawValue)

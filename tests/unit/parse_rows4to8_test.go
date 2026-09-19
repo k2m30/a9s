@@ -811,13 +811,13 @@ func TestNavIDFromValue_S3BucketARNResolvesInEveryPartition(t *testing.T) {
 		{name: "GovCloud bucket ARN", value: "arn:aws-us-gov:s3:::acme-assets", want: "acme-assets"},
 		// A bare bucket name is the common case and must pass through.
 		{name: "a bare bucket name", value: "acme-assets", want: "acme-assets"},
-		// Anything that is not an S3 bucket ARN is not a bucket name to
-		// rewrite, so it passes through for the caller to fall back on.
-		{name: "another service's ARN", value: "arn:aws-cn:sqs:cn-north-1:123456789012:acme-queue", want: "arn:aws-cn:sqs:cn-north-1:123456789012:acme-queue"},
+		// Another service's ARN names no bucket, so it resolves to nothing
+		// rather than being handed to the bucket list as an ID it cannot hold.
+		{name: "another service's ARN", value: "arn:aws-cn:sqs:cn-north-1:123456789012:acme-queue", want: ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := resource.NavIDFromValue("s3", tc.value); got != tc.want {
+			if got := resource.NavIDFromValue("s3", tc.value, domain.RefContext{}); got != tc.want {
 				t.Errorf("NavIDFromValue(s3, %q) = %q, want %q", tc.value, got, tc.want)
 			}
 		})
