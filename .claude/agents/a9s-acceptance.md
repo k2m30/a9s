@@ -50,7 +50,8 @@ A `REJECT` item names a written criterion (a spec row, a ruling, the comment pol
 7. **Comment policy.** Read every comment line the task added or changed in production and test code (`git diff <base>..<head> -U0 -- '*.go'`, the `+` lines holding `//` or `/*`). Each one that violates the policy is a `REJECT` item naming `file:line`:
    - it restates what the adjacent code already says (a line paraphrase, a block summary of the attributes below it, narration of structure or of test setup/assertions);
    - it narrates a change or a defect history ("was", "now", "previously", "fixed", "used to", incident dates, "after the review");
-   - it comments on what is absent or omitted, or argues with a reviewer.
+   - it comments on what is absent or omitted, or argues with a reviewer;
+   - it names a task, issue, row, ruling, review or round (`#545`, "row 3", "ruling P2-6", "inverted", "do not restore") — an inverted test states the correct behaviour as a fact, and the history lives in the commit message. No comment form is exempt.
    A comment survives only if it states rationale, a constraint, a gotcha or external context the code cannot say. Name these as wording; the orchestrator removes them without a dev round.
 8. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a ruling in the spec is a defect. A wrong sentence in a changelog fragment, a doc or a comment is a `REJECT` item like any other, but name it as wording so the orchestrator fixes it without a dev round.
 

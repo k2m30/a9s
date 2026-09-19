@@ -39,7 +39,7 @@ Exactly one of these per dispute, with `file:line` evidence for the deciding fac
 
 1. **Spec is wrong.** Rewrite the affected spec row in place (keep the row's code and phrase unless they are the error). Say what was wrong in the log, not in the spec.
 2. **Dev is wrong.** Name the exact change: file, function, what the branch must do. If the change would create a second truth source, say where the single one lives.
-3. **QA is wrong.** Name the test and why the behaviour it pins is a defect, not intent. The test is to be inverted or deleted by QA with a comment saying it was inverted so the next reader does not "restore" it.
+3. **QA is wrong.** Name the test and why the behaviour it pins is a defect, not intent. The test is to be inverted or deleted by QA with a comment stating the correct behaviour as a fact; the history goes in the commit message.
 4. **Both right, spec silent.** Add the missing rule to the spec (severity, phrase, edge behaviour) and cite the precedent in the codebase you matched it to.
 5. **Genuinely blocked.** The signal is not observable read-only, the SDK lacks the field, or the fixture cannot represent it. Record the descoped row in the spec under `## Descoped` with the evidence. This is the only path that removes scope — never convenience, never "later".
 

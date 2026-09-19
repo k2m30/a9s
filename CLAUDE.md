@@ -33,7 +33,7 @@ Applies to every defect — one you found, one a review reported, one a test cau
 3. **Order fixes so no work gets rewritten.** If an architectural change will rewrite the lines a smaller fix touches, do the architectural one first or fold them together. Never fix the same lines twice.
 4. **No confidence filter.** Every finding is either fixed or explicitly disproved with `file:line` evidence. "Probably fine", "pre-existing", and "minor" are not dispositions. A stale or misattributed finding is *disproved*, not dropped.
 5. **Fix the class, not the report.** A reviewer names the symptom it happened to see. Before closing, check whether the same defect exists in sibling fields, sibling call sites, or the other lane.
-6. **A test that encodes a defect as intent is worse than no test** — it makes the fix look like a regression. When a test must be inverted, say so in its comment so the next reader does not "restore" it.
+6. **A test that encodes a defect as intent is worse than no test** — it makes the fix look like a regression. When a test must be inverted, its comment states the correct behaviour as a fact (what AWS or the contract makes true), never the history: no task or issue numbers, no "inverted", no "do not restore". The commit message carries the history.
 7. **Re-derive numbers, never relay them.** Counts from a grep, a subagent, or a prior report are unverified until you reproduce them. Report only what you have run.
 
 ## External Review Protocol

@@ -68,7 +68,7 @@ A stub-only round exists only when a spec names a symbol another task or a fixtu
 ## Rules that end rounds early
 
 - A test that encodes a defect as intent is `OFF`, not a thing to make pass.
-- An existing test that pins the behaviour your spec row deletes is inverted in the same round, with a comment naming the row and why the old assertion is not to be restored, and listed in your log entry. Never a value tweak to make a test pass, never a deletion.
+- An existing test that pins the behaviour your spec row deletes is inverted in the same round, with a comment stating the correct behaviour as a fact (never a task, row or ruling reference, never "inverted" or "do not restore"), and listed in your log entry. Never a value tweak to make a test pass, never a deletion.
 - Deleting a test, a helper, or a `//nolint` to get green is never the fix. Understand why it exists first; if it is dead, say so with evidence.
 - A "fix" that adds a second place computing the same fact is `OFF`.
 - Do not widen scope. An adjacent defect an operator would see goes on the log's `deferred:` line with what they would see; anything else you notice is not written anywhere.
