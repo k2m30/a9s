@@ -403,8 +403,8 @@ func TestRelated_WAF_APIGW_ExtractsAPIIDFromARN(t *testing.T) {
 // /restapis/ is read through the apigw resolver like any other: "/apis/<id>"
 // names the API <id>.
 //
-// Inverted by #545 ruling A: the checker no longer parses the ARN itself, and
-// the apigw resolver reads both API ARN shapes. Do not restore the skip.
+// The checker does not parse the ARN itself; the apigw resolver reads both
+// API ARN shapes.
 func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -465,8 +465,8 @@ func TestRelated_WAF_Logs_CWLogGroupNameExtracted(t *testing.T) {
 }
 
 // TestRelated_WAF_Logs_FirehoseARNPassthrough: a Firehose destination is no
-// log group and is not counted. Inverted by #545 row 6: a stream ARN drills into
-// no log group, so it is never the ID. Do not restore it.
+// log group and is not counted: a stream ARN drills into no log group, so it
+// is never the ID.
 func TestRelated_WAF_Logs_FirehoseARNPassthrough(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",

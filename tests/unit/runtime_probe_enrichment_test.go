@@ -151,8 +151,8 @@ func TestCoreProbeEnrichment_CacheSnapshotMergesRowStore(t *testing.T) {
 			},
 		}, nil
 	}
-	// Dispatch hands an enricher only the caches its Reads declares (#549
-	// area-review ruling P2-6), so the sentinel names the one it scans.
+	// Dispatch hands an enricher only the caches its Reads declares, so the
+	// sentinel names the one it scans.
 	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: sentinelFn, Priority: 100, Reads: []string{"dbi"}})
 
 	sess := session.New()

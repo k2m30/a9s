@@ -157,9 +157,8 @@ func TestRelated_Lambda_EFS_WithAccessPoints(t *testing.T) {
 			},
 		},
 	}
-	// Inverted by #545 row 1: efs keys its rows on the file system, so both
-	// access points resolve to the one file system the list says holds them.
-	// Do not restore the access point IDs.
+	// efs rows are keyed by the file system, so both access points resolve to
+	// the one file system the list says holds them.
 	cache := resource.ResourceCache{"efs": resource.ResourceCacheEntry{Resources: []resource.Resource{
 		{ID: "fs-0aaa111", Fields: map[string]string{"access_point_ids": "fsap-aaa111,fsap-bbb222"}},
 	}}}
@@ -375,8 +374,8 @@ func TestRelated_Lambda_CF_MatchByField(t *testing.T) {
 
 // TestRelated_Lambda_CF_NoMatch uses Fields["lambda_function_arns"] (plural,
 // per lambda.md:42) with a genuinely different function's versioned ARN, so
-// this exercises the real no-match path rather than a stale field name the
-// checker no longer reads at all.
+// this exercises the real no-match path rather than a field name the checker
+// does not read.
 func TestRelated_Lambda_CF_NoMatch(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-edge-fn"
 
@@ -1416,8 +1415,7 @@ func TestRelated_Lambda_MSK_FoundViaKafkaARN(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (MSK cluster name extracted)", result.Count())
 	}
-	// Inverted by #545 row 1: msk keys its rows on the cluster name, not
-	// the ARN's trailing UUID. Do not restore it.
+	// msk rows are keyed by the cluster name, not the ARN's trailing UUID.
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-msk-cluster" {
 		t.Errorf("ResourceIDs = %v, want [my-msk-cluster]", result.ResourceIDs())
 	}

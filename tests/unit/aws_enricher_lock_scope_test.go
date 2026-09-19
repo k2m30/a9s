@@ -153,8 +153,8 @@ func TestEnrichRoute53Zone_QueryLoggingReadsOverlap(t *testing.T) {
 		zones = append(zones, r)
 	}
 
-	// The address lists are loaded (#549 area-review ruling P2-6), so a mark on
-	// a zone comes from the reads this test overlaps.
+	// The address lists are loaded, so a mark on a zone comes from the reads
+	// this test overlaps.
 	addressesLoaded := resource.ResourceCache{"eip": {Resources: []resource.Resource{}}, "ec2": {Resources: []resource.Resource{}}}
 	res, err := w2Enricher(t, "r53")(context.Background(), &awsclient.ServiceClients{Route53: fake}, zones, addressesLoaded)
 	if err != nil {

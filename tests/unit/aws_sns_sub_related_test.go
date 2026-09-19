@@ -86,8 +86,7 @@ func TestRelated_SNSSub_Lambda_Match(t *testing.T) {
 			"endpoint":  lambdaARN,
 		},
 	}
-	// Inverted by #545 row 1: lambda keys its rows on the function name.
-	// Do not restore the ARN as the row ID.
+	// lambda rows are keyed by the function name, not the ARN.
 	cache := resource.ResourceCache{
 		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{ID: "my-function"},

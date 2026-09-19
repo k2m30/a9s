@@ -411,8 +411,8 @@ func TestRelated_Glue_Secrets_MatchSecretARN(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// Inverted by #545 row 1: the secret's name, without the "-XXXXXX"
-	// Secrets Manager appends in the ARN. Do not restore the suffix.
+	// The ID is the secret's name, without the "-XXXXXX" Secrets Manager
+	// appends in the ARN.
 	const wantName = "acme/db-password"
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != wantName {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wantName)

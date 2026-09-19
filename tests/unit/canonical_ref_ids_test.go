@@ -107,7 +107,7 @@ func sortedIDs(r resource.RelatedCheckResult) []string {
 	return ids
 }
 
-// ── Row 1: every target type parses its own references ───────────────────
+// ── every target type parses its own references ────────────────────────────
 
 type refCase struct {
 	name   string
@@ -245,7 +245,7 @@ func TestLambdaEFS_AccessPointCountedAsItsFileSystem(t *testing.T) {
 	}
 }
 
-// ── Row 2: related checkers return through the shared resolver ────────────
+// ── related checkers return through the shared resolver ────────────────────
 
 // TestEcsTaskSecrets_JSONKeyTailCountsTheSecret is the ecs-task witness. A
 // container can inject one JSON key of a secret; the reference then carries
@@ -358,7 +358,7 @@ func relatedParseCall(call *ast.CallExpr) string {
 }
 
 // TestRelatedCheckers_ParseNoReferenceThemselves is the class guard behind
-// row 2: a checker that splits an ARN itself is a second reading of a fact the
+// A checker that splits an ARN itself is a second reading of a fact the
 // target type's resolver owns. Only a RefToID function may parse.
 func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
 	files, err := filepath.Glob("../../core/aws/*_related*.go")
@@ -399,7 +399,7 @@ func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
 	}
 }
 
-// ── Row 3: a navigable field and a related row read one reference alike ───
+// ── a navigable field and a related row read one reference alike ───────────
 
 // refDetailController is a controller on the demo bench with every type's
 // rows loaded and navigability bootstrapped as the app does at startup.
@@ -693,7 +693,7 @@ func TestSSMKeyId_KeyListArrivingAfterTheDetailStillResolves(t *testing.T) {
 	}
 }
 
-// ── Row 4: navigable fields that had no reading now resolve ───────────────
+// ── every navigable field resolves to its target row ───────────────────────
 
 // rowsNamedBy returns every rendered row whose value is ref, with or without
 // the list-item dash a string list renders.
@@ -786,7 +786,7 @@ func TestNavIDFromValue_TargetsWithoutAnExtractorResolve(t *testing.T) {
 	}
 }
 
-// ── Row 5: a reference to another account or region is not a local row ───
+// ── a reference to another account or region is not a local row ────────────
 
 // TestResolveRef_ForeignAccountOrRegionIsNotLocal pins that a same-named or
 // same-ID resource in another account or region never resolves to the local

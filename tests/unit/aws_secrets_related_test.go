@@ -86,10 +86,9 @@ func TestRelated_Secrets_KMS_Found(t *testing.T) {
 	}
 }
 
-// Inverted by #545 facilitator ruling 1 (row 6, lazy-add targets): a key
-// the resource names by ID is counted by that ID whether or not the kms
+// A key the resource names by ID is counted by that ID whether or not the kms
 // list holds it — AWS-managed keys never are — and the related drill
-// lazy-adds it. Do not restore the list-bound answer.
+// lazy-adds it.
 func TestRelated_Secrets_KMS_NotFound(t *testing.T) {
 	kmsRes := resource.Resource{
 		ID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
@@ -107,10 +106,9 @@ func TestRelated_Secrets_KMS_NotFound(t *testing.T) {
 	}
 }
 
-// Inverted by #545 facilitator ruling 1 (row 6, lazy-add targets): a key
-// the resource names by ID is counted by that ID whether or not the kms
+// A key the resource names by ID is counted by that ID whether or not the kms
 // list holds it — AWS-managed keys never are — and the related drill
-// lazy-adds it. Do not restore the list-bound answer.
+// lazy-adds it.
 func TestRelated_Secrets_KMS_CacheMissNoClients(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, secretsSource(), resource.ResourceCache{})

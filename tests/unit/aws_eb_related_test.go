@@ -543,8 +543,7 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// Inverted by #545 row 1: tg keys its rows on the target group name.
-	// Do not restore the ARN.
+	// tg rows are keyed by the target group name, not the ARN.
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "awseb-AWSEBTA-ABCDEF123456" {
 		t.Errorf("ResourceIDs = %v, want [awseb-AWSEBTA-ABCDEF123456]", result.ResourceIDs())
 	}

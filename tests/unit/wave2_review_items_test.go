@@ -1,8 +1,7 @@
 package unit_test
 
-// wave2_review_items_test.go — the partial-failure class found by the area
-// review. Each test starts from the review's trigger: a refused, throttled,
-// missing or not-yet-loaded input. The rule is always the same: a check that
+// wave2_review_items_test.go — Wave 2 partial failures. Each test starts from
+// a refused, throttled, missing or not-yet-loaded input. The rule is always the same: a check that
 // did not answer leaves its row marked, never inspected-and-clean, and the
 // badge says whether its count can be short.
 
@@ -97,7 +96,7 @@ func rvMenuPatch(t *testing.T, core *runtime.Core, ev messages.EnrichmentChecked
 }
 
 // ---------------------------------------------------------------------------
-// P2-1 — a refused row on a "!"-capable type makes the badge a lower bound
+// a refused row on a "!"-capable type makes the badge a lower bound
 // ---------------------------------------------------------------------------
 
 // TestBadge_RefusedRowOnIssueCapableTypeIsALowerBound: one row's check was
@@ -148,7 +147,7 @@ func TestBadge_RefusedRowOnIssueCapableTypeIsALowerBound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-2 — a throttled account walk keeps the partial answer
+// a throttled account walk keeps the partial answer
 // ---------------------------------------------------------------------------
 
 func rvThrottled(service, op string) error {
@@ -217,7 +216,7 @@ func TestProbe_ThrottledAccountWalkKeepsThePartialAnswer(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-3 — cf: a HeadBucket that did not answer is not "bucket exists"
+// cf: a HeadBucket that did not answer is not "bucket exists"
 // ---------------------------------------------------------------------------
 
 type rvCFFake struct {
@@ -274,7 +273,7 @@ func TestCFOriginBucket_UnansweredHeadBucketMarksTheDistribution(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-4 — kms: a refused rotation read is a refused read
+// kms: a refused rotation read is a refused read
 // ---------------------------------------------------------------------------
 
 type rvKMSFake struct {
@@ -319,7 +318,7 @@ func TestKMSRotation_DeniedOnCustomerKeyIsUninspected(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-5 — one badge lower-bound rule, live, on demand and after a restart
+// one badge lower-bound rule, live, on demand and after a restart
 // ---------------------------------------------------------------------------
 
 // TestBadge_EveryRowRefusedIsNotConfirmedZero: every ec2 row's check was
@@ -433,7 +432,7 @@ func TestBadge_OnDemandRowCheckKeepsTheSweepsRule(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-6 — a check whose sibling list is missing or cut did not run
+// a check whose sibling list is missing or cut did not run
 // ---------------------------------------------------------------------------
 
 // TestWave2CacheGate_EveryEnricherMarksRowsItCouldNotJudge runs each enricher
@@ -480,7 +479,7 @@ func TestWave2CacheGate_EveryEnricherMarksRowsItCouldNotJudge(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-1 — redshift can hide no issue
+// redshift can hide no issue
 // ---------------------------------------------------------------------------
 
 type rvRedshiftFake struct {
@@ -522,7 +521,7 @@ func TestRedshiftBadge_CapDoesNotMakeTheCountALowerBound(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-2 — lambda: a policy a9s cannot parse is not "not public"
+// lambda: a policy a9s cannot parse is not "not public"
 // ---------------------------------------------------------------------------
 
 type rvLambdaFake struct {
@@ -560,7 +559,7 @@ func TestLambdaPolicy_UnparseablePolicyIsUninspected(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-3 — an ID the batch describe did not return was not inspected
+// an ID the batch describe did not return was not inspected
 // ---------------------------------------------------------------------------
 
 const rvClusterARN = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-prod"
@@ -727,7 +726,7 @@ func TestECSBatches_DeadlineMarksEveryUnreachedRow(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-4 — own account unknown: the cross-account check cannot run
+// own account unknown: the cross-account check cannot run
 // ---------------------------------------------------------------------------
 
 // rvOwnRolePolicy grants the account's own role — cross-account only when the
@@ -824,7 +823,7 @@ func TestOwnAccountUnknown_CrossAccountCheckIsUninspected(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-5 — s3: an unread block cannot be assumed off
+// s3: an unread block cannot be assumed off
 // ---------------------------------------------------------------------------
 
 type rvS3PostureFake struct {

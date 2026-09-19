@@ -98,7 +98,7 @@ func bkProvenButTagDenied(t *testing.T, rules []resource.Resource, proven string
 }
 
 // ---------------------------------------------------------------------------
-// Row 2 — a row marked not inspected keeps what the result proved for it
+// a row marked not inspected keeps what the result proved for it
 // ---------------------------------------------------------------------------
 
 // TestFoldWave2Rows_UninspectedRowKeepsTheFindingItsResultProved folds a
@@ -270,7 +270,7 @@ func TestUninspectedRowWithProvenFinding_ListBadgeAndDetailAgree(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 3 — a failed call proves nothing
+// a failed call proves nothing
 // ---------------------------------------------------------------------------
 
 // TestEBRuleDeniedTargetCall_RaisesNoNoTargetsFinding: an empty target list
@@ -393,7 +393,7 @@ func TestWave2DeniedCalls_NoEnricherRaisesAFindingTheDataRefutes(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 4 — a walk that failed names the call
+// a walk that failed names the call
 // ---------------------------------------------------------------------------
 
 // bkEC2Fake serves DescribeInstanceStatus and DescribeSnapshots from ordered
@@ -566,7 +566,7 @@ func TestBackupJobWalk_RefusedPageNamesTheCall(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 5 — the cap is spent on rows the check applies to
+// the cap is spent on rows the check applies to
 // ---------------------------------------------------------------------------
 
 // bkAssertIneligibleUntouched: a row the check can never apply to is neither
@@ -773,7 +773,7 @@ func TestDBISnapShareCap_AutomatedSnapshotsDoNotSpendTheCap(t *testing.T) {
 	}
 	fake := &bkRDSFake{asked: map[string]bool{}}
 
-	// The parent instance list is loaded (#549 area-review ruling P2-6), so a
+	// The parent instance list is loaded, so a
 	// mark here can only come from the share-attribute cap under test.
 	dbiLoaded := resource.ResourceCache{"dbi": {Resources: []resource.Resource{}}}
 	res, _ := enricher.Fn(context.Background(), &awsclient.ServiceClients{RDS: fake}, rows, dbiLoaded) //nolint:errcheck // judged by its findings and marks

@@ -521,9 +521,8 @@ func TestRelated_ECSTask_CTEvents_NilCache(t *testing.T) {
 // checkECSTaskEC2 — the container instance's Ec2InstanceId
 // ---------------------------------------------------------------------------
 
-// Inverted by #545 ruling C: the container-instance UUID is not an EC2
-// instance ID, and without an ECS client the instance behind it is unknown.
-// Do not restore the UUID as an ec2 ID.
+// The container-instance UUID is not an EC2 instance ID, and without an ECS
+// client the instance behind it is unknown.
 func TestRelated_ECSTask_EC2_MatchFromContainerInstanceArn(t *testing.T) {
 	task := ecstypes.Task{
 		ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/my-cluster/abcdef1234567890"),

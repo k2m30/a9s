@@ -52,7 +52,7 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 		// The same second step the real lane takes (handleResourcesLoadedEvent):
 		// the menu observation and then the save that records it. Calling only
 		// the save would leave this seam persisting an issue count the menu
-		// never reconciled — the two answers the round-2 ruling removes.
+		// never reconciled, so the menu and the cache would give two answers.
 		c.syncExactTotalToMenu(&c.stack[len(c.stack)-1], canon)
 	}
 }

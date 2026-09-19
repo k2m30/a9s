@@ -61,8 +61,7 @@ func secretsSourceWithRotation(secretARN, secretName, rotationLambdaARN string) 
 
 // TestRelated_Secrets_CodeArtifact_MatchByName verifies that a secret whose
 // name says codeartifact counts the loaded repository its name names.
-// Inverted by #545 row 6: the secret's own name is no codeartifact row, so
-// it is never the ID. Do not restore it.
+// The secret's own name is no codeartifact row, so it is never the ID.
 func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod/codeartifact/acme-npm/token",

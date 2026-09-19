@@ -1011,8 +1011,8 @@ func r53ACMCache(domains ...string) (resource.ResourceCache, []string) {
 
 // TestRelated_R53_ACM_Match verifies that a CNAME record starting with "_" whose
 // value ends with ".acm-validations.aws" counts the certificate for the domain
-// it validates. Inverted by #545 row 6: the record name is no acm row, so the
-// ID is the certificate ARN. Do not restore the record name.
+// it validates. The record name is no acm row, so the ID is the certificate
+// ARN.
 func TestRelated_R53_ACM_Match(t *testing.T) {
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
@@ -1048,8 +1048,8 @@ func TestRelated_R53_ACM_Match(t *testing.T) {
 }
 
 // TestRelated_R53_ACM_MultipleValidationRecords verifies that two CNAME validation
-// records for two certificates in one zone both produce IDs. Inverted by #545
-// row 6, as in TestRelated_R53_ACM_Match: the IDs are the certificates' ARNs.
+// records for two certificates in one zone both produce IDs: the
+// certificates' ARNs.
 func TestRelated_R53_ACM_MultipleValidationRecords(t *testing.T) {
 	fakeR53 := &fakeRoute53Full{
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{

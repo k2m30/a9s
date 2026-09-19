@@ -169,8 +169,8 @@ func w2DDBClients(fake *w2DDBPolicyFake) *awsclient.ServiceClients {
 
 func w2DDBRun(t *testing.T, fake *w2DDBPolicyFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
-	// The backup plan list is loaded (#549 area-review ruling P2-6), so a mark
-	// on a table comes from the policy read these tests drive.
+	// The backup plan list is loaded, so a mark on a table comes from the
+	// policy read these tests drive.
 	backupLoaded := resource.ResourceCache{"backup": {Resources: []resource.Resource{}}}
 	res, err := w2Enricher(t, "ddb")(context.Background(), w2DDBClients(fake), rs, backupLoaded)
 	w2AssertEnricherShape(t, res)

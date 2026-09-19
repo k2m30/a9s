@@ -1,8 +1,8 @@
 package unit_test
 
-// canonical_ref_review_test.go — the reference readings the area review and
-// acceptance found still done by hand, or still reading a name as an ID: each
-// test drives the registered checker, the fetcher or the rendered detail with
+// canonical_ref_review_test.go — reference readings that must go through the
+// target's resolver rather than a hand-rolled parse or a name read as an ID:
+// each test drives the registered checker, the fetcher or the rendered detail with
 // the shape AWS returns and asserts the row ID the target list keys on.
 
 import (
@@ -55,7 +55,7 @@ func refRelatedDef(t *testing.T, source, target string) resource.RelatedDef {
 	return resource.RelatedDef{}
 }
 
-// ── A: every checker reads its references through the target's resolver ───
+// ── every checker reads its references through the target's resolver ───────
 
 // TestTGWRole_ServiceLinkedRoleCountedByName: role rows are keyed by role
 // name, so the transit gateway's service-linked role is counted by name, not
@@ -211,7 +211,7 @@ func TestASGELB_ClassicNamesAreNotLoadBalancerRows(t *testing.T) {
 	}
 }
 
-// ── B: alarm dimensions that hold a name ──────────────────────────────────
+// ── alarm dimensions that hold a name ──────────────────────────────────────
 
 func refNamedRow(t *testing.T, b refBench, typ string) resource.Resource {
 	t.Helper()
@@ -264,7 +264,7 @@ func TestAlarmNamedDimensions_ResolveToTheRowID(t *testing.T) {
 	}
 }
 
-// ── C: an ECS task's host is an EC2 instance ID ───────────────────────────
+// ── an ECS task's host is an EC2 instance ID ───────────────────────────────
 
 // TestEcsTaskEC2_HostIsAnInstanceID: a task on the EC2 launch type runs on a
 // container instance whose Ec2InstanceId is the ec2 row; the container
@@ -294,7 +294,7 @@ func TestEcsTaskEC2_HostIsAnInstanceID(t *testing.T) {
 	}
 }
 
-// ── D: CloudTrail principals from another account ─────────────────────────
+// ── CloudTrail principals from another account ─────────────────────────────
 
 type refCloudTrailFake struct {
 	awsclient.CloudTrailAPI
@@ -396,7 +396,7 @@ func TestCtEventsPrincipals_AnotherAccountIsNotTheLocalNamesake(t *testing.T) {
 	}
 }
 
-// ── E: a KMS lookup that partly fails keeps what it resolved ──────────────
+// ── a KMS lookup that partly fails keeps what it resolved ──────────────────
 
 // refKMSLookupFake answers DescribeKey for the listed key IDs and aliases,
 // NotFound for a retired alias, and a service failure for a flaky one.
@@ -548,7 +548,7 @@ func TestKMSPivots_PartialLookupFailureKeepsWhatResolved(t *testing.T) {
 	}
 }
 
-// ── F: a KMS alias field opens the key the related row counts ─────────────
+// ── a KMS alias field opens the key the related row counts ─────────────────
 
 // TestSSMKeyId_AWSManagedAliasNavigableWithoutTheKeyList: the operator opens
 // the parameter before ever loading the kms list. Once the KMS row's result
@@ -578,7 +578,7 @@ func TestSSMKeyId_AWSManagedAliasNavigableWithoutTheKeyList(t *testing.T) {
 	}
 }
 
-// ── G: KMS → secrets reads the viewed key's own aliases ───────────────────
+// ── KMS → secrets reads the viewed key's own aliases ───────────────────────
 
 // TestKMSSecrets_ViewedKeyAliasesMatchWithoutTheKeyList: a secret names its
 // key by alias ARN, and the viewed key (opened from a pivot, the kms list not
@@ -606,7 +606,7 @@ func TestKMSSecrets_ViewedKeyAliasesMatchWithoutTheKeyList(t *testing.T) {
 	}
 }
 
-// ── I: the demo bench shows each reference shape ──────────────────────────
+// ── the demo bench shows each reference shape ──────────────────────────────
 
 func refRawJSON(r resource.Resource) string {
 	raw, err := json.Marshal(r.RawStruct)
@@ -699,7 +699,7 @@ func TestDemoKMS_NoCustomerKeyInTheReservedAliasNamespace(t *testing.T) {
 	}
 }
 
-// ── J: the CloudTrail JSON fallback keeps the principal's account ─────────
+// ── the CloudTrail JSON fallback keeps the principal's account ─────────────
 
 // TestCtEventsPrincipals_JSONFallbackKeepsTheAccount: an event whose only
 // role evidence is userIdentity.sessionContext.sessionIssuer (LookupEvents
@@ -777,7 +777,7 @@ func TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole(t *testing.T) {
 	}
 }
 
-// ── K: Route 53 → API Gateway reads the host through the apigw resolver ──
+// ── Route 53 → API Gateway reads the host through the apigw resolver ───────
 
 type refR53Fake struct {
 	awsclient.Route53API

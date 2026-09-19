@@ -672,8 +672,8 @@ func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 			KMSKeyArn:    aws.String("alias/aws/lambda"),
 		},
 	}
-	// Inverted by #545 row 1: the alias resolves, whole, to the key the kms
-	// list says carries it. Do not restore the alias as the ID.
+	// The alias resolves, whole, to the key the kms list says carries it; the
+	// alias is never the ID.
 	const keyID = "1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e"
 	cache := resource.ResourceCache{"kms": resource.ResourceCacheEntry{Resources: []resource.Resource{
 		{ID: keyID, Fields: map[string]string{"alias": "alias/aws/lambda"}},

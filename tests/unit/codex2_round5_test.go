@@ -71,8 +71,8 @@ func TestEnrichDBI_HealthyRunStillReturnsNoError(t *testing.T) {
 	current.EngineVersion = aws.String("16.3")
 
 	fake := &w2RDSEngineVersionsFake{status: map[string]string{"postgres|16.3": "available"}}
-	// The backup plan list is loaded (#549 area-review ruling P2-6): a clean
-	// run is one where every list the checks join against was read.
+	// The backup plan list is loaded: a clean run is one where every list the
+	// checks join against was read.
 	backupLoaded := resource.ResourceCache{"backup": {Resources: []resource.Resource{}}}
 	res, err := w2Enricher(t, "dbi")(context.Background(),
 		&awsclient.ServiceClients{RDS: fake}, codex2DBIRows(t, current), backupLoaded)

@@ -69,8 +69,8 @@ func w2DBISnapRun(t *testing.T, fake *w2DBISnapAttrFake, ids ...string) (awsclie
 	for _, id := range ids {
 		rs = append(rs, w2Res(id, w2DBISnapshot(id)))
 	}
-	// The parent instance list is loaded (#549 area-review ruling P2-6), so a
-	// mark on a snapshot comes from the share read these tests drive.
+	// The parent instance list is loaded, so a mark on a snapshot comes from
+	// the share read these tests drive.
 	dbiLoaded := resource.ResourceCache{"dbi": {Resources: []resource.Resource{}}}
 	res, err := w2Enricher(t, "dbi-snap")(context.Background(), &awsclient.ServiceClients{RDS: fake}, rs, dbiLoaded)
 	w2AssertEnricherShape(t, res)

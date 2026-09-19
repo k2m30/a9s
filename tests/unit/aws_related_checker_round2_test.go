@@ -1240,8 +1240,8 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				// Inverted by #545 row 1: r53 keys its rows on the
-				// "/hostedzone/" form. Do not restore the bare zone ID.
+				// r53 rows are keyed by the "/hostedzone/" form, not the
+				// bare zone ID.
 				{ID: "/hostedzone/Z1234567890ABC", Name: "internal.acme.local."},
 			},
 		},

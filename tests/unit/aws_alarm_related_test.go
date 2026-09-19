@@ -400,8 +400,8 @@ func TestRelated_Alarm_EC2_NoDimension(t *testing.T) {
 
 // TestRelated_Alarm_ECS_MatchByClusterName: EKS and ECS alarms share the
 // ClusterName dimension, so only the namespace says which cluster type it
-// is. Inverted by #545 row 6 (an EKS cluster name counted as an ECS
-// cluster): the alarm now carries its namespace. Do not drop it.
+// is: an alarm without its namespace would count an EKS cluster name as an
+// ECS cluster.
 func TestRelated_Alarm_ECS_MatchByClusterName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
 		Namespace: aws.String("AWS/ECS"),

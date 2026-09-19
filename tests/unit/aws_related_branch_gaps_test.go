@@ -291,9 +291,8 @@ func TestRelated_CbSecrets_NilEnvironment(t *testing.T) {
 	}
 }
 
-// Inverted by #545 ruling A: secrets rows are keyed by the secret's name, and
-// the "-AbCdEf" Secrets Manager appends in the ARN is not part of it. Do not
-// restore the suffixed ID.
+// secrets rows are keyed by the secret's name, and the "-AbCdEf" Secrets
+// Manager appends in the ARN is not part of it.
 func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-project",
@@ -320,8 +319,7 @@ func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 	}
 }
 
-// Inverted by #545 ruling A: the ID is the secret's name, without the ARN's
-// random suffix. Do not restore the suffixed ID.
+// The ID is the secret's name, without the ARN's random suffix.
 func TestRelated_CbSecrets_ARNWithJSONKeySuffix_StripsSuffix(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-project",

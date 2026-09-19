@@ -35,7 +35,7 @@ const (
 //   - Rows     = [{Mount Target, <mtID>, "!"}, {AZ, <az>}, {State, <state>, "!"}, {Degraded, "N/M"}]
 //   - Severity = "!"
 //
-// The enricher no longer writes FieldUpdates["status"]. The merged
+// The enricher does not write FieldUpdates["status"]. The merged
 // S4 phrase ("mount target down" alone, or stacked with Wave-1 findings) is
 // computed at render time from r.Findings via domain.StatusPhrase.
 func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {

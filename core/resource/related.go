@@ -200,9 +200,9 @@ func DeferredRelated(targetType string, filter map[string]string) RelatedCheckRe
 // completed and ids is either the exhaustive match set (truncated == false)
 // or the best-effort subset found so far, with more possibly unseen
 // (truncated == true). This is the ONLY way to construct a RelatedResolved
-// result with a count — the bare struct literal that let a checker report
-// Count: 0 after a swallowed error no longer compiles outside core/domain,
-// since RelatedCheckResult's fields are all unexported. See
+// result with a count — a bare struct literal reporting Count: 0 after a
+// swallowed error does not compile outside core/domain, since
+// RelatedCheckResult's fields are all unexported. See
 // domain.KnownRelated for the truncated-as-partial-success semantics.
 func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckResult {
 	return domain.KnownRelated(targetType, ids, truncated)

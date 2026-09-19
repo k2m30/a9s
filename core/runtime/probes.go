@@ -249,7 +249,7 @@ type saveObservation struct {
 }
 
 // incomingTypeFile derives the Count and Exact a save hands reconcileTypeFile.
-// Both lanes that write a type file call it, so the two can no longer answer
+// Both lanes that write a type file call it, so the two cannot answer
 // the same question differently, and a third lane cannot copy the reasoning a
 // third time. Rows are the caller's to attach: they are the one thing the two
 // lanes genuinely differ about.

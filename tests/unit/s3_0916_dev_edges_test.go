@@ -1,8 +1,8 @@
 package unit_test
 
-// s3_0916_dev_edges_test.go — the edges of task s3-0916's five rows that no
-// row test pins: the negated form of each rule, the empty input, the malformed
-// element, and the partition the examples do not use.
+// s3_0916_dev_edges_test.go — edge cases of the S3 reference and exposure
+// rules: the negated form of each rule, the empty input, the malformed
+// element, and a non-commercial partition.
 
 import (
 	"context"
@@ -23,10 +23,10 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Row 3 — which part of the record names the bucket
+// which part of the record names the bucket
 // ---------------------------------------------------------------------------
 
-// TestS3_0916_Dev_Row3_BucketPrefixedTargetNamesNoBucket pins the ruling that a
+// TestS3_0916_Dev_Row3_BucketPrefixedTargetNamesNoBucket pins that a
 // bucket segment inside the alias target is not a bucket. S3 routes a website
 // request by Host header, so AWS requires the record's name to equal the
 // bucket; a target carrying a bucket segment is not a shape Route 53 returns,
@@ -106,7 +106,7 @@ func (f *row3ZoneFake) ListResourceRecordSets(
 }
 
 // ---------------------------------------------------------------------------
-// Row 4 — hostnames the stories do not cover
+// S3 endpoint hostnames
 // ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row4_ChinaPartitionOriginIsAnS3Endpoint pins the other
@@ -131,7 +131,7 @@ func TestS3_0916_Dev_Row4_BareEndpointAddressesNoBucket(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 2 — the empty list and the element that is not an ARN
+// the empty list and the element that is not an ARN
 // ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row2_EmptyAndMalformedElements pins that an element which is
@@ -187,7 +187,7 @@ func TestS3_0916_Dev_Row2_ErrorOutranksTruncation(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 1 — grantee shapes and an uninspectable block
+// grantee shapes and an uninspectable block
 // ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row1_LogDeliveryGroupIsNotPublic pins the third group S3
@@ -247,11 +247,8 @@ func (f *row1DeniedBlockFake) GetPublicAccessBlock(
 // TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged: the public access
 // block that would neutralise the grant could not be read, so whether S3
 // honours the grant is unknown. The bucket is marked not inspected and no
-// s3.public is claimed.
-//
-// Inverted by #549 area-review ruling P3-5: this test used to pin that the
-// grant was reported anyway, which turned an unread setting into a "!"
-// finding. Do not restore the old assertion.
+// s3.public is claimed: reporting the grant anyway would turn an unread
+// setting into a "!" finding.
 func TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged(t *testing.T) {
 	fake := &row1DeniedBlockFake{row1S3Fake{
 		grants: []s3types.Grant{row1GroupGrant(row1AllUsers, s3types.PermissionRead)},
@@ -269,7 +266,7 @@ func TestS3_0916_Dev_Row1_RefusedBlockLeavesTheGrantUnjudged(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 5 — the page boundary the table does not cover
+// the page boundary: an empty NextToken
 // ---------------------------------------------------------------------------
 
 // TestS3_0916_Dev_Row5_EmptyTokenIsNotTruncation pins that a NextToken present

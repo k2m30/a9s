@@ -382,8 +382,8 @@ func TestR53AddressOwnership_AnswersOnlyWhatTheInventoryProves(t *testing.T) {
 			want:  awsclient.R53AddrUnknown,
 		},
 		{
-			// The eni cache is no longer consulted, so its absence must not
-			// void a verdict the eip and ec2 caches already prove.
+			// The eni cache is not consulted, so its absence must not void a
+			// verdict the eip and ec2 caches already prove.
 			name:  "the network interface inventory is absent",
 			addr:  unattached,
 			cache: full,
@@ -757,16 +757,11 @@ func TestS3BucketPolicyRoles_RolePrincipalsInEveryPartitionAreCounted(t *testing
 	}
 }
 
-// TestGlueSecrets_SecretARNsInEveryPartitionAreCounted pins the fourth site of
-// the secret-ARN question, the one the first sweep left behind while
-// converting the other three. A Glue job names its secrets in the job
-// arguments AWS returned.
-//
-// Inverted by #545 rows 1 and 5: the ID is the secret's name without the
-// "-XXXXXX" Secrets Manager appends in the ARN, and each partition's secret
-// is read from a session in its own region, since a secret in another
-// region is no row of the local list. Do not restore the suffixed ID or the
-// single us-east-1 session.
+// TestGlueSecrets_SecretARNsInEveryPartitionAreCounted: a Glue job names its
+// secrets in the job arguments AWS returned. The ID is the secret's name
+// without the "-XXXXXX" Secrets Manager appends in the ARN, and each
+// partition's secret is read from a session in its own region, since a
+// secret in another region is no row of the local list.
 func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 	checker := parseCheckerFor(t, "glue", "secrets")
 	const secretName = "acme/db"

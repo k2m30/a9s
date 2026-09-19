@@ -128,9 +128,9 @@ func row4LoggingClients(host string) *awsclient.ServiceClients {
 }
 
 // TestS3_0916_Row4_LoggingBucketIsTheParsedName pins the standard-logging
-// bucket's host reading. The bucket counts under S3 Buckets (#545 facilitator
-// ruling 1, item 3c: cf→logs is unregistered and docs/resources/cf.md § s3
-// names the logging bucket), read by the same rule as an origin host.
+// bucket's host reading. The bucket counts under S3 Buckets (cf→logs is
+// unregistered and docs/resources/cf.md § s3 names the logging bucket), read
+// by the same rule as an origin host.
 func TestS3_0916_Row4_LoggingBucketIsTheParsedName(t *testing.T) {
 	checker := checkerByTarget(t, "cf", "s3")
 	dist := row4Distribution(row4ProxyHost)

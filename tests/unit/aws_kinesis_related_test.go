@@ -512,9 +512,8 @@ func TestRelated_Kinesis_KMS_Present(t *testing.T) {
 
 	source := resource.Resource{ID: streamName, Name: streamName}
 
-	// Inverted by #545 row 1: an alias resolves, whole, to the key the kms
-	// list says carries it — kms keys its rows on the key ID. Do not restore
-	// the alias as the ID.
+	// An alias resolves, whole, to the key the kms list says carries it — kms
+	// rows are keyed by the key ID.
 	const keyID = "0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d"
 	cache := resource.ResourceCache{"kms": resource.ResourceCacheEntry{Resources: []resource.Resource{
 		{ID: keyID, Fields: map[string]string{"alias": "alias/aws/kinesis/mrk-abc1234"}},

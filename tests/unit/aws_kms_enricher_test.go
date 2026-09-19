@@ -134,10 +134,6 @@ func TestEnrichKMSRotation_EnabledProducesNoFinding(t *testing.T) {
 // customer-managed keys, so a denied GetKeyRotationStatus is a missing
 // permission on a key the operator owns, not an AWS-managed key. The key is
 // marked not inspected, the denial is reported, and no finding is claimed.
-//
-// Inverted by #549 area-review ruling P2-4: this test used to pin that the
-// denial was skipped silently, which left the key looking clean. Do not
-// restore the old assertion.
 func TestEnrichKMSRotation_DeniedRotationReadMarksTheKey(t *testing.T) {
 	fake := &kmsFake{
 		perKey: map[string]*kmsRotationResponse{

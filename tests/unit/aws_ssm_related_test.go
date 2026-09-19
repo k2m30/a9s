@@ -155,9 +155,8 @@ func TestRelated_SSM_KMS_NilKeyId(t *testing.T) {
 
 // TestRelated_SSM_NilClients: an alias no loaded key carries, with no client
 // to look it up, names no row; the count says one reference went unread.
-// Inverted by #545 facilitator ruling 1 (item 3a): the answer does not wait on
-// the kms list, which never holds an AWS-managed key. Do not restore the
-// Unknown.
+// The answer does not wait on the kms list, which never holds an AWS-managed
+// key.
 func TestRelated_SSM_NilClients(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, ssmSecureRes(), resource.ResourceCache{})

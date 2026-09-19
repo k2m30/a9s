@@ -650,9 +650,8 @@ func TestRelated_Redis_SG(t *testing.T) {
 // DescribeCacheClusters(MemberClusters[0]) path (phase 7). The sns cache is
 // pre-populated so FetchRelatedTarget takes the cache path.
 //
-// Inverted by #545 ruling A: sns rows are keyed by topic ARN, and a row keyed
-// by the bare topic name is no row the sns fetcher produces, so it is not
-// counted. Do not restore the name match.
+// sns rows are keyed by topic ARN; a row keyed by the bare topic name is no
+// row the sns fetcher produces, so it is not counted.
 func TestRelated_Redis_SNS(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:redis-ops-pager"
 	const topicName = "redis-ops-pager"

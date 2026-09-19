@@ -249,8 +249,8 @@ const tgwSLRARN = "arn:aws:iam::123456789012:role/aws-service-role/transitgatewa
 // TestRelated_TGW_Role_Match verifies that a GetRole response with a valid ARN
 // produces Count=1 with the role's name in ResourceIDs.
 //
-// Inverted by #545 ruling A: role rows are keyed by role name, and the ARN is
-// read through the role resolver. Do not restore the ARN as the ID.
+// Role rows are keyed by role name, and the ARN is read through the role
+// resolver.
 func TestRelated_TGW_Role_Match(t *testing.T) {
 	fake := newFakeIAMWithRole(tgwSLRARN, tgwSLRName)
 	clients := &awsclient.ServiceClients{IAM: fake}

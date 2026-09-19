@@ -715,8 +715,7 @@ func TestRelated_ASG_AMI_WrongRawStruct(t *testing.T) {
 // TestRelated_ASG_ELB_MatchByClassicELBNames verifies that checkASGELB counts
 // no Classic ELB names from LoadBalancerNames.
 //
-// Inverted by #545 ruling A: the elb type holds ELBv2 load balancers only, so
-// a Classic name names no row. Do not restore the Classic count.
+// The elb type holds ELBv2 load balancers only, so a Classic name names no row.
 func TestRelated_ASG_ELB_MatchByClassicELBNames(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-asg",
@@ -1219,8 +1218,7 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (one ALB from TG ARN)", result.Count())
 	}
-	// Inverted by #545 row 1: elb keys its rows on the load balancer name.
-	// Do not restore the ARN.
+	// elb rows are keyed by the load balancer name, not the ARN.
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
 		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
@@ -1232,8 +1230,7 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 // TestRelated_ASG_ELB_TGARNs_BothClassicAndALB verifies that checkASGELB counts
 // the ALB resolved from TargetGroupARNs and not the Classic ELB name.
 //
-// Inverted by #545 ruling A: the elb type holds ELBv2 load balancers only. Do
-// not restore the Classic count.
+// The elb type holds ELBv2 load balancers only.
 func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/xyz987"
@@ -1265,7 +1262,7 @@ func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	// Inverted by #545 row 1: the ALB is counted by its name, the elb row ID.
+	// The ALB is counted by its name, the elb row ID.
 	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "my-alb" {
 		t.Errorf("ResourceIDs = %v, want [my-alb] (Classic %q is no elb row)", ids, classicName)
 	}

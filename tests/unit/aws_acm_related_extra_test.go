@@ -172,8 +172,7 @@ func TestRelated_ACM_ELB_NonLBARNSkipped(t *testing.T) {
 
 // TestRelated_ACM_APIGW_DomainnamesARN: an InUseBy ARN naming an API
 // Gateway custom domain is not counted — a domain name is no apigw row — and
-// the count says it left one out. Inverted by #545 row 6: a domain name drills into
-// no apigw row, so it is never the ID. Do not restore it.
+// the count says it left one out.
 func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
 	const certARN = "arn:aws:acm:us-east-1:111122223333:certificate/abc-apigw"
 	source := resource.Resource{
