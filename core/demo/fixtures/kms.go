@@ -203,8 +203,8 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
-		// OrdersProdKMSKeyID — DDB→kms pivot: matched by checkDdbKMS stripping the ARN
-		// suffix from SSEDescription.KMSMasterKeyArn on the orders-prod table.
+		// OrdersProdKMSKeyID — the orders-prod table's SSEDescription.KMSMasterKeyArn
+		// names this key.
 		{
 			KeyId:                aws.String(OrdersProdKMSKeyID),
 			Arn:                  aws.String(OrdersProdKMSKeyARN),

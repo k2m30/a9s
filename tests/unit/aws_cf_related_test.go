@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// The fake CloudFront client used by the checkCfLambda tests now
-// lives in fakes_cloudfront_test.go (fakeCloudFrontAPI) — see that file's
-// header for the one-fake-per-interface convention.
-
 // fakeCFServiceClients builds a *awsclient.ServiceClients with only CloudFront populated.
 func fakeCFServiceClients(cf *fakeCloudFrontAPI) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{CloudFront: cf}

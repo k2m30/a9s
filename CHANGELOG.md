@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   certificates, ECS task secrets, SSM parameter keys and several other rows
   showed a count and opened an empty list.
 - A field in the detail view that names another resource opens the same
-  resource its related row counts. Target group load balancers, secrets,
+  resource its related row counts. Target group load balancers,
   internet gateways and peering connections now open; a gateway value of
   `local` is no longer offered.
 - A reference to a resource in another account or region is no longer

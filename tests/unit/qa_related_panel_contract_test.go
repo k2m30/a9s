@@ -352,7 +352,6 @@ func TestRelatedPanel_NoExcludedPairsRegistered(t *testing.T) {
 	}
 	excluded := parseExcludedPairs(string(raw))
 
-	// Count the total excluded entries and verify the doc still has all 81.
 	total := 0
 	for _, targets := range excluded {
 		total += len(targets)

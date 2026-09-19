@@ -173,7 +173,7 @@ expect ng.txt "details denied" "ng keeps the node group whose describe was denie
 expect ng.txt "details unavailable" "ng keeps the node group whose describe found nothing"
 
 # Lambda: the issue-colored rows explain themselves in the State column.
-expect lambda.txt "lambda(36) !" "lambda title carries the issue count"
+expect lambda.txt "lambda(39) !" "lambda title carries the issue count"
 expect lambda.txt "runtime is end-of-life" "lambda deprecated runtime explains itself"
 
 # S3: reference type baseline — count, issues, the PAB cause visible.

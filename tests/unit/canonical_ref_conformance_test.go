@@ -92,10 +92,6 @@ func TestRefConformance_RelatedIDsAreTargetRows(t *testing.T) {
 // as the app renders it and requires Enter on each navigable row to hand the
 // navigation an ID that opens a row of the target, and that ID to be the one
 // resource.NavIDFromValue gives the same value — one reading for both.
-//
-// ct-events is left out: its navigable rows are the event body's own
-// principal and target, not registered NavigableFields, and they name
-// resources as they were when the call was made.
 func TestRefConformance_NavigableFieldsOpenTargetRows(t *testing.T) {
 	b := newRefBench(t)
 	o := newRefOpener(b)
