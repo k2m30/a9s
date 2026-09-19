@@ -27,10 +27,13 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -694,4 +697,195 @@ func TestDemoKMS_NoCustomerKeyInTheReservedAliasNamespace(t *testing.T) {
 			}
 		}
 	}
+}
+
+// ── J: the CloudTrail JSON fallback keeps the principal's account ─────────
+
+// TestCtEventsPrincipals_JSONFallbackKeepsTheAccount: an event whose only
+// role evidence is userIdentity.sessionContext.sessionIssuer (LookupEvents
+// reports the session name as Username, and there is no roleArn or role
+// resource) names the issuing role with its account. A role in another
+// account is no local role; the iam-user pivot reads another account's user
+// the same way.
+func TestCtEventsPrincipals_JSONFallbackKeepsTheAccount(t *testing.T) {
+	b := newRefBench(t)
+	const role = "a9s-demo-s3-access-role"
+	const user = "alice.johnson"
+	bySession := func(id, account string) cloudtrailtypes.Event {
+		return refCTEvent(id, "DescribeInstances", "ops-1759", map[string]any{
+			"eventName":          "DescribeInstances",
+			"recipientAccountId": refAccount,
+			"userIdentity": map[string]any{
+				"type": "AssumedRole", "accountId": account,
+				"arn": "arn:aws:sts::" + account + ":assumed-role/" + role + "/ops-1759",
+				"sessionContext": map[string]any{"sessionIssuer": map[string]any{
+					"type": "Role", "accountId": account, "userName": role,
+					"arn": "arn:aws:iam::" + account + ":role/" + role,
+				}},
+			},
+		})
+	}
+	byUser := func(id, account string) cloudtrailtypes.Event {
+		return refCTEvent(id, "ListBuckets", user, map[string]any{
+			"eventName":          "ListBuckets",
+			"recipientAccountId": refAccount,
+			"userIdentity": map[string]any{
+				"type": "IAMUser", "accountId": account, "userName": user,
+				"arn": "arn:aws:iam::" + account + ":user/" + user,
+			},
+		})
+	}
+	rows := refCTRows(t,
+		bySession("evt-json-local", refAccount), bySession("evt-json-foreign", refForeignAccount),
+		byUser("evt-user-local", refAccount), byUser("evt-user-foreign", refForeignAccount),
+	)
+	cases := []struct {
+		id, target string
+		want       []string
+	}{
+		{"evt-json-local", "role", []string{role}},
+		{"evt-json-foreign", "role", nil},
+		{"evt-user-local", "iam-user", []string{user}},
+		{"evt-user-foreign", "iam-user", nil},
+	}
+	for _, tc := range cases {
+		got := refChecker(t, "ct-events", tc.target)(context.Background(), refClients(), rows[tc.id], b.cache)
+		if ids := sortedIDs(got); !slices.Equal(ids, tc.want) {
+			t.Errorf("%s → %s IDs = %v, want %v", tc.id, tc.target, ids, tc.want)
+		}
+	}
+}
+
+// TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole is the demo witness: the
+// Karpenter event was made by a role in account 111111111111, so its IAM
+// Roles row reads (0). The local role list is the caller's account only, so
+// no role row carries another account's ARN.
+func TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole(t *testing.T) {
+	b := newRefBench(t)
+	for _, r := range b.byType["role"] {
+		var raw struct{ Arn string }
+		if err := json.Unmarshal([]byte(refRawJSON(r)), &raw); err == nil && raw.Arn != "" &&
+			!strings.HasPrefix(raw.Arn, "arn:aws:iam::"+refAccount+":") {
+			t.Errorf("role %s in the local list carries another account's ARN %s", r.ID, raw.Arn)
+		}
+	}
+	ev := b.row(t, "ct-events", "e-a1b2c3d4")
+	got := refChecker(t, "ct-events", "role")(context.Background(), refClients(), ev, b.cache)
+	if got.EffectiveState() != domain.RelatedResolved || got.Count() != 0 {
+		t.Errorf("e-a1b2c3d4 (KarpenterNodeRole in 111111111111) → IAM Roles = %v (state %v), want a resolved 0",
+			got.ResourceIDs(), got.EffectiveState())
+	}
+}
+
+// ── K: Route 53 → API Gateway reads the host through the apigw resolver ──
+
+type refR53Fake struct {
+	awsclient.Route53API
+	aliases []string
+}
+
+func (f *refR53Fake) ListResourceRecordSets(context.Context, *route53.ListResourceRecordSetsInput, ...func(*route53.Options)) (*route53.ListResourceRecordSetsOutput, error) {
+	out := &route53.ListResourceRecordSetsOutput{}
+	for i, a := range f.aliases {
+		out.ResourceRecordSets = append(out.ResourceRecordSets, r53types.ResourceRecordSet{
+			Name:        aws.String("api" + string(rune('a'+i)) + ".acme-corp.com."),
+			Type:        r53types.RRTypeA,
+			AliasTarget: &r53types.AliasTarget{DNSName: aws.String(a + "."), HostedZoneId: aws.String("Z1UJRXOUMOOFQ8")},
+		})
+	}
+	return out, nil
+}
+
+// TestR53APIGW_ExecuteAPIHostsReadThroughTheResolver: a zone's alias records
+// name APIs by their execute-api host. The API a host names is counted by its
+// row ID, and a host naming an API the list does not hold makes the count a
+// lower bound instead of a proven number.
+func TestR53APIGW_ExecuteAPIHostsReadThroughTheResolver(t *testing.T) {
+	b := newRefBench(t)
+	zone := b.byType["r53"][0]
+	clients := refClients()
+	clients.Route53 = &refR53Fake{aliases: []string{
+		"abc123def4.execute-api.us-east-1.amazonaws.com",
+		"zz99nope00.execute-api.us-east-1.amazonaws.com",
+		"d111111abcdef8.cloudfront.net",
+	}}
+	got := refChecker(t, "r53", "apigw")(context.Background(), clients, zone, b.cache)
+	if ids := sortedIDs(got); !slices.Equal(ids, []string{"abc123def4"}) || !got.Truncated() {
+		t.Errorf("r53 → API Gateways = %v truncated=%v, want [abc123def4] truncated=true", ids, got.Truncated())
+	}
+}
+
+// ── L: the demo shows rulings B and G on screen ───────────────────────────
+
+// TestDemoAlarm_ApiNameDimensionOpensTheAPI: one demo alarm names its API by
+// ApiName, the name, and its API Gateways row counts the API's row ID.
+func TestDemoAlarm_ApiNameDimensionOpensTheAPI(t *testing.T) {
+	b := newRefBench(t)
+	for _, a := range b.byType["alarm"] {
+		alarm, ok := a.RawStruct.(cwtypes.MetricAlarm)
+		if !ok || aws.ToString(alarm.Namespace) != "AWS/ApiGateway" {
+			continue
+		}
+		for _, d := range alarm.Dimensions {
+			if aws.ToString(d.Name) != "ApiName" {
+				continue
+			}
+			var want []string
+			for _, api := range b.byType["apigw"] {
+				if api.Name == aws.ToString(d.Value) {
+					want = append(want, api.ID)
+				}
+			}
+			if len(want) != 1 {
+				t.Fatalf("alarm %s ApiName=%q names %d demo APIs, want 1", a.ID, aws.ToString(d.Value), len(want))
+			}
+			if ids := sortedIDs(refChecker(t, "alarm", "apigw")(context.Background(), refClients(), a, b.cache)); !slices.Equal(ids, want) {
+				t.Errorf("alarm %s → API Gateways = %v, want %v", a.ID, ids, want)
+			}
+			return
+		}
+	}
+	t.Fatal("no demo alarm on AWS/ApiGateway names its API by ApiName")
+}
+
+// TestDemoSecret_AliasARNKeyShowsUnderKMSSecrets: one demo secret names its
+// key by alias ARN; the key's Secrets row counts it.
+func TestDemoSecret_AliasARNKeyShowsUnderKMSSecrets(t *testing.T) {
+	b := newRefBench(t)
+	ctx := context.Background()
+	for _, s := range b.byType["secrets"] {
+		if !strings.Contains(aws.ToString(refSecretEntry(t, s).KmsKeyId), ":alias/") {
+			continue
+		}
+		keys := refChecker(t, "secrets", "kms")(ctx, refClients(), s, b.cache).ResourceIDs()
+		if len(keys) != 1 {
+			t.Fatalf("secret %s → KMS Key = %v, want the one key its alias names", s.ID, keys)
+		}
+		key, ok := refRowOrFetched(b, "kms", keys[0])
+		if !ok {
+			t.Fatalf("secret %s names key %s, which neither the kms list nor its by-ID lookup holds", s.ID, keys[0])
+		}
+		if ids := refChecker(t, "kms", "secrets")(ctx, refClients(), key, b.cache).ResourceIDs(); !slices.Contains(ids, s.ID) {
+			t.Errorf("kms %s → Secrets = %v, want it to include %s", key.ID, ids, s.ID)
+		}
+		return
+	}
+	t.Fatal("no demo secret names its KMS key by alias ARN")
+}
+
+func refRowOrFetched(b refBench, typ, id string) (resource.Resource, bool) {
+	for _, r := range b.byType[typ] {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	if fetch := resource.GetFetchByIDs(typ); fetch != nil {
+		rows, _ := fetch(context.Background(), refClients(), []string{id}) //nolint:errcheck // no row is the answer either way
+		for _, r := range rows {
+			if r.ID == id {
+				return r, true
+			}
+		}
+	}
+	return resource.Resource{}, false
 }
