@@ -319,8 +319,10 @@ func TestSecretsPivots_EverySourceCountsBySecretName(t *testing.T) {
 }
 
 // relatedParseCall reports whether call is one of the reference parses the
-// resolvers own: arnLastSegment, strings.LastIndex(x, "/") or
-// strings.Split(x, ":").
+// resolvers own: arnLastSegment; strings.LastIndex, TrimPrefix, TrimSuffix,
+// Cut, CutPrefix or CutSuffix on anything; strings.Split, SplitN, SplitSeq,
+// SplitAfter or Index on a literal holding "/" or ":". A comma-joined field
+// list split on "," is not a reference and is not matched.
 func relatedParseCall(call *ast.CallExpr) string {
 	switch fn := call.Fun.(type) {
 	case *ast.Ident:
@@ -332,19 +334,18 @@ func relatedParseCall(call *ast.CallExpr) string {
 		if !ok || pkg.Name != "strings" || len(call.Args) < 2 {
 			return ""
 		}
-		lit, ok := call.Args[1].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return ""
-		}
-		sep, err := strconv.Unquote(lit.Value)
-		if err != nil {
-			return ""
-		}
-		if fn.Sel.Name == "LastIndex" && sep == "/" {
-			return `strings.LastIndex(…, "/")`
-		}
-		if fn.Sel.Name == "Split" && sep == ":" {
-			return `strings.Split(…, ":")`
+		switch fn.Sel.Name {
+		case "LastIndex", "TrimPrefix", "TrimSuffix", "Cut", "CutPrefix", "CutSuffix":
+			return "strings." + fn.Sel.Name
+		case "Split", "SplitN", "SplitSeq", "SplitAfter", "Index":
+			lit, ok := call.Args[1].(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return ""
+			}
+			sep, err := strconv.Unquote(lit.Value)
+			if err == nil && strings.ContainsAny(sep, "/:") {
+				return "strings." + fn.Sel.Name + "(…, " + strconv.Quote(sep) + ")"
+			}
 		}
 	}
 	return ""

@@ -32,7 +32,7 @@ func TestRelated_CF_Registered(t *testing.T) {
 		hasChecker  bool
 	}
 	expected := map[string]expectation{
-		"s3":  {"S3 Buckets (origin)", true},
+		"s3":  {"S3 Buckets", true},
 		"elb": {"Load Balancers (origin)", true},
 		"waf": {"WAF Web ACLs", true},
 		"acm": {"ACM Certificates", true},

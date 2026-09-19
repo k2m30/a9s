@@ -229,7 +229,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"r53", "acm"}: "ACM Certificates",
 
 		// cf (CloudFront)
-		{"cf", "s3"}:  "S3 Buckets (origin)",
+		{"cf", "s3"}:  "S3 Buckets",
 		{"cf", "elb"}: "Load Balancers (origin)",
 		{"cf", "waf"}: "WAF Web ACLs",
 		{"cf", "acm"}: "ACM Certificates",
