@@ -311,6 +311,27 @@ func TestEBRuleDeniedTargetCall_RaisesNoNoTargetsFinding(t *testing.T) {
 	}
 }
 
+// TestEBRuleDeniedTargetCall_WritesNoTargetCount: a refused ListTargetsByRule
+// counted nothing, so the Targets column stays blank. "0" is the answer of a
+// call that succeeded with an empty list, and is only written for one.
+func TestEBRuleDeniedTargetCall_WritesNoTargetCount(t *testing.T) {
+	const denied, empty = "acme-orders-rule", "acme-billing-rule"
+	rules := []resource.Resource{bkEBRule(denied, "ENABLED"), bkEBRule(empty, "ENABLED")}
+	fake := &bkEBFake{
+		targets: map[string][]eventbridgetypes.Target{empty: {}},
+		errs:    map[string]error{denied: bkOpErr("EventBridge", "ListTargetsByRule", "AccessDeniedException")},
+	}
+
+	res, _ := awsclient.EnrichEventBridgeRuleTargets(context.Background(), &awsclient.ServiceClients{EventBridge: fake}, rules, nil) //nolint:errcheck // the refused call's aggregate error is not under test
+
+	if got, ok := res.FieldUpdates[denied]["target_count"]; ok && got != "" {
+		t.Errorf("%s: target_count = %q after a refused ListTargetsByRule, want blank — the call counted nothing", denied, got)
+	}
+	if got := res.FieldUpdates[empty]["target_count"]; got != "0" {
+		t.Errorf("%s: target_count = %q after ListTargetsByRule answered with no targets, want %q", empty, got, "0")
+	}
+}
+
 // bkDeniedTransport refuses every AWS call the way an SCP deny does.
 type bkDeniedTransport struct{}
 
@@ -754,9 +775,20 @@ func TestDBISnapShareCap_AutomatedSnapshotsDoNotSpendTheCap(t *testing.T) {
 	fake := &bkRDSFake{asked: map[string]bool{}}
 
 	res, _ := enricher.Fn(context.Background(), &awsclient.ServiceClients{RDS: fake}, rows, nil) //nolint:errcheck // judged by its findings and marks
+	td := resource.FindResourceType("dbi-snap")
+	if td == nil {
+		t.Fatal("dbi-snap is not registered")
+	}
+	folded := make(map[string]resource.Resource, len(manual))
+	for _, r := range rows {
+		if slices.Contains(manual, r.ID) {
+			runtime.ApplyWave2ToRow(&r, *td, res.Findings, res.AttentionDetails)
+			folded[r.ID] = r
+		}
+	}
 	for _, id := range manual {
-		if !bkHasCode(res.Findings[id], "dbi-snap.public") {
-			t.Errorf("%s: carries %v, want dbi-snap.public — the manual snapshot was never checked", id, bkCodes(res.Findings[id]))
+		if fs := folded[id].Findings; !bkHasCode(fs, "dbi-snap.public") {
+			t.Errorf("%s: the folded row carries %v, want dbi-snap.public — the manual snapshot was never checked", id, bkCodes(fs))
 		}
 		if mark, marked := res.TruncatedIDs[id]; marked {
 			t.Errorf("%s: marked %q — the cap was spent on automated snapshots", id, mark)
