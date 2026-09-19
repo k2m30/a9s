@@ -88,7 +88,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		})
 	}
 
-	// Only audit (CloudTrail) log groups are inspected for metric filters.
 	audit := capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
 		return strings.HasPrefix(logGroupNameOf(r), "/aws/cloudtrail/")
 	}, resourceIDsOf)

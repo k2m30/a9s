@@ -444,9 +444,8 @@ func bkInstances(ids ...string) []resource.Resource {
 	return out
 }
 
-// TestEBSSnapPublicWalk_RefusedCallIsNotReportedAsTheCap reproduces the
-// reviewer's scenario: DescribeSnapshots(RestorableByUserIds=all) is refused on
-// its first page. Every snapshot is uninspected because AWS said no, and the
+// TestEBSSnapPublicWalk_RefusedCallIsNotReportedAsTheCap: DescribeSnapshots
+// (RestorableByUserIds=all) is refused on its first page. Every snapshot is uninspected because AWS said no, and the
 // row must name that call — "stopped at the inspection cap" tells the operator
 // a9s chose to stop, and the detail view retries a call that will be refused
 // again.
