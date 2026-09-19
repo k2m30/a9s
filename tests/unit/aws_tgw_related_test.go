@@ -247,7 +247,10 @@ const tgwSLRName = "AWSServiceRoleForVPCTransitGateway"
 const tgwSLRARN = "arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"
 
 // TestRelated_TGW_Role_Match verifies that a GetRole response with a valid ARN
-// produces Count=1 with the role ARN in ResourceIDs.
+// produces Count=1 with the role's name in ResourceIDs.
+//
+// Inverted by #545 ruling A: role rows are keyed by role name, and the ARN is
+// read through the role resolver. Do not restore the ARN as the ID.
 func TestRelated_TGW_Role_Match(t *testing.T) {
 	fake := newFakeIAMWithRole(tgwSLRARN, tgwSLRName)
 	clients := &awsclient.ServiceClients{IAM: fake}
@@ -259,8 +262,8 @@ func TestRelated_TGW_Role_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Fatalf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tgwSLRARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tgwSLRARN)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != tgwSLRName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), tgwSLRName)
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected Err: %v", result.Err())

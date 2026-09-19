@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
@@ -129,44 +128,16 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("sns", nil, false)
 	}
 
-	// Resolve topic names against sns cache (topic name is last segment of ARN).
-	snsList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "sns")
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			snsList = nil
-		}
-	}
-	var ids []string
-	for _, arn := range topicARNs {
-		name := arn
-		if idx := strings.LastIndex(arn, ":"); idx >= 0 && idx < len(arn)-1 {
-			name = arn[idx+1:]
-		}
-		matched := false
-		for _, snsRes := range snsList {
-			if snsRes.ID == name || snsRes.ID == arn || snsRes.Name == name || snsRes.Fields["arn"] == arn {
-				ids = append(ids, snsRes.ID)
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			ids = append(ids, name)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("sns", nil, true)
-	}
+	ids, dropped := resolveRefs("sns", topicARNs, refContext(clients, cache, "sns"))
 	if len(ids) == 0 && aggErr != nil {
-		// Nothing was confirmed and the sns cache page was complete: the
-		// vault-notification failures are a plain fetch failure, not a
-		// truncation signal.
+		// Nothing was confirmed: the vault-notification failures are a plain
+		// fetch failure, not a truncation signal.
 		return resource.ErrorRelated("sns", aggErr)
 	}
 	// Some GetBackupVaultNotifications calls may have failed: ids is a proven
 	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
 	// row actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("sns", ids, truncated || aggErr != nil)
+	return relatedResultTrunc("sns", ids, dropped || aggErr != nil)
 }
 
 // backupPlanVaults returns the unique TargetBackupVaultName values from the

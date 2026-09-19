@@ -136,9 +136,9 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkLambdaDDB scans this Lambda's event source mappings for DynamoDB
-// stream ARNs and returns the table names (last path segment after "table/").
+// stream ARNs, read through the ddb resolver.
 // Requires live Lambda client for ListEventSourceMappings.
-func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
 		return resource.KnownRelated("ddb", nil, false)
@@ -153,32 +153,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, _ r
 	if err != nil {
 		return resource.ErrorRelated("ddb", err)
 	}
-	seen := make(map[string]struct{})
-	for _, m := range out.EventSourceMappings {
-		if m.EventSourceArn == nil {
-			continue
-		}
-		arn := *m.EventSourceArn
-		if !strings.Contains(arn, ":dynamodb:") {
-			continue
-		}
-		// ARN form: arn:aws:dynamodb:region:account:table/NAME/stream/TIMESTAMP
-		_, rest, ok := strings.Cut(arn, "table/")
-		if !ok {
-			continue
-		}
-		if before, _, hasSep := strings.Cut(rest, "/"); hasSep {
-			rest = before
-		}
-		if rest != "" {
-			seen[rest] = struct{}{}
-		}
-	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	return relatedResult("ddb", ids)
+	return relatedRefs("ddb", eventSourceARNs(out.EventSourceMappings, ":dynamodb:"), refContext(clients, cache, "ddb"))
 }
 
 // checkLambdaKinesis scans this Lambda's event source mappings for Kinesis

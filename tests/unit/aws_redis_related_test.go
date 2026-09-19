@@ -645,10 +645,14 @@ func TestRelated_Redis_SG(t *testing.T) {
 // sns — reads NotificationConfiguration.TopicArn from CacheCluster
 // ---------------------------------------------------------------------------
 
-// TestRelated_Redis_SNS verifies that the SNS topic whose ARN/name matches
-// the NotificationConfiguration.TopicArn from the primary member cluster
-// is returned. Uses DescribeCacheClusters(MemberClusters[0]) path (phase 7).
-// The sns cache is pre-populated so FetchRelatedTarget takes the cache path.
+// TestRelated_Redis_SNS verifies that the SNS topic the primary member
+// cluster's NotificationConfiguration.TopicArn names is returned. Uses
+// DescribeCacheClusters(MemberClusters[0]) path (phase 7). The sns cache is
+// pre-populated so FetchRelatedTarget takes the cache path.
+//
+// Inverted by #545 ruling A: sns rows are keyed by topic ARN, and a row keyed
+// by the bare topic name is no row the sns fetcher produces, so it is not
+// counted. Do not restore the name match.
 func TestRelated_Redis_SNS(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:redis-ops-pager"
 	const topicName = "redis-ops-pager"
@@ -669,21 +673,23 @@ func TestRelated_Redis_SNS(t *testing.T) {
 		},
 	}
 
-	snsRes := resource.Resource{
-		ID:     topicName,
-		Name:   topicName,
-		Fields: map[string]string{"arn": topicARN},
-	}
-	// Pre-populate sns cache so FetchRelatedTarget takes the cache path.
-	cache := resource.ResourceCache{
-		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{snsRes}},
-	}
-
 	checker := redisCheckerByTarget(t, "sns")
-	result := checker(context.Background(), clients, redisGraphRoot(), cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	for _, tc := range []struct {
+		rowID string
+		want  int
+	}{{topicARN, 1}, {topicName, 0}} {
+		snsRes := resource.Resource{
+			ID:     tc.rowID,
+			Name:   topicName,
+			Fields: map[string]string{"arn": topicARN},
+		}
+		cache := resource.ResourceCache{
+			"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{snsRes}},
+		}
+		result := checker(context.Background(), clients, redisGraphRoot(), cache)
+		if result.Count() != tc.want {
+			t.Errorf("sns row %q: Count = %d, want %d", tc.rowID, result.Count(), tc.want)
+		}
 	}
 }
 

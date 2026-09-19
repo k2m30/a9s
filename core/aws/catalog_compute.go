@@ -352,6 +352,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Services",
 		ShortName:      "ecs-svc",
+		RefToID:        ecsSvcRefToID,
 		HumanizeFields: []string{"launch_type", "status", "SchedulingStrategy"},
 		Aliases:        []string{"ecs-svc", "ecs-services"},
 		Category:       "COMPUTE",

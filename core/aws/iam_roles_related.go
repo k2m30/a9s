@@ -129,17 +129,6 @@ func roleNameFromARN(s string) string {
 	return s
 }
 
-// arnAccountID returns the account-id segment (index 4) of an ARN, or "" when
-// the string is not a well-formed ARN. ARN layout:
-// arn:partition:service:region:account-id:resource.
-func arnAccountID(arn string) string {
-	parts := strings.SplitN(arn, ":", 6)
-	if len(parts) < 5 {
-		return ""
-	}
-	return parts[4]
-}
-
 // checkRoleLambda searches the lambda cache for functions whose Role ARN references
 // this IAM role. It resolves both name-segment and full-ARN matches.
 func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

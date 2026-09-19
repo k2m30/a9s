@@ -152,11 +152,7 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("alarm")
 	}
 
-	// Extract the TG suffix for dimension matching: "targetgroup/name/hash"
-	tgSuffix := tgARNVal
-	if idx := strings.Index(tgARNVal, "targetgroup/"); idx >= 0 {
-		tgSuffix = tgARNVal[idx:]
-	}
+	tgSuffix := elbv2Dimension(tgARNVal)
 
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -260,8 +256,8 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 
 // checkTGLambda reports Lambda functions registered as targets (lambda-type TG).
 // Pattern C: one elbv2:DescribeTargetHealth call; targets are Lambda invoke
-// ARNs — extract the function name.
-func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// ARNs, read through the lambda resolver.
+func checkTGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("lambda")
@@ -283,26 +279,14 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ re
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
-	seen := make(map[string]bool)
-	var ids []string
+	var arns []string
 	for _, t := range out.TargetHealthDescriptions {
 		if t.Target == nil || t.Target.Id == nil {
 			continue
 		}
-		arn := *t.Target.Id
-		// Lambda invoke ARN: arn:aws:lambda:REGION:ACCT:function:NAME[:VERSION]
-		if !strings.Contains(arn, ":function:") {
-			continue
-		}
-		idx := strings.LastIndex(arn, ":function:")
-		rest := arn[idx+len(":function:"):]
-		if colon := strings.Index(rest, ":"); colon >= 0 {
-			rest = rest[:colon]
-		}
-		if rest != "" && !seen[rest] {
-			seen[rest] = true
-			ids = append(ids, rest)
+		if _, isFunction := ARNForService(*t.Target.Id, "lambda"); isFunction {
+			arns = append(arns, *t.Target.Id)
 		}
 	}
-	return relatedResult("lambda", ids)
+	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
 }

@@ -116,3 +116,118 @@ func ARNForService(s, service string) (arn.ARN, bool) {
 	}
 	return a, true
 }
+
+// lambdaIntegrationARN returns the function ARN an API Gateway integration
+// URI names: the URI itself when it is a function ARN, or the ARN an invoke
+// URI wraps ("arn:aws:apigateway:<region>:lambda:path/<date>/functions/<function
+// ARN>/invocations"). Any other integration names no function, and the answer
+// is "".
+func lambdaIntegrationARN(uri string) string {
+	if _, rest, ok := strings.Cut(uri, "/functions/"); ok {
+		uri = strings.TrimSuffix(rest, "/invocations")
+	}
+	if _, ok := ARNForService(uri, "lambda"); !ok {
+		return ""
+	}
+	return uri
+}
+
+// canonicalDNS lowercases and strips a single trailing dot.
+func canonicalDNS(s string) string {
+	s = strings.ToLower(s)
+	return strings.TrimSuffix(s, ".")
+}
+
+// arnAccountID returns the account ID an ARN names, or "" when the string is
+// not an ARN.
+func arnAccountID(s string) string {
+	a, err := arn.Parse(s)
+	if err != nil {
+		return ""
+	}
+	return a.AccountID
+}
+
+// elbv2Dimension returns the CloudWatch dimension value ELBv2 metrics carry
+// for an ELBv2 ARN: for a load balancer the resource after "loadbalancer/"
+// ("app/<name>/<id>"), for a target group the resource from "targetgroup/"
+// on ("targetgroup/<name>/<id>"). Any other value is returned as is.
+func elbv2Dimension(arn string) string {
+	if _, after, ok := strings.Cut(arn, ":loadbalancer/"); ok {
+		return after
+	}
+	if i := strings.Index(arn, "targetgroup/"); i >= 0 {
+		return arn[i:]
+	}
+	return arn
+}
+
+// elbNameFromENIDescription returns the load balancer name an ELB-owned ENI's
+// Description carries ("ELB app/<name>/<id>"), or "" for any other
+// description.
+func elbNameFromENIDescription(desc string) string {
+	rest, ok := strings.CutPrefix(desc, "ELB ")
+	if !ok {
+		return ""
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
+}
+
+// lambdaFunctionNameFromENIDescription extracts the Lambda function name from
+// the ENI Description field. Returns "" when it cannot parse reliably.
+func lambdaFunctionNameFromENIDescription(desc string) string {
+	const prefix = "AWS Lambda VPC ENI"
+	if !strings.HasPrefix(desc, prefix) {
+		return ""
+	}
+	rest := strings.TrimPrefix(desc, prefix)
+	rest = strings.TrimLeft(rest, "- ")
+	// The trailing segment is a UUID (8-4-4-4-12 hex + dashes = 36 chars).
+	if len(rest) >= 37 && rest[len(rest)-37] == '-' {
+		uuidPart := rest[len(rest)-36:]
+		if uuidPart[8] == '-' && uuidPart[13] == '-' && uuidPart[18] == '-' && uuidPart[23] == '-' {
+			return rest[:len(rest)-37]
+		}
+	}
+	if idx := strings.LastIndex(rest, "-"); idx > 0 {
+		return rest[:idx]
+	}
+	return rest
+}
+
+// logGroupOwner returns the resource a log group is named after by AWS's
+// naming convention prefix<owner>[/<suffix>] ("/aws/lambda/<function>",
+// "/ecs/<family>", "API-Gateway-Execution-Logs_<api-id>/<stage>"), or "" when
+// the group does not follow it.
+func logGroupOwner(group, prefix string) string {
+	rest, ok := strings.CutPrefix(group, prefix)
+	if !ok {
+		return ""
+	}
+	owner, _, _ := strings.Cut(rest, "/")
+	return owner
+}
+
+// acmValidationDomain returns the domain an ACM DNS validation record name
+// ("_<token>.<domain>") validates.
+func acmValidationDomain(name string) (string, bool) {
+	token, domain, ok := strings.Cut(canonicalDNS(name), ".")
+	return domain, ok && strings.HasPrefix(token, "_")
+}
+
+// certDomain returns the domain a certificate name covers, without the
+// wildcard label: the one its DNS validation record validates.
+func certDomain(name string) string {
+	return strings.TrimPrefix(canonicalDNS(name), "*.")
+}
+
+// emailDomain returns the domain of an e-mail address: what follows its last
+// "@".
+func emailDomain(addr string) (string, bool) {
+	i := strings.LastIndex(addr, "@")
+	return addr[i+1:], i >= 0
+}

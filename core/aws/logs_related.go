@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -23,12 +22,7 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 		logGroupName = res.Name
 	}
 
-	const prefix = "/aws/lambda/"
-	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.KnownRelated("lambda", nil, false)
-	}
-
-	functionName := strings.TrimPrefix(logGroupName, prefix)
+	functionName := logGroupOwner(logGroupName, "/aws/lambda/")
 	if functionName == "" {
 		return resource.KnownRelated("lambda", nil, false)
 	}
@@ -79,12 +73,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 	if logGroupName == "" {
 		return resource.KnownRelated("apigw", nil, false)
 	}
-	const prefix = "API-Gateway-Execution-Logs_"
-	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.KnownRelated("apigw", nil, false)
-	}
-	rest := strings.TrimPrefix(logGroupName, prefix)
-	apiID, _, _ := strings.Cut(rest, "/")
+	apiID := logGroupOwner(logGroupName, "API-Gateway-Execution-Logs_")
 	if apiID == "" {
 		return resource.KnownRelated("apigw", nil, false)
 	}
@@ -112,14 +101,7 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 	if logGroupName == "" {
 		return resource.KnownRelated("ecs-task", nil, false)
 	}
-	const prefix = "/ecs/"
-	if !strings.HasPrefix(logGroupName, prefix) {
-		return resource.KnownRelated("ecs-task", nil, false)
-	}
-	family := strings.TrimPrefix(logGroupName, prefix)
-	if idx := strings.Index(family, "/"); idx >= 0 {
-		family = family[:idx]
-	}
+	family := logGroupOwner(logGroupName, "/ecs/")
 	if family == "" {
 		return resource.KnownRelated("ecs-task", nil, false)
 	}
@@ -177,7 +159,7 @@ func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName stri
 // checkLogsKinesis calls cloudwatchlogs:DescribeSubscriptionFilters and
 // returns the Kinesis stream names whose ARNs appear as subscription-filter
 // destinations on this log group. Pattern C — single API call.
-func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
@@ -185,25 +167,14 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _
 		}
 		return resource.ErrorRelated("kinesis", err)
 	}
-	var ids []string
-	for _, f := range filters {
-		if f.DestinationArn == nil {
-			continue
-		}
-		arn := *f.DestinationArn
-		// Kinesis stream ARN: arn:aws:kinesis:REGION:ACCOUNT:stream/NAME
-		if _, name, ok := strings.Cut(arn, ":stream/"); ok && name != "" {
-			ids = append(ids, name)
-		}
-	}
-	return relatedResult("kinesis", ids)
+	return relatedRefs("kinesis", destinationARNs(filters, "kinesis"), refContext(clients, cache, "kinesis"))
 }
 
 // checkLogsS3 calls cloudwatchlogs:DescribeSubscriptionFilters and returns S3
 // bucket names whose ARNs appear as subscription-filter destinations (via a
 // Firehose delivery stream that fans out to S3, or direct S3 destination for
 // newer filter features). Pattern C — single API call.
-func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
@@ -211,22 +182,20 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return resource.ErrorRelated("s3", err)
 	}
-	var ids []string
+	return relatedRefs("s3", destinationARNs(filters, "s3"), refContext(clients, cache, "s3"))
+}
+
+// destinationARNs returns the subscription-filter destinations that are ARNs
+// of service.
+func destinationARNs(filters []cloudwatchlogstypes.SubscriptionFilter, service string) []string {
+	var arns []string
 	for _, f := range filters {
 		if f.DestinationArn == nil {
 			continue
 		}
-		// An S3 ARN's resource is the bucket, optionally followed by a key
-		// prefix: arn:<partition>:s3:::bucket-name/prefix.
-		if a, ok := ARNForService(*f.DestinationArn, "s3"); ok {
-			name := a.Resource
-			if before, _, hasSep := strings.Cut(name, "/"); hasSep {
-				name = before
-			}
-			if name != "" {
-				ids = append(ids, name)
-			}
+		if _, ok := ARNForService(*f.DestinationArn, service); ok {
+			arns = append(arns, *f.DestinationArn)
 		}
 	}
-	return relatedResult("s3", ids)
+	return arns
 }

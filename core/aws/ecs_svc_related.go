@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -26,8 +27,8 @@ func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resou
 }
 
 // checkECSSvcTargetGroups returns the target groups attached to this ECS service (Pattern F).
-// It reads LoadBalancers from the raw ecstypes.Service struct and parses TG names from ARNs.
-func checkECSSvcTargetGroups(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// It reads the TargetGroupArn of each LoadBalancers entry through the tg resolver.
+func checkECSSvcTargetGroups(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("tg")
@@ -36,22 +37,11 @@ func checkECSSvcTargetGroups(_ context.Context, _ any, res resource.Resource, _ 
 		return resource.KnownRelated("tg", nil, false)
 	}
 
-	var ids []string
+	var arns []string
 	for _, lb := range raw.LoadBalancers {
-		if lb.TargetGroupArn == nil || *lb.TargetGroupArn == "" {
-			continue
-		}
-		// TG ARN format: arn:aws:elasticloadbalancing:region:account:targetgroup/name/hash
-		// Extract the name as the second segment after splitting by "/"
-		parts := strings.Split(*lb.TargetGroupArn, "/")
-		if len(parts) >= 2 {
-			name := parts[len(parts)-2]
-			if name != "" {
-				ids = append(ids, name)
-			}
-		}
+		arns = append(arns, aws.ToString(lb.TargetGroupArn))
 	}
-	return relatedResult("tg", ids)
+	return relatedRefs("tg", arns, refContext(clients, cache, "tg"))
 }
 
 // checkECSSvcAlarms searches the alarm cache for alarms with both ServiceName and ClusterName

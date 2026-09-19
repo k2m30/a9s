@@ -106,7 +106,7 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 			},
 			// S3 healthy-bucket ETL job (checkS3Glue pivot).
 			// checkS3Glue uses assertStruct[gluetypes.Job] and reads Command.ScriptLocation.
-			// bucketFromS3URI("s3://a9s-demo-healthy/scripts/etl.py") == "a9s-demo-healthy".
+			// The s3 resolver reads "s3://a9s-demo-healthy/scripts/etl.py" as "a9s-demo-healthy".
 			{
 				Name:            aws.String("a9s-demo-s3-etl"),
 				Role:            aws.String("acme-glue-role"),

@@ -447,13 +447,7 @@ var namedExtras = map[string]instExtras{
 			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
 		},
 	},
-	// ECS EC2-launch-type container host — ecs.go's acme-batch cluster's
-	// batch-etl-runner task carries this exact ContainerInstanceArn suffix
-	// as its surfaced ecs-task->ec2 link (checkECSTaskEC2's own doc comment:
-	// "the backing EC2 instance ID is not in this ARN... return the
-	// container-instance UUID as a surfaced link" — mirrors the real API's
-	// own limitation, not a fixture bug).
-	"e1f2a3b4c5d6e1f2a3b4c5d6": { // acme-batch cluster, batch-etl-host-01
+	ECSBatchHostInstanceID: { // acme-batch cluster, batch-etl-host-01
 		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
 		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
 		securityGroups: []ec2types.GroupIdentifier{
@@ -642,10 +636,7 @@ func makeInstance(
 			Message: aws.String("Server.SpotInstanceShutdown: The instance was stopped because the Spot Instance was interrupted."),
 		}
 	}
-	// aws:ecs:cluster-name tag — this is the acme-batch cluster's own
-	// EC2-launch-type container host (ecs.go's batch-etl-runner task
-	// carries this exact instance ID as its ContainerInstanceArn suffix).
-	if instanceID == "e1f2a3b4c5d6e1f2a3b4c5d6" {
+	if instanceID == ECSBatchHostInstanceID {
 		inst.Tags = append(inst.Tags,
 			ec2types.Tag{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("acme-batch")},
 		)
@@ -735,10 +726,7 @@ func buildReservations() []ec2types.Reservation {
 		{"i-0aaa777777777777a", "web-worker-03", "running", ec2types.InstanceTypeT3Large, "10.0.10.32", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 5, 12, 8, 7, 0, 0, time.UTC), ""},
 		{"i-0bbb888888888888b", "payments-worker-01", "running", ec2types.InstanceTypeC5Xlarge, "10.0.10.40", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 7, 1, 8, 5, 0, 0, time.UTC), ""},
 		{"i-0ccc999999999999c", "payments-worker-02", "running", ec2types.InstanceTypeC5Xlarge, "10.0.10.41", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 7, 1, 8, 6, 0, 0, time.UTC), ""},
-		// ECS EC2-launch-type container host (acme-batch cluster) — see the
-		// matching namedExtras entry above for the ContainerInstanceArn
-		// graph-connection rationale.
-		{"e1f2a3b4c5d6e1f2a3b4c5d6", "batch-etl-host-01", "running", ec2types.InstanceTypeM5Large, "10.0.10.50", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 15, 6, 0, 0, 0, time.UTC), ""},
+		{ECSBatchHostInstanceID, "batch-etl-host-01", "running", ec2types.InstanceTypeM5Large, "10.0.10.50", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 15, 6, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60030", "dev-sandbox-01", "stopped", ec2types.InstanceTypeT3Medium, "10.1.0.20", "", fixtStagingVPCID, fixtStagingSubnetA, time.Date(2025, 10, 12, 7, 0, 0, 0, time.UTC), ""},
 		{EC2InstanceHostileTag, EC2HostileTagValue, "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
 		// GPU inference fleet — the Cost Explorer growth story's resource-drill

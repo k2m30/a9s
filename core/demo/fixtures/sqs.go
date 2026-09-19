@@ -94,7 +94,7 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"ApproximateNumberOfMessagesNotVisible": "0",
 					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + SQSPublicPolicy,
 					"RedrivePolicy":                         `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
-					"KmsMasterKeyId":                        OrdersProdKMSKeyID,
+					"KmsMasterKeyId":                        OrdersQueueKMSAlias,
 					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `"}]}`,
 				},
 			},

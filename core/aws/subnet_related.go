@@ -254,7 +254,6 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("efs")
 	}
 
-	const mountTargetPrefix = "EFS mount target for "
 	fsIDSet := make(map[string]struct{})
 	for _, eniRes := range eniList {
 		eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct)
@@ -264,11 +263,10 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		if eni.SubnetId == nil || *eni.SubnetId != subnetID {
 			continue
 		}
-		if eni.Description == nil || !strings.HasPrefix(*eni.Description, mountTargetPrefix) {
+		if eni.Description == nil {
 			continue
 		}
-		fsID := strings.TrimPrefix(*eni.Description, mountTargetPrefix)
-		if fsID != "" {
+		if fsID, ok := afterPrefix(*eni.Description, "EFS mount target for "); ok {
 			fsIDSet[fsID] = struct{}{}
 		}
 	}

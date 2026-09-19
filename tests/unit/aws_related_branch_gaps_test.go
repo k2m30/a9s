@@ -291,6 +291,9 @@ func TestRelated_CbSecrets_NilEnvironment(t *testing.T) {
 	}
 }
 
+// Inverted by #545 ruling A: secrets rows are keyed by the secret's name, and
+// the "-AbCdEf" Secrets Manager appends in the ARN is not part of it. Do not
+// restore the suffixed ID.
 func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-project",
@@ -312,11 +315,13 @@ func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/db/password-AbCdEf" {
-		t.Errorf("ResourceIDs = %v, want [prod/db/password-AbCdEf]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/db/password" {
+		t.Errorf("ResourceIDs = %v, want [prod/db/password]", result.ResourceIDs())
 	}
 }
 
+// Inverted by #545 ruling A: the ID is the secret's name, without the ARN's
+// random suffix. Do not restore the suffixed ID.
 func TestRelated_CbSecrets_ARNWithJSONKeySuffix_StripsSuffix(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-project",
@@ -338,8 +343,8 @@ func TestRelated_CbSecrets_ARNWithJSONKeySuffix_StripsSuffix(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/api/creds-XyZ123" {
-		t.Errorf("ResourceIDs = %v, want [prod/api/creds-XyZ123] (json-key suffix stripped)", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod/api/creds" {
+		t.Errorf("ResourceIDs = %v, want [prod/api/creds] (json-key and ARN suffix stripped)", result.ResourceIDs())
 	}
 }
 

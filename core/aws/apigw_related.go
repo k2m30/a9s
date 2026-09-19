@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
@@ -45,29 +46,18 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	var refs []string
 	var failures []Failure
 	total := 0
+	lambdaRC := refContext(clients, cache, "lambda")
 	for _, item := range items {
-		if item.IntegrationUri == nil || !strings.Contains(*item.IntegrationUri, ":function:") {
-			continue
-		}
-		// Extract function name from the integration URI.
-		uri := *item.IntegrationUri
-		idx := strings.LastIndex(uri, ":function:")
-		rest := uri[idx+len(":function:"):]
-		if slash := strings.Index(rest, "/"); slash >= 0 {
-			rest = rest[:slash]
-		}
-		if colon := strings.Index(rest, ":"); colon >= 0 {
-			rest = rest[:colon]
-		}
-		if rest == "" {
+		fn, ok := resource.ResolveRef("lambda", lambdaIntegrationARN(aws.ToString(item.IntegrationUri)), lambdaRC)
+		if !ok {
 			continue
 		}
 		total++
 		out, lerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambdapkg.GetFunctionOutput, error) {
-			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &rest})
+			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &fn})
 		})
 		if lerr != nil {
-			failures = append(failures, FailedCall(rest, lerr))
+			failures = append(failures, FailedCall(fn, lerr))
 			continue
 		}
 		if out == nil || out.Configuration == nil {
@@ -77,22 +67,21 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 			refs = append(refs, *out.Configuration.KMSKeyArn)
 		}
 	}
-	rc, err := kmsRefContext(ctx, clients, cache, refs)
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	ids, dropped := resolveRefs("kms", refs, rc)
+	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
 	if len(ids) == 0 {
 		// Nothing was confirmed: any failures are a plain fetch failure, not
 		// a truncation signal (there is no larger population left unseen).
 		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil {
 			return resource.ErrorRelated("kms", aggErr)
 		}
+		if err != nil {
+			return resource.ErrorRelated("kms", err)
+		}
 	}
-	// Some GetFunction calls may have failed: ids is a proven subset, not
-	// necessarily exhaustive. Truncated (not Errored) keeps the row
-	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("kms", ids, dropped || len(failures) > 0)
+	// Some calls may have failed: ids is a proven subset, not necessarily
+	// exhaustive. Truncated (not Errored) keeps the row actionable rather
+	// than discarding confirmed matches as a dead end.
+	return relatedResultTrunc("kms", ids, lowerBound || len(failures) > 0)
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this
@@ -155,7 +144,7 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 // checkApigwLambda reports Lambda integration targets of this API Gateway.
 // Pattern C: one apigatewayv2:GetIntegrations call, filter to AWS_PROXY /
 // AWS integrations whose IntegrationUri points at a Lambda invoke ARN.
-func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return resource.KnownRelated("lambda", nil, false)
@@ -167,33 +156,11 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 		}
 		return resource.ErrorRelated("lambda", err)
 	}
-	seen := make(map[string]bool)
-	var ids []string
+	var arns []string
 	for _, item := range items {
-		if item.IntegrationUri == nil || *item.IntegrationUri == "" {
-			continue
-		}
-		uri := *item.IntegrationUri
-		// Lambda invoke ARN form: arn:aws:apigateway:REGION:lambda:path/.../functions/arn:aws:lambda:REGION:ACCT:function:NAME/invocations
-		// Or direct: arn:aws:lambda:REGION:ACCT:function:NAME
-		if !strings.Contains(uri, ":function:") {
-			continue
-		}
-		idx := strings.LastIndex(uri, ":function:")
-		rest := uri[idx+len(":function:"):]
-		// Strip "/invocations" suffix and optional version alias.
-		if slash := strings.Index(rest, "/"); slash >= 0 {
-			rest = rest[:slash]
-		}
-		if colon := strings.Index(rest, ":"); colon >= 0 {
-			rest = rest[:colon]
-		}
-		if rest != "" && !seen[rest] {
-			seen[rest] = true
-			ids = append(ids, rest)
-		}
+		arns = append(arns, lambdaIntegrationARN(aws.ToString(item.IntegrationUri)))
 	}
-	return relatedResult("lambda", ids)
+	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
 }
 
 // checkApigwACM reports ACM certificates attached to this API's custom domain names.

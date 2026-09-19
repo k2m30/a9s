@@ -10,6 +10,7 @@ import (
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -77,9 +78,10 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
-// checkECSTaskEC2 extracts container-instance EC2 IDs from task.ContainerInstanceArn.
-// For Fargate tasks this is absent → Count:0.
-func checkECSTaskEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkECSTaskEC2 reports the EC2 instance an EC2-launch-type task runs on:
+// the Ec2InstanceId of its container instance (ecs:DescribeContainerInstances).
+// A Fargate task has no container instance → Count:0.
+func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ec2")
@@ -87,16 +89,31 @@ func checkECSTaskEC2(_ context.Context, _ any, res resource.Resource, _ resource
 	if task.ContainerInstanceArn == nil || *task.ContainerInstanceArn == "" {
 		return resource.KnownRelated("ec2", nil, false)
 	}
-	// ContainerInstanceArn: arn:aws:ecs:region:account:container-instance/cluster/uuid
-	// The backing EC2 instance ID is not in this ARN — it's on the container
-	// instance metadata. Return the container-instance UUID as a surfaced link.
-	arn := *task.ContainerInstanceArn
-	parts := strings.Split(arn, "/")
-	name := parts[len(parts)-1]
-	if name == "" {
-		return resource.KnownRelated("ec2", nil, false)
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return resource.UnknownRelated("ec2")
 	}
-	return relatedResult("ec2", []string{name})
+	api, ok := c.ECS.(ECSDescribeContainerInstancesAPI)
+	if !ok {
+		return resource.UnknownRelated("ec2")
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
+		return api.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
+			Cluster:            task.ClusterArn,
+			ContainerInstances: []string{*task.ContainerInstanceArn},
+		})
+	})
+	if err != nil {
+		return resource.ErrorRelated("ec2", err)
+	}
+	var ids []string
+	for _, ci := range out.ContainerInstances {
+		if ci.Ec2InstanceId != nil {
+			ids = append(ids, *ci.Ec2InstanceId)
+		}
+	}
+	ids, dropped := resolveRefs("ec2", ids, refContext(clients, cache, "ec2"))
+	return resource.KnownRelated("ec2", ids, dropped || len(out.Failures) > 0)
 }
 
 // checkECSTaskECR reads the ECR repositories of the task's container image

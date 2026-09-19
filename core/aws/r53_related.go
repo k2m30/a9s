@@ -58,12 +58,6 @@ func r53AliasDNSNames(sets []r53types.ResourceRecordSet) []string {
 	return out
 }
 
-// canonicalDNS lowercases and strips a single trailing dot.
-func canonicalDNS(s string) string {
-	s = strings.ToLower(s)
-	return strings.TrimSuffix(s, ".")
-}
-
 // r53RelatedResult folds the zone's own record scan and the target list's
 // pagination into the one truncation flag the row renders. Either being cut
 // short means "what you see is what was read", which is what "(N+)" says.
@@ -289,9 +283,8 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	validated := map[string]bool{}
 	for _, r := range sets {
-		name := canonicalDNS(aws.ToString(r.Name))
-		token, domain, ok := strings.Cut(name, ".")
-		if r.Type != r53types.RRTypeCname || !ok || !strings.HasPrefix(token, "_") {
+		domain, ok := acmValidationDomain(aws.ToString(r.Name))
+		if r.Type != r53types.RRTypeCname || !ok {
 			continue
 		}
 		for _, rr := range r.ResourceRecords {
@@ -318,7 +311,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 			continue
 		}
 		names := append([]string{aws.ToString(sum.DomainName)}, sum.SubjectAlternativeNameSummaries...)
-		if slices.ContainsFunc(names, func(n string) bool { return validated[strings.TrimPrefix(canonicalDNS(n), "*.")] }) {
+		if slices.ContainsFunc(names, func(n string) bool { return validated[certDomain(n)] }) {
 			ids = append(ids, cert.ID)
 		}
 	}
@@ -362,31 +355,14 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("logs")
 	}
 
-	wanted := make(map[string]struct{})
+	var arns []string
 	for _, cfg := range out.QueryLoggingConfigs {
-		if cfg.CloudWatchLogsLogGroupArn == nil || *cfg.CloudWatchLogsLogGroupArn == "" {
-			continue
-		}
-		// Log group ARN: arn:aws:logs:REGION:ACCT:log-group:NAME:*
-		if _, name, found := strings.Cut(*cfg.CloudWatchLogsLogGroupArn, ":log-group:"); found {
-			if colon := strings.Index(name, ":"); colon >= 0 {
-				name = name[:colon]
-			}
-			if name != "" {
-				wanted[name] = struct{}{}
-			}
+		if cfg.CloudWatchLogsLogGroupArn != nil {
+			arns = append(arns, *cfg.CloudWatchLogsLogGroupArn)
 		}
 	}
-	if len(wanted) == 0 {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	var ids []string
-	for _, logRes := range logList {
-		if _, found := wanted[logRes.ID]; found {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return r53RelatedResult("logs", ids, false, logsTruncated)
+	ids, dropped := listedRefs("logs", arns, refContext(clients, cache, "logs"), logList)
+	return r53RelatedResult("logs", ids, dropped, logsTruncated)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.

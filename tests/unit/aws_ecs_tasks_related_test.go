@@ -518,9 +518,12 @@ func TestRelated_ECSTask_CTEvents_NilCache(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkECSTaskEC2 — container-instance UUID from ContainerInstanceArn
+// checkECSTaskEC2 — the container instance's Ec2InstanceId
 // ---------------------------------------------------------------------------
 
+// Inverted by #545 ruling C: the container-instance UUID is not an EC2
+// instance ID, and without an ECS client the instance behind it is unknown.
+// Do not restore the UUID as an ec2 ID.
 func TestRelated_ECSTask_EC2_MatchFromContainerInstanceArn(t *testing.T) {
 	task := ecstypes.Task{
 		ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/my-cluster/abcdef1234567890"),
@@ -530,11 +533,11 @@ func TestRelated_ECSTask_EC2_MatchFromContainerInstanceArn(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (no ECS client to read the container instance)", result.State())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "abcdef1234567890" {
-		t.Errorf("ResourceIDs = %v, want [abcdef1234567890]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
 	}
 }
 

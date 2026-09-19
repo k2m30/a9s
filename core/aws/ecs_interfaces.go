@@ -43,6 +43,13 @@ type ECSDescribeTaskDefinitionAPI interface {
 	DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error)
 }
 
+// ECSDescribeContainerInstancesAPI defines the interface for the ECS
+// DescribeContainerInstances operation. It sits outside ECSAPI: only the
+// ecs-task → ec2 pivot calls it, and asserts it on the client.
+type ECSDescribeContainerInstancesAPI interface {
+	DescribeContainerInstances(ctx context.Context, params *ecs.DescribeContainerInstancesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeContainerInstancesOutput, error)
+}
+
 // ECSAPI is the aggregate interface covering all ECS operations used by a9s fetchers.
 // *ecs.Client structurally satisfies this interface.
 type ECSAPI interface {

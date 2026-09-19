@@ -14,7 +14,7 @@ import (
 
 // checkECSTaskService returns the ECS service this task belongs to (Pattern F).
 // For service-managed tasks, the Group field has the format "service:{service-name}".
-func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSTaskService(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ecs-svc")
@@ -22,11 +22,7 @@ func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ reso
 	if raw.Group == nil || !strings.HasPrefix(*raw.Group, "service:") {
 		return resource.KnownRelated("ecs-svc", nil, false)
 	}
-	serviceName := strings.TrimPrefix(*raw.Group, "service:")
-	if serviceName == "" {
-		return resource.KnownRelated("ecs-svc", nil, false)
-	}
-	return relatedResult("ecs-svc", []string{serviceName})
+	return relatedRefs("ecs-svc", []string{*raw.Group}, refContext(clients, cache, "ecs-svc"))
 }
 
 // checkECSTaskCluster returns the ECS cluster this task belongs to (Pattern F):

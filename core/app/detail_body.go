@@ -255,7 +255,7 @@ func (c *Controller) resolveNavIDs(items []fieldpath.FieldItem) {
 		if !it.IsNavigable || it.NavID != "" {
 			continue
 		}
-		rc := domain.RefContext{AccountID: accountID, Region: c.core.Region(), Targets: c.cachedResources(it.TargetType)}
+		rc := domain.RefContext{AccountID: accountID, Region: c.core.Region(), Targets: c.core.AnyLaneResources(it.TargetType)}
 		id := resource.NavIDFromValue(it.TargetType, strings.TrimPrefix(strings.TrimSpace(it.Value), "- "), rc)
 		switch {
 		case id == "":

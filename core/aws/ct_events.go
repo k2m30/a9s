@@ -825,3 +825,23 @@ func extractRoleNameFromCTEventJSON(cloudTrailEvent *string) string {
 	}
 	return ""
 }
+
+// ctLocalPrincipals clears role_name and user on every event whose principal
+// is in another account than the session's: those fields open the local role
+// or user of that name, which is not the principal the event names. With the
+// session account unknown, nothing is cleared.
+func ctLocalPrincipals(c *ServiceClients) func(resource.FetchResult, error) (resource.FetchResult, error) {
+	return func(res resource.FetchResult, err error) (resource.FetchResult, error) {
+		account := ""
+		if store := c.IdentityStore(); store != nil {
+			account = store.AccountID()
+		}
+		for _, r := range res.Resources {
+			if a := r.Fields["_ct.account_id"]; account != "" && a != "" && a != account {
+				r.Fields["role_name"] = ""
+				r.Fields["user"] = ""
+			}
+		}
+		return res, err
+	}
+}

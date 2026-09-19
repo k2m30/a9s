@@ -87,7 +87,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Related: []domain.RelatedDef{
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkAlarmAPIGW},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkAlarmAPIGW, NeedsTargetCache: true},
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkAlarmCB},
 			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkAlarmDBI},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAlarmEC2},
@@ -98,7 +98,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAlarmLogs},
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmS3},
 			{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmSFN},
-			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF},
+			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF, NeedsTargetCache: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
 		},
 		Findings: []catalog.FindingDef{
@@ -250,10 +250,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Color:                 colorCTEvents,
 		Project:               ctevent.Project,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
-			return FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken)
+			return ctLocalPrincipals(c)(FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken))
 		}),
 		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
-			return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
+			return ctLocalPrincipals(c)(FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken))
 		}),
 		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome", "_ct.cause", "_ct.error_code"},
 		Related: []domain.RelatedDef{

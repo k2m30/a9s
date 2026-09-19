@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -92,9 +91,9 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 
 // checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for
 // this endpoint's network interfaces. Pattern C: one ec2:DescribeFlowLogs
-// call filtered by resource-id; extract LogGroupName or parse log-group name
-// from LogDestination ARN.
-func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// call filtered by resource-id; each flow log's LogGroupName, or its
+// LogDestination when that is a log group ARN.
+func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpceID := res.ID
 	if vpceID == "" {
 		return resource.KnownRelated("logs", nil, false)
@@ -114,31 +113,18 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ re
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
-	seen := make(map[string]bool)
-	var ids []string
+	var refs []string
 	for _, fl := range out.FlowLogs {
-		name := ""
-		if fl.LogGroupName != nil && *fl.LogGroupName != "" {
-			name = *fl.LogGroupName
-		} else if fl.LogDestination != nil && *fl.LogDestination != "" {
-			name = *fl.LogDestination
-			if strings.Contains(name, ":log-group:") {
-				parts := strings.Split(name, ":log-group:")
-				if len(parts) == 2 {
-					name = parts[1]
-					if colon := strings.Index(name, ":"); colon >= 0 {
-						name = name[:colon]
-					}
-				}
+		switch {
+		case fl.LogGroupName != nil && *fl.LogGroupName != "":
+			refs = append(refs, *fl.LogGroupName)
+		case fl.LogDestination != nil:
+			if _, isLogs := ARNForService(*fl.LogDestination, "logs"); isLogs {
+				refs = append(refs, *fl.LogDestination)
 			}
 		}
-		if name == "" || seen[name] {
-			continue
-		}
-		seen[name] = true
-		ids = append(ids, name)
 	}
-	return relatedResult("logs", ids)
+	return relatedRefs("logs", refs, refContext(clients, cache, "logs"))
 }
 
 // checkVPCER53 reports Route 53 private hosted zones associated with this VPC

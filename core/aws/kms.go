@@ -202,6 +202,10 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 				resources = append(resources, kmsAccessDeniedResource(id))
 				continue
 			}
+			if _, isAlias := kmsAliasName(id); isAlias && IsNotFoundErr(err) {
+				// A deleted alias names no key; that is an answer, not a failure.
+				continue
+			}
 			failures = append(failures, FailedCall(id, err))
 			continue
 		}

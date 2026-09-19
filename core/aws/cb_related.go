@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -169,30 +170,21 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.UnknownRelated("s3")
 	}
 
-	buckets := map[string]struct{}{}
-	addBucketFrom := func(loc string) {
-		if loc == "" {
-			return
-		}
-		if idx := strings.Index(loc, "/"); idx > 0 {
-			loc = loc[:idx]
-		}
-		buckets[loc] = struct{}{}
-	}
+	var locations []string
 	if a := project.Artifacts; a != nil && a.Type == cbtypes.ArtifactsTypeS3 && a.Location != nil {
-		addBucketFrom(*a.Location)
+		locations = append(locations, *a.Location)
 	}
 	for i := range project.SecondaryArtifacts {
 		a := project.SecondaryArtifacts[i]
 		if a.Type == cbtypes.ArtifactsTypeS3 && a.Location != nil {
-			addBucketFrom(*a.Location)
+			locations = append(locations, *a.Location)
 		}
 	}
 	if s := project.Source; s != nil && s.Type == cbtypes.SourceTypeS3 && s.Location != nil {
-		addBucketFrom(*s.Location)
+		locations = append(locations, *s.Location)
 	}
 
-	if len(buckets) == 0 {
+	if len(locations) == 0 {
 		return resource.KnownRelated("s3", nil, false)
 	}
 
@@ -203,23 +195,14 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 	if s3List == nil {
 		return resource.UnknownRelated("s3")
 	}
-	var ids []string
-	for _, b := range s3List {
-		if _, hit := buckets[b.ID]; hit {
-			ids = append(ids, b.ID)
-			continue
-		}
-		if _, hit := buckets[b.Name]; hit {
-			ids = append(ids, b.ID)
-		}
-	}
+	ids, _ := listedRefs("s3", locations, refContext(clients, cache, "s3"), s3List)
 	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkCbSecrets extracts Secrets Manager secret references from project environment
 // variables (Type=SECRETS_MANAGER). The Value is either the secret name or an ARN
 // with an optional ":json-key" suffix. Pattern F.
-func checkCbSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkCbSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("secrets")
@@ -227,26 +210,13 @@ func checkCbSecrets(_ context.Context, _ any, res resource.Resource, _ resource.
 	if project.Environment == nil {
 		return resource.KnownRelated("secrets", nil, false)
 	}
-	var ids []string
+	var refs []string
 	for _, env := range project.Environment.EnvironmentVariables {
-		if env.Type != cbtypes.EnvironmentVariableTypeSecretsManager || env.Value == nil {
-			continue
-		}
-		name := *env.Value
-		if strings.HasPrefix(name, "arn:") {
-			if sec := strings.Index(name, ":secret:"); sec >= 0 {
-				tail := name[sec+len(":secret:"):]
-				if colon := strings.Index(tail, ":"); colon >= 0 {
-					tail = tail[:colon]
-				}
-				name = tail
-			}
-		}
-		if name != "" {
-			ids = append(ids, name)
+		if env.Type == cbtypes.EnvironmentVariableTypeSecretsManager {
+			refs = append(refs, aws.ToString(env.Value))
 		}
 	}
-	return relatedResult("secrets", ids)
+	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
 }
 
 // checkCbSSM extracts SSM parameter references from project environment variables

@@ -67,9 +67,10 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 				// EnvironmentVariables — required for the cb:secrets and
 				// cb:ssm related-panel pivot witnesses (checkCbSecrets /
 				// checkCbSSM). prod/api/gateway-key is a real secrets.go
-				// fixture; /acme/prod/app/config is a real ssm.go fixture.
+				// fixture, named by its ARN and a JSON key as CodeBuild
+				// allows; /acme/prod/app/config is a real ssm.go fixture.
 				EnvironmentVariables: []cbtypes.EnvironmentVariable{
-					{Name: aws.String("API_GATEWAY_KEY"), Type: cbtypes.EnvironmentVariableTypeSecretsManager, Value: aws.String("prod/api/gateway-key")},
+					{Name: aws.String("API_GATEWAY_KEY"), Type: cbtypes.EnvironmentVariableTypeSecretsManager, Value: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123:token")},
 					{Name: aws.String("APP_CONFIG"), Type: cbtypes.EnvironmentVariableTypeParameterStore, Value: aws.String("/acme/prod/app/config")},
 				},
 			},

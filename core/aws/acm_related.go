@@ -161,7 +161,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	var recordNames []string
 	for _, dvo := range out.Certificate.DomainValidationOptions {
 		if dvo.ResourceRecord != nil && dvo.ResourceRecord.Name != nil {
-			recordNames = append(recordNames, strings.TrimSuffix(strings.ToLower(*dvo.ResourceRecord.Name), "."))
+			recordNames = append(recordNames, canonicalDNS(*dvo.ResourceRecord.Name))
 		}
 	}
 	if len(recordNames) == 0 {
@@ -179,7 +179,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		bestZoneID := ""
 		bestZoneLen := 0
 		for _, zoneRes := range zoneList {
-			zn := strings.TrimSuffix(strings.ToLower(zoneRes.Fields["name"]), ".")
+			zn := canonicalDNS(zoneRes.Fields["name"])
 			if zn == "" {
 				continue
 			}

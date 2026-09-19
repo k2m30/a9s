@@ -418,26 +418,14 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("sns")
 	}
 
-	// SNS topic ARN format: arn:aws:sns:region:account:topic-name
-	topicName := topicARN
-	if idx := strings.LastIndex(topicARN, ":"); idx >= 0 && idx < len(topicARN)-1 {
-		topicName = topicARN[idx+1:]
-	}
-
-	var ids []string
-	for _, snsRes := range snsList {
-		if snsRes.ID == topicARN || snsRes.ID == topicName ||
-			snsRes.Name == topicName || snsRes.Fields["arn"] == topicARN {
-			ids = append(ids, snsRes.ID)
-		}
-	}
+	ids, dropped := listedRefs("sns", []string{topicARN}, refContext(clients, cache, "sns"), snsList)
 	if len(ids) == 0 && truncated {
 		return relatedResultTrunc("sns", nil, true)
 	}
 	if truncated {
 		return truncatedResultRedis("sns", ids)
 	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, dropped)
 }
 
 // checkRedisSubnet resolves the subnets for the replication group by calling

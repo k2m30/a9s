@@ -34,7 +34,7 @@ type ruleSetStore interface {
 // Hosted zone names have a trailing dot (e.g. "acme-corp.com.") which is stripped
 // before comparison.
 func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	domain := sesIdentityDomain(res)
+	domain := canonicalDNS(sesIdentityDomain(res))
 	if domain == "" {
 		return resource.KnownRelated("r53", nil, false)
 	}
@@ -49,7 +49,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 
 	var ids []string
 	for _, zone := range r53List {
-		zoneName := strings.TrimSuffix(zone.Name, ".")
+		zoneName := canonicalDNS(zone.Name)
 		if strings.EqualFold(zoneName, domain) || strings.HasSuffix(domain, "."+zoneName) {
 			ids = append(ids, zone.ID)
 		}
@@ -67,16 +67,10 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 // For EMAIL_ADDRESS identities (containing "@"), it returns the part after "@".
 // For DOMAIN identities, it returns the identity name directly.
 func sesIdentityDomain(res resource.Resource) string {
-	name := res.ID
-	if name == "" {
-		return ""
+	if domain, ok := emailDomain(res.ID); ok {
+		return domain
 	}
-	// EMAIL_ADDRESS: extract domain after @
-	if idx := strings.LastIndex(name, "@"); idx >= 0 {
-		return name[idx+1:]
-	}
-	// DOMAIN: use as-is
-	return name
+	return res.ID
 }
 
 // sesConfigSetName resolves the ConfigurationSetName for the given SES identity by
@@ -269,10 +263,7 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 	switch identityType {
 	case sesIdentityTypeEmailAddress:
 		// Derive domain from identity (e.g. "billing@sub.acme.com" → "sub.acme.com").
-		domain := ""
-		if idx := strings.LastIndex(identityName, "@"); idx >= 0 {
-			domain = identityName[idx+1:]
-		}
+		domain, _ := emailDomain(identityName)
 		for _, r := range valid {
 			// Exact email match.
 			if strings.EqualFold(r, identityName) {
@@ -294,8 +285,8 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 			rLower := strings.ToLower(r)
 			// Recipient is an email address — check its domain.
 			rDomain := rLower
-			if idx := strings.LastIndex(rLower, "@"); idx >= 0 {
-				rDomain = rLower[idx+1:]
+			if d, ok := emailDomain(rLower); ok {
+				rDomain = d
 			}
 			// rDomain equals the identity domain or is a subdomain of it.
 			if rDomain == domainLower || strings.HasSuffix(rDomain, "."+domainLower) {

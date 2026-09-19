@@ -162,6 +162,21 @@ func (f *ECSFake) DescribeTasks(_ context.Context, input *ecs.DescribeTasksInput
 	return &ecs.DescribeTasksOutput{Tasks: result}, nil
 }
 
+func (f *ECSFake) DescribeContainerInstances(_ context.Context, input *ecs.DescribeContainerInstancesInput, _ ...func(*ecs.Options)) (*ecs.DescribeContainerInstancesOutput, error) {
+	out := &ecs.DescribeContainerInstancesOutput{}
+	for _, arn := range input.ContainerInstances {
+		i := slices.IndexFunc(f.fix.ContainerInstances, func(ci ecstypes.ContainerInstance) bool {
+			return aws.ToString(ci.ContainerInstanceArn) == arn
+		})
+		if i < 0 {
+			out.Failures = append(out.Failures, ecstypes.Failure{Arn: aws.String(arn), Reason: aws.String("MISSING")})
+			continue
+		}
+		out.ContainerInstances = append(out.ContainerInstances, f.fix.ContainerInstances[i])
+	}
+	return out, nil
+}
+
 func (f *ECSFake) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	arn := aws.ToString(input.TaskDefinition)
 	tdef, ok := f.fix.TaskDefinitions[arn]

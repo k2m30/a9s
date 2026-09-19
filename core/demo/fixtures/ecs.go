@@ -21,6 +21,8 @@ type ECSFixtures struct {
 	Tasks []ecstypes.Task
 	// TaskDefinitions maps task definition ARN → TaskDefinition.
 	TaskDefinitions map[string]*ecstypes.TaskDefinition
+	// ContainerInstances is the list DescribeContainerInstances answers from.
+	ContainerInstances []ecstypes.ContainerInstance
 }
 
 // NewECSFixtures builds and returns a fully-populated ECSFixtures struct.
@@ -34,12 +36,24 @@ var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
 		Services:        services,
 		Tasks:           tasks,
 		TaskDefinitions: tdefs,
+		ContainerInstances: []ecstypes.ContainerInstance{{
+			ContainerInstanceArn: aws.String(ecsBatchContainerInstanceArn),
+			Ec2InstanceId:        aws.String(ECSBatchHostInstanceID),
+			Status:               aws.String("ACTIVE"),
+		}},
 	}
 })
 
 func NewECSFixtures() *ECSFixtures {
 	return sharedECSFixtures()
 }
+
+// ECSBatchHostInstanceID is the EC2 instance behind the acme-batch cluster's
+// one container instance, the host batch-etl-runner's task runs on.
+const (
+	ECSBatchHostInstanceID       = "i-0e1f2a3b4c5d60050"
+	ecsBatchContainerInstanceArn = "arn:aws:ecs:us-east-1:123456789012:container-instance/acme-batch/e1f2a3b4c5d6e1f2a3b4c5d6"
+)
 
 // ECS posture witnesses.
 const (
@@ -547,7 +561,7 @@ func buildECSTasks() []ecstypes.Task {
 			LaunchType:        ecstypes.LaunchTypeEc2,
 			// ContainerInstanceArn — required for ecs-task→ec2 related-panel
 			// pivot (EC2 launch-type task).
-			ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/acme-batch/e1f2a3b4c5d6e1f2a3b4c5d6"),
+			ContainerInstanceArn: aws.String(ecsBatchContainerInstanceArn),
 			Cpu:                  aws.String("2048"),
 			Memory:               aws.String("4096"),
 			Group:                aws.String("service:batch-etl-runner"),

@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"time"
 
@@ -115,9 +114,7 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 	if !ok || c == nil {
 		return resource.UnknownRelated("iam-group")
 	}
-	// Inline policies: extract group name from path "inline/<group>"
-	if path := res.Fields["path"]; strings.HasPrefix(path, "inline/") {
-		groupName := strings.TrimPrefix(path, "inline/")
+	if groupName, ok := inlinePolicyGroup(res); ok {
 		return relatedResult("iam-group", []string{groupName})
 	}
 	policyARN := policyARNFromResource(res)

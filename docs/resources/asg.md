@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `elb`
 
 - **Why related**: Load balancers the ASG registers instances with — the "is traffic reaching new instances?" pivot.
-- **How discovered**: Read `AutoScalingGroup.LoadBalancerNames[]` (classic ELBv1 names) and `AutoScalingGroup.TargetGroupARNs[]`; for ALB/NLB, cross-reference the already-loaded `tg` list (targets → `LoadBalancerArns`) then the `elb` list by ARN. — a9s-devops: possible=yes (`AutoScalingGroup.LoadBalancerNames` + `AutoScalingGroup.TargetGroupARNs`; TG→ELB via `TargetGroup.LoadBalancerArns`), worth=yes (joint ASG+TG health is the canonical scale-event investigation).
+- **How discovered**: Read `AutoScalingGroup.TargetGroupARNs[]`; Classic `LoadBalancerNames[]` are not counted, since the `elb` type holds ELBv2 load balancers only. For ALB/NLB, cross-reference the already-loaded `tg` list (targets → `LoadBalancerArns`) then the `elb` list by ARN. — a9s-devops: possible=yes (`AutoScalingGroup.LoadBalancerNames` + `AutoScalingGroup.TargetGroupARNs`; TG→ELB via `TargetGroup.LoadBalancerArns`), worth=yes (joint ASG+TG health is the canonical scale-event investigation).
 - **Count shown**: yes.
 
 ### `ng`

@@ -223,7 +223,7 @@ cf — DNS & CDN. Status key: `status` — the key the status cell reads, and th
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| s3 | S3 Buckets (origin) | yes |
+| s3 | S3 Buckets | yes |
 | elb | Load Balancers (origin) | yes |
 | waf | WAF Web ACLs | yes |
 | acm | ACM Certificates | yes |

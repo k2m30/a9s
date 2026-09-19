@@ -108,17 +108,11 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		// identified from the ENI alone without cross-referencing the ELB cache.
 		return resource.UnknownRelated("elb")
 	}
-	desc := *raw.Description
-	// Example: "ELB app/my-alb/abcdef1234567890"
-	if !strings.HasPrefix(desc, "ELB ") {
+	name := elbNameFromENIDescription(*raw.Description)
+	if name == "" {
 		return resource.KnownRelated("elb", nil, false)
 	}
-	rest := desc[4:]
-	parts := strings.Split(rest, "/")
-	if len(parts) < 2 || parts[1] == "" {
-		return resource.KnownRelated("elb", nil, false)
-	}
-	return relatedResult("elb", []string{parts[1]})
+	return relatedResult("elb", []string{name})
 }
 
 // checkENILambda reports Lambda functions that own this ENI. Lambda-owned ENIs
@@ -149,28 +143,6 @@ func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.
 		return resource.UnknownRelated("lambda")
 	}
 	return relatedResult("lambda", []string{name})
-}
-
-// lambdaFunctionNameFromENIDescription extracts the Lambda function name from
-// the ENI Description field. Returns "" when it cannot parse reliably.
-func lambdaFunctionNameFromENIDescription(desc string) string {
-	const prefix = "AWS Lambda VPC ENI"
-	if !strings.HasPrefix(desc, prefix) {
-		return ""
-	}
-	rest := strings.TrimPrefix(desc, prefix)
-	rest = strings.TrimLeft(rest, "- ")
-	// The trailing segment is a UUID (8-4-4-4-12 hex + dashes = 36 chars).
-	if len(rest) >= 37 && rest[len(rest)-37] == '-' {
-		uuidPart := rest[len(rest)-36:]
-		if uuidPart[8] == '-' && uuidPart[13] == '-' && uuidPart[18] == '-' && uuidPart[23] == '-' {
-			return rest[:len(rest)-37]
-		}
-	}
-	if idx := strings.LastIndex(rest, "-"); idx > 0 {
-		return rest[:idx]
-	}
-	return rest
 }
 
 // checkENINAT reports NAT gateways whose NatGatewayAddresses include this

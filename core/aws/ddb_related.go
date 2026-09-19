@@ -4,8 +4,8 @@ package aws
 
 import (
 	"context"
-	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -102,7 +102,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 // checkDdbKinesis resolves Kinesis Data Streams connected to this DynamoDB table
 // via dynamodb:DescribeKinesisStreamingDestination (Pattern C: 1 API call).
 // KinesisDataStreamDestinations[].StreamArn values are returned as resource IDs.
-func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
 		return resource.KnownRelated("kinesis", nil, false)
@@ -121,18 +121,11 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.ErrorRelated("kinesis", err)
 	}
-	var ids []string
+	var arns []string
 	for _, dest := range out.KinesisDataStreamDestinations {
-		if dest.StreamArn != nil && *dest.StreamArn != "" {
-			// Extract stream name from ARN (last ":" segment).
-			parts := strings.Split(*dest.StreamArn, "/")
-			name := parts[len(parts)-1]
-			if name != "" {
-				ids = append(ids, name)
-			}
-		}
+		arns = append(arns, aws.ToString(dest.StreamArn))
 	}
-	return relatedResult("kinesis", ids)
+	return relatedRefs("kinesis", arns, refContext(clients, cache, "kinesis"))
 }
 
 // truncatedResultDDB returns a RelatedCheckResult with Truncated=true when the

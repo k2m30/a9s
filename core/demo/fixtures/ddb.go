@@ -74,6 +74,9 @@ const (
 	// orders-prod KMS key — referenced by kms.go fixture.
 	OrdersProdKMSKeyID  = "7a1c2e3f-4b5d-4e6f-8a9b-0c1d2e3f4a50"
 	OrdersProdKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + OrdersProdKMSKeyID
+	// OrdersQueueKMSAlias is the orders key's second alias; the public-policy
+	// queue names its key by it.
+	OrdersQueueKMSAlias = "alias/orders-queue-cmk"
 
 	// orders-prod Kinesis CDC stream — referenced by kinesis.go fixture.
 	OrdersProdKinesisStream    = "orders-prod-cdc"

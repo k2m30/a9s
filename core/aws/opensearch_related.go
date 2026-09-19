@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
@@ -23,7 +22,7 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 
 // checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.
 // Pattern F — reads from RawStruct, no cache needed.
-func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
@@ -32,32 +31,13 @@ func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ reso
 		return resource.KnownRelated("logs", nil, false)
 	}
 
-	seen := make(map[string]struct{})
-	var ids []string
+	var arns []string
 	for _, opt := range domain.LogPublishingOptions {
-		if opt.CloudWatchLogsLogGroupArn == nil || *opt.CloudWatchLogsLogGroupArn == "" {
-			continue
-		}
-		arn := *opt.CloudWatchLogsLogGroupArn
-		// ARN format: arn:aws:logs:region:account:log-group:/name:*
-		// Extract log group name by splitting on ":log-group:" and stripping trailing ":*"
-		parts := strings.SplitN(arn, ":log-group:", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		logGroupName := strings.TrimSuffix(parts[1], ":*")
-		if logGroupName == "" {
-			continue
-		}
-		if _, exists := seen[logGroupName]; !exists {
-			seen[logGroupName] = struct{}{}
-			ids = append(ids, logGroupName)
+		if opt.CloudWatchLogsLogGroupArn != nil {
+			arns = append(arns, *opt.CloudWatchLogsLogGroupArn)
 		}
 	}
-	if len(ids) == 0 {
-		return resource.KnownRelated("logs", nil, false)
-	}
-	return relatedResult("logs", ids)
+	return relatedRefs("logs", arns, refContext(clients, cache, "logs"))
 }
 
 // checkOpenSearchSG extracts security group IDs from the OpenSearch Domain's

@@ -261,8 +261,9 @@ func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secret resource.Resour
 // associated with this secret. Reads RotationLambdaARN and calls
 // lambda:GetFunction → FunctionConfiguration.LoggingConfig.LogGroup (or derives
 // /aws/lambda/<function-name> as default).
-// If no RotationLambdaARN is set, returns Count: 0.
-func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// If no RotationLambdaARN is set, returns Count: 0; a function in another
+// account or region has its log group there, so the count is a lower bound.
+func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
@@ -272,10 +273,9 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _
 	}
 	rotationARN := *secret.RotationLambdaARN
 
-	// Extract function name from ARN (arn:aws:lambda:region:account:function:<name>)
-	funcName := rotationARN
-	if idx := strings.LastIndex(rotationARN, ":"); idx >= 0 && idx < len(rotationARN)-1 {
-		funcName = rotationARN[idx+1:]
+	funcName, local := resource.ResolveRef("lambda", rotationARN, refContext(clients, cache, "lambda"))
+	if !local {
+		return resource.KnownRelated("logs", nil, true)
 	}
 
 	defaultLogGroup := "/aws/lambda/" + funcName

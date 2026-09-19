@@ -282,11 +282,7 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 	if !ok || task.Group == nil || !strings.HasPrefix(*task.Group, "service:") {
 		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
-	svcName := strings.TrimPrefix(*task.Group, "service:")
-	if svcName == "" {
-		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
-	}
-	return unreadZero(res, relatedResult("ecs-svc", []string{svcName}))
+	return unreadZero(res, relatedRefs("ecs-svc", []string{*task.Group}, refContext(clients, cache, "ecs-svc")))
 }
 
 // checkEIPECS reports the ECS cluster whose task currently holds this EIP,

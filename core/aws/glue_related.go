@@ -120,7 +120,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 // checkGlueS3 extracts the S3 bucket referenced by the job's
 // Command.ScriptLocation (s3://bucket/path/to/script.py). Forward lookup
 // from gluetypes.Job.
-func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkGlueS3(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("s3")
@@ -128,11 +128,7 @@ func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
 		return resource.KnownRelated("s3", nil, false)
 	}
-	bucket := bucketFromS3URI(*job.Command.ScriptLocation)
-	if bucket == "" {
-		return resource.KnownRelated("s3", nil, false)
-	}
-	return relatedResult("s3", []string{bucket})
+	return relatedRefs("s3", []string{*job.Command.ScriptLocation}, refContext(clients, cache, "s3"))
 }
 
 // checkGlueKMS calls glue:GetSecurityConfiguration(name=Job.SecurityConfiguration)

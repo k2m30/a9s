@@ -712,8 +712,11 @@ func TestRelated_ASG_AMI_WrongRawStruct(t *testing.T) {
 // T010 — checkASGELB (forward: LoadBalancerNames + resolve TG ARNs via ELBv2)
 // ---------------------------------------------------------------------------
 
-// TestRelated_ASG_ELB_MatchByClassicELBNames verifies that checkASGELB returns
-// classic ELB names directly from LoadBalancerNames.
+// TestRelated_ASG_ELB_MatchByClassicELBNames verifies that checkASGELB counts
+// no Classic ELB names from LoadBalancerNames.
+//
+// Inverted by #545 ruling A: the elb type holds ELBv2 load balancers only, so
+// a Classic name names no row. Do not restore the Classic count.
 func TestRelated_ASG_ELB_MatchByClassicELBNames(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-asg",
@@ -724,15 +727,11 @@ func TestRelated_ASG_ELB_MatchByClassicELBNames(t *testing.T) {
 		},
 	}
 
-	// checkASGELB reads classic ELB names without calling AWS when only LoadBalancerNames present
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2", result.Count())
-	}
-	if len(result.ResourceIDs()) != 2 {
-		t.Fatalf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
+	if result.Count() != 0 || len(result.ResourceIDs()) != 0 {
+		t.Errorf("Count = %d, ResourceIDs = %v, want none", result.Count(), result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
@@ -1230,8 +1229,11 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 	}
 }
 
-// TestRelated_ASG_ELB_TGARNs_BothClassicAndALB verifies that checkASGELB merges
-// classic ELB names and ALB ARNs resolved from TargetGroupARNs into a single result.
+// TestRelated_ASG_ELB_TGARNs_BothClassicAndALB verifies that checkASGELB counts
+// the ALB resolved from TargetGroupARNs and not the Classic ELB name.
+//
+// Inverted by #545 ruling A: the elb type holds ELBv2 load balancers only. Do
+// not restore the Classic count.
 func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/xyz987"
@@ -1263,18 +1265,9 @@ func TestRelated_ASG_ELB_TGARNs_BothClassicAndALB(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2 (classic + ALB)", result.Count())
-	}
 	// Inverted by #545 row 1: the ALB is counted by its name, the elb row ID.
-	found := map[string]bool{classicName: false, "my-alb": false}
-	for _, id := range result.ResourceIDs() {
-		found[id] = true
-	}
-	for k, ok := range found {
-		if !ok {
-			t.Errorf("ResourceIDs = %v, want to contain %q", result.ResourceIDs(), k)
-		}
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "my-alb" {
+		t.Errorf("ResourceIDs = %v, want [my-alb] (Classic %q is no elb row)", ids, classicName)
 	}
 }
 

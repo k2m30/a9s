@@ -208,17 +208,15 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 
 	var ids []string
 	for _, zoneRes := range zoneList {
-		zoneName := r53ZoneName(zoneRes)
+		zoneName := canonicalDNS(r53ZoneName(zoneRes))
 		if zoneName == "" {
 			continue
 		}
-		// Zone names typically end with "." — normalize.
-		zoneName = strings.TrimSuffix(zoneName, ".")
 		for _, alias := range aliases {
 			if alias == "" {
 				continue
 			}
-			a := strings.TrimSuffix(alias, ".")
+			a := canonicalDNS(alias)
 			if a == zoneName || strings.HasSuffix(a, "."+zoneName) {
 				ids = append(ids, zoneRes.ID)
 				break

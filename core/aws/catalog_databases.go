@@ -398,6 +398,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Name:           "DynamoDB Tables",
 		ShortName:      "ddb",
 		HumanizeFields: []string{"TableStatus"},
+		RefToID:        ddbRefToID,
 		Aliases:        []string{"ddb", "dynamodb", "dynamo"},
 		Category:       "DATABASES & STORAGE",
 		CloudTrailKey:  "ResourceName:ID",

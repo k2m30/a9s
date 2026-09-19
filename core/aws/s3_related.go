@@ -17,6 +17,7 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -259,11 +260,17 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var ids []string
 	for _, wg := range wgList {
-		if bucketFromS3URI(wg.Fields["result_output_location"]) == bucket {
+		if s3URINames(wg.Fields["result_output_location"], bucket) {
 			ids = append(ids, wg.ID)
 		}
 	}
 	return relatedResultTrunc("athena", ids, truncated)
+}
+
+// s3URINames reports whether an s3:// URI (or bucket ARN) names bucket.
+func s3URINames(uri, bucket string) bool {
+	id, ok := resource.ResolveRef("s3", uri, domain.RefContext{})
+	return ok && id == bucket
 }
 
 // checkS3Glue scans the glue cache for Jobs whose Command.ScriptLocation
@@ -286,7 +293,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		if !ok || job.Command == nil || job.Command.ScriptLocation == nil {
 			continue
 		}
-		if bucketFromS3URI(*job.Command.ScriptLocation) == bucket {
+		if s3URINames(*job.Command.ScriptLocation, bucket) {
 			ids = append(ids, jobRes.ID)
 		}
 	}

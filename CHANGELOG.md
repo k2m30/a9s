@@ -32,6 +32,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not only the one the key list shows; Enter opens that key.
 - A CloudFront distribution's S3 Buckets row counts its standard-logging
   bucket beside its origin buckets.
+- An ECS task on EC2 lists the EC2 instance it runs on, read from its
+  container instance; before, the row named the container instance's ID,
+  which is not an instance.
+- A CloudWatch alarm on an API Gateway or WAF web ACL finds the API or ACL
+  by the name its dimension carries, and no longer offers a name that matches
+  no loaded row.
+- An Auto Scaling group's Load Balancers row no longer counts Classic load
+  balancer names, which the Load Balancers list does not hold.
+- A KMS row keeps the keys it could read when looking up one of several
+  aliases fails, and marks its count as a lower bound instead of failing
+  outright. A KMS key's Secrets, Volumes and RDS rows match references to
+  the key by any of its aliases.
+- A detail field naming a KMS alias opens the key even when the KMS list has
+  not been loaded.
+- A CloudTrail event from another account no longer fills the role and user
+  of the local namesake.
 
 ### Removed
 

@@ -9,7 +9,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -134,7 +133,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 
 // checkWAFAPIGW calls wafv2:ListResourcesForWebACL with API Gateway resource type
 // and returns matching API IDs (Pattern A — direct API call).
-func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
 		return resource.UnknownRelated("apigw")
@@ -150,18 +149,5 @@ func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 	if err != nil {
 		return resource.ErrorRelated("apigw", err)
 	}
-	var ids []string
-	for _, arn := range out.ResourceArns {
-		// Extract API ID from stage ARN: arn:aws:apigateway:REGION::/restapis/ID/stages/STAGE
-		if strings.Contains(arn, "/restapis/") {
-			parts := strings.Split(arn, "/")
-			for i, p := range parts {
-				if p == "restapis" && i+1 < len(parts) {
-					ids = append(ids, parts[i+1])
-					break
-				}
-			}
-		}
-	}
-	return relatedResult("apigw", ids)
+	return relatedRefs("apigw", out.ResourceArns, refContext(clients, cache, "apigw"))
 }

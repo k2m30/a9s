@@ -426,8 +426,8 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		},
 		// Issue-state aliases
 		{
-			AliasName:   aws.String("alias/aws/disabled-key"),
-			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/aws/disabled-key"),
+			AliasName:   aws.String("alias/acme-disabled-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-disabled-key"),
 			TargetKeyId: aws.String("d4e5f6a7-bcde-1234-5678-aabbccddeeff"),
 		},
 		{
@@ -472,6 +472,13 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-redis-prod-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-redis-prod-key"),
 			TargetKeyId: aws.String(ProdRedisKMSKeyID),
+		},
+		// OrdersQueueKMSAlias: the orders key's second alias, listed first so
+		// the key's row displays orders-prod-cmk.
+		{
+			AliasName:   aws.String(OrdersQueueKMSAlias),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:" + OrdersQueueKMSAlias),
+			TargetKeyId: aws.String(OrdersProdKMSKeyID),
 		},
 		// orders-prod DynamoDB CMK alias.
 		{

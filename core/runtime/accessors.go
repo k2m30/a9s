@@ -307,7 +307,9 @@ func (c *Core) AnyOriginResourceCacheGen(rt string) domain.Gen {
 // the render-time row source for a related-FILTERED list: because the list is
 // scoped to a RelatedIDSet, surfacing the Partial (lazy/by-ID) lane is safe —
 // everything outside the set is filtered out — so a cache-hit filtered list
-// renders its rows without a fetch, identically on both renderers.
+// renders its rows without a fetch, identically on both renderers. It is also
+// the set a detail's navigable field resolves against: the rows the related
+// checkers see, so a field and the related row read a reference alike.
 func (c *Core) AnyLaneResources(rt string) []domain.Resource {
 	return c.session.RowStore.Snapshot(rt).Rows
 }

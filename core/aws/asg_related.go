@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -143,51 +142,34 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	return resource.KnownRelated("ami", nil, false)
 }
 
-// checkASGELB resolves load balancers associated with this ASG.
-// Classic ELB names come directly from parent.LoadBalancerNames.
-// ALB/NLB ARNs are resolved from parent.TargetGroupARNs via elbv2:DescribeTargetGroups.LoadBalancerArns.
+// checkASGELB resolves the ALB/NLB behind this ASG's TargetGroupARNs via
+// elbv2:DescribeTargetGroups.LoadBalancerArns. Classic LoadBalancerNames name
+// no row: the elb type holds ELBv2 load balancers only.
 func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("elb")
 	}
-	if len(asg.LoadBalancerNames) == 0 && len(asg.TargetGroupARNs) == 0 {
+	if len(asg.TargetGroupARNs) == 0 {
 		return resource.KnownRelated("elb", nil, false)
 	}
-
-	rc := refContext(clients, cache, "elb")
-	ids, _ := resolveRefs("elb", asg.LoadBalancerNames, rc)
-
-	// Resolve ALB/NLB from TG ARNs. Bailing out here still reports the classic
-	// ELB names already collected, but as a truncated lower bound — the
-	// ALB/NLB side of TargetGroupARNs was never resolved, so ids is not the
-	// exhaustive answer.
-	if len(asg.TargetGroupARNs) > 0 {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			if len(ids) > 0 {
-				return relatedResultTrunc("elb", ids, true)
-			}
-			return resource.UnknownRelated("elb")
-		}
-		tgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetGroupsOutput, error) {
-			return c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
-				TargetGroupArns: asg.TargetGroupARNs,
-			})
-		})
-		if err != nil {
-			if len(ids) > 0 {
-				return relatedResultTrunc("elb", ids, true)
-			}
-			return resource.ErrorRelated("elb", err)
-		}
-		refs := slices.Clone(asg.LoadBalancerNames)
-		for _, tg := range tgOut.TargetGroups {
-			refs = append(refs, tg.LoadBalancerArns...)
-		}
-		return relatedRefs("elb", refs, rc)
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return resource.UnknownRelated("elb")
 	}
-	return relatedRefs("elb", asg.LoadBalancerNames, rc)
+	tgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetGroupsOutput, error) {
+		return c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
+			TargetGroupArns: asg.TargetGroupARNs,
+		})
+	})
+	if err != nil {
+		return resource.ErrorRelated("elb", err)
+	}
+	var refs []string
+	for _, tg := range tgOut.TargetGroups {
+		refs = append(refs, tg.LoadBalancerArns...)
+	}
+	return relatedRefs("elb", refs, refContext(clients, cache, "elb"))
 }
 
 // checkASGRole resolves IAM roles associated with this ASG.

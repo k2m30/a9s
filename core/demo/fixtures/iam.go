@@ -262,14 +262,6 @@ func buildIAMRoles() []iamtypes.Role {
 			Description: aws.String("Execution role for Lambda functions"),
 		},
 		{
-			RoleName:    aws.String(fixtIAMProdLambdaRoleARN),
-			RoleId:      aws.String("AROAEXAMPLE222222223"),
-			Arn:         aws.String(fixtIAMProdLambdaRoleARN),
-			Path:        aws.String("/service-role/"),
-			CreateDate:  aws.Time(time.Date(2025, 3, 10, 8, 15, 0, 0, time.UTC)),
-			Description: aws.String("Lambda execution role ARN alias (navigable-field cross-reference)"),
-		},
-		{
 			RoleName:    aws.String("acme-ci-deploy-role"),
 			RoleId:      aws.String("AROAEXAMPLE333333333"),
 			Arn:         aws.String("arn:aws:iam::123456789012:role/acme-ci-deploy-role"),
@@ -335,22 +327,22 @@ func buildIAMRoles() []iamtypes.Role {
 			CreateDate:  aws.Time(time.Date(2025, 1, 5, 9, 0, 0, 0, time.UTC)),
 			Description: aws.String("EC2 instance role for web-tier ASG instances"),
 		},
-		// ARN-keyed alias fixtures for EKS node group NodeRole navigable field
+		// The EKS node groups' NodeRole roles.
 		{
-			RoleName:    aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
+			RoleName:    aws.String("eks-node-role"),
 			RoleId:      aws.String("AROAEXAMPLENGNODE001"),
 			Arn:         aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 2, 20, 12, 0, 0, 0, time.UTC)),
-			Description: aws.String("EKS node role ARN alias (navigable-field cross-reference)"),
+			Description: aws.String("Role for the EKS node groups"),
 		},
 		{
-			RoleName:    aws.String("arn:aws:iam::123456789012:role/eks-gpu-node-role"),
+			RoleName:    aws.String("eks-gpu-node-role"),
 			RoleId:      aws.String("AROAEXAMPLENGNODE002"),
 			Arn:         aws.String("arn:aws:iam::123456789012:role/eks-gpu-node-role"),
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 4, 5, 9, 30, 0, 0, time.UTC)),
-			Description: aws.String("EKS GPU node role ARN alias (navigable-field cross-reference)"),
+			Description: aws.String("Role for the EKS GPU node group"),
 		},
 	}
 
@@ -636,28 +628,15 @@ func buildIAMRoles() []iamtypes.Role {
 	}
 	// AWSServiceRoleForVPCTransitGateway — required for the tgw→role
 	// related-panel pivot (checkTGWRole), which probes for this exact
-	// service-linked-role name via iam:GetRole. checkTGWRole's navigation ID
-	// is the role's ARN (not the bare name), and the demo drill's role
-	// FetchByIDs passes that ID straight through as GetRoleInput.RoleName —
-	// so a second alias entry keyed by the ARN itself is required, mirroring
-	// the fixtIAMProdLambdaRoleARN pattern above.
-	const tgwSLRArn = "arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"
+	// service-linked-role name via iam:GetRole.
 	roles = append(roles,
 		iamtypes.Role{
 			RoleName:    aws.String("AWSServiceRoleForVPCTransitGateway"),
 			RoleId:      aws.String("AROAEXAMPLETGW0001"),
-			Arn:         aws.String(tgwSLRArn),
+			Arn:         aws.String("arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"),
 			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
 			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
 			Description: aws.String("Service-linked role for AWS Transit Gateway"),
-		},
-		iamtypes.Role{
-			RoleName:    aws.String(tgwSLRArn),
-			RoleId:      aws.String("AROAEXAMPLETGW0002"),
-			Arn:         aws.String(tgwSLRArn),
-			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
-			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
-			Description: aws.String("Transit Gateway SLR ARN alias (navigable-field cross-reference)"),
 		},
 	)
 	return roles

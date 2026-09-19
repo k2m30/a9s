@@ -92,9 +92,9 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkTGWRole checks whether the Transit Gateway service-linked role (SLR)
 // "AWSServiceRoleForVPCTransitGateway" exists via iam:GetRole.
-// Count: 1 with the role ARN if found; Count: 0 if the role does not exist
+// Count: 1 with the role if found; Count: 0 if the role does not exist
 // (NoSuchEntity); unknown state on unexpected errors.
-func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
@@ -123,7 +123,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	return relatedResult("role", []string{*out.Role.Arn})
+	return relatedRefs("role", []string{*out.Role.Arn}, refContext(clients, cache, "role"))
 }
 
 // checkTGWSubnet reports subnets this transit gateway is attached to via VPC

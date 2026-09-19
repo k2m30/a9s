@@ -5,11 +5,12 @@ package aws
 
 import (
 	"context"
-	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -45,7 +46,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 // Resources slice (AWS::IAM::Role) and matches against the role cache.
 // Pattern C — cache lookup by name extracted from ARN.
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	candidates := ctEventsRoleCandidates(res)
+	candidates := ctEventsRoleCandidates(res, refContext(clients, cache, "role"))
 	if len(candidates) == 0 {
 		return unreadZero(res, resource.KnownRelated("role", nil, false))
 	}
@@ -58,7 +59,7 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 // service-role path, then the event JSON. Each source's raw value goes through
 // ctRoleAlternatives, so the candidates follow row 11's id rule rather than any
 // role-specific trim.
-func ctEventsRoleCandidates(res resource.Resource) []string {
+func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
 	// TARGET role being assumed. Prefer it over Resources[]/sessionIssuer, which
@@ -68,7 +69,7 @@ func ctEventsRoleCandidates(res resource.Resource) []string {
 		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
 			if req, _ := parsed["requestParameters"].(map[string]any); req != nil {
 				if arn, _ := req["roleArn"].(string); arn != "" {
-					return ctRoleAlternatives(arn)
+					return ctRoleAlternatives(arn, rc)
 				}
 			}
 		}
@@ -77,7 +78,7 @@ func ctEventsRoleCandidates(res resource.Resource) []string {
 		for _, r := range event.Resources {
 			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") {
 				if r.ResourceName != nil && *r.ResourceName != "" {
-					return ctRoleAlternatives(*r.ResourceName)
+					return ctRoleAlternatives(*r.ResourceName, rc)
 				}
 			}
 		}
@@ -85,28 +86,30 @@ func ctEventsRoleCandidates(res resource.Resource) []string {
 
 	// Fallback: Username may encode a service role path ("AWSServiceRole/RoleName").
 	if username := res.Fields["user"]; strings.Contains(username, "/") {
-		return ctRoleAlternatives(username)
+		return ctRoleAlternatives(username, rc)
 	}
 
 	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON string.
 	if ok {
 		if name := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); name != "" {
-			return ctRoleAlternatives(name)
+			return ctRoleAlternatives(name, rc)
 		}
 	}
 
 	return nil
 }
 
-// ctRoleAlternatives is ctIDAlternatives plus the STS form: an assumed-role
-// ARN ends "assumed-role/<role>/<session>", so the role is the segment before
-// the session and no general rule can see that.
-func ctRoleAlternatives(v string) []string {
-	out := ctIDAlternatives(v)
-	if name := roleNameFromARN(v); name != "" && !slices.Contains(out, name) {
-		out = append(out, name)
+// ctRoleAlternatives reads a role ARN (or an STS assumed-role ARN) through
+// the role resolver, so another account's role is no candidate; anything else
+// is read by ctIDAlternatives.
+func ctRoleAlternatives(v string, rc domain.RefContext) []string {
+	if !arn.IsARN(v) {
+		return ctIDAlternatives(v)
 	}
-	return out
+	if id, ok := resource.ResolveRef("role", v, rc); ok {
+		return []string{id}
+	}
+	return nil
 }
 
 // ctEventsRelatedResources reads the target list from the session cache ONLY —
@@ -185,63 +188,6 @@ func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.Resour
 	return relatedResultTrunc(target, matched, truncated)
 }
 
-// ctIDAlternatives returns the candidate ids for one value an event named,
-// derived from what the event wrote and never from the ARN's fixed grammar.
-// An ARN contributes the id inside its resource part — everything after the
-// type word, as one string — and then itself, so no segment of the grammar and
-// no type word can answer for a resource. Anything else contributes itself. A
-// fragment of a name is not a form of it.
-func ctIDAlternatives(v string) []string {
-	if parts := strings.SplitN(v, ":", 6); strings.HasPrefix(v, "arn:") && len(parts) == 6 {
-		// The whole ARN is offered last, behind the resource-part forms: a
-		// list that carries its rows' own ARNs can answer it exactly, which
-		// is the only way to confirm an id whose ARN carries a suffix the
-		// name does not. Last because the callers that read a group
-		// positionally (cfnStackNameFromResourceName, ctLambdaAlternatives)
-		// read the resource part at [0] and its stripped form at [1].
-		return append(ctStripTypeWord(parts[5], "/:"), v)
-	}
-	// Not an ARN: the value IS the id. An event may still write the resource
-	// part alone ("instance/i-abc"), so the type-word strip is offered behind
-	// it — on "/" only, because a trailing ":qualifier" on a bare name is
-	// Lambda's business and its head is the function.
-	return ctStripTypeWord(v, "/")
-}
-
-// ctStripTypeWord returns res and the form inside it, most specific first:
-// res as written, then without its leading "<type><sep>"
-// ("instance/i-abc" → "i-abc", "secret:prod/api/key" → "prod/api/key").
-// Nothing shorter: a fragment of a name belongs to a different resource.
-func ctStripTypeWord(res, seps string) []string {
-	out := []string{res}
-	i := strings.IndexAny(res, seps)
-	if i < 0 || i >= len(res)-1 {
-		return out
-	}
-	return append(out, res[i+1:])
-}
-
-// ctLambdaAlternatives is ctIDAlternatives plus the Lambda-only rule: a
-// function may be named with a trailing ":<alias>" qualifier, so the head
-// before it is a candidate after the as-written form.
-func ctLambdaAlternatives(group []string) []string {
-	// The type word is what precedes the first separator of the widest
-	// candidate; a head that equals it is grammar, not a function name.
-	typeWord := ""
-	if len(group) > 1 {
-		if i := strings.IndexAny(group[0], "/:"); i > 0 && group[0][i+1:] == group[1] {
-			typeWord = group[0][:i]
-		}
-	}
-	out := group
-	for _, c := range group {
-		if i := strings.LastIndex(c, ":"); i > 0 && c[:i] != typeWord {
-			out = append(out, c[:i])
-		}
-	}
-	return out
-}
-
 // extractCTResourceIDs scans the event's Resources slice for entries matching
 // awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
 // per entry, built by ctIDAlternatives: at most two forms, the value as written
@@ -263,20 +209,6 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 		groups = append(groups, ctIDAlternatives(*r.ResourceName))
 	}
 	return groups
-}
-
-// cfnStackNameFromResourceName extracts the stack NAME from a CloudTrail
-// CloudFormation resource name. Stack ARNs are ".../stack/<name>/<uuid>"; the
-// generic last-segment trim (extractCTResourceIDs) would keep the uuid, but cfn
-// resources are keyed by stack name. A bare name (no "stack/" segment) passes
-// through unchanged.
-func cfnStackNameFromResourceName(group []string) []string {
-	s := group[0]
-	if len(group) > 1 {
-		s = group[1] // the id after the "stack/" type word: "<name>/<uuid>"
-	}
-	name, _, _ := strings.Cut(s, "/")
-	return []string{name}
 }
 
 // ctJSONString walks a parsed CT event JSON map along the given keys and

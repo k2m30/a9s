@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
@@ -32,9 +31,8 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkSecretsLambda returns the Lambda rotation function associated with this
-// secret (Pattern F). RotationLambdaARN has the form
-// arn:aws:lambda:region:account:function:{name}; we extract the function name
-// after the last ":" and search the lambda cache for a matching resource ID.
+// secret (Pattern F): RotationLambdaARN read through the lambda resolver and
+// kept to the lambda list.
 func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[smtypes.SecretListEntry](res.RawStruct)
 	if !ok {
@@ -46,13 +44,6 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.KnownRelated("lambda", nil, false)
 	}
-	arn := *secret.RotationLambdaARN
-	idx := strings.LastIndex(arn, ":")
-	if idx < 0 || idx == len(arn)-1 {
-		return resource.KnownRelated("lambda", nil, false)
-	}
-	funcName := arn[idx+1:]
-
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
@@ -61,13 +52,8 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("lambda")
 	}
 
-	var ids []string
-	for _, lambdaRes := range lambdaList {
-		if lambdaRes.ID == funcName {
-			ids = append(ids, lambdaRes.ID)
-		}
-	}
-	return relatedResultTrunc("lambda", ids, truncated)
+	ids, dropped := listedRefs("lambda", []string{*secret.RotationLambdaARN}, refContext(clients, cache, "lambda"), lambdaList)
+	return relatedResultTrunc("lambda", ids, truncated || dropped)
 }
 
 // checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name
@@ -180,8 +166,7 @@ func secretIdentifiers(res resource.Resource) (arn, name string) {
 // projects whose Environment.EnvironmentVariables contains a SECRETS_MANAGER
 // variable whose Value references this secret's ARN or name.
 func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	secretARN, secretName := secretIdentifiers(res)
-	if secretARN == "" && secretName == "" {
+	if res.ID == "" {
 		return resource.KnownRelated("cb", nil, false)
 	}
 
@@ -193,6 +178,8 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("cb")
 	}
 
+	rc := refContext(clients, cache, "secrets")
+	rc.Targets = []resource.Resource{res}
 	var ids []string
 	for _, cbRes := range cbList {
 		proj, ok := assertStruct[cbtypes.Project](cbRes.RawStruct)
@@ -203,9 +190,7 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 			if ev.Type != cbtypes.EnvironmentVariableTypeSecretsManager || ev.Value == nil {
 				continue
 			}
-			val := *ev.Value
-			if (secretARN != "" && val == secretARN) ||
-				(secretName != "" && (val == secretName || strings.HasPrefix(val, secretName+":"))) {
+			if id, ok := resource.ResolveRef("secrets", *ev.Value, rc); ok && id == res.ID {
 				ids = append(ids, cbRes.ID)
 				break
 			}

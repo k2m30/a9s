@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -39,6 +40,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("ebs")
 	}
 
+	rc := kmsViewedKeyContext(clients, cache, res)
 	var ids []string
 	for _, ebsRes := range ebsList {
 		vol, ok := assertStruct[ec2types.Volume](ebsRes.RawStruct)
@@ -48,9 +50,11 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 		if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*vol.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
+		match, unknown := kmsRefNames(*vol.KmsKeyId, keyID, rc)
+		if match {
 			ids = append(ids, ebsRes.ID)
 		}
+		truncated = truncated || unknown
 	}
 	return relatedResultTrunc("ebs", ids, truncated)
 }
@@ -70,6 +74,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("dbi")
 	}
 
+	rc := kmsViewedKeyContext(clients, cache, res)
 	var ids []string
 	for _, dbiRes := range dbiList {
 		db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct)
@@ -79,9 +84,11 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 		if db.KmsKeyId == nil || *db.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*db.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
+		match, unknown := kmsRefNames(*db.KmsKeyId, keyID, rc)
+		if match {
 			ids = append(ids, dbiRes.ID)
 		}
+		truncated = truncated || unknown
 	}
 	return relatedResultTrunc("dbi", ids, truncated)
 }
@@ -102,6 +109,7 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("secrets")
 	}
 
+	rc := kmsViewedKeyContext(clients, cache, res)
 	var ids []string
 	for _, secretRes := range secretsList {
 		secret, ok := assertStruct[smtypes.SecretListEntry](secretRes.RawStruct)
@@ -111,18 +119,33 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		if secret.KmsKeyId == nil || *secret.KmsKeyId == "" {
 			continue
 		}
-		if kmsIDMatches(*secret.KmsKeyId, keyID, refContext(clients, cache, "kms")) {
+		match, unknown := kmsRefNames(*secret.KmsKeyId, keyID, rc)
+		if match {
 			ids = append(ids, secretRes.ID)
 		}
+		truncated = truncated || unknown
 	}
 	return relatedResultTrunc("secrets", ids, truncated)
 }
 
-// kmsIDMatches reports whether a KMS reference value (key ARN, bare key ID,
-// alias or alias ARN) names the key keyID.
-func kmsIDMatches(ref, keyID string, rc domain.RefContext) bool {
-	id, ok := resource.ResolveRef("kms", ref, rc)
-	return ok && id == keyID
+// kmsViewedKeyContext is refContext for the kms target with the viewed key
+// among the Targets, so its aliases resolve whether or not the kms list is
+// loaded.
+func kmsViewedKeyContext(clients any, cache resource.ResourceCache, key resource.Resource) domain.RefContext {
+	rc := refContext(clients, cache, "kms")
+	rc.Targets = append(slices.Clone(rc.Targets), key)
+	return rc
+}
+
+// kmsRefNames reports whether a KMS reference value (key ARN, bare key ID,
+// alias or alias ARN) names the key keyID, and whether it is a local alias no
+// target carries, which may name it.
+func kmsRefNames(ref, keyID string, rc domain.RefContext) (match, unknown bool) {
+	if id, ok := resource.ResolveRef("kms", ref, rc); ok {
+		return id == keyID, false
+	}
+	res, _, local := localARN(ref, rc, "kms")
+	return false, local && strings.HasPrefix(res, "alias/")
 }
 
 // kmsIAMPolicyDoc is a minimal IAM policy document used for parsing Principal.AWS fields.

@@ -92,12 +92,11 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 			refs = append(refs, *vol.KmsKeyId)
 		}
 	}
-	rc, err := kmsRefContext(ctx, clients, cache, refs)
+	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
-	ids, dropped := resolveRefs("kms", refs, rc)
-	return relatedResultTrunc("kms", ids, truncated || dropped)
+	return relatedResultTrunc("kms", ids, truncated || lowerBound)
 }
 
 // checkEC2Logs searches the logs cache for log groups matching this EC2

@@ -399,8 +399,12 @@ func TestRelated_WAF_APIGW_ExtractsAPIIDFromARN(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_APIGW_NoRestAPIsInARN verifies that ARNs without /restapis/
-// are skipped and Count=0 is returned.
+// TestRelated_WAF_APIGW_NoRestAPIsInARN verifies that an API ARN without
+// /restapis/ is read through the apigw resolver like any other: "/apis/<id>"
+// names the API <id>.
+//
+// Inverted by #545 ruling A: the checker no longer parses the ARN itself, and
+// the apigw resolver reads both API ARN shapes. Do not restore the skip.
 func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -418,8 +422,8 @@ func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), clients, res, nil)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (no /restapis/ in ARN)", result.Count())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "xyz789" {
+		t.Errorf("ResourceIDs = %v, want [xyz789]", ids)
 	}
 }
 

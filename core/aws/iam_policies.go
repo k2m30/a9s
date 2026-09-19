@@ -439,7 +439,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 					"policy_name":      name,
 					"policy_type":      "inline",
 					"attachment_count": "",
-					"path":             "inline/" + groupName,
+					"path":             inlinePolicyPathPrefix + groupName,
 					"create_date":      "",
 				},
 			})
@@ -475,4 +475,13 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 	}
 
 	return resources, AggregateFailures("ListGroupPolicies", groupFailures, n)
+}
+
+// inlinePolicyPathPrefix marks the path of a group's inline policy row,
+// followed by the group's name.
+const inlinePolicyPathPrefix = "inline/"
+
+// inlinePolicyGroup returns the group an inline policy row belongs to.
+func inlinePolicyGroup(res resource.Resource) (string, bool) {
+	return afterPrefix(res.Fields["path"], inlinePolicyPathPrefix)
 }

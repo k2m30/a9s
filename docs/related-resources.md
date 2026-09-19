@@ -208,7 +208,7 @@ AWS API: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScali
 - **`ami`** — LaunchConfiguration.ImageId or LaunchTemplate.LaunchTemplateData.ImageId — AMI used by instances.
 - **`ct-events`** — Audit trail for scaling events / config changes.
 - **`ec2`** — Instances the ASG currently manages.
-- **`elb`** — AutoScalingGroup.LoadBalancerNames (classic ELBs) + TargetGroupARNs → DescribeTargetGroups.LoadBalancerArns (ALB/NLB).
+- **`elb`** — TargetGroupARNs → DescribeTargetGroups.LoadBalancerArns (ALB/NLB). Classic `LoadBalancerNames` are not counted: the `elb` type holds ELBv2 load balancers only.
 - **`ng`** — EKS node groups wrap ASGs; shown when parent node group exists.
 - **`role`** — AutoScalingGroup.ServiceLinkedRoleARN + LaunchConfiguration/Template IamInstanceProfile → GetInstanceProfile roles.
 - **`sg`** — LaunchConfiguration.SecurityGroups or LaunchTemplate.SecurityGroupIds / NetworkInterfaces[].Groups.
@@ -1620,7 +1620,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbc-snap | ct-events | CloudTrail Events | no |
 | alarm | sns | SNS Topics | no |
 | alarm | asg | Auto Scaling Groups | yes |
-| alarm | apigw | API Gateways | no |
+| alarm | apigw | API Gateways | yes |
 | alarm | cb | CodeBuild Projects | no |
 | alarm | dbi | RDS Instances | no |
 | alarm | ec2 | EC2 Instances | no |
@@ -1631,7 +1631,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | alarm | logs | Log Groups | no |
 | alarm | s3 | S3 Buckets | no |
 | alarm | sfn | Step Functions | no |
-| alarm | waf | WAF Web ACLs | no |
+| alarm | waf | WAF Web ACLs | yes |
 | alarm | ct-events | CloudTrail Events | yes |
 | logs | lambda | Lambda Functions | yes |
 | logs | alarm | CW Alarms | yes |
@@ -1757,7 +1757,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | r53 | s3 | S3 Buckets | yes |
 | r53 | vpc | VPCs | no |
 | r53 | ct-events | CloudTrail Events | no |
-| cf | s3 | S3 Buckets (origin) | yes |
+| cf | s3 | S3 Buckets | yes |
 | cf | elb | Load Balancers (origin) | yes |
 | cf | waf | WAF Web ACLs | yes |
 | cf | acm | ACM Certificates | yes |

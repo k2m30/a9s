@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"slices"
-	"strings"
 
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -63,14 +62,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 
-	// Compute the ARN suffix: everything after "loadbalancer/"
-	const prefix = "loadbalancer/"
-	arnSuffix := elbARN
-	if _, after, found := strings.Cut(elbARN, prefix); found {
-		arnSuffix = after
-	}
-
-	return alarmIDsByDimension(ctx, clients, cache, "", "LoadBalancer", arnSuffix)
+	return alarmIDsByDimension(ctx, clients, cache, "", "LoadBalancer", elbv2Dimension(elbARN))
 }
 
 // checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's
@@ -244,12 +236,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		if raw.Description == nil {
 			continue
 		}
-		desc := *raw.Description
-		if !strings.HasPrefix(desc, "ELB ") {
-			continue
-		}
-		parts := strings.Split(desc[4:], "/")
-		if len(parts) >= 2 && parts[1] == lbName {
+		if elbNameFromENIDescription(*raw.Description) == lbName {
 			ids = append(ids, eniRes.ID)
 		}
 	}

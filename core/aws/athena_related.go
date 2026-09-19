@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
@@ -38,7 +37,7 @@ func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *ath
 // checkAthenaS3 calls athena:GetWorkGroup and extracts the result-output bucket
 // from Configuration.ResultConfiguration.OutputLocation (form: s3://bucket/prefix).
 // Pattern C — single API call per checker.
-func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
 		return resource.UnknownRelated("s3")
@@ -46,11 +45,7 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ re
 	if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.OutputLocation == nil {
 		return resource.KnownRelated("s3", nil, false)
 	}
-	bucket := bucketFromS3URI(*cfg.ResultConfiguration.OutputLocation)
-	if bucket == "" {
-		return resource.KnownRelated("s3", nil, false)
-	}
-	return relatedResult("s3", []string{bucket})
+	return relatedRefs("s3", []string{*cfg.ResultConfiguration.OutputLocation}, refContext(clients, cache, "s3"))
 }
 
 // checkAthenaKMS calls athena:GetWorkGroup and extracts the KMS key ID from
@@ -99,18 +94,4 @@ func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("role", nil, false)
 	}
 	return relatedRefs("role", []string{*cfg.ExecutionRole}, refContext(clients, cache, "role"))
-}
-
-// bucketFromS3URI extracts the bucket name from an s3:// URI.
-// Returns "" for non-s3 URIs or malformed input.
-func bucketFromS3URI(uri string) string {
-	const prefix = "s3://"
-	if !strings.HasPrefix(uri, prefix) {
-		return ""
-	}
-	rest := uri[len(prefix):]
-	if bucket, _, ok := strings.Cut(rest, "/"); ok {
-		return bucket
-	}
-	return rest
 }
