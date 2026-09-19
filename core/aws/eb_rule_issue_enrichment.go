@@ -127,6 +127,9 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 
 		switch {
 		case fetchErr != nil:
+			// A refused call counted nothing: the column is blanked, since
+			// "0" is the answer of a call that succeeded with no targets.
+			targetCountStr = ""
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, fetchErr)
 		case targetsTruncated:

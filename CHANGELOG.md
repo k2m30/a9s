@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marked `not inspected: stopped at the Wave 2 deadline` instead of looking
   clean, and the enrichment reports the timeout.
 - An EventBridge rule whose target list could not be read no longer shows
-  "enabled rule has no targets".
+  "enabled rule has no targets", and its Targets column is left blank
+  instead of reading 0.
 - An account-wide check stopped by a refused or throttled call names that
   call on the rows it never reached instead of "stopped at the inspection
   cap".
