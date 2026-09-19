@@ -1031,19 +1031,26 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	// The enricher sees only the lists its registration declares, so a read
 	// it does not declare comes back empty in every session rather than only
-	// in the ones that never loaded that list.
+	// in the ones that never loaded that list. A declared list this session
+	// has not observed — a list opened before any sweep — is fetched here,
+	// first page only, the way RunRelatedDef prefetches a NeedsTargetCache
+	// target; one that cannot be fetched stays absent and its rows are marked.
 	loaded := c.BuildResourceCacheSnapshot()
 	cacheSnap := make(resource.ResourceCache, len(e.Reads))
 	for _, name := range e.Reads {
 		if entry, ok := loaded[name]; ok {
 			cacheSnap[name] = entry
+			continue
+		}
+		if entry, ok := prefetchDeclaredRead(probeCtx, clients, name); ok {
+			cacheSnap[name] = entry
 		}
 	}
-
-	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 
 	// RetryOnThrottle hands back a zero result once its retries run out or the
 	// deadline passes in a backoff; the last attempt's partial answer — the
@@ -1067,6 +1074,32 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 		TruncatedIDs:     result.TruncatedIDs,
 		Err:              err,
 	}
+}
+
+// prefetchDeclaredRead reads the first page of a list an enricher declares
+// but the session has not observed. ok is false when the list could not be
+// read in full: a fetcher error, a partial answer, or a panic, which a fetcher
+// raises on a session without that service's client — recovered here as
+// RunRelatedDef does, since this runs on a task goroutine.
+func prefetchDeclaredRead(ctx context.Context, clients *awsclient.ServiceClients, name string) (entry resource.ResourceCacheEntry, ok bool) {
+	pf := resource.GetPaginatedFetcher(name)
+	if pf == nil {
+		return entry, false
+	}
+	defer func() {
+		if recover() != nil {
+			entry, ok = resource.ResourceCacheEntry{}, false
+		}
+	}()
+	fr, err := pf(ctx, clients, "")
+	if err != nil {
+		return entry, false
+	}
+	return resource.ResourceCacheEntry{
+		Resources:   fr.Resources,
+		IsTruncated: fr.Pagination != nil && fr.Pagination.IsTruncated,
+		Pagination:  fr.Pagination,
+	}, true
 }
 
 // BuildResourceCacheSnapshot returns a read-only snapshot of currently-loaded

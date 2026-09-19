@@ -31,8 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A check that joins against another list (backup plans, snapshots,
   security groups, network interfaces, route tables, AMIs, buckets,
   addresses) marks the rows it could not judge `not inspected: <list> list
-  incomplete` when that list is not loaded or not loaded in full, instead of
-  clearing their earlier findings.
+  incomplete` when that list cannot be read or is not loaded in full,
+  instead of clearing their earlier findings. A list opened before the
+  startup sweep has loaded that other list reads its first page itself.
 - A KMS key whose rotation status was refused, a Lambda function whose
   policy could not be parsed, a bucket whose public access block could not be
   read, a CloudFront origin bucket whose HeadBucket did not answer, a resource
