@@ -372,10 +372,6 @@ func TestRelated_Lambda_CF_MatchByField(t *testing.T) {
 	}
 }
 
-// TestRelated_Lambda_CF_NoMatch uses Fields["lambda_function_arns"] (plural,
-// per lambda.md:42) with a genuinely different function's versioned ARN, so
-// this exercises the real no-match path rather than a field name the checker
-// does not read.
 func TestRelated_Lambda_CF_NoMatch(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-edge-fn"
 

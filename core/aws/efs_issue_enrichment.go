@@ -29,15 +29,6 @@ const (
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
 // pagination up to PerParentPageCap pages) and emits one EnrichmentFinding per file system
 // with any mount target whose LifeCycleState is not "available".
-//
-// Finding contract (spec §4, U11):
-//   - Summary  = "mount target down"  (exact §4 phrase; ≤ 40 chars; no Row values embedded)
-//   - Rows     = [{Mount Target, <mtID>, "!"}, {AZ, <az>}, {State, <state>, "!"}, {Degraded, "N/M"}]
-//   - Severity = "!"
-//
-// The enricher does not write FieldUpdates["status"]. The merged
-// S4 phrase ("mount target down" alone, or stacked with Wave-1 findings) is
-// computed at render time from r.Findings via domain.StatusPhrase.
 func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

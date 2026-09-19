@@ -1055,7 +1055,7 @@ func Wave1Only(r resource.Resource) resource.Resource {
 // that raises an issue at all, since an unchecked "~" check hides none. Rows
 // marked not inspected are unchecked whatever was counted. A cut the enricher
 // reports without marking a row only opens a count it produced: when it found
-// nothing and left no row unanswered there is no count to be short (CR273).
+// nothing and left no row unanswered there is no count to be short.
 func issueLowerBound(shortName string, pageTruncated, enricherCut, found bool, uninspected int) bool {
 	if pageTruncated {
 		return true

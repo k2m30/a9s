@@ -27,16 +27,6 @@ const (
 
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates
 // the single account-level finding onto every identity row in the input slice.
-//
-// §4 precedence:
-//   - SHUTDOWN  → severity "!", Summary "sending paused by AWS (shutdown)"
-//   - PROBATION → severity "!", Summary "account under review (probation)"
-//   - quota > 80% → severity "~", Summary "quota 80%+ used"
-//   - otherwise → no finding
-//
-// The enricher does not write FieldUpdates["status"]. The Wave-2
-// phrase is sourced at render time from r.Findings via domain.StatusPhrase;
-// row color is sourced from the Wave-2 finding's Severity via colorSES.
 func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

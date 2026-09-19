@@ -181,8 +181,8 @@ func containsResourceID(resolved []resource.Resource, id string) bool {
 //
 // Callers pass only IDs that opened no row. exempt matches the target and the
 // ID exactly, so a broken pivot whose source merely mentions the name is not
-// swallowed; require fails when the ID was never seen unresolved, which covers
-// both "no longer witnessed" and "now resolves".
+// swallowed; require fails when the ID was never seen unresolved, whether the
+// demo does not show it or it resolves.
 type retiredPolicyWitness struct{ seen bool }
 
 func (w *retiredPolicyWitness) exempt(target, id string) bool {

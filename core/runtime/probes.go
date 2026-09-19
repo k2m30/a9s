@@ -1055,7 +1055,7 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	// RetryOnThrottle hands back a zero result once its retries run out or the
 	// deadline passes in a backoff; the last attempt's partial answer — the
 	// findings it did establish and the rows it marked — is what the runtime
-	// is owed instead (partial-success contract: never-silent-skip).
+	// is owed instead.
 	var last awsclient.IssueEnricherResult
 	result, err := awsclient.RetryOnThrottle(probeCtx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
 		r, err := e.Fn(probeCtx, clients, resources, cacheSnap)

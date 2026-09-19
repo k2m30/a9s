@@ -69,8 +69,7 @@ func (c *Core) applyEnrichment(
 // inspected (an id in uninspected, the enricher's TruncatedIDs) was answered
 // only in part: every finding the result did prove for it lands, and every
 // earlier Wave-2 finding the result says nothing about stays, because a check
-// that did not answer is not a clean check (C1: stale-until-replaced, never
-// blank-until-replaced). A nil uninspected folds every row — the plain
+// that did not answer is not a clean check. A nil uninspected folds every row — the plain
 // full-result case, and the deliberate clear paths.
 //
 // The single decision of WHICH rows a result replaces, for both surfaces:

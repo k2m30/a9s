@@ -3,8 +3,8 @@ package unit_test
 // canonical_ref_ids_test.go — a reference AWS hands back is one fact with one
 // reading. A related row counts the target's rows by that reading and a
 // navigable field opens the target by it, so both go through the target
-// type's own resolver (resource.ResolveRef → catalog RefToID). A second
-// hand-rolled parse anywhere is the "count shows, drill opens nothing" defect.
+// type's own resolver (resource.ResolveRef → catalog RefToID); a second parse
+// would let the count show a row the drill cannot open.
 
 import (
 	"context"
@@ -763,8 +763,6 @@ func TestNavigableFields_RouteToNoGatewayIsNotAnIGW(t *testing.T) {
 	}
 }
 
-// TestNavIDFromValue_TargetsWithoutAnExtractorResolve pins the resolver half
-// of the same row for every target the spec names.
 func TestNavIDFromValue_TargetsWithoutAnExtractorResolve(t *testing.T) {
 	b := newRefBench(t)
 	cases := []struct{ target, value, want string }{
