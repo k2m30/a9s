@@ -435,6 +435,7 @@ func TestRelated_Eb_Alarm_MatchByDimension(t *testing.T) {
 		ID:   alarmName,
 		Name: alarmName,
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/ElasticBeanstalk"),
 			AlarmName: aws.String(alarmName),
 			Dimensions: []cwtypes.Dimension{
 				{
@@ -505,7 +506,9 @@ func TestRelated_Eb_Alarm_NoMatchNeitherDimensionNorName(t *testing.T) {
 	}
 }
 
-func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
+// An alarm whose own name carries the environment's name is not an alarm on
+// the environment: what an alarm watches is the metric its dimensions name.
+func TestRelated_Eb_Alarm_NamedAfterTheEnvironmentIsNotAMatch(t *testing.T) {
 	const envName = "prod-php-env"
 	alarmName := "custom-" + envName + "-alert"
 
@@ -514,6 +517,7 @@ func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
 		Name: alarmName,
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String(alarmName),
+			Namespace: aws.String("AWS/ElasticBeanstalk"),
 			Dimensions: []cwtypes.Dimension{
 				{
 					Name:  aws.String("SomeOtherDimension"),
@@ -538,10 +542,7 @@ func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
 	checker := ebCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (name substring fallback)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != alarmName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), alarmName)
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (%v): the alarm watches another metric", result.Count(), result.ResourceIDs())
 	}
 }

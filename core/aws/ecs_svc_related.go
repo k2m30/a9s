@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -43,47 +42,11 @@ func checkECSSvcTargetGroups(_ context.Context, clients any, res resource.Resour
 	return relatedRefs("tg", arns, refContext(clients, cache, "tg"))
 }
 
-// checkECSSvcAlarms searches the alarm cache for alarms with both ServiceName and ClusterName
-// dimensions matching this ECS service (Pattern C).
+// checkECSSvcAlarms reports the CloudWatch alarms on this service. A service
+// name is unique within its cluster only, so an alarm that names a cluster
+// must name this service's.
 func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	serviceName := res.ID
-	clusterName := res.Fields["cluster"]
-	if serviceName == "" {
-		return resource.ProvenZero("alarm", "serviceName")
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		hasServiceName := false
-		hasClusterName := clusterName == ""
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name == nil || d.Value == nil {
-				continue
-			}
-			if *d.Name == "ServiceName" && *d.Value == serviceName {
-				hasServiceName = true
-			}
-			if clusterName != "" && *d.Name == "ClusterName" && *d.Value == clusterName {
-				hasClusterName = true
-			}
-		}
-		if hasServiceName && hasClusterName {
-			ids = append(ids, alarmRes.ID)
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "ecs-svc", res)
 }
 
 // checkECSSvcCFN checks the ECS service's tags for aws:cloudformation:stack-name and finds the

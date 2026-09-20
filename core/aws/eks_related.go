@@ -46,7 +46,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 
 // checkEKSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
 func checkEKSAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "ClusterName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "eks", res)
 }
 
 // checkEKSCFN checks the EKS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.

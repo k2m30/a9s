@@ -104,7 +104,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 // namespace with a QueueName dimension matching this queue's name.
 // Pattern C — reverse lookup in alarm cache.
 func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "AWS/SQS", "QueueName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "sqs", res)
 }
 
 // sqsRedriveTarget extracts the deadLetterTargetArn from a RedrivePolicy JSON string.

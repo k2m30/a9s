@@ -610,6 +610,7 @@ func TestRelated_CF_Alarm_MatchByDistributionId(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "cf-error-rate-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/CloudFront"),
 			AlarmName: aws.String("cf-error-rate-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("DistributionId"), Value: aws.String(distID)},
@@ -713,6 +714,7 @@ func TestRelated_CF_Alarm_AlarmWithNoRawStruct(t *testing.T) {
 	matchingAlarm := resource.Resource{
 		ID: "matching-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/CloudFront"),
 			AlarmName: aws.String("matching-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("DistributionId"), Value: aws.String(distID)},

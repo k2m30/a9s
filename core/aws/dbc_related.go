@@ -133,7 +133,7 @@ func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 // checkDbcAlarm searches the alarm cache for alarms with a "DBClusterIdentifier" dimension
 // matching this DocumentDB cluster's identifier.
 func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "DBClusterIdentifier", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "dbc", res)
 }
 
 // checkDbcLogs searches the logs cache for log groups matching the DocumentDB cluster's

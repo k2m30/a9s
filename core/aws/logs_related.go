@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
@@ -44,10 +45,94 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResultTrunc("lambda", ids, truncated)
 }
 
-// checkLogsAlarms searches the alarm cache for alarms with a "LogGroupName" dimension
-// matching this log group's name (res.ID).
+// checkLogsAlarms reports the alarms watching this log group: the ones
+// carrying it as a dimension, and the ones over a metric its metric filters
+// emit. Nothing in an alarm names a log group when a filter is what bridges
+// them, so the filters are read once and the loaded alarms matched on the
+// metric they publish.
 func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "LogGroupName", res.ID)
+	emitted, partial := logGroupFilterMetrics(ctx, clients, res.ID)
+	result := alarmIDsByDimension(ctx, clients, cache, "logs", res, func(a cwtypes.MetricAlarm) bool {
+		m, ok := AlarmMetricWatched(a)
+		return ok && emitted[m]
+	})
+	if partial {
+		return result.PartialScan()
+	}
+	return result
+}
+
+// logGroupFilterMetrics returns the metrics the group's metric filters emit.
+// partial is true when the filters could not be read in full, which leaves
+// whatever matched a lower bound rather than a proven count.
+func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string) (emitted map[AlarmMetric]bool, partial bool) {
+	api := metricFiltersAPI(clients)
+	if api == nil || logGroupName == "" {
+		return nil, false
+	}
+	filters, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.MetricFilter, *string, error) {
+		out, err := api.DescribeMetricFilters(ctx, &cloudwatchlogs.DescribeMetricFiltersInput{
+			LogGroupName: aws.String(logGroupName),
+			NextToken:    token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.MetricFilters, out.NextToken, nil
+	})
+	if err != nil {
+		return nil, true
+	}
+	emitted = map[AlarmMetric]bool{}
+	for _, f := range filters {
+		for _, t := range f.MetricTransformations {
+			m := AlarmMetric{Namespace: aws.ToString(t.MetricNamespace), Name: aws.ToString(t.MetricName)}
+			if m.Namespace != "" && m.Name != "" {
+				emitted[m] = true
+			}
+		}
+	}
+	return emitted, !complete
+}
+
+// alarmMetricLogGroups returns the log groups whose metric filters emit the
+// metric, which is how a metric-filter alarm names the group it watches.
+func alarmMetricLogGroups(ctx context.Context, clients any, m AlarmMetric) (groups map[string]bool, partial bool) {
+	api := metricFiltersAPI(clients)
+	if api == nil {
+		return nil, false
+	}
+	filters, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.MetricFilter, *string, error) {
+		out, err := api.DescribeMetricFilters(ctx, &cloudwatchlogs.DescribeMetricFiltersInput{
+			MetricName:      aws.String(m.Name),
+			MetricNamespace: aws.String(m.Namespace),
+			NextToken:       token,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.MetricFilters, out.NextToken, nil
+	})
+	if err != nil {
+		return nil, true
+	}
+	groups = map[string]bool{}
+	for _, f := range filters {
+		if name := aws.ToString(f.LogGroupName); name != "" {
+			groups[name] = true
+		}
+	}
+	return groups, !complete
+}
+
+// metricFiltersAPI is the session's CloudWatch Logs client, or nil for a
+// session that has none.
+func metricFiltersAPI(clients any) CWLogsDescribeMetricFiltersAPI {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudWatchLogs == nil {
+		return nil
+	}
+	return c.CloudWatchLogs
 }
 
 // checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId

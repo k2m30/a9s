@@ -228,9 +228,10 @@ func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "vpce-packets-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/PrivateLinkEndpoints"),
 			AlarmName: aws.String("vpce-packets-alarm"),
 			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-abc123")},
+				{Name: aws.String("VPC Endpoint Id"), Value: aws.String("vpce-abc123")},
 			},
 		},
 	}

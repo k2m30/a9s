@@ -195,6 +195,7 @@ func TestRelated_NAT_Alarm_MatchByNatGatewayIDDimension(t *testing.T) {
 		ID:   alarmName,
 		Name: alarmName,
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/NATGateway"),
 			AlarmName: aws.String(alarmName),
 			Dimensions: []cwtypes.Dimension{
 				{

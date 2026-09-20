@@ -130,7 +130,7 @@ func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 // checkCbAlarm scans the alarm cache for CloudWatch alarms with a "ProjectName"
 // dimension matching this project's name.
 func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "AWS/CodeBuild", "ProjectName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "cb", res)
 }
 
 // checkCbECR maps the CodeBuild project's build image to an ECR repository when the

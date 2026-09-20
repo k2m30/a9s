@@ -158,6 +158,7 @@ func TestRelated_Glue_Alarms_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "glue-job-failure-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("Glue"),
 			AlarmName: aws.String("glue-job-failure-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("JobName"), Value: aws.String(jobName)},

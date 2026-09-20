@@ -87,7 +87,7 @@ func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.Re
 // PrivateLink interface endpoints have per-endpoint alarms using dimension
 // "VpcEndpointId". The endpoint ID is the res.ID; alarm cache is scanned.
 func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "VpcEndpointId", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "vpce", res)
 }
 
 // checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for

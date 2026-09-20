@@ -170,7 +170,7 @@ AWS API: <https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_M
 - **`eks`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`kms`** — Alarms on KMS key usage.
 - **`lambda`** — Common alarm dimension: Lambda Errors/Throttles/Duration.
-- **`logs`** — Metric-filter-driven alarms point at log groups.
+- **`logs`** — Metric-filter-driven alarms point at log groups: the filter that emits the metric the alarm watches names the group, read with `logs:DescribeMetricFilters`.
 - **`s3`** — S3 request metrics alarm dimension.
 - **`sfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sns`** — MetricAlarm.AlarmActions / OKActions — SNS topics notified.
@@ -686,7 +686,7 @@ AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguratio
 
 AWS API: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html>
 
-- **`alarm`** — Metric-filter-driven alarms.
+- **`alarm`** — Metric-filter-driven alarms, found through the group's own metric filters, plus alarms carrying a `LogGroupName` dimension in `AWS/Logs`.
 - **`apigw`** — APIGW access logs.
 - **`ct-events`** — Audit trail for log group changes.
 - **`ecs-task`** — awslogs driver log groups.
@@ -1620,19 +1620,19 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbc-snap | vpc | VPC | no |
 | dbc-snap | backup | Backup Plans | no |
 | dbc-snap | ct-events | CloudTrail Events | no |
-| alarm | sns | SNS Topics | no |
+| alarm | sns | SNS Topics | yes |
 | alarm | asg | Auto Scaling Groups | yes |
 | alarm | apigw | API Gateways | yes |
-| alarm | cb | CodeBuild Projects | no |
-| alarm | dbi | RDS Instances | no |
-| alarm | ec2 | EC2 Instances | no |
-| alarm | ecs | ECS Clusters | no |
-| alarm | eks | EKS Clusters | no |
-| alarm | kms | KMS Keys | no |
-| alarm | lambda | Lambda Functions | no |
-| alarm | logs | Log Groups | no |
-| alarm | s3 | S3 Buckets | no |
-| alarm | sfn | Step Functions | no |
+| alarm | cb | CodeBuild Projects | yes |
+| alarm | dbi | RDS Instances | yes |
+| alarm | ec2 | EC2 Instances | yes |
+| alarm | ecs | ECS Clusters | yes |
+| alarm | eks | EKS Clusters | yes |
+| alarm | kms | KMS Keys | yes |
+| alarm | lambda | Lambda Functions | yes |
+| alarm | logs | Log Groups | yes |
+| alarm | s3 | S3 Buckets | yes |
+| alarm | sfn | Step Functions | yes |
 | alarm | waf | WAF Web ACLs | yes |
 | alarm | ct-events | CloudTrail Events | yes |
 | logs | lambda | Lambda Functions | yes |

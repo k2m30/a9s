@@ -37,14 +37,8 @@ func checkLambdaRole(_ context.Context, clients any, res resource.Resource, cach
 	return relatedRefs("role", []string{*fn.Role}, refContext(clients, cache, "role"))
 }
 
-// checkLambdaAlarms searches the alarm cache for alarms with a "FunctionName" dimension
-// matching this Lambda function's name (res.ID).
 func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	functionName := res.ID
-	if functionName == "" {
-		functionName = res.Name
-	}
-	return alarmIDsByDimension(ctx, clients, cache, "", "FunctionName", functionName)
+	return alarmIDsByDimension(ctx, clients, cache, "lambda", res)
 }
 
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.

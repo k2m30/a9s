@@ -45,6 +45,7 @@ func TestRelated_SNS_Alarm_Found(t *testing.T) {
 		ID:     "test-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace:    aws.String("AWS/SNS"),
 			AlarmName:    aws.String("test-alarm"),
 			AlarmActions: []string{snsTopicARN},
 		},
@@ -73,6 +74,7 @@ func TestRelated_SNS_Alarm_MultipleActions(t *testing.T) {
 		ID:     "multi-action-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace:    aws.String("AWS/SNS"),
 			AlarmName:    aws.String("multi-action-alarm"),
 			AlarmActions: []string{snsTopicARN},
 			OKActions:    []string{snsTopicARN},
@@ -95,6 +97,7 @@ func TestRelated_SNS_Alarm_MultipleAlarms(t *testing.T) {
 		ID:     "alarm-one",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace:    aws.String("AWS/SNS"),
 			AlarmName:    aws.String("alarm-one"),
 			AlarmActions: []string{snsTopicARN},
 		},
@@ -103,6 +106,7 @@ func TestRelated_SNS_Alarm_MultipleAlarms(t *testing.T) {
 		ID:     "alarm-two",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/SNS"),
 			AlarmName: aws.String("alarm-two"),
 			OKActions: []string{snsTopicARN},
 		},
@@ -181,6 +185,7 @@ func TestRelated_SNS_Alarm_InsufficientDataActions(t *testing.T) {
 		ID:     "insufficient-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace:               aws.String("AWS/SNS"),
 			AlarmName:               aws.String("insufficient-alarm"),
 			InsufficientDataActions: []string{snsTopicARN},
 		},

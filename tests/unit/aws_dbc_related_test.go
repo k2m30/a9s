@@ -146,6 +146,7 @@ func TestRelated_DBC_Alarm_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "alarm-docdb-prod-cpu",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/DocDB"),
 			AlarmName: aws.String("alarm-docdb-prod-cpu"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("DBClusterIdentifier"), Value: aws.String(clusterID)},

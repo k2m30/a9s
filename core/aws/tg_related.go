@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -135,40 +134,8 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResultTrunc("asg", ids, truncated)
 }
 
-// checkTGAlarm searches the alarm cache for CloudWatch alarms targeting this
-// target group via the TargetGroup dimension.
 func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	tgARNVal := tgARN(res)
-	if tgARNVal == "" {
-		return resource.ProvenZero("alarm", "tgARNVal")
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	tgSuffix := elbv2Dimension(tgARNVal)
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "TargetGroup" && d.Value != nil {
-				if strings.Contains(*d.Value, tgSuffix) || strings.Contains(tgARNVal, *d.Value) {
-					ids = append(ids, alarmRes.ID)
-					break
-				}
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "tg", res)
 }
 
 // checkTGVPC returns the VPC this target group is scoped to (Pattern F).

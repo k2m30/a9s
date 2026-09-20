@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: CloudWatch alarms that notify this topic — `MetricAlarm.AlarmActions` / `OKActions` / `InsufficientDataActions` contain SNS topic ARNs. Primary incident pivot: "which alarms route to this channel?" (docs/related-resources.md § `sns`; `docs/related-resources.md` § `alarm`).
-- **How discovered**: cross-reference the already-loaded `alarm` list by matching the topic's `TopicArn` against any entry in each alarm's `AlarmActions` / `OKActions` / `InsufficientDataActions` — a9s-devops: standard list-scan, no extra API call needed since alarms are loaded in the same sweep.
+- **How discovered**: cross-reference the already-loaded `alarm` list by matching the topic's `TopicArn` against any entry in each alarm's `AlarmActions` / `OKActions` / `InsufficientDataActions`, and by namespace `AWS/SNS` with dimension `TopicName` == the topic's name, which is how an alarm on the topic's own delivery metrics names it — a9s-devops: standard list-scan, no extra API call needed since alarms are loaded in the same sweep.
 - **Count shown**: yes — a9s-devops: number of alarms fanning into the topic is operationally meaningful (noisy channel detection).
 
 ### `ct-events`

@@ -80,6 +80,7 @@ func TestRelated_ASG_Alarm_MatchByDimension(t *testing.T) {
 		ID:     "asg-cpu-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/AutoScaling"),
 			AlarmName: aws.String("asg-cpu-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{
@@ -265,6 +266,7 @@ func TestRelated_ASG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 		ID:     "asg-cpu-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/AutoScaling"),
 			AlarmName: aws.String("asg-cpu-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{

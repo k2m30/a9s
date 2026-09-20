@@ -15,7 +15,7 @@ import (
 
 // checkRedshiftAlarms checks the cache for CloudWatch alarms with ClusterIdentifier dimension matching this cluster.
 func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "ClusterIdentifier", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "redshift", res)
 }
 
 // checkRedshiftSG extracts security group IDs from the Redshift Cluster's

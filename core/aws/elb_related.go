@@ -55,15 +55,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 // checkELBAlarms checks the cache for CloudWatch alarms with a "LoadBalancer"
 // dimension matching the ARN suffix of this ELB (everything after "loadbalancer/").
 func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	elbARN := res.Fields["load_balancer_arn"]
-	if elbARN == "" {
-		raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
-		if ok && raw.LoadBalancerArn != nil {
-			elbARN = *raw.LoadBalancerArn
-		}
-	}
-
-	return alarmIDsByDimension(ctx, clients, cache, "", "LoadBalancer", elbv2Dimension(elbARN))
+	return alarmIDsByDimension(ctx, clients, cache, "elb", res)
 }
 
 // checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's

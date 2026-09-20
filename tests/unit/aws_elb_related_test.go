@@ -184,6 +184,7 @@ func TestRelated_ELB_Alarms_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "elb-5xx-errors",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/ApplicationELB"),
 			AlarmName: aws.String("elb-5xx-errors"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("LoadBalancer"), Value: aws.String(dimensionValue)},

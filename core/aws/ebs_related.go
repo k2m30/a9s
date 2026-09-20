@@ -59,7 +59,7 @@ func checkEBSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 // checkEBSAlarm searches the alarm cache for alarms with a VolumeId dimension
 // matching this volume.
 func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "VolumeId", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "ebs", res)
 }
 
 // checkEBSCFN matches the volume's aws:cloudformation:stack-name tag to a

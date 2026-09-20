@@ -39,16 +39,9 @@ func checkWAFELB(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkWAFAlarm reports CloudWatch alarms on this Web ACL's metrics. WAF
-// publishes per-WebACL metrics (e.g. CountedRequests) using dimensions
-// "WebACL" and "Region" (REGIONAL) — matching on dimension value requires
-// the Web ACL name, not ID. Since alarm cache is the source and checker must
-// inspect dimensions, we scan it with the name.
+// publishes them under the Web ACL's name, while the row is keyed by its id.
 func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	name := res.Fields["name"]
-	if name == "" {
-		name = res.Name
-	}
-	return alarmIDsByDimension(ctx, clients, cache, "", "WebACL", name)
+	return alarmIDsByDimension(ctx, clients, cache, "waf", res)
 }
 
 // checkWAFLogs reports the CloudWatch log groups among the log destinations

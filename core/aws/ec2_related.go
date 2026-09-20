@@ -84,10 +84,8 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("asg", ids, truncated)
 }
 
-// checkEC2Alarms checks the cache for CloudWatch alarms targeting this EC2 instance.
 func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	instanceID, _, _ := ec2Identity(res)
-	return alarmIDsByDimension(ctx, clients, cache, "", "InstanceId", instanceID)
+	return alarmIDsByDimension(ctx, clients, cache, "ec2", res)
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -60,37 +59,8 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResultTrunc("logs", ids, truncated)
 }
 
-// checkSFNAlarm searches the alarm cache for alarms with a "StateMachineArn" dimension
-// matching this state machine's ARN.
-// Pattern D — dimension-based lookup.
 func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	sfnARN := res.Fields["arn"]
-	if sfnARN == "" {
-		return resource.UnknownRelated("alarm")
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "StateMachineArn" && d.Value != nil && *d.Value == sfnARN {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "sfn", res)
 }
 
 // checkSFNRole resolves the IAM execution role for this state machine via

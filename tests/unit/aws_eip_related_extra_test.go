@@ -76,7 +76,10 @@ func TestRelated_EIP_CFN_WrongRawStruct(t *testing.T) {
 	}
 }
 
-func TestRelated_EIP_Alarm_MatchByInstanceId(t *testing.T) {
+// An Elastic IP's traffic is metered on the network interface it is
+// associated with, so an alarm on the instance behind it — its CPU, its
+// status checks — is an alarm on the instance, not on the address.
+func TestRelated_EIP_Alarm_InstanceAlarmIsNotTheAddresssAlarm(t *testing.T) {
 	source := resource.Resource{
 		ID: "eipalloc-001",
 		RawStruct: ec2types.Address{
@@ -88,6 +91,7 @@ func TestRelated_EIP_Alarm_MatchByInstanceId(t *testing.T) {
 		ID: "instance-cpu-high",
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("instance-cpu-high"),
+			Namespace: aws.String("AWS/EC2"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("InstanceId"), Value: aws.String("i-0abc1234567890def")},
 			},
@@ -100,11 +104,8 @@ func TestRelated_EIP_Alarm_MatchByInstanceId(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if result.ResourceIDs()[0] != "instance-cpu-high" {
-		t.Errorf("ResourceIDs[0] = %q, want instance-cpu-high", result.ResourceIDs()[0])
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (%v)", result.Count(), result.ResourceIDs())
 	}
 }
 
@@ -120,6 +121,7 @@ func TestRelated_EIP_Alarm_MatchByNetworkInterfaceId(t *testing.T) {
 		ID: "eni-bandwidth-alarm",
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("eni-bandwidth-alarm"),
+			Namespace: aws.String("AWS/EC2"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("NetworkInterfaceId"), Value: aws.String("eni-0deadbeefcafe0001")},
 			},

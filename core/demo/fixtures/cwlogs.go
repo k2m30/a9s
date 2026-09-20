@@ -22,7 +22,22 @@ type CWLogsFixtures struct {
 	// backs logs:DescribeSubscriptionFilters for the logs:kinesis and
 	// logs:s3 related-panel pivots.
 	SubscriptionFilters map[string][]cwlogstypes.SubscriptionFilter
+	// MetricFilters maps log group name to its metric filters — backs
+	// logs:DescribeMetricFilters for the logs↔alarm bridge, where the alarm
+	// watches the metric a filter emits and names no log group at all.
+	MetricFilters map[string][]cwlogstypes.MetricFilter
 }
+
+// OrphanOldLogGroupName is the log group whose metric filter bridges it to an
+// alarm: the filter counts ERROR lines into a custom namespace, and the alarm
+// is over that metric.
+const OrphanOldLogGroupName = "/app/legacy/orphan-old"
+
+// OrphanOldMetricNamespace and OrphanOldMetricName are what its filter emits.
+const (
+	OrphanOldMetricNamespace = "LogMetrics"
+	OrphanOldMetricName      = "OrphanErrorCount"
+)
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
 var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
@@ -319,9 +334,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		// security-audit-trail's own per-trail delivery log group — a
 		// sub-path under /aws/cloudtrail/ (unlike the shared "/aws/cloudtrail"
 		// group above). EnrichLogsMetricFilters only inspects groups matching
-		// the "/aws/cloudtrail/" prefix; CWLogsFake.DescribeMetricFilters
-		// always returns an empty list, so this group fires
-		// logs.missing-metric-filters.
+		// the "/aws/cloudtrail/" prefix, and no metric filter is registered
+		// for this one, so it fires logs.missing-metric-filters.
 		{
 			LogGroupName:    aws.String("/aws/cloudtrail/security-audit-trail"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail/security-audit-trail:*"),
@@ -609,11 +623,28 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		},
 	}
 
+	metricFilters := map[string][]cwlogstypes.MetricFilter{
+		OrphanOldLogGroupName: {
+			{
+				FilterName:    aws.String("orphan-old-error-count"),
+				LogGroupName:  aws.String(OrphanOldLogGroupName),
+				FilterPattern: aws.String("ERROR"),
+				CreationTime:  aws.Int64(1715731200000),
+				MetricTransformations: []cwlogstypes.MetricTransformation{{
+					MetricName:      aws.String(OrphanOldMetricName),
+					MetricNamespace: aws.String(OrphanOldMetricNamespace),
+					MetricValue:     aws.String("1"),
+				}},
+			},
+		},
+	}
+
 	return &CWLogsFixtures{
 		LogGroups:           logGroups,
 		LogStreams:          logStreams,
 		LogEvents:           logEvents,
 		SubscriptionFilters: subscriptionFilters,
+		MetricFilters:       metricFilters,
 	}
 })
 

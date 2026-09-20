@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A log group and the alarms watching it now find each other through the
+  metric filter that links them. A filter turns a log pattern into a metric in
+  a namespace the operator chose, and the alarm is over that metric, so
+  nothing on either side names the other: a log group's CW Alarms row reads
+  its filters once and matches the alarms over what they emit, and an alarm's
+  Log Groups row looks up the filters that emit the metric it watches. The
+  CloudTrail or audit group whose alarm the panel used to report as a proven
+  zero now shows it.
+- An MWAA environment's alarms are found where Airflow publishes its metrics —
+  the `AmazonMWAA` namespace with an `Environment` dimension — as well as
+  under `AWS/MWAA`. An ECS task shows the alarms over the cluster it runs in,
+  and of those, a service's alarms only when it is a task of that service. A
+  Beanstalk worker environment shows the alarms on its daemon's health metric.
+  A VPC endpoint matches alarms written against either spelling of the
+  endpoint dimension. An Elastic IP no longer counts the alarms on the
+  instance behind it: what an address is metered on is its network interface.
+- A resource's CloudWatch Alarms row and an alarm's own rows of what it
+  watches now read one table of which metric namespaces and dimensions name
+  each kind of resource, so the two ends always agree. An alarm counts for a
+  resource only in the namespace that resource's service publishes under — an
+  EKS alarm on a cluster called `prod` is no longer an alarm on the ECS
+  cluster of that name, and an alarm merely named after an Elastic Beanstalk
+  environment is not an alarm on it. A metric-math or anomaly-detection alarm,
+  which names what it watches inside its metric queries rather than in
+  top-level dimensions, now appears on that resource: a 5xx-ratio alarm shows
+  on its load balancer. An alarm that runs an Auto Scaling policy shows on
+  that group, and one that notifies a topic shows on that topic, without
+  either having to be a dimension.
 - An ECS service's and task's Log Groups row now names the groups their
   containers actually write to — the `awslogs-group` of the task definition,
   read once per family — instead of every group whose name happened to carry

@@ -212,6 +212,7 @@ func TestRelated_EBS_Alarm_MatchByVolumeId(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: alarmName,
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/EBS"),
 			AlarmName: aws.String(alarmName),
 			Dimensions: []cwtypes.Dimension{
 				{Name: &dimName, Value: &dimVal},

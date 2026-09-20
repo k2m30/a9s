@@ -169,6 +169,7 @@ func TestRelated_EKS_Alarms_MatchClusterName(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "eks-cpu-high",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/EKS"),
 			AlarmName: aws.String("eks-cpu-high"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("ClusterName"), Value: aws.String("acme-services")},

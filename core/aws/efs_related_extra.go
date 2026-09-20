@@ -7,7 +7,6 @@ package aws
 import (
 	"context"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -15,34 +14,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkEFSAlarm scans the alarm cache for CW alarms in the AWS/EFS namespace
-// whose FileSystemId dimension matches this filesystem.
 func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fsID := res.ID
-	if fsID == "" {
-		return resource.ProvenZero("alarm", "fsID")
-	}
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "FileSystemId" && d.Value != nil && *d.Value == fsID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "efs", res)
 }
 
 // checkEFSENI scans eni cache for mount-target ENIs (description contains fs-id).

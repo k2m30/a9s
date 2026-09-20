@@ -40,7 +40,7 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // checkASGAlarm searches the alarm cache for alarms with an "AutoScalingGroupName" dimension
 // matching this ASG's name.
 func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "AutoScalingGroupName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "asg", res)
 }
 
 // checkASGNG searches the node group cache for EKS node groups whose AutoScalingGroups

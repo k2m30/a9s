@@ -132,6 +132,7 @@ func TestRelated_WAF_Alarm_MatchByWebACLDimension(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "waf-blocked-requests-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/WAFV2"),
 			AlarmName: aws.String("waf-blocked-requests-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("WebACL"), Value: aws.String("my-waf")},

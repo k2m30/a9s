@@ -53,7 +53,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 
 // checkECSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
 func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "ClusterName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "ecs", res)
 }
 
 // checkECSCFN checks the ECS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.

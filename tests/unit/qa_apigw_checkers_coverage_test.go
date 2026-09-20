@@ -51,6 +51,7 @@ func TestRelated_APIGW_Alarm_Match(t *testing.T) {
 	const apiID = "api-test-alarm123"
 
 	alarm := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/ApiGateway"),
 		AlarmName: aws.String("apigw-5xx-alarm"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("ApiId"), Value: aws.String(apiID)},
@@ -63,6 +64,7 @@ func TestRelated_APIGW_Alarm_Match(t *testing.T) {
 		RawStruct: alarm,
 	}
 	otherAlarm := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/ApiGateway"),
 		AlarmName: aws.String("other-api-alarm"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("ApiId"), Value: aws.String("different-api-id")},

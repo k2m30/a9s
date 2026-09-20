@@ -5,9 +5,7 @@ package aws
 
 import (
 	"context"
-	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -36,37 +34,10 @@ func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[str
 	return out.Attributes
 }
 
-// checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,
-// or InsufficientDataActions reference this SNS topic ARN.
-// Pattern C — reverse lookup in alarm cache.
+// checkSNSAlarm reports the CloudWatch alarms on this topic's own metrics
+// and the ones that notify it.
 func checkSNSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	topicARN := res.Fields["topic_arn"]
-	if topicARN == "" {
-		return resource.UnknownRelated("alarm")
-	}
-
-	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return resource.UnknownRelated("alarm")
-		}
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if snsAlarmReferences(alarm, topicARN) {
-			ids = append(ids, alarmRes.ID)
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "sns", res)
 }
 
 // checkSNSSub searches the sns-sub cache for subscriptions whose topic_arn
@@ -145,25 +116,4 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.UnknownRelated("role")
 	}
 	return relatedRefs("role", refs, rc)
-}
-
-// snsAlarmReferences reports whether any of the alarm's action lists contain
-// an ARN that matches or contains the given SNS topic ARN.
-func snsAlarmReferences(alarm cwtypes.MetricAlarm, topicARN string) bool {
-	for _, arn := range alarm.AlarmActions {
-		if strings.Contains(arn, topicARN) || arn == topicARN {
-			return true
-		}
-	}
-	for _, arn := range alarm.OKActions {
-		if strings.Contains(arn, topicARN) || arn == topicARN {
-			return true
-		}
-	}
-	for _, arn := range alarm.InsufficientDataActions {
-		if strings.Contains(arn, topicARN) || arn == topicARN {
-			return true
-		}
-	}
-	return false
 }

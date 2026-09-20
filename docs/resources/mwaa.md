@@ -27,8 +27,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `alarm`
 
-- **Why related**: CloudWatch alarms in the `AWS/MWAA` namespace carry the `EnvironmentName` dimension — first triage stop during an incident.
-- **How discovered**: cross-reference the already-loaded `alarm` list by dimension `EnvironmentName` == environment name (workflow pivot; no ARN field on `Environment`).
+- **Why related**: CloudWatch alarms on this environment's Airflow metrics — first triage stop during an incident. Airflow metrics are published under the `AmazonMWAA` namespace with an `Environment` dimension; `AWS/MWAA` carries the container, queue and database metrics.
+- **How discovered**: cross-reference the already-loaded `alarm` list by namespace `AmazonMWAA` or `AWS/MWAA` and dimension `Environment` (or `EnvironmentName`) == environment name (workflow pivot; no ARN field on `Environment`).
 - **Count shown**: yes.
 
 ### `kms`

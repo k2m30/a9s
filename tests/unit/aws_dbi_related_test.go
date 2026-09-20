@@ -169,6 +169,7 @@ func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) 
 		ID:   "rds-cpu-utilization",
 		Name: "rds-cpu-utilization",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/RDS"),
 			AlarmName: aws.String("rds-cpu-utilization"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("DBInstanceIdentifier"), Value: aws.String(fixtures.ProdDbiID)},
@@ -179,6 +180,7 @@ func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) 
 		ID:   "ec2-cpu-alarm",
 		Name: "ec2-cpu-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/RDS"),
 			AlarmName: aws.String("ec2-cpu-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d")},

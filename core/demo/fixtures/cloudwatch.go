@@ -47,8 +47,10 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 				AlarmActions:               []string{relatedAlarmSNSARN},
 				OKActions:                  []string{relatedAlarmSNSARN},
 				InsufficientDataActions:    []string{relatedAlarmSNSARN},
+				// A REST API publishes its metrics under ApiName and Stage.
 				Dimensions: []cwtypes.Dimension{
-					{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d4e5f60001")},
+					{Name: aws.String("ApiName"), Value: aws.String("acme-orders-rest")},
+					{Name: aws.String("Stage"), Value: aws.String("prod")},
 				},
 			},
 			{
@@ -550,6 +552,9 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 				ActionsEnabled:        aws.Bool(false),
 				AlarmActions:          []string{relatedAlarmSNSARN},
 				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d4e5f60001")},
+				},
 			},
 			// EFS prod-app-data alarms — required for efs→alarm related-panel pivot (Count = 2).
 			// checkEFSAlarm matches Namespace=AWS/EFS AND Dimensions[Name=FileSystemId, Value=ProdEFSID].
@@ -733,9 +738,62 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("LoadBalancer"), Value: aws.String("app/acme-prod-web/1234567890abcdef")},
 				},
 			},
-			// acme-web-tg alarm — required for tg:alarm related-panel pivot.
-			// checkTGAlarm matches dimension TargetGroup containing the TG's
-			// ARN suffix (elb.go fixtProdWebTGARN).
+			// MetricMathELBAlarmName: a ratio alarm carries no top-level
+			// namespace or dimensions — what it watches is inside Metrics[].
+			{
+				AlarmName:             aws.String(MetricMathELBAlarmName),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + MetricMathELBAlarmName),
+				AlarmDescription:      aws.String("Triggers when acme-prod-web 5XX responses exceed 5% of requests"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (5.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 10, 0, 0, time.UTC)),
+				Threshold:             aws.Float64(5.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Metrics: []cwtypes.MetricDataQuery{
+					{
+						Id: aws.String("m1"),
+						MetricStat: &cwtypes.MetricStat{
+							Metric: &cwtypes.Metric{
+								Namespace:  aws.String("AWS/ApplicationELB"),
+								MetricName: aws.String("HTTPCode_Target_5XX_Count"),
+								Dimensions: []cwtypes.Dimension{
+									{Name: aws.String("LoadBalancer"), Value: aws.String("app/acme-prod-web/1234567890abcdef")},
+								},
+							},
+							Period: aws.Int32(60),
+							Stat:   aws.String("Sum"),
+						},
+						ReturnData: aws.Bool(false),
+					},
+					{
+						Id: aws.String("m2"),
+						MetricStat: &cwtypes.MetricStat{
+							Metric: &cwtypes.Metric{
+								Namespace:  aws.String("AWS/ApplicationELB"),
+								MetricName: aws.String("RequestCount"),
+								Dimensions: []cwtypes.Dimension{
+									{Name: aws.String("LoadBalancer"), Value: aws.String("app/acme-prod-web/1234567890abcdef")},
+								},
+							},
+							Period: aws.Int32(60),
+							Stat:   aws.String("Sum"),
+						},
+						ReturnData: aws.Bool(false),
+					},
+					{
+						Id:         aws.String("e1"),
+						Expression: aws.String("m1/m2*100"),
+						Label:      aws.String("5XX ratio"),
+						ReturnData: aws.Bool(true),
+					},
+				},
+			},
+			// acme-web-tg alarm — the tg↔alarm pivot. ELBv2 dimensions a
+			// target group's metrics by the part of its ARN from
+			// "targetgroup/" on (elb.go fixtProdWebTGARN).
 			{
 				AlarmName:             aws.String("tg-acme-web-tg-unhealthy-hosts"),
 				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:tg-acme-web-tg-unhealthy-hosts"),
@@ -778,9 +836,8 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("NatGatewayId"), Value: aws.String("nat-0aaa111111111111a")},
 				},
 			},
-			// vpce-0aaa111111111111a alarm — required for vpce:alarm
-			// related-panel pivot. checkVPCEAlarm matches dimension
-			// VpcEndpointId (ec2.go).
+			// vpce-0aaa111111111111a alarm — the vpce↔alarm pivot. PrivateLink
+			// publishes the endpoint dimension with spaces in its name.
 			{
 				AlarmName:             aws.String("vpce-0aaa111111111111a-packet-drop"),
 				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:vpce-0aaa111111111111a-packet-drop"),
@@ -798,7 +855,7 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 				ActionsEnabled:        aws.Bool(true),
 				AlarmActions:          []string{relatedAlarmSNSARN},
 				Dimensions: []cwtypes.Dimension{
-					{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-0aaa111111111111a")},
+					{Name: aws.String("VPC Endpoint Id"), Value: aws.String("vpce-0aaa111111111111a")},
 				},
 			},
 			// acme-web-prod-asg alarm — required for alarm:asg related-panel
@@ -847,18 +904,60 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("KeyId"), Value: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111")},
 				},
 			},
-			// Log group metric-filter alarm — required for alarm:logs
-			// related-panel pivot. checkAlarmLogs matches dimension
-			// LogGroupName against the /app/legacy/orphan-old fixture (cwlogs.go).
+			// Metric-filter alarm — the logs↔alarm bridge. A filter counts
+			// ERROR lines into an operator-chosen namespace and the alarm
+			// watches that metric, so nothing on the alarm names the group:
+			// DescribeMetricFilters is what links them.
 			{
 				AlarmName:             aws.String("logs-orphan-old-error-count"),
 				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:logs-orphan-old-error-count"),
-				AlarmDescription:      aws.String("Triggers when /app/legacy/orphan-old ERROR count exceeds 20 in 5 minutes"),
+				AlarmDescription:      aws.String("Triggers when /app/legacy/orphan-old logs more than 20 ERROR lines in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (20.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 40, 0, 0, time.UTC)),
+				MetricName:            aws.String(OrphanOldMetricName),
+				Namespace:             aws.String(OrphanOldMetricNamespace),
+				Threshold:             aws.Float64(20.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+			},
+			// web-prod-01-eip's interface alarm — an Elastic IP's traffic is
+			// metered on the interface it is associated with.
+			{
+				AlarmName:             aws.String("eip-web-prod-01-network-out"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:eip-web-prod-01-network-out"),
+				AlarmDescription:      aws.String("Triggers when the interface behind web-prod-01-eip sends more than 5 GB in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 2 datapoints were less than the threshold (5000000000.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 45, 0, 0, time.UTC)),
+				MetricName:            aws.String("NetworkOut"),
+				Namespace:             aws.String("AWS/EC2"),
+				Threshold:             aws.Float64(5000000000.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(2),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("NetworkInterfaceId"), Value: aws.String("eni-0aaa111111111111a")},
+				},
+			},
+			// Log group alarm — the logs↔alarm pivot both ways. CloudWatch
+			// Logs publishes IncomingLogEvents per log group under AWS/Logs.
+			{
+				AlarmName:             aws.String("logs-orphan-old-incoming-events"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:logs-orphan-old-incoming-events"),
+				AlarmDescription:      aws.String("Triggers when /app/legacy/orphan-old receives more than 20 events in 5 minutes"),
 				StateValue:            cwtypes.StateValueOk,
 				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (20.0)."),
 				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 35, 0, 0, time.UTC)),
-				MetricName:            aws.String("ErrorCount"),
-				Namespace:             aws.String("LogMetrics"),
+				MetricName:            aws.String("IncomingLogEvents"),
+				Namespace:             aws.String("AWS/Logs"),
 				Threshold:             aws.Float64(20.0),
 				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
 				EvaluationPeriods:     aws.Int32(1),
@@ -1066,6 +1165,8 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 			"prod-efs-percent-io-high":                  minimalAlarmHistory("prod-efs-percent-io-high"),
 			"cf-e1a2b3c4d5e6f7-error-rate":              minimalAlarmHistory("cf-e1a2b3c4d5e6f7-error-rate"),
 			"elb-acme-prod-web-5xx":                     minimalAlarmHistory("elb-acme-prod-web-5xx"),
+			"logs-orphan-old-error-count":               minimalAlarmHistory("logs-orphan-old-error-count"),
+			MetricMathELBAlarmName:                      minimalAlarmHistory(MetricMathELBAlarmName),
 			"tg-acme-web-tg-unhealthy-hosts":            minimalAlarmHistory("tg-acme-web-tg-unhealthy-hosts"),
 			"nat-0aaa111111111111a-error-port-alloc":    minimalAlarmHistory("nat-0aaa111111111111a-error-port-alloc"),
 			"vpce-0aaa111111111111a-packet-drop":        minimalAlarmHistory("vpce-0aaa111111111111a-packet-drop"),
@@ -1113,11 +1214,15 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	}
 }
 
+// MetricMathELBAlarmName is the ONE demo alarm that names what it watches
+// inside Metrics[] instead of in top-level dimensions.
+const MetricMathELBAlarmName = "elb-acme-prod-web-5xx-ratio"
+
 // AlarmActionsDisabled is the ONE demo alarm with its actions switched off.
 // It has actions configured, so it is distinct from the alarm with no
 // actions.
 const AlarmActionsDisabled = "acme-actions-disabled-alarm"
 
 func init() {
-	Register(Pin{ShortName: "alarm", Rows: 47, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "alarm", Rows: 50, Issues: 6, CoverageGaps: []string{"dim"}})
 }

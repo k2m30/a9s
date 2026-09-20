@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"maps"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -79,9 +80,29 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 	return &cloudwatchlogs.FilterLogEventsOutput{Events: filtered}, nil
 }
 
-// DescribeMetricFilters returns an empty list for all log groups in demo mode.
-func (f *CWLogsFake) DescribeMetricFilters(_ context.Context, _ *cloudwatchlogs.DescribeMetricFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeMetricFiltersOutput, error) {
-	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: []cwlogstypes.MetricFilter{}}, nil
+// DescribeMetricFilters answers either shape of the call AWS accepts: the
+// filters of one log group, or the filters that emit one metric.
+func (f *CWLogsFake) DescribeMetricFilters(_ context.Context, input *cloudwatchlogs.DescribeMetricFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeMetricFiltersOutput, error) {
+	filters := []cwlogstypes.MetricFilter{}
+	if input == nil {
+		return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
+	}
+	if input.LogGroupName != nil {
+		return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: f.fix.MetricFilters[*input.LogGroupName]}, nil
+	}
+	if input.MetricName == nil || input.MetricNamespace == nil {
+		return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
+	}
+	for _, group := range slices.Sorted(maps.Keys(f.fix.MetricFilters)) {
+		for _, filter := range f.fix.MetricFilters[group] {
+			for _, t := range filter.MetricTransformations {
+				if aws.ToString(t.MetricName) == *input.MetricName && aws.ToString(t.MetricNamespace) == *input.MetricNamespace {
+					filters = append(filters, filter)
+				}
+			}
+		}
+	}
+	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
 }
 
 // DescribeSubscriptionFilters returns subscription filters for the named log

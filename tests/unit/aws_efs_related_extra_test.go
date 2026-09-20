@@ -19,6 +19,7 @@ func TestRelated_EFS_Alarm_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "efs-throughput-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/EFS"),
 			AlarmName: aws.String("efs-throughput-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("FileSystemId"), Value: aws.String(fsID)},

@@ -113,6 +113,7 @@ func TestRelated_Logs_Alarms_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "log-group-error-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/Logs"),
 			AlarmName: aws.String("log-group-error-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("LogGroupName"), Value: aws.String(logGroupName)},

@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: CloudWatch alarms that watch this job's run failures so on-call gets paged when a nightly ETL breaks — this is the hand-off from "a9s shows it broken" to "pager fires."
-- **How discovered**: cross-reference the already-loaded `alarm` list by `AlarmActions`/`Dimensions` referencing the Glue job name; fall back to name-contains match on `AlarmDescription` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue does not expose an inverse index of alarms; CloudWatch metric-alarm dimensions for Glue use `JobName` as the dimension key, which is the field the already-loaded alarm list can be filtered on client-side without extra API calls.
+- **How discovered**: cross-reference the already-loaded `alarm` list by namespace `Glue` and dimension `JobName` == the job's name — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue does not expose an inverse index of alarms; CloudWatch metric-alarm dimensions for Glue use `JobName` as the dimension key, which is the field the already-loaded alarm list can be filtered on client-side without extra API calls. A name-contains match on the free-text `AlarmDescription` is a guess about what an alarm watches, and this relation is an exact one.
 - **Count shown**: yes.
 
 ### `cfn`

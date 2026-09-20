@@ -84,7 +84,7 @@ All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are disc
 ### `logs`
 
 - **Why related**: Metric-filter-driven alarms — a CloudWatch Logs metric filter emits a custom metric that the alarm watches. The golden doc states this directly.
-- **How discovered**: metric filters emit metrics in an operator-chosen custom namespace (not `AWS/Logs`), so `Namespace` alone is not reliable; instead, scan `Dimensions[]` for a `LogGroupName` key (set by the metric-filter definition when the filter includes log-group as a dimension) and, when absent, fall back to `MetricAlarm.AlarmDescription` / `AlarmName` substring match against loaded log-group names — a9s-devops (2026-04-20): possible=partial, worth=yes. The golden doc surfaces this pivot but AWS does not guarantee a structured link from a metric-filter alarm back to its log group; the `LogGroupName` dimension is convention-driven. Implementations should prefer the dimension when present and accept a name-match fallback.
+- **How discovered**: a metric filter emits its metric into an operator-chosen custom namespace, so nothing on the alarm names the log group; the filter is the recorded link. Call `logs:DescribeMetricFilters(metricName=<MetricName>, metricNamespace=<Namespace>)` for the metric this alarm watches and take the `logGroupName` of each filter that emits it — one call per open, and a metric-math alarm names no one metric, so it has none to look a filter up by. Alongside that, scan `Dimensions[]` in namespace `AWS/Logs` for a `LogGroupName` key — a9s-devops (2026-04-20): possible=yes, worth=yes. Both arms are exact: a substring match of the alarm's own name or description against loaded log-group names is a guess about what an alarm watches, and this relation is an exact one.
 - **Count shown**: yes.
 
 ### `s3`
@@ -211,7 +211,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - ecs discovered via `Namespace == "AWS/ECS"` + `Dimensions[]` `ClusterName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Golden-doc row cites ecs as a generic audit pivot; namespace + ClusterName dimension is the standard ECS metric shape.`
 - eks discovered via `Namespace` in `"AWS/EKS"` or `"ContainerInsights"` + `Dimensions[]` `ClusterName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. EKS-adjacent alarms in practice live as often under Container Insights as under AWS/EKS; both should be recognized.`
 - kms discovered via `Namespace == "AWS/KMS"` + `Dimensions[]` `KeyId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/KMS metrics are dimensioned by KeyId.`
-- logs discovered via `Dimensions[]` `LogGroupName` with a name-match fallback on `AlarmName`/`AlarmDescription` — `a9s-devops (2026-04-20): possible=partial, worth=yes. Metric-filter alarms emit to an operator-chosen custom namespace, so AWS does not guarantee a structured link back to the log group; the LogGroupName dimension is convention-driven but widely used. Name-match fallback preserves the pivot when the convention is not followed.`
+- logs discovered via `Namespace == "AWS/Logs"` + `Dimensions[]` `LogGroupName`, and via `logs:DescribeMetricFilters` on the alarm's own metric — `a9s-devops (2026-04-20): possible=partial, worth=yes. Metric-filter alarms emit to an operator-chosen custom namespace, so no field on the alarm names the log group; the filter that emits the metric is the recorded link, and DescribeMetricFilters takes the metric name and namespace. The LogGroupName dimension is convention-driven but widely used.`
 - s3 discovered via `Namespace == "AWS/S3"` + `Dimensions[]` `BucketName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Request-metrics and storage metrics both dimension by BucketName.`
 - sfn discovered via `Namespace == "AWS/States"` + `Dimensions[]` `StateMachineArn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/States is the Step Functions namespace and StateMachineArn is its canonical dimension.`
 - waf discovered via `Namespace == "AWS/WAFV2"` or `"AWS/WAF"` + `Dimensions[]` `WebACL`/`WebACLName`/`WebACLId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. WAFv2 is the modern namespace; the dimension key is WebACL. Legacy WAF Classic uses different dimension keys but is still in production at some accounts.`
@@ -235,19 +235,19 @@ alarm — MONITORING. Status key: `state` — the key the status cell reads, and
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| sns | SNS Topics | no |
+| sns | SNS Topics | yes |
 | asg | Auto Scaling Groups | yes |
-| apigw | API Gateways | no |
-| cb | CodeBuild Projects | no |
-| dbi | RDS Instances | no |
-| ec2 | EC2 Instances | no |
-| ecs | ECS Clusters | no |
-| eks | EKS Clusters | no |
-| kms | KMS Keys | no |
-| lambda | Lambda Functions | no |
-| logs | Log Groups | no |
-| s3 | S3 Buckets | no |
-| sfn | Step Functions | no |
-| waf | WAF Web ACLs | no |
+| apigw | API Gateways | yes |
+| cb | CodeBuild Projects | yes |
+| dbi | RDS Instances | yes |
+| ec2 | EC2 Instances | yes |
+| ecs | ECS Clusters | yes |
+| eks | EKS Clusters | yes |
+| kms | KMS Keys | yes |
+| lambda | Lambda Functions | yes |
+| logs | Log Groups | yes |
+| s3 | S3 Buckets | yes |
+| sfn | Step Functions | yes |
+| waf | WAF Web ACLs | yes |
 | ct-events | CloudTrail Events | yes |
 <!-- END GENERATED: related -->

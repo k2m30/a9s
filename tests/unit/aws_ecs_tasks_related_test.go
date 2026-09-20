@@ -322,6 +322,7 @@ func TestRelated_ECSTask_Alarm_MatchByTaskIdDimension(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "ecs-task-cpu-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("ECS/ContainerInsights"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("TaskId"), Value: aws.String("abc123def456")},
 			},
@@ -343,11 +344,14 @@ func TestRelated_ECSTask_Alarm_MatchByTaskIdDimension(t *testing.T) {
 	}
 }
 
-func TestRelated_ECSTask_Alarm_MatchByTaskArnDimension(t *testing.T) {
+// Container Insights publishes a task's metrics under TaskId; a dimension
+// whose value merely contains the task's id names no task.
+func TestRelated_ECSTask_Alarm_TaskArnDimensionIsNotAMatch(t *testing.T) {
 	taskID := "abc123def456"
 	alarmRes := resource.Resource{
 		ID: "ecs-task-mem-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("ECS/ContainerInsights"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("TaskArn"), Value: aws.String("arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123def456")},
 			},
@@ -361,8 +365,8 @@ func TestRelated_ECSTask_Alarm_MatchByTaskArnDimension(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (TaskArn contains taskID)", result.Count())
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (%v)", result.Count(), result.ResourceIDs())
 	}
 }
 

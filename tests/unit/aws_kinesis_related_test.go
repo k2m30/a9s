@@ -41,6 +41,7 @@ func TestRelated_Kinesis_Alarms_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "kinesis-iterator-age",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/Kinesis"),
 			AlarmName: aws.String("kinesis-iterator-age"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("StreamName"), Value: aws.String(streamName)},

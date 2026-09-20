@@ -31,14 +31,8 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedRefs("role", []string{*job.Role}, refContext(clients, cache, "role"))
 }
 
-// checkGlueAlarms searches the alarm cache for alarms with a "JobName" dimension
-// matching this Glue job's name.
 func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	jobName := res.Name
-	if jobName == "" {
-		jobName = res.ID
-	}
-	return alarmIDsByDimension(ctx, clients, cache, "", "JobName", jobName)
+	return alarmIDsByDimension(ctx, clients, cache, "glue", res)
 }
 
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.

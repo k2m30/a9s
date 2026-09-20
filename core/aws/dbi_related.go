@@ -74,7 +74,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 // checkDbiAlarm searches the alarm cache for alarms with a "DBInstanceIdentifier" dimension
 // matching this DB instance's identifier.
 func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "DBInstanceIdentifier", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "dbi", res)
 }
 
 // checkDbiDBISnap searches the dbi-snap cache for snapshots taken from this

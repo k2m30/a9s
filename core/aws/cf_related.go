@@ -215,7 +215,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 // CloudFront alarms use dimension "DistributionId" (global metrics). Scans
 // the alarm cache for that dimension matching this distribution's ID.
 func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "DistributionId", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "cf", res)
 }
 
 // checkCfLambda reports Lambda@Edge associations on this distribution.

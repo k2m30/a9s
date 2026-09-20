@@ -170,6 +170,7 @@ func TestRelated_Redis_Alarm(t *testing.T) {
 		Name:   "redis-cpu-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/ElastiCache"),
 			AlarmName: aws.String("redis-cpu-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{
@@ -182,6 +183,7 @@ func TestRelated_Redis_Alarm(t *testing.T) {
 	otherAlarm := resource.Resource{
 		ID: "unrelated-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace:  aws.String("AWS/ElastiCache"),
 			AlarmName:  aws.String("unrelated-alarm"),
 			Dimensions: []cwtypes.Dimension{},
 		},
@@ -859,6 +861,7 @@ func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated(t *testi
 		Name:   "matching-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/ElastiCache"),
 			AlarmName: aws.String("matching-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{

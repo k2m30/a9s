@@ -71,6 +71,7 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 			{
 				ID: "cpu-high",
 				RawStruct: cwtypes.MetricAlarm{
+					Namespace:  aws.String("AWS/EC2"),
 					Dimensions: []cwtypes.Dimension{{Name: aws.String("InstanceId"), Value: aws.String("i-abc123")}},
 				},
 			},
@@ -572,6 +573,7 @@ func TestRelated_EC2_Alarm_Found(t *testing.T) {
 			{
 				ID: "alarm-1",
 				RawStruct: cwtypes.MetricAlarm{
+					Namespace: aws.String("AWS/EC2"),
 					Dimensions: []cwtypes.Dimension{
 						{Name: aws.String("InstanceId"), Value: aws.String("i-match")},
 					},

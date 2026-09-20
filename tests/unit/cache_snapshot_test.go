@@ -65,6 +65,7 @@ func TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches(t *testing
 				{
 					ID: "alarm-match",
 					RawStruct: cwtypes.MetricAlarm{
+						Namespace:  aws.String("AWS/EC2"),
 						AlarmName:  aws.String("alarm-match"),
 						Dimensions: []cwtypes.Dimension{{Name: aws.String("InstanceId"), Value: aws.String("i-has-alarm")}},
 					},

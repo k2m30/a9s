@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: CloudWatch alarms that fire on traffic through this EIP — operator needs to see alarm state next to the IP when investigating connectivity.
-- **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Dimensions[]` containing `{Name: "AllocationId"|"NetworkInterfaceId", Value: <Address.AllocationId | Address.NetworkInterfaceId>}`. CloudWatch has no native EIP-scoped metric namespace, so in practice alarms attach to the backing ENI or to a NAT gateway consuming the EIP — persona (a9s-devops): alarms dimensioned on `NetworkInterfaceId` are the reliable pivot because EIP traffic shows up under the interface it is associated with.
+- **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Dimensions[]` containing `{Name: "NetworkInterfaceId", Value: <Address.NetworkInterfaceId>}`. CloudWatch has no native EIP-scoped metric namespace, so in practice alarms attach to the backing ENI or to a NAT gateway consuming the EIP — persona (a9s-devops): alarms dimensioned on `NetworkInterfaceId` are the reliable pivot because EIP traffic shows up under the interface it is associated with. An alarm on the instance behind the address watches the instance, not the address, so the instance is no pivot here.
 - **Count shown**: yes.
 
 ### `asg`

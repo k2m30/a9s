@@ -135,6 +135,7 @@ func TestRelated_ECS_Alarm_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "my-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/ECS"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("ClusterName"), Value: aws.String("my-cluster")},
 			},

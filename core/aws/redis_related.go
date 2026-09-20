@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -29,67 +28,11 @@ import (
 // be used.
 var errRedisNoGroupDetail = errors.New("the replication group could not be read")
 
-// checkRedisAlarms checks the alarm cache for CloudWatch alarms with a
-// CacheClusterId dimension matching any member cluster of this replication group.
+// checkRedisAlarms reports the CloudWatch alarms on this replication group:
+// ElastiCache publishes per-node metrics, so an alarm on any member cluster
+// is an alarm on the group.
 func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	var memberSet map[string]struct{}
-	var rgID string
-
-	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
-	if ok {
-		memberSet = make(map[string]struct{}, len(rg.MemberClusters))
-		for _, m := range rg.MemberClusters {
-			memberSet[m] = struct{}{}
-		}
-		if rg.ReplicationGroupId != nil {
-			rgID = *rg.ReplicationGroupId
-		}
-	} else {
-		// Fall back to resource ID — may still match ReplicationGroupId dimension.
-		rgID = res.ID
-	}
-
-	if rgID == "" && len(memberSet) == 0 {
-		return unreadZero(res, resource.ProvenZero("alarm", "memberSet"))
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name == nil || d.Value == nil {
-				continue
-			}
-			if *d.Name == "CacheClusterId" && memberSet != nil {
-				if _, ok := memberSet[*d.Value]; ok {
-					ids = append(ids, alarmRes.ID)
-					break
-				}
-			}
-			if *d.Name == "ReplicationGroupId" && rgID != "" && *d.Value == rgID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return unreadZeroScanned(res, len(alarmList), relatedResultTrunc("alarm", nil, true))
-	}
-	if truncated {
-		return unreadZeroScanned(res, len(alarmList), truncatedResultRedis("alarm", ids))
-	}
-	return unreadZeroScanned(res, len(alarmList), relatedResultTrunc("alarm", ids, false))
+	return alarmIDsByDimension(ctx, clients, cache, "redis", res)
 }
 
 // checkRedisCFN resolves CloudFormation stack ownership via a single

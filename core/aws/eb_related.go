@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
@@ -154,46 +153,6 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResultTrunc("ec2", ids, truncated)
 }
 
-// checkEbAlarm scans the alarm cache for alarms tagged with this environment's name
-// via the "elasticbeanstalk:environment-name" dimension (standard Beanstalk alarm
-// convention). Falls back to substring match on alarm name if no dimension matches.
-// Pattern D.
 func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	envName := res.Name
-	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
-		if eb.EnvironmentName != nil && *eb.EnvironmentName != "" {
-			envName = *eb.EnvironmentName
-		}
-	}
-	if envName == "" {
-		return resource.ProvenZero("alarm", "envName")
-	}
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, a := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](a.RawStruct)
-		if !ok {
-			continue
-		}
-		matched := false
-		for _, d := range alarm.Dimensions {
-			if d.Value != nil && *d.Value == envName {
-				matched = true
-				break
-			}
-		}
-		if !matched && strings.Contains(a.ID, envName) {
-			matched = true
-		}
-		if matched {
-			ids = append(ids, a.ID)
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "eb", res)
 }

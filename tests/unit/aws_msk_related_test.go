@@ -45,6 +45,7 @@ func TestRelated_MSK_Alarms_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "msk-cpu-utilization",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/Kafka"),
 			AlarmName: aws.String("msk-cpu-utilization"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("Cluster Name"), Value: aws.String(clusterName)},

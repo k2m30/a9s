@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -94,56 +93,10 @@ func checkEIPCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
-// checkEIPAlarm reports CloudWatch alarms on entities this EIP is attached
-// to. EIPs have no CW dimension of their own; alarms operationally related
-// to an EIP target the InstanceId or NetworkInterfaceId it's attached to.
-// Scans the alarm cache for those dimension values.
+// checkEIPAlarm reports the CloudWatch alarms on what this Elastic IP is
+// associated with: the address publishes no metric of its own.
 func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated("alarm")
-	}
-	wanted := map[string]string{}
-	if raw.InstanceId != nil && *raw.InstanceId != "" {
-		wanted["InstanceId"] = *raw.InstanceId
-	}
-	if raw.NetworkInterfaceId != nil && *raw.NetworkInterfaceId != "" {
-		wanted["NetworkInterfaceId"] = *raw.NetworkInterfaceId
-	}
-	if len(wanted) == 0 {
-		return resource.ProvenZero("alarm", "wanted")
-	}
-	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
-	if err != nil {
-		if _, sok := clients.(*ServiceClients); !sok {
-			return resource.UnknownRelated("alarm")
-		}
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	seen := map[string]bool{}
-	var ids []string
-	for _, alarmRes := range alarmList {
-		a, aok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !aok {
-			continue
-		}
-		for _, d := range a.Dimensions {
-			if d.Name == nil || d.Value == nil {
-				continue
-			}
-			if v, exists := wanted[*d.Name]; exists && v == *d.Value {
-				if !seen[alarmRes.ID] {
-					seen[alarmRes.ID] = true
-					ids = append(ids, alarmRes.ID)
-				}
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "eip", res)
 }
 
 // checkEIPASG reports Auto Scaling Groups whose instances hold this EIP.

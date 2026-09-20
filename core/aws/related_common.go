@@ -248,17 +248,26 @@ func ecsTaskDefinition(ctx context.Context, clients any, taskDefARN string) (*ec
 	return out.TaskDefinition, nil
 }
 
-// alarmIDsByDimension is the shared body of every check*Alarm function whose
-// match rule is "one CloudWatch dimension name/value pair, exact equality,
-// first match wins". namespace, when non-empty, additionally restricts
-// matches to alarms in that AWS/* namespace (the sqs/cb/mwaa pattern); pass
-// "" to skip the namespace guard (the dbi pattern). An empty dimValue means
-// the caller had nothing to match against — reported as a proven zero, not
-// unknown. A nil alarm list means the alarm cache/fetcher gave no answer at
-// all — reported as unknown, never as a proven zero.
-func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, namespace, dimName, dimValue string) resource.RelatedCheckResult {
-	if dimValue == "" {
-		return resource.ProvenZero("alarm", "dimValue")
+// alarmIDsByDimension is the resource→alarm pivot of every type an alarm can
+// name: the alarms that name this row, read through the one match table the
+// alarm→resource direction reads too. A row whose identity could not be read
+// has nothing to match against — reported as a proven zero, or as unknown
+// when the row arrived without its RawStruct. A nil alarm list means the
+// alarm cache/fetcher gave no answer at all — reported as unknown, never as
+// a proven zero.
+// also, when given, is a second way an alarm names this row, for a type whose
+// link to an alarm is not written in the alarm's dimensions.
+func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, source string, res resource.Resource, also ...func(cwtypes.MetricAlarm) bool) resource.RelatedCheckResult {
+	spec, ok := AlarmMatchSpecFor(source)
+	if !ok {
+		return resource.UnknownRelated("alarm")
+	}
+	values, read := spec.alarmValuesOf(res)
+	if !read {
+		return resource.UnknownRelated("alarm")
+	}
+	if len(values) == 0 {
+		return unreadZero(res, resource.ProvenZero("alarm", "the row's identity"))
 	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
@@ -275,17 +284,44 @@ func alarmIDsByDimension(ctx context.Context, clients any, cache resource.Resour
 		if !ok {
 			continue
 		}
-		if namespace != "" && (alarm.Namespace == nil || *alarm.Namespace != namespace) {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == dimName && d.Value != nil && *d.Value == dimValue {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
+		if spec.names(alarm, res) || anyMatch(also, alarm) {
+			ids = append(ids, alarmRes.ID)
 		}
 	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	result := relatedResultTrunc("alarm", ids, truncated)
+	if spec.ValuesFromRawStruct {
+		return unreadZeroScanned(res, len(alarmList), result)
+	}
+	return result
+}
+
+// alarmRowsNaming is the alarm→target pivot of every type an alarm can name:
+// the rows of target this alarm names, through the same match table the
+// target's own alarm pivot reads, so the two ends cannot disagree.
+// also, when given, is a second way the alarm names a row of target.
+func alarmRowsNaming(ctx context.Context, clients any, cache resource.ResourceCache, target string, res resource.Resource, also ...func(resource.Resource) bool) resource.RelatedCheckResult {
+	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
+	if !ok {
+		return resource.UnknownRelated(target)
+	}
+	spec, ok := AlarmMatchSpecFor(target)
+	if !ok {
+		return resource.UnknownRelated(target)
+	}
+	rows, truncated, err := relatedResourcesFor(ctx, clients, cache, target)
+	if err != nil {
+		return resource.ErrorRelated(target, err)
+	}
+	if rows == nil {
+		return resource.UnknownRelated(target)
+	}
+	var ids []string
+	for _, row := range rows {
+		if spec.names(alarm, row) || anyMatch(also, row) {
+			ids = append(ids, row.ID)
+		}
+	}
+	return relatedResultTrunc(target, ids, truncated)
 }
 
 // typedRow pairs a cached Resource's ID with its RawStruct already asserted
@@ -365,4 +401,13 @@ func eventSourceARNs(mappings []lambdatypes.EventSourceMappingConfiguration, ser
 		}
 	}
 	return arns
+}
+
+func anyMatch[T any](predicates []func(T) bool, v T) bool {
+	for _, p := range predicates {
+		if p(v) {
+			return true
+		}
+	}
+	return false
 }

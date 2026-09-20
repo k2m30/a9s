@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
@@ -25,42 +24,8 @@ func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return kmsRelated(ctx, clients, cache, []string{*table.SSEDescription.KMSMasterKeyArn})
 }
 
-// checkDdbAlarm searches the alarm cache for alarms with a "TableName" dimension
-// matching this DynamoDB table's name.
 func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	tableName := res.ID
-	if tableName == "" {
-		return resource.ProvenZero("alarm", "tableName")
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "TableName" && d.Value != nil && *d.Value == tableName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("alarm", nil, true)
-	}
-	if truncated {
-		return truncatedResultDDB("alarm", ids)
-	}
-	return relatedResultTrunc("alarm", ids, false)
+	return alarmIDsByDimension(ctx, clients, cache, "ddb", res)
 }
 
 // checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
@@ -109,13 +74,6 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, ca
 		arns = append(arns, aws.ToString(dest.StreamArn))
 	}
 	return relatedRefs("kinesis", arns, refContext(clients, cache, "kinesis"))
-}
-
-// truncatedResultDDB returns a RelatedCheckResult with Truncated=true when the
-// target cache is truncated and matches were found. Later pages may contain
-// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
-func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult {
-	return resource.KnownRelated(target, ids, true)
 }
 
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream

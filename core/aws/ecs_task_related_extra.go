@@ -10,44 +10,14 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkECSTaskAlarm scans the alarm cache for alarms with a TaskDefinition or
-// TaskArn dimension matching this task.
 func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	taskID := res.ID
-	if taskID == "" {
-		return resource.ProvenZero("alarm", "taskID")
-	}
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name == nil || d.Value == nil {
-				continue
-			}
-			if (*d.Name == "TaskId" || *d.Name == "TaskArn") && strings.Contains(*d.Value, taskID) {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "ecs-task", res)
 }
 
 // checkECSTaskCTEvents scans ct-events for events involving this task.

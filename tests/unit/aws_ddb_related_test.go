@@ -94,6 +94,7 @@ func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
 		ID:   "orders-prod-throttle",
 		Name: "orders-prod-throttle",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/DynamoDB"),
 			AlarmName: aws.String("orders-prod-throttle"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("TableName"), Value: aws.String(fixtures.OrdersProdID)},
@@ -104,6 +105,7 @@ func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
 		ID:   "ec2-cpu-alarm",
 		Name: "ec2-cpu-alarm",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/DynamoDB"),
 			AlarmName: aws.String("ec2-cpu-alarm"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d")},
@@ -253,6 +255,7 @@ func TestDDB_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 		ID:   "orders-prod-throttle",
 		Name: "orders-prod-throttle",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/DynamoDB"),
 			AlarmName: aws.String("orders-prod-throttle"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("TableName"), Value: aws.String(fixtures.OrdersProdID)},

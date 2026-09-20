@@ -6,92 +6,75 @@ package aws
 
 import (
 	"context"
-	"slices"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// alarmDimension returns the first dimension value for the given dimension name.
-func alarmDimension(alarm cwtypes.MetricAlarm, name string) string {
-	for _, d := range alarm.Dimensions {
-		if d.Name != nil && *d.Name == name && d.Value != nil {
-			return *d.Value
+func checkAlarmAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "apigw", res)
+}
+
+func checkAlarmCB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "cb", res)
+}
+
+func checkAlarmDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "dbi", res)
+}
+
+func checkAlarmEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "ec2", res)
+}
+
+func checkAlarmECS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "ecs", res)
+}
+
+func checkAlarmEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "eks", res)
+}
+
+func checkAlarmKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "kms", res)
+}
+
+func checkAlarmLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "lambda", res)
+}
+
+// checkAlarmLogs reports the log groups this alarm watches: the one it names
+// in a LogGroupName dimension, and the ones whose metric filters emit the
+// metric it is over, read with one DescribeMetricFilters on that metric.
+func checkAlarmLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	var groups map[string]bool
+	var partial bool
+	if alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct); ok {
+		if m, named := AlarmMetricWatched(alarm); named {
+			groups, partial = alarmMetricLogGroups(ctx, clients, m)
 		}
 	}
-	return ""
-}
-
-// alarmTarget is the result of an alarm pivot whose target the alarm names in
-// the first of dims it carries, read through the target's resolver. When
-// namespaces is non-empty the dimension names the target only in those metric
-// namespaces: "ClusterName" names an ECS cluster in one and an EKS cluster in
-// another.
-func alarmTarget(clients any, cache resource.ResourceCache, res resource.Resource, target string, namespaces []string, dims ...string) resource.RelatedCheckResult {
-	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
-	if !ok {
-		return resource.UnknownRelated(target)
+	result := alarmRowsNaming(ctx, clients, cache, "logs", res, func(row resource.Resource) bool {
+		return groups[row.ID]
+	})
+	if partial {
+		return result.PartialScan()
 	}
-	if len(namespaces) > 0 && !slices.Contains(namespaces, aws.ToString(alarm.Namespace)) {
-		return resource.ProvenZero(target, "the alarm namespace")
-	}
-	for _, dim := range dims {
-		if v := alarmDimension(alarm, dim); v != "" {
-			return relatedRefs(target, []string{v}, refContext(clients, cache, target))
-		}
-	}
-	return resource.ProvenZero(target, "the alarm dimensions")
+	return result
 }
 
-func checkAlarmAPIGW(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "apigw", nil, "ApiName", "ApiId")
+func checkAlarmS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "s3", res)
 }
 
-func checkAlarmCB(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "cb", nil, "ProjectName")
+func checkAlarmSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "sfn", res)
 }
 
-func checkAlarmDBI(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "dbi", nil, "DBInstanceIdentifier")
-}
-
-func checkAlarmEC2(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "ec2", nil, "InstanceId")
-}
-
-func checkAlarmECS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "ecs", []string{"AWS/ECS", "ECS/ContainerInsights"}, "ClusterName")
-}
-
-func checkAlarmEKS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "eks", []string{"AWS/EKS", "ContainerInsights"}, "ClusterName")
-}
-
-func checkAlarmKMS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "kms", nil, "KeyId")
-}
-
-func checkAlarmLambda(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "lambda", nil, "FunctionName")
-}
-
-func checkAlarmLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "logs", nil, "LogGroupName")
-}
-
-func checkAlarmS3(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "s3", nil, "BucketName")
-}
-
-func checkAlarmSFN(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "sfn", nil, "StateMachineArn")
-}
-
-func checkAlarmWAF(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmTarget(clients, cache, res, "waf", nil, "WebACL")
+func checkAlarmWAF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return alarmRowsNaming(ctx, clients, cache, "waf", res)
 }
 
 // checkAlarmCTEvents scans the ct-events cache for events that reference this

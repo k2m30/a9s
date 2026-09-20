@@ -21,7 +21,7 @@ import (
 // field usable for a forward lookup, so this is a workflow pivot (cache
 // scan).
 func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "AWS/MWAA", "EnvironmentName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "mwaa", res)
 }
 
 // checkMWAAKMS reads Environment.KmsKey directly.

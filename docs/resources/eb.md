@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: Health alarms the operator relies on to be notified when this environment degrades.
-- **How discovered**: Cross-reference the already-loaded `alarm` list — filter `AlarmName` / `Dimensions` referencing the environment. The golden doc does not pin a specific field citation for this pivot, so the exact filter is an operator heuristic — a9s-devops: possible=yes, worth=yes. Typical EB alarms are auto-created with `Dimensions=[{Name:EnvironmentName,Value:<env>}]`, so match on that.
+- **How discovered**: Cross-reference the already-loaded `alarm` list by namespace `AWS/ElasticBeanstalk` or `ElasticBeanstalk/SQSD` and dimension `EnvironmentName` == the environment's name. The golden doc does not pin a specific field citation for this pivot — a9s-devops: possible=yes, worth=yes. EB alarms are auto-created with `Dimensions=[{Name:EnvironmentName,Value:<env>}]`, and the worker daemon's `Health` metric is published under `ElasticBeanstalk/SQSD` with the same dimension.
 - **Count shown**: unknown.
 
 ### `asg`

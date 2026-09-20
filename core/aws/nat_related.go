@@ -121,14 +121,6 @@ func checkNATENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("eni", ids, false)
 }
 
-// checkNATAlarm reports CloudWatch alarms for this NAT Gateway.
-// NAT Gateway metrics use dimension "NatGatewayId" (e.g. ActiveConnectionCount).
-// Scans the alarm cache for MetricAlarm.Dimensions with that name/value.
 func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	natID := res.ID
-	raw, ok := assertStruct[ec2types.NatGateway](res.RawStruct)
-	if ok && raw.NatGatewayId != nil && *raw.NatGatewayId != "" {
-		natID = *raw.NatGatewayId
-	}
-	return alarmIDsByDimension(ctx, clients, cache, "", "NatGatewayId", natID)
+	return alarmIDsByDimension(ctx, clients, cache, "nat", res)
 }

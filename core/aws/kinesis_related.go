@@ -16,7 +16,7 @@ import (
 
 // checkKinesisAlarms checks the cache for CloudWatch alarms with StreamName dimension matching this stream.
 func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "StreamName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "kinesis", res)
 }
 
 // checkKinesisLambda calls lambda:ListEventSourceMappings with the

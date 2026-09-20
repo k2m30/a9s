@@ -17,7 +17,7 @@ import (
 
 // checkMSKAlarms checks the cache for CloudWatch alarms with "Cluster Name" dimension matching this cluster.
 func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "Cluster Name", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "msk", res)
 }
 
 // checkMSKSG returns the security groups associated with the MSK cluster's broker nodes.

@@ -17,7 +17,7 @@ import (
 
 // checkOpenSearchAlarms checks the cache for CloudWatch alarms with DomainName dimension matching this domain.
 func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "DomainName", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "opensearch", res)
 }
 
 // checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.

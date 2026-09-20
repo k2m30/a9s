@@ -33,8 +33,14 @@ func TestRelated_Alarm_SNS_Found(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:my-topic", Name: "arn:aws:sns:us-east-1:123456789012:my-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -51,8 +57,14 @@ func TestRelated_Alarm_SNS_OKActions(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:ok-topic", Name: "arn:aws:sns:us-east-1:123456789012:ok-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -66,8 +78,14 @@ func TestRelated_Alarm_SNS_InsufficientDataActions(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:insufficient-topic", Name: "arn:aws:sns:us-east-1:123456789012:insufficient-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -82,8 +100,14 @@ func TestRelated_Alarm_SNS_FiltersNonSNS(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:my-topic", Name: "arn:aws:sns:us-east-1:123456789012:my-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (Lambda ARN should not match SNS)", result.Count())
@@ -99,8 +123,14 @@ func TestRelated_Alarm_SNS_Deduplicates(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:shared-topic", Name: "arn:aws:sns:us-east-1:123456789012:shared-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (same ARN in all actions should deduplicate)", result.Count())
@@ -111,8 +141,14 @@ func TestRelated_Alarm_SNS_NoActions(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:my-topic", Name: "arn:aws:sns:us-east-1:123456789012:my-topic"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -132,6 +168,7 @@ func TestRelated_Alarm_SNS_InvalidRawStruct(t *testing.T) {
 
 func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/AutoScaling"),
 		Dimensions: []cwtypes.Dimension{
 			{
 				Name:  aws.String("AutoScalingGroupName"),
@@ -156,6 +193,7 @@ func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
 
 func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/AutoScaling"),
 		Dimensions: []cwtypes.Dimension{
 			{
 				Name:  aws.String("AutoScalingGroupName"),
@@ -180,6 +218,7 @@ func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
 
 func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/Lambda"),
 		Dimensions: []cwtypes.Dimension{
 			{
 				Name:  aws.String("FunctionName"),
@@ -204,6 +243,7 @@ func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/AutoScaling"),
 		Dimensions: []cwtypes.Dimension{
 			{
 				Name:  aws.String("AutoScalingGroupName"),
@@ -224,14 +264,21 @@ func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 
 func TestRelated_Alarm_APIGW_MatchByApiName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/ApiGateway"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("ApiName"), Value: aws.String("my-api")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-api", Name: "my-api"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -243,14 +290,21 @@ func TestRelated_Alarm_APIGW_MatchByApiName(t *testing.T) {
 
 func TestRelated_Alarm_APIGW_MatchByApiId(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/ApiGateway"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("ApiId"), Value: aws.String("abc123xyz")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "abc123xyz", Name: "abc123xyz"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (ApiId dimension)", result.Count())
@@ -262,14 +316,21 @@ func TestRelated_Alarm_APIGW_MatchByApiId(t *testing.T) {
 
 func TestRelated_Alarm_APIGW_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/Lambda"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("FunctionName"), Value: aws.String("my-func")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-api", Name: "my-api"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no ApiName or ApiId dimension)", result.Count())
@@ -289,14 +350,21 @@ func TestRelated_Alarm_APIGW_InvalidRawStruct(t *testing.T) {
 
 func TestRelated_Alarm_CB_MatchByProjectName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/CodeBuild"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("ProjectName"), Value: aws.String("my-build")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"cb": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-build", Name: "my-build"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "cb")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -310,8 +378,14 @@ func TestRelated_Alarm_CB_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"cb": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-build", Name: "my-build"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "cb")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -320,14 +394,21 @@ func TestRelated_Alarm_CB_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_DBI_MatchByDBInstanceIdentifier(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/RDS"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-postgres-01")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "prod-postgres-01", Name: "prod-postgres-01"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "dbi")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -341,8 +422,14 @@ func TestRelated_Alarm_DBI_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "prod-postgres-01", Name: "prod-postgres-01"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "dbi")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -351,14 +438,21 @@ func TestRelated_Alarm_DBI_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_EC2_MatchByInstanceId(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/EC2"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d4e5f67890")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "i-0a1b2c3d4e5f67890", Name: "i-0a1b2c3d4e5f67890"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -372,8 +466,14 @@ func TestRelated_Alarm_EC2_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "i-0a1b2c3d4e5f67890", Name: "i-0a1b2c3d4e5f67890"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -393,8 +493,14 @@ func TestRelated_Alarm_ECS_MatchByClusterName(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"ecs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "prod-cluster", Name: "prod-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "ecs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -408,8 +514,14 @@ func TestRelated_Alarm_ECS_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"ecs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "prod-cluster", Name: "prod-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "ecs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -427,8 +539,14 @@ func TestRelated_Alarm_EKS_MatchByClusterNameAndEKSNamespace(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-eks-cluster", Name: "my-eks-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "eks")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (EKS namespace + ClusterName)", result.Count())
@@ -447,8 +565,14 @@ func TestRelated_Alarm_EKS_MatchByContainerInsightsNamespace(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-eks-cluster", Name: "my-eks-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "eks")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (ContainerInsights namespace)", result.Count())
@@ -465,8 +589,14 @@ func TestRelated_Alarm_EKS_NoMatchECSNamespace(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-ecs-cluster", Name: "my-ecs-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "eks")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (ECS namespace should not match EKS checker)", result.Count())
@@ -479,8 +609,14 @@ func TestRelated_Alarm_EKS_NoDimension(t *testing.T) {
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"eks": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-eks-cluster", Name: "my-eks-cluster"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "eks")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no ClusterName dimension)", result.Count())
@@ -489,14 +625,21 @@ func TestRelated_Alarm_EKS_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_KMS_MatchByKeyId(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/KMS"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("KeyId"), Value: aws.String("mrk-1234567890abcdef1234567890abcdef")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"kms": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "mrk-1234567890abcdef1234567890abcdef", Name: "mrk-1234567890abcdef1234567890abcdef"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -510,8 +653,14 @@ func TestRelated_Alarm_KMS_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"kms": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "mrk-1234567890abcdef1234567890abcdef", Name: "mrk-1234567890abcdef1234567890abcdef"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -520,14 +669,21 @@ func TestRelated_Alarm_KMS_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_Lambda_MatchByFunctionName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/Lambda"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("FunctionName"), Value: aws.String("my-processor")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-processor", Name: "my-processor"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -541,8 +697,14 @@ func TestRelated_Alarm_Lambda_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-processor", Name: "my-processor"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -551,14 +713,21 @@ func TestRelated_Alarm_Lambda_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_Logs_MatchByLogGroupName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/Logs"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("LogGroupName"), Value: aws.String("/aws/lambda/my-func")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/aws/lambda/my-func", Name: "/aws/lambda/my-func"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -572,8 +741,14 @@ func TestRelated_Alarm_Logs_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/aws/lambda/my-func", Name: "/aws/lambda/my-func"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -582,14 +757,21 @@ func TestRelated_Alarm_Logs_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_S3_MatchByBucketName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/S3"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("BucketName"), Value: aws.String("my-data-bucket")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"s3": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-data-bucket", Name: "my-data-bucket"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "s3")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -611,19 +793,25 @@ func TestRelated_Alarm_S3_NoDimension(t *testing.T) {
 	}
 }
 
-// checkAlarmSFN strips everything up to the last ":" and returns the suffix
-// (the state machine name). For ARNs the suffix is the name; for non-ARN values
-// the full value is returned as-is.
+// Step Functions publishes its metrics under the state machine's ARN, which
+// names the row the list holds that ARN for.
 func TestRelated_Alarm_SFN_MatchByStateMachineArn(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/States"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("StateMachineArn"), Value: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-workflow", Name: "my-workflow", Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow"}},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sfn")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -633,17 +821,25 @@ func TestRelated_Alarm_SFN_MatchByStateMachineArn(t *testing.T) {
 	}
 }
 
-// When the dimension value has no ":" separator, the full value is returned.
+// A dimension carrying the state machine's name, rather than its ARN, names
+// the row of that name.
 func TestRelated_Alarm_SFN_MatchByPlainName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/States"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("StateMachineArn"), Value: aws.String("my-workflow")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-workflow", Name: "my-workflow", Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow"}},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sfn")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (plain name, no ARN separator)", result.Count())
@@ -657,8 +853,14 @@ func TestRelated_Alarm_SFN_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"sfn": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-workflow", Name: "my-workflow", Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow"}},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "sfn")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
@@ -667,14 +869,21 @@ func TestRelated_Alarm_SFN_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_WAF_MatchByWebACL(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
+		Namespace: aws.String("AWS/WAFV2"),
 		Dimensions: []cwtypes.Dimension{
 			{Name: aws.String("WebACL"), Value: aws.String("my-waf-acl")},
 		},
 	}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"waf": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-waf-acl", Name: "my-waf-acl"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -688,8 +897,14 @@ func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {
 	raw := cwtypes.MetricAlarm{}
 	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
 
+	cache := resource.ResourceCache{
+		"waf": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-waf-acl", Name: "my-waf-acl"},
+		}},
+	}
+
 	checker := alarmCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())

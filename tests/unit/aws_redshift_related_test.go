@@ -105,6 +105,7 @@ func redshiftAlarmResource(alarmName, dimName, dimValue string) resource.Resourc
 		Name: alarmName,
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String(alarmName),
+			Namespace: aws.String("AWS/Redshift"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String(dimName), Value: aws.String(dimValue)},
 			},

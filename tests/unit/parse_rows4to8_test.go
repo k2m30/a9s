@@ -85,11 +85,18 @@ func TestARNForService_MatchesOnServiceNotOnPartition(t *testing.T) {
 }
 
 // TestAlarmSNS_TargetsInEveryPartitionAreCounted drives the alarm→sns pivot,
-// which reads the topic ARNs straight off the alarm AWS returned. A partition
-// prefix drops all three action lists at once, and the panel then says zero
-// rather than "I could not tell".
+// which reports the topics of the loaded list the alarm notifies. A topic ARN
+// names its topic in every partition, and an action that is no topic ARN
+// names none.
 func TestAlarmSNS_TargetsInEveryPartitionAreCounted(t *testing.T) {
 	checker := parseCheckerFor(t, "alarm", "sns")
+	topics := resource.ResourceCache{
+		"sns": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "arn:aws:sns:us-east-1:123456789012:acme-alerts", Name: "acme-alerts", Fields: map[string]string{"topic_arn": "arn:aws:sns:us-east-1:123456789012:acme-alerts"}},
+			{ID: "arn:aws-cn:sns:cn-north-1:123456789012:acme-alerts", Name: "acme-alerts", Fields: map[string]string{"topic_arn": "arn:aws-cn:sns:cn-north-1:123456789012:acme-alerts"}},
+			{ID: "arn:aws-us-gov:sns:us-gov-west-1:123456789012:acme-alerts", Name: "acme-alerts", Fields: map[string]string{"topic_arn": "arn:aws-us-gov:sns:us-gov-west-1:123456789012:acme-alerts"}},
+		}},
+	}
 	tests := []struct {
 		name    string
 		actions []string
@@ -107,7 +114,7 @@ func TestAlarmSNS_TargetsInEveryPartitionAreCounted(t *testing.T) {
 				AlarmName:    aws.String("acme-cpu-high"),
 				AlarmActions: tc.actions,
 			}}
-			got := checker(context.Background(), parseClients("us-east-1"), res, resource.ResourceCache{})
+			got := checker(context.Background(), parseClients("us-east-1"), res, topics)
 			if got.Count() != tc.wantIDs {
 				t.Errorf("Count = %d, want %d (ids %v)", got.Count(), tc.wantIDs, got.ResourceIDs())
 			}

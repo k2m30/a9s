@@ -113,6 +113,7 @@ func TestRelated_SFN_Alarm_Found(t *testing.T) {
 		ID:     "sfn-failures",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("AWS/States"),
 			AlarmName: aws.String("sfn-failures"),
 			Dimensions: []cwtypes.Dimension{
 				{

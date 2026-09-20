@@ -133,6 +133,7 @@ func TestRelated_ECSSvc_Alarms_MatchServiceAndCluster(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "ecs-svc-cpu-high",
 		RawStruct: cwtypes.MetricAlarm{
+			Namespace: aws.String("ECS/ContainerInsights"),
 			AlarmName: aws.String("ecs-svc-cpu-high"),
 			Dimensions: []cwtypes.Dimension{
 				{Name: aws.String("ServiceName"), Value: aws.String(serviceName)},

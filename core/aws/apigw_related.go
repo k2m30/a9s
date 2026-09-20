@@ -240,7 +240,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
 // use dimension "ApiId". Scans the alarm cache.
 func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "", "ApiId", res.ID)
+	return alarmIDsByDimension(ctx, clients, cache, "apigw", res)
 }
 
 // checkApigwCF reports CloudFront distributions fronting this API: those

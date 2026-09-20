@@ -212,6 +212,7 @@ func TestRelated_TG_Alarm_Match(t *testing.T) {
 		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{{
 			ID: "tg-unhealthy-alarm",
 			RawStruct: cwtypes.MetricAlarm{
+				Namespace: new("AWS/ApplicationELB"),
 				Dimensions: []cwtypes.Dimension{
 					{Name: new("TargetGroup"), Value: new(tgARNSuffix)},
 				},
@@ -317,6 +318,7 @@ func TestRelated_TG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 			Resources: []resource.Resource{{
 				ID: "tg-unhealthy-alarm",
 				RawStruct: cwtypes.MetricAlarm{
+					Namespace: new("AWS/ApplicationELB"),
 					Dimensions: []cwtypes.Dimension{
 						{Name: new("TargetGroup"), Value: new(tgARNSuffix)},
 					},
