@@ -46,9 +46,9 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 }
 
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	repoName := res.ID
-	if repoName == "" {
-		return resource.ProvenZero("ecs-task", "repoName")
+	repoURI := ecrRepoURI(res)
+	if repoURI == "" {
+		return resource.ProvenZero("ecs-task", "repoURI")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -63,14 +63,11 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 		// Containers[].Image values (populated directly from DescribeTasks —
 		// no task-definition join required).
 		for image := range strings.SplitSeq(tRes.Fields["container_images"], ",") {
-			if strings.Contains(image, ".dkr.ecr.") && strings.Contains(image, "/"+repoName) {
+			if imageRefersToRepo(image, repoURI) {
 				ids = append(ids, tRes.ID)
 				break
 			}
 		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("ecs-task", nil, true)
 	}
 	return relatedResultTrunc("ecs-task", ids, truncated)
 }

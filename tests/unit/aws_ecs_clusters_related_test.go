@@ -668,61 +668,90 @@ func TestRelated_ECS_Tasks_NilCache(t *testing.T) {
 	}
 }
 
+// ecsExecLogCluster is a cluster whose ecs exec session transcripts are
+// written to execLogGroup, or, when it is "", one that configures no
+// CloudWatch destination for them.
+func ecsExecLogCluster(name, execLogGroup string) resource.Resource {
+	cluster := ecstypes.Cluster{
+		ClusterName: aws.String(name),
+		ClusterArn:  aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/" + name),
+		Status:      aws.String("ACTIVE"),
+	}
+	if execLogGroup != "" {
+		cluster.Configuration = &ecstypes.ClusterConfiguration{
+			ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
+				Logging: ecstypes.ExecuteCommandLoggingOverride,
+				LogConfiguration: &ecstypes.ExecuteCommandLogConfiguration{
+					CloudWatchLogGroupName: aws.String(execLogGroup),
+				},
+			},
+		}
+	}
+	return resource.Resource{ID: name, Name: name, Fields: map[string]string{"cluster_name": name}, RawStruct: cluster}
+}
+
+// A Cluster names one log group of its own: the destination of its ecs exec
+// session transcripts.
 func TestRelated_ECS_Logs_Match(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/ecs/my-cluster/app",
-		Fields: map[string]string{},
-	}
-	otherLog := resource.Resource{
-		ID:     "/ecs/other-service/worker",
-		Fields: map[string]string{},
-	}
 	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes, otherLog}},
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/ecs/exec/my-cluster", Fields: map[string]string{}},
+			{ID: "/ecs/my-cluster/app", Fields: map[string]string{}},
+			{ID: "/ecs/other-service/worker", Fields: map[string]string{}},
+		}},
 	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
 
 	checker := ecsCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), nil, ecsExecLogCluster("my-cluster", "/ecs/exec/my-cluster"), cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/ecs/my-cluster/app" {
-		t.Errorf("ResourceIDs = %v, want [/ecs/my-cluster/app]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/ecs/exec/my-cluster" {
+		t.Errorf("ResourceIDs = %v, want [/ecs/exec/my-cluster]", result.ResourceIDs())
 	}
 }
 
+// A group the loaded list does not hold is no row to open.
 func TestRelated_ECS_Logs_NoMatch(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/ecs/other-service/worker",
-		Fields: map[string]string{},
-	}
 	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/ecs/other-service/worker", Fields: map[string]string{}},
+		}},
 	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
 
 	checker := ecsCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), nil, ecsExecLogCluster("my-cluster", "/ecs/exec/my-cluster"), cache)
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
 
-func TestRelated_ECS_Logs_EmptySourceID(t *testing.T) {
+// A cluster that sends its exec sessions nowhere names no log group.
+func TestRelated_ECS_Logs_NoExecCommandLogging(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, resource.Resource{ID: ""}, resource.ResourceCache{})
+	result := checker(context.Background(), nil, ecsExecLogCluster("my-cluster", ""), resource.ResourceCache{})
 
 	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
+		t.Errorf("Count = %d, want 0 (no exec-command log configuration)", result.Count())
 	}
 }
 
-func TestRelated_ECS_Logs_NilCache(t *testing.T) {
+// A row whose Cluster shape was never read knows nothing about its log group.
+func TestRelated_ECS_Logs_FieldsOnlyRow(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("Count = %d, want -1 (the Cluster shape was not read)", result.Count())
+	}
+}
+
+// The cluster names its group, but no log-group list was read to open it in.
+func TestRelated_ECS_Logs_NilCache(t *testing.T) {
+	checker := ecsCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, ecsExecLogCluster("my-cluster", "/ecs/exec/my-cluster"), resource.ResourceCache{})
 
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())

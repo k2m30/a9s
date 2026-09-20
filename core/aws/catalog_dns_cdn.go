@@ -66,7 +66,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		FieldKeys: []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names", "records_truncated"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, Truncated: true},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs, Truncated: true},
@@ -113,10 +113,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		FieldKeys: []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class", "lambda_function_arns"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfS3, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCfR53, Truncated: true},
+			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCfR53, Truncated: true, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCfAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cf")},

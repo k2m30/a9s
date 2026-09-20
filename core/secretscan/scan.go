@@ -98,10 +98,18 @@ func Classify(key, value string) string {
 		return ""
 	}
 	kind := scanValue(value)
-	if kind == "" && kvKeyRe.MatchString(key) {
+	if kind == "" && KeyNamesCredential(key) {
 		kind = KindKeyword
 	}
 	return kind
+}
+
+// KeyNamesCredential reports whether a name says the value under it is a
+// credential. It is the keyword rule on its own, for a caller that holds a
+// name with no value to scan — a Systems Manager parameter's path, which
+// names what it stores while the value stays in AWS.
+func KeyNamesCredential(key string) bool {
+	return kvKeyRe.MatchString(key)
 }
 
 // ScanText inspects free text line by line, one hit per line, in line order.

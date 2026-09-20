@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
@@ -234,11 +235,9 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkSubnetEFS reports EFS file systems mounted into this subnet. Pattern
-// C — zero extra API calls: scans the already-loaded eni cache for mount-
-// target ENIs (Description "EFS mount target for <fsID>") whose SubnetId
-// matches this subnet, extracting the filesystem ID and cross-checking it
-// against the efs cache. Mirrors checkEFSSubnet's reverse direction
-// (efs_related.go).
+// C — zero extra API calls: scans the already-loaded eni cache for the
+// mount-target ENIs whose SubnetId matches this subnet, reading the file
+// system each one names and cross-checking it against the efs cache.
 func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
@@ -262,10 +261,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		if eni.SubnetId == nil || *eni.SubnetId != subnetID {
 			continue
 		}
-		if eni.Description == nil {
-			continue
-		}
-		if fsID, ok := afterPrefix(*eni.Description, "EFS mount target for "); ok {
+		if fsID, ok := efsIDFromENIDescription(aws.ToString(eni.Description)); ok {
 			fsIDSet[fsID] = struct{}{}
 		}
 	}

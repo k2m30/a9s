@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -45,15 +46,15 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return relatedResultTrunc("s3", nil, cfgErr != nil)
 	}
 
-	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
+	s3List, _, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
 	if s3List == nil {
 		return resource.UnknownRelated("s3")
 	}
-	ids, dropped := listedRefs("s3", buckets, refContext(clients, cache, "s3"), s3List)
-	return relatedResultTrunc("s3", ids, truncated || dropped || cfgErr != nil)
+	ids, lowerBound := listedRefs("s3", buckets, refContext(clients, cache, "s3"), s3List)
+	return relatedResultTrunc("s3", ids, lowerBound || cfgErr != nil)
 }
 
 // cfDistributionConfig reads the distribution's full config, which the list
@@ -74,7 +75,6 @@ func cfDistributionConfig(ctx context.Context, clients any, distID string) (*cft
 
 // checkCfELB searches the ELB cache for load balancers whose DNS name is
 // referenced as an origin in this CloudFront distribution.
-// ELB origin domain names follow the pattern: {name}-{id}.{region}.elb.amazonaws.com
 func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
@@ -84,17 +84,14 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ProvenZero("elb", "dist.Origins")
 	}
 
-	elbDomains := make(map[string]struct{})
+	var origins []string
 	for _, origin := range dist.Origins.Items {
-		if origin.DomainName == nil {
-			continue
-		}
-		if strings.Contains(*origin.DomainName, ".elb.amazonaws.com") {
-			elbDomains[*origin.DomainName] = struct{}{}
+		if name := aws.ToString(origin.DomainName); maybeELBDNS(name) {
+			origins = append(origins, name)
 		}
 	}
-	if len(elbDomains) == 0 {
-		return resource.ProvenZero("elb", "elbDomains")
+	if len(origins) == 0 {
+		return resource.ProvenZero("elb", "the distribution's origins")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -107,8 +104,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 
 	var ids []string
 	for _, elbRes := range elbList {
-		dnsName := elbRes.Fields["dns_name"]
-		if _, found := elbDomains[dnsName]; found {
+		if slices.ContainsFunc(origins, func(o string) bool { return dnsAliasNames(o, elbRes.Fields["dns_name"]) }) {
 			ids = append(ids, elbRes.ID)
 		}
 	}
@@ -173,28 +169,20 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResultTrunc("acm", ids, truncated)
 }
 
-// checkCfR53 reports Route 53 hosted zones whose names plausibly contain this
-// CloudFront distribution's aliases (suffix match). A zone z is reported as
-// related when any of the distribution's aliases equals z.Name or ends with
-// "." + z.Name. This is a cache-only heuristic: we do NOT confirm the zone
-// actually has an alias record for the distribution (that would require
-// O(N)-per-zone route53:ListResourceRecordSets calls). It IS, however, far
-// better than returning "unknown" for every distribution, and matches the
-// O(1)-per-zone budget of all other related-panel checkers.
+// checkCfR53 reports the Route 53 hosted zones with an alias record
+// pointing at this distribution. The r53 fetcher already carries every
+// zone's AliasTarget.DNSName values in Fields["alias_targets"], so the join
+// costs no call of its own.
 //
 // When the r53 cache is truncated and zero matches found, returns
 // a truncated "(0+)" result.
 func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.KnownRelated("r53", nil, false)
+	domainName := res.Fields["domain_name"]
+	if dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct); ok && dist.DomainName != nil {
+		domainName = *dist.DomainName
 	}
-
-	// Extract the distribution's aliases. RawStruct is cftypes.DistributionSummary;
-	// the field is Aliases.Items ([]string).
-	// Fallback: parse Fields["aliases"] (comma-joined in the fetcher).
-	aliases := extractCfAliases(res)
-	if len(aliases) == 0 {
-		return resource.ProvenZero("r53", "aliases")
+	if domainName == "" {
+		return resource.ProvenZero("r53", "domain_name")
 	}
 
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
@@ -207,54 +195,20 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 
 	var ids []string
 	for _, zoneRes := range zoneList {
-		zoneName := canonicalDNS(r53ZoneName(zoneRes))
-		if zoneName == "" {
-			continue
+		// The zone fetcher reads one page of record sets. When more remain,
+		// this distribution's alias record may be on one of them, so the
+		// answer is a lower bound — which is what r53 → cf already renders
+		// for the same zone, and the two directions of one relationship have
+		// to agree.
+		if zoneRes.Fields["records_truncated"] == "true" {
+			truncated = true
 		}
-		for _, alias := range aliases {
-			if alias == "" {
-				continue
-			}
-			a := canonicalDNS(alias)
-			if a == zoneName || strings.HasSuffix(a, "."+zoneName) {
-				ids = append(ids, zoneRes.ID)
-				break
-			}
+		targets := strings.Split(zoneRes.Fields["alias_targets"], ",")
+		if slices.ContainsFunc(targets, func(t string) bool { return dnsAliasNames(t, domainName) }) {
+			ids = append(ids, zoneRes.ID)
 		}
 	}
 	return relatedResultTrunc("r53", ids, truncated)
-}
-
-// extractCfAliases returns the distribution's alias domains from either
-// RawStruct (preferred) or Fields["aliases"] (fallback, comma-joined).
-func extractCfAliases(res resource.Resource) []string {
-	// Try RawStruct first. CloudFront DistributionSummary has .Aliases.Items.
-	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
-	if ok && dist.Aliases != nil {
-		return dist.Aliases.Items
-	}
-	raw := res.Fields["aliases"]
-	if raw == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// r53ZoneName returns the zone name for an r53 cache entry. The r53 fetcher
-// stores the name in Fields["name"] and also Name on the Resource.
-func r53ZoneName(res resource.Resource) string {
-	if res.Name != "" {
-		return res.Name
-	}
-	return res.Fields["name"]
 }
 
 // checkCfAlarm reports CloudWatch alarms on this CloudFront distribution.

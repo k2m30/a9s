@@ -174,15 +174,18 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	seen := map[string]bool{}
 	var ids []string
 	for _, recordName := range recordNames {
-		// Longest-suffix match against zone names.
+		// The zone that holds the record is the innermost one containing it:
+		// a name may sit in a zone of its own and in every parent zone, and
+		// the deepest is where a record of that name is written. ACM
+		// validates against public DNS, so a private zone never holds it.
 		bestZoneID := ""
 		bestZoneLen := 0
 		for _, zoneRes := range zoneList {
 			zn := canonicalDNS(zoneRes.Fields["name"])
-			if zn == "" {
+			if zoneRes.Fields["private_zone"] == "true" || !dnsZoneHosts(zn, recordName) {
 				continue
 			}
-			if strings.HasSuffix(recordName, zn) && len(zn) > bestZoneLen {
+			if len(zn) > bestZoneLen {
 				bestZoneID = zoneRes.ID
 				bestZoneLen = len(zn)
 			}

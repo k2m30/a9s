@@ -73,6 +73,8 @@ func TestNavigableFields_ECR_Registered(t *testing.T) {
 	}
 }
 
+// A container-packaged function runs one image, and which repository that
+// image comes from is only in GetFunction's Code.ImageUri.
 func TestRelated_ECR_Lambda_Found(t *testing.T) {
 	repoURI := "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service"
 	lambdaRes := resource.Resource{
@@ -91,9 +93,10 @@ func TestRelated_ECR_Lambda_Found(t *testing.T) {
 		ID:     "acme/api-service",
 		Fields: map[string]string{"uri": repoURI},
 	}
+	clients := &awsclient.ServiceClients{Lambda: &ecrIdentLambdaFake{images: map[string]string{"my-image-fn": repoURI + ":v3"}}}
 
 	checker := ecrCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -895,6 +898,7 @@ func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 		Name: repoName,
 		RawStruct: ecrtypes.Repository{
 			RepositoryName: aws.String(repoName),
+			RepositoryUri:  aws.String(account + ".dkr.ecr." + region + ".amazonaws.com/" + repoName),
 		},
 	}
 
@@ -1016,10 +1020,13 @@ func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 			Resources: []resource.Resource{ecrECSTaskResource("api-task", imageURI)},
 		},
 	}
-	// checkECRECSTask matches on res.ID, not RawStruct.
+	// The repository's URI is read from Fields when RawStruct is not a
+	// Repository, so a row restored from the disk cache answers as a fresh
+	// one does.
 	source := resource.Resource{
 		ID:        repoName,
 		Name:      repoName,
+		Fields:    map[string]string{"uri": account + ".dkr.ecr." + region + ".amazonaws.com/" + repoName},
 		RawStruct: "wrong-type",
 	}
 
@@ -1027,6 +1034,6 @@ func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (checker uses res.ID, not RawStruct)", result.Count())
+		t.Errorf("Count = %d, want 1 (the repository URI comes from Fields)", result.Count())
 	}
 }

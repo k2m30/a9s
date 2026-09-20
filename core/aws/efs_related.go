@@ -103,7 +103,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 		if !ok {
 			continue
 		}
-		if eni.Description == nil || !strings.Contains(*eni.Description, fsID) {
+		if !eniMountsFileSystem(eni, fsID) {
 			continue
 		}
 		for _, sg := range eni.Groups {
@@ -121,7 +121,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkEFSSubnet finds subnets for this EFS file system by scanning the ENI
-// cache for mount-target ENIs whose Description contains the filesystem ID (Pattern C).
+// cache for the mount-target ENIs whose Description names it (Pattern C).
 func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
@@ -142,7 +142,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		if !ok {
 			continue
 		}
-		if eni.Description == nil || !strings.Contains(*eni.Description, fsID) {
+		if !eniMountsFileSystem(eni, fsID) {
 			continue
 		}
 		if eni.SubnetId != nil && *eni.SubnetId != "" {

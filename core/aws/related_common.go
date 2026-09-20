@@ -12,6 +12,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -160,6 +162,90 @@ func heuristicResult(target string, ids []string, truncated bool) resource.Relat
 		return r.PartialScan()
 	}
 	return r
+}
+
+// logGroupsNaming offers the log groups whose name carries name, as
+// candidates. A log group's name is free text an operator chooses, and what
+// binds one to a resource is written where no list response reaches — the
+// awslogs-group option inside a task definition, a CloudWatch agent's
+// configuration file — so carrying the source's name is a property an
+// unrelated group may share too.
+func logGroupsNaming(ctx context.Context, clients any, cache resource.ResourceCache, name string) resource.RelatedCheckResult {
+	if name == "" {
+		return resource.ProvenZero("logs", "the source's name")
+	}
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.ErrorRelated("logs", err)
+	}
+	if logList == nil {
+		return resource.UnknownRelated("logs")
+	}
+	var ids []string
+	for _, logRes := range logList {
+		if strings.Contains(logRes.ID, name) {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	return heuristicResult("logs", ids, truncated)
+}
+
+// ecsTaskDefLogGroups is the logs pivot of a workload that runs a task
+// definition: the awslogs-group option of every container of the definition,
+// which is where that container's output goes and the link AWS records, read
+// with one ecs:DescribeTaskDefinition. A definition nobody could read proves
+// nothing either way, so the groups whose name carries the family are left as
+// candidates.
+func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.ResourceCache, taskDefARN string) resource.RelatedCheckResult {
+	family := taskDefFamily(taskDefARN)
+	def, err := ecsTaskDefinition(ctx, clients, taskDefARN)
+	// A refusal and a definition answered without a body are the same answer
+	// here: nothing was read.
+	// no finding: the candidate row below is what the operator is owed, and it already says the link was not read.
+	if err != nil || def == nil {
+		return logGroupsNaming(ctx, clients, cache, family)
+	}
+	var groups []string
+	for _, container := range def.ContainerDefinitions {
+		if container.LogConfiguration == nil || container.LogConfiguration.LogDriver != ecstypes.LogDriverAwslogs {
+			continue
+		}
+		if g := container.LogConfiguration.Options["awslogs-group"]; g != "" {
+			groups = append(groups, g)
+		}
+	}
+	if len(groups) == 0 {
+		return resource.ProvenZero("logs", "the definition's awslogs-group options")
+	}
+	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
+	if err != nil {
+		return resource.ErrorRelated("logs", err)
+	}
+	if logList == nil {
+		return resource.UnknownRelated("logs")
+	}
+	ids, lowerBound := listedRefs("logs", groups, refContext(clients, cache, "logs"), logList)
+	return relatedResultTrunc("logs", ids, lowerBound)
+}
+
+// ecsTaskDefinition reads one task definition. errClientMissing stands for a
+// session with no ECS client, which read nothing.
+func ecsTaskDefinition(ctx context.Context, clients any, taskDefARN string) (*ecstypes.TaskDefinition, error) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.ECS == nil || taskDefARN == "" {
+		return nil, errClientMissing
+	}
+	api, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
+	if !ok {
+		return nil, errClientMissing
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
+		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: &taskDefARN})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.TaskDefinition, nil
 }
 
 // alarmIDsByDimension is the shared body of every check*Alarm function whose

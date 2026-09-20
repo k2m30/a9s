@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ecr`
 
 - **Why related**: Containers pull images from ECR; when an image tag is moved or a repository deleted, subsequent task launches fail to pull. The ECR pivot lets the operator jump from a failing task to the repository that owns the image.
-- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].Image`, parse each as `{account}.dkr.ecr.{region}.amazonaws.com/{repo}[:tag|@digest]`, and cross-reference the already-loaded `ecr` list by `repo`. Images not matching the ECR URI pattern (Docker Hub, public ECR, gcr.io) are ignored.
+- **How discovered**: iterate `Task.Containers[].Image` (the fetcher already carries them) and match each against the loaded `ecr` rows' own `RepositoryUri`: registry host and repository path must both be equal, and the `:tag` or `@digest` after them names an image inside the repository. An image from another registry, another account or another region belongs to no local repository.
 - **Count shown**: yes.
 
 ### `ecs`
@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: awslogs-driver log groups receive the container's stdout/stderr — when a task died from `EssentialContainerExited` the next step is almost always "tail the log group".
-- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].LogConfiguration` where `LogDriver=="awslogs"`, read `Options["awslogs-group"]`, and cross-reference the already-loaded `logs` list by log-group name.
+- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].LogConfiguration` where `LogDriver=="awslogs"`, read `Options["awslogs-group"]`, and cross-reference the already-loaded `logs` list by log-group name. A definition that cannot be read (the call refused, or no ECS client) proves nothing either way, so the row falls back to the log groups whose name carries the family, as candidates without a count.
 - **Count shown**: yes.
 
 ### `role`
@@ -306,7 +306,7 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 | alarm | CloudWatch Alarms | yes |
 | ct-events | CloudTrail Events | yes |
 | ec2 | EC2 Instances | yes |
-| ecr | ECR Repositories | no |
+| ecr | ECR Repositories | yes |
 | eni | Network Interfaces | no |
 | secrets | Secrets | yes |
 | sg | Security Groups | yes |

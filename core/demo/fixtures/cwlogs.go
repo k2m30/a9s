@@ -229,9 +229,16 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(14),
 			CreationTime:    aws.Int64(1748736000000), // 2025-06-01
 		},
-		// acme-services ECS cluster log group — required for ecs→logs
-		// related-panel pivot. checkECSLogs matches log groups whose ID
-		// contains the cluster name.
+		// The acme-services cluster's ecs exec session transcripts — the one
+		// log group a Cluster names, and the witness for the ecs→logs pivot.
+		{
+			LogGroupName:    aws.String(ECSExecLogGroup),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + ECSExecLogGroup + ":*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750050000000),
+		},
+		// Where the acme-services cluster's application containers write.
 		{
 			LogGroupName:    aws.String("/ecs/acme-services/app"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/acme-services/app:*"),
@@ -240,8 +247,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			CreationTime:    aws.Int64(1750000000000),
 		},
 		// api-gateway ECS task-definition family log group — required for
-		// ecs-svc→logs and ecs-task→logs related-panel pivots. Both checkers
-		// match log groups whose ID contains the task-def family name.
+		// ecs-svc→logs and ecs-task→logs related-panel pivots. Both read the
+		// awslogs-group option of the family's container definitions.
 		{
 			LogGroupName:    aws.String("/ecs/api-gateway"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/api-gateway:*"),
@@ -623,7 +630,7 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 176
+const LogGroupsPageSize = 177
 
 // derivedLogGroups returns a log group for every one the other demo fixtures
 // name and have does not hold yet: each MWAA environment's component groups,
@@ -698,11 +705,16 @@ func minimalLogStreams(suffix string) []cwlogstypes.LogStream {
 // LogGroupNoKMS carries.
 const demoLogsKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 
+// ECSExecLogGroup is where the acme-services cluster's ecs exec session
+// transcripts are written; the cluster names it in its
+// ExecuteCommandConfiguration (ecs.go).
+const ECSExecLogGroup = "/ecs/exec/acme-services"
+
 // LogGroupNoKMS is the ONE demo log group with no KMS key.
 // Every other log group fixture carries a synthetic KmsKeyId so the demo
 // bench shows exactly one row for logs.no-kms.
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 176, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 177, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

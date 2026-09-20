@@ -49,8 +49,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 
 	var ids []string
 	for _, zone := range r53List {
-		zoneName := canonicalDNS(zone.Name)
-		if strings.EqualFold(zoneName, domain) || strings.HasSuffix(domain, "."+zoneName) {
+		if dnsZoneHosts(zone.Name, domain) {
 			ids = append(ids, zone.ID)
 		}
 	}

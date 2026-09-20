@@ -145,6 +145,13 @@ func buildECSClusters() []ecstypes.Cluster {
 			Configuration: &ecstypes.ClusterConfiguration{
 				ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
 					KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+					Logging:  ecstypes.ExecuteCommandLoggingOverride,
+					// The one demo cluster that sends its exec session
+					// transcripts to CloudWatch: the witness for ecs→logs.
+					LogConfiguration: &ecstypes.ExecuteCommandLogConfiguration{
+						CloudWatchLogGroupName:      aws.String(ECSExecLogGroup),
+						CloudWatchEncryptionEnabled: true,
+					},
 				},
 			},
 			// aws:cloudformation:stack-name tag — required for ecs→cfn

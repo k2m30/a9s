@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `cb`
 
 - **Why related**: CodeBuild projects are the primary mechanism that pushes images into this repo — when an image is stale or a scan fails, operator hops to the build that produced it.
-- **How discovered**: Reverse-scan the already-loaded `cb` list — for each project, match `Environment.Image` against `<RegistryId>.dkr.ecr.<region>.amazonaws.com/<RepositoryName>` and any `Environment.EnvironmentVariables[].Value` that references the repo URI or name. — a9s-devops: project environment image and env vars are the cheapest deterministic link; `buildspec` scanning would require artifact reads and is out of scope.
+- **How discovered**: Reverse-scan the already-loaded `cb` list — for each project, match `Environment.Image` against this repository's own `RepositoryUri`, registry host and repository path both equal. — a9s-devops: the project's environment image is the cheapest deterministic link; `buildspec` scanning would require artifact reads and is out of scope.
 - **Count shown**: yes.
 
 ### `cfn`
@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `lambda`
 
 - **Why related**: Container-image Lambda functions pull from this repo — debugging a cold-start or deployment failure starts at the image source.
-- **How discovered**: Reverse-scan the already-loaded `lambda` list — for each function, when `PackageType==Image`, match `Code.ImageUri` against `<RegistryId>.dkr.ecr.<region>.amazonaws.com/<RepositoryName>[:tag|@digest]`. — a9s-devops: `Code.ImageUri` is the canonical pointer for container-image Lambdas; skip functions where `PackageType==Zip`.
+- **How discovered**: Reverse-scan the already-loaded `lambda` list — for each function with `PackageType==Image`, one `lambda:GetFunction` call reads `Code.ImageUri` (`ListFunctions` does not carry it), matched against this repository's own `RepositoryUri`. — a9s-devops: `Code.ImageUri` is the canonical pointer for container-image Lambdas; functions where `PackageType==Zip` are skipped and cost no call.
 - **Count shown**: yes.
 
 ### `pipeline`

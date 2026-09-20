@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -300,13 +301,12 @@ func launchConfigurations(ctx context.Context, api ASGDescribeLaunchConfiguratio
 	return lcs, err
 }
 
-// launchTemplateVersions reads one version of a launch template; an empty
-// version is $Latest.
+// launchTemplateVersions reads the version of a launch template a group
+// launches from. A LaunchTemplateSpecification that names no version takes
+// AWS's default for the field, "$Default" — the template's default version,
+// which is not necessarily its latest.
 func launchTemplateVersions(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, id, version *string) ([]ec2types.LaunchTemplateVersion, error) {
-	v := aws.ToString(version)
-	if v == "" {
-		v = "$Latest"
-	}
+	v := cmp.Or(aws.ToString(version), "$Default")
 	versions, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.LaunchTemplateVersion, *string, error) {
 		out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
 			LaunchTemplateId: id,

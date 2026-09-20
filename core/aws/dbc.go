@@ -134,7 +134,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 	}, nil
 }
 
-// transitionalDBCStatusSet contains DocumentDB cluster statuses that indicate a
+// transitionalDBCStatusSet contains the DB cluster statuses that indicate a
 // transitional (Warning) state. These show a ": in progress" suffix.
 var transitionalDBCStatusSet = map[string]struct{}{
 	"creating": {}, "modifying": {}, "backing-up": {}, "maintenance": {},
@@ -142,30 +142,26 @@ var transitionalDBCStatusSet = map[string]struct{}{
 	"renaming": {},
 }
 
-// countWriters returns the number of DBClusterMembers with IsClusterWriter == true.
-func countWriters(members []docdbtypes.DBClusterMember) int {
-	n := 0
-	for _, m := range members {
-		if m.IsClusterWriter != nil && *m.IsClusterWriter {
-			n++
-		}
-	}
-	return n
+// dbClusterState is what a DB cluster's findings are read from. DocumentDB
+// and RDS both answer DescribeDBClusters for the same clusters, in two SDK
+// types carrying the same fields; a DocumentDB cluster has no
+// AutoMinorVersionUpgrade or IAMDatabaseAuthenticationEnabled, and those two
+// predicates stay silent when the posture is handed nil for them.
+type dbClusterState struct {
+	Status                string
+	Writers               int
+	DeletionProtection    *bool
+	StorageEncrypted      *bool
+	BackupRetentionPeriod *int32
+	Posture               rdsPosture
 }
 
-// computeDBCFindings returns the findings for a DocumentDB cluster plus the
-// supporting AttentionDetail rows keyed by the finding that owns them.
-// The security-posture pack (rds_posture.go) is evaluated independently of
-// the lifecycle status and stacks on top of it. DocumentDB clusters carry no
-// AutoMinorVersionUpgrade or IAMDatabaseAuthenticationEnabled field, so those
-// two predicates are handed nil and stay silent.
-func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	status := aws.ToString(cluster.Status)
-	postureFindings, postureDetails := rdsPostureFindings(rdsPosture{
-		Engine:         aws.ToString(cluster.Engine),
-		MultiAZ:        cluster.MultiAZ,
-		MasterUsername: cluster.MasterUsername,
-	}, dbcPostureCodes)
+// computeDBClusterFindings returns the findings for a DB cluster plus the
+// supporting AttentionDetail rows keyed by the finding that owns them. The
+// security-posture pack (rds_posture.go) is evaluated independently of the
+// lifecycle status and stacks on top of it.
+func computeDBClusterFindings(c dbClusterState) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	postureFindings, postureDetails := rdsPostureFindings(c.Posture, dbcPostureCodes)
 
 	// Broken statuses — first match wins; no warning stacking.
 	brokenCode := map[string]domain.FindingCode{
@@ -173,38 +169,38 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
 		"incompatible-parameters":             CodeDBCIncompatibleParameters,
 	}
-	if code, ok := brokenCode[status]; ok {
+	if code, ok := brokenCode[c.Status]; ok {
 		lead := []domain.Finding{wave1Finding(code)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
-	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
+	if c.Status == "available" && c.Writers == 0 {
 		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
 	// A cluster on its way out has no posture worth reporting.
-	if isTeardownStatus(status) {
+	if isTeardownStatus(c.Status) {
 		postureFindings, postureDetails = nil, nil
 	}
 
 	// Transitional statuses.
-	if _, ok := transitionalDBCStatusSet[status]; ok {
-		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
+	if _, ok := transitionalDBCStatusSet[c.Status]; ok {
+		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, c.Status)}
 		return append(lead, postureFindings...), postureDetails
 	}
 
 	// Healthy available — collect Wave-1 warnings.
-	if status == "available" {
+	if c.Status == "available" {
 		var findings []domain.Finding
-		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
+		if c.DeletionProtection != nil && !*c.DeletionProtection {
 			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
 		}
-		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
+		if c.StorageEncrypted != nil && !*c.StorageEncrypted {
 			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest))
 		}
-		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
+		if c.BackupRetentionPeriod != nil && *c.BackupRetentionPeriod == 0 {
 			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
 		}
 		return append(findings, postureFindings...), postureDetails
@@ -213,13 +209,35 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 	// A cluster AWS reported no status for has no keyword to pass through.
 	// The transitional wording puts that keyword in front of "in progress",
 	// and an empty one claims a transition nobody reported.
-	if status == "" {
+	if c.Status == "" {
 		return postureFindings, postureDetails
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
+	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, c.Status)}
 	return append(lead, postureFindings...), postureDetails
+}
+
+// computeDBCFindings reads a DocumentDB cluster's findings.
+func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	writers := 0
+	for _, m := range cluster.DBClusterMembers {
+		if aws.ToBool(m.IsClusterWriter) {
+			writers++
+		}
+	}
+	return computeDBClusterFindings(dbClusterState{
+		Status:                aws.ToString(cluster.Status),
+		Writers:               writers,
+		DeletionProtection:    cluster.DeletionProtection,
+		StorageEncrypted:      cluster.StorageEncrypted,
+		BackupRetentionPeriod: cluster.BackupRetentionPeriod,
+		Posture: rdsPosture{
+			Engine:         aws.ToString(cluster.Engine),
+			MultiAZ:        cluster.MultiAZ,
+			MasterUsername: cluster.MasterUsername,
+		},
+	})
 }
 
 // dedupResourcesByID returns rs with duplicate Resource.ID entries removed,

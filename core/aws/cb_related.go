@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
@@ -142,19 +141,10 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("ecr")
 	}
 
-	if project.Environment == nil || project.Environment.Image == nil || !strings.Contains(*project.Environment.Image, ".dkr.ecr.") {
+	if project.Environment == nil || aws.ToString(project.Environment.Image) == "" {
 		return resource.ProvenZero("ecr", "project.Environment.Image")
 	}
-
-	ecrList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecr")
-	if err != nil {
-		return resource.ErrorRelated("ecr", err)
-	}
-	if ecrList == nil {
-		return resource.UnknownRelated("ecr")
-	}
-	ids, dropped := listedRefs("ecr", []string{*project.Environment.Image}, refContext(clients, cache, "ecr"), ecrList)
-	return relatedResultTrunc("ecr", ids, truncated || dropped)
+	return ecrWorkloadRepos(ctx, clients, cache, []string{*project.Environment.Image})
 }
 
 // checkCbS3 scans Artifacts/SecondaryArtifacts/Source for S3 bucket locations and
@@ -183,15 +173,15 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.ProvenZero("s3", "locations")
 	}
 
-	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
+	s3List, _, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
 	if s3List == nil {
 		return resource.UnknownRelated("s3")
 	}
-	ids, _ := listedRefs("s3", locations, refContext(clients, cache, "s3"), s3List)
-	return relatedResultTrunc("s3", ids, truncated)
+	ids, lowerBound := listedRefs("s3", locations, refContext(clients, cache, "s3"), s3List)
+	return relatedResultTrunc("s3", ids, lowerBound)
 }
 
 // checkCbSecrets extracts Secrets Manager secret references from project environment

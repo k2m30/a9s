@@ -6,7 +6,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -65,7 +64,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 		if !ok {
 			continue
 		}
-		if eni.Description != nil && strings.Contains(*eni.Description, fsID) {
+		if eniMountsFileSystem(eni, fsID) {
 			ids = append(ids, eniRes.ID)
 		}
 	}
@@ -91,7 +90,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		if !ok {
 			continue
 		}
-		if eni.Description == nil || !strings.Contains(*eni.Description, fsID) {
+		if !eniMountsFileSystem(eni, fsID) {
 			continue
 		}
 		if eni.VpcId != nil && *eni.VpcId != "" {

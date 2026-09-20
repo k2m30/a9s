@@ -178,11 +178,13 @@ func TestRelated_ENI_ELB_WrongRawStruct(t *testing.T) {
 }
 
 func TestRelated_ENI_Lambda_ExtractsFunctionName(t *testing.T) {
-	// Standard Lambda ENI description: "AWS Lambda VPC ENI-<name>-<uuid>"
+	// EC2 types a Lambda hyperplane ENI "lambda"; its description,
+	// "AWS Lambda VPC ENI-<name>-<uuid>", names the function.
 	source := resource.Resource{
 		ID: "eni-lambda-001",
 		RawStruct: ec2types.NetworkInterface{
 			NetworkInterfaceId: aws.String("eni-lambda-001"),
+			InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
 			RequesterId:        aws.String("123456789012:awslambda_us-east-1"),
 			Description:        aws.String("AWS Lambda VPC ENI-process-orders-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"),
 		},

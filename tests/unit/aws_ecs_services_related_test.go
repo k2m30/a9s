@@ -586,9 +586,14 @@ func TestRelated_ECSSvc_ECR_Match(t *testing.T) {
 	}
 	fakeECS := newFakeECSWithTaskDefinition(td)
 	clients := &awsclient.ServiceClients{ECS: fakeECS}
+	// An image belongs to the repository whose URI it carries, so the answer
+	// is the repository row of that URI.
+	cache := resource.ResourceCache{"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: expectedRepo, Name: expectedRepo, Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/" + expectedRepo}},
+	}}}
 
 	checker := ecsSvcCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{})
+	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -632,9 +637,13 @@ func TestRelated_ECSSvc_ECR_MultipleContainers(t *testing.T) {
 	}
 	fakeECS := newFakeECSWithTaskDefinition(td)
 	clients := &awsclient.ServiceClients{ECS: fakeECS}
+	cache := resource.ResourceCache{"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "app-repo", Name: "app-repo", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/app-repo"}},
+		{ID: "sidecar-repo", Name: "sidecar-repo", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/sidecar-repo"}},
+	}}}
 
 	checker := ecsSvcCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), clients, ecsSvcWithTaskDef("multi-service", taskDefARN), resource.ResourceCache{})
+	result := checker(context.Background(), clients, ecsSvcWithTaskDef("multi-service", taskDefARN), cache)
 
 	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2", result.Count())

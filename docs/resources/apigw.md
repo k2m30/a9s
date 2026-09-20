@@ -42,7 +42,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `cf`
 
 - **Why related**: APIGW often fronted by CloudFront for edge caching, WAF, and a friendlier hostname.
-- **How discovered**: reverse-scan the already-loaded `cf` list for `Origins.Items[].DomainName` ending in `execute-api.<region>.amazonaws.com` and matching this `ApiId` — a9s-devops: CloudFront origin hostname is the only place that reveals the upstream API without walking APIGW configs.
+- **How discovered**: reverse-scan the already-loaded `cf` list for an origin whose host is this API's own invoke host — the label before `.execute-api.` is the API's id, whole, so another API whose id merely contains this one's is not a match — a9s-devops: the CloudFront origin hostname is the only place that reveals the upstream API without walking APIGW configs.
 - **Count shown**: yes.
 
 ### `elb`

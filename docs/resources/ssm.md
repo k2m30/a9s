@@ -49,7 +49,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **State bucket**: Warning.
   - **How obtained**: `ParameterMetadata.Type` and `ParameterMetadata.LastModifiedDate` on the `DescribeParameters` list response.
 
-- **Signal**: `Type==String` AND name suffix matches `-password` / `-secret` / `-token` or name contains `/secret` / `/password` / `/token` → Broken (should be SecureString — plaintext credential).
+- **Signal**: `Type==String` AND the parameter's name says it holds a credential, by the same rule that reads an environment variable's name (`core/secretscan`, the one place that rule lives): `secret`, `password`, `passwd`, `token`, `api_key`/`apikey`, `private_key`, `access_key`, `client_secret`, `credential`, `auth_token`, `db_pass`, case-insensitively → Broken (should be SecureString — plaintext credential). A `SecureString` of the same name holds its value under a KMS key and is not plaintext.
   - **State bucket**: Broken.
   - **How obtained**: `ParameterMetadata.Type` and `ParameterMetadata.Name` on the list response; pure string match against the name.
 

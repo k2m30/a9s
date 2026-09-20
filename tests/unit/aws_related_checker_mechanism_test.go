@@ -234,7 +234,7 @@ func TestLambda_Related_ECR_ResolvesViaGetFunction(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ecr": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{ID: "my-repo", Name: "my-repo"},
+				{ID: "my-repo", Name: "my-repo", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo"}},
 			},
 		},
 	}

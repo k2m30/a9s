@@ -14,17 +14,47 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
-	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkECRLambda checks the cache for Lambda functions using image-based packaging
-// (Pattern C — cache-based heuristic). Since FunctionConfiguration does not include
-// the image URI, any Lambda with PackageType=Image is considered potentially related
-// to this ECR repository.
+// ecrRepoURI is the "<registry>/<repository>" URI AWS gives the repository a
+// row stands for.
+func ecrRepoURI(res resource.Resource) string {
+	if raw, ok := assertStruct[ecrtypes.Repository](res.RawStruct); ok && raw.RepositoryUri != nil && *raw.RepositoryUri != "" {
+		return *raw.RepositoryUri
+	}
+	return res.Fields["uri"]
+}
+
+// ecrWorkloadRepos is the ecr pivot of a workload that runs container
+// images: the loaded repositories those images name.
+func ecrWorkloadRepos(ctx context.Context, clients any, cache resource.ResourceCache, images []string) resource.RelatedCheckResult {
+	if len(images) == 0 {
+		return resource.ProvenZero("ecr", "container images")
+	}
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecr")
+	if err != nil {
+		return resource.ErrorRelated("ecr", err)
+	}
+	if list == nil {
+		return resource.UnknownRelated("ecr")
+	}
+	var ids []string
+	for _, repoRes := range list {
+		uri := ecrRepoURI(repoRes)
+		if slices.ContainsFunc(images, func(img string) bool { return imageRefersToRepo(img, uri) }) {
+			ids = append(ids, repoRes.ID)
+		}
+	}
+	return relatedResultTrunc("ecr", ids, truncated)
+}
+
+// checkECRLambda reports the Lambda functions running an image of this
+// repository. FunctionConfiguration carries no image URI, so the image of
+// each container-packaged function is read with one lambda:GetFunction call.
 func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	repoURI := res.Fields["uri"]
+	repoURI := ecrRepoURI(res)
 	if repoURI == "" {
 		return resource.ProvenZero("lambda", "repoURI")
 	}
@@ -38,25 +68,33 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	var ids []string
+	attempted, failed := 0, 0
 	for _, r := range lambdaList {
-		raw, ok := assertStruct[lambdatypes.FunctionConfiguration](r.RawStruct)
-		if ok {
-			if raw.PackageType == lambdatypes.PackageTypeImage {
-				ids = append(ids, r.ID)
-			}
+		if !lambdaRunsImage(r) {
 			continue
 		}
-		if r.Fields["package_type"] == "Image" {
+		attempted++
+		image, err := lambdaImageURI(ctx, clients, r.ID)
+		if err != nil {
+			failed++
+			continue
+		}
+		if imageRefersToRepo(image, repoURI) {
 			ids = append(ids, r.ID)
 		}
 	}
-	return relatedResultTrunc("lambda", ids, truncated)
+	// Every lookup in the loop failed (throttled, denied, deleted mid-scan):
+	// nothing was actually resolved, so this is not a proven zero.
+	if attempted > 0 && failed == attempted {
+		return resource.UnknownRelated("lambda")
+	}
+	return relatedResultTrunc("lambda", ids, truncated || failed > 0)
 }
 
-// checkECRCodeBuild checks the cache for CodeBuild projects whose environment image
-// contains this ECR repository URI (Pattern C — cache-based).
+// checkECRCodeBuild reports the CodeBuild projects whose build environment
+// runs an image of this repository (Pattern C — cache-based).
 func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	repoURI := res.Fields["uri"]
+	repoURI := ecrRepoURI(res)
 	if repoURI == "" {
 		return resource.ProvenZero("cb", "repoURI")
 	}
@@ -75,7 +113,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 		if !ok {
 			continue
 		}
-		if raw.Environment != nil && raw.Environment.Image != nil && strings.Contains(*raw.Environment.Image, repoURI) {
+		if raw.Environment != nil && raw.Environment.Image != nil && imageRefersToRepo(*raw.Environment.Image, repoURI) {
 			ids = append(ids, r.ID)
 		}
 	}

@@ -19,6 +19,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -102,7 +103,7 @@ func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 }
 
 // checkLTASG scans the already-loaded "asg" cache for groups referencing
-// this template by id, via LaunchTemplate.LaunchTemplateId,
+// this template, via LaunchTemplate, the
 // MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification, or any
 // per-Overrides[] LaunchTemplateSpecification (docs/resources/lt.md).
 // Zero extra API calls.
@@ -113,7 +114,7 @@ func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.
 	}
 	var ids []string
 	for _, row := range asgList {
-		if ltReferencedByASG(row.Raw, res.ID) {
+		if ltReferencedByASG(row.Raw, res.ID, res.Name) {
 			ids = append(ids, row.ID)
 		}
 	}
@@ -122,24 +123,24 @@ func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.
 
 // ltReferencedByASG reports whether asg's plain LaunchTemplate, its
 // MixedInstancesPolicy launch template, or any of its per-instance-type
-// Overrides[] reference ltID.
-func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID string) bool {
-	if asg.LaunchTemplate != nil && aws.ToString(asg.LaunchTemplate.LaunchTemplateId) == ltID {
+// Overrides[] name the template with ltID / ltName.
+func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID, ltName string) bool {
+	names := func(spec *asgtypes.LaunchTemplateSpecification) bool {
+		return spec != nil && namesLaunchTemplate(aws.ToString(spec.LaunchTemplateId), aws.ToString(spec.LaunchTemplateName), ltID, ltName)
+	}
+	if names(asg.LaunchTemplate) {
 		return true
 	}
 	if asg.MixedInstancesPolicy == nil || asg.MixedInstancesPolicy.LaunchTemplate == nil {
 		return false
 	}
 	mip := asg.MixedInstancesPolicy.LaunchTemplate
-	if mip.LaunchTemplateSpecification != nil && aws.ToString(mip.LaunchTemplateSpecification.LaunchTemplateId) == ltID {
+	if names(mip.LaunchTemplateSpecification) {
 		return true
 	}
-	for _, override := range mip.Overrides {
-		if override.LaunchTemplateSpecification != nil && aws.ToString(override.LaunchTemplateSpecification.LaunchTemplateId) == ltID {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(mip.Overrides, func(o asgtypes.LaunchTemplateOverrides) bool {
+		return names(o.LaunchTemplateSpecification)
+	})
 }
 
 // checkLTNG scans the already-loaded "ng" cache for node groups pinning this
@@ -155,8 +156,7 @@ func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.R
 		if row.Raw.LaunchTemplate == nil {
 			continue
 		}
-		if aws.ToString(row.Raw.LaunchTemplate.Id) == res.ID ||
-			(res.Name != "" && aws.ToString(row.Raw.LaunchTemplate.Name) == res.Name) {
+		if namesLaunchTemplate(aws.ToString(row.Raw.LaunchTemplate.Id), aws.ToString(row.Raw.LaunchTemplate.Name), res.ID, res.Name) {
 			ids = append(ids, row.ID)
 		}
 	}

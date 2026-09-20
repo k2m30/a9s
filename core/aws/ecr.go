@@ -15,6 +15,11 @@ import (
 
 // FetchECRRepositoriesPage fetches a single page of ECR repositories.
 func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAPI, continuationToken string) (resource.FetchResult, error) {
+	// A session that never wired ECR is an empty page, not a crash, as every
+	// sibling fetcher answers.
+	if api == nil {
+		return resource.FetchResult{}, nil
+	}
 	input := &ecr.DescribeRepositoriesInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}

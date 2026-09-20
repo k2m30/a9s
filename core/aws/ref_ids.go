@@ -94,18 +94,25 @@ func resolveRefs(target string, refs []string, rc domain.RefContext) (ids []stri
 }
 
 // listedRefs is resolveRefs kept to the rows of list, for a checker whose
-// pivot counts only what the target list holds. A ref that names no local
-// row is left out and reported, as in resolveRefs; one that names a local
-// row the list does not hold is left out silently.
-func listedRefs(target string, refs []string, rc domain.RefContext, list []resource.Resource) (ids []string, dropped bool) {
+// pivot counts only what the target list holds.
+//
+// lowerBound says the answer is missing a row. The references are a closed
+// set the source names, so a page of the target list nobody read can hold
+// more rows of that type but none this source named: when every named
+// reference produced a row the count is exact however far the list was read.
+// A reference that produced none — unreadable, or naming a row this list does
+// not hold — is a row missing from the answer, and the resolvers are
+// syntactic, so a bare name or an ARN of an account the session has not
+// learned yet resolves without proving the row is there.
+func listedRefs(target string, refs []string, rc domain.RefContext, list []resource.Resource) (ids []string, lowerBound bool) {
 	rc.Targets = list
 	names, dropped := resolveRefs(target, refs, rc)
 	for _, r := range list {
-		if slices.Contains(names, r.ID) {
+		if slices.Contains(names, r.ID) && !slices.Contains(ids, r.ID) {
 			ids = append(ids, r.ID)
 		}
 	}
-	return ids, dropped
+	return ids, dropped || len(ids) < len(names)
 }
 
 // localARN reads ref as an ARN of service. isARN is false for anything that

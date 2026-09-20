@@ -11,6 +11,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -18,9 +19,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkVpcPeerRTB scans the loaded rtb cache for routes referencing this
-// peering connection via Routes[].VpcPeeringConnectionId — "who actually
-// routes to this peer". Zero extra API calls.
+// checkVpcPeerRTB scans the loaded rtb cache for live routes to this peering
+// connection via Routes[].VpcPeeringConnectionId — "who actually routes to
+// this peer". Zero extra API calls.
 //
 // A present-but-truncated rtb cache is trusted enough to scan — the house
 // fleet convention (lt's asg/ng/ec2 checkers): State stays RelatedResolved,
@@ -34,11 +35,8 @@ func checkVpcPeerRTB(_ context.Context, _ any, res resource.Resource, cache reso
 	}
 	var ids []string
 	for _, row := range rtbList {
-		for _, route := range row.Raw.Routes {
-			if aws.ToString(route.VpcPeeringConnectionId) == res.ID {
-				ids = append(ids, row.ID)
-				break
-			}
+		if slices.ContainsFunc(row.Raw.Routes, func(route ec2types.Route) bool { return routeTargetsGateway(route, res.ID) }) {
+			ids = append(ids, row.ID)
 		}
 	}
 	return relatedResultTrunc("rtb", ids, truncated)

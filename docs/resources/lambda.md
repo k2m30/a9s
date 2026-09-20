@@ -34,8 +34,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `apigw`
 
 - **Why related**: API Gateway integrations that invoke this function.
-- **How discovered**: cross-reference `apigw` stage/integration metadata — match API Gateway integration `Uri` containing `/functions/<FunctionArn>/invocations` against the function's ARN. — a9s-devops: this is an apigw-side reference (the integration lives on the route), not a Lambda-side field.
-- **Count shown**: yes.
+- **How discovered**: the integration that names the function is the fact, and it lives on the API's routes, which `Api` does not embed and only `GetIntegrations` per API returns. Until that read exists, the row offers candidates — the loaded APIs that name this function in a tag key or in their own Name. — a9s-devops: this is an apigw-side reference (the integration lives on the route), not a Lambda-side field.
+- **Count shown**: no — the candidates are not a count of the APIs that invoke this function.
 
 ### `cf`
 
@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ecr`
 
 - **Why related**: container-image Lambda — the function runs the image from this ECR repository.
-- **How discovered**: `PackageType==Image`; the image URI is returned by `GetFunction` under `Code.ImageUri` (not on `ListFunctions`/`FunctionConfiguration`). Parse the repository name from the URI (`<acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>`) and cross-reference the `ecr` list. — a9s-devops: `Code.ImageUri` is only on the `GetFunction` output; surfacing requires a one-call-per-image-function fan-out.
+- **How discovered**: `PackageType==Image`; the image URI is returned by `GetFunction` under `Code.ImageUri` (not on `ListFunctions`/`FunctionConfiguration`). Match the URI against the loaded `ecr` rows' own `RepositoryUri`: registry host and repository path both equal, with the `:tag` or `@digest` after them naming an image inside the repository. — a9s-devops: `Code.ImageUri` is only on the `GetFunction` output; surfacing requires a one-call-per-image-function fan-out.
 - **Count shown**: yes.
 
 ### `efs`
@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `eni`
 
 - **Why related**: Lambda-in-VPC creates requester-managed ENIs (Hyperplane ENIs) for outbound network access.
-- **How discovered**: cross-reference the `eni` list — match `RequesterId=="AWS Lambda VPC ENI"` / `Description` starting with `AWS Lambda VPC ENI-<FunctionName>-…`. — a9s-devops: confirmed ENI description pattern; `FunctionConfiguration` has no ENI-ID list.
+- **How discovered**: cross-reference the `eni` list — EC2 types a hyperplane ENI `InterfaceType == lambda`, and its `Description`, `AWS Lambda VPC ENI-<FunctionName>-<uuid>`, names the function it belongs to. — a9s-devops: `FunctionConfiguration` has no ENI-ID list, and `RequesterId` is an account or service alias that varies.
 - **Count shown**: yes.
 
 ### `kinesis`
@@ -383,7 +383,7 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 | sns | SNS Topics | yes |
 | sns-sub | SNS Subscriptions | yes |
 | s3 | S3 Buckets | yes |
-| ecr | ECR Repositories | no |
+| ecr | ECR Repositories | yes |
 | eni | Network Interfaces | yes |
 | secrets | Secrets | yes |
 | ssm | SSM Parameters | yes |

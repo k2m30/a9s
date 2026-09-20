@@ -6,8 +6,8 @@ package aws
 import (
 	"context"
 	"slices"
-	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -113,29 +113,20 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("elb", []string{name}, false)
 }
 
-// checkENILambda reports Lambda functions that own this ENI. Lambda-owned ENIs
-// are marked by RequesterId "*:awslambda_*" and Description contains the
-// function name. Without a stable parse contract on description, the function
-// cannot always be identified; returns an unknown result when the ENI is
-// clearly Lambda-managed but the function name isn't directly derivable.
+// checkENILambda reports the Lambda function that owns this ENI. The
+// Description carries the function's name by convention only, so an ENI
+// Lambda owns whose description does not parse identifies no function and
+// the answer is unknown.
 func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("lambda")
 	}
-	reqID := ""
-	if raw.RequesterId != nil {
-		reqID = *raw.RequesterId
-	}
-	desc := ""
-	if raw.Description != nil {
-		desc = *raw.Description
-	}
-	if !isLambdaENI(reqID, desc) {
-		return resource.ProvenZero("lambda", "reqID")
+	if !isLambdaENI(raw) {
+		return resource.ProvenZero("lambda", "the interface type")
 	}
 	// Parse function name from Description: "AWS Lambda VPC ENI-<name>-<uuid>".
-	name := lambdaFunctionNameFromENIDescription(desc)
+	name := lambdaFunctionNameFromENIDescription(aws.ToString(raw.Description))
 	if name == "" {
 		return resource.UnknownRelated("lambda")
 	}
@@ -209,18 +200,4 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	return relatedResultTrunc("vpce", ids, truncated)
-}
-
-// isLambdaENI reports whether an ENI is owned by AWS Lambda based on
-// RequesterId/Description markers.
-func isLambdaENI(requesterID, description string) bool {
-	// Typical Lambda RequesterId forms: "<account>:awslambda_*" or contains "awslambda".
-	if requesterID != "" && (requesterID == "lambda.amazonaws.com" || strings.Contains(requesterID, "awslambda")) {
-		return true
-	}
-	// Description pattern: "AWS Lambda VPC ENI-<funcname>-<uuid>".
-	if description != "" && strings.Contains(description, "Lambda") {
-		return true
-	}
-	return false
 }

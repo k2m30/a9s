@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `eni`
 
 - **Why related**: Mount-target ENIs — the exact network-interface objects AWS provisions per mount target, one per AZ the FS is mounted in.
-- **How discovered**: call `DescribeMountTargets(FileSystemId=<fs-id>)` and read `MountTargetDescription.NetworkInterfaceId` per MT; cross-reference the loaded `eni` list by those IDs.
+- **How discovered**: zero-call ENI scan — a mount-target ENI names its file system in `NetworkInterface.Description`, in the documented form (`Mount target fsmt-… for file system fs-…`) or the console's (`EFS mount target for fs-… (fsmt-…)`); the id is read as a whole token, so one file system's id never matches another's longer one.
 - **Count shown**: yes (equals `NumberOfMountTargets` on a healthy FS).
 
 ### `kms`
@@ -70,19 +70,19 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `sg`
 
 - **Why related**: Security groups attached to each mount target ENI — the first thing to check when clients get `connection refused` on port 2049.
-- **How discovered**: for each mount target from `DescribeMountTargets`, call `DescribeMountTargetSecurityGroups(MountTargetId=<mt-id>)`; union the returned SG IDs and cross-reference the loaded `sg` list. Alternative: read `Groups` from the corresponding `eni` cross-reference (no extra call) — a9s-devops: both paths give the same set; prefer the ENI-join path when the `eni` list is already loaded, fall back to `DescribeMountTargetSecurityGroups` when not.
+- **How discovered**: zero-call ENI scan — union `NetworkInterface.Groups[].GroupId` across the already-loaded ENIs whose description names this file system, and cross-reference the loaded `sg` list. `DescribeMountTargetSecurityGroups` per mount target gives the same set at the cost of one call each.
 - **Count shown**: yes.
 
 ### `subnet`
 
 - **Why related**: Subnets hosting the mount-target ENIs — an AZ's worth of connectivity for this FS dies when its subnet loses routing.
-- **How discovered**: call `DescribeMountTargets(FileSystemId=<fs-id>)` and read `MountTargetDescription.SubnetId` per MT; cross-reference the loaded `subnet` list.
+- **How discovered**: zero-call ENI scan — take the `NetworkInterface.SubnetId` of every already-loaded ENI whose description names this file system, and cross-reference the loaded `subnet` list.
 - **Count shown**: yes (equals `NumberOfMountTargets`).
 
 ### `vpc`
 
 - **Why related**: The VPC the file system is mounted into — EFS mount targets are VPC-scoped, and a FS in a VPC that's being retired is a FS being retired.
-- **How discovered**: call `DescribeMountTargets(FileSystemId=<fs-id>)` and read `MountTargetDescription.VpcId` from any mount target (all MTs of a single FS share one VPC); cross-reference the loaded `vpc` list.
+- **How discovered**: zero-call ENI scan — take the `NetworkInterface.VpcId` of every already-loaded ENI whose description names this file system (all mount targets of one file system share a VPC); cross-reference the loaded `vpc` list.
 - **Count shown**: yes (typically 1).
 
 ### `ct-events`

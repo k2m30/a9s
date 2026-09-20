@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// coalesce.go wraps the four AWS clients whose narrow related-checker AND
+// coalesce.go wraps the AWS clients whose narrow related-checkers AND
 // on-demand detail-enricher independently call the identical operation on
 // the identical resource on every detail open: sfn's DescribeStateMachine
 // (checkSFNRole + checkSFNKMS + checkSFNLambda + enrichSfn — up to 4x
 // concurrently), sns's GetTopicAttributes (checkSNSKMS + checkSNSRole +
 // enrichSns), s3's GetBucketPolicy (the s3→role related checker + enrichS3),
-// and lambda's GetFunction (checkLambdaECR + enrichLambda).
+// lambda's GetFunction (checkLambdaECR + enrichLambda), and ecs's
+// DescribeTaskDefinition (checkECSSvcECR + checkECSSvcSecrets +
+// checkECSSvcLogs on one service, checkECSTaskLogs on one task).
 // golang.org/x/sync/singleflight coalesces concurrent identical
 // in-flight calls into one underlying call and shares its result across
 // every caller waiting on that key. Layered on top, completedResultMemo
@@ -39,15 +41,14 @@
 // this package). Demo mode's fakes (core/demo/client.go) are instant,
 // in-process, and deterministic — coalescing them would add complexity for
 // zero benefit, so they stay undecorated (core/demo/client.go overwrites
-// these four fields with typed fakes immediately after calling
+// these fields with typed fakes immediately after calling
 // CreateServiceClients, discarding whatever real client this file
 // constructed).
 //
-// The four constructors are exported (returning the widest interface, not
-// the concrete decorator type) so both the live bootstrap and external
-// tests (tests/unit, an exported-symbols-only package) can construct one —
-// the decorator struct types themselves stay unexported implementation
-// detail.
+// The constructors are exported (returning the widest interface, not the
+// concrete decorator type) so both the live bootstrap and external tests
+// (tests/unit, an exported-symbols-only package) can construct one — the
+// decorator struct types themselves stay unexported implementation detail.
 //
 // Each decorator also records every call it makes (executed vs served from
 // the memo) to two independent, off-by-default observers: an optional
@@ -64,6 +65,7 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
@@ -375,6 +377,60 @@ func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucket
 		func(_ *s3.GetBucketPolicyOutput, err error) bool {
 			return err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")
 		},
+	)
+}
+
+// coalescingECS wraps ECSAPI, coalescing identical DescribeTaskDefinition
+// calls (same operation, same task definition) into one underlying call —
+// the ecr, secrets and logs rows of one ecs-svc detail open, and the logs
+// row of an ecs-task's, each ask for the same definition independently.
+//
+// Callers must treat the shared *ecs.DescribeTaskDefinitionOutput as
+// read-only: every current consumer only reads from it.
+//
+// Does not violate "transport carries no session state" — see
+// coalescingSFN's doc comment; the same reasoning applies verbatim.
+type coalescingECS struct {
+	ECSAPI
+	g    singleflight.Group
+	memo *completedResultMemo
+}
+
+// coalescingECSContainerInstances is coalescingECS for a client that also
+// answers DescribeContainerInstances, the one ECS operation outside ECSAPI
+// (ecs_interfaces.go): the ecs-task → ec2 pivot asserts it on the client, and
+// a decorator embedding ECSAPI alone would fail that assertion and take the
+// pivot's answer away. Forwarded, not coalesced: one pivot calls it once.
+type coalescingECSContainerInstances struct {
+	*coalescingECS
+	ECSDescribeContainerInstancesAPI
+}
+
+// NewCoalescingECS wraps api with DescribeTaskDefinition call coalescing.
+// Exported for construction at the live client bootstrap (client.go) and
+// from external tests; the concrete decorator types stay unexported.
+func NewCoalescingECS(api ECSAPI) ECSAPI {
+	c := &coalescingECS{ECSAPI: api, memo: newCompletedResultMemo()}
+	if withInstances, ok := api.(ECSDescribeContainerInstancesAPI); ok {
+		return &coalescingECSContainerInstances{coalescingECS: c, ECSDescribeContainerInstancesAPI: withInstances}
+	}
+	return c
+}
+
+func (c *coalescingECS) DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return coalesceCall(ctx, &c.g, c.memo, nil, "ecs.DescribeTaskDefinition", aws.ToString(params.TaskDefinition),
+		func() (*ecs.DescribeTaskDefinitionOutput, error) {
+			return c.ECSAPI.DescribeTaskDefinition(ctx, params, optFns...)
+		},
+		// A task definition revision is immutable, so whatever one open
+		// learns about it — the definition itself, or a refusal to hand it
+		// over — is that open's answer, and asking again inside the open buys
+		// nothing. The refusal is memoized for a second reason the other
+		// decorators do not have: three rows of one screen read this one
+		// definition, and a refusal the second row re-ran could leave two
+		// rows of a screen disagreeing about what the workload runs. A
+		// refresh mints a new operation id, so it always reads afresh.
+		func(_ *ecs.DescribeTaskDefinitionOutput, _ error) bool { return true },
 	)
 }
 

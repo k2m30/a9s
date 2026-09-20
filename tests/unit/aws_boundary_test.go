@@ -140,12 +140,14 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			RawStruct: ecrtypes.Repository{
 				RepositoryName: aws.String(repoName),
 				RegistryId:     aws.String(account),
+				RepositoryUri:  aws.String(account + ".dkr.ecr." + region + ".amazonaws.com/" + repoName),
 			},
 		}
 		taskRes := resource.Resource{
 			ID:   "task-boundary:1",
 			Name: "task-boundary:1",
-			// checkECRECSTask scans Fields["container_images"] (comma-joined) for ".dkr.ecr." + "/repoName" patterns.
+			// checkECRECSTask scans Fields["container_images"], a comma-joined
+			// list of the task's container image URIs.
 			Fields: map[string]string{
 				"container_images": imageURI,
 			},

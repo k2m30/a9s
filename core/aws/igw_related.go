@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -54,11 +55,8 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		if !rtbOk {
 			continue
 		}
-		for _, route := range rtbRaw.Routes {
-			if route.GatewayId != nil && *route.GatewayId == igwID {
-				ids = append(ids, rtbRes.ID)
-				break
-			}
+		if slices.ContainsFunc(rtbRaw.Routes, func(route ec2types.Route) bool { return routeTargetsGateway(route, igwID) }) {
+			ids = append(ids, rtbRes.ID)
 		}
 	}
 	return relatedResultTrunc("rtb", ids, truncated)

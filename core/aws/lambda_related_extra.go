@@ -11,9 +11,11 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -55,11 +57,11 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 	return relatedRefs("efs", refs, refContext(clients, cache, "efs"))
 }
 
-// checkLambdaAPIGW scans the apigw cache for HTTP/REST APIs that integrate
-// with this Lambda function. apigatewayv2.Api struct does not embed
-// integrations, so without a GetIntegrations API call this is undeterminable.
-// It approximates by searching for the function name in the api's Name or
-// Tags — a weak signal, but better than Count:0 when a real match exists.
+// checkLambdaAPIGW offers the APIs that name this function in a tag or in
+// their own Name, as candidates. Which function an API invokes is in its
+// integrations, which apigatewayv2.Api does not embed and only
+// GetIntegrations per API returns; a name or a tag key is free text an
+// operator chooses, so the row shows candidates rather than a count.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -88,7 +90,7 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, apiRes.ID)
 		}
 	}
-	return relatedResultTrunc("apigw", ids, truncated)
+	return heuristicResult("apigw", ids, truncated)
 }
 
 // checkLambdaCF scans the cloudfront cache for Lambda@Edge distributions that
@@ -421,10 +423,10 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("s3", ids, truncated)
 }
 
-// checkLambdaENI scans the eni cache for ENIs attached to this Lambda's
-// hyperplane (VPC-attached functions get AWS-managed requester-managed ENIs).
-// Per docs/resources/lambda.md, the match is RequesterId=="AWS Lambda VPC
-// ENI" or Description starting with "AWS Lambda VPC ENI-<FunctionName>-".
+// checkLambdaENI scans the eni cache for the hyperplane ENIs EC2 creates for
+// this VPC-attached function. The interface type says Lambda owns the ENI;
+// the Description, "AWS Lambda VPC ENI-<FunctionName>-<uuid>", is what says
+// which function it belongs to.
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -437,20 +439,15 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 	if eniList == nil {
 		return resource.UnknownRelated("eni")
 	}
-	// RequesterId=="AWS Lambda VPC ENI" identifies the ENI as Lambda-managed;
-	// the Description prefix is what disambiguates which function it
-	// belongs to, since RequesterId alone is identical across every
-	// VPC-attached function's ENIs.
-	wantPrefix := "AWS Lambda VPC ENI-" + fnName + "-"
 	var ids []string
 	for _, eniRes := range eniList {
-		if eniRes.Fields["requester_id"] != "AWS Lambda VPC ENI" {
+		eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct)
+		if !ok || !isLambdaENI(eni) {
 			continue
 		}
-		if !strings.HasPrefix(eniRes.Fields["description"], wantPrefix) {
-			continue
+		if lambdaFunctionNameFromENIDescription(aws.ToString(eni.Description)) == fnName {
+			ids = append(ids, eniRes.ID)
 		}
-		ids = append(ids, eniRes.ID)
 	}
 	return relatedResultTrunc("eni", ids, truncated)
 }

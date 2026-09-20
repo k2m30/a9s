@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ecr`
 
 - **Why related**: ECR repos the project pushes to — the build container image (or the artifact the build emits) usually lives in a team-owned ECR repo; operators pivot here when "build is green but the image didn't update" (`docs/related-resources.md § ecr`: "CodeBuild projects that push images").
-- **How discovered**: read `Project.Environment.Image` — if the URI matches `<acct>.dkr.ecr.<region>.amazonaws.com/<repo>[:tag]`, the `<repo>` segment resolves against the loaded `ecr` cache — a9s-devops: possible=yes, worth=yes. `Environment.Image` is the only deterministic ECR reference on `Project`; push-target repos live only inside buildspec.yml, which a9s does not fetch. Starting with the build image covers the most common "what container am I building in?" workflow.
+- **How discovered**: read `Project.Environment.Image` and match it against each loaded `ecr` row's own `RepositoryUri`: registry host and repository path must both be equal, and the `:tag` or `@digest` after them names an image inside the repository, not another one — a9s-devops: possible=yes, worth=yes. `Environment.Image` is the only deterministic ECR reference on `Project`; push-target repos live only inside buildspec.yml, which a9s does not fetch. Starting with the build image covers the most common "what container am I building in?" workflow.
 - **Count shown**: yes.
 
 ### `kms`

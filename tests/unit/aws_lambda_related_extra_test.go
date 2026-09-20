@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -904,12 +905,9 @@ func TestRelated_Lambda_S3_NilCache(t *testing.T) {
 }
 
 // TestRelated_Lambda_ENI_MatchByDescription verifies the checkLambdaENI
-// mechanism: a match requires BOTH
-// Fields["requester_id"]=="AWS Lambda VPC ENI" AND a Description prefix of
-// "AWS Lambda VPC ENI-<FunctionName>-" — RequesterId alone is identical
-// across every VPC-attached function's ENIs, so Description is what
-// disambiguates which function it belongs to; a description-only match
-// (missing requester_id) must not count.
+// mechanism: EC2 types a Lambda hyperplane ENI "lambda", and its Description,
+// "AWS Lambda VPC ENI-<FunctionName>-<uuid>", is what says which function it
+// belongs to — every VPC-attached function's ENIs carry the same type.
 func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
 	const fnName = "my-vpc-function"
 	eniRes := resource.Resource{
@@ -919,6 +917,12 @@ func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
 			"requester_id": "AWS Lambda VPC ENI",
 			"description":  "AWS Lambda VPC ENI-my-vpc-function-abcdef",
 		},
+		RawStruct: ec2types.NetworkInterface{
+			NetworkInterfaceId: aws.String("eni-aaa111"),
+			InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
+			RequesterId:        aws.String("AWS Lambda VPC ENI"),
+			Description:        aws.String("AWS Lambda VPC ENI-my-vpc-function-abcdef"),
+		},
 	}
 	cache := resource.ResourceCache{
 		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{eniRes}},
@@ -927,7 +931,7 @@ func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
 	checker := lambdaExtraCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, cache)
 	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (requester_id + description prefix match)", result.Count())
+		t.Errorf("Count = %d, want 1 (a lambda-type ENI whose description names this function)", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eni-aaa111" {
 		t.Errorf("ResourceIDs = %v, want [eni-aaa111]", result.ResourceIDs())

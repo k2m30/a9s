@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `elb`
 
 - **Why related**: ALB configured as a CloudFront origin. When a CF distribution returns `5xxErrorRate` and the origin is an ALB, operator pivots straight to the load balancer to check target health and backend state.
-- **How discovered**: cross-reference the already-loaded `elb` list by matching `Distribution.Origins.Items[].DomainName` against the ALB's `DNSName` (ELBv2 DNS names have the form `<name>-<id>.<region>.elb.amazonaws.com`) — a9s-devops: there is no direct LB ARN field on the origin; name-match against the loaded ELB list is the standard cross-reference.
+- **How discovered**: cross-reference the already-loaded `elb` list by matching `Distribution.Origins.Items[].DomainName` against the load balancer's `DNSName`, case-folded (an application or classic load balancer answers under `<name>-<id>.<region>.elb.amazonaws.com`, a network or gateway one under `<name>-<id>.elb.<region>.amazonaws.com`) — a9s-devops: there is no direct LB ARN field on the origin; name-match against the loaded ELB list is the standard cross-reference.
 - **Count shown**: yes.
 
 ### `lambda`

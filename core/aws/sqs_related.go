@@ -41,13 +41,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		if endpoint == "" {
 			continue
 		}
-		match := false
-		if queueARN != "" && strings.Contains(endpoint, queueARN) {
-			match = true
-		} else if queueName != "" && strings.HasSuffix(endpoint, ":"+queueName) {
-			match = true
-		}
-		if !match {
+		if !endpointIsQueue(endpoint, queueARN, queueName) {
 			continue
 		}
 		if ta := sub.Fields["topic_arn"]; ta != "" {
@@ -99,9 +93,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 		if endpoint == "" {
 			continue
 		}
-		// Match by full ARN or queue name as a suffix.
-		if (queueARN != "" && strings.Contains(endpoint, queueARN)) ||
-			(queueName != "" && strings.HasSuffix(endpoint, ":"+queueName)) {
+		if endpointIsQueue(endpoint, queueARN, queueName) {
 			ids = append(ids, subRes.ID)
 		}
 	}

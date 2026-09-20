@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `rtb`, `
 ### `rtb`
 
 - **Why related**: Route tables reveal whether this IGW is actually carrying internet traffic — an IGW with no route table pointing `0.0.0.0/0` at it is paid-for, attached, and unused. This is also how the operator answers "which subnets go to the internet through this gateway?".
-- **How discovered**: Reverse-scan the already-loaded `rtb` list — walk each route table's `Routes[]` and match any route whose `GatewayId` equals this gateway's `InternetGatewayId`. No extra AWS call needed. — a9s-devops: the route target lives on the `Route` object as `GatewayId`; reverse-scan against the already-loaded `rtb` list is the cheapest approach. Possible=yes, worth=yes.
+- **How discovered**: Reverse-scan the already-loaded `rtb` list — walk each route table's `Routes[]` and match any live route whose `GatewayId` equals this gateway's `InternetGatewayId`. A blackhole route keeps the stale target id after the gateway is detached, so it names no live gateway and is not counted. No extra AWS call needed. — a9s-devops: the route target lives on the `Route` object as `GatewayId`; reverse-scan against the already-loaded `rtb` list is the cheapest approach. Possible=yes, worth=yes.
 - **Count shown**: yes.
 
 ### `vpc`

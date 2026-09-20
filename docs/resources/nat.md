@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `rtb`
 
 - **Why related**: route tables with default routes pointing at this NAT — confirms which private subnets actually egress through this gateway; orphaned NATs (no route targets) are cost waste.
-- **How discovered**: cross-reference the already-loaded `rtb` list by any `Route.NatGatewayId==<this NatGatewayId>`.
+- **How discovered**: cross-reference the already-loaded `rtb` list by any live `Route.NatGatewayId==<this NatGatewayId>`. A blackhole route keeps the stale target id after the NAT gateway is deleted, so it names no live gateway and is not counted.
 - **Count shown**: unknown.
 
 ### `subnet`

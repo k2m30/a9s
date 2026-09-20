@@ -76,7 +76,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 ### `efs`
 
 - **Why related**: EFS file systems project into a subnet via one mount target per AZ; losing a subnet (or running out of IPs) breaks EFS reachability from that AZ. Related-resources.md §subnet lists `efs` as a DevOps audit pivot.
-- **How discovered**: zero-call ENI scan — EFS mount-target ENIs carry a well-known description (`EFS mount target for <fs-id> (fsmt-...)`); scan the already-loaded `eni` list for entries with `NetworkInterface.SubnetId == Subnet.SubnetId` and that description form, extract the file-system IDs, and match them against the already-loaded `efs` list. Avoids the per-file-system `DescribeMountTargets` fan-out (mount targets are not on the top-level `efs` list response).
+- **How discovered**: zero-call ENI scan — EFS mount-target ENIs name their file system in `NetworkInterface.Description`, in the documented form (`Mount target fsmt-… for file system fs-…`) or the console's (`EFS mount target for fs-… (fsmt-…)`); scan the already-loaded `eni` list for entries with `NetworkInterface.SubnetId == Subnet.SubnetId`, read the file-system id each description names as a whole token, and match it against the already-loaded `efs` list. Avoids the per-file-system `DescribeMountTargets` fan-out (mount targets are not on the top-level `efs` list response).
 - **Count shown**: yes (subject to the `eni` and `efs` lists being loaded).
 
 ### `vpce`

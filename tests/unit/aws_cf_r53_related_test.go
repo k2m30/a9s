@@ -1,12 +1,13 @@
 package unit_test
 
-// aws_cf_r53_related_test.go — Tests for the CloudFront → Route 53 zone-suffix
-// related checker (checkCfR53). The checker is unexported; we retrieve it via
+// aws_cf_r53_related_test.go — Tests for the CloudFront → Route 53 related
+// checker (checkCfR53). The checker is unexported; we retrieve it via
 // resource.GetRelated("cf") and the "r53" TargetType entry, matching the pattern
 // used by other related-checker tests (see aws_sg_related_test.go).
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
@@ -31,35 +32,34 @@ func cfR53Checker(t *testing.T) resource.RelatedChecker {
 	return nil
 }
 
-// makeCFResource builds a resource.Resource representing a CloudFront distribution
-// with the given aliases. The RawStruct is set to a cftypes.DistributionSummary so
-// that extractCfAliases uses the preferred RawStruct path.
-func makeCFResource(id string, aliases []string) resource.Resource {
-	items := make([]string, len(aliases))
-	copy(items, aliases)
-	qty := int32(len(items))
-
+// makeCFResource builds a resource.Resource representing a CloudFront
+// distribution. A distribution answers under its own
+// "<id>.cloudfront.net" domain name, which is what a Route 53 alias record
+// pointing at it carries.
+func makeCFResource(id, domainName string) resource.Resource {
 	dist := cftypes.DistributionSummary{
-		Id: &id,
-		Aliases: &cftypes.Aliases{
-			Quantity: &qty,
-			Items:    items,
-		},
+		Id:         &id,
+		DomainName: &domainName,
 	}
 	return resource.Resource{
 		ID:        id,
 		Name:      id,
+		Fields:    map[string]string{"domain_name": domainName},
 		RawStruct: dist,
 	}
 }
 
-// makeR53Resource builds a resource.Resource representing a Route 53 hosted zone.
-// The zone name is stored in resource.Name (the r53ZoneName helper reads Name first).
-func makeR53Resource(id, zoneName string) resource.Resource {
+// makeR53Resource builds a resource.Resource representing a Route 53 hosted
+// zone whose records alias the given targets. The r53 fetcher joins every
+// AliasTarget.DNSName it enumerated into Fields["alias_targets"].
+func makeR53Resource(id, zoneName string, aliasTargets ...string) resource.Resource {
 	return resource.Resource{
-		ID:     id,
-		Name:   zoneName,
-		Fields: map[string]string{"name": zoneName, "status": "active"},
+		ID:   id,
+		Name: zoneName,
+		Fields: map[string]string{
+			"name": zoneName, "status": "active",
+			"alias_targets": strings.Join(aliasTargets, ","),
+		},
 	}
 }
 
@@ -73,18 +73,19 @@ func r53Cache(truncated bool, zones ...resource.Resource) resource.ResourceCache
 	}
 }
 
-// TestCheckCfR53_MatchesExactZoneName: alias "example.com" matches zone "example.com".
-func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
+// TestCheckCfR53_MatchesZoneWithAliasRecord: a zone with an alias record
+// pointing at this distribution is the zone that serves it.
+func TestCheckCfR53_MatchesZoneWithAliasRecord(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E1ABC", []string{"example.com"})
-	zone := makeR53Resource("/hostedzone/Z001", "example.com")
+	res := makeCFResource("E1ABC", "d111111abcdef8.cloudfront.net")
+	zone := makeR53Resource("/hostedzone/Z001", "example.com", "d111111abcdef8.cloudfront.net")
 	cache := r53Cache(false, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (exact zone name match)", result.Count())
+		t.Errorf("Count = %d, want 1 (the zone aliases this distribution)", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
 		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
@@ -94,39 +95,42 @@ func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
 	}
 }
 
-// TestCheckCfR53_MatchesSubdomainOfZone: alias "www.example.com" matches zone "example.com".
-func TestCheckCfR53_MatchesSubdomainOfZone(t *testing.T) {
+// TestCheckCfR53_MatchesAlongsideOtherAliasTargets: a zone aliases several
+// things; the distribution's own domain among them is what counts.
+func TestCheckCfR53_MatchesAlongsideOtherAliasTargets(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E2DEF", []string{"www.example.com"})
-	zone := makeR53Resource("/hostedzone/Z002", "example.com")
+	res := makeCFResource("E2DEF", "d222222abcdef8.cloudfront.net")
+	zone := makeR53Resource("/hostedzone/Z002", "example.com",
+		"acme-web-alb-1234567890.us-east-1.elb.amazonaws.com", "d222222abcdef8.cloudfront.net")
 	cache := r53Cache(false, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (subdomain suffix match)", result.Count())
+		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
 		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)
 	}
 }
 
-// TestCheckCfR53_MultipleAliasesAcrossMultipleZones: two aliases matching two
-// different zones each → Count=2.
-func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
+// TestCheckCfR53_MultipleZonesAliasOneDistribution: one distribution can be
+// aliased from several zones → Count=2.
+func TestCheckCfR53_MultipleZonesAliasOneDistribution(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E3GHI", []string{"www.example.com", "api.other.com"})
-	zone1 := makeR53Resource("/hostedzone/Z003", "example.com")
-	zone2 := makeR53Resource("/hostedzone/Z004", "other.com")
-	zone3 := makeR53Resource("/hostedzone/Z005", "unrelated.io")
+	const domainName = "d333333abcdef8.cloudfront.net"
+	res := makeCFResource("E3GHI", domainName)
+	zone1 := makeR53Resource("/hostedzone/Z003", "example.com", domainName)
+	zone2 := makeR53Resource("/hostedzone/Z004", "other.com", domainName)
+	zone3 := makeR53Resource("/hostedzone/Z005", "unrelated.io", "d999999abcdef8.cloudfront.net")
 	cache := r53Cache(false, zone1, zone2, zone3)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2 (one zone per alias domain)", result.Count())
+		t.Errorf("Count = %d, want 2 (one per zone that aliases it)", result.Count())
 	}
 	if len(result.ResourceIDs()) != 2 {
 		t.Errorf("ResourceIDs = %v, want 2 entries ([%q, %q])", result.ResourceIDs(), zone1.ID, zone2.ID)
@@ -143,18 +147,19 @@ func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
 	}
 }
 
-// TestCheckCfR53_NoMatchDifferentDomain: alias "example.com" does NOT match zone "other.com".
-func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
+// TestCheckCfR53_NoMatchDifferentDistribution: a zone that aliases another
+// distribution is not this one's.
+func TestCheckCfR53_NoMatchDifferentDistribution(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E4JKL", []string{"example.com"})
-	zone := makeR53Resource("/hostedzone/Z006", "other.com")
+	res := makeCFResource("E4JKL", "d444444abcdef8.cloudfront.net")
+	zone := makeR53Resource("/hostedzone/Z006", "other.com", "d555555abcdef8.cloudfront.net")
 	cache := r53Cache(false, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (no matching zone)", result.Count())
+		t.Errorf("Count = %d, want 0 (no zone aliases this distribution)", result.Count())
 	}
 	if len(result.ResourceIDs()) != 0 {
 		t.Errorf("ResourceIDs = %v, want empty (no match)", result.ResourceIDs())
@@ -170,8 +175,8 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E5MNO", []string{"example.com"})
-	zone := makeR53Resource("/hostedzone/Z007", "other.com")
+	res := makeCFResource("E5MNO", "d555555abcdef8.cloudfront.net")
+	zone := makeR53Resource("/hostedzone/Z007", "other.com", "d666666abcdef8.cloudfront.net")
 	cache := r53Cache(true, zone)
 
 	result := checker(context.Background(), nil, res, cache)
@@ -186,49 +191,40 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	}
 }
 
-// TestCheckCfR53_NoAliasesReturnsZero: distribution with no aliases → Count=0.
-func TestCheckCfR53_NoAliasesReturnsZero(t *testing.T) {
+// TestCheckCfR53_NoDomainNameReturnsZero: a row carrying no domain name names
+// nothing an alias record could point at → Count=0.
+func TestCheckCfR53_NoDomainNameReturnsZero(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	zero := int32(0)
-	dist := cftypes.DistributionSummary{
-		Aliases: &cftypes.Aliases{
-			Quantity: &zero,
-			Items:    nil,
-		},
-	}
 	distID := "E6PQR"
-	dist.Id = &distID
 	res := resource.Resource{
 		ID:        distID,
-		RawStruct: dist,
+		RawStruct: cftypes.DistributionSummary{Id: &distID},
 	}
 
-	zone := makeR53Resource("/hostedzone/Z008", "example.com")
+	zone := makeR53Resource("/hostedzone/Z008", "example.com", "d777777abcdef8.cloudfront.net")
 	cache := r53Cache(false, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 for distribution with no aliases", result.Count())
+		t.Errorf("Count = %d, want 0 for a distribution with no domain name", result.Count())
 	}
 }
 
-// TestCheckCfR53_TrailingDotNormalized: zone name "example.com." (with trailing
-// dot, as Route 53 stores it) matches alias "example.com" after normalisation.
+// TestCheckCfR53_TrailingDotNormalized: Route 53 stores an alias target fully
+// qualified, with a trailing dot.
 func TestCheckCfR53_TrailingDotNormalized(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	res := makeCFResource("E7STU", []string{"example.com"})
-	// Zone name has trailing dot — standard Route 53 format.
-	zone := makeR53Resource("/hostedzone/Z009", "example.com.")
+	res := makeCFResource("E7STU", "d888888abcdef8.cloudfront.net")
+	zone := makeR53Resource("/hostedzone/Z009", "example.com.", "d888888abcdef8.cloudfront.net.")
 	cache := r53Cache(false, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 — trailing dot must be normalised before matching;"+
-			" zone.Name=%q, alias=%q", result.Count(), zone.Name, "example.com")
+		t.Errorf("Count = %d, want 1 — a trailing dot must be normalised before matching", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != zone.ID {
 		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs(), zone.ID)

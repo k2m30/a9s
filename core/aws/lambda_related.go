@@ -4,9 +4,12 @@
 package aws
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -216,37 +219,55 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("cfn", ids, truncated)
 }
 
-// checkLambdaECR resolves the ECR repository for container-image Lambda
-// functions. Short-circuits unless Fields["package_type"]=="Image" (set by
-// the lambda fetcher). The image URI is only returned by GetFunction's
-// Code.ImageUri — never by ListFunctions/FunctionConfiguration — so this
-// checker calls GetFunction for this one function (in budget: one call per
-// open Image-package function, per docs/resources/lambda.md).
-func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if res.Fields["package_type"] != "Image" {
-		return resource.ProvenZero("ecr", "res.Fields[package_type]")
+// lambdaRunsImage reports whether the function is packaged as a container
+// image, the packaging that runs an image out of a repository.
+func lambdaRunsImage(res resource.Resource) bool {
+	if pkg := res.Fields["package_type"]; pkg != "" {
+		return pkg == "Image"
 	}
-	fnName := res.ID
-	if fnName == "" {
-		fnName = res.Name
-	}
-	if fnName == "" {
-		return resource.UnknownRelated("ecr")
-	}
+	raw, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	return ok && raw.PackageType == lambdatypes.PackageTypeImage
+}
+
+// lambdaImageURI reads the image URI a container-packaged function runs.
+// Only GetFunction's Code.ImageUri carries it — never
+// ListFunctions/FunctionConfiguration — so it is one call per function.
+func lambdaImageURI(ctx context.Context, clients any, fnName string) (string, error) {
 	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("ecr")
+	if !ok || c == nil || c.Lambda == nil || fnName == "" {
+		return "", errClientMissing
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return c.Lambda.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &fnName})
 	})
 	if err != nil {
+		return "", err
+	}
+	if out == nil || out.Code == nil {
+		return "", nil
+	}
+	return aws.ToString(out.Code.ImageUri), nil
+}
+
+// checkLambdaECR reports the repository this container-packaged function
+// runs an image of (in budget: one call per open Image-package function,
+// per docs/resources/lambda.md).
+func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if !lambdaRunsImage(res) {
+		return resource.ProvenZero("ecr", "the function's package type")
+	}
+	fnName := cmp.Or(res.ID, res.Name)
+	image, err := lambdaImageURI(ctx, clients, fnName)
+	if err != nil {
+		if errors.Is(err, errClientMissing) {
+			return resource.UnknownRelated("ecr")
+		}
 		return resource.ErrorRelated("ecr", err)
 	}
-	if out == nil || out.Code == nil || out.Code.ImageUri == nil || *out.Code.ImageUri == "" {
+	if image == "" {
 		return resource.UnknownRelated("ecr")
 	}
-	return relatedRefs("ecr", []string{*out.Code.ImageUri}, refContext(clients, cache, "ecr"))
+	return ecrWorkloadRepos(ctx, clients, cache, []string{image})
 }
 
 // checkLambdaEBRule finds EventBridge rules that target this Lambda

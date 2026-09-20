@@ -65,6 +65,10 @@ type RelatedDef struct {
 	// NeedsTargetCache (a prefetch flag), and is the single source of truth
 	// for the per-resource docs' "Truncated?" column.
 	Truncated bool
+	// Mirror marks this direction and its reverse as one relationship: both
+	// read the same AWS fact from its two ends, so on any data A lists B
+	// exactly when B lists A. Set on both directions or neither.
+	Mirror bool
 }
 
 // NavigableField associates a detail view field path with a target resource type.

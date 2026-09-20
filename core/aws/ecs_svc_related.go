@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -218,9 +217,8 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("elb", ids, truncatedELB || truncatedTG)
 }
 
-// checkECSSvcLogs searches the logs cache for log groups matching the ECS service's
-// task definition family name.
-// Pattern N — convention: scan cache for log groups containing the task def family name.
+// checkECSSvcLogs reports the log groups the containers of the service's
+// task definition write to.
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
@@ -229,33 +227,11 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		return resource.KnownRelated("logs", nil, false)
 	}
-	taskDefARN := ""
-	if raw.TaskDefinition != nil {
-		taskDefARN = *raw.TaskDefinition
-	}
+	taskDefARN := aws.ToString(raw.TaskDefinition)
 	if taskDefARN == "" {
-		return resource.ProvenZero("logs", "taskDefARN")
+		return resource.ProvenZero("logs", "raw.TaskDefinition")
 	}
-	family := taskDefFamily(taskDefARN)
-	if family == "" {
-		return resource.ProvenZero("logs", "family")
-	}
-
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if err != nil {
-		return resource.ErrorRelated("logs", err)
-	}
-	if logList == nil {
-		return resource.UnknownRelated("logs")
-	}
-
-	var ids []string
-	for _, logRes := range logList {
-		if strings.Contains(logRes.ID, family) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return ecsTaskDefLogGroups(ctx, clients, cache, taskDefARN)
 }
 
 // checkECSSvcSG extracts security group IDs from the ECS Service's

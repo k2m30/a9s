@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `rtb`
 
 - **Why related**: VPC route tables that direct traffic into this TGW — answers "which subnets actually send traffic through here?" (`docs/related-resources.md` § `tgw`).
-- **How discovered**: cross-reference the already-loaded `rtb` list client-side; match `Routes[].TransitGatewayId == this.TransitGatewayId`. Zero extra AWS calls — a9s-devops: this is the standard same-sweep sibling-list pivot used elsewhere (e.g. `subnet` ↔ `rtb`), and rtb's list response does include `Routes[]` with the target-ID fields populated.
+- **How discovered**: cross-reference the already-loaded `rtb` list client-side; match `Routes[].TransitGatewayId == this.TransitGatewayId` on live routes; a blackhole route keeps the stale target id after the attachment is deleted and is not counted. Zero extra AWS calls — a9s-devops: this is the standard same-sweep sibling-list pivot used elsewhere (e.g. `subnet` ↔ `rtb`), and rtb's list response does include `Routes[]` with the target-ID fields populated.
 - **Count shown**: yes.
 
 ### `role`

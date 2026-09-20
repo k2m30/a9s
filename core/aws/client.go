@@ -192,7 +192,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		SNS:              NewCoalescingSNS(sns.NewFromConfig(cfg)),
 		SQS:              sqs.NewFromConfig(cfg),
 		ELBv2:            elbv2.NewFromConfig(cfg),
-		ECS:              ecs.NewFromConfig(cfg),
+		ECS:              NewCoalescingECS(ecs.NewFromConfig(cfg)),
 		CloudFormation:   cloudformation.NewFromConfig(cfg),
 		IAM:              iam.NewFromConfig(cfg),
 		CloudWatchLogs:   cloudwatchlogs.NewFromConfig(cfg),

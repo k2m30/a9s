@@ -7,6 +7,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -198,11 +199,10 @@ func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache r
 		if !ok || dist.Origins == nil {
 			continue
 		}
-		for _, origin := range dist.Origins.Items {
-			if origin.DomainName != nil && *origin.DomainName == dnsName {
-				ids = append(ids, cfRes.ID)
-				break
-			}
+		if slices.ContainsFunc(dist.Origins.Items, func(o cftypes.Origin) bool {
+			return dnsAliasNames(aws.ToString(o.DomainName), dnsName)
+		}) {
+			ids = append(ids, cfRes.ID)
 		}
 	}
 	return relatedResultTrunc("cf", ids, truncated)

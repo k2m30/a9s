@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -118,18 +119,18 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkECSTaskECR reads the ECR repositories of the task's container image
 // URIs. Pattern F — requires Containers[].Image to be populated in Task.
-func checkECSTaskECR(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSTaskECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ecr")
 	}
 	var images []string
 	for _, c := range task.Containers {
-		if c.Image != nil && strings.Contains(*c.Image, ".dkr.ecr.") {
-			images = append(images, *c.Image)
+		if image := aws.ToString(c.Image); image != "" {
+			images = append(images, image)
 		}
 	}
-	return relatedRefs("ecr", images, refContext(clients, cache, "ecr"))
+	return ecrWorkloadRepos(ctx, clients, cache, images)
 }
 
 // checkECSTaskENI extracts ENI IDs from task.Attachments (awsvpc mode). Pattern F.
@@ -165,7 +166,7 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 	if joined == "" {
 		return resource.ProvenZero("secrets", "joined")
 	}
-	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
+	secretList, _, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -173,8 +174,8 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 		return resource.UnknownRelated("secrets")
 	}
 
-	ids, dropped := listedRefs("secrets", strings.Split(joined, ","), refContext(clients, cache, "secrets"), secretList)
-	return relatedResultTrunc("secrets", ids, truncated || dropped)
+	ids, lowerBound := listedRefs("secrets", strings.Split(joined, ","), refContext(clients, cache, "secrets"), secretList)
+	return relatedResultTrunc("secrets", ids, lowerBound)
 }
 
 // checkECSTaskSSM reads Fields["ssm_param_names"] (a comma-joined list of SSM

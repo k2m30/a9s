@@ -824,4 +824,5 @@ var reverseScanExpectsUnknown = map[string]string{
 	"ecs-svc→vpc":      "reads the subnet list to find the VPC the service's awsvpc subnets sit in",
 	"secrets→eb":       "describes each environment's config through a live client to see which resolves this secret",
 	"secrets→ecs-task": "describes each task definition through a live client to see which reads this secret",
+	"ecs-svc→ecr":      "describes the service's task definition through a live client to read the images it runs",
 }

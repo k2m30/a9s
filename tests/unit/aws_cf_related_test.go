@@ -421,10 +421,10 @@ func TestRelated_CF_ACM_NilCache(t *testing.T) {
 	}
 }
 
-// --- checkCfR53 tests (cache-only zone-name suffix match) ---
+// --- checkCfR53 tests (the zones whose alias records target this distribution) ---
 
-// TestRelated_CF_R53_NoAliasesReturnsZero: distribution without any alias
-// domains has no possible zone match — returns Count: 0 (definitive).
+// TestRelated_CF_R53_NoAliasesReturnsZero: a row carrying no domain name
+// names nothing an alias record could target — returns Count: 0 (definitive).
 func TestRelated_CF_R53_NoAliasesReturnsZero(t *testing.T) {
 	res := resource.Resource{
 		ID:     "E1A2B3C4D5E6F7",
@@ -433,7 +433,7 @@ func TestRelated_CF_R53_NoAliasesReturnsZero(t *testing.T) {
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (distribution has no aliases — nothing to match)", result.Count())
+		t.Errorf("Count = %d, want 0 (distribution has no domain name — nothing to match)", result.Count())
 	}
 	if result.TargetType() != "r53" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "r53")
@@ -450,15 +450,18 @@ func TestRelated_CF_R53_EmptyInput(t *testing.T) {
 	}
 }
 
-// --- checkCfR53: zone suffix match from RawStruct aliases ---
+// --- checkCfR53: the distribution's domain name from RawStruct ---
 
-// TestRelated_CF_R53_MatchByRawStructAlias: distribution with alias "www.example.com"
-// matches zone "example.com." (suffix match after normalization).
-func TestRelated_CF_R53_MatchByRawStructAlias(t *testing.T) {
+// TestRelated_CF_R53_MatchByRawStructDomainName: a zone whose alias record
+// targets this distribution's own domain name serves it.
+func TestRelated_CF_R53_MatchByRawStructDomainName(t *testing.T) {
 	zoneRes := resource.Resource{
-		ID:     "/hostedzone/Z123456ABCDEF",
-		Name:   "example.com.",
-		Fields: map[string]string{"name": "example.com."},
+		ID:   "/hostedzone/Z123456ABCDEF",
+		Name: "example.com.",
+		Fields: map[string]string{
+			"name":          "example.com.",
+			"alias_targets": "d111111abcdef8.cloudfront.net.",
+		},
 	}
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{Resources: []resource.Resource{zoneRes}},
@@ -468,10 +471,7 @@ func TestRelated_CF_R53_MatchByRawStructAlias(t *testing.T) {
 		ID:     "E1A2B3C4D5E6F7",
 		Fields: map[string]string{},
 		RawStruct: cftypes.DistributionSummary{
-			Aliases: &cftypes.Aliases{
-				Items:    []string{"www.example.com"},
-				Quantity: aws.Int32(1),
-			},
+			DomainName: aws.String("d111111abcdef8.cloudfront.net"),
 		},
 	}
 
@@ -486,22 +486,24 @@ func TestRelated_CF_R53_MatchByRawStructAlias(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_R53_MatchByFieldsFallback: distribution with no RawStruct but
-// aliases in Fields["aliases"] (comma-joined) still produces a zone match.
+// TestRelated_CF_R53_MatchByFieldsFallback: a row restored from the disk
+// cache carries its domain name in Fields and answers as a fresh one does.
 func TestRelated_CF_R53_MatchByFieldsFallback(t *testing.T) {
 	zoneRes := resource.Resource{
-		ID:     "/hostedzone/ZFALLBACK",
-		Name:   "fallback.io",
-		Fields: map[string]string{"name": "fallback.io"},
+		ID:   "/hostedzone/ZFALLBACK",
+		Name: "fallback.io",
+		Fields: map[string]string{
+			"name":          "fallback.io",
+			"alias_targets": "dfallback1234.cloudfront.net",
+		},
 	}
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{Resources: []resource.Resource{zoneRes}},
 	}
 
-	// No RawStruct — fallback to Fields["aliases"].
 	res := resource.Resource{
 		ID:     "EFALLBACK123",
-		Fields: map[string]string{"aliases": "app.fallback.io, www.fallback.io"},
+		Fields: map[string]string{"domain_name": "dfallback1234.cloudfront.net"},
 	}
 
 	checker := cfCheckerByTarget(t, "r53")
@@ -515,33 +517,33 @@ func TestRelated_CF_R53_MatchByFieldsFallback(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_R53_NilCacheWithAliases: aliases present but nil zone cache → State: RelatedUnknown.
-func TestRelated_CF_R53_NilCacheWithAliases(t *testing.T) {
+// TestRelated_CF_R53_NilCacheWithDomainName: no zone list read → State: RelatedUnknown.
+func TestRelated_CF_R53_NilCacheWithDomainName(t *testing.T) {
 	res := resource.Resource{
 		ID:     "E1A2B3C4D5E6F7",
 		Fields: map[string]string{},
 		RawStruct: cftypes.DistributionSummary{
-			Aliases: &cftypes.Aliases{
-				Items:    []string{"www.example.com"},
-				Quantity: aws.Int32(1),
-			},
+			DomainName: aws.String("d111111abcdef8.cloudfront.net"),
 		},
 	}
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (aliases present but nil zone cache)", result.Count())
+		t.Errorf("Count = %d, want -1 (no zone list was read)", result.Count())
 	}
 }
 
-// TestRelated_CF_R53_TruncatedCacheNoMatch: truncated zone cache, alias doesn't
-// match any loaded zone → TruncatedResult.
+// TestRelated_CF_R53_TruncatedCacheNoMatch: truncated zone cache, no loaded
+// zone aliases this distribution → TruncatedResult.
 func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 	zoneRes := resource.Resource{
-		ID:     "/hostedzone/ZOTHER",
-		Name:   "other.net",
-		Fields: map[string]string{"name": "other.net"},
+		ID:   "/hostedzone/ZOTHER",
+		Name: "other.net",
+		Fields: map[string]string{
+			"name":          "other.net",
+			"alias_targets": "dother0000000.cloudfront.net",
+		},
 	}
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
@@ -554,10 +556,7 @@ func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 		ID:     "ETRUNC123",
 		Fields: map[string]string{},
 		RawStruct: cftypes.DistributionSummary{
-			Aliases: &cftypes.Aliases{
-				Items:    []string{"www.example.com"},
-				Quantity: aws.Int32(1),
-			},
+			DomainName: aws.String("dtrunc0000000.cloudfront.net"),
 		},
 	}
 
@@ -568,12 +567,13 @@ func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_R53_ExactMatch: alias equals zone name exactly (no subdomain).
-func TestRelated_CF_R53_ExactMatch(t *testing.T) {
+// TestRelated_CF_R53_ZoneWithoutAliasRecords: a zone that aliases nothing
+// serves no distribution.
+func TestRelated_CF_R53_ZoneWithoutAliasRecords(t *testing.T) {
 	zoneRes := resource.Resource{
 		ID:     "/hostedzone/ZEXACT",
 		Name:   "example.com",
-		Fields: map[string]string{"name": "example.com"},
+		Fields: map[string]string{"name": "example.com", "alias_targets": ""},
 	}
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{Resources: []resource.Resource{zoneRes}},
@@ -583,17 +583,14 @@ func TestRelated_CF_R53_ExactMatch(t *testing.T) {
 		ID:     "EEXACT456",
 		Fields: map[string]string{},
 		RawStruct: cftypes.DistributionSummary{
-			Aliases: &cftypes.Aliases{
-				Items:    []string{"example.com"},
-				Quantity: aws.Int32(1),
-			},
+			DomainName: aws.String("dexact0000000.cloudfront.net"),
 		},
 	}
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (exact alias == zone name)", result.Count())
+	if result.Count() != 0 {
+		t.Errorf("Count = %d, want 0 (the zone has no alias record)", result.Count())
 	}
 }
 

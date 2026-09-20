@@ -5,7 +5,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,14 +12,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 )
-
-// ssmSensitiveSuffixes is the set of name suffixes colorSSM treats as
-// sensitive when found on a plaintext (String) parameter.
-var ssmSensitiveSuffixes = []string{ //nolint:gochecknoglobals // static catalog: intentional package-level var
-	"_password", "_secret", "_token", "_apikey",
-	"_api_key", "_credentials", "_passwd",
-}
 
 // ssmCodePlaintextSensitive is the canonical FindingCode for a String-type
 // parameter whose name suggests it holds a credential, stored unencrypted.
@@ -67,14 +60,7 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			description = *param.Description
 		}
 
-		risk := ""
-		lowerName := strings.ToLower(paramName)
-		if paramType == "SecureString" && param.LastModifiedDate != nil && time.Since(*param.LastModifiedDate) > 365*24*time.Hour {
-			risk = riskStaleValue
-		} else if paramType == "String" && (strings.Contains(lowerName, "/password") || strings.Contains(lowerName, "/secret") || strings.Contains(lowerName, "/token")) {
-			risk = riskPlaintextValue
-		}
-
+		findings := ssmColorFindings(paramName, paramType, param.LastModifiedDate)
 		r := resource.Resource{
 			ID:   paramName,
 			Name: paramName,
@@ -84,9 +70,9 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 				"version":       version,
 				"last_modified": lastModified,
 				"description":   description,
-				"risk":          risk,
+				"risk":          ssmRiskWord(findings),
 			},
-			Findings:  ssmColorFindings(paramName, paramType, param.LastModifiedDate),
+			Findings:  findings,
 			RawStruct: param,
 		}
 
@@ -116,23 +102,38 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 	}, nil
 }
 
-// ssmColorFindings mirrors colorSSM's own precedence (plaintext-sensitive
-// String parameter wins first, then a stale last-modified date on any type)
-// so the list Status cell / detail Attention block always explain the
-// non-healthy color.
+// ssmColorFindings is the one judgment of a parameter: an unencrypted value
+// whose name says it holds a credential first, then a value nothing has
+// changed in over a year, whatever its type. The Status cell, the row colour
+// and the Attention block all read it. A parameter's path is the name over
+// its value, so the name says "credential" here exactly when it says so on
+// an environment variable or a task definition — secretscan's key rule.
 func ssmColorFindings(paramName, paramType string, lastModifiedDate *time.Time) []domain.Finding {
-	name := strings.ToLower(paramName)
-	if paramType == "String" {
-		for _, suffix := range ssmSensitiveSuffixes {
-			if strings.HasSuffix(name, suffix) {
-				return []domain.Finding{wave1Finding(ssmCodePlaintextSensitive)}
-			}
-		}
+	if paramType == "String" && secretscan.KeyNamesCredential(paramName) {
+		return []domain.Finding{wave1Finding(ssmCodePlaintextSensitive)}
 	}
 	if lastModifiedDate != nil && time.Since(*lastModifiedDate) > 365*24*time.Hour {
 		return []domain.Finding{wave1Finding(ssmCodeStaleValue)}
 	}
 	return nil
+}
+
+// ssmRiskWord is the Status column's word for what ssmColorFindings found,
+// the one the risk vocabulary (risk_column.go) spells for an operator. It is
+// what a row rebuilt from its cached Fields shows, having no findings of its
+// own to word.
+func ssmRiskWord(findings []domain.Finding) string {
+	top, ok := domain.TopFinding(findings)
+	if !ok {
+		return ""
+	}
+	switch top.Code {
+	case ssmCodePlaintextSensitive:
+		return riskPlaintextValue
+	case ssmCodeStaleValue:
+		return riskStaleValue
+	}
+	return ""
 }
 
 // RevealSSMParameter calls the SSM GetParameter API with decryption enabled

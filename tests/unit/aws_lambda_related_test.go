@@ -242,7 +242,7 @@ func TestRelated_Lambda_ECR_Match(t *testing.T) {
 	}
 	cache := resource.ResourceCache{
 		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: "my-ecr-repo", Name: "my-ecr-repo"},
+			{ID: "my-ecr-repo", Name: "my-ecr-repo", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo"}},
 		}},
 	}
 	fake := &fakeLambdaGetFunctionAPI{
@@ -336,7 +336,7 @@ func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
 	}
 	cache := resource.ResourceCache{
 		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: "my-ecr-repo", Name: "my-ecr-repo"},
+			{ID: "my-ecr-repo", Name: "my-ecr-repo", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo"}},
 		}},
 	}
 	fake := &fakeLambdaGetFunctionAPI{

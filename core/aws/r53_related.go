@@ -84,14 +84,9 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(aliases) == 0 {
 		return relatedResultTrunc("elb", nil, recordsTruncated)
 	}
-	// Only alias records pointing at "*.elb.amazonaws.com" are ELB aliases.
-	wanted := make(map[string]struct{})
-	for _, d := range aliases {
-		if strings.Contains(d, ".elb.amazonaws.com") {
-			wanted[d] = struct{}{}
-		}
-	}
-	if len(wanted) == 0 {
+	// Paging the load balancer list costs a call: a zone that aliases no
+	// load balancer at all never needs it.
+	if !slices.ContainsFunc(aliases, maybeELBDNS) {
 		return relatedResultTrunc("elb", nil, recordsTruncated)
 	}
 	elbList, elbTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
@@ -106,16 +101,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	var ids []string
 	for _, elbRes := range elbList {
-		dns := canonicalDNS(elbRes.Fields["dns_name"])
-		// ELB DNS names also may be prefixed with "dualstack." in alias form.
-		if dns == "" {
-			continue
-		}
-		if _, found := wanted[dns]; found {
-			ids = append(ids, elbRes.ID)
-			continue
-		}
-		if _, found := wanted["dualstack."+dns]; found {
+		if slices.ContainsFunc(aliases, func(d string) bool { return dnsAliasNames(d, elbRes.Fields["dns_name"]) }) {
 			ids = append(ids, elbRes.ID)
 		}
 	}
@@ -141,13 +127,9 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	if len(aliases) == 0 {
 		return relatedResultTrunc("cf", nil, recordsTruncated)
 	}
-	wanted := make(map[string]struct{})
-	for _, d := range aliases {
-		if strings.Contains(d, ".cloudfront.net") {
-			wanted[d] = struct{}{}
-		}
-	}
-	if len(wanted) == 0 {
+	// A distribution answers under <id>.cloudfront.net; a zone that aliases
+	// none never needs the distribution list paged.
+	if !slices.ContainsFunc(aliases, func(d string) bool { return strings.Contains(d, ".cloudfront.net") }) {
 		return relatedResultTrunc("cf", nil, recordsTruncated)
 	}
 	cfList, cfTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
@@ -162,11 +144,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	var ids []string
 	for _, cfRes := range cfList {
-		dn := canonicalDNS(cfRes.Fields["domain_name"])
-		if dn == "" {
-			continue
-		}
-		if _, found := wanted[dn]; found {
+		if slices.ContainsFunc(aliases, func(d string) bool { return dnsAliasNames(d, cfRes.Fields["domain_name"]) }) {
 			ids = append(ids, cfRes.ID)
 		}
 	}
@@ -197,7 +175,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if len(apiIDs) == 0 {
 		return relatedResultTrunc("apigw", nil, recordsTruncated)
 	}
-	apigwList, apigwTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
+	apigwList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
 	if apigwList == nil {
 		if fetchErr != nil {
 			return resource.ErrorRelated("apigw", fetchErr)
@@ -207,8 +185,8 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 		// offer the operator a row that navigates to nothing.
 		return resource.UnknownRelated("apigw")
 	}
-	ids, dropped := listedRefs("apigw", apiIDs, refContext(clients, cache, "apigw"), apigwList)
-	return r53RelatedResult("apigw", ids, recordsTruncated || dropped, apigwTruncated)
+	ids, lowerBound := listedRefs("apigw", apiIDs, refContext(clients, cache, "apigw"), apigwList)
+	return relatedResultTrunc("apigw", ids, recordsTruncated || lowerBound)
 }
 
 // checkR53S3 reports the S3 buckets this zone's S3-website alias records
@@ -338,7 +316,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return relatedResultTrunc("logs", nil, !configsComplete)
 	}
 
-	logList, logsTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
+	logList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
 	if logList == nil {
 		if fetchErr != nil {
 			return resource.ErrorRelated("logs", fetchErr)
@@ -355,8 +333,8 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 			arns = append(arns, *cfg.CloudWatchLogsLogGroupArn)
 		}
 	}
-	ids, dropped := listedRefs("logs", arns, refContext(clients, cache, "logs"), logList)
-	return r53RelatedResult("logs", ids, dropped || !configsComplete, logsTruncated)
+	ids, lowerBound := listedRefs("logs", arns, refContext(clients, cache, "logs"), logList)
+	return relatedResultTrunc("logs", ids, lowerBound || !configsComplete)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.

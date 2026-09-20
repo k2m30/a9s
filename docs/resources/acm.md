@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `apigw`,
 ### `r53`
 
 - **Why related**: Route 53 hosted zone that owns the certificate's domain — the zone where DNS validation records live and where the operator looks when validation stalls.
-- **How discovered**: read `CertificateSummary.DomainName` on the resource; cross-reference the already-loaded `r53` list by hosted-zone `Name` using longest-suffix match (e.g. cert `*.api.example.com` pivots to zone `example.com` if `api.example.com` is not itself a zone) — a9s-devops: ACM surfaces the domain but not the owning zone; suffix matching against loaded hosted zones is the idiomatic pivot and requires no extra API call. For certificates with DNS validation, `DomainValidationOptions[].ResourceRecord.Name` from the describe response is a more precise hint when multiple zones could match.
+- **How discovered**: call `DescribeCertificate` and read each `DomainValidationOptions[].ResourceRecord.Name`; the zone that holds it is the innermost public zone whose name is that record's own name or its parent at a label boundary — `app.notexample.com` ends in the characters of `example.com` while being a name in another domain. A private zone is never the answer, since ACM validates a public certificate against public DNS. — a9s-devops: ACM surfaces the validation record but not the owning zone; matching it against loaded hosted zones requires no extra API call.
 - **Count shown**: yes (typically 1).
 
 ### `ct-events`

@@ -9,6 +9,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -151,27 +152,29 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("ecs-task", ids, truncated)
 }
 
-// checkECSLogs scans the logs cache for log groups associated with this
-// cluster's task definitions. ECS convention uses /ecs/{family}; with no
-// concrete family we match any log group whose ID contains the cluster name
-// as a substring (weak signal).
+// checkECSLogs reports the log group this cluster's ecs exec session
+// transcripts are written to, the one log group a Cluster names:
+// Configuration.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName.
+// A cluster that sends its sessions nowhere names none.
 func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
-		return resource.ProvenZero("logs", "clusterName")
+	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if !ok {
+		return resource.UnknownRelated("logs")
 	}
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
+	group := ""
+	if cfg := cluster.Configuration; cfg != nil && cfg.ExecuteCommandConfiguration != nil && cfg.ExecuteCommandConfiguration.LogConfiguration != nil {
+		group = aws.ToString(cfg.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName)
+	}
+	if group == "" {
+		return resource.ProvenZero("logs", "the cluster's exec-command log configuration")
+	}
+	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.UnknownRelated("logs")
 	}
-	var ids []string
-	for _, logRes := range logList {
-		if strings.Contains(logRes.ID, clusterName) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	ids, lowerBound := listedRefs("logs", []string{group}, refContext(clients, cache, "logs"), logList)
+	return relatedResultTrunc("logs", ids, lowerBound)
 }

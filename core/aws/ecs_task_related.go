@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -36,41 +37,18 @@ func checkECSTaskCluster(_ context.Context, clients any, res resource.Resource, 
 	return relatedRefs("ecs", []string{cluster}, refContext(clients, cache, "ecs"))
 }
 
-// checkECSTaskLogs searches the logs cache for log groups matching the task's
-// task definition family name.
-// Pattern N — convention: scan cache for log groups containing the task def family name.
+// checkECSTaskLogs reports the log groups the containers of the task's
+// task definition write to.
 func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
 	}
-	taskDefARN := ""
-	if raw.TaskDefinitionArn != nil {
-		taskDefARN = *raw.TaskDefinitionArn
-	}
+	taskDefARN := aws.ToString(raw.TaskDefinitionArn)
 	if taskDefARN == "" {
-		return resource.ProvenZero("logs", "taskDefARN")
+		return resource.ProvenZero("logs", "raw.TaskDefinitionArn")
 	}
-	family := taskDefFamily(taskDefARN)
-	if family == "" {
-		return resource.ProvenZero("logs", "family")
-	}
-
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if err != nil {
-		return resource.ErrorRelated("logs", err)
-	}
-	if logList == nil {
-		return resource.UnknownRelated("logs")
-	}
-
-	var ids []string
-	for _, logRes := range logList {
-		if strings.Contains(logRes.ID, family) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return ecsTaskDefLogGroups(ctx, clients, cache, taskDefARN)
 }
 
 // checkECSTaskRole returns the IAM role(s) associated with this ECS task:
@@ -94,13 +72,13 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("role", "arns")
 	}
 
-	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
+	roleList, _, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
 		return resource.UnknownRelated("role")
 	}
-	ids, dropped := listedRefs("role", arns, refContext(clients, cache, "role"), roleList)
-	return relatedResultTrunc("role", ids, truncated || dropped)
+	ids, lowerBound := listedRefs("role", arns, refContext(clients, cache, "role"), roleList)
+	return relatedResultTrunc("role", ids, lowerBound)
 }

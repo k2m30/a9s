@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -27,21 +26,14 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 	if api == nil || lt == nil || lt.Id == nil {
 		return "", nil
 	}
-	version := "$Default"
-	if lt.Version != nil && *lt.Version != "" {
-		version = *lt.Version
-	}
-	out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-		LaunchTemplateId: lt.Id,
-		Versions:         []string{version},
-	})
+	versions, err := launchTemplateVersions(ctx, api, lt.Id, lt.Version)
 	if err != nil {
 		return "", err
 	}
-	if out == nil || len(out.LaunchTemplateVersions) == 0 {
+	if len(versions) == 0 {
 		return "", UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "launch template version"}
 	}
-	data := out.LaunchTemplateVersions[0].LaunchTemplateData
+	data := versions[0].LaunchTemplateData
 	// no finding: the version was read and declares no image, which is an
 	// answer — the node group inherits the EKS-optimised default.
 	if data == nil || data.ImageId == nil {

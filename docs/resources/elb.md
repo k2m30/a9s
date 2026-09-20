@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `cf`
 
 - **Why related**: ALB as CloudFront origin — the LB may be fronted by a CDN, which changes the blast radius when it is unhealthy.
-- **How discovered**: cross-reference the already-loaded `cf` list by `Origins.Items[].DomainName` matching this LB's `DNSName`. — a9s-devops: possible=yes, worth=yes. CloudFront `Distribution.Origins.Items[].DomainName` holds a fully-qualified DNS name; the a9s `cf` list already includes origin data per the `cf` contract row pointing at `elb`.
+- **How discovered**: cross-reference the already-loaded `cf` list by `Origins.Items[].DomainName` matching this LB's `DNSName`, case-folded, whatever the load balancer's kind. — a9s-devops: possible=yes, worth=yes. CloudFront `Distribution.Origins.Items[].DomainName` holds a fully-qualified DNS name; the a9s `cf` list already includes origin data per the `cf` contract row pointing at `elb`.
 - **Count shown**: yes.
 
 ### `cfn`

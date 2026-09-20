@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ecr`
 
 - **Why related**: Container images the service's tasks pull — upstream supply chain for every task launched by this service.
-- **How discovered**: resolve `Service.TaskDefinition` → `DescribeTaskDefinition` → `ContainerDefinitions[].Image`; parse ECR URIs of shape `<acct>.dkr.ecr.<region>.amazonaws.com/<repo>[:tag|@digest]`; cross-reference the already-loaded `ecr` list by `Repository.repositoryName` — a9s-devops-persona: the task definition is the only place that names the images, and `DescribeTaskDefinition` is one call per distinct `TaskDefinition` ARN (often one per service). Worth it because operators routinely pivot from a failing service to "is the image still there? when was it pushed?".
+- **How discovered**: resolve `Service.TaskDefinition` → `DescribeTaskDefinition` → `ContainerDefinitions[].Image`; match each image against the loaded `ecr` rows' own `RepositoryUri`, registry host and repository path both equal, with the `:tag` or `@digest` after them naming an image inside the repository — a9s-devops-persona: the task definition is the only place that names the images, and `DescribeTaskDefinition` is one call per distinct `TaskDefinition` ARN (often one per service). Worth it because operators routinely pivot from a failing service to "is the image still there? when was it pushed?".
 - **Count shown**: yes.
 
 ### `ecs`
@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: CloudWatch Log Groups receiving container stdout/stderr — primary runtime diagnostic for task failures.
-- **How discovered**: resolve `Service.TaskDefinition` → `DescribeTaskDefinition` → `ContainerDefinitions[].LogConfiguration` where `LogDriver == "awslogs"`; extract `Options["awslogs-group"]`; cross-reference the already-loaded `logs` list by `logGroupName` — a9s-devops-persona: awslogs is the overwhelmingly common driver for ECS; `Options["awslogs-group"]` names the log group directly. Re-uses the same `DescribeTaskDefinition` call made for `ecr` discovery.
+- **How discovered**: resolve `Service.TaskDefinition` → `DescribeTaskDefinition` → `ContainerDefinitions[].LogConfiguration` where `LogDriver == "awslogs"`; extract `Options["awslogs-group"]`; cross-reference the already-loaded `logs` list by `logGroupName`. A definition that cannot be read (the call refused, or no ECS client) proves nothing either way, so the row falls back to the log groups whose name carries the family, as candidates without a count — a9s-devops-persona: awslogs is the overwhelmingly common driver for ECS; `Options["awslogs-group"]` names the log group directly.
 - **Count shown**: yes.
 
 ### `role`
@@ -296,7 +296,7 @@ ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and
 | cfn | CloudFormation Stacks | yes |
 | ct-events | CloudTrail Events | yes |
 | eb-rule | EventBridge Rules | yes |
-| ecr | ECR Repositories | no |
+| ecr | ECR Repositories | yes |
 | ecs-task | ECS Tasks | yes |
 | secrets | Secrets | no |
 | sfn | Step Functions | yes |

@@ -616,7 +616,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup, NeedsTargetCache: true, Truncated: true},

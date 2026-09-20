@@ -14,7 +14,7 @@ Every row is exactly one of these. `(?)` is never shown.
 | Row shows | Meaning | Enter |
 |-----------|---------|-------|
 | `Name (N)` | Found N (complete scan). | opens the N targets (N=1 → straight to its detail) |
-| `Name (N+)` / `Name (0+)` | Found N so far, the target list is **truncated** — more may exist. | opens the found targets / population; the list shows "m for more" |
+| `Name (N+)` / `Name (0+)` | Found N so far, and a row of this relationship may be missing — the target list is **truncated**, or a reference the source names produced no row. | opens the found targets / population; the list shows "m for more" |
 | `Name (0)` dimmed | Complete search, found nothing — a proven zero. | — (dead end, cursor skips) |
 | `Name` (no count) | Couldn't count (Unknown), nothing was searched (no discovery path, or nothing to search with), heuristic candidates, or navigates via a server-side filter (Deferred). | drills in |
 | `Name —` dimmed | The check errored. | — (dead end); the error shows in the error window + `!` log, **Ctrl+R** retries |
@@ -84,6 +84,18 @@ Reverse-scan checkers set the truncation flag through
 `relatedResultTrunc(target, ids, truncated)`, which carries it uniformly for any
 count (so a truncated scan that found 10 shows `(10+)`, and one that found 0
 shows `(0+)` — same path).
+
+A checker whose source names the rows — a task definition naming its log
+groups, a task naming its roles, a secret naming its rotation function — reads
+its references through `listedRefs`, and there the references are a closed set:
+a page of the target list nobody read can hold more rows of that type, but none
+this source named. Such a pivot reports an exact count as soon as every named
+reference produced a row, however far the target list was read, and a lower
+bound whenever one produced none — the reference was unreadable, or its row
+sits on a page nobody read. The resolvers are syntactic, so a bare name and an
+ARN of an account the session has not learned yet both resolve without proving
+the row is there; `listedRefs` therefore reports the bound, and the caller
+folds in only the truncation of its own source.
 
 ---
 

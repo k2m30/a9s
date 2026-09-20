@@ -124,22 +124,23 @@ func TestRelated_VpcPeer_GraphRootRTBCount(t *testing.T) {
 	}
 }
 
-// A blackholed route reference still counts as "who routes into this
-// tunnel" for the related PANEL — the panel answers a structural question
-// (does a route reference this pcx), distinct from the enrichment layer's
-// health judgment (is that route usable). WarnPeerBlackholeID's one
-// referencing route (rtb-0ddd444444444444d) must still be counted.
-func TestRelated_VpcPeer_RTB_BlackholedRouteStillCounted(t *testing.T) {
+// A blackhole route carries no traffic: AWS leaves the pcx- id on the route
+// after the connection is gone, so the route names no path to the peer and
+// the table it sits in does not route there. WarnPeerBlackholeID's only
+// referencing route (rtb-0ddd444444444444d) is blackhole, so the row is a
+// resolved zero — the same rule the igw, NAT and transit-gateway route
+// pivots read.
+func TestRelated_VpcPeer_RTB_BlackholedRouteIsNoPath(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.WarnPeerBlackholeID)
 	cache := vpcPeerRTBCache(t)
 
 	checker := checkerByTarget(t, "vpc-peer", "rtb")
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count() != 1 {
-		t.Fatalf("Count = %d, want 1 (a blackholed route is still a route reference)", result.Count())
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want RelatedResolved", result.State())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "rtb-0ddd444444444444d" {
-		t.Errorf("ResourceIDs = %v, want [rtb-0ddd444444444444d]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 0 {
+		t.Errorf("ResourceIDs = %v, want none", result.ResourceIDs())
 	}
 }
 

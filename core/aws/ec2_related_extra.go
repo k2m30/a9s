@@ -6,7 +6,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -99,29 +98,10 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("kms", ids, truncated || lowerBound)
 }
 
-// checkEC2Logs searches the logs cache for log groups matching this EC2
-// instance. Convention: CloudWatch Agent writes to /aws/ec2/{instance-id}.
-// Pattern N — scan logs cache for groups containing the instance ID.
+// checkEC2Logs offers the log groups whose name carries this instance's id,
+// the CloudWatch agent's convention (/aws/ec2/{instance-id}).
 func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	instanceID := res.ID
-	if instanceID == "" {
-		return resource.ProvenZero("logs", "instanceID")
-	}
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if err != nil {
-		return resource.ErrorRelated("logs", err)
-	}
-	if logList == nil {
-		return resource.UnknownRelated("logs")
-	}
-
-	var ids []string
-	for _, logRes := range logList {
-		if strings.Contains(logRes.ID, instanceID) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return logGroupsNaming(ctx, clients, cache, res.ID)
 }
 
 // checkEC2Backup scans the backup cache for backup plans that cover this

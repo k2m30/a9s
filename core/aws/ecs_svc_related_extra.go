@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -258,11 +259,11 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cac
 
 	var images []string
 	for _, cd := range out.TaskDefinition.ContainerDefinitions {
-		if cd.Image != nil && strings.Contains(*cd.Image, ".dkr.ecr.") {
-			images = append(images, *cd.Image)
+		if image := aws.ToString(cd.Image); image != "" {
+			images = append(images, image)
 		}
 	}
-	return relatedRefs("ecr", images, refContext(clients, cache, "ecr"))
+	return ecrWorkloadRepos(ctx, clients, cache, images)
 }
 
 // checkECSSvcSecrets resolves Secrets Manager secrets referenced by this ECS service.

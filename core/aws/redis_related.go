@@ -408,7 +408,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 
-	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
+	snsList, _, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -416,14 +416,8 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("sns")
 	}
 
-	ids, dropped := listedRefs("sns", []string{topicARN}, refContext(clients, cache, "sns"), snsList)
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("sns", nil, true)
-	}
-	if truncated {
-		return truncatedResultRedis("sns", ids)
-	}
-	return relatedResultTrunc("sns", ids, dropped)
+	ids, lowerBound := listedRefs("sns", []string{topicARN}, refContext(clients, cache, "sns"), snsList)
+	return relatedResultTrunc("sns", ids, lowerBound)
 }
 
 // checkRedisSubnet resolves the subnets for the replication group by calling

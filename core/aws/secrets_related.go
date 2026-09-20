@@ -44,7 +44,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.ProvenZero("lambda", "secret.RotationLambdaARN")
 	}
-	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
+	lambdaList, _, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -52,8 +52,8 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("lambda")
 	}
 
-	ids, dropped := listedRefs("lambda", []string{*secret.RotationLambdaARN}, refContext(clients, cache, "lambda"), lambdaList)
-	return relatedResultTrunc("lambda", ids, truncated || dropped)
+	ids, lowerBound := listedRefs("lambda", []string{*secret.RotationLambdaARN}, refContext(clients, cache, "lambda"), lambdaList)
+	return relatedResultTrunc("lambda", ids, lowerBound)
 }
 
 // checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name

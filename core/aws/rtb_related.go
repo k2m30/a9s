@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"slices"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -44,16 +43,10 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("nat", nil, false)
 	}
-	// RouteTable.Routes[].NatGatewayId are the referenced NAT gateways.
-	// Skip blackhole routes — AWS leaves the stale target id on a route after the
-	// NAT is deleted, so counting it would advertise an unopenable target.
 	var ids []string
 	for _, route := range rtb.Routes {
-		if route.State == ec2types.RouteStateBlackhole {
-			continue
-		}
-		if route.NatGatewayId != nil && *route.NatGatewayId != "" {
-			ids = append(ids, *route.NatGatewayId)
+		if id := routeGatewayTarget(route, "nat"); id != "" {
+			ids = append(ids, id)
 		}
 	}
 	return relatedResultTrunc("nat", ids, false)
@@ -69,15 +62,10 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("igw", nil, false)
 	}
-	// RouteTable.Routes[].GatewayId with the igw- prefix are the IGWs.
-	// Skip blackhole routes — the target id is stale once the gateway is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
-		if route.State == ec2types.RouteStateBlackhole {
-			continue
-		}
-		if route.GatewayId != nil && strings.HasPrefix(*route.GatewayId, "igw-") {
-			ids = append(ids, *route.GatewayId)
+		if id := routeGatewayTarget(route, "igw"); id != "" {
+			ids = append(ids, id)
 		}
 	}
 	return relatedResultTrunc("igw", ids, false)
@@ -167,15 +155,10 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("tgw", nil, false)
 	}
-	// RouteTable.Routes[].TransitGatewayId are the referenced TGWs.
-	// Skip blackhole routes — the target id is stale once the TGW is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
-		if route.State == ec2types.RouteStateBlackhole {
-			continue
-		}
-		if route.TransitGatewayId != nil && *route.TransitGatewayId != "" {
-			ids = append(ids, *route.TransitGatewayId)
+		if id := routeGatewayTarget(route, "tgw"); id != "" {
+			ids = append(ids, id)
 		}
 	}
 	return relatedResultTrunc("tgw", ids, false)

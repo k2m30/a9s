@@ -9,6 +9,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An ECS service's and task's Log Groups row now names the groups their
+  containers actually write to — the `awslogs-group` of the task definition,
+  read once per family — instead of every group whose name happened to carry
+  the family's. An ECS cluster's row names the one log group a cluster has of
+  its own, where its `ecs exec` session transcripts are written, and reads
+  `(0)` for a cluster that sends them nowhere.
+- A related row whose resource names its own neighbours now counts them
+  exactly, instead of adding a `+` because the account holds more resources of
+  that type than one page. A service's or task's log groups, a task's roles, a
+  secret's rotation function, a build project's artifact buckets, a
+  distribution's origin buckets, a cluster's cache alarm topic, a bucket's
+  policy roles, a zone's APIs and query-log groups: the resource names them, so
+  an unread page can hold more rows of that type but none of this resource's.
+  The `+` stays where a named neighbour produced no row — it is on an unread
+  page, or in an account the session cannot see — and a build project's
+  artifact buckets now say so instead of always reading as exact.
+- Opening an ECS service or task reads its task definition once, however many
+  rows of that screen are answered from it. On a throttled account the rows no
+  longer each spend their own retry budget on the same call, and every row
+  reading that definition — the images, the log groups, the secrets — answers
+  from the same read, so they cannot disagree about what the workload runs.
+- A related row no longer counts what it only guessed. An EC2 instance's log
+  groups and the API Gateways of a function are matched on a name an operator
+  chose, so they are offered as candidates — the row lists them and navigates,
+  without a number that says they were found to belong to the resource. What
+  binds them is written where no list response reaches: a CloudWatch agent's
+  configuration, an API's integrations. An ECS service or task whose
+  definition cannot be read falls back to the same candidate row.
+- A queue and its dead-letter queue no longer share each other's SNS
+  subscriptions and topics: a subscription delivers to the queue whose ARN is
+  its endpoint, whole, and `…:orders` is the prefix of `…:orders-dlq`.
+- A certificate's hosted-zone row names the zone that actually holds its
+  validation record: the innermost public zone whose name is the record's
+  parent at a label boundary. `app.notexample.com` no longer pivots to
+  `example.com`, and a private zone of the same name no longer wins over the
+  public parent that validates it.
+- A CloudFront distribution's hosted-zone row says `(0+)` where a zone's
+  records were read only to the end of one page, instead of a dimmed `(0)`
+  contradicting the `(0+)` the zone's own CloudFront row shows.
+- A Systems Manager parameter's name is read for a credential by the one rule
+  that reads an environment variable's, so `/prod/api/aws_access_key_id`,
+  `client_secret_v2`, `db_pass`, `auth_token` and `private_key` are flagged as
+  plaintext on a String parameter, as the identical name already was in a
+  Lambda or CodeBuild environment variable.
+- An API Gateway's CloudFront row counts only the distributions fronting its
+  own invoke host: the API id is the whole label before `.execute-api.`, so an
+  API whose id merely contains another's no longer claims its distributions.
+- A VPC peering connection's route-table row counts only the tables that still
+  route to it; a blackhole route keeps the stale `pcx-` id after the
+  connection is deleted, and every other route pivot already skipped it.
+- A launch template lists the Auto Scaling groups that name it by name, not
+  only those naming it by id — the Auto Scaling API requires either — as the
+  node-group row already did.
+
+- Both directions of a relationship now read it the same way, so a resource no
+  longer lists a neighbour the neighbour denies. An ECR repository lists only
+  the tasks, services, build projects and functions running an image of that
+  repository — `api` no longer lists `api-worker`'s or `team/api`'s images, nor
+  the same repository name in another account or region — and each of those
+  lists back only the repository its image belongs to; a container-packaged
+  function's repository is read from its image URI instead of every
+  image-packaged function being offered. An internet, NAT or transit gateway no
+  longer lists a route table whose only route to it is a blackhole, matching
+  what the route table already showed. A Lambda hyperplane ENI and its function
+  find each other through the interface type EC2 gives them, and an ordinary
+  interface that merely mentions Lambda in its description is a resolved zero.
+  A file system and a subnet find each other through the file system id written
+  in the mount-target interface's description, whole, so `fs-9a13661e` is no
+  longer the prefix of another file system. A CloudFront distribution and a
+  load balancer match on the DNS name whatever the load balancer's kind and
+  whatever case the origin was typed in, a hosted zone's alias record now finds
+  a network load balancer as it finds an application one, and a distribution
+  lists the zones whose records actually point at it instead of every zone
+  whose name covers one of its aliases.
+- An Auto Scaling group, node group or cluster that names a launch template
+  without a version now opens the version it launches from — the template's
+  default — where it previously opened the latest one, so the AMI, security
+  groups and role shown are a canary's only when the group is pinned to it.
+- A Systems Manager parameter is judged once: the Status cell, the row colour
+  and the finding come from one rule, so `/prod/orders/db/password` no longer
+  reads "plaintext" in a row carrying no finding and coloured healthy. A value
+  unchanged in over a year is flagged whether it is encrypted or not.
+- An Aurora or Multi-AZ DB cluster answered by the RDS API gets the same
+  findings as the DocumentDB API gives the same cluster, including a cluster
+  AWS reported without a status, which previously crashed the fetch.
+
 - A DB, cluster or EBS snapshot copied from another region or account is no
   longer flagged "orphan: source ... deleted": its parent was never in this
   region's list, and its source pivot no longer points at a local volume,

@@ -243,16 +243,15 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 	return alarmIDsByDimension(ctx, clients, cache, "", "ApiId", res.ID)
 }
 
-// checkApigwCF reports CloudFront distributions fronting this API. Distribution
-// Origins may reference the API's invoke URL. Determining this requires
-// scanning the cf cache for origins whose DomainName includes the API ID
-// (typically "<api-id>.execute-api.<region>.amazonaws.com").
+// checkApigwCF reports CloudFront distributions fronting this API: those
+// with an origin whose host is the API's own invoke host,
+// "<api-id>.execute-api.<region>.amazonaws.com", whose leading label is the
+// API's id.
 func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return resource.ProvenZero("cf", "apiID")
 	}
-	suffix := apiID + ".execute-api."
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
@@ -268,11 +267,10 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 		if !ok || dist.Origins == nil {
 			continue
 		}
-		for _, origin := range dist.Origins.Items {
-			if origin.DomainName != nil && strings.Contains(*origin.DomainName, suffix) {
-				ids = append(ids, cfRes.ID)
-				break
-			}
+		if slices.ContainsFunc(dist.Origins.Items, func(o cftypes.Origin) bool {
+			return executeAPIHostID(canonicalDNS(aws.ToString(o.DomainName))) == apiID
+		}) {
+			ids = append(ids, cfRes.ID)
 		}
 	}
 	return relatedResultTrunc("cf", ids, truncated)

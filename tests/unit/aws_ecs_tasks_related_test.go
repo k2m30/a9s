@@ -543,9 +543,12 @@ func TestRelated_ECSTask_ECR_MatchSingleRepo(t *testing.T) {
 		},
 	}
 	res := resource.Resource{ID: "task-abc", RawStruct: task}
+	cache := resource.ResourceCache{"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "my-app", Name: "my-app", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
+	}}}
 
 	checker := ecsTaskCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -563,9 +566,12 @@ func TestRelated_ECSTask_ECR_DeduplicatesMultipleContainersSameRepo(t *testing.T
 		},
 	}
 	res := resource.Resource{ID: "task-abc", RawStruct: task}
+	cache := resource.ResourceCache{"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "my-app", Name: "my-app", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
+	}}}
 
 	checker := ecsTaskCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (same repo, two tags — deduped)", result.Count())
@@ -596,9 +602,12 @@ func TestRelated_ECSTask_ECR_StripsTagFromRepo(t *testing.T) {
 		},
 	}
 	res := resource.Resource{ID: "task-abc", RawStruct: task}
+	cache := resource.ResourceCache{"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+		{ID: "org/my-app", Name: "org/my-app", Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/org/my-app"}},
+	}}}
 
 	checker := ecsTaskCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

@@ -565,9 +565,11 @@ func TestRelated_CB_ECR_Match(t *testing.T) {
 			},
 		},
 	}
+	// A repository row carries the registry it lives in: ECR's
+	// DescribeRepositories answers RepositoryUri for every one of them.
 	cache := resource.ResourceCache{
 		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: repoName, Name: repoName},
+			{ID: repoName, Name: repoName, Fields: map[string]string{"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
 		}},
 	}
 

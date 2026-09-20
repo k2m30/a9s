@@ -462,7 +462,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ProvenZero("role", "roleARNs")
 	}
 
-	roleList, truncated, rerr := relatedResourcesFor(ctx, clients, cache, "role")
+	roleList, _, rerr := relatedResourcesFor(ctx, clients, cache, "role")
 	if rerr != nil {
 		return resource.ErrorRelated("role", rerr)
 	}
@@ -470,8 +470,8 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("role")
 	}
 
-	ids, dropped := listedRefs("role", roleARNs, rc, roleList)
-	return relatedResultTrunc("role", ids, truncated || dropped)
+	ids, lowerBound := listedRefs("role", roleARNs, rc, roleList)
+	return relatedResultTrunc("role", ids, lowerBound)
 }
 
 // checkS3Trail searches the trail cache for trails whose S3BucketName matches

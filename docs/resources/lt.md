@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `asg`
 
 - **Why related**: "which fleets launch from this template" — the blast radius of a bad default-version bump.
-- **How discovered**: cross-reference the already-loaded `asg` list by `AutoScalingGroup.LaunchTemplate.LaunchTemplateId`, `MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification`, and per-`Overrides[]` specifications. Zero extra API calls.
+- **How discovered**: cross-reference the already-loaded `asg` list by `AutoScalingGroup.LaunchTemplate`, `MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification`, and per-`Overrides[]` specifications. A specification carries a `LaunchTemplateId` or a `LaunchTemplateName` — the API requires either — and both name the template. Zero extra API calls.
 - **Count shown**: yes.
 
 ### `ec2`

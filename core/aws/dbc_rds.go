@@ -16,87 +16,29 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// transitionalRDSDBCStatusSet contains Aurora / Multi-AZ cluster statuses that
-// indicate a transitional (Warning) state.
-// Mirrors transitionalDBCStatusSet for the RDS-side cluster type.
-var transitionalRDSDBCStatusSet = map[string]struct{}{
-	"creating": {}, "modifying": {}, "backing-up": {}, "maintenance": {},
-	"upgrading": {}, "starting": {}, "stopping": {}, "resetting-master-credentials": {},
-	"renaming": {},
-}
-
-// countRDSWriters returns the number of rdstypes.DBClusterMember with IsClusterWriter == true.
-// Sister helper to countWriters for the RDS-side cluster member type.
-func countRDSWriters(members []rdstypes.DBClusterMember) int {
-	n := 0
-	for _, m := range members {
-		if m.IsClusterWriter != nil && *m.IsClusterWriter {
-			n++
-		}
-	}
-	return n
-}
-
-// computeRDSDBClusterFindings returns the findings for an RDS-side (Aurora /
-// Multi-AZ) DB cluster plus the supporting AttentionDetail rows keyed by the
-// finding that owns them. Algorithm mirrors computeDBCFindings, including the
-// shared security-posture pack from rds_posture.go.
+// computeRDSDBClusterFindings reads an RDS-side (Aurora / Multi-AZ) DB
+// cluster's findings.
 func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	status := aws.ToString(cluster.Status)
-	postureFindings, postureDetails := rdsPostureFindings(rdsPosture{
-		Engine:                  aws.ToString(cluster.Engine),
-		MultiAZ:                 cluster.MultiAZ,
-		AutoMinorVersionUpgrade: cluster.AutoMinorVersionUpgrade,
-		IAMAuthEnabled:          cluster.IAMDatabaseAuthenticationEnabled,
-		MasterUsername:          cluster.MasterUsername,
-	}, dbcPostureCodes)
-
-	// Broken statuses — first match wins; no warning stacking.
-	brokenCode := map[string]domain.FindingCode{
-		"failed":                              CodeDBCFailed,
-		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
-		"incompatible-parameters":             CodeDBCIncompatibleParameters,
-	}
-	if code, ok := brokenCode[status]; ok {
-		lead := []domain.Finding{wave1Finding(code)}
-		return append(lead, postureFindings...), postureDetails
-	}
-
-	// No writer on an available cluster — reads only (Broken; beats warnings).
-	if status == "available" && countRDSWriters(cluster.DBClusterMembers) == 0 {
-		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
-		return append(lead, postureFindings...), postureDetails
-	}
-
-	// A cluster on its way out has no posture worth reporting.
-	if isTeardownStatus(status) {
-		postureFindings, postureDetails = nil, nil
-	}
-
-	// Transitional statuses.
-	if _, ok := transitionalRDSDBCStatusSet[status]; ok {
-		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
-		return append(lead, postureFindings...), postureDetails
-	}
-
-	// Healthy available — collect Wave-1 warnings.
-	if status == "available" {
-		var findings []domain.Finding
-		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
-			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
+	writers := 0
+	for _, m := range cluster.DBClusterMembers {
+		if aws.ToBool(m.IsClusterWriter) {
+			writers++
 		}
-		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
-			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest))
-		}
-		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
-			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
-		}
-		return append(findings, postureFindings...), postureDetails
 	}
-
-	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, status)}
-	return append(lead, postureFindings...), postureDetails
+	return computeDBClusterFindings(dbClusterState{
+		Status:                aws.ToString(cluster.Status),
+		Writers:               writers,
+		DeletionProtection:    cluster.DeletionProtection,
+		StorageEncrypted:      cluster.StorageEncrypted,
+		BackupRetentionPeriod: cluster.BackupRetentionPeriod,
+		Posture: rdsPosture{
+			Engine:                  aws.ToString(cluster.Engine),
+			MultiAZ:                 cluster.MultiAZ,
+			AutoMinorVersionUpgrade: cluster.AutoMinorVersionUpgrade,
+			IAMAuthEnabled:          cluster.IAMDatabaseAuthenticationEnabled,
+			MasterUsername:          cluster.MasterUsername,
+		},
+	})
 }
 
 // FetchRDSDBClustersPage fetches a single page of Aurora + Multi-AZ DB clusters

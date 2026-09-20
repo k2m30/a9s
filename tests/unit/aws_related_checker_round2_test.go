@@ -218,10 +218,13 @@ func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 		}
 	}
 	if !hasImageField {
-		t.Fatalf("no Fields value on the real FetchECSTasks output carries the container image URI %q — the fetcher must emit Task.Containers[].Image into Fields (spec ecr.md — image-URI substring cross-ref)", imageURI)
+		t.Fatalf("no Fields value on the real FetchECSTasks output carries the container image URI %q — the fetcher must emit Task.Containers[].Image into Fields (spec ecr.md — image-URI cross-ref)", imageURI)
 	}
 
-	repo := ecrtypes.Repository{RepositoryName: aws.String("acme-repo")}
+	repo := ecrtypes.Repository{
+		RepositoryName: aws.String("acme-repo"),
+		RepositoryUri:  aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme-repo"),
+	}
 	repoRes := resource.Resource{ID: "acme-repo", Name: "acme-repo", RawStruct: repo}
 	cache := resource.ResourceCache{"ecs-task": resource.ResourceCacheEntry{Resources: resources}}
 
@@ -229,7 +232,7 @@ func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 	result := checker(context.Background(), nil, repoRes, cache)
 
 	if result.Count() < 1 {
-		t.Fatalf("Count = %d, want >=1 (checkECRECSTask's existing substring match should resolve once the fetcher emits the image URI)", result.Count())
+		t.Fatalf("Count = %d, want >=1 (checkECRECSTask resolves once the fetcher emits the image URI)", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "task-abc123" {
 		t.Fatalf("ResourceIDs = %v, want [task-abc123]", result.ResourceIDs())
