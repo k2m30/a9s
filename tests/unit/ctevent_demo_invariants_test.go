@@ -292,77 +292,57 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 	}
 }
 
-// TestCtEventsDemoRegistryNavigableFields iterates all 12 demo fixtures × the
-// 2 NavigableField registrations for ct-events ("user"→iam-user, "role_name"→role)
-// and asserts:
+// TestCtEventsDemoActorNavigationMatchesTheIdentity walks every demo fixture's
+// rendered ACTOR section and asserts:
 //
-//	R1: If the field value is non-empty, the TargetType must resolve to a known
-//	    resource type and (if a fixture set exists) must contain the value.
-//	R2: Root/AWSService events must have empty "user" AND empty "role_name"
-//	    (to avoid spurious navigate targets for events with no real actor).
-func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
+//	A1: an account-root or AWSService identity offers nothing to navigate to —
+//	    neither names a browseable IAM principal, so an underlined value there
+//	    would send the operator to an empty view.
+//	A2: the "user" and "role_name" fields the fetcher writes carry an actor only
+//	    when there is one, so a filtered ct-events list built from either never
+//	    names the root account or a service.
+//
+// A3 guards the sweep itself: at least one fixture must render a navigable
+// actor, otherwise A1 holds vacuously.
+func TestCtEventsDemoActorNavigationMatchesTheIdentity(t *testing.T) {
 	ensureNoColor(t)
 
-	navFields := resource.GetNavigableFields("ct-events")
-	if len(navFields) == 0 {
-		t.Fatal("resource.GetNavigableFields(\"ct-events\") returned no fields — SetNavigableFieldsForTest not called?")
-	}
-
 	fixtures := loadAllCTFixtures(t)
-	cache := buildFakeResourceCache(t)
+	navigableActors := 0
 
 	for _, res := range fixtures {
+		isRoot := isRootFixture(res)
+		isAWSService := isAWSServiceFixture(res)
+
 		t.Run(res.ID, func(t *testing.T) {
-			isRoot := isRootFixture(res)
-			isAWSService := isAWSServiceFixture(res)
-
-			for _, nf := range navFields {
-				fieldVal := res.Fields[nf.FieldPath]
-
-				rowLabel := fmt.Sprintf("event=%s field=%s targetType=%s value=%q",
-					res.ID, nf.FieldPath, nf.TargetType, fieldVal)
-
-				// R2: Root and AWSService events must have empty user and role_name.
-				if (isRoot || isAWSService) && fieldVal != "" {
-					t.Errorf("R2 FAIL: Root/AWSService event has non-empty navigable field %s=%q — "+
-						"should be empty to prevent false navigation — %s",
-						nf.FieldPath, fieldVal, rowLabel)
+			for _, field := range []string{"user", "role_name"} {
+				if v := res.Fields[field]; (isRoot || isAWSService) && v != "" {
+					t.Errorf("A2 FAIL: event=%s has %s=%q — a root or service identity names no IAM principal",
+						res.ID, field, v)
 				}
+			}
 
-				if fieldVal == "" {
-					// Nothing to navigate to — this is expected for most Root/AWSService events.
+			parsed := parseCTEventForFixture(t, res)
+			for _, section := range ctevent.BuildSections(parsed) {
+				if section.Name != ctevent.SectionActor {
 					continue
 				}
-
-				// R1: TargetType must resolve.
-				_, _, found := resource.ResolveNavigationTarget(nf.TargetType)
-				if !found {
-					t.Errorf("R1 FAIL: TargetType %q does not resolve via ResolveNavigationTarget — %s",
-						nf.TargetType, rowLabel)
-					continue
-				}
-
-				// R1: If demo data exists for TargetType, value must be a known ID or Name.
-				fixtureIDs := fixtureIDsForType(cache, nf.TargetType)
-				if len(fixtureIDs) == 0 {
-					continue
-				}
-				found = fixtureIDs[fieldVal]
-				if !found {
-					entry := cache[nf.TargetType]
-					for _, r := range entry.Resources {
-						if r.Name == fieldVal {
-							found = true
-							break
-						}
+				for _, row := range section.Rows {
+					if !row.IsNavigable {
+						continue
 					}
-				}
-				if !found {
-					t.Errorf("R1 FAIL: field value %q not found in fake cache for %q — %s",
-						fieldVal, nf.TargetType, rowLabel)
+					navigableActors++
+					if isRoot || isAWSService {
+						t.Errorf("A1 FAIL: event=%s offers a navigable ACTOR row %s=%q (target %s) for a root or service identity",
+							res.ID, row.Key, row.Value, row.TargetType)
+					}
 				}
 			}
 		})
+	}
+
+	if navigableActors == 0 {
+		t.Error("A3 FAIL: no demo fixture renders a navigable ACTOR row, so A1 is unfalsifiable")
 	}
 }
 

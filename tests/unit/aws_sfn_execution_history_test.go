@@ -600,11 +600,11 @@ func TestConvertHistoryEvent_StateName_ExecutionLevel(t *testing.T) {
 func TestSFNExecutionHistoryColumns(t *testing.T) {
 	cols := resource.SFNExecutionHistoryColumns()
 
-	expectedKeys := []string{"timestamp", "event_type_short", "state_name", "event_detail"}
+	expectedKeys := []string{"timestamp", "event_type_short", "status", "state_name", "event_detail"}
 
 	t.Run("column_count", func(t *testing.T) {
-		if len(cols) != 4 {
-			t.Fatalf("expected 4 columns, got %d", len(cols))
+		if len(cols) != 5 {
+			t.Fatalf("expected 5 columns, got %d", len(cols))
 		}
 	})
 
@@ -617,7 +617,10 @@ func TestSFNExecutionHistoryColumns(t *testing.T) {
 	})
 
 	t.Run("column_titles", func(t *testing.T) {
-		wantTitles := []string{"Timestamp", "Event Type", "State", "Detail"}
+		// Status carries the event's verdict; State carries the name the
+		// operator gave the step in their state machine definition, which is
+		// what they grep their ASL for and so is never reworded.
+		wantTitles := []string{"Timestamp", "Event Type", "Status", "State", "Detail"}
 		for i, wantTitle := range wantTitles {
 			if cols[i].Title != wantTitle {
 				t.Errorf("col[%d].Title: expected %q, got %q", i, wantTitle, cols[i].Title)
@@ -626,7 +629,7 @@ func TestSFNExecutionHistoryColumns(t *testing.T) {
 	})
 
 	t.Run("column_widths", func(t *testing.T) {
-		wantWidths := []int{22, 24, 24, 40}
+		wantWidths := []int{22, 24, 12, 24, 40}
 		for i, wantWidth := range wantWidths {
 			if cols[i].Width != wantWidth {
 				t.Errorf("col[%d].Width: expected %d, got %d", i, wantWidth, cols[i].Width)

@@ -234,8 +234,11 @@ const CostExplorerServiceNameEC2 = "Amazon Elastic Compute Cloud - Compute"
 // computeTypes is the declarative catalog for all COMPUTE category resource types.
 var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:                    "EC2 Instances",
-		ShortName:               "ec2",
+		Name:      "EC2 Instances",
+		ShortName: "ec2",
+		// UserData is base64 on DescribeInstanceAttribute and is decoded onto
+		// InstanceEnriched when the detail opens.
+		ComputedDetailPaths:     []string{"UserData"},
 		Aliases:                 []string{"ec2", "instances"},
 		Category:                "COMPUTE",
 		CloudTrailKey:           "ResourceName:ID",
@@ -555,13 +558,16 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:           "Lambda Functions",
-		ShortName:      "lambda",
-		RefToID:        lambdaRefToID,
-		HumanizeFields: []string{"last_update_status"},
-		Aliases:        []string{"lambda", "functions"},
-		Category:       "COMPUTE",
-		CloudTrailKey:  "ResourceName:Fields.arn",
+		Name:      "Lambda Functions",
+		ShortName: "lambda",
+		// Concurrency is a GetFunction field and lands on FunctionEnriched
+		// when the detail opens.
+		ComputedDetailPaths: []string{"Concurrency"},
+		RefToID:             lambdaRefToID,
+		HumanizeFields:      []string{"last_update_status"},
+		Aliases:             []string{"lambda", "functions"},
+		Category:            "COMPUTE",
+		CloudTrailKey:       "ResourceName:Fields.arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "lambda/home?region="+region+"#/functions/"+url.PathEscape(r.ID))
 		},
@@ -929,6 +935,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
 			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
 			"log_group", "log_stream",
+			"billed_duration_ms_raw", "duration_ms_raw",
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "lambda_invocation_logs",
@@ -952,7 +959,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		},
 		Columns:   resource.LambdaInvocationLogColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"timestamp", "message", "log_group", "log_stream"},
+		FieldKeys: []string{"timestamp", "message", "log_group", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
 		}),

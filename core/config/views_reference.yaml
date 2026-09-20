@@ -361,37 +361,27 @@ dbi_events:  # rdstypes.Event
   - SourceIdentifier
   - SourceType
 
-redis:  # elasticachetypes.CacheCluster
+redis:  # elasticachetypes.ReplicationGroup
   - ARN
   - AtRestEncryptionEnabled
   - AuthTokenEnabled
   - AuthTokenLastModifiedDate
   - AutoMinorVersionUpgrade
-  - CacheClusterCreateTime
-  - CacheClusterId
-  - CacheClusterStatus
+  - AutomaticFailover
   - CacheNodeType
-  - CacheNodes[].CacheNodeCreateTime
-  - CacheNodes[].CacheNodeId
-  - CacheNodes[].CacheNodeStatus
-  - CacheNodes[].CustomerAvailabilityZone
-  - CacheNodes[].CustomerOutpostArn
-  - CacheNodes[].Endpoint.Address
-  - CacheNodes[].Endpoint.Port
-  - CacheNodes[].ParameterGroupStatus
-  - CacheNodes[].SourceCacheNodeId
-  - CacheParameterGroup.CacheNodeIdsToReboot[]
-  - CacheParameterGroup.CacheParameterGroupName
-  - CacheParameterGroup.ParameterApplyStatus
-  - CacheSecurityGroups[].CacheSecurityGroupName
-  - CacheSecurityGroups[].Status
-  - CacheSubnetGroupName
-  - ClientDownloadLandingPage
+  - ClusterEnabled
+  - ClusterMode
   - ConfigurationEndpoint.Address
   - ConfigurationEndpoint.Port
+  - DataTiering
+  - Description
+  - Durability
+  - EffectiveDurability
   - Engine
-  - EngineVersion
+  - GlobalReplicationGroupInfo.GlobalReplicationGroupId
+  - GlobalReplicationGroupInfo.GlobalReplicationGroupMemberRole
   - IpDiscovery
+  - KmsKeyId
   - LogDeliveryConfigurations[].DestinationDetails.CloudWatchLogsDetails.LogGroup
   - LogDeliveryConfigurations[].DestinationDetails.KinesisFirehoseDetails.DeliveryStream
   - LogDeliveryConfigurations[].DestinationType
@@ -399,35 +389,48 @@ redis:  # elasticachetypes.CacheCluster
   - LogDeliveryConfigurations[].LogType
   - LogDeliveryConfigurations[].Message
   - LogDeliveryConfigurations[].Status
+  - MemberClusters[]
+  - MemberClustersOutpostArns[]
+  - MultiAZ
   - NetworkType
-  - NotificationConfiguration.TopicArn
-  - NotificationConfiguration.TopicStatus
-  - NumCacheNodes
+  - NodeGroups[].NodeGroupId
+  - NodeGroups[].NodeGroupMembers[].CacheClusterId
+  - NodeGroups[].NodeGroupMembers[].CacheNodeId
+  - NodeGroups[].NodeGroupMembers[].CurrentRole
+  - NodeGroups[].NodeGroupMembers[].PreferredAvailabilityZone
+  - NodeGroups[].NodeGroupMembers[].PreferredOutpostArn
+  - NodeGroups[].NodeGroupMembers[].ReadEndpoint.Address
+  - NodeGroups[].NodeGroupMembers[].ReadEndpoint.Port
+  - NodeGroups[].PrimaryEndpoint.Address
+  - NodeGroups[].PrimaryEndpoint.Port
+  - NodeGroups[].ReaderEndpoint.Address
+  - NodeGroups[].ReaderEndpoint.Port
+  - NodeGroups[].Slots
+  - NodeGroups[].Status
   - PendingModifiedValues.AuthTokenStatus
-  - PendingModifiedValues.CacheNodeIdsToRemove[]
-  - PendingModifiedValues.CacheNodeType
-  - PendingModifiedValues.EngineVersion
+  - PendingModifiedValues.AutomaticFailoverStatus
+  - PendingModifiedValues.ClusterMode
   - PendingModifiedValues.LogDeliveryConfigurations[].DestinationDetails.CloudWatchLogsDetails.LogGroup
   - PendingModifiedValues.LogDeliveryConfigurations[].DestinationDetails.KinesisFirehoseDetails.DeliveryStream
   - PendingModifiedValues.LogDeliveryConfigurations[].DestinationType
   - PendingModifiedValues.LogDeliveryConfigurations[].LogFormat
   - PendingModifiedValues.LogDeliveryConfigurations[].LogType
-  - PendingModifiedValues.NumCacheNodes
-  - PendingModifiedValues.ScaleConfig.ScaleIntervalMinutes
-  - PendingModifiedValues.ScaleConfig.ScalePercentage
+  - PendingModifiedValues.PrimaryClusterId
+  - PendingModifiedValues.Resharding.SlotMigration.ProgressPercentage
   - PendingModifiedValues.TransitEncryptionEnabled
   - PendingModifiedValues.TransitEncryptionMode
-  - PreferredAvailabilityZone
-  - PreferredMaintenanceWindow
-  - PreferredOutpostArn
+  - PendingModifiedValues.UserGroups.UserGroupIdsToAdd[]
+  - PendingModifiedValues.UserGroups.UserGroupIdsToRemove[]
+  - ReplicationGroupCreateTime
   - ReplicationGroupId
-  - ReplicationGroupLogDeliveryEnabled
-  - SecurityGroups[].SecurityGroupId
-  - SecurityGroups[].Status
   - SnapshotRetentionLimit
   - SnapshotWindow
+  - SnapshottingClusterId
+  - Status
+  - StorageEncryptionType
   - TransitEncryptionEnabled
   - TransitEncryptionMode
+  - UserGroupIds[]
 
 dbc:  # docdbtypes.DBCluster
   - AssociatedRoles[].RoleArn
@@ -3656,6 +3659,330 @@ ct-events:  # cloudtrailtypes.Event
   - Resources[].ResourceType
   - Username
 
+lt:  # awsclient.LTRaw
+  - Template.CreateTime
+  - Template.CreatedBy
+  - Template.DefaultVersionNumber
+  - Template.LatestVersionNumber
+  - Template.LaunchTemplateId
+  - Template.LaunchTemplateName
+  - Template.Operator.HiddenByDefault
+  - Template.Operator.Managed
+  - Template.Operator.Principal
+  - Template.Tags[].Key
+  - Template.Tags[].Value
+  - DefaultVersion.CreateTime
+  - DefaultVersion.CreatedBy
+  - DefaultVersion.DefaultVersion
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].DeviceName
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.DeleteOnTermination
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.EbsCardIndex
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.Encrypted
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.Iops
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.KmsKeyId
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.SnapshotId
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.Throughput
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.VolumeInitializationRate
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.VolumeSize
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.VolumeType
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].NoDevice
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].VirtualName
+  - DefaultVersion.LaunchTemplateData.CapacityReservationSpecification.CapacityReservationPreference
+  - DefaultVersion.LaunchTemplateData.CapacityReservationSpecification.CapacityReservationTarget.CapacityReservationId
+  - DefaultVersion.LaunchTemplateData.CapacityReservationSpecification.CapacityReservationTarget.CapacityReservationResourceGroupArn
+  - DefaultVersion.LaunchTemplateData.CpuOptions.AmdSevSnp
+  - DefaultVersion.LaunchTemplateData.CpuOptions.CoreCount
+  - DefaultVersion.LaunchTemplateData.CpuOptions.NestedVirtualization
+  - DefaultVersion.LaunchTemplateData.CpuOptions.ThreadsPerCore
+  - DefaultVersion.LaunchTemplateData.CreditSpecification.CpuCredits
+  - DefaultVersion.LaunchTemplateData.DisableApiStop
+  - DefaultVersion.LaunchTemplateData.DisableApiTermination
+  - DefaultVersion.LaunchTemplateData.EbsOptimized
+  - DefaultVersion.LaunchTemplateData.ElasticGpuSpecifications[].Type
+  - DefaultVersion.LaunchTemplateData.ElasticInferenceAccelerators[].Count
+  - DefaultVersion.LaunchTemplateData.ElasticInferenceAccelerators[].Type
+  - DefaultVersion.LaunchTemplateData.EnclaveOptions.Enabled
+  - DefaultVersion.LaunchTemplateData.HibernationOptions.Configured
+  - DefaultVersion.LaunchTemplateData.IamInstanceProfile.Arn
+  - DefaultVersion.LaunchTemplateData.IamInstanceProfile.Name
+  - DefaultVersion.LaunchTemplateData.ImageId
+  - DefaultVersion.LaunchTemplateData.InstanceInitiatedShutdownBehavior
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.MarketType
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.SpotOptions.BlockDurationMinutes
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.SpotOptions.InstanceInterruptionBehavior
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.SpotOptions.MaxPrice
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.SpotOptions.SpotInstanceType
+  - DefaultVersion.LaunchTemplateData.InstanceMarketOptions.SpotOptions.ValidUntil
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorCount.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorCount.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorManufacturers[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorNames[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorTotalMemoryMiB.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorTotalMemoryMiB.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AcceleratorTypes[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.AllowedInstanceTypes[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.BareMetal
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.BaselineEbsBandwidthMbps.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.BaselineEbsBandwidthMbps.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.BaselinePerformanceFactors.Cpu.References[].InstanceFamily
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.BurstablePerformance
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.CpuManufacturers[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.ExcludedInstanceTypes[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.InstanceGenerations[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.LocalStorage
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.LocalStorageTypes[]
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.MaxSpotPriceAsPercentageOfOptimalOnDemandPrice
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.MemoryGiBPerVCpu.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.MemoryGiBPerVCpu.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.MemoryMiB.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.MemoryMiB.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.NetworkBandwidthGbps.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.NetworkBandwidthGbps.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.NetworkInterfaceCount.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.NetworkInterfaceCount.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.OnDemandMaxPricePercentageOverLowestPrice
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.RequireEncryptionInTransit
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.RequireHibernateSupport
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.SpotMaxPricePercentageOverLowestPrice
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.TotalLocalStorageGB.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.TotalLocalStorageGB.Min
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.VCpuCount.Max
+  - DefaultVersion.LaunchTemplateData.InstanceRequirements.VCpuCount.Min
+  - DefaultVersion.LaunchTemplateData.InstanceType
+  - DefaultVersion.LaunchTemplateData.KernelId
+  - DefaultVersion.LaunchTemplateData.KeyName
+  - DefaultVersion.LaunchTemplateData.LicenseSpecifications[].LicenseConfigurationArn
+  - DefaultVersion.LaunchTemplateData.MaintenanceOptions.AutoRecovery
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.HttpEndpoint
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.HttpProtocolIpv6
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.HttpPutResponseHopLimit
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.HttpTokens
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.InstanceMetadataTags
+  - DefaultVersion.LaunchTemplateData.MetadataOptions.State
+  - DefaultVersion.LaunchTemplateData.Monitoring.Enabled
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].AssociateCarrierIpAddress
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].AssociatePublicIpAddress
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].ConnectionTrackingSpecification.TcpEstablishedTimeout
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].ConnectionTrackingSpecification.UdpStreamTimeout
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].ConnectionTrackingSpecification.UdpTimeout
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].DeleteOnTermination
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Description
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].DeviceIndex
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].EnaQueueCount
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].EnaSrdSpecification.EnaSrdEnabled
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].EnaSrdSpecification.EnaSrdUdpSpecification.EnaSrdUdpEnabled
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Groups[]
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].InterfaceType
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv4PrefixCount
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv4Prefixes[].Ipv4Prefix
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv6AddressCount
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv6Addresses[].Ipv6Address
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv6Addresses[].IsPrimaryIpv6
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv6PrefixCount
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].Ipv6Prefixes[].Ipv6Prefix
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].NetworkCardIndex
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].NetworkInterfaceId
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].PrimaryIpv6
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].PrivateIpAddress
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].PrivateIpAddresses[].Primary
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].PrivateIpAddresses[].PrivateIpAddress
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].SecondaryPrivateIpAddressCount
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces[].SubnetId
+  - DefaultVersion.LaunchTemplateData.NetworkPerformanceOptions.BandwidthWeighting
+  - DefaultVersion.LaunchTemplateData.Operator.HiddenByDefault
+  - DefaultVersion.LaunchTemplateData.Operator.Managed
+  - DefaultVersion.LaunchTemplateData.Operator.Principal
+  - DefaultVersion.LaunchTemplateData.Placement.Affinity
+  - DefaultVersion.LaunchTemplateData.Placement.AvailabilityZone
+  - DefaultVersion.LaunchTemplateData.Placement.AvailabilityZoneId
+  - DefaultVersion.LaunchTemplateData.Placement.GroupId
+  - DefaultVersion.LaunchTemplateData.Placement.GroupName
+  - DefaultVersion.LaunchTemplateData.Placement.HostId
+  - DefaultVersion.LaunchTemplateData.Placement.HostResourceGroupArn
+  - DefaultVersion.LaunchTemplateData.Placement.PartitionNumber
+  - DefaultVersion.LaunchTemplateData.Placement.SpreadDomain
+  - DefaultVersion.LaunchTemplateData.Placement.Tenancy
+  - DefaultVersion.LaunchTemplateData.PrivateDnsNameOptions.EnableResourceNameDnsAAAARecord
+  - DefaultVersion.LaunchTemplateData.PrivateDnsNameOptions.EnableResourceNameDnsARecord
+  - DefaultVersion.LaunchTemplateData.PrivateDnsNameOptions.HostnameType
+  - DefaultVersion.LaunchTemplateData.RamDiskId
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].DeleteOnTermination
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].DeviceIndex
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].InterfaceType
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].NetworkCardIndex
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].PrivateIpAddressCount
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].PrivateIpAddresses[].PrivateIpAddress
+  - DefaultVersion.LaunchTemplateData.SecondaryInterfaces[].SecondarySubnetId
+  - DefaultVersion.LaunchTemplateData.SecurityGroupIds[]
+  - DefaultVersion.LaunchTemplateData.SecurityGroups[]
+  - DefaultVersion.LaunchTemplateData.TagSpecifications[].ResourceType
+  - DefaultVersion.LaunchTemplateData.TagSpecifications[].Tags[].Key
+  - DefaultVersion.LaunchTemplateData.TagSpecifications[].Tags[].Value
+  - DefaultVersion.LaunchTemplateData.UserData
+  - DefaultVersion.LaunchTemplateId
+  - DefaultVersion.LaunchTemplateName
+  - DefaultVersion.Operator.HiddenByDefault
+  - DefaultVersion.Operator.Managed
+  - DefaultVersion.Operator.Principal
+  - DefaultVersion.VersionDescription
+  - DefaultVersion.VersionNumber
+
+mwaa:  # mwaatypes.Environment
+  - AirflowConfigurationOptions
+  - AirflowVersion
+  - Arn
+  - CeleryExecutorQueue
+  - CreatedAt
+  - DagS3Path
+  - DatabaseVpcEndpointService
+  - EndpointManagement
+  - EnvironmentClass
+  - ExecutionRoleArn
+  - KmsKey
+  - LastUpdate.CreatedAt
+  - LastUpdate.Error.ErrorCode
+  - LastUpdate.Error.ErrorMessage
+  - LastUpdate.Source
+  - LastUpdate.Status
+  - LastUpdate.WorkerReplacementStrategy
+  - LoggingConfiguration.DagProcessingLogs.CloudWatchLogGroupArn
+  - LoggingConfiguration.DagProcessingLogs.Enabled
+  - LoggingConfiguration.DagProcessingLogs.LogLevel
+  - LoggingConfiguration.SchedulerLogs.CloudWatchLogGroupArn
+  - LoggingConfiguration.SchedulerLogs.Enabled
+  - LoggingConfiguration.SchedulerLogs.LogLevel
+  - LoggingConfiguration.TaskLogs.CloudWatchLogGroupArn
+  - LoggingConfiguration.TaskLogs.Enabled
+  - LoggingConfiguration.TaskLogs.LogLevel
+  - LoggingConfiguration.WebserverLogs.CloudWatchLogGroupArn
+  - LoggingConfiguration.WebserverLogs.Enabled
+  - LoggingConfiguration.WebserverLogs.LogLevel
+  - LoggingConfiguration.WorkerLogs.CloudWatchLogGroupArn
+  - LoggingConfiguration.WorkerLogs.Enabled
+  - LoggingConfiguration.WorkerLogs.LogLevel
+  - MaxWebservers
+  - MaxWorkers
+  - MinWebservers
+  - MinWorkers
+  - Name
+  - NetworkConfiguration.SecurityGroupIds[]
+  - NetworkConfiguration.SubnetIds[]
+  - PluginsS3ObjectVersion
+  - PluginsS3Path
+  - RequirementsS3ObjectVersion
+  - RequirementsS3Path
+  - Schedulers
+  - ServiceRoleArn
+  - SourceBucketArn
+  - StartupScriptS3ObjectVersion
+  - StartupScriptS3Path
+  - Status
+  - Tags
+  - WebserverAccessMode
+  - WebserverUrl
+  - WebserverVpcEndpointService
+  - WeeklyMaintenanceWindowStart
+
+transfer:  # transfertypes.DescribedServer
+  - Arn
+  - As2ServiceManagedEgressIpAddresses[]
+  - Certificate
+  - Domain
+  - EndpointDetails.AddressAllocationIds[]
+  - EndpointDetails.SecurityGroupIds[]
+  - EndpointDetails.SubnetIds[]
+  - EndpointDetails.VpcEndpointId
+  - EndpointDetails.VpcId
+  - EndpointType
+  - HostKeyFingerprint
+  - IdentityProviderDetails.DirectoryId
+  - IdentityProviderDetails.Function
+  - IdentityProviderDetails.InvocationRole
+  - IdentityProviderDetails.SftpAuthenticationMethods
+  - IdentityProviderDetails.Url
+  - IdentityProviderType
+  - IpAddressType
+  - LoggingRole
+  - PostAuthenticationLoginBanner
+  - PreAuthenticationLoginBanner
+  - ProtocolDetails.As2Transports[]
+  - ProtocolDetails.PassiveIp
+  - ProtocolDetails.ProxyConfig.SftpMode
+  - ProtocolDetails.SetStatOption
+  - ProtocolDetails.TlsSessionResumptionMode
+  - Protocols[]
+  - S3StorageOptions.DirectoryListingOptimization
+  - SecurityPolicyName
+  - ServerId
+  - State
+  - StructuredLogDestinations[]
+  - Tags[].Key
+  - Tags[].Value
+  - UserCount
+  - WorkflowDetails.OnPartialUpload[].ExecutionRole
+  - WorkflowDetails.OnPartialUpload[].WorkflowId
+  - WorkflowDetails.OnUpload[].ExecutionRole
+  - WorkflowDetails.OnUpload[].WorkflowId
+
+transfer_agreements:  # transfertypes.DescribedAgreement
+  - Arn
+  - AccessRole
+  - AgreementId
+  - BaseDirectory
+  - CustomDirectories.FailedFilesDirectory
+  - CustomDirectories.MdnFilesDirectory
+  - CustomDirectories.PayloadFilesDirectory
+  - CustomDirectories.StatusFilesDirectory
+  - CustomDirectories.TemporaryFilesDirectory
+  - Description
+  - EnforceMessageSigning
+  - LocalProfileId
+  - PartnerProfileId
+  - PreserveFilename
+  - ServerId
+  - Status
+  - Tags[].Key
+  - Tags[].Value
+
+vpc-peer:  # ec2types.VpcPeeringConnection
+  - AccepterVpcInfo.CidrBlock
+  - AccepterVpcInfo.CidrBlockSet[].CidrBlock
+  - AccepterVpcInfo.Ipv6CidrBlockSet[].Ipv6CidrBlock
+  - AccepterVpcInfo.OwnerId
+  - AccepterVpcInfo.PeeringOptions.AllowDnsResolutionFromRemoteVpc
+  - AccepterVpcInfo.PeeringOptions.AllowEgressFromLocalClassicLinkToRemoteVpc
+  - AccepterVpcInfo.PeeringOptions.AllowEgressFromLocalVpcToRemoteClassicLink
+  - AccepterVpcInfo.Region
+  - AccepterVpcInfo.VpcId
+  - ExpirationTime
+  - RequesterVpcInfo.CidrBlock
+  - RequesterVpcInfo.CidrBlockSet[].CidrBlock
+  - RequesterVpcInfo.Ipv6CidrBlockSet[].Ipv6CidrBlock
+  - RequesterVpcInfo.OwnerId
+  - RequesterVpcInfo.PeeringOptions.AllowDnsResolutionFromRemoteVpc
+  - RequesterVpcInfo.PeeringOptions.AllowEgressFromLocalClassicLinkToRemoteVpc
+  - RequesterVpcInfo.PeeringOptions.AllowEgressFromLocalVpcToRemoteClassicLink
+  - RequesterVpcInfo.Region
+  - RequesterVpcInfo.VpcId
+  - Status.Code
+  - Status.Message
+  - Tags[].Key
+  - Tags[].Value
+  - VpcPeeringConnectionId
+
+pipeline_stages:  # awsclient.PipelineStageRow
+  - StageName
+  - StageStatus
+  - ActionName
+  - ActionStatus
+  - LastStatusChange
+  - ExternalURL
+  - Token
+  - ErrorCode
+  - ErrorMessage
+  - RevisionId
+  - RevisionSummary
+
 lambda_invocations:  # synthetic (parsed from CloudWatch Logs)
   - request_id
   - timestamp
@@ -3672,16 +3999,4 @@ lambda_invocations:  # synthetic (parsed from CloudWatch Logs)
 lambda_invocation_logs:  # synthetic (CloudWatch log lines)
   - timestamp
   - message
-
-pipeline_stages:  # synthetic (CodePipeline stage/action state)
-  - stage_name
-  - stage_status
-  - action_name
-  - action_status
-  - last_change_time
-  - external_url
-  - action_token
-  - action_error_details
-  - revision_id
-  - revision_summary
 

@@ -17,7 +17,9 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
@@ -460,13 +462,15 @@ func TestECSTask_Related_SG_ViaTaskENISecurityGroupCrossRef(t *testing.T) {
 
 // checkEC2Backup matches the loaded backup plans' selections against the
 // instance ARN and tags through BackupPlanCovers.
+//
+// DescribeInstances returns no ARN for an instance, so the instance ARN is
+// composed from the session's region and the caller's account id
+// (arn:<partition>:ec2:<region>:<account>:instance/<id>).
 
 func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
-	instanceARN := "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"
 	instRes := resource.Resource{
-		ID:     "i-0abc123def456",
-		Name:   "i-0abc123def456",
-		Fields: map[string]string{"arn": instanceARN},
+		ID:   "i-0abc123def456",
+		Name: "i-0abc123def456",
 	}
 
 	cache := resource.ResourceCache{
@@ -480,10 +484,42 @@ func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
 	}
 
 	checker := mechanismEC2CheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, instRes, cache)
+	result := checker(context.Background(), rel2BackupClients(), instRes, cache)
 
-	if result.Count() < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec ec2.md:49 — loaded plan's selection ARN pattern covers this instance)", result.Count())
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want resolved (spec ec2.md:49 — loaded plan's selection ARN pattern covers this instance)", result.State())
+	}
+	if got := result.ResourceIDs(); len(got) != 1 || got[0] != "plan-prod-ec2" {
+		t.Fatalf("ResourceIDs = %v, want [plan-prod-ec2]", got)
+	}
+}
+
+// TestEC2_Related_Backup_UnknownWhenTheAccountIsUnresolved pins the honest
+// answer when the account id the ARN needs is unavailable: whether a plan
+// covers this instance is unanswered, not answered "none".
+func TestEC2_Related_Backup_UnknownWhenTheAccountIsUnresolved(t *testing.T) {
+	clients := &awsclient.ServiceClients{Region: "us-east-1"}
+	clients.SetIdentityStore(session.NewIdentityStore())
+
+	instRes := resource.Resource{
+		ID:   "i-0abc123def456",
+		Name: "i-0abc123def456",
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				unit.BackupPlanRow(t, "plan-prod-ec2", backuptypes.BackupSelection{
+					Resources: []string{"arn:aws:ec2:us-east-1:123456789012:instance/*"},
+				}),
+			},
+		},
+	}
+
+	checker := mechanismEC2CheckerByTarget(t, "backup")
+	result := checker(context.Background(), clients, instRes, cache)
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v, want unknown", result.State())
 	}
 }
 

@@ -3,7 +3,8 @@ package unit
 // Structural invariants across the resource registry.
 //
 // TestResourceTypeDef_AllHaveNavigableFields: every resource type in
-// AllResourceTypes() has at least one NavigableField, except the types on
+// AllResourceTypes() has at least one NavigableField, or a DetailProjector
+// that marks a row navigable over the demo fixtures, except the types on
 // noNavFieldsAllowList.
 //
 // TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare: every enricher in
@@ -37,6 +38,8 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -108,9 +111,12 @@ var noNavFieldsAllowList = map[string]string{
 	"waf": "WAF web ACL list entry has no navigable cross-resource ARN fields",
 }
 
-// TestResourceTypeDef_AllHaveNavigableFields verifies that every type returned by
-// AllResourceTypes() has at least one NavigableField registered, OR is explicitly
-// listed in noNavFieldsAllowList with a documented reason.
+// TestResourceTypeDef_AllHaveNavigableFields verifies that every type returned
+// by AllResourceTypes() offers the operator somewhere to drill to: either a
+// registered NavigableField, or — for a type rendered by its own
+// DetailProjector, which decides navigation per row rather than per field
+// path — at least one navigable row over the type's demo fixtures. Types with
+// no cross-resource reference at all are listed in noNavFieldsAllowList.
 //
 // Failure here means a new resource type was added without wiring navigable fields.
 // Fix: either call resource.SetNavigableFieldsForTest in the type's aws/*.go init(),
@@ -121,6 +127,7 @@ func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 		t.Fatal("AllResourceTypes() returned empty — registry not initialised (missing _ import?)")
 	}
 
+	clients := demo.NewServiceClients()
 	for _, td := range types {
 		fields := resource.GetNavigableFields(td.ShortName)
 		if len(fields) > 0 {
@@ -130,9 +137,68 @@ func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 			_ = reason // documented exemption
 			continue
 		}
-		t.Errorf("resource type %q has 0 NavigableFields and is not in the allow-list — "+
-			"add SetNavigableFieldsForTest in core/aws/<type>.go init() or document "+
+		if projectorOffersANavigableRow(t, td, clients) {
+			continue
+		}
+		t.Errorf("resource type %q has 0 NavigableFields, is not in the allow-list, and its "+
+			"detail projection offers no navigable row over the demo fixtures — "+
+			"add SetNavigableFieldsForTest in core/aws/<type>.go init(), have the type's "+
+			"DetailProjector mark its cross-references navigable, or document "+
 			"why this type needs no navigable fields in noNavFieldsAllowList", td.ShortName)
+	}
+}
+
+// projectorOffersANavigableRow reports whether td's own DetailProjector marks
+// any row navigable over td's demo fixtures. A projector resolves the target
+// from the row's own data — a CloudTrail actor ARN names a role, an IAM user
+// or, for the account root, nothing — which is the case a NavigableField's
+// fixed field-path-to-type binding cannot describe.
+func projectorOffersANavigableRow(t *testing.T, td resource.ResourceTypeDef, clients *awsclient.ServiceClients) bool {
+	t.Helper()
+	if td.Project == nil {
+		return false
+	}
+	rows, ok := DrainFixtures(t, td, clients)
+	if !ok {
+		return false
+	}
+	for _, row := range rows {
+		for _, section := range td.Project(row) {
+			for _, item := range section.Items {
+				if item.Navigable {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// TestProjectorNavigableCheckRefusesAProjectorThatOffersNothing keeps the
+// projector branch from degenerating into "declares a projector, therefore
+// passes".
+func TestProjectorNavigableCheckRefusesAProjectorThatOffersNothing(t *testing.T) {
+	row := resource.Resource{ID: "only-row", Name: "only-row"}
+	td := resource.ResourceTypeDef{
+		ShortName: "projector-probe",
+		Fetcher: func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+			return resource.FetchResult{Resources: []resource.Resource{row}}, nil
+		},
+	}
+	clients := demo.NewServiceClients()
+
+	td.Project = func(_ domain.Resource) []domain.Section {
+		return []domain.Section{{Title: "ACTOR", Items: []domain.Item{{Label: "Principal", Value: "arn:aws:iam::123456789012:root"}}}}
+	}
+	if projectorOffersANavigableRow(t, td, clients) {
+		t.Error("a projection whose every row is display-only was accepted as navigable")
+	}
+
+	td.Project = func(_ domain.Resource) []domain.Section {
+		return []domain.Section{{Title: "ACTOR", Items: []domain.Item{{Label: "Principal", Value: "arn:aws:iam::123456789012:user/dana", Navigable: true, TargetType: "iam-user", NavID: "dana"}}}}
+	}
+	if !projectorOffersANavigableRow(t, td, clients) {
+		t.Error("a projection with a navigable row was not accepted")
 	}
 }
 

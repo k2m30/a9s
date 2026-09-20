@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Project Name:
     path: Name
@@ -32,4 +32,6 @@ detail:
   - Cache
   - LogsConfig
   - ConcurrentBuildLimit
+  - EncryptionKey
+  - VpcConfig
   - Tags

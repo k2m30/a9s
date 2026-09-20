@@ -115,6 +115,15 @@ func realisticEC2Instance() ec2types.Instance {
 		SecurityGroups: []ec2types.GroupIdentifier{
 			{GroupId: new("sg-0abc1234"), GroupName: new("web-sg")},
 		},
+		NetworkInterfaces: []ec2types.InstanceNetworkInterface{
+			{
+				NetworkInterfaceId: new("eni-0abc1234567890def"),
+				SubnetId:           new("subnet-0abc5678"),
+				VpcId:              new("vpc-0abc1234"),
+				PrivateIpAddress:   new("10.0.1.42"),
+				Status:             ec2types.NetworkInterfaceStatusInUse,
+			},
+		},
 		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
 			{
 				DeviceName: new("/dev/sda1"),

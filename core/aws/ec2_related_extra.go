@@ -122,12 +122,9 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 
-	target := backupTarget{arn: res.Fields["arn"], tags: tags}
+	target := backupTarget{arn: sessionEC2ARN(ctx, clients, "instance", instanceID), tags: tags}
 	if !tagsKnown {
 		target.unread = "DescribeInstances"
-	}
-	if target.arn == "" {
-		target.arn = sessionEC2ARN(ctx, clients, "instance", instanceID)
 	}
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")

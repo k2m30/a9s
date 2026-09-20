@@ -145,13 +145,16 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "S3 Buckets",
-		ShortName:     "s3",
-		RefToID:       s3RefToID,
-		LifecycleKey:  "status",
-		Aliases:       []string{"s3", "buckets"},
-		Category:      "DATABASES & STORAGE",
-		CloudTrailKey: "ResourceName:ID",
+		Name:      "S3 Buckets",
+		ShortName: "s3",
+		// Policy is the document GetBucketPolicy returns and lands on
+		// BucketEnriched when the detail opens.
+		ComputedDetailPaths: []string{"Policy"},
+		RefToID:             s3RefToID,
+		LifecycleKey:        "status",
+		Aliases:             []string{"s3", "buckets"},
+		Category:            "DATABASES & STORAGE",
+		CloudTrailKey:       "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "s3/buckets/"+url.PathEscape(r.ID))
 		},
@@ -418,7 +421,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100, Reads: []string{"backup"}},
-		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "size_bytes_raw", "billing_mode"},
+		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "size_bytes_raw", "billing_mode", "arn", "degraded_finding", "name"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true, Truncated: true},
@@ -486,6 +489,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"deleted", "processing", "upgrade_processing",
 			"service_software_update_available", "encryption_at_rest_enabled",
 			"automated_update_date", "current_version", "new_version",
+			"access_policy_public", "degraded_finding", "enforce_https", "name", "node_to_node_encryption_enabled", "vpc_enabled",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true, Truncated: true},
@@ -545,6 +549,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"cluster_id", "status", "cluster_status", "node_type", "num_nodes",
 			"db_name", "endpoint", "publicly_accessible", "encrypted",
 			"cluster_availability_status",
+			"create_time", "master_user",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true, Truncated: true},
@@ -611,7 +616,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichEFSMountTargets, Priority: 100},
-		FieldKeys: []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"},
+		FieldKeys: []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets", "access_point_ids"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true, Truncated: true},
@@ -663,7 +668,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: enrichDBISnapCrossRef, Priority: 100, Reads: []string{"dbi"}},
-		FieldKeys: []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"},
+		FieldKeys: []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn", "encrypted"},
 		Related: []domain.RelatedDef{
 			{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkDBISnapKMS, NeedsTargetCache: true, Truncated: true},

@@ -478,8 +478,29 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		"/aws/lambda/a9s-demo-s3-notifier": minimalLogStreams("lambda-s3-notifier"),
 		"/aws/lambda/acme-inbound-parser":  minimalLogStreams("lambda-inbound-parser"),
 		"/aws/lambda/orders-projector":     minimalLogStreams("lambda-orders-projector"),
-		transferLogGroupPrimaryName:        minimalLogStreams("transfer-as2-gateway"),
-		transferLogGroupPartnerAuditName:   minimalLogStreams("transfer-partner-audit"),
+		// ecs-svc→ecs_svc_logs renders "container/task-id" from the stream
+		// name, which only reads on the "<prefix>/<container>/<task>" shape
+		// the awslogs driver writes (core/aws/ecs_svc_logs.go).
+		"/ecs/api-gateway": {
+			{
+				LogStreamName:       aws.String("ecs/api-gateway/4f7c1a9e2b6d4f08b1c35a7e9d240c6f"),
+				CreationTime:        aws.Int64(1774253700000),
+				FirstEventTimestamp: aws.Int64(1774253700000),
+				LastEventTimestamp:  aws.Int64(1774253730000),
+				StoredBytes:         aws.Int64(8192),
+			},
+		},
+		"/aws/codebuild/acme-api-build": {
+			{
+				LogStreamName:       aws.String("build-142/acme-api-build"),
+				CreationTime:        aws.Int64(1774149300000),
+				FirstEventTimestamp: aws.Int64(1774149300000),
+				LastEventTimestamp:  aws.Int64(1774149430000),
+				StoredBytes:         aws.Int64(6144),
+			},
+		},
+		transferLogGroupPrimaryName:      minimalLogStreams("transfer-as2-gateway"),
+		transferLogGroupPartnerAuditName: minimalLogStreams("transfer-partner-audit"),
 	}
 
 	logEvents := map[string][]cwlogstypes.OutputLogEvent{
@@ -592,6 +613,64 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			},
 		}
 	}
+	// The build-142 stream of acme-api-build, reached through cb→cb_builds→
+	// cb_build_logs. One line of each class classifyBuildLogStatus
+	// (core/aws/cb_build_logs.go) recognises, so no class of the build log is
+	// demoed only as the unclassified default.
+	logEvents["/aws/codebuild/acme-api-build"] = []cwlogstypes.OutputLogEvent{
+		{
+			Timestamp:     aws.Int64(1774149300000),
+			Message:       aws.String("[Container] 2026/03/22 03:15:00 Entering phase INSTALL"),
+			IngestionTime: aws.Int64(1774149300100),
+		},
+		{
+			Timestamp:     aws.Int64(1774149310000),
+			Message:       aws.String("[Container] 2026/03/22 03:15:10 Running command npm ci --no-audit"),
+			IngestionTime: aws.Int64(1774149310100),
+		},
+		{
+			Timestamp:     aws.Int64(1774149365000),
+			Message:       aws.String("[Container] 2026/03/22 03:16:05 Phase complete: INSTALL State: SUCCEEDED"),
+			IngestionTime: aws.Int64(1774149365100),
+		},
+		{
+			Timestamp:     aws.Int64(1774149420000),
+			Message:       aws.String("[Container] 2026/03/22 03:17:00 ERROR: unit suite did not exit successfully: 3 assertions failed in orders/pricing_test.js"),
+			IngestionTime: aws.Int64(1774149420100),
+		},
+		{
+			Timestamp:     aws.Int64(1774149430000),
+			Message:       aws.String("[Container] 2026/03/22 03:17:10 Uploading artifacts to s3://acme-build-artifacts/acme-api-build/142"),
+			IngestionTime: aws.Int64(1774149430100),
+		},
+	}
+
+	// Where the api-gateway ECS task definition's containers write
+	// (awslogs-group "/ecs/<family>", core/demo/fixtures/ecs.go), reached
+	// through ecs-svc→ecs_svc_logs.
+	logEvents["/ecs/api-gateway"] = []cwlogstypes.OutputLogEvent{
+		{
+			Timestamp:     aws.Int64(1774253700000),
+			Message:       aws.String("INFO  [http] GET /v1/orders/7842 200 in 31ms"),
+			IngestionTime: aws.Int64(1774253700100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253710000),
+			Message:       aws.String("WARN  [upstream] pricing-service responded in 1840ms, above the 1500ms budget; served from the stale cache"),
+			IngestionTime: aws.Int64(1774253710100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253720000),
+			Message:       aws.String("ERROR [http] POST /v1/orders 502 upstream pricing-service refused the connection"),
+			IngestionTime: aws.Int64(1774253720100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253730000),
+			Message:       aws.String("INFO  [http] GET /v1/health 200 in 2ms"),
+			IngestionTime: aws.Int64(1774253730100),
+		},
+	}
+
 	logEvents["/aws/lambda/a9s-demo-s3-notifier"] = lambdaInvocationReport("a9s-demo-s3-notifier")
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")

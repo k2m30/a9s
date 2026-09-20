@@ -11,7 +11,9 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
 // capturingCloudTrailClient captures the LookupEventsInput for assertion.
@@ -784,35 +786,87 @@ func TestFetchCloudTrailEventsPage_RoleNameFieldExtracted(t *testing.T) {
 	}
 }
 
-// TestCtEvents_NavigableFields_Registered verifies that ct-events has navigable
-// fields registered for both "user" → "iam-user" and "role_name" → "role".
-func TestCtEvents_NavigableFields_Registered(t *testing.T) {
-	fields := resource.GetNavigableFields("ct-events")
-	if len(fields) == 0 {
-		t.Fatal("GetNavigableFields(\"ct-events\") returned empty — navigable fields not registered")
-	}
-
-	type want struct {
-		fieldPath  string
+// TestCtEvents_FetchedEventDetailOffersTheActorAsNavigable carries a row the
+// fetcher produced through the detail projection and asserts the actor is
+// offered for navigation there: an IAMUser identity to iam-user and an
+// AssumedRole identity to role, per
+// https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html.
+func TestCtEvents_FetchedEventDetailOffersTheActorAsNavigable(t *testing.T) {
+	cases := []struct {
+		eventID    string
+		json       string
 		targetType string
-	}
-	expectations := []want{
-		{"user", "iam-user"},
-		{"role_name", "role"},
+		navID      string
+	}{
+		{
+			eventID:    "evt-user-001",
+			json:       `{"userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/dana","userName":"dana"},"eventName":"GetObject","eventSource":"s3.amazonaws.com","eventTime":"2026-03-28T12:10:05Z","awsRegion":"us-east-1","eventCategory":"Management"}`,
+			targetType: "iam-user",
+			navID:      "dana",
+		},
+		{
+			eventID:    "evt-role-001",
+			json:       `{"userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/my-role/sess","sessionContext":{"sessionIssuer":{"userName":"my-role"}}},"eventName":"AssumeRole","eventSource":"sts.amazonaws.com","eventTime":"2026-03-28T12:10:05Z","awsRegion":"us-east-1","eventCategory":"Management"}`,
+			targetType: "role",
+			navID:      "my-role",
+		},
 	}
 
-	for _, exp := range expectations {
-		found := false
-		for _, nf := range fields {
-			if nf.FieldPath == exp.fieldPath && nf.TargetType == exp.targetType {
-				found = true
-				break
+	for _, tc := range cases {
+		t.Run(tc.targetType, func(t *testing.T) {
+			mock := &capturingCloudTrailClient{
+				output: &cloudtrail.LookupEventsOutput{
+					Events: []cloudtrailtypes.Event{
+						{
+							EventId:         aws.String(tc.eventID),
+							EventName:       aws.String("AssumeRole"),
+							CloudTrailEvent: aws.String(tc.json),
+							Resources:       []cloudtrailtypes.Resource{},
+						},
+					},
+				},
+			}
+
+			result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), mock, "")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+			}
+
+			item, ok := ctPrincipalItem(ctevent.Project(result.Resources[0]))
+			if !ok {
+				t.Fatal("the projected detail carries no Principal row")
+			}
+			if !item.Navigable {
+				t.Errorf("Principal Navigable = false, want true (value %q)", item.Value)
+			}
+			if item.TargetType != tc.targetType {
+				t.Errorf("Principal TargetType = %q, want %q", item.TargetType, tc.targetType)
+			}
+			if item.NavID != tc.navID {
+				t.Errorf("Principal NavID = %q, want %q", item.NavID, tc.navID)
+			}
+		})
+	}
+}
+
+// ctPrincipalItem returns the projected ACTOR section's Principal row. A
+// service event carries a Service row there instead, so the second return says
+// whether a principal was rendered at all.
+func ctPrincipalItem(sections []domain.Section) (domain.Item, bool) {
+	for _, s := range sections {
+		if s.Title != ctevent.SectionActor {
+			continue
+		}
+		for _, it := range s.Items {
+			if it.Label == "Principal" {
+				return it, true
 			}
 		}
-		if !found {
-			t.Errorf("navigable field {FieldPath: %q, TargetType: %q} not found in ct-events navigable fields", exp.fieldPath, exp.targetType)
-		}
 	}
+	return domain.Item{}, false
 }
 
 // TestFetchCloudTrailEventsPageFiltered_LocalFieldKeysExcludedFromLookupAttributes

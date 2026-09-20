@@ -66,10 +66,10 @@ func codeArtifactRepoResources(names ...string) []resource.Resource {
 			ID:   name,
 			Name: name,
 			Fields: map[string]string{
-				"domain":          "my-domain",
-				"repository_name": name,
-				"format":          "npm",
-				"description":     "test repository " + name,
+				"domain_name": "my-domain",
+				"repo_name":   name,
+				"format":      "npm",
+				"description": "test repository " + name,
 			},
 		})
 	}

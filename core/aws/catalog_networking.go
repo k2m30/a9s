@@ -187,9 +187,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichTargetGroupHealth, Priority: 10},
 		IssueEnricherFieldKeys: []string{"health_summary"},
-		// target_group_arn is required by checkLambdaTG (lambda:tg pivot) to
-		// call DescribeTargetHealth on cache-restored rows — without it in
-		// FieldKeys the ARN does not survive a YAML cache round-trip.
+		// checkLambdaTG (the lambda:tg pivot) calls DescribeTargetHealth with
+		// target_group_arn read off tg rows replayed from the disk cache,
+		// which carries Fields but no RawStruct.
 		FieldKeys: []string{"target_group_name", "target_group_arn", "port", "protocol", "vpc_id", "target_type", "health_check_path"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkTGELB, NeedsTargetCache: false, Truncated: true},
@@ -321,7 +321,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSubnetsPage(ctx, c.EC2, continuationToken)
 		}),
-		FieldKeys: []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"},
+		FieldKeys: []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips", "auto_public_ip"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSubnetEC2, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkSubnetENI, NeedsTargetCache: true, Truncated: true},
@@ -549,7 +549,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
 		}),
-		FieldKeys: []string{"vpce_id", "service_name", "type", "state", "vpc_id"},
+		FieldKeys: []string{"vpce_id", "service_name", "type", "state", "vpc_id", "policy_exposure"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCESubnet, NeedsTargetCache: false},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCESG, NeedsTargetCache: false},
@@ -603,7 +603,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichTGWAttachments, Priority: 100},
 		IssueEnricherFieldKeys: []string{"att_status"},
-		FieldKeys:              []string{"tgw_id", "name", "state", "owner_id", "description"},
+		FieldKeys:              []string{"tgw_id", "name", "state", "owner_id", "description", "auto_accept"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkTGWVPC, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkTGWRTB, NeedsTargetCache: true, Truncated: true, Mirror: true},

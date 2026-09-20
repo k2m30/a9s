@@ -173,6 +173,10 @@ var viewColumnChanges = []viewColumnChange{
 	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 	{Version: 6, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 	{Version: 7, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	{Version: 8, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	{Version: 8, View: "athena", Was: ListColumn{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12}},
+	{Version: 8, View: "kms", Was: ListColumn{Title: "Alias", Path: "AliasName", Width: 32}},
+	{Version: 9, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 }
 
 // keyMoveVersion is the stamp at which every built-in column took the key its
@@ -313,6 +317,7 @@ var viewColumnAdditions = []struct { //nolint:gochecknoglobals // static migrati
 	Title   string
 }{
 	{Version: 5, View: "lambda", Title: "Handler"},
+	{Version: 9, View: "sfn_execution_history", Title: "Status"},
 }
 
 // introducedAfter reports whether the named column entered the built-in views
@@ -392,10 +397,14 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	// every other field, and comparing only the fields a given correction
 	// happens to change would leave the next kind of correction stranded.
 	for i, on := range vd.List {
-		if moved, ok := movedStatusKey(name, on, vd.Generated); ok {
+		now, ok := want[on.Title]
+		// A column already carrying the key this build declares for it is
+		// current, whatever its title reads as. Only a column whose key this
+		// build has no use for can be one the replaced status rule keyed.
+		current := ok && on.Key == now.Key
+		if moved, movedOK := movedStatusKey(name, on, vd.Generated); movedOK && !current {
 			vd.List[i].Key = moved
 		}
-		now, ok := want[on.Title]
 		if !ok {
 			continue
 		}

@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
 
@@ -70,11 +71,17 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 	}
 	events := f.fix.LogEvents[logGroupName]
 	filtered := make([]cwlogstypes.FilteredLogEvent, 0, len(events))
-	for _, e := range events {
+	for i, e := range events {
+		// EventId and LogStreamName are what FilterLogEvents adds over
+		// GetLogEvents, and consumers key their rows by them: without an id
+		// every event of a group collapses onto one row. The fixture stores
+		// events per group, so the stream is the group's own.
 		filtered = append(filtered, cwlogstypes.FilteredLogEvent{
 			Timestamp:     e.Timestamp,
 			Message:       e.Message,
 			IngestionTime: e.IngestionTime,
+			EventId:       aws.String(fmt.Sprintf("%d%011d", aws.ToInt64(e.Timestamp), i)),
+			LogStreamName: aws.String(f.filteredStreamName(logGroupName, i)),
 		})
 	}
 	return &cloudwatchlogs.FilterLogEventsOutput{Events: filtered}, nil
@@ -114,6 +121,17 @@ func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloud
 		logGroupName = *input.LogGroupName
 	}
 	return &cloudwatchlogs.DescribeSubscriptionFiltersOutput{SubscriptionFilters: f.fix.SubscriptionFilters[logGroupName]}, nil
+}
+
+// filteredStreamName names the stream the i-th event of a group came from,
+// cycling the group's fixture streams, and "" for a group the fixtures give
+// no streams — the same empty value a real event without one carries.
+func (f *CWLogsFake) filteredStreamName(logGroupName string, i int) string {
+	streams := f.fix.LogStreams[logGroupName]
+	if len(streams) == 0 {
+		return ""
+	}
+	return aws.ToString(streams[i%len(streams)].LogStreamName)
 }
 
 // hasLogGroup reports whether the fixtures register this log group. A group

@@ -111,12 +111,15 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 	},
 	{
-		Name:          "IAM Policies",
-		ShortName:     "policy",
-		LifecycleKey:  "risk",
-		Aliases:       []string{"policy", "policies", "iam-policies", "iam_policies"},
-		Category:      "SECURITY & IAM",
-		CloudTrailKey: "ResourceName:ID",
+		Name:      "IAM Policies",
+		ShortName: "policy",
+		// Document is the version GetPolicyVersion returns and lands on
+		// PolicyEnriched when the detail opens.
+		ComputedDetailPaths: []string{"Document"},
+		LifecycleKey:        "risk",
+		Aliases:             []string{"policy", "policies", "iam-policies", "iam_policies"},
+		Category:            "SECURITY & IAM",
+		CloudTrailKey:       "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -330,7 +333,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.WAFv2CloudFront, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
-		FieldKeys:              []string{"name", "id", "description", "scope"},
+		FieldKeys:              []string{"name", "id", "description", "scope", "arn", "lock_token"},
 		IssueEnricherFieldKeys: []string{"rules_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
@@ -386,7 +389,7 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		},
 		Columns:   resource.RolePolicyColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
+		FieldKeys: []string{"policy_name", "policy_arn", "policy_type", "role_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)
 		}),

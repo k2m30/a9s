@@ -66,7 +66,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichGlueJobStatus, Priority: 10},
-		FieldKeys: []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified"},
+		FieldKeys: []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified", "command", "created_on", "max_retries", "role"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true, Truncated: true},
@@ -101,7 +101,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Columns: []domain.Column{
 			{Key: "workgroup_name", Title: "Workgroup", Path: "Name", Width: 28},
 			{Key: "state", Title: "Status", Path: "State", Width: 12},
-			{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12},
+			{Key: "cost_cap", Title: "Cost Cap", Width: 12},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
 		},
@@ -110,7 +110,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichAthenaWorkGroup, Priority: 100},
-		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location"},
+		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location", "creation_time", "cost_cap"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS, Truncated: true},

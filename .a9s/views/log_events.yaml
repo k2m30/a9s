@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Timestamp:
     key: timestamp
@@ -11,4 +11,4 @@ detail:
   - Timestamp
   - Message
   - IngestionTime
-  - EventId
+  - { key: event_id, label: "Event ID" }

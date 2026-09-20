@@ -12,7 +12,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "PublicIpAddress"}, {Path: "IamInstanceProfile"},
 				{Path: "SecurityGroups"}, {Path: "BlockDeviceMappings"}, {Path: "EbsOptimized"}, {Path: "MetadataOptions"},
 				{Path: "LaunchTime"}, {Path: "Architecture"}, {Path: "Platform"}, {Path: "Tags"},
-				{Path: "UserData"},
+				{Path: "NetworkInterfaces"}, {Path: "UserData"},
 			},
 		},
 		"ecs": {
@@ -21,7 +21,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "RunningTasksCount"}, {Path: "PendingTasksCount"},
 				{Path: "ActiveServicesCount"}, {Path: "RegisteredContainerInstancesCount"},
 				{Path: "CapacityProviders"}, {Path: "DefaultCapacityProviderStrategy"},
-				{Path: "Settings"}, {Path: "Tags"},
+				{Path: "Settings"}, {Path: "Configuration"}, {Path: "Tags"},
 			},
 		},
 		"ecs-svc": {
@@ -52,8 +52,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "Description"}, {Path: "Role"}, {Path: "PackageType"}, {Path: "Architectures"},
 				{Path: "State"}, {Path: "LastUpdateStatus"}, {Path: "LastUpdateStatusReason"},
 				{Path: "Environment"}, {Path: "VpcConfig"}, {Path: "DeadLetterConfig"},
-				{Path: "TracingConfig"}, {Path: "Layers"}, {Path: "LoggingConfig"}, {Path: "LastModified"},
-				{Path: "Concurrency"},
+				{Path: "TracingConfig"}, {Path: "Layers"}, {Path: "LoggingConfig"}, {Path: "KMSKeyArn"},
+				{Path: "LastModified"}, {Path: "Concurrency"},
 			},
 		},
 		"asg": {

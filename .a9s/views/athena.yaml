@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Workgroup:
     path: Name
@@ -9,7 +9,7 @@ list:
     key: state
     width: 12
   Cost Cap:
-    path: Configuration.BytesScannedCutoffPerQuery
+    key: cost_cap
     width: 12
   Description:
     path: Description

@@ -139,7 +139,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
-		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id"},
+		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id", "encryption"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true},
@@ -203,7 +203,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		// in-fetcher work. It is cache-only, so Priority 200 lets the s3
 		// enricher (100) populate the bucket findings it reads.
 		Wave2:     IssueEnricher{Fn: EnrichTrailLogBucket, Priority: 200},
-		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn"},
+		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn", "latest_delivery_time", "org_trail"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true, Truncated: true},
@@ -255,7 +255,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
 			return ctLocalPrincipals(c)(FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken))
 		}),
-		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome", "_ct.cause", "_ct.error_code"},
+		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome", "_ct.cause", "_ct.error_code", "_ct.account_id", "_ct.cross_account", "_ct.event_category", "_ct.event_type", "_ct.is_root", "_ct.recipient_account", "_ct.region", "_ct.source_ip", "shared_event_id"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: false, Truncated: true},
@@ -274,10 +274,6 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: checkCtEventsPivotByUsername, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CT events by EventName", Checker: checkCtEventsPivotByEventName, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CT events by SharedEventId", Checker: checkCtEventsPivotBySharedEventId, NeedsTargetCache: false},
-		},
-		Navigable: []domain.NavigableField{
-			{FieldPath: "user", TargetType: "iam-user"},
-			{FieldPath: "role_name", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeCTEventDanger, Phrase: "destructive call", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudTrail recorded a call that deletes or tears something down. Verify it was expected and, if not, find out who made it."},
@@ -319,7 +315,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 		Columns:   resource.LogEventColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group", "log_stream"},
+		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),

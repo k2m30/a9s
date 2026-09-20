@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Columns and detail rows that could never carry a value now do. Athena's Cost
+  Cap reads the per-query scan limit the workgroup configures, and a CodeBuild
+  or CloudWatch log line's Event ID row shows the event's id. A Launch Template,
+  MWAA environment, Transfer server, Transfer agreement, VPC peering
+  connection, Redis replication group and CodePipeline stage can now be
+  addressed by field path in a `~/.a9s/views/` file: the views reference lists
+  every field of the object a9s actually holds for them.
+- Detail rows an operator could jump from but never see are now shown: an EC2
+  instance's network interfaces, an ECS cluster's execute-command
+  configuration, a Lambda function's KMS key, an OpenSearch domain's VPC
+  options, a Redshift cluster's VPC, an EFS file system's KMS key, a
+  CloudTrail trail's SNS topic and CloudWatch Logs role, a CloudFormation
+  stack's notification topics, and a CodeBuild project's encryption key and
+  VPC configuration.
+- Demo mode now shows CodeBuild build logs and ECS service logs, which drilled
+  into an empty list.
 - A log group and the alarms watching it now find each other through the
   metric filter that links them. A filter turns a log pattern into a metric in
   a namespace the operator chose, and the alarm is over that metric, so
@@ -297,6 +313,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not been loaded.
 - A CloudTrail event from another account no longer fills the role and user
   of the local namesake.
+- A Step Functions execution history shows the state name a person wrote in
+  their state machine definition, verbatim, in its State column, and carries
+  the event's own verdict in a new Status column beside it. A failed event
+  names the kind of failure it was — a Lambda error, an execution timeout, a
+  manual abort — instead of every one of them reading `task failed`.
 
 ### Removed
 

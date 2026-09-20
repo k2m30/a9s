@@ -65,6 +65,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 		FieldKeys: []string{
 			"cluster_name", "version", "status", "endpoint", "platform_version",
 			"arn", "health_issues_count", "health_issues", "subnet_ids",
+			"control_plane_logging", "degraded_finding", "name", "public_endpoint", "secrets_encryption", "version_support",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true, Truncated: true},
@@ -133,6 +134,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 		FieldKeys: []string{
 			"nodegroup_name", "cluster_name", "status", "instance_types",
 			"desired_size", "health_issues_count", "health_issues", "image_id",
+			"degraded_finding", "name",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true, Truncated: true},
@@ -258,6 +260,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			"image_tags", "digest_short", "pushed_at", "image_size", "image_size_raw",
 			"scan_status", "finding_counts", "image_uri", "image_digest",
 			"repository_name",
+			"status",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
@@ -331,7 +334,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 		Columns:   resource.EcsSvcLogColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"timestamp", "stream_short", "message", "log_group", "log_stream"},
+		FieldKeys: []string{"timestamp", "stream_short", "message", "log_group", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),

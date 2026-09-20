@@ -60,13 +60,20 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		}
 
 		outputLocation := ""
+		costCap := ""
 		if getAPI != nil && wgName != "" {
 			if wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)}); wgErr == nil &&
 				wgOut != nil && wgOut.WorkGroup != nil &&
-				wgOut.WorkGroup.Configuration != nil &&
-				wgOut.WorkGroup.Configuration.ResultConfiguration != nil &&
-				wgOut.WorkGroup.Configuration.ResultConfiguration.OutputLocation != nil {
-				outputLocation = *wgOut.WorkGroup.Configuration.ResultConfiguration.OutputLocation
+				wgOut.WorkGroup.Configuration != nil {
+				cfg := wgOut.WorkGroup.Configuration
+				if cfg.ResultConfiguration != nil && cfg.ResultConfiguration.OutputLocation != nil {
+					outputLocation = *cfg.ResultConfiguration.OutputLocation
+				}
+				// A nil cutoff means the workgroup caps nothing, which reads
+				// as an empty cell rather than a zero-byte budget.
+				if cfg.BytesScannedCutoffPerQuery != nil {
+					costCap = formatBytes(*cfg.BytesScannedCutoffPerQuery)
+				}
 			}
 		}
 
@@ -80,6 +87,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 				"creation_time":          creationTime,
 				"engine_version":         engineVersion,
 				"result_output_location": outputLocation,
+				"cost_cap":               costCap,
 			},
 			RawStruct: wg,
 		}

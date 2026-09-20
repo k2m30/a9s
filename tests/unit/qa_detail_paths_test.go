@@ -72,8 +72,10 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 				t.Fatalf("Body.Detail is nil for %s", shortName)
 			}
 
-			vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(40))
-			m := views.NewTransientDetail(120, 40, vp)
+			// Tall enough that no configured field is cut off by the
+			// viewport rather than by the renderer.
+			vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(120))
+			m := views.NewTransientDetail(120, 120, vp)
 			plain := stripAnsi(m.RenderDetail(*body))
 
 			for _, df := range vd.Detail {

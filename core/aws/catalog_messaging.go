@@ -84,7 +84,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:         "SFN Execution History",
 		ShortName:    "sfn_execution_history",
-		LifecycleKey: "state_name",
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["execution_arn"]
 			if arn == "" {
@@ -98,12 +98,13 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		FieldKeys: []string{
 			"timestamp", "event_type", "event_type_short",
 			"state_name", "event_detail", "event_id", "previous_event_id", "execution_arn",
+			"status",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeSFNHistoryEventFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This step of the workflow failed, and unless a catcher handled it everything after it was skipped. The event's error and cause fields name the service call that failed and what it returned."},
+			{Code: CodeSFNHistoryEventFailed, Phrase: "<failed event type>", Severity: domain.SevBroken, Source: "wave1", Detail: "This step of the workflow failed, and unless a catcher handled it everything after it was skipped. The event's error and cause fields name the service call that failed and what it returned."},
 		},
 	},
 	{
@@ -193,12 +194,15 @@ func colorSES(r domain.Resource) domain.Color {
 
 var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "SQS Queues",
-		ShortName:     "sqs",
-		RefToID:       sqsRefToID,
-		Aliases:       []string{"sqs", "queues"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:Fields.arn",
+		Name:      "SQS Queues",
+		ShortName: "sqs",
+		// ListQueues returns URLs and GetQueueAttributes a map[string]string,
+		// which the fetcher assembles into the row.
+		ComputedDetailPaths: []string{"QueueUrl", "Attributes"},
+		RefToID:             sqsRefToID,
+		Aliases:             []string{"sqs", "queues"},
+		Category:            "MESSAGING",
+		CloudTrailKey:       "ResourceName:Fields.arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -243,12 +247,15 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:          "SNS Topics",
-		ShortName:     "sns",
-		RefToID:       snsRefToID,
-		Aliases:       []string{"sns", "topics"},
-		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:      "SNS Topics",
+		ShortName: "sns",
+		// Attributes is the GetTopicAttributes map and lands on TopicEnriched
+		// when the detail opens.
+		ComputedDetailPaths: []string{"Attributes"},
+		RefToID:             snsRefToID,
+		Aliases:             []string{"sns", "topics"},
+		Category:            "MESSAGING",
+		CloudTrailKey:       "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/topic/"+r.ID)
 		},
@@ -366,7 +373,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchEBEnvironmentsPage(ctx, c.ElasticBeanstalk, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichEBEnvironmentHealth, Priority: 100},
-		FieldKeys: []string{"environment_name", "application_name", "status", "health", "version_label", "environment_arn"},
+		FieldKeys: []string{"environment_name", "application_name", "status", "health", "version_label", "environment_arn", "date_created", "endpoint_url", "environment_id", "platform_arn", "solution_stack"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cfn", DisplayName: "CloudFormation Stack", Checker: checkEbCFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true, Truncated: true},
@@ -470,7 +477,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichKinesisStreamSummary, Priority: 100},
-		FieldKeys: []string{"stream_name", "status", "stream_mode", "creation_time"},
+		FieldKeys: []string{"stream_name", "status", "stream_mode", "creation_time", "stream_arn", "stream_status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: true, Truncated: true},
@@ -513,7 +520,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichMSKCluster, Priority: 100},
-		FieldKeys: []string{"cluster_name", "cluster_type", "state", "version", "cluster_arn"},
+		FieldKeys: []string{"cluster_name", "cluster_type", "state", "version", "cluster_arn", "status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
@@ -545,13 +552,16 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:           "Step Functions",
-		ShortName:      "sfn",
-		RefToID:        sfnRefToID,
-		HumanizeFields: []string{"type"},
-		Aliases:        []string{"sfn", "stepfunctions", "state-machines"},
-		Category:       "MESSAGING",
-		CloudTrailKey:  "ResourceName:ID",
+		Name:      "Step Functions",
+		ShortName: "sfn",
+		// Status and RoleArn are DescribeStateMachine fields and land on
+		// StateMachineEnriched when the detail opens.
+		ComputedDetailPaths: []string{"Status", "RoleArn"},
+		RefToID:             sfnRefToID,
+		HumanizeFields:      []string{"type"},
+		Aliases:             []string{"sfn", "stepfunctions", "state-machines"},
+		Category:            "MESSAGING",
+		CloudTrailKey:       "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {

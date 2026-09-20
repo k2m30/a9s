@@ -58,7 +58,8 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "DomainName"}, {Path: "DomainId"}, {Path: "ARN"}, {Path: "EngineVersion"},
 				{Path: "ClusterConfig"}, {Path: "EBSOptions"}, {Path: "Endpoint"}, {Path: "Endpoints"},
 				{Path: "EncryptionAtRestOptions"}, {Path: "DomainEndpointOptions"},
-				{Path: "AdvancedSecurityOptions"}, {Path: "Created"}, {Path: "Deleted"},
+				{Path: "AdvancedSecurityOptions"}, {Path: "VPCOptions"},
+				{Path: "Created"}, {Path: "Deleted"},
 			},
 		},
 		"redshift": {
@@ -66,13 +67,13 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "ClusterIdentifier"}, {Path: "ClusterStatus"}, {Path: "NodeType"},
 				{Path: "NumberOfNodes"}, {Path: "DBName"}, {Path: "MasterUsername"},
 				{Path: "Endpoint"}, {Path: "ClusterCreateTime"}, {Path: "ClusterNamespaceArn"},
-				{Path: "AvailabilityZone"},
+				{Path: "VpcId"}, {Path: "AvailabilityZone"},
 			},
 		},
 		"efs": {
 			Detail: []DetailField{
 				{Path: "FileSystemId"}, {Path: "Name"}, {Path: "LifeCycleState"}, {Path: "PerformanceMode"},
-				{Path: "ThroughputMode"}, {Path: "Encrypted"}, {Path: "NumberOfMountTargets"},
+				{Path: "ThroughputMode"}, {Path: "Encrypted"}, {Path: "KmsKeyId"}, {Path: "NumberOfMountTargets"},
 				{Path: "FileSystemArn"}, {Path: "OwnerId"}, {Path: "SizeInBytes"}, {Path: "CreationTime"}, {Path: "Tags"},
 			},
 		},

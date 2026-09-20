@@ -91,6 +91,12 @@ type ResourceTypeDef struct {
 	// types back — an access key, a role id, an API operation name — must
 	// stay verbatim or it stops being the thing they can search for.
 	HumanizeFields []string
+	// ComputedDetailPaths lists the detail-view paths of this type whose value
+	// is assembled outside the AWS SDK struct the list is built from — a policy
+	// document or an attribute map fetched on detail open, a value the
+	// projector synthesises. core/config/views_reference.yaml reflects that
+	// struct alone, so the type declares these paths here.
+	ComputedDetailPaths []string
 
 	// ─── Behavior ──────────────────────────────────────────────────────────
 
@@ -262,10 +268,6 @@ func HumanizeFieldKey(s string) string {
 	return strings.ToLower(strings.NewReplacer("_", "", " ", "", ".", "").Replace(s))
 }
 
-// HumanizedFields returns HumanizeFields as a lookup set keyed by
-// HumanizeFieldKey, or nil when the type declares none. The list surface, the
-// detail surface and any later reader ask here, so none of them can disagree
-// about which fields the type wants in words.
 // StatusKey is the Fields key this type's status cell reads, and so the key
 // its status column names: LifecycleKey, or "state" when the type declares
 // none. The render cascade, the decorator lookup, the status-column resolver
@@ -277,6 +279,10 @@ func (d ResourceTypeDef) StatusKey() string {
 	return "state"
 }
 
+// HumanizedFields returns HumanizeFields as a lookup set keyed by
+// HumanizeFieldKey, or nil when the type declares none. The list surface, the
+// detail surface and any later reader ask here, so none of them can disagree
+// about which fields the type wants in words.
 func (d ResourceTypeDef) HumanizedFields() map[string]bool {
 	if len(d.HumanizeFields) == 0 {
 		return nil

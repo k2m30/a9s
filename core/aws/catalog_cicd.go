@@ -88,7 +88,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichCFNCombined, Priority: 100},
-		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description", "arn"},
+		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description", "arn", "output_secret", "termination_protection"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole},
 			{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true, Truncated: true},
@@ -322,7 +322,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichCodeArtifactRepository, Priority: 100},
-		FieldKeys:              []string{"repo_name", "domain_name", "description", "domain_owner", "arn"},
+		FieldKeys:              []string{"repo_name", "domain_name", "description", "domain_owner", "arn", "admin_account", "created_time"},
 		IssueEnricherFieldKeys: []string{"package_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeartifactKMS, NeedsTargetCache: false},
@@ -402,7 +402,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns:   resource.CBBuildLogColumns(),
 		CopyField: "message",
-		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group_name", "log_stream_name"},
+		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group_name", "log_stream_name", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchCBBuildLogs(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),
@@ -424,6 +424,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"stage_name", "stage_status", "action_name", "action_status",
 			"last_change_time", "external_url", "action_token",
 			"action_error_details", "revision_id", "revision_summary", "pipeline_name",
+			"status",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)

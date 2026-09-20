@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Stack Name:
     path: StackName
@@ -41,6 +41,7 @@ detail:
   - Capabilities
   - EnableTerminationProtection
   - DriftInformation
+  - NotificationARNs
   - Parameters
   - Outputs
   - Tags

@@ -19,9 +19,16 @@ import (
 )
 
 // TestEveryTypeDeclaresOneStatusColumn sweeps the whole catalog, parents and
-// children. A type with a column an operator reads as the status column — one
-// titled "Status" or "State" — must declare that column, and a type must not
-// declare two.
+// children. A type must not declare two status columns, and where it has a
+// column an operator reads as the status column — one titled "Status" or
+// "State" — one of those titles must be the declared one.
+//
+// The title a word carries is the type's to decide: sfn_execution_history's
+// "State" is the name of a step in the operator's state machine definition,
+// and its verdict lives in the "Status" column beside it. What an operator
+// cannot be left with is a table where every title that reads as a status
+// names some other key, because then no cell on the row ever shows a finding
+// phrase.
 func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 	types := append(resource.AllResourceTypes(), resource.AllChildTypes()...)
 	for _, td := range types {
@@ -31,12 +38,15 @@ func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 		}
 
 		declared, titled := 0, 0
+		titledIsDeclared := false
 		for _, col := range td.Columns {
-			if config.IsStatusColumn(col.Key, lifecycleKey) {
+			isStatus := config.IsStatusColumn(col.Key, lifecycleKey)
+			if isStatus {
 				declared++
 			}
 			if col.Title == "Status" || col.Title == "State" {
 				titled++
+				titledIsDeclared = titledIsDeclared || isStatus
 			}
 		}
 
@@ -45,10 +55,10 @@ func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 				"second one carrying it makes the cell depend on which is found first",
 				td.ShortName, declared, lifecycleKey)
 		}
-		if titled > declared {
-			t.Errorf("%s has a column titled Status or State that does not name the type's lifecycle "+
-				"key %q — the cell reads the key the column declares, so this one shows whatever the "+
-				"fetcher happens to store there and never a finding phrase",
+		if titled > 0 && !titledIsDeclared {
+			t.Errorf("%s has a column titled Status or State and none of them names the type's "+
+				"lifecycle key %q — the cell reads the key the column declares, so each shows "+
+				"whatever the fetcher happens to store there and never a finding phrase",
 				td.ShortName, lifecycleKey)
 		}
 	}

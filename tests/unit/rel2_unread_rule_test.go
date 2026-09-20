@@ -35,8 +35,8 @@ func rel2WarmEBSRow() resource.Resource {
 	}
 }
 
-// rel2BackupClients is a session with the region and account the ebs backup
-// pivot builds the volume's ARN from.
+// rel2BackupClients is a session with the region and account the ebs and ec2
+// backup pivots build their resource's ARN from.
 func rel2BackupClients() *awsclient.ServiceClients {
 	clients := &awsclient.ServiceClients{Region: "us-east-1"}
 	store := session.NewIdentityStore()

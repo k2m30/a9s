@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Cluster ID:
     path: ClusterIdentifier
@@ -38,4 +38,5 @@ detail:
   - Endpoint
   - ClusterCreateTime
   - ClusterNamespaceArn
+  - VpcId
   - AvailabilityZone

@@ -965,14 +965,17 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenARNHasNoSlash(t *testi
 
 // checkEC2Backup matches a plan's selection by its ListOfTags against the
 // instance tags or by its ARN patterns, per docs/resources/ec2.md.
+//
+// A plan that names no ARN pattern still decides the instance, so the ARN the
+// pivot composes from the session identity is what separates "no plan covers
+// it" from "the coverage question was never answerable".
 
 // TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag verifies that
 // a backup plan's ListOfTags matching the instance's own Tags[] counts as
 // related, independent of the ARN-pattern signal.
 func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 	res := resource.Resource{
-		ID:     "i-0abc123def456",
-		Fields: map[string]string{"arn": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"},
+		ID: "i-0abc123def456",
 		RawStruct: ec2types.Instance{
 			Tags: []ec2types.Tag{
 				{Key: aws.String("backup-tier"), Value: aws.String("prod")},
@@ -985,7 +988,7 @@ func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 		}},
 	}
 	checker := fieldExtractionChecker(t, "ec2", "backup")
-	result := checker(context.Background(), nil, res, cache)
+	result := checker(context.Background(), rel2BackupClients(), res, cache)
 
 	if result.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (spec ec2.md:49 selection_tags match against Instance.Tags[])", result.Count())
@@ -996,11 +999,11 @@ func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
 }
 
 // TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer verifies that
-// a mismatched selection tag value does not count.
+// a mismatched selection tag value does not count, and that the answer is a
+// proven zero rather than an undecided one.
 func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
 	res := resource.Resource{
-		ID:     "i-0abc123def456",
-		Fields: map[string]string{"arn": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"},
+		ID: "i-0abc123def456",
 		RawStruct: ec2types.Instance{
 			Tags: []ec2types.Tag{
 				{Key: aws.String("backup-tier"), Value: aws.String("dev")},
@@ -1013,8 +1016,11 @@ func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
 		}},
 	}
 	checker := fieldExtractionChecker(t, "ec2", "backup")
-	result := checker(context.Background(), nil, res, cache)
+	result := checker(context.Background(), rel2BackupClients(), res, cache)
 
+	if result.State() != domain.RelatedResolved {
+		t.Fatalf("State = %v, want resolved", result.State())
+	}
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (selection_tags value mismatch)", result.Count())
 	}

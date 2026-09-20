@@ -29,6 +29,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Path: "IsMultiRegionTrail"}, {Path: "IsOrganizationTrail"},
 				{Path: "LogFileValidationEnabled"}, {Path: "IncludeGlobalServiceEvents"},
 				{Path: "KmsKeyId"}, {Path: "CloudWatchLogsLogGroupArn"},
+				{Path: "CloudWatchLogsRoleArn"}, {Path: "SnsTopicARN"},
 				{Key: "is_logging", Label: "Logging"},
 				{Key: "latest_delivery_error", Label: "Latest Delivery Error"},
 			},
@@ -48,7 +49,8 @@ func monitoringDefaultViews() map[string]ViewDef {
 		},
 		"log_events": {
 			Detail: []DetailField{
-				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"}, {Path: "EventId"},
+				{Path: "Timestamp"}, {Path: "Message"}, {Path: "IngestionTime"},
+				{Key: "event_id", Label: "Event ID"},
 			},
 		},
 		"ct-events": {

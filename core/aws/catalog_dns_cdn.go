@@ -107,9 +107,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
 		}),
 		Wave2: IssueEnricher{Fn: EnrichCloudFrontDistribution, Priority: 100, Reads: []string{"s3"}},
-		// lambda_function_arns — required for the lambda:cf related-panel
-		// pivot (checkLambdaCF); cache-restored rows have no RawStruct, so
-		// this must survive the YAML cache round-trip via FieldKeys.
+		// checkLambdaCF (the lambda:cf pivot) matches on lambda_function_arns
+		// read off cf rows replayed from the disk cache, which carries Fields
+		// but no RawStruct.
 		FieldKeys: []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class", "lambda_function_arns"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfS3, NeedsTargetCache: true, Truncated: true},
@@ -162,7 +162,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
 		}),
-		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"},
+		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left", "certificate_arn", "key_algorithm"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},

@@ -38,6 +38,7 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
@@ -48,6 +49,7 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
@@ -91,7 +93,7 @@ func main() {
 		{"ec2", "ec2types.Instance", reflect.TypeFor[ec2types.Instance]()},
 		{"dbi", "rdstypes.DBInstance", reflect.TypeFor[rdstypes.DBInstance]()},
 		{"dbi_events", "rdstypes.Event", reflect.TypeFor[rdstypes.Event]()},
-		{"redis", "elasticachetypes.CacheCluster", reflect.TypeFor[elasticachetypes.CacheCluster]()},
+		{"redis", "elasticachetypes.ReplicationGroup", reflect.TypeFor[elasticachetypes.ReplicationGroup]()},
 		{"dbc", "docdbtypes.DBCluster", reflect.TypeFor[docdbtypes.DBCluster]()},
 		{"eks", "ekstypes.Cluster", reflect.TypeFor[ekstypes.Cluster]()},
 		{"secrets", "smtypes.SecretListEntry", reflect.TypeFor[smtypes.SecretListEntry]()},
@@ -177,6 +179,12 @@ func main() {
 		{"ebs-snap", "ec2types.Snapshot", reflect.TypeFor[ec2types.Snapshot]()},
 		{"ami", "ec2types.Image", reflect.TypeFor[ec2types.Image]()},
 		{"ct-events", "cloudtrailtypes.Event", reflect.TypeFor[cloudtrailtypes.Event]()},
+		{"lt", "awsclient.LTRaw", reflect.TypeFor[awsclient.LTRaw]()},
+		{"mwaa", "mwaatypes.Environment", reflect.TypeFor[mwaatypes.Environment]()},
+		{"transfer", "transfertypes.DescribedServer", reflect.TypeFor[transfertypes.DescribedServer]()},
+		{"transfer_agreements", "transfertypes.DescribedAgreement", reflect.TypeFor[transfertypes.DescribedAgreement]()},
+		{"vpc-peer", "ec2types.VpcPeeringConnection", reflect.TypeFor[ec2types.VpcPeeringConnection]()},
+		{"pipeline_stages", "awsclient.PipelineStageRow", reflect.TypeFor[awsclient.PipelineStageRow]()},
 	}
 
 	fmt.Println("# views_reference.yaml")
@@ -206,11 +214,6 @@ func main() {
 		}},
 		{"lambda_invocation_logs", "synthetic (CloudWatch log lines)", []string{
 			"timestamp", "message",
-		}},
-		{"pipeline_stages", "synthetic (CodePipeline stage/action state)", []string{
-			"stage_name", "stage_status", "action_name", "action_status",
-			"last_change_time", "external_url", "action_token",
-			"action_error_details", "revision_id", "revision_summary",
 		}},
 	}
 	for _, s := range synthetic {

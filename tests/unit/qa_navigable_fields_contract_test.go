@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
 type navContract struct {
@@ -63,8 +64,7 @@ var navigableContracts = []navContract{
 	{shortName: "cfn", apiDoc: "https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html", fieldPath: "NotificationARNs", targetType: "sns", reasoning: "Stack.NotificationARNs is a list of SNS topics CloudFormation publishes stack events to."},
 
 	// ct-events — CloudTrail Events
-	{shortName: "ct-events", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html", fieldPath: "user", targetType: "iam-user", reasoning: "CloudTrail Event user identity (Type=IAMUser) links to IAM Users."},
-	{shortName: "ct-events", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html", fieldPath: "role_name", targetType: "role", reasoning: "CloudTrail Event user identity (Type=AssumedRole) session carries the role name."},
+	{shortName: "ct-events", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html", fieldPath: "", reasoning: "userIdentity.arn names an IAM user, an assumed-role session or the account root, so the target type is a property of the ARN's shape rather than of the field. TestCtEventsPrincipalRowNavigatesByARNShape covers the mapping."},
 
 	// dbc — DocumentDB Clusters. docdb_types.DBCluster.DBSubnetGroup is *string
 	// (just the subnet-group name), not a struct — VPC/Subnet navigation is
@@ -408,4 +408,99 @@ func findContract(shortName, fieldPath string) navContract {
 		}
 	}
 	return navContract{}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ct-events principal navigation
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestCtEventsPrincipalRowNavigatesByARNShape pins the ACTOR section's
+// Principal row to the three userIdentity shapes CloudTrail documents at
+// https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html:
+//
+//   - IAMUser      → arn:aws:iam::<account>:user/<path>/<name>, navigable to iam-user
+//     under the bare user name, which is the id a9s browses IAM users by.
+//   - AssumedRole  → arn:aws:sts::<account>:assumed-role/<role>/<session>, navigable
+//     to role under the bare role name; the session suffix names no resource.
+//   - Root         → arn:aws:iam::<account>:root, which names the account itself and
+//     no browseable resource, so the row stays display-only.
+//
+// The displayed Value is the full ARN in every case; NavID carries what
+// navigation dispatches on.
+func TestCtEventsPrincipalRowNavigatesByARNShape(t *testing.T) {
+	cases := []struct {
+		name       string
+		event      string
+		navigable  bool
+		targetType string
+		navID      string
+		value      string
+	}{
+		{
+			name:       "IAMUser",
+			event:      `{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE","arn":"arn:aws:iam::123456789012:user/ops/dana","accountId":"123456789012","userName":"dana"},"eventTime":"2026-03-28T12:10:05Z","eventSource":"s3.amazonaws.com","eventName":"GetObject","awsRegion":"us-east-1","eventID":"e-iam-user","eventType":"AwsApiCall","eventCategory":"Management"}`,
+			navigable:  true,
+			targetType: "iam-user",
+			navID:      "dana",
+			value:      "arn:aws:iam::123456789012:user/ops/dana",
+		},
+		{
+			name:       "AssumedRole",
+			event:      `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE:sess","arn":"arn:aws:sts::123456789012:assumed-role/acme-deploy-role/sess","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","arn":"arn:aws:iam::123456789012:role/acme-deploy-role","userName":"acme-deploy-role"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-03-28T12:00:00Z"}}},"eventTime":"2026-03-28T12:10:05Z","eventSource":"ec2.amazonaws.com","eventName":"DescribeInstances","awsRegion":"us-east-1","eventID":"e-assumed-role","eventType":"AwsApiCall","eventCategory":"Management"}`,
+			navigable:  true,
+			targetType: "role",
+			navID:      "acme-deploy-role",
+			value:      "arn:aws:sts::123456789012:assumed-role/acme-deploy-role/sess",
+		},
+		{
+			name:       "Root",
+			event:      `{"eventVersion":"1.08","userIdentity":{"type":"Root","principalId":"123456789012","arn":"arn:aws:iam::123456789012:root","accountId":"123456789012"},"eventTime":"2026-03-28T12:10:05Z","eventSource":"iam.amazonaws.com","eventName":"CreateUser","awsRegion":"us-east-1","eventID":"e-root","eventType":"AwsApiCall","eventCategory":"Management"}`,
+			navigable:  false,
+			targetType: "",
+			navID:      "",
+			value:      "arn:aws:iam::123456789012:root",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ev, err := ctevent.Parse(tc.event)
+			if err != nil {
+				t.Fatalf("ctevent.Parse: %v", err)
+			}
+			row, ok := ctPrincipalRow(ctevent.BuildSections(ev))
+			if !ok {
+				t.Fatal("the ACTOR section carries no Principal row")
+			}
+			if row.Value != tc.value {
+				t.Errorf("Principal Value = %q, want %q", row.Value, tc.value)
+			}
+			if row.IsNavigable != tc.navigable {
+				t.Errorf("Principal IsNavigable = %v, want %v", row.IsNavigable, tc.navigable)
+			}
+			if row.TargetType != tc.targetType {
+				t.Errorf("Principal TargetType = %q, want %q", row.TargetType, tc.targetType)
+			}
+			if row.NavID != tc.navID {
+				t.Errorf("Principal NavID = %q, want %q", row.NavID, tc.navID)
+			}
+		})
+	}
+}
+
+// ctPrincipalRow returns the ACTOR section's Principal row. A service event
+// carries a Service row there instead, so the second return says whether a
+// principal was rendered at all.
+func ctPrincipalRow(sections []ctevent.Section) (ctevent.Row, bool) {
+	for _, s := range sections {
+		if s.Name != ctevent.SectionActor {
+			continue
+		}
+		for _, r := range s.Rows {
+			if r.Key == "Principal" {
+				return r, true
+			}
+		}
+	}
+	return ctevent.Row{}, false
 }

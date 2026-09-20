@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Domain Name:
     path: DomainName
@@ -36,5 +36,6 @@ detail:
   - EncryptionAtRestOptions
   - DomainEndpointOptions
   - AdvancedSecurityOptions
+  - VPCOptions
   - Created
   - Deleted

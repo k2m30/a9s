@@ -154,7 +154,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "kms/home?region="+region+"#/kms/keys/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "alias", Title: "Alias", Path: "AliasName", Width: 32},
+			{Key: "alias", Title: "Alias", Width: 32},
 			{Key: "key_id", Title: "Key ID", Path: "KeyId", Width: 38},
 			{Key: "status", Title: "Status", Path: "KeyState", Width: 12},
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10},
@@ -164,7 +164,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Fetcher:                fetcherWithClients(FetchKMSKeysPage),
 		Wave2:                  IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
 		FetchByIDs:             fetchByIDsWithClients(FetchKMSKeysByIDs),
-		FieldKeys:              []string{"alias", "key_id", "status", "description"},
+		FieldKeys:              []string{"alias", "key_id", "status", "description", "aliases"},
 		IssueEnricherFieldKeys: []string{"rotation_enabled"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true, Truncated: true},

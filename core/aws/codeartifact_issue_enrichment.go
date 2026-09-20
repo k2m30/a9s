@@ -52,15 +52,9 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		r := resources[i]
 		repoName := r.Fields["repo_name"]
 		if repoName == "" {
-			repoName = r.Fields["repository_name"]
-		}
-		if repoName == "" {
 			repoName = r.ID
 		}
 		domainName := r.Fields["domain_name"]
-		if domainName == "" {
-			domainName = r.Fields["domain"]
-		}
 		domainOwner := r.Fields["domain_owner"]
 		if repoName == "" || domainName == "" {
 			return

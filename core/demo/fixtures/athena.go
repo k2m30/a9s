@@ -149,6 +149,10 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Name:  aws.String("acme-analytics"),
 					State: athenatypes.WorkGroupStateEnabled,
 					Configuration: &athenatypes.WorkGroupConfiguration{
+						// The one demo workgroup that caps per-query scan
+						// volume, so the Cost Cap column is demoed in both of
+						// its states.
+						BytesScannedCutoffPerQuery: aws.Int64(10737418240),
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/analytics-results/"),
 							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{

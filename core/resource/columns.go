@@ -168,6 +168,7 @@ func SFNExecutionHistoryColumns() []Column {
 	return []Column{
 		{Key: "timestamp", Title: "Timestamp", Path: "Timestamp", Width: 22},
 		{Key: "event_type_short", Title: "Event Type", Width: 24},
+		{Key: "status", Title: "Status", Width: 12},
 		{Key: "state_name", Title: "State", Width: 24},
 		{Key: "event_detail", Title: "Detail", Width: 40},
 	}

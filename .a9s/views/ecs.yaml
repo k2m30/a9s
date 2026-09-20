@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Cluster Name:
     path: ClusterName
@@ -32,4 +32,5 @@ detail:
   - CapacityProviders
   - DefaultCapacityProviderStrategy
   - Settings
+  - Configuration
   - Tags

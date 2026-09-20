@@ -1,7 +1,6 @@
-generated: 7
+generated: 9
 list:
   Alias:
-    path: AliasName
     key: alias
     width: 32
   Key ID:

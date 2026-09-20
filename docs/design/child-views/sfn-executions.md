@@ -136,6 +136,9 @@ sfn_execution_history:
     Event Type:
       key: event_type_short
       width: 24
+    Status:
+      key: status
+      width: 12
     State:
       key: state_name
       width: 24
@@ -196,17 +199,17 @@ Source struct: `sfntypes.HistoryEvent`
 
 ```
  a9s v0.5.0  prod:us-east-1                                              ? for help
-┌──── sfn-history(24) — exec-2026-0322-0115-c9d0e1f2 ───────────────────────────┐
-│ TIMESTAMP              EVENT TYPE               STATE                    DETA…  │
-│ 2026-03-22 01:15:00    Execution Started        —                        {"or…  │
-│ 2026-03-22 01:15:00    State Entered            ValidateOrder            {"or…  │
-│ 2026-03-22 01:15:01    Task Scheduled           ValidateOrder            lambd…  │
-│ 2026-03-22 01:15:02    Task Succeeded           ValidateOrder            {"val…  │
-│ 2026-03-22 01:15:02    State Exited             ValidateOrder            —      │
-│ 2026-03-22 01:15:02    State Entered            ProcessPayment           {"ord…  │
-│ 2026-03-22 01:15:03    Task Scheduled           ProcessPayment           lambd…  │
-│ 2026-03-22 01:15:05    Task Failed              ProcessPayment           PayPr…  │
-│ 2026-03-22 01:15:05    Execution Failed         —                        Stat…  │
+┌──── sfn-history(24) — exec-2026-0322-0115-c9d0e1f2 ─────────────────────────────┐
+│ TIMESTAMP            EVENT TYPE        STATUS            STATE            DETA… │
+│ 2026-03-22 01:15:00  Execution Started active            —                {"or… │
+│ 2026-03-22 01:15:00  State Entered     pending           ValidateOrder    {"or… │
+│ 2026-03-22 01:15:01  Task Scheduled    pending           ValidateOrder    lambd…│
+│ 2026-03-22 01:15:02  Task Succeeded    succeeded         ValidateOrder    {"val…│
+│ 2026-03-22 01:15:02  State Exited      succeeded         ValidateOrder    —     │
+│ 2026-03-22 01:15:02  State Entered     pending           ProcessPayment   {"ord…│
+│ 2026-03-22 01:15:03  Task Scheduled    pending           ProcessPayment   lambd…│
+│ 2026-03-22 01:15:05  Task Failed       task failed       ProcessPayment   PayPr…│
+│ 2026-03-22 01:15:05  Execution Failed  execution failed  —                Stat… │
 │   · · · (15 more)                                                               │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```

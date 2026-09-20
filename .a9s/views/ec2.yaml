@@ -1,4 +1,4 @@
-generated: 7
+generated: 9
 list:
   Name:
     key: name
@@ -56,4 +56,5 @@ detail:
   - Architecture
   - Platform
   - Tags
+  - NetworkInterfaces
   - UserData

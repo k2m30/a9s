@@ -10,6 +10,7 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Path: "StackStatusReason"}, {Path: "CreationTime"}, {Path: "LastUpdatedTime"},
 				{Path: "DeletionTime"}, {Path: "Description"}, {Path: "RoleARN"}, {Path: "Capabilities"},
 				{Path: "EnableTerminationProtection"}, {Path: "DriftInformation"},
+				{Path: "NotificationARNs"},
 				{Path: "Parameters"}, {Path: "Outputs"}, {Path: "Tags"},
 			},
 		},
@@ -23,7 +24,8 @@ func cicdDefaultViews() map[string]ViewDef {
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "Description"}, {Path: "Arn"}, {Path: "Source"},
 				{Path: "Environment"}, {Path: "ServiceRole"}, {Path: "Created"}, {Path: "LastModified"},
-				{Path: "Cache"}, {Path: "LogsConfig"}, {Path: "ConcurrentBuildLimit"}, {Path: "Tags"},
+				{Path: "Cache"}, {Path: "LogsConfig"}, {Path: "ConcurrentBuildLimit"},
+				{Path: "EncryptionKey"}, {Path: "VpcConfig"}, {Path: "Tags"},
 			},
 		},
 		"ecr": {
@@ -49,7 +51,8 @@ func cicdDefaultViews() map[string]ViewDef {
 		},
 		"cb_build_logs": {
 			Detail: []DetailField{
-				{Path: "Timestamp"}, {Path: "IngestionTime"}, {Path: "Message"}, {Path: "EventId"},
+				{Path: "Timestamp"}, {Path: "IngestionTime"}, {Path: "Message"},
+				{Key: "event_id", Label: "Event ID"},
 			},
 		},
 		"pipeline_stages": {
