@@ -61,9 +61,12 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 		clusterType := string(cluster.ClusterType)
 		state := string(cluster.State)
 
+		// CurrentVersion is the opaque revision token an update call carries;
+		// the version an operator reads on a Kafka cluster is the broker
+		// software's. A serverless cluster reports none.
 		version := ""
-		if cluster.CurrentVersion != nil {
-			version = *cluster.CurrentVersion
+		if cluster.Provisioned != nil && cluster.Provisioned.CurrentBrokerSoftwareInfo != nil {
+			version = aws.ToString(cluster.Provisioned.CurrentBrokerSoftwareInfo.KafkaVersion)
 		}
 
 		clusterARN := ""

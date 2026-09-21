@@ -57,7 +57,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		if slices.Contains(ids, subnetRes.ID) {
 			continue
 		}
-		if slices.Contains(subnetRouteTableIDs(subnetRes.ID, subnetRes.Fields["vpc_id"], rtbList), res.ID) {
+		if slices.Contains(subnetRouteTableIDs(subnetRes.ID, subnetRes.Fields["vpc_id"], rtbList, !rtbTrunc), res.ID) {
 			ids = append(ids, subnetRes.ID)
 		}
 	}

@@ -137,7 +137,10 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 // VPC's main table — AWS associates a subnet with no explicit association to
 // the main table, and RouteTableAssociation carries no SubnetId for that
 // implicit association. Both directions of the rtb ↔ subnet pair read it.
-func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource) []string {
+//
+// rtbComplete says whether rtbList is the whole account's tables: the main-table
+// fallback reads "no table names this subnet", which an unread page can falsify.
+func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource, rtbComplete bool) []string {
 	var ids []string
 	mainRTBID := ""
 	for _, rtbRes := range rtbList {
@@ -158,7 +161,7 @@ func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource) []
 			}
 		}
 	}
-	if len(ids) == 0 && mainRTBID != "" {
+	if len(ids) == 0 && mainRTBID != "" && rtbComplete {
 		ids = append(ids, mainRTBID)
 	}
 	return ids
@@ -180,7 +183,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 	if rtbList == nil {
 		return resource.UnknownRelated("rtb")
 	}
-	return relatedResultTrunc("rtb", subnetRouteTableIDs(subnetID, res.Fields["vpc_id"], rtbList), truncated)
+	return relatedResultTrunc("rtb", subnetRouteTableIDs(subnetID, res.Fields["vpc_id"], rtbList, !truncated), truncated)
 }
 
 // checkSubnetCFN checks the subnet's tags for aws:cloudformation:stack-name.

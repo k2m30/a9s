@@ -28,16 +28,19 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 					ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/events-cluster/abc-123"),
 					ClusterType:    kafkatypes.ClusterTypeProvisioned,
 					State:          kafkatypes.ClusterStateActive,
-					CurrentVersion: aws.String("2.8.1"),
-					CreationTime:   &creationTime,
-					Tags:           map[string]string{"env": "production"},
+					CurrentVersion: aws.String("K3AEGXET"),
+					Provisioned: &kafkatypes.Provisioned{
+						CurrentBrokerSoftwareInfo: &kafkatypes.BrokerSoftwareInfo{KafkaVersion: aws.String("2.8.1")},
+					},
+					CreationTime: &creationTime,
+					Tags:         map[string]string{"env": "production"},
 				},
 				{
 					ClusterName:    aws.String("logs-cluster"),
 					ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/logs-cluster/def-456"),
 					ClusterType:    kafkatypes.ClusterTypeServerless,
 					State:          kafkatypes.ClusterStateCreating,
-					CurrentVersion: aws.String("3.5.1"),
+					CurrentVersion: aws.String("K7BFGT2P"),
 					CreationTime:   &creationTime,
 				},
 			},
@@ -78,6 +81,8 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Fields["cluster_type"] != "PROVISIONED" {
 		t.Errorf("resource[0].Fields[\"cluster_type\"]: expected %q, got %q", "PROVISIONED", r0.Fields["cluster_type"])
 	}
+	// The version of a Kafka cluster is its broker software's; CurrentVersion is
+	// the opaque revision token AWS carries for update calls.
 	if r0.Fields["version"] != "2.8.1" {
 		t.Errorf("resource[0].Fields[\"version\"]: expected %q, got %q", "2.8.1", r0.Fields["version"])
 	}
@@ -89,6 +94,10 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 	}
 	if r1.Fields["cluster_type"] != "SERVERLESS" {
 		t.Errorf("resource[1].Fields[\"cluster_type\"]: expected %q, got %q", "SERVERLESS", r1.Fields["cluster_type"])
+	}
+	// A serverless cluster runs no brokers of its own, so it reports no version.
+	if r1.Fields["version"] != "" {
+		t.Errorf("resource[1].Fields[\"version\"]: expected empty for a serverless cluster, got %q", r1.Fields["version"])
 	}
 
 	if r0.RawStruct == nil {
