@@ -138,7 +138,7 @@ func TestConsoleURL_PerType(t *testing.T) {
 			// ServiceArn is only present on RawStruct (ecstypes.Service), not
 			// in Fields — the literal ARN below was captured from the same
 			// demo fixture (core/demo/fixtures/ecs.go) building "api-gateway".
-			name: "ecs-svc", shortName: "ecs-svc", pickID: "api-gateway",
+			name: "ecs-svc", shortName: "ecs-svc", pickID: "acme-services/api-gateway",
 			want: func(row resource.Resource) string {
 				arn := "arn:aws:ecs:us-east-1:123456789012:service/acme-services/api-gateway"
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/ecs/v2/redirect?arn=%s&region=%s", r, url.QueryEscape(arn), r)
@@ -364,10 +364,10 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			name: "eb-rule", shortName: "eb-rule", pickID: "nightly-db-backup",
+			name: "eb-rule", shortName: "eb-rule", pickID: "default/nightly-db-backup",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/events/home?region=%s#/eventbus/%s/rules/%s",
-					r, r, url.PathEscape(row.Fields["event_bus"]), url.PathEscape(row.ID))
+					r, r, url.PathEscape(row.Fields["event_bus"]), url.PathEscape(row.Fields["name"]))
 			},
 		},
 		{
@@ -452,13 +452,9 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			// Arn is only present on RawStruct (iamtypes.Policy), not Fields —
-			// the literal ARN below was captured from the same demo fixture
-			// (core/demo/fixtures/iam.go) building "acme-s3-read-only".
-			name: "policy", shortName: "policy", pickID: "acme-s3-read-only",
+			name: "policy", shortName: "policy", pickID: "arn:aws:iam::123456789012:policy/acme-s3-read-only",
 			want: func(row resource.Resource) string {
-				arn := "arn:aws:iam::123456789012:policy/acme-s3-read-only"
-				return fmt.Sprintf("https://console.aws.amazon.com/iam/home#/policies/details/%s", url.QueryEscape(arn))
+				return fmt.Sprintf("https://console.aws.amazon.com/iam/home#/policies/details/%s", url.QueryEscape(row.ID))
 			},
 		},
 		{
@@ -509,10 +505,10 @@ func TestConsoleURL_PerType(t *testing.T) {
 			// domain_owner present directly in Fields — the AccountFromARN
 			// fallback branch is covered separately by
 			// TestConsoleURL_Codeartifact_AccountFallsBackToARNWhenDomainOwnerMissing.
-			name: "codeartifact", shortName: "codeartifact", pickID: "acme-npm",
+			name: "codeartifact", shortName: "codeartifact", pickID: "acme-artifacts/acme-npm",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/codesuite/codeartifact/d/%s/%s/r/%s",
-					r, row.Fields["domain_owner"], url.PathEscape(row.Fields["domain_name"]), url.PathEscape(row.ID))
+					r, row.Fields["domain_owner"], url.PathEscape(row.Fields["domain_name"]), url.PathEscape(row.Fields["repo_name"]))
 			},
 		},
 		{

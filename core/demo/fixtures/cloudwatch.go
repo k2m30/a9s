@@ -3,6 +3,7 @@
 package fixtures
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -1151,7 +1152,7 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 		// AlarmHistory — every graph-root-reachable alarm needs at least one
 		// entry so alarm→alarm_history drill lands on non-empty content.
 		AlarmHistory: map[string][]cwtypes.AlarmHistoryItem{
-			"orders-prod-throttle":                      minimalAlarmHistory("orders-prod-throttle"),
+			AlarmHistoryTwoItemsAtOneInstant:            flappingAlarmHistory(AlarmHistoryTwoItemsAtOneInstant),
 			"rds-prod-dbi-aurora-1-cpu":                 minimalAlarmHistory("rds-prod-dbi-aurora-1-cpu"),
 			"docdb-acme-prod-cpu":                       minimalAlarmHistory("docdb-acme-prod-cpu"),
 			"aurora-prod-cluster-cpu":                   minimalAlarmHistory("aurora-prod-cluster-cpu"),
@@ -1212,6 +1213,27 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 			HistorySummary:  aws.String("Alarm \"" + alarmName + "\" created"),
 		},
 	}
+}
+
+// AlarmHistoryTwoItemsAtOneInstant is the alarm whose history carries two
+// items of one instant: CloudWatch records the action it ran at the very
+// moment of the transition that triggered it, and DescribeAlarmHistory gives
+// neither item an id of its own.
+const AlarmHistoryTwoItemsAtOneInstant = "orders-prod-throttle"
+
+// flappingAlarmHistory is minimalAlarmHistory plus the notification the
+// transition to ALARM ran, stamped at the same instant as the transition.
+func flappingAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
+	items := minimalAlarmHistory(alarmName)
+	t0 := time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)
+	// DescribeAlarmHistory answers newest first, and the action follows the
+	// transition that ran it.
+	return slices.Insert(items, 2, cwtypes.AlarmHistoryItem{
+		AlarmName:       aws.String(alarmName),
+		Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
+		HistoryItemType: cwtypes.HistoryItemTypeAction,
+		HistorySummary:  aws.String("Successfully executed action arn:aws:sns:us-east-1:123456789012:acme-oncall"),
+	})
 }
 
 // MetricMathELBAlarmName is the ONE demo alarm that names what it watches

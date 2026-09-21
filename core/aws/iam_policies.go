@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -86,10 +87,13 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 	}, nil
 }
 
-// managedPolicyToResource builds the canonical policy Resource (ID == policy
-// name, same Fields keys as the paginated fetcher) from an IAM Policy — used by
-// both the ListPolicies page fetch and the per-name GetPolicy lazy-add so the
-// two paths can never drift in shape.
+// managedPolicyToResource builds the canonical policy Resource from an IAM
+// Policy — used by the ListPolicies page fetch, the local-policy sweep and
+// the per-name GetPolicy lazy-add, so the three paths cannot drift in shape.
+//
+// The row is keyed by the ARN, which is the identity IAM itself uses: a name
+// is unique among the account's own policies only, and an AWS-managed policy
+// of that name lives under account "aws" alongside it.
 func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 	policyName := ""
 	if policy.PolicyName != nil {
@@ -112,7 +116,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 		isAttachable = "true"
 	}
 	// Distinguish AWS-managed from customer-managed by ARN so lazy-added
-	// AWS-managed policies (resolved via getAWSManagedPolicyByName) match the
+	// AWS-managed policies (resolved via getAWSManagedPolicy) match the
 	// vocabulary buildLocalPolicies uses and callers/tests rely on.
 	policyType := "managed"
 	if policy.Arn != nil && !IsCustomerManagedIAMPolicyARN(*policy.Arn) {
@@ -123,7 +127,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 		arn = *policy.Arn
 	}
 	return resource.Resource{
-		ID:   policyName,
+		ID:   arn,
 		Name: policyName,
 		Fields: map[string]string{
 			"policy_name":      policyName,
@@ -141,7 +145,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 
 // awsManagedPolicyPathPrefixes are the ARN path prefixes AWS-managed policies
 // live under. Most are root ("/"); job-function and service-role policies carry
-// a path that the bare policy name does not reveal, so getAWSManagedPolicyByName
+// a path that the bare policy name does not reveal, so getAWSManagedPolicy
 // tries each in turn — a handful of GetPolicy calls, still bounded and vastly
 // cheaper than listing the whole ~1000+ AWS-managed catalog.
 var awsManagedPolicyPaths = []string{ //nolint:gochecknoglobals // static AWS-managed path set
@@ -151,14 +155,23 @@ var awsManagedPolicyPaths = []string{ //nolint:gochecknoglobals // static AWS-ma
 	"policy/aws-service-role/",
 }
 
-// getAWSManagedPolicyByName resolves ONE AWS-managed policy by name via GetPolicy
-// on the well-known ARN(s) arn:aws:iam::aws:policy[/<path>]/<name>. This is how
-// the lazy-add resolves the handful of AWS-managed policy names a checker emitted,
-// WITHOUT listing the whole ~1000+ AWS-managed catalog.
-func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, partition, name string) (resource.Resource, error) {
+// getAWSManagedPolicy resolves ONE AWS-managed policy via GetPolicy: on the
+// ARN itself when the reference is one, otherwise on the well-known ARNs
+// arn:aws:iam::aws:policy[/<path>]/<name>. This is how the lazy-add resolves
+// the handful of AWS-managed policies a checker emitted, WITHOUT listing the
+// whole ~1000+ AWS-managed catalog.
+func getAWSManagedPolicy(ctx context.Context, api IAMGetPolicyAPI, partition, ref string) (resource.Resource, error) {
+	paths := awsManagedPolicyPaths
+	name := ref
+	if strings.HasPrefix(ref, "arn:") {
+		paths, name = []string{""}, ""
+	}
 	var lastErr error
-	for _, path := range awsManagedPolicyPaths {
+	for _, path := range paths {
 		arn := "arn:" + partition + ":iam::aws:" + path + name
+		if name == "" {
+			arn = ref
+		}
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetPolicyOutput, error) {
 			return api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(arn)})
 		})
@@ -271,10 +284,12 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 			resources = append(resources, r)
 			continue
 		}
-		// Not customer-managed or inline — resolve as an AWS-managed policy by
-		// name via a single GetPolicy (arn:aws:iam::aws:policy/<name>), rather
-		// than having listed the whole AWS-managed catalog. Cache the hit.
-		if r, err := getAWSManagedPolicyByName(ctx, api, partition, id); err == nil {
+		// Not customer-managed or inline — resolve as an AWS-managed policy
+		// via a single GetPolicy, rather than having listed the whole
+		// AWS-managed catalog. An id that is already an ARN names the policy
+		// outright; a bare name is tried under each path AWS-managed policies
+		// live under. Cache the hit.
+		if r, err := getAWSManagedPolicy(ctx, api, partition, id); err == nil {
 			store.Set(id, r)
 			resources = append(resources, r)
 		} else {
@@ -304,58 +319,16 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 			return fmt.Errorf("listing customer-managed IAM policies for lazy-add: %w", err)
 		}
 		for _, p := range out.Policies {
-			policyName := ""
-			if p.PolicyName != nil {
-				policyName = *p.PolicyName
-			}
-			if policyName == "" {
+			if aws.ToString(p.PolicyName) == "" {
 				continue
 			}
-			attachmentCount := "0"
-			if p.AttachmentCount != nil {
-				attachmentCount = fmt.Sprintf("%d", *p.AttachmentCount)
-			}
-			path := ""
-			if p.Path != nil {
-				path = *p.Path
-			}
-			createDate := ""
-			if p.CreateDate != nil {
-				createDate = p.CreateDate.Format("2006-01-02 15:04")
-			}
-			isAttachable := "false"
-			if p.IsAttachable {
-				isAttachable = "true"
-			}
-			policyType := "managed"
-			if p.Arn != nil && !IsCustomerManagedIAMPolicyARN(*p.Arn) {
-				policyType = "aws-managed"
-			}
-			arn := ""
-			if p.Arn != nil {
-				arn = *p.Arn
-			}
-			r := resource.Resource{
-				ID:   policyName,
-				Name: policyName,
-				Fields: map[string]string{
-					"policy_name":      policyName,
-					"policy_type":      policyType,
-					"attachment_count": attachmentCount,
-					"is_attachable":    isAttachable,
-					"path":             path,
-					"create_date":      createDate,
-					"arn":              arn,
-				},
-				Findings:  orphanUnattachedPolicyFinding(attachmentCount, p.IsAttachable),
-				RawStruct: p,
-			}
-			// Index by PolicyName AND by ARN so callers that emit ARN-based IDs
-			// (e.g. checkers that embed policy.Arn from SDK structs) can still
-			// resolve the policy via FetchIAMPoliciesByIDsFull.
-			store.Set(policyName, r)
-			if p.Arn != nil && *p.Arn != policyName {
-				store.Set(*p.Arn, r)
+			r := managedPolicyToResource(p)
+			// Indexed by name as well as by ID, so a reference that names the
+			// policy the way a checker read it — a bare name from an
+			// attachment, an ARN from an SDK struct — resolves either way.
+			store.Set(r.ID, r)
+			if name := aws.ToString(p.PolicyName); name != r.ID {
+				store.Set(name, r)
 			}
 		}
 		if !out.IsTruncated || out.Marker == nil {
@@ -431,7 +404,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		names := make([]resource.Resource, 0, len(out.PolicyNames))
 		for _, name := range out.PolicyNames {
 			names = append(names, resource.Resource{
-				ID:   name,
+				ID:   inlinePolicyID(groupName, name),
 				Name: name,
 				Fields: map[string]string{
 					"policy_name":      name,
@@ -478,6 +451,13 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 // inlinePolicyPathPrefix marks the path of a group's inline policy row,
 // followed by the group's name.
 const inlinePolicyPathPrefix = "inline/"
+
+// inlinePolicyID is the row identity of a group's inline policy: the name is
+// the group's to choose, so two groups may each carry one called "s3-read",
+// and the account may hold a managed policy of that name as well.
+func inlinePolicyID(groupName, policyName string) string {
+	return inlinePolicyPathPrefix + groupName + "/" + policyName
+}
 
 // inlinePolicyGroup returns the group an inline policy row belongs to.
 func inlinePolicyGroup(res resource.Resource) (string, bool) {

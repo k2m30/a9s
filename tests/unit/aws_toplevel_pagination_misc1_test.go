@@ -586,17 +586,17 @@ func TestFetchCodeArtifactRepos_Pagination(t *testing.T) {
 	})
 
 	t.Run("page1_repo", func(t *testing.T) {
-		if resources[0].ID != "page1-repo-1" {
-			t.Errorf("expected %q, got %q", "page1-repo-1", resources[0].ID)
+		if resources[0].ID != "my-domain/page1-repo-1" {
+			t.Errorf("expected %q, got %q", "my-domain/page1-repo-1", resources[0].ID)
 		}
 	})
 
 	t.Run("page2_repos", func(t *testing.T) {
-		if resources[1].ID != "page2-repo-1" {
-			t.Errorf("expected %q, got %q", "page2-repo-1", resources[1].ID)
+		if resources[1].ID != "my-domain/page2-repo-1" {
+			t.Errorf("expected %q, got %q", "my-domain/page2-repo-1", resources[1].ID)
 		}
-		if resources[2].ID != "page2-repo-2" {
-			t.Errorf("expected %q, got %q", "page2-repo-2", resources[2].ID)
+		if resources[2].ID != "my-domain/page2-repo-2" {
+			t.Errorf("expected %q, got %q", "my-domain/page2-repo-2", resources[2].ID)
 		}
 	})
 

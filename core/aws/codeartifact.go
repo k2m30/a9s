@@ -65,7 +65,7 @@ func FetchCodeArtifactReposPage(ctx context.Context, api CodeArtifactListReposit
 		}
 
 		r := resource.Resource{
-			ID:   repoName,
+			ID:   codeArtifactRepoID(domainName, repoName),
 			Name: repoName,
 			Fields: map[string]string{
 				"repo_name":     repoName,
@@ -103,4 +103,11 @@ func FetchCodeArtifactReposPage(ctx context.Context, api CodeArtifactListReposit
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// codeArtifactRepoID is the row identity of a CodeArtifact repository:
+// ListRepositories spans every domain in the account, and a repository name
+// is unique inside its domain only.
+func codeArtifactRepoID(domainName, repoName string) string {
+	return domainName + "/" + repoName
 }

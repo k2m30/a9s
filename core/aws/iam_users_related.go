@@ -59,5 +59,5 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.ErrorRelated("policy", err)
 	}
-	return relatedResultTrunc("policy", attachedPolicyNames(attached), !complete)
+	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
 }

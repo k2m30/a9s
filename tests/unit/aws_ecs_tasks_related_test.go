@@ -32,7 +32,8 @@ func ecsTaskCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 func TestRelated_ECSTask_Service_FromGroup(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ecs-svc")
 	task := ecstypes.Task{
-		Group: aws.String("service:api-gateway"),
+		Group:      aws.String("service:api-gateway"),
+		ClusterArn: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"),
 	}
 	res := resource.Resource{
 		ID:        "abc123",
@@ -48,8 +49,10 @@ func TestRelated_ECSTask_Service_FromGroup(t *testing.T) {
 	if len(result.ResourceIDs()) != 1 {
 		t.Fatalf("expected 1 ResourceID, got %d", len(result.ResourceIDs()))
 	}
-	if result.ResourceIDs()[0] != "api-gateway" {
-		t.Errorf("expected ResourceIDs[0]=%q, got %q", "api-gateway", result.ResourceIDs()[0])
+	// The task names its service by the bare name; a service name is unique
+	// inside the cluster the task itself runs in.
+	if result.ResourceIDs()[0] != "acme-services/api-gateway" {
+		t.Errorf("expected ResourceIDs[0]=%q, got %q", "acme-services/api-gateway", result.ResourceIDs()[0])
 	}
 }
 

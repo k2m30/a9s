@@ -114,7 +114,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 		// The row id is "<cluster>/<nodegroup>"; both the console path and
 		// CloudTrail's ResourceName know the node group by its bare name.
 		CloudTrailKey: "ResourceName:Fields.nodegroup_name",
-		LifecycleKey:  "status",
+		CloudTrailQualifier: catalog.CloudTrailQualifier{
+			ParentField: "cluster_name",
+			EventPaths:  []string{"requestParameters.clusterName"},
+		},
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			cluster, ngName := r.Fields["cluster_name"], r.Fields["nodegroup_name"]
 			if cluster == "" || ngName == "" {

@@ -39,6 +39,14 @@ const (
 	OrphanOldMetricName      = "OrphanErrorCount"
 )
 
+// BuildLogRepeatedLine is written twice at BuildLogRepeatedLineAt in the
+// acme-api-build log: two events of one millisecond carrying one line, which
+// GetLogEvents hands back with no id of their own.
+const (
+	BuildLogRepeatedLine   = "[Container] 2026/03/22 03:17:12 Retrying artifact upload (attempt 2 of 3)"
+	BuildLogRepeatedLineAt = int64(1774149432000)
+)
+
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
 var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logGroups := []cwlogstypes.LogGroup{
@@ -642,6 +650,19 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			Timestamp:     aws.Int64(1774149430000),
 			Message:       aws.String("[Container] 2026/03/22 03:17:10 Uploading artifacts to s3://acme-build-artifacts/acme-api-build/142"),
 			IngestionTime: aws.Int64(1774149430100),
+		},
+		// A retry loop writes the same line twice inside one millisecond.
+		// CloudWatch Logs keeps both, and GetLogEvents gives neither an id,
+		// so the two are told apart by their order in the response.
+		{
+			Timestamp:     aws.Int64(BuildLogRepeatedLineAt),
+			Message:       aws.String(BuildLogRepeatedLine),
+			IngestionTime: aws.Int64(BuildLogRepeatedLineAt + 90),
+		},
+		{
+			Timestamp:     aws.Int64(BuildLogRepeatedLineAt),
+			Message:       aws.String(BuildLogRepeatedLine),
+			IngestionTime: aws.Int64(BuildLogRepeatedLineAt + 90),
 		},
 	}
 

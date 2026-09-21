@@ -30,7 +30,9 @@ import (
 // without folding, because the result map itself is their subject.
 //
 // Key shape: "<file>:<func>".
-var wave2FoldExempt = map[string]string{}
+var wave2FoldExempt = map[string]string{
+	"row_identity_demo_bench_test.go:TestDemoRowIdentity_SourcePanelsDoNotDependOnTheIDShape": "the subject is which key the enricher writes a finding under, which folding onto a row would hide",
+}
 
 // TestWave2FoldConformance_BenchHelpersFoldBeforeReading walks every test file
 // under tests/ and flags a function that drives a registered wave-2 enricher,

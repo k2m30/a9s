@@ -117,6 +117,11 @@ const (
 	ecsClusterArnFailed   = "arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-failed"
 )
 
+// ECSServiceInTwoClusters is the service name acme-batch and acme-staging
+// both run: ECS scopes a service name to its cluster, so the two are two
+// services and list as two rows.
+const ECSServiceInTwoClusters = "log-aggregator"
+
 var ecsServiceNamePool = []string{
 	"metrics-collector", "user-auth-svc", "product-catalog", "search-svc",
 	"notification-dispatcher", "email-service", "file-upload-svc", "payments-svc",
@@ -365,6 +370,22 @@ func buildECSServices() []ecstypes.Service {
 			CreatedAt:          aws.Time(mustTime("2025-03-01T12:00:00Z")),
 			Tags: []ecstypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
+			ServiceName:        aws.String(ECSServiceInTwoClusters),
+			ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-staging/" + ECSServiceInTwoClusters),
+			ClusterArn:         aws.String(ecsClusterArnStaging),
+			Status:             aws.String("ACTIVE"),
+			DesiredCount:       2,
+			RunningCount:       2,
+			PendingCount:       0,
+			LaunchType:         ecstypes.LaunchTypeFargate,
+			TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/log-aggregator:7"),
+			SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
+			CreatedAt:          aws.Time(mustTime("2025-06-14T10:00:00Z")),
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
 		{
@@ -1158,6 +1179,6 @@ func init() {
 	Register(Pin{ShortName: "ecs", Rows: 7, Issues: 4, CoverageGaps: []string{"dim"}})
 	// acme-svc-stalled wants tasks and runs none, so it is one of the 26 rows
 	// and one of the 7 Broken badges.
-	Register(Pin{ShortName: "ecs-svc", Rows: 26, Issues: 7, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecs-svc", Rows: 27, Issues: 7, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ecs-task", Rows: 18, Issues: 8})
 }

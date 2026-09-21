@@ -17,8 +17,10 @@ import (
 //  2. "Checker: nil" — a RelatedDef with a nil checker is a structural bug;
 //     use the demo harness or a properly wired checker.
 //
-//  3. Lines matching `.Checker(<anything containing nil>)` — direct nil-client
-//     checker invocations bypass the demo transport entirely.
+//  3. Lines passing nil for a checker's clients or resource argument — such
+//     a call bypasses the demo transport entirely. The last argument is the
+//     target cache, and nil there is what a checker needing none is called
+//     with.
 func TestNoForbiddenTestHelpers(t *testing.T) {
 	t.Helper()
 
@@ -26,8 +28,8 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 
 	// Compiled once; matches direct nil-client checker calls such as:
 	//   SomeChecker(ctx, nil, res)
-	//   resource.CheckVPC(ctx, nil, r)
-	nilCheckerCallRE := regexp.MustCompile(`\.Checker\([^)]*nil[^)]*\)`)
+	//   resource.CheckVPC(context.Background(), nil, r)
+	nilCheckerCallRE := regexp.MustCompile(`\.Checker\([^)]*nil\s*,`)
 
 	type literalCheck struct {
 		substr string

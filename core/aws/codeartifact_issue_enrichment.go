@@ -51,18 +51,12 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		repoName := r.Fields["repo_name"]
-		if repoName == "" {
-			repoName = r.ID
-		}
 		domainName := r.Fields["domain_name"]
 		domainOwner := r.Fields["domain_owner"]
 		if repoName == "" || domainName == "" {
 			return
 		}
 		key := r.ID
-		if key == "" {
-			key = repoName
-		}
 		// Count packages in this repository (optional — only if the client supports ListPackages).
 		// Walks all pages via NextToken so the count is exact, not first-page only —
 		// up to PerParentPageCap: no packages-per-repository quota exists at all, and

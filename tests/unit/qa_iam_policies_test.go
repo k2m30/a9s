@@ -50,8 +50,8 @@ func TestQA_IAMPolicies_FetchSuccess(t *testing.T) {
 	}
 
 	r := resources[0]
-	if r.ID != "my-custom-policy" {
-		t.Errorf("expected ID 'my-custom-policy', got %q", r.ID)
+	if r.ID != "arn:aws:iam::123456789012:policy/my-custom-policy" {
+		t.Errorf("expected ID to be the policy ARN, got %q", r.ID)
 	}
 	if r.Name != "my-custom-policy" {
 		t.Errorf("expected Name 'my-custom-policy', got %q", r.Name)

@@ -49,8 +49,9 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 	}
 
 	r0 := resources[0]
-	if r0.ID != "daily-backup" {
-		t.Errorf("resource[0].ID: expected %q, got %q", "daily-backup", r0.ID)
+	// A rule name is unique on its event bus, so the row carries both.
+	if r0.ID != "default/daily-backup" {
+		t.Errorf("resource[0].ID: expected %q, got %q", "default/daily-backup", r0.ID)
 	}
 	if r0.Name != "daily-backup" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "daily-backup", r0.Name)

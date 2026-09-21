@@ -757,7 +757,7 @@ func TestQA_ChildPagination_FetchAlarmHistory_FirstPage(t *testing.T) {
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	result, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "")
-	assertFirstPage(t, result, err, "cw-next-token-2", []string{"2025-03-15 10:00"})
+	assertFirstPage(t, result, err, "cw-next-token-2", []string{"20250315T100000.000000000Z-2c0a347c39e46f89"})
 }
 
 func TestQA_ChildPagination_FetchAlarmHistory_Continuation(t *testing.T) {
@@ -774,7 +774,7 @@ func TestQA_ChildPagination_FetchAlarmHistory_Continuation(t *testing.T) {
 	}
 	parentCtx := map[string]string{"alarm_name": "my-cpu-alarm"}
 	result, err := awsclient.FetchAlarmHistory(context.Background(), mock, parentCtx, "cw-next-token-2")
-	assertContinuation(t, result, err, []string{"2025-03-16 10:00"})
+	assertContinuation(t, result, err, []string{"20250316T100000.000000000Z-87d9655a07f8d6d8"})
 }
 
 func TestQA_ChildPagination_FetchAlarmHistory_Empty(t *testing.T) {
@@ -823,7 +823,7 @@ func TestQA_ChildPagination_FetchRDSEvents_FirstPage(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "")
-	assertFirstPage(t, result, err, "rds-marker-2", []string{"2025-03-10 14:00/my-db"})
+	assertFirstPage(t, result, err, "rds-marker-2", []string{"20250310T140000.000000000Z-84febd0410ce83d3"})
 }
 
 func TestQA_ChildPagination_FetchRDSEvents_Continuation(t *testing.T) {
@@ -839,7 +839,7 @@ func TestQA_ChildPagination_FetchRDSEvents_Continuation(t *testing.T) {
 		},
 	}
 	result, err := awsclient.FetchRDSEvents(context.Background(), mock, "my-db", "rds-marker-2")
-	assertContinuation(t, result, err, []string{"2025-03-11 14:00/my-db"})
+	assertContinuation(t, result, err, []string{"20250311T140000.000000000Z-7a587a8ca7f218b7"})
 }
 
 func TestQA_ChildPagination_FetchRDSEvents_Empty(t *testing.T) {

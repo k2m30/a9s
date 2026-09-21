@@ -55,12 +55,12 @@ func TestFetchAlarmHistory_Basic(t *testing.T) {
 
 	r := result.Resources[0]
 
-	t.Run("ID_is_formatted_timestamp", func(t *testing.T) {
-		if r.ID == "" {
-			t.Error("ID should not be empty")
-		}
-		if !strings.Contains(r.ID, "2024-03-22") {
-			t.Errorf("ID should contain formatted date, got %q", r.ID)
+	// DescribeAlarmHistory hands out no event ID, and several items of one
+	// minute are several rows, so the row is keyed by the instant it happened
+	// at full precision and what it says.
+	t.Run("ID_carries_the_full_instant", func(t *testing.T) {
+		if !strings.HasPrefix(r.ID, "20240322T100000.000000000Z-") {
+			t.Errorf("ID = %q, want the item's instant and a digest of its content", r.ID)
 		}
 	})
 

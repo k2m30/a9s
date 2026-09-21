@@ -6,6 +6,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,13 +36,17 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-func TestQA_Pagination_FetchEventBridgeRulesPage_FirstPage(t *testing.T) {
+// An EventBridge rule list is read to its end by the fetcher: a NextToken
+// belongs to one bus's rules and cannot carry a walk across the account's
+// buses. A list still unfinished when the walk reaches its page cap comes
+// back as a lower bound with no cursor behind it.
+func TestQA_Pagination_FetchEventBridgeRulesPage_WalkCapIsALowerBound(t *testing.T) {
 	mock := &fakeEventBridgeListRules{
-		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
+		PageFunc: func(page int) (*eventbridge.ListRulesOutput, error) {
 			return &eventbridge.ListRulesOutput{
 				Rules: []ebtypes.Rule{
 					{
-						Name:         aws.String("my-eb-rule"),
+						Name:         aws.String(fmt.Sprintf("my-eb-rule-%d", page)),
 						State:        ebtypes.RuleStateEnabled,
 						EventBusName: aws.String("default"),
 					},
@@ -59,23 +64,25 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_FirstPage(t *testing.T) {
 		t.Fatal("expected Pagination metadata, got nil")
 	}
 	if !result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=true for first page with NextToken")
+		t.Error("expected IsTruncated=true for a walk that stopped at its cap")
 	}
-	if result.Pagination.NextToken != "token-eb-page-2" {
-		t.Errorf("NextToken: expected %q, got %q", "token-eb-page-2", result.Pagination.NextToken)
+	if !result.Pagination.LowerBoundOnly {
+		t.Error("expected LowerBoundOnly=true: the count is what the capped walk read, and there is no cursor to read on with")
 	}
-	if result.Pagination.PageSize != 1 {
-		t.Errorf("PageSize: expected 1, got %d", result.Pagination.PageSize)
+	if result.Pagination.NextToken != "" {
+		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
 	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	if len(result.Resources) != awsclient.PerParentPageCap {
+		t.Fatalf("expected %d resources, got %d", awsclient.PerParentPageCap, len(result.Resources))
 	}
-	if result.Resources[0].ID != "my-eb-rule" {
-		t.Errorf("resource ID: expected %q, got %q", "my-eb-rule", result.Resources[0].ID)
+	if result.Resources[0].ID != "default/my-eb-rule-1" {
+		t.Errorf("resource ID: expected %q, got %q", "default/my-eb-rule-1", result.Resources[0].ID)
 	}
 }
 
-func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
+// The walk starts at the first page of every bus it visits, whatever token
+// the caller was holding.
+func TestQA_Pagination_FetchEventBridgeRulesPage_ReadsFromTheFirstPage(t *testing.T) {
 	mock := &fakeEventBridgeListRules{
 		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
 			return &eventbridge.ListRulesOutput{
@@ -98,7 +105,7 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
 		t.Fatal("expected Pagination metadata, got nil")
 	}
 	if result.Pagination.IsTruncated {
-		t.Error("expected IsTruncated=false for last page")
+		t.Error("expected IsTruncated=false for a walk that reached the end")
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty, got %q", result.Pagination.NextToken)
@@ -106,14 +113,14 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "last-eb-rule" {
-		t.Errorf("resource ID: expected %q, got %q", "last-eb-rule", result.Resources[0].ID)
+	if result.Resources[0].ID != "default/last-eb-rule" {
+		t.Errorf("resource ID: expected %q, got %q", "default/last-eb-rule", result.Resources[0].ID)
 	}
 	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-eb-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-eb-page-2")
+	if mock.LastInput.NextToken != nil {
+		t.Errorf("NextToken sent: got %q, want none", *mock.LastInput.NextToken)
 	}
 }
 

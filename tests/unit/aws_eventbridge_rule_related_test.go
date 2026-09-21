@@ -130,7 +130,7 @@ func TestRelated_EbRule_Role_WrongRawStruct(t *testing.T) {
 }
 
 func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -150,7 +150,7 @@ func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
 }
 
 func TestRelated_EbRule_Kinesis_NoMatch(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -167,7 +167,7 @@ func TestRelated_EbRule_Kinesis_NoMatch(t *testing.T) {
 }
 
 func TestRelated_EbRule_Kinesis_NilClients(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
@@ -187,7 +187,7 @@ func TestRelated_EbRule_Kinesis_EmptyID(t *testing.T) {
 }
 
 func TestRelated_EbRule_Lambda_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -207,7 +207,7 @@ func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 }
 
 func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -227,7 +227,7 @@ func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
 }
 
 func TestRelated_EbRule_Logs_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -247,7 +247,7 @@ func TestRelated_EbRule_Logs_Match(t *testing.T) {
 }
 
 func TestRelated_EbRule_SFN_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -267,7 +267,7 @@ func TestRelated_EbRule_SFN_Match(t *testing.T) {
 }
 
 func TestRelated_EbRule_SNS_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -289,7 +289,7 @@ func TestRelated_EbRule_SNS_Match(t *testing.T) {
 }
 
 func TestRelated_EbRule_SQS_Match(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	clients := &awsclient.ServiceClients{
 		EventBridge: &fakeEventBridgeAPI{
 			Targets: []eventbridgetypes.Target{
@@ -311,7 +311,7 @@ func TestRelated_EbRule_SQS_Match(t *testing.T) {
 // TestRelated_EbRule_TargetService_NilClients verifies that all
 // ebRuleTargetsByService-based checkers return Count=-1 when clients are nil.
 func TestRelated_EbRule_TargetService_NilClients(t *testing.T) {
-	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
+	res := resource.Resource{ID: "default/my-rule", Fields: map[string]string{"name": "my-rule", "event_bus": "default"}}
 	for _, target := range []string{"kinesis", "lambda", "logs", "sfn", "sns", "sqs"} {
 		checker := ebRuleCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})

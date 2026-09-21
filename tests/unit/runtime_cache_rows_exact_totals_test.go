@@ -14,6 +14,7 @@
 package unit_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -240,7 +241,11 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 100, Truncated: true},
 	})
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	c.ApplyResourcesLoaded("ec2", make([]resource.Resource, 100), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"}, false)
+	firstPage := make([]resource.Resource, 100)
+	for i := range firstPage {
+		firstPage[i] = resource.Resource{ID: fmt.Sprintf("i-page1-%03d", i)}
+	}
+	c.ApplyResourcesLoaded("ec2", firstPage, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"}, false)
 
 	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",

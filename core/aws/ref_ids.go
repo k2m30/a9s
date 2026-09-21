@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
@@ -215,21 +217,60 @@ func s3RefToID(ref string, rc domain.RefContext) (string, bool) {
 var s3ARNRefToID = arnNameRef("s3", "", "/")
 
 // ecsSvcRefToID reads a service ARN ("service/<cluster>/<name>", or the
-// older "service/<name>") or a task's group "service:<name>" as the service
-// name.
+// older "service/<name>"), the cluster-qualified ID itself, or a task's
+// group "service:<name>" as the service row's ID. A reference naming no
+// cluster is a service name, which is unique inside a cluster only: it names
+// the loaded row of that name, and with two of them the first.
 func ecsSvcRefToID(ref string, rc domain.RefContext) (string, bool) {
-	if name, ok := strings.CutPrefix(ref, "service:"); ok {
-		return name, name != ""
-	}
 	res, isARN, ok := localARN(ref, rc, "ecs")
-	if !ok || !isARN {
-		return res, ok
-	}
-	rest, ok := afterPrefix(res, "service/")
 	if !ok {
 		return "", false
 	}
-	return lastSegment(rest, "/"), true
+	if isARN {
+		if res, ok = afterPrefix(res, "service/"); !ok {
+			return "", false
+		}
+	} else {
+		res, _ = strings.CutPrefix(res, "service:")
+	}
+	if cluster, name, qualified := strings.Cut(res, "/"); qualified {
+		return ecsSvcID(cluster, name), cluster != "" && name != ""
+	}
+	return idOrLoadedName(res, rc)
+}
+
+// ecsSvcRefFromTask is the reference a task makes to the service that
+// started it: ECS writes the service's bare name into the task's group, and
+// a service name is unique inside the cluster the task itself runs in.
+func ecsSvcRefFromTask(res resource.Resource, task ecstypes.Task) (ref string, ofService bool) {
+	name, ofService := strings.CutPrefix(aws.ToString(task.Group), "service:")
+	if !ofService || name == "" {
+		return "", false
+	}
+	return ecsSvcID(lastSegment(cmp.Or(aws.ToString(task.ClusterArn), res.Fields["cluster"]), "/"), name), true
+}
+
+// policyRefToID reads an IAM policy reference as the policy row's ID, which
+// is the policy's ARN. An AWS-managed policy's ARN names the account "aws"
+// rather than the session's, and is this account's policy all the same. A
+// bare name is the name of a loaded policy, and names nothing else: two
+// policies of one name, one the account's own and one AWS's, are told apart
+// by nothing else a reference carries.
+func policyRefToID(ref string, rc domain.RefContext) (string, bool) {
+	a, err := arn.Parse(ref)
+	if err != nil {
+		return idOrLoadedName(ref, rc)
+	}
+	if a.Service != "iam" || !strings.HasPrefix(a.Resource, "policy/") {
+		return "", false
+	}
+	// AWS owns its managed policies under the account "aws", and they are
+	// attachable in every account; any other account's policy is that
+	// account's.
+	if a.AccountID != "aws" && rc.AccountID != "" && a.AccountID != "" && a.AccountID != rc.AccountID {
+		return "", false
+	}
+	return ref, true
 }
 
 // roleRefToID reads a role ARN — or the STS assumed-role ARN a session of

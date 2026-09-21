@@ -697,6 +697,16 @@ const CTRegionFilterKey = "_region"
 // value. Like CTRegionFilterKey it is not a LookupAttribute.
 const CTAltNameFilterKey = "_altname"
 
+// CTQualifierFilterKey carries the parent the row belongs to, and
+// CTQualifierPathsKey the comma-separated event-JSON paths that name the
+// parent of what an event acted on. A name AWS scopes to a parent is unique
+// nowhere else, so an event naming a different parent is another row's; like
+// the two keys above these are a9s's own and name no LookupAttribute.
+const (
+	CTQualifierFilterKey = "_qualifier"
+	CTQualifierPathsKey  = "_qualifierpaths"
+)
+
 // BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
 // The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
 // Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
@@ -716,6 +726,12 @@ func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string 
 	}
 	if alt := ctAltName(res, filter); alt != "" {
 		filter[CTAltNameFilterKey] = alt
+	}
+	if q := rt.CloudTrailQualifier; q.ParentField != "" && len(q.EventPaths) > 0 {
+		if parent := res.Fields[q.ParentField]; parent != "" {
+			filter[CTQualifierFilterKey] = parent
+			filter[CTQualifierPathsKey] = strings.Join(q.EventPaths, ",")
+		}
 	}
 	return filter
 }

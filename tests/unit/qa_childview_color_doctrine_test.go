@@ -82,8 +82,10 @@ func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 	if err != nil {
 		t.Fatalf("FetchTargetHealth(acme-web-tg): unexpected error: %v", err)
 	}
-	if len(result.Resources) != 3 {
-		t.Fatalf("FetchTargetHealth(acme-web-tg): got %d resources, want 3 (2 healthy + 1 unhealthy) — demo fixture in core/demo/fixtures/elb.go's buildTargetHealth changed shape, update this test's assumptions", len(result.Resources))
+	// Four registrations: three instances, one of them registered a second
+	// time on another port, and one of the four failing its checks.
+	if len(result.Resources) != 4 {
+		t.Fatalf("FetchTargetHealth(acme-web-tg): got %d resources, want 4 (3 healthy + 1 unhealthy) — demo fixture in core/demo/fixtures/elb.go's buildTargetHealth changed shape, update this test's assumptions", len(result.Resources))
 	}
 	return result.Resources
 }

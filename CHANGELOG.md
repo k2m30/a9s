@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Two resources that share a name no longer show as one row. AWS scopes an ECS
+  service name to its cluster, a CodeArtifact repository name to its domain, an
+  EventBridge rule name to its event bus and a group's inline policy name to
+  the group, so two of them with one name used to collapse into a single row
+  and the second resource simply was not on the screen. Each row now carries
+  its parent with it, the columns still show the bare name, and every related
+  pivot into those types opens the row it means.
+- The EventBridge rule list holds every bus's rules, not only the default
+  bus's. An account that routes its own events through a bus of its own saw
+  none of those rules at all, and a pivot from one of their targets back to
+  the rule opened nothing.
+- An event view shows every event, not one row per minute. Alarm history, RDS
+  events and the CloudWatch and CodeBuild log views keyed their rows by a
+  minute-precision timestamp or by a position in the response, so several
+  events of one minute replaced each other and a line's findings jumped to
+  another line as soon as a newer line arrived.
+- A page that carries one ID twice now says so in the status bar and names the
+  ID, instead of dropping the second row without a word.
+- The demo account no longer lists a subnet twice, and the prod-lake bucket's
+  folders no longer appear both in their parent's listing and as folders of
+  their own.
+- A target group's health view shows one row per registration. An instance or
+  IP registered on two ports — the normal shape of an ECS service with dynamic
+  port mapping — showed a single row whose health was whichever registration
+  answered first, so an unhealthy port hid behind a healthy one.
+- A log view keeps a line that is repeated inside the same millisecond. The
+  CloudWatch Logs and CodeBuild log views keyed a row by its timestamp and its
+  text, so the second of two identical lines was dropped.
+- The CloudTrail Events pivot of a node group, an ECS service, an EventBridge
+  rule and a CodeArtifact repository shows only the events of that parent's
+  resource. CloudTrail is searched by the bare name, so a namesake in another
+  cluster, on another bus or in another domain contributed its events to the
+  list unlabelled.
+- The IAM Policies pivot of a role, user or group opens the policy that is
+  attached. An account may own a policy whose name AWS also uses, and the
+  account's own one used to answer for both, so an AWS-managed attachment
+  opened a local policy's document and verdicts.
+- An ECS service's Tasks and EventBridge Rules rows count only its own
+  cluster's. A service name is unique within a cluster, and both pivots
+  matched the bare name, so a namesake service's tasks and rules were counted
+  and opened as this one's.
+- The detail header of an alarm-history, RDS-event or build-log row reads the
+  event, not its synthetic key.
+
 - A CloudTrail event that names another account's principal or resource no
   longer opens this account's role, secret or key of the same name. The
   detail's Principal, Role, Secret and Key rows carry the reference the event

@@ -717,7 +717,7 @@ func TestEBRuleTargets_TargetsInTheSessionPartitionAreCounted(t *testing.T) {
 				Arn: aws.String(tc.targetARN),
 			}}}
 			result := checker(context.Background(), clients,
-				resource.Resource{ID: "acme-nightly", Name: "acme-nightly"},
+				resource.Resource{ID: "default/acme-nightly", Name: "acme-nightly", Fields: map[string]string{"name": "acme-nightly", "event_bus": "default"}},
 				resource.ResourceCache{})
 
 			if result.Count() != len(tc.wantIDs) {

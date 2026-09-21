@@ -44,8 +44,8 @@ const (
 
 	// ProdRedisSubnetA and ProdRedisSubnetB are the subnets in the Redis subnet group.
 	// Must exist in ec2.go (Subnets slice).
-	ProdRedisSubnetA = "subnet-prod-a"
-	ProdRedisSubnetB = "subnet-prod-b"
+	ProdRedisSubnetA = "subnet-redis-prod-a"
+	ProdRedisSubnetB = "subnet-redis-prod-b"
 
 	// ProdRedisVpcID is the VPC that hosts the Redis subnet group.
 	// Must exist in ec2.go (Vpcs slice).

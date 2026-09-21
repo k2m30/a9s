@@ -55,7 +55,7 @@ func TestRelatedTruncation_FirstHopTruncationReachesTheCount(t *testing.T) {
 		source, target, row, firstHop string
 		wantIDs                       []string
 	}{
-		{"ecs-svc", "elb", "api-gateway", "tg", []string{"acme-prod-web"}},
+		{"ecs-svc", "elb", "acme-services/api-gateway", "tg", []string{"acme-prod-web"}},
 		{"ecs-task", "sg", "a1b2c3d4e5f6a1b2c3d4e5f6", "eni", []string{"sg-0aaa111111111111a"}},
 		{"subnet", "efs", "subnet-0efs0prod00000a", "eni", []string{"fs-0prod1234abcd5678"}},
 	}

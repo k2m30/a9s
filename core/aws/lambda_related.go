@@ -306,7 +306,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	var failures []Failure
 	for _, ruleRes := range ruleList {
 		parentCtx := map[string]string{
-			"rule_name": ruleRes.ID,
+			"rule_name": ruleRes.Fields["name"],
 			"event_bus": ruleRes.Fields["event_bus"],
 		}
 		targets, err := FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, "")

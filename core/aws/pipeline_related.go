@@ -180,9 +180,9 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 }
 
 // checkPipelineECSSvc resolves ECS services deployed by this pipeline.
-// Provider=ECS → Configuration["ServiceName"] (ClusterName is also present but
-// the ecs-svc type is keyed by service name).
-func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// Provider=ECS → Configuration["ServiceName"], which names a service inside
+// the deploy action's own ClusterName.
+func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
 		return pipelineRelatedOnErr("ecs-svc", err)
@@ -194,10 +194,11 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 			return
 		}
 		if name := a.Configuration["ServiceName"]; name != "" {
-			seen[name] = struct{}{}
+			seen[ecsSvcID(a.Configuration["ClusterName"], name)] = struct{}{}
 		}
 	})
-	return relatedResultTrunc("ecs-svc", mapKeys(seen), false)
+	ids, dropped := resolveRefs("ecs-svc", mapKeys(seen), refContext(clients, cache, "ecs-svc"))
+	return relatedResultTrunc("ecs-svc", ids, dropped)
 }
 
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey
@@ -294,10 +295,10 @@ func mapKeys(m map[string]struct{}) []string {
 // checkPipelineEbRule resolves EventBridge rules that target this CodePipeline pipeline.
 // One events:ListRuleNamesByTarget call using the pipeline ARN from
 // res.Fields["arn"]. Count = len(RuleNames).
-func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	pipelineARN := res.Fields["arn"]
 	if pipelineARN == "" {
 		return resource.ProvenZero("eb-rule", "pipelineARN")
 	}
-	return ebRulesTargeting(ctx, clients, pipelineARN)
+	return ebRulesTargeting(ctx, clients, cache, pipelineARN)
 }

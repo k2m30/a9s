@@ -69,7 +69,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 			if event.EventId != nil {
 				id = *event.EventId
 			} else if event.Timestamp != nil {
-				id = fmt.Sprintf("evt-%d", *event.Timestamp)
+				id = eventRowIDFromMillis(*event.Timestamp, message)
 			}
 
 			name := logEventDisplayName(message)

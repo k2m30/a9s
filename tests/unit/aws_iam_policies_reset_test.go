@@ -63,8 +63,8 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	if mock1.calls.Load() != 1 {
 		t.Errorf("mock1.calls after first call: want 1, got %d", mock1.calls.Load())
 	}
-	if len(res1) != 1 || res1[0].ID != "policy-A" {
-		t.Errorf("first call: want [{ID:policy-A}], got %v", res1)
+	if len(res1) != 1 || res1[0].ID != "arn:aws:iam::123456789012:policy/policy-A" {
+		t.Errorf("first call: want [{ID:arn:aws:iam::123456789012:policy/policy-A}], got %v", res1)
 	}
 
 	res2, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock1, []string{"policy-A"}, store, "aws")
@@ -74,8 +74,8 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	if mock1.calls.Load() != 1 {
 		t.Errorf("mock1.calls after second call (cache hit): want 1, got %d — cache not working", mock1.calls.Load())
 	}
-	if len(res2) != 1 || res2[0].ID != "policy-A" {
-		t.Errorf("second call: want [{ID:policy-A}], got %v", res2)
+	if len(res2) != 1 || res2[0].ID != "arn:aws:iam::123456789012:policy/policy-A" {
+		t.Errorf("second call: want [{ID:arn:aws:iam::123456789012:policy/policy-A}], got %v", res2)
 	}
 
 	store.Clear()
@@ -88,8 +88,8 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	if mock2.calls.Load() != 1 {
 		t.Errorf("mock2.calls after clear+fetch: want 1, got %d", mock2.calls.Load())
 	}
-	if len(res3) != 1 || res3[0].ID != "policy-B" {
-		t.Errorf("post-clear call: want [{ID:policy-B}], got %v — stale cache from mock1 not cleared", res3)
+	if len(res3) != 1 || res3[0].ID != "arn:aws:iam::123456789012:policy/policy-B" {
+		t.Errorf("post-clear call: want [{ID:arn:aws:iam::123456789012:policy/policy-B}], got %v — stale cache from mock1 not cleared", res3)
 	}
 }
 

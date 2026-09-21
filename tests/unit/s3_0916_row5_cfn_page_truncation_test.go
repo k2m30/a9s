@@ -93,8 +93,14 @@ func TestS3_0916_Row5_StackResourcePivotsReportALowerBound(t *testing.T) {
 				t.Errorf("Truncated = %v, want %v", got.Truncated(), c.wantTruncated)
 			}
 			if c.presentOnPage {
-				if ids := got.ResourceIDs(); len(ids) != 1 || ids[0] != c.physicalID {
-					t.Errorf("ResourceIDs = %v, want [%s]", ids, c.physicalID)
+				// A rule name is unique on its event bus, and a rule created
+				// without one sits on the default bus.
+				wantID := c.physicalID
+				if c.target == "eb-rule" {
+					wantID = "default/" + c.physicalID
+				}
+				if ids := got.ResourceIDs(); len(ids) != 1 || ids[0] != wantID {
+					t.Errorf("ResourceIDs = %v, want [%s]", ids, wantID)
 				}
 			}
 			wantCalls := 1

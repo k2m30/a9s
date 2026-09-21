@@ -85,7 +85,8 @@ func (f *iamPolicyRetryFake) ListGroupPolicies(
 // second call succeeds → inline policy found in result.
 //
 // InlineBuilt must stay false on error, or the second call skips the inline
-// fetch and never finds the inline policy by name.
+// fetch and never finds the inline policy. An inline policy row is keyed by
+// its group and its name, since the name alone is the group's to choose.
 func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	store := session.NewPolicyStore()
 
@@ -141,7 +142,8 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	// ── Call 2: fix inline fake to succeed ────────────────────────────────────
 	fake.listGroupPoliciesErr = nil
 
-	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName}, store, "aws")
+	inlinePolicyID := "inline/" + inlineGroupName + "/" + inlinePolicyName
+	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyID}, store, "aws")
 
 	if err2 != nil {
 		t.Errorf("call 2: expected no error after inline retry; got %v", err2)
@@ -190,7 +192,8 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
+	inlinePolicyID := "inline/" + inlineGroupName + "/" + inlinePolicyName
+	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyID}, store, "aws")
 	if err1 != nil {
 		t.Errorf("call 1: unexpected error: %v", err1)
 	}
@@ -199,7 +202,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	}
 	callsAfterFirst := listGroupPoliciesCallCount
 
-	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store, "aws")
+	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyID}, store, "aws")
 	if err2 != nil {
 		t.Errorf("call 2: unexpected error: %v", err2)
 	}

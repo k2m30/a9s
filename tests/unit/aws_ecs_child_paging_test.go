@@ -39,6 +39,12 @@ func ecsPagingServiceName(cluster string, i int) string {
 	return fmt.Sprintf("%s-svc-%03d", cluster, i)
 }
 
+// ecsPagingServiceID is the row ID of that service: a service name is unique
+// inside its cluster, so the row carries the cluster with it.
+func ecsPagingServiceID(cluster string, i int) string {
+	return cluster + "/" + ecsPagingServiceName(cluster, i)
+}
+
 func ecsPagingTaskID(cluster string, i int) string {
 	return fmt.Sprintf("%08x%024x", crc32.ChecksumIEEE([]byte(cluster)), i)
 }
@@ -195,10 +201,10 @@ func TestECSServicesList_WalksEveryListServicesPage(t *testing.T) {
 	got := ecsPagingCollect(t, "ecs-svc", f)
 	var want []string
 	for i := range 11 {
-		want = append(want, ecsPagingServiceName("prod-web", i))
+		want = append(want, ecsPagingServiceID("prod-web", i))
 	}
 	for i := range 3 {
-		want = append(want, ecsPagingServiceName("prod-batch", i))
+		want = append(want, ecsPagingServiceID("prod-batch", i))
 	}
 	assertECSPagingIDs(t, got, want)
 }
@@ -214,10 +220,10 @@ func TestECSServicesList_ResumesInsideALargeCluster(t *testing.T) {
 	got := ecsPagingCollect(t, "ecs-svc", f)
 	var want []string
 	for i := range 120 {
-		want = append(want, ecsPagingServiceName("prod-web", i))
+		want = append(want, ecsPagingServiceID("prod-web", i))
 	}
 	for i := range 2 {
-		want = append(want, ecsPagingServiceName("prod-batch", i))
+		want = append(want, ecsPagingServiceID("prod-batch", i))
 	}
 	assertECSPagingIDs(t, got, want)
 }

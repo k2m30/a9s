@@ -321,8 +321,8 @@ func TestRelatedCoverage_HeuristicPivotWithNoCandidatesIsAProvenZero(t *testing.
 	t.Run("secret that names one", func(t *testing.T) {
 		src := b.row(t, "secrets", "prod/codeartifact/npm-publish-token")
 		r := refChecker(t, "secrets", "codeartifact")(context.Background(), refClients(), src, b.cache)
-		if got := sortedIDs(r); !slices.Equal(got, []string{"acme-npm"}) {
-			t.Fatalf("ids = %v, want [acme-npm]", got)
+		if got := sortedIDs(r); !slices.Equal(got, []string{"acme-artifacts/acme-npm"}) {
+			t.Fatalf("ids = %v, want [acme-artifacts/acme-npm]", got)
 		}
 		if r.Coverage() != resource.CoverageHeuristic {
 			t.Errorf("coverage = %v, want CoverageHeuristic", r.Coverage())

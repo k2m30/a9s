@@ -51,6 +51,14 @@ import (
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, loadingMore bool, topLevelCanonical bool, fetchErr error, listSeq domain.Gen) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
+	// One page, one row per ID: the rows below this line are keyed by ID, so
+	// a page carrying an ID twice loses a resource whichever lane it lands
+	// on. The operator is told which one, here rather than in each lane.
+	resources, dups := resource.DedupByID(resources)
+	if len(dups) > 0 {
+		c.flash = Flash{Text: "rows share one ID and only the first is shown: " + strings.Join(dups, ", "), IsError: true}
+	}
+
 	// Silent-swap findings carry: a silent swap (a non-append replace — the common cold-boot shape
 	// where a seeded/cached list is replaced by its own verify-refetch) must
 	// never let a row's glyph flash off. The fresh resources argument arrives
@@ -144,7 +152,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.RowsGen = gen
 			ls.rowsVersion++
 		case appendPage:
-			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
+			ls.Rows, _ = resource.DedupByID(append(slices.Clone(ls.Rows), resources...))
 			ls.rowsVersion++
 		default:
 			ls.Rows = resources
@@ -271,14 +279,6 @@ func outgoingRowFindingsByID(ls *ListState, cachedRows func() []resource.Resourc
 		}
 	}
 	return out, details
-}
-
-// dedupAgainstExisting returns the subset of incoming whose ID is not already
-// present in existing: an append that would introduce a row already
-// on the screen is dropped rather than shown twice. Delegates to
-// resource.DedupByID, the single-source implementation.
-func dedupAgainstExisting(existing, incoming []resource.Resource) []resource.Resource {
-	return resource.DedupByID(existing, incoming)
 }
 
 // materializeListFieldsForType resolves the column set for typeName the same

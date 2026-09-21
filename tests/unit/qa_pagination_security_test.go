@@ -289,6 +289,7 @@ func TestQA_Pagination_FetchIAMPoliciesPage_FirstPage(t *testing.T) {
 					{
 						PolicyName:      aws.String("MyCustomPolicy"),
 						PolicyId:        aws.String("ANPA111222333444AAAAA"),
+						Arn:             aws.String("arn:aws:iam::123456789012:policy/MyCustomPolicy"),
 						Path:            aws.String("/"),
 						AttachmentCount: &attachCount,
 					},
@@ -318,8 +319,8 @@ func TestQA_Pagination_FetchIAMPoliciesPage_FirstPage(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "MyCustomPolicy" {
-		t.Errorf("resource ID: expected %q, got %q", "MyCustomPolicy", result.Resources[0].ID)
+	if result.Resources[0].ID != "arn:aws:iam::123456789012:policy/MyCustomPolicy" {
+		t.Errorf("resource ID: expected %q, got %q", "arn:aws:iam::123456789012:policy/MyCustomPolicy", result.Resources[0].ID)
 	}
 }
 

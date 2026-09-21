@@ -172,8 +172,11 @@ func TestW4bPowerUserResolvesThroughGroupPolicyPivot(t *testing.T) {
 
 	group := resource.Resource{ID: fixtures.IAMGroupPowerUser, Name: fixtures.IAMGroupPowerUser, Type: "iam-group"}
 	result := checker(context.Background(), clients, group, nil)
-	if !slices.Contains(result.ResourceIDs(), "PowerUserAccess") {
-		t.Fatalf("group→policy pivot ids = %v, want to contain PowerUserAccess", result.ResourceIDs())
+	// A policy row is keyed by its ARN: a name belongs to the account's own
+	// policies, and this is one of AWS's.
+	const powerUserARN = "arn:aws:iam::aws:policy/PowerUserAccess"
+	if !slices.Contains(result.ResourceIDs(), powerUserARN) {
+		t.Fatalf("group→policy pivot ids = %v, want to contain %s", result.ResourceIDs(), powerUserARN)
 	}
 
 	store := session.NewPolicyStore()

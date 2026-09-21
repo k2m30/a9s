@@ -406,13 +406,18 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		HumanizeFields: []string{"state"},
 		Aliases:        []string{"eb-rule", "eventbridge"},
 		Category:       "MESSAGING",
-		CloudTrailKey:  "ResourceName:ID",
+		RefToID:        ebRuleRefToID,
+		CloudTrailKey:  "ResourceName:Fields.name",
+		CloudTrailQualifier: catalog.CloudTrailQualifier{
+			ParentField: "event_bus",
+			EventPaths:  []string{"requestParameters.eventBusName"},
+		},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			bus := r.Fields["event_bus"]
 			if bus == "" {
 				bus = "default"
 			}
-			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(r.ID))
+			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(r.Fields["name"]))
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Rule Name", Path: "Name", Width: 28},
@@ -425,7 +430,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Children: []domain.ChildViewDef{{
 			ChildType:      "eb_rule_targets",
 			Key:            "enter",
-			ContextKeys:    map[string]string{"rule_name": "ID", "event_bus": "event_bus"},
+			ContextKeys:    map[string]string{"rule_name": "name", "event_bus": "event_bus"},
 			DisplayNameKey: "rule_name",
 		}},
 		Color: colorEBRule,

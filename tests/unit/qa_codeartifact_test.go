@@ -52,8 +52,9 @@ func TestFetchCodeArtifactRepos_ParsesMultipleRepos(t *testing.T) {
 	if r.Name != "my-repo" {
 		t.Errorf("expected Name 'my-repo', got %q", r.Name)
 	}
-	if r.ID != "my-repo" {
-		t.Errorf("expected ID 'my-repo', got %q", r.ID)
+	// A repository name is unique inside its domain, so the row carries both.
+	if r.ID != "my-domain/my-repo" {
+		t.Errorf("expected ID 'my-domain/my-repo', got %q", r.ID)
 	}
 	if r.Fields["repo_name"] != "my-repo" {
 		t.Errorf("expected Fields[repo_name] 'my-repo', got %q", r.Fields["repo_name"])

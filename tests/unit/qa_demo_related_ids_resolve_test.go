@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/demo"
@@ -165,7 +166,9 @@ func containsResourceID(resolved []resource.Resource, id string) bool {
 type retiredPolicyWitness struct{ seen bool }
 
 func (w *retiredPolicyWitness) exempt(target, id string) bool {
-	if target == "policy" && id == fixtures.RetiredManagedPolicyName {
+	// A policy row is keyed by its ARN, and the attachment the role carries
+	// names the retired policy by the ARN it had.
+	if target == "policy" && strings.HasSuffix(id, "/"+fixtures.RetiredManagedPolicyName) {
 		w.seen = true
 		return true
 	}

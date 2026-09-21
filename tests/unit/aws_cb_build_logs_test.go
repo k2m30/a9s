@@ -51,13 +51,15 @@ func TestFetchCBBuildLogs_Basic(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	t.Run("first_event_ID_synthetic", func(t *testing.T) {
-		// ID should be synthetic "evt-{timestamp}-{index}" format
-		if resources[0].ID == "" {
-			t.Error("ID should not be empty")
+	// GetLogEvents hands out no event ID, and a line keeps its own ID as the
+	// window it was read in moves, so the row is keyed by the instant the
+	// line was written at and the line itself.
+	t.Run("first_event_ID_is_the_instant_and_the_line", func(t *testing.T) {
+		if resources[0].ID == resources[1].ID {
+			t.Errorf("two log lines share the ID %q", resources[0].ID)
 		}
-		if !strings.HasPrefix(resources[0].ID, "evt-") {
-			t.Errorf("ID should start with 'evt-', got %q", resources[0].ID)
+		if !strings.Contains(resources[0].ID, "-") {
+			t.Errorf("ID = %q, want the line's instant and a digest of its content", resources[0].ID)
 		}
 	})
 

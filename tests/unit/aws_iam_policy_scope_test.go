@@ -39,8 +39,10 @@ func TestRelated_IAMGroup_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
 	// Fixture: admins group has exactly one attached policy (AdministratorAccess,
-	// AWS-managed) and no inline group policies.
-	want := []string{"AdministratorAccess"}
+	// AWS-managed) and no inline group policies. An attachment names the
+	// policy's ARN, which is what the policy row is keyed by — the account
+	// may hold a policy of that name too.
+	want := []string{"arn:aws:iam::aws:policy/AdministratorAccess"}
 	if result.Count() != len(want) {
 		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count(), len(want), want)
 	}
@@ -59,7 +61,10 @@ func TestRelated_IAMRole_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	// Fixture: acme-eks-node-role has two AWS-managed attached policies
 	// (AmazonEKSWorkerNodePolicy, AmazonEC2ContainerRegistryReadOnly).
 	// Inline role policies (ListRolePolicies) are not surfaced by checkRolePolicy.
-	want := []string{"AmazonEKSWorkerNodePolicy", "AmazonEC2ContainerRegistryReadOnly"}
+	want := []string{
+		"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+		"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+	}
 	if result.Count() != len(want) {
 		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count(), len(want), want)
 	}
@@ -108,8 +113,9 @@ func TestRelated_IAMUser_Policy_EmitsAWSManagedAttachedPolicy(t *testing.T) {
 	if result.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (AdministratorAccess attached, lazy-add resolves AWS-managed at drill time)", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "AdministratorAccess" {
-		t.Errorf("ResourceIDs = %v, want [AdministratorAccess]", result.ResourceIDs())
+	const adminARN = "arn:aws:iam::aws:policy/AdministratorAccess"
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != adminARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), adminARN)
 	}
 }
 
@@ -138,9 +144,10 @@ func TestDemoExpectedTopLevelCountsForTest_Policy_ExcludesAWSManaged(t *testing.
 	// inline group policy surfaced by ListGroupPolicies. AWS-managed policies
 	// are excluded by the Scope=Local filter in the fetcher and by
 	// IsCustomerManagedPolicyARN in countTopLevelIAMPolicies.
-	// 28 includes the privilege-escalation fixture policy acme-privesc-policy.
+	// 29 includes the privilege-escalation fixture policy acme-privesc-policy
+	// and the account's own policy named after an AWS-managed one.
 	counts := fixtures.ExpectedTopLevelCountsForTest()
-	if got, want := counts["policy"], 28; got != want {
+	if got, want := counts["policy"], 29; got != want {
 		t.Fatalf("policy count = %d, want %d", got, want)
 	}
 }

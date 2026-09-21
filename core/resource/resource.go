@@ -9,24 +9,28 @@ import "github.com/k2m30/a9s/v3/core/domain"
 // core/domain; this alias re-exports it.
 type Resource = domain.Resource
 
-// DedupByID returns the subset of incoming whose ID is not already present in
-// existing, preserving incoming's order. Rows are keyed by their stable
-// resource ID.
-func DedupByID(existing, incoming []Resource) []Resource {
-	if len(incoming) == 0 {
-		return incoming
+// DedupByID returns rs keyed by resource ID — the first row carrying an ID
+// wins — and the IDs that more than one row carried, in the order they
+// collapsed. Rows are keyed by their ID everywhere downstream (findings,
+// attention details, related sets, the cursor), so two rows with one ID
+// cannot both be shown; dups is what the screen owes the operator.
+func DedupByID(rs []Resource) (out []Resource, dups []string) {
+	if len(rs) == 0 {
+		return rs, nil
 	}
-	seen := make(map[string]struct{}, len(existing))
-	for _, r := range existing {
-		seen[r.ID] = struct{}{}
-	}
-	out := make([]Resource, 0, len(incoming))
-	for _, r := range incoming {
-		if _, dup := seen[r.ID]; dup {
+	seen := make(map[string]bool, len(rs))
+	reported := make(map[string]bool)
+	out = make([]Resource, 0, len(rs))
+	for _, r := range rs {
+		if seen[r.ID] {
+			if !reported[r.ID] {
+				reported[r.ID] = true
+				dups = append(dups, r.ID)
+			}
 			continue
 		}
-		seen[r.ID] = struct{}{}
+		seen[r.ID] = true
 		out = append(out, r)
 	}
-	return out
+	return out, dups
 }

@@ -271,8 +271,8 @@ func TestQA_Pagination_FetchECSServicesPage_FirstPage(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "my-service" {
-		t.Errorf("resource ID: expected %q, got %q", "my-service", result.Resources[0].ID)
+	if result.Resources[0].ID != "prod/my-service" {
+		t.Errorf("resource ID: expected %q, got %q", "prod/my-service", result.Resources[0].ID)
 	}
 }
 

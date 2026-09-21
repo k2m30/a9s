@@ -202,7 +202,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.ErrorRelated("policy", err)
 	}
-	return relatedResultTrunc("policy", attachedPolicyNames(attached), !complete)
+	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
 }
 
 // checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile

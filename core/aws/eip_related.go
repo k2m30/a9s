@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -230,10 +229,14 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 		return unreadZero(res, resource.KnownRelated("ecs-svc", nil, false))
 	}
 	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
-	if !ok || task.Group == nil || !strings.HasPrefix(*task.Group, "service:") {
+	if !ok {
 		return unreadZero(res, resource.ProvenZero("ecs-svc", "task.Group"))
 	}
-	return unreadZero(res, relatedRefs("ecs-svc", []string{*task.Group}, refContext(clients, cache, "ecs-svc")))
+	ref, ofService := ecsSvcRefFromTask(taskRes, task)
+	if !ofService {
+		return unreadZero(res, resource.ProvenZero("ecs-svc", "task.Group"))
+	}
+	return unreadZero(res, relatedRefs("ecs-svc", []string{ref}, refContext(clients, cache, "ecs-svc")))
 }
 
 // checkEIPECS reports the ECS cluster whose task currently holds this EIP,

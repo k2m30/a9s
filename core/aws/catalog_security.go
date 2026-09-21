@@ -114,13 +114,14 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:      "IAM Policies",
 		ShortName: "policy",
+		RefToID:   policyRefToID,
 		// Document is the version GetPolicyVersion returns and lands on
 		// PolicyEnriched when the detail opens.
 		ComputedDetailPaths: []string{"Document"},
 		LifecycleKey:        "risk",
 		Aliases:             []string{"policy", "policies", "iam-policies", "iam_policies"},
 		Category:            "SECURITY & IAM",
-		CloudTrailKey:       "ResourceName:ID",
+		CloudTrailKey:       "ResourceName:Fields.policy_name",
 		CloudTrailRegion:    ctRegionUSEast1,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]

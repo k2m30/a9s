@@ -248,15 +248,30 @@ func allTypesExpectRowRendered(s *fullIntegrationScenario, shortName string, res
 // allTypesExpectIDVisible asserts the resource ID appears in the current
 // YAML/JSON view. The compacted fallback tolerates viewport line wrap and
 // right-edge padding splitting a long ID across rendered lines.
+//
+// A row of a type whose name AWS scopes to a parent is keyed by the parent
+// and the name together, and the resource itself carries the two in separate
+// fields (an EventBridge rule's Name and EventBusName), so each part of such
+// an ID is looked for on its own.
 func allTypesExpectIDVisible(s *fullIntegrationScenario, id, surface string) {
 	s.t.Helper()
 	view := s.currentView()
-	if strings.Contains(view, id) {
+	compact := strings.ReplaceAll(strings.ReplaceAll(view, "\n", ""), " ", "")
+	shown := func(part string) bool {
+		return strings.Contains(view, part) || strings.Contains(compact, part)
+	}
+	if shown(id) {
 		return
 	}
-	compact := strings.ReplaceAll(strings.ReplaceAll(view, "\n", ""), " ", "")
-	if strings.Contains(compact, id) {
-		return
+	parts := strings.Split(id, "/")
+	if len(parts) > 1 {
+		missing := false
+		for _, part := range parts {
+			missing = missing || !shown(part)
+		}
+		if !missing {
+			return
+		}
 	}
 	s.failf("%s view does not contain resource id %q", surface, id)
 }

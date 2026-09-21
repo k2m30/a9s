@@ -263,8 +263,8 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 		if len(resources) < 1 {
 			t.Skip("not enough resources")
 		}
-		if resources[0].ID != "svc-alpha" {
-			t.Errorf("expected %q, got %q", "svc-alpha", resources[0].ID)
+		if resources[0].ID != "cluster-1/svc-alpha" {
+			t.Errorf("expected %q, got %q", "cluster-1/svc-alpha", resources[0].ID)
 		}
 	})
 
@@ -272,8 +272,8 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 		if len(resources) < 2 {
 			t.Skip("not enough resources")
 		}
-		if resources[1].ID != "svc-beta" {
-			t.Errorf("expected %q, got %q", "svc-beta", resources[1].ID)
+		if resources[1].ID != "cluster-2/svc-beta" {
+			t.Errorf("expected %q, got %q", "cluster-2/svc-beta", resources[1].ID)
 		}
 	})
 

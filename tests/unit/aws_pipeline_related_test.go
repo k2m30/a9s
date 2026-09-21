@@ -263,8 +263,11 @@ func TestRelated_Pipeline_ECSSvc_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != serviceName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), serviceName)
+	// The action names the cluster it deploys into, and a service name is
+	// unique inside a cluster.
+	const wantID = "acme-prod/" + serviceName
+	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != wantID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), wantID)
 	}
 }
 

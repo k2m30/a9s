@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -91,7 +92,7 @@ func FetchECSServicesPage(
 				findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
 				r := resource.Resource{
-					ID:   serviceName,
+					ID:   ecsSvcID(clusterName, serviceName),
 					Name: serviceName,
 					Fields: map[string]string{
 						"service_name":    serviceName,
@@ -114,6 +115,18 @@ func FetchECSServicesPage(
 		batch: 10,
 	}
 	return walk.page(ctx, continuationToken)
+}
+
+// ecsSvcID is the row identity of an ECS service: AWS scopes a service name
+// to its cluster, so two clusters may each run one called "api".
+func ecsSvcID(cluster, serviceName string) string {
+	return cluster + "/" + serviceName
+}
+
+// ecsSvcName is a service row's own name, as every AWS API that takes a
+// service takes it.
+func ecsSvcName(res resource.Resource) string {
+	return cmp.Or(res.Fields["service_name"], res.Name)
 }
 
 // ecsSvcFindings is the one predicate for a service's health: its lifecycle

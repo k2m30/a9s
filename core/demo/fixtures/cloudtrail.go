@@ -857,6 +857,22 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","awsRegion":"us-east-1","eventName":"UpdateService","requestParameters":{"service":"api-gateway","cluster":"acme-services","desiredCount":4}}`),
 		},
+		// The same service name in another cluster: an UpdateService of the
+		// acme-batch log-aggregator, which the acme-staging service of that
+		// name did not do. CloudTrail's ResourceName is the bare service
+		// name for both.
+		{
+			EventId:     aws.String("evt-ecs-svc-log-aggregator-batch-update-001"),
+			EventName:   aws.String("UpdateService"),
+			EventSource: aws.String("ecs.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECS::Service"), ResourceName: aws.String(ECSServiceInTwoClusters)},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","awsRegion":"us-east-1","eventName":"UpdateService","requestParameters":{"service":"` + ECSServiceInTwoClusters + `","cluster":"arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch","desiredCount":2}}`),
+		},
 		// api-gateway ECS task events — required for the ecs-task→ct-events
 		// related-panel pivot. ResourceName is the task id (ecs.go).
 		{
@@ -1092,5 +1108,5 @@ func init() {
 	// healthy: colorCTEvents (core/aws/catalog_monitoring.go) colors only
 	// ct-danger→Broken and ct-attention→Warning and defaults everything else
 	// to Dim, so Healthy is not a return value of this classifier.
-	Register(Pin{ShortName: "ct-events", Rows: 55, Issues: 0, CoverageGaps: []string{"healthy"}})
+	Register(Pin{ShortName: "ct-events", Rows: 56, Issues: 0, CoverageGaps: []string{"healthy"}})
 }

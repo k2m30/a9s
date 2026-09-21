@@ -68,7 +68,7 @@ func TestNGRows_SameNameInTwoClustersBothRender(t *testing.T) {
 		t.Fatalf("fetcher returned %d rows, want 2", len(out.Resources))
 	}
 
-	deduped := resource.DedupByID(nil, out.Resources)
+	deduped, _ := resource.DedupByID(out.Resources)
 	if len(deduped) != 2 {
 		ids := make([]string, 0, len(out.Resources))
 		for _, r := range out.Resources {
@@ -127,8 +127,16 @@ func TestNGRow_CloudTrailFilterUsesTheBareName(t *testing.T) {
 	}
 
 	got := resource.BuildCloudTrailFilter(row, "ng")
-	if len(got) != 1 || got["ResourceName"] != "workers" {
-		t.Errorf("BuildCloudTrailFilter = %v, want map[ResourceName:workers]", got)
+	// A key starting with "_" is a9s's own and is stripped before the call;
+	// what reaches LookupEvents is the lookup attributes, and it takes one.
+	lookup := map[string]string{}
+	for k, v := range got {
+		if !strings.HasPrefix(k, "_") {
+			lookup[k] = v
+		}
+	}
+	if len(lookup) != 1 || lookup["ResourceName"] != "workers" {
+		t.Errorf("BuildCloudTrailFilter lookup attributes = %v, want map[ResourceName:workers]", lookup)
 	}
 }
 
@@ -164,7 +172,7 @@ func TestNGRow_DegradedRowKeepsTheClusterScopedID(t *testing.T) {
 	if got := degraded.Fields["cluster_name"]; got != "green" {
 		t.Errorf("degraded row Fields[\"cluster_name\"] = %q, want %q", got, "green")
 	}
-	if len(resource.DedupByID(nil, out.Resources)) != 2 {
+	if deduped, _ := resource.DedupByID(out.Resources); len(deduped) != 2 {
 		t.Error("the degraded row and the healthy row of the same name collapsed into one")
 	}
 }

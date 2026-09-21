@@ -450,7 +450,8 @@ func TestRelated_EIPECSSvc_Match_ReturnsServiceName(t *testing.T) {
 	matchedTask := resource.Resource{
 		ID: "task-0abc1234567890def",
 		RawStruct: ecstypes.Task{
-			Group: aws.String("service:prod-web-svc"),
+			Group:      aws.String("service:prod-web-svc"),
+			ClusterArn: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"),
 			Attachments: []ecstypes.Attachment{
 				{Details: []ecstypes.KeyValuePair{
 					{Name: aws.String("networkInterfaceId"), Value: aws.String(eniID)},
@@ -467,8 +468,8 @@ func TestRelated_EIPECSSvc_Match_ReturnsServiceName(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "prod-web-svc" {
-		t.Errorf("ResourceIDs = %v, want [prod-web-svc]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-services/prod-web-svc" {
+		t.Errorf("ResourceIDs = %v, want [acme-services/prod-web-svc]", result.ResourceIDs())
 	}
 }
 

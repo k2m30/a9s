@@ -213,7 +213,7 @@ func checkSQSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 // Pattern C: one events:ListRuleNamesByTarget call using the queue ARN.
 // Queue ARN is read from SQSQueueAttributesRow.Attributes["QueueArn"].
 // Count = len(RuleNames).
-func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	queueARN := ""
 	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
 		queueARN = raw.Attributes["QueueArn"]
@@ -221,5 +221,5 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	if queueARN == "" {
 		return unreadZero(res, resource.ProvenZero("eb-rule", "queueARN"))
 	}
-	return unreadZero(res, ebRulesTargeting(ctx, clients, queueARN))
+	return unreadZero(res, ebRulesTargeting(ctx, clients, cache, queueARN))
 }

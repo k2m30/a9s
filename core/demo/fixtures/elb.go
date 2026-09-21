@@ -490,6 +490,11 @@ func buildListeners(f *ELBFixtures) {
 	}
 }
 
+// TGInstanceOnTwoPorts is the instance the prod-web target group holds two
+// registrations of, one per port: ELB checks each registration on its own, so
+// the two are two rows and the healthy one does not stand for the other.
+const TGInstanceOnTwoPorts = "i-0a1b2c3d4e5f60003"
+
 func buildTargetHealth(f *ELBFixtures) {
 	f.TargetHealth[fixtProdWebTGARN] = []elbv2types.TargetHealthDescription{
 		{
@@ -514,7 +519,7 @@ func buildTargetHealth(f *ELBFixtures) {
 		},
 		{
 			Target: &elbv2types.TargetDescription{
-				Id:   aws.String("i-0a1b2c3d4e5f60003"),
+				Id:   aws.String(TGInstanceOnTwoPorts),
 				Port: aws.Int32(443),
 			},
 			HealthCheckPort: aws.String("443"),
@@ -522,6 +527,19 @@ func buildTargetHealth(f *ELBFixtures) {
 				State:       elbv2types.TargetHealthStateEnumUnhealthy,
 				Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
 				Description: aws.String("Health checks failed"),
+			},
+		},
+		// The same instance on a second port, passing its checks: a service
+		// with dynamic port mapping registers one instance once per task, and
+		// each registration is checked on its own.
+		{
+			Target: &elbv2types.TargetDescription{
+				Id:   aws.String(TGInstanceOnTwoPorts),
+				Port: aws.Int32(32771),
+			},
+			HealthCheckPort: aws.String("32771"),
+			TargetHealth: &elbv2types.TargetHealth{
+				State: elbv2types.TargetHealthStateEnumHealthy,
 			},
 		},
 	}

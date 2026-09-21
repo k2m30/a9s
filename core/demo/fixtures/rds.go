@@ -674,6 +674,10 @@ func buildRDSDBSubnetGroups() []rdstypes.DBSubnetGroup {
 	}
 }
 
+// RDSEventSameInstantAsRestart shares its instant with the restart event of
+// prod-api-primary: two events of one moment are two rows.
+const RDSEventSameInstantAsRestart = "DB instance shutdown: prod-api-primary"
+
 func buildRDSEvents() []rdstypes.Event {
 	t1 := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 3, 19, 22, 30, 0, 0, time.UTC)
@@ -690,6 +694,15 @@ func buildRDSEvents() []rdstypes.Event {
 			SourceIdentifier: aws.String("prod-api-primary"),
 			SourceType:       rdstypes.SourceTypeDbInstance,
 			Message:          aws.String("DB instance restarted: prod-api-primary"),
+			EventCategories:  []string{"availability"},
+			Date:             aws.Time(t2),
+		},
+		// A restart writes its two events at one instant, and DescribeEvents
+		// gives neither an id of its own.
+		{
+			SourceIdentifier: aws.String("prod-api-primary"),
+			SourceType:       rdstypes.SourceTypeDbInstance,
+			Message:          aws.String(RDSEventSameInstantAsRestart),
 			EventCategories:  []string{"availability"},
 			Date:             aws.Time(t2),
 		},

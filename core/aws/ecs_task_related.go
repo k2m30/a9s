@@ -20,10 +20,11 @@ func checkECSTaskService(_ context.Context, clients any, res resource.Resource, 
 	if !ok {
 		return resource.UnknownRelated("ecs-svc")
 	}
-	if raw.Group == nil || !strings.HasPrefix(*raw.Group, "service:") {
+	ref, ofService := ecsSvcRefFromTask(res, raw)
+	if !ofService {
 		return resource.ProvenZero("ecs-svc", "raw.Group")
 	}
-	return relatedRefs("ecs-svc", []string{*raw.Group}, refContext(clients, cache, "ecs-svc"))
+	return relatedRefs("ecs-svc", []string{ref}, refContext(clients, cache, "ecs-svc"))
 }
 
 // checkECSTaskCluster returns the ECS cluster this task belongs to (Pattern F):

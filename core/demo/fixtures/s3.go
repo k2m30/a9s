@@ -711,14 +711,17 @@ func buildS3Objects() map[string]map[string][]s3types.Object {
 			},
 		},
 		"prod-lake": {
-			"": {},
-			"landing/": {
+			"":                 {},
+			"landing/":         {},
+			"landing/2026/":    {},
+			"landing/2026/04/": {},
+			"landing/2025/": {
 				{Key: aws.String("landing/2025/"), Size: aws.Int64(0), StorageClass: s3types.ObjectStorageClassStandard},
 			},
-			"landing/2026/": {
+			"landing/2026/03/": {
 				{Key: aws.String("landing/2026/03/"), Size: aws.Int64(0), StorageClass: s3types.ObjectStorageClassStandard},
 			},
-			"landing/2026/04/": {
+			"landing/2026/04/06/": {
 				{Key: aws.String("landing/2026/04/06/"), Size: aws.Int64(0), StorageClass: s3types.ObjectStorageClassStandard},
 			},
 			"landing/2026/04/07/": {

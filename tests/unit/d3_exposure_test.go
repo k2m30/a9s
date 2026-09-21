@@ -273,8 +273,8 @@ func d3EnrichCodeArtifact(t *testing.T, policy string) awsclient.IssueEnricherRe
 	res, err := awsclient.EnrichCodeArtifactRepository(context.Background(),
 		&awsclient.ServiceClients{CodeArtifact: fake, Region: "us-east-1"},
 		[]resource.Resource{{
-			ID: "acme-artifacts", Name: "acme-artifacts", Type: "codeartifact",
-			Fields: map[string]string{"domain_name": "acme-artifacts"},
+			ID: "acme-artifacts/acme-npm", Name: "acme-npm", Type: "codeartifact",
+			Fields: map[string]string{"repo_name": "acme-npm", "domain_name": "acme-artifacts"},
 		}}, nil)
 	if err != nil {
 		t.Fatalf("EnrichCodeArtifactPolicies: %v", err)

@@ -187,9 +187,9 @@ func TestEnrichCodeArtifact_CappedPackageCountKeepsPolicyVerdict(t *testing.T) {
 		ID:   repoID,
 		Name: "acme-repo",
 		Fields: map[string]string{
-			"repository_name": "acme-repo",
-			"domain_name":     "acme-domain",
-			"domain_owner":    "123456789012",
+			"repo_name":    "acme-repo",
+			"domain_name":  "acme-domain",
+			"domain_owner": "123456789012",
 		},
 	}}
 

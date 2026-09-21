@@ -292,7 +292,7 @@ func TestSecretsPivots_EverySourceCountsBySecretName(t *testing.T) {
 		source, id string
 		want       []string
 	}{
-		{"ecs-svc", "api-gateway", []string{"prod/api/gateway-key", "prod/database/primary"}},
+		{"ecs-svc", "acme-services/api-gateway", []string{"prod/api/gateway-key", "prod/database/primary"}},
 		{"glue", "acme-etl-orders", []string{"prod/database/primary"}},
 		{"msk", "acme-events-prod", []string{"prod/database/primary"}},
 	}
@@ -704,7 +704,7 @@ func TestNavigableFields_ARNListsAndGatewaysOpenTheirRow(t *testing.T) {
 	}{
 		{"tg LoadBalancerArns", "tg", "acme-web-tg", albARN, "elb", "acme-prod-web"},
 		{"asg TargetGroupARNs", "asg", "acme-web-prod-asg", tgARN, "tg", "acme-web-tg"},
-		{"ecs-svc LoadBalancers.TargetGroupArn", "ecs-svc", "api-gateway", tgARN, "tg", "acme-web-tg"},
+		{"ecs-svc LoadBalancers.TargetGroupArn", "ecs-svc", "acme-services/api-gateway", tgARN, "tg", "acme-web-tg"},
 		{"rtb Routes.GatewayId", "rtb", "rtb-0bbb222222222222b", "igw-0aaa111111111111a", "igw", "igw-0aaa111111111111a"},
 		{"rtb Routes.VpcPeeringConnectionId", "rtb", "rtb-0aaa111111111111a", "pcx-0prodpeershared1a", "vpc-peer", "pcx-0prodpeershared1a"},
 	}

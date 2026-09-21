@@ -294,7 +294,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		ShortName:     "codeartifact",
 		Aliases:       []string{"codeartifact", "artifact", "ca"},
 		Category:      "CI/CD",
-		CloudTrailKey: "ResourceName:ID",
+		CloudTrailKey: "ResourceName:Fields.repo_name",
+		CloudTrailQualifier: catalog.CloudTrailQualifier{
+			ParentField: "domain_name",
+			EventPaths:  []string{"requestParameters.domain"},
+		},
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {
 			acct := r.Fields["domain_owner"]
 			if acct == "" {
@@ -304,10 +308,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 				acct = accountID
 			}
 			domainName := r.Fields["domain_name"]
-			if acct == "" || domainName == "" {
+			repoName := r.Fields["repo_name"]
+			if acct == "" || domainName == "" || repoName == "" {
 				return ""
 			}
-			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(domainName)+"/r/"+url.PathEscape(r.ID))
+			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(domainName)+"/r/"+url.PathEscape(repoName))
 		},
 		Columns: []domain.Column{
 			{Key: "repo_name", Title: "Repository", Path: "Name", Width: 28},
@@ -395,8 +400,9 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		Name:      "Build Logs",
-		ShortName: "cb_build_logs",
+		Name:         "Build Logs",
+		ShortName:    "cb_build_logs",
+		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group_name"], r.Fields["log_stream_name"])
 		},

@@ -76,7 +76,7 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 	reasonHuman := humanizeTargetHealthReason(reason)
 
 	return resource.Resource{
-		ID:   targetID,
+		ID:   tgHealthRowID(targetID, port, az),
 		Name: targetID,
 		Fields: map[string]string{
 			"target_id":        targetID,
@@ -91,6 +91,23 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 		Findings:  targetHealthFindings(health, reasonHuman),
 		RawStruct: thd,
 	}
+}
+
+// tgHealthRowID is the row identity of one registration in a target group.
+// The same instance or address may be registered several times on different
+// ports — the shape of a service with dynamic port mapping — and
+// DescribeTargetHealth answers with one description per (Id, Port,
+// AvailabilityZone), so all three carry the identity; the health of one
+// registration says nothing about another's.
+func tgHealthRowID(targetID, port, az string) string {
+	id := targetID
+	if port != "" {
+		id += ":" + port
+	}
+	if az != "" {
+		id += "@" + az
+	}
+	return id
 }
 
 // humanizeTargetHealthReason converts a raw elbv2types.TargetHealthReasonEnum

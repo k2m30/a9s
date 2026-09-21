@@ -13,6 +13,12 @@ type EventBridgeListRulesAPI interface {
 	ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error)
 }
 
+// EventBridgeListEventBusesAPI defines the interface for the EventBridge
+// ListEventBuses operation.
+type EventBridgeListEventBusesAPI interface {
+	ListEventBuses(ctx context.Context, params *eventbridge.ListEventBusesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListEventBusesOutput, error)
+}
+
 // EventBridgeListTargetsByRuleAPI defines the interface for the EventBridge ListTargetsByRule operation.
 type EventBridgeListTargetsByRuleAPI interface {
 	ListTargetsByRule(ctx context.Context, params *eventbridge.ListTargetsByRuleInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error)
@@ -27,6 +33,7 @@ type EventBridgeListRuleNamesByTargetAPI interface {
 // *eventbridge.Client structurally satisfies this interface.
 type EventBridgeAPI interface {
 	EventBridgeListRulesAPI
+	EventBridgeListEventBusesAPI
 	EventBridgeListTargetsByRuleAPI
 	EventBridgeListRuleNamesByTargetAPI
 }

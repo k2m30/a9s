@@ -42,7 +42,12 @@
    ARN per API call, and an account can hold both spellings for one resource:
    a lookup whose first page is empty is retried once under the other
    spelling, and the list then holds what the answering spelling holds. Where
-   both occur in one account the list is a subset.
+   both occur in one account the list is a subset. A type whose name is unique
+   only under a parent also declares a `CloudTrailQualifier` — the row field
+   holding the parent and the event JSON paths that record it — and an event
+   whose body names a different parent is dropped; one that names none is
+   kept, as `AlarmMatchSpec.QualifierDimension` treats an alarm carrying no
+   qualifier dimension.
 5. **Never bypass** — do NOT "temporarily" remove a row to unblock a refactor.
    Previous drift happened exactly this way. If the registration is blocking
    you, fix the registration, not the contract.

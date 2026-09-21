@@ -280,11 +280,12 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 
 	resources := make([]resource.Resource, 42)
 	for i := range resources {
+		id := fmt.Sprintf("i-recovered%02d", i)
 		resources[i] = resource.Resource{
-			ID:   "i-recovered",
+			ID:   id,
 			Name: "recovered",
 			Fields: map[string]string{
-				"instance_id": "i-recovered",
+				"instance_id": id,
 				"name":        "recovered",
 				"state":       "running",
 				"type":        "t3.micro",

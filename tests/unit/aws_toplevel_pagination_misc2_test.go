@@ -465,8 +465,8 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 		if len(resources) < 1 {
 			t.Skip("not enough resources")
 		}
-		if resources[0].ID != "page1-rule-1" {
-			t.Errorf("expected %q, got %q", "page1-rule-1", resources[0].ID)
+		if resources[0].ID != "default/page1-rule-1" {
+			t.Errorf("expected %q, got %q", "default/page1-rule-1", resources[0].ID)
 		}
 	})
 
@@ -474,8 +474,8 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 		if len(resources) < 3 {
 			t.Skip("not enough resources")
 		}
-		if resources[2].ID != "page2-rule-1" {
-			t.Errorf("expected %q, got %q", "page2-rule-1", resources[2].ID)
+		if resources[2].ID != "default/page2-rule-1" {
+			t.Errorf("expected %q, got %q", "default/page2-rule-1", resources[2].ID)
 		}
 	})
 

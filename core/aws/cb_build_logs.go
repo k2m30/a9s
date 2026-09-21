@@ -35,8 +35,9 @@ func FetchCBBuildLogs(
 	}
 
 	var resources []resource.Resource
+	var ids eventRowIDs
 
-	for i, event := range output.Events {
+	for _, event := range output.Events {
 		message := ""
 		if event.Message != nil {
 			message = strings.ReplaceAll(strings.TrimRight(*event.Message, "\n"), "\n", " ")
@@ -54,7 +55,7 @@ func FetchCBBuildLogs(
 			ingestionTime = formatEpochMillisSec(*event.IngestionTime)
 		}
 
-		id := fmt.Sprintf("evt-%d-%d", tsVal, i)
+		id := ids.at(tsVal, message)
 
 		name := message
 		if len(name) > 80 {

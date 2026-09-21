@@ -795,8 +795,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 
 var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "RDS Events",
-		ShortName: "dbi_events",
+		Name:         "RDS Events",
+		ShortName:    "dbi_events",
+		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			db := r.Fields["source_identifier"]
 			if db == "" {

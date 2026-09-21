@@ -169,10 +169,11 @@ func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resou
 // checkCfnEBRule calls ListStackResources and returns EventBridge rules
 // created by the stack (ResourceType=AWS::Events::Rule). The PhysicalResourceId
 // of an Events::Rule is the rule name.
-func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
+func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	refs, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
 	if !ok {
 		return resource.UnknownRelated("eb-rule")
 	}
-	return relatedResultTrunc("eb-rule", ids, truncated)
+	ids, dropped := resolveRefs("eb-rule", refs, refContext(clients, cache, "eb-rule"))
+	return relatedResultTrunc("eb-rule", ids, truncated || dropped)
 }

@@ -10,21 +10,26 @@ package unit_test
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 )
 
 // fakeEventBridgeAPI implements awsclient.EventBridgeAPI (ListRules,
-// ListTargetsByRule, ListRuleNamesByTarget).
+// ListEventBuses, ListTargetsByRule, ListRuleNamesByTarget).
 //
 // Each method is configured independently:
 //   - ListRules: RulesOutput/RulesErr (unconditional)
+//   - ListEventBuses: EventBuses, defaulting to the default bus alone
 //   - ListTargetsByRule: Targets/TargetsErr (unconditional)
 //   - ListRuleNamesByTarget: RuleNamesByTargetArn (keyed by the request's
 //     TargetArn) if set, else the unconditional RuleNames/RuleNamesErr
 type fakeEventBridgeAPI struct {
 	RulesOutput *eventbridge.ListRulesOutput
 	RulesErr    error
+
+	EventBuses []eventbridgetypes.EventBus
+	BusesErr   error
 
 	Targets    []eventbridgetypes.Target
 	TargetsErr error
@@ -46,6 +51,24 @@ func (f *fakeEventBridgeAPI) ListRules(
 		return f.RulesOutput, nil
 	}
 	return &eventbridge.ListRulesOutput{}, nil
+}
+
+// ListEventBuses answers with the default bus alone unless a test names its
+// own: every account has one, and a rule created without a bus is on it.
+func (f *fakeEventBridgeAPI) ListEventBuses(
+	_ context.Context,
+	_ *eventbridge.ListEventBusesInput,
+	_ ...func(*eventbridge.Options),
+) (*eventbridge.ListEventBusesOutput, error) {
+	if f.BusesErr != nil {
+		return nil, f.BusesErr
+	}
+	if f.EventBuses == nil {
+		return &eventbridge.ListEventBusesOutput{
+			EventBuses: []eventbridgetypes.EventBus{{Name: aws.String("default")}},
+		}, nil
+	}
+	return &eventbridge.ListEventBusesOutput{EventBuses: f.EventBuses}, nil
 }
 
 func (f *fakeEventBridgeAPI) ListTargetsByRule(

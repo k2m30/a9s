@@ -5,7 +5,9 @@ package fixtures
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -104,6 +106,12 @@ const (
 	// PolicyPrivEsc is a customer-managed policy granting the same
 	// escalation combination — policy.privilege-escalation.
 	PolicyPrivEsc = "acme-privesc-policy"
+	// PolicyNameAlsoAWSManaged is the name the account's own policy shares
+	// with an AWS-managed one, and LocalPowerUserAccessARN is the account's.
+	// IAM keeps a name unique among the account's own policies, so the two
+	// coexist and are one row each.
+	PolicyNameAlsoAWSManaged = "PowerUserAccess"
+	LocalPowerUserAccessARN  = "arn:aws:iam::123456789012:policy/PowerUserAccess"
 	// RetiredManagedPolicyName is attached to redshift-reporting-copy-role and
 	// registered in NO policy list, because AWS has retired it: the attachment
 	// on the role survives while GetPolicy answers NoSuchEntity. It is the
@@ -717,6 +725,21 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2024, 11, 1, 7, 45, 0, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
+		// The account's own policy of a name AWS also uses: IAM keeps names
+		// unique among the account's policies only, so this one and the
+		// AWS-managed PowerUserAccess below are two policies, and only their
+		// ARNs tell them apart.
+		{
+			PolicyName:       aws.String(PolicyNameAlsoAWSManaged),
+			PolicyId:         aws.String("ANPAEXAMPLELOCALPWR01"),
+			Arn:              aws.String(LocalPowerUserAccessARN),
+			AttachmentCount:  aws.Int32(1),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2025, 8, 14, 10, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+			IsAttachable:     true,
+			Description:      aws.String("Read-only break-glass audit policy, named after the AWS-managed one it is not"),
+		},
 		// AWS-managed AdministratorAccess policy (ct-events cross-reference)
 		{
 			PolicyName:       aws.String("AdministratorAccess"),
@@ -727,13 +750,14 @@ func buildIAMPolicies() []iamtypes.Policy {
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 40, 16, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
-		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUser: the
-		// near-miss the admin-attached finding must not fire on.
+		// AWS-managed PowerUserAccess, attached to IAMGroupPowerUser and to
+		// RolePowerUserAttached: the near-miss the admin-attached finding
+		// must not fire on.
 		{
 			PolicyName:       aws.String("PowerUserAccess"),
 			PolicyId:         aws.String("ANPAEXAMPLE000000002"),
 			Arn:              aws.String("arn:aws:iam::aws:policy/PowerUserAccess"),
-			AttachmentCount:  aws.Int32(1),
+			AttachmentCount:  aws.Int32(2),
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2015, 2, 6, 18, 39, 47, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
@@ -1010,6 +1034,7 @@ func buildIAMRelations(f *IAMFixtures) {
 
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("acme-s3-read-only"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only")},
+		{PolicyName: aws.String(PolicyNameAlsoAWSManaged), PolicyArn: aws.String(LocalPowerUserAccessARN)},
 	}
 	f.AttachedUserPolicies[IAMUserAdminAttached] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
@@ -1054,27 +1079,7 @@ func buildIAMRelations(f *IAMFixtures) {
 		{GroupName: aws.String("developers"), GroupId: aws.String("AGPAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:group/developers"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 5, 0, 0, time.UTC))},
 	}
 
-	f.EntitiesForPolicy["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = &PolicyEntities{
-		Roles: []iamtypes.PolicyRole{
-			{RoleName: aws.String("acme-lambda-execution"), RoleId: aws.String("AROAEXAMPLE222222222")},
-		},
-		Users: []iamtypes.PolicyUser{
-			{UserName: aws.String("alice.johnson"), UserId: aws.String("AIDAEXAMPLE111111111")},
-		},
-		Groups: []iamtypes.PolicyGroup{
-			{GroupName: aws.String("developers"), GroupId: aws.String("AGPAEXAMPLE222222222")},
-		},
-	}
-	f.EntitiesForPolicy["arn:aws:iam::aws:policy/PowerUserAccess"] = &PolicyEntities{
-		Groups: []iamtypes.PolicyGroup{
-			{GroupName: aws.String(IAMGroupPowerUser), GroupId: aws.String("AGPAEXAMPLE555555555")},
-		},
-	}
-	f.EntitiesForPolicy["arn:aws:iam::aws:policy/AdministratorAccess"] = &PolicyEntities{
-		Groups: []iamtypes.PolicyGroup{
-			{GroupName: aws.String("admins"), GroupId: aws.String("AGPAEXAMPLE111111111")},
-		},
-	}
+	buildEntitiesForPolicy(f)
 
 	// The generated least-privilege policies: one read-only document each,
 	// named after the service in the policy's own name. Nothing here is a
@@ -1092,6 +1097,7 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 
 	// Policy documents (URL-encoded JSON)
+	f.PolicyDocuments[LocalPowerUserAccessARN] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:GenerateCredentialReport","iam:Get*","iam:List*"],"Resource":"*"}]}`)
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-cloudwatch-logs"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:*:123456789012:*"}]}`)
 
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/acme-s3-read-only"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::acme-data-*","arn:aws:s3:::acme-data-*/*"]}]}`)
@@ -1130,7 +1136,52 @@ func buildIAMRelations(f *IAMFixtures) {
 
 func init() {
 	Register(Pin{ShortName: "role", Rows: 55, Issues: 4, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "policy", Rows: 28, Issues: 1, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "policy", Rows: 29, Issues: 1, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-user", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-group", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})
+}
+
+// buildEntitiesForPolicy answers ListEntitiesForPolicy out of the attachments
+// themselves: a policy's principals are the roles, users and groups that
+// attach it, and a demo policy whose detail names a principal that does not
+// attach it describes an account the demo does not have.
+func buildEntitiesForPolicy(f *IAMFixtures) {
+	roleIDs := map[string]string{}
+	for _, r := range f.Roles {
+		roleIDs[aws.ToString(r.RoleName)] = aws.ToString(r.RoleId)
+	}
+	userIDs := map[string]string{}
+	for _, u := range f.Users {
+		userIDs[aws.ToString(u.UserName)] = aws.ToString(u.UserId)
+	}
+	groupIDs := map[string]string{}
+	for _, g := range f.Groups {
+		groupIDs[aws.ToString(g.GroupName)] = aws.ToString(g.GroupId)
+	}
+	entities := func(policyARN string) *PolicyEntities {
+		e, ok := f.EntitiesForPolicy[policyARN]
+		if !ok {
+			e = &PolicyEntities{}
+			f.EntitiesForPolicy[policyARN] = e
+		}
+		return e
+	}
+	for _, name := range slices.Sorted(maps.Keys(f.AttachedRolePolicies)) {
+		for _, p := range f.AttachedRolePolicies[name] {
+			e := entities(aws.ToString(p.PolicyArn))
+			e.Roles = append(e.Roles, iamtypes.PolicyRole{RoleName: aws.String(name), RoleId: aws.String(roleIDs[name])})
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(f.AttachedUserPolicies)) {
+		for _, p := range f.AttachedUserPolicies[name] {
+			e := entities(aws.ToString(p.PolicyArn))
+			e.Users = append(e.Users, iamtypes.PolicyUser{UserName: aws.String(name), UserId: aws.String(userIDs[name])})
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(f.AttachedGroupPolicies)) {
+		for _, p := range f.AttachedGroupPolicies[name] {
+			e := entities(aws.ToString(p.PolicyArn))
+			e.Groups = append(e.Groups, iamtypes.PolicyGroup{GroupName: aws.String(name), GroupId: aws.String(groupIDs[name])})
+		}
+	}
 }

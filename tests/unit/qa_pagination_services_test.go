@@ -1827,8 +1827,8 @@ func TestQA_Pagination_FetchCodeArtifactReposPage_FirstPage(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "my-npm-repo" {
-		t.Errorf("resource ID: expected %q, got %q", "my-npm-repo", result.Resources[0].ID)
+	if result.Resources[0].ID != "my-domain/my-npm-repo" {
+		t.Errorf("resource ID: expected %q, got %q", "my-domain/my-npm-repo", result.Resources[0].ID)
 	}
 }
 

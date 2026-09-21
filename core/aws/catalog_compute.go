@@ -358,8 +358,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		HumanizeFields: []string{"launch_type", "status", "SchedulingStrategy"},
 		Aliases:        []string{"ecs-svc", "ecs-services"},
 		Category:       "COMPUTE",
-		CloudTrailKey:  "ResourceName:ID",
-		LifecycleKey:   "status",
+		CloudTrailKey:  "ResourceName:Fields.service_name",
+		CloudTrailQualifier: catalog.CloudTrailQualifier{
+			ParentField: "cluster",
+			EventPaths:  []string{"requestParameters.cluster"},
+		},
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {

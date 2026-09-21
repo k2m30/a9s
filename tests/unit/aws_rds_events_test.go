@@ -65,10 +65,12 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
 
-	t.Run("event_0_ID", func(t *testing.T) {
-		expected := "2024-06-15 10:00/my-db-instance"
-		if result.Resources[0].ID != expected {
-			t.Errorf("ID: expected %q, got %q", expected, result.Resources[0].ID)
+	// DescribeEvents hands out no event ID, and several events of one minute
+	// are several rows, so the row is keyed by the instant it happened at
+	// full precision and what it says.
+	t.Run("event_0_ID_carries_the_full_instant", func(t *testing.T) {
+		if !strings.HasPrefix(result.Resources[0].ID, "20240615T100000.000000000Z-") {
+			t.Errorf("ID = %q, want the event's instant and a digest of its content", result.Resources[0].ID)
 		}
 	})
 

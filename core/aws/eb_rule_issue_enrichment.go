@@ -50,9 +50,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 
 		ruleName := r.Fields["name"]
 		if ruleName == "" {
-			ruleName = r.ID
-		}
-		if ruleName == "" {
 			return
 		}
 
@@ -124,19 +121,19 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			// noTargets, which needs a complete walk, is suppressed, by its
 			// own !targetsTruncated guard above.
 		}
-		result.FieldUpdates[ruleName] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"target_count": targetCountStr,
 		}
 
 		if noTargets {
-			setWave2Finding(&result, ruleName, ebRuleCodeNoTargets, []domain.DetailRow{{Label: "Targets", Value: "none", Tier: tierOf(ebRuleCodeNoTargets)}})
+			setWave2Finding(&result, r.ID, ebRuleCodeNoTargets, []domain.DetailRow{{Label: "Targets", Value: "none", Tier: tierOf(ebRuleCodeNoTargets)}})
 
 		}
 
 		if len(rows) == 0 {
 			return
 		}
-		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, rows)
+		setWave2Finding(&result, r.ID, ebRuleCodeTargetIssue, rows)
 	})
 
 	SetTruncated(&result, truncated)

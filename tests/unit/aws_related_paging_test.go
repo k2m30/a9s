@@ -154,6 +154,14 @@ func pagedGroupName(i int) string  { return fmt.Sprintf("group-%04d", i) }
 func pagedPolicyName(i int) string { return fmt.Sprintf("policy-%04d", i) }
 func pagedInlineName(i int) string { return fmt.Sprintf("inline-%04d", i) }
 
+// pagedPolicyID is the row ID of a customer-managed policy: IAM identifies a
+// policy by its ARN, and a name can be shared with an AWS-managed policy.
+func pagedPolicyID(i int) string { return "arn:aws:iam::123456789012:policy/" + pagedPolicyName(i) }
+
+// pagedInlineID is the row ID of that inline policy on the group the paging
+// tests walk: an inline policy name is the group's to choose.
+func pagedInlineID(i int) string { return "inline/platform-engineers/" + pagedInlineName(i) }
+
 func pagedAttached(p *pagedList, marker *string) ([]iamtypes.AttachedPolicy, *string) {
 	if p == nil {
 		return nil, nil
@@ -163,7 +171,7 @@ func pagedAttached(p *pagedList, marker *string) ([]iamtypes.AttachedPolicy, *st
 	for i := lo; i < hi; i++ {
 		out = append(out, iamtypes.AttachedPolicy{
 			PolicyName: aws.String(pagedPolicyName(i)),
-			PolicyArn:  aws.String("arn:aws:iam::123456789012:policy/" + pagedPolicyName(i)),
+			PolicyArn:  aws.String(pagedPolicyID(i)),
 		})
 	}
 	return out, next
@@ -263,12 +271,12 @@ func TestRelatedPaging_IAMUserGroupsAndPolicies(t *testing.T) {
 	t.Run("policies exact", func(t *testing.T) {
 		pols := &pagedList{total: 8, size: 5}
 		clients := &awsclient.ServiceClients{IAM: &pagedIAM{userPolicies: pols}}
-		assertPagedExact(t, pagedChecker(t, "iam-user", "policy")(context.Background(), clients, user, resource.ResourceCache{}), pagedIDs(8, pagedPolicyName))
+		assertPagedExact(t, pagedChecker(t, "iam-user", "policy")(context.Background(), clients, user, resource.ResourceCache{}), pagedIDs(8, pagedPolicyID))
 	})
 	t.Run("policies capped", func(t *testing.T) {
 		pols := &pagedList{total: pagedEndless, size: 5}
 		clients := &awsclient.ServiceClients{IAM: &pagedIAM{userPolicies: pols}}
-		assertPagedCapped(t, pagedChecker(t, "iam-user", "policy")(context.Background(), clients, user, resource.ResourceCache{}), pols, pagedPolicyName)
+		assertPagedCapped(t, pagedChecker(t, "iam-user", "policy")(context.Background(), clients, user, resource.ResourceCache{}), pols, pagedPolicyID)
 	})
 }
 
@@ -278,12 +286,12 @@ func TestRelatedPaging_RolePolicies(t *testing.T) {
 	t.Run("exact", func(t *testing.T) {
 		pols := &pagedList{total: 8, size: 5}
 		clients := &awsclient.ServiceClients{IAM: &pagedIAM{rolePolicies: pols}}
-		assertPagedExact(t, pagedChecker(t, "role", "policy")(context.Background(), clients, role, resource.ResourceCache{}), pagedIDs(8, pagedPolicyName))
+		assertPagedExact(t, pagedChecker(t, "role", "policy")(context.Background(), clients, role, resource.ResourceCache{}), pagedIDs(8, pagedPolicyID))
 	})
 	t.Run("capped", func(t *testing.T) {
 		pols := &pagedList{total: pagedEndless, size: 5}
 		clients := &awsclient.ServiceClients{IAM: &pagedIAM{rolePolicies: pols}}
-		assertPagedCapped(t, pagedChecker(t, "role", "policy")(context.Background(), clients, role, resource.ResourceCache{}), pols, pagedPolicyName)
+		assertPagedCapped(t, pagedChecker(t, "role", "policy")(context.Background(), clients, role, resource.ResourceCache{}), pols, pagedPolicyID)
 	})
 }
 
@@ -298,7 +306,7 @@ func TestRelatedPaging_IAMGroupPolicies(t *testing.T) {
 			groupInline:   &pagedList{total: 6, size: 5},
 		}}
 		r := pagedChecker(t, "iam-group", "policy")(context.Background(), clients, group, resource.ResourceCache{})
-		assertPagedExact(t, r, append(pagedIDs(7, pagedPolicyName), pagedIDs(6, pagedInlineName)...))
+		assertPagedExact(t, r, append(pagedIDs(7, pagedPolicyID), pagedIDs(6, pagedInlineID)...))
 	})
 	t.Run("inline capped", func(t *testing.T) {
 		inline := &pagedList{total: pagedEndless, size: 5}
@@ -462,7 +470,7 @@ func (f *pagedEventBridge) ListTargetsByRule(_ context.Context, in *eventbridge.
 }
 
 func TestRelatedPaging_EventBridgeRuleTargets(t *testing.T) {
-	rule := resource.Resource{ID: "order-events", Name: "order-events"}
+	rule := resource.Resource{ID: "default/order-events", Name: "order-events", Fields: map[string]string{"name": "order-events", "event_bus": "default"}}
 	t.Run("exact", func(t *testing.T) {
 		targets := &pagedList{total: 7, size: 5}
 		clients := &awsclient.ServiceClients{EventBridge: &pagedEventBridge{targets: targets}}

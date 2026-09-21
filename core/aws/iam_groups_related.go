@@ -51,7 +51,10 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	}
 	// A walk that failed or stopped at the cap leaves ids a proven subset of
 	// the group's policies, not the exhaustive answer.
-	ids := append(attachedPolicyNames(attached), inline...)
+	ids := attachedPolicyIDs(attached)
+	for _, name := range inline {
+		ids = append(ids, inlinePolicyID(groupName, name))
+	}
 	return relatedResultTrunc("policy", ids, !attachedComplete || !inlineComplete)
 }
 

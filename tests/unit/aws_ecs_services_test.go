@@ -85,9 +85,10 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 		}
 	}
 
+	// A service name is unique inside its cluster, so the row carries both.
 	r0 := resources[0]
-	if r0.ID != "web-service" {
-		t.Errorf("resource[0].ID: expected %q, got %q", "web-service", r0.ID)
+	if r0.ID != "prod-cluster/web-service" {
+		t.Errorf("resource[0].ID: expected %q, got %q", "prod-cluster/web-service", r0.ID)
 	}
 	if r0.Name != "web-service" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-service", r0.Name)
@@ -116,8 +117,8 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 	}
 
 	r1 := resources[1]
-	if r1.ID != "api-service" {
-		t.Errorf("resource[1].ID: expected %q, got %q", "api-service", r1.ID)
+	if r1.ID != "prod-cluster/api-service" {
+		t.Errorf("resource[1].ID: expected %q, got %q", "prod-cluster/api-service", r1.ID)
 	}
 	if r1.Fields["desired_count"] != "2" {
 		t.Errorf("resource[1].Fields[\"desired_count\"]: expected %q, got %q", "2", r1.Fields["desired_count"])

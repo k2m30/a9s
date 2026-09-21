@@ -48,8 +48,8 @@ var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 	{"ddb", "analytics-deleting", "TableStatus", "DELETING", "deleting"},
 	{"ddb", "legacy-kms-lost", "TableStatus", "INACCESSIBLE_ENCRYPTION_CREDENTIALS", "inaccessible encryption credentials"},
 
-	{"ecs-svc", "api-gateway", "SchedulingStrategy", "REPLICA", "replica"},
-	{"ecs-svc", "log-aggregator", "SchedulingStrategy", "DAEMON", "daemon"},
+	{"ecs-svc", "acme-services/api-gateway", "SchedulingStrategy", "REPLICA", "replica"},
+	{"ecs-svc", "acme-batch/log-aggregator", "SchedulingStrategy", "DAEMON", "daemon"},
 
 	{"ecs-task", "a1b2c3d4e5f6a1b2c3d4e5f6", "Connectivity", "CONNECTED", "connected"},
 

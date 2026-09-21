@@ -151,8 +151,8 @@ func policyCallers() []policyCaller {
 			deny:  `{"Sid":"DenyOutsideOrg","Effect":"Deny","Principal":"*","Action":"codeartifact:*","Resource":"*",` + orgDeny + `}`,
 			run: func(t *testing.T, doc string) ([]domain.Finding, bool) {
 				res := enrichCodeArtifactPolicy(doc)
-				_, unknown := res.TruncatedIDs["acme-artifacts"]
-				return res.Findings["acme-artifacts"], unknown
+				_, unknown := res.TruncatedIDs["acme-artifacts/acme-npm"]
+				return res.Findings["acme-artifacts/acme-npm"], unknown
 			},
 		},
 		{
@@ -206,8 +206,8 @@ func enrichCodeArtifactPolicy(doc string) awsclient.IssueEnricherResult {
 	res, _ := awsclient.EnrichCodeArtifactRepository(context.Background(),
 		&awsclient.ServiceClients{CodeArtifact: fake, Region: "us-east-1"},
 		[]resource.Resource{{
-			ID: "acme-artifacts", Name: "acme-artifacts", Type: "codeartifact",
-			Fields: map[string]string{"domain_name": "acme-artifacts"},
+			ID: "acme-artifacts/acme-npm", Name: "acme-npm", Type: "codeartifact",
+			Fields: map[string]string{"repo_name": "acme-npm", "domain_name": "acme-artifacts"},
 		}}, nil)
 	return res
 }
@@ -297,14 +297,14 @@ func TestCodeArtifactServicePrincipalGrantIsNotPublic(t *testing.T) {
 		`"Condition":{"Bool":{"aws:PrincipalIsAWSService":"VALUE"}}}]}`
 
 	services := enrichCodeArtifactPolicy(strings.Replace(tmpl, "VALUE", "true", 1))
-	if hasCode(services.Findings["acme-artifacts"], "codeartifact.public-access-policy") {
+	if hasCode(services.Findings["acme-artifacts/acme-npm"], "codeartifact.public-access-policy") {
 		t.Errorf("a grant only AWS service principals satisfy was reported as public")
 	}
 
 	everyoneElse := enrichCodeArtifactPolicy(strings.Replace(tmpl, "VALUE", "false", 1))
-	if !hasCode(everyoneElse.Findings["acme-artifacts"], "codeartifact.public-access-policy") {
+	if !hasCode(everyoneElse.Findings["acme-artifacts/acme-npm"], "codeartifact.public-access-policy") {
 		t.Errorf("a grant to every non-service caller was not reported as public; got %v",
-			w2Codes(everyoneElse.Findings["acme-artifacts"]))
+			w2Codes(everyoneElse.Findings["acme-artifacts/acme-npm"]))
 	}
 }
 

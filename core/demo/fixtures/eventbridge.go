@@ -12,11 +12,27 @@ import (
 // EventBridgeFixtures holds typed fixture data for EventBridge.
 type EventBridgeFixtures struct {
 	Rules []eventbridgetypes.Rule
+	// EventBuses are the account's buses; ListRules answers for one of them
+	// at a time.
+	EventBuses []eventbridgetypes.EventBus
 	// TargetsByRule maps rule name to its targets.
 	TargetsByRule map[string][]eventbridgetypes.Target
 }
 
 const prodEBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
+
+// EBRuleForOneClustersService names both a service group and a cluster, so it
+// belongs to the acme-batch log-aggregator and not to the acme-staging
+// service of that name.
+const EBRuleForOneClustersService = "ecs-batch-log-aggregator-task-state-change"
+
+// EBCustomBus is the account's bus beside the default one, and
+// EBRuleOnCustomBus is the rule that sits on it: a rule name is unique on its
+// bus, so a rule is only listed by the bus it was created on.
+const (
+	EBCustomBus       = "acme-orders-bus"
+	EBRuleOnCustomBus = "order-placed-fanout"
+)
 
 // NewEventBridgeFixtures constructs EventBridgeFixtures from the canonical demo data.
 var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
@@ -84,6 +100,17 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			EventPattern: aws.String(`{"source":["aws.ecs"],"detail-type":["ECS Task State Change"],"detail":{"clusterArn":["arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"]}}`),
 			Description:  aws.String("Routes ECS task state changes for the acme-services cluster to SNS"),
 		},
+		// A rule scoped to one cluster's service: it names the service group
+		// and the cluster, and only the acme-batch log-aggregator is the
+		// service it fires for.
+		{
+			Name:         aws.String(EBRuleForOneClustersService),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBRuleForOneClustersService),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.ecs"],"detail-type":["ECS Task State Change"],"detail":{"group":["service:log-aggregator"],"clusterArn":["arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"]}}`),
+			Description:  aws.String("Routes the acme-batch log-aggregator's task state changes to SNS"),
+		},
 		// S3 healthy-bucket event bridge rule (checkS3EBRule pivot).
 		// checkS3EBRule reads ruleRes.Fields["target_arns"] (emitted by the
 		// eventbridge fetcher); this rule is pre-set so the demo related graph renders.
@@ -144,7 +171,25 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 		},
 	}
 
+	rules = append(rules, eventbridgetypes.Rule{
+		Name:         aws.String(EBRuleOnCustomBus),
+		Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBCustomBus + "/" + EBRuleOnCustomBus),
+		State:        eventbridgetypes.RuleStateEnabled,
+		EventBusName: aws.String(EBCustomBus),
+		EventPattern: aws.String(`{"source":["acme.orders"],"detail-type":["OrderPlaced"]}`),
+		Description:  aws.String("Fans an accepted order out to fulfilment"),
+	})
+
 	targetsByRule := map[string][]eventbridgetypes.Target{
+		EBRuleOnCustomBus: {
+			{
+				Id:  aws.String("OrderFulfilmentQueue"),
+				Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:order-processing-queue"),
+				DeadLetterConfig: &eventbridgetypes.DeadLetterConfig{
+					Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
+				},
+			},
+		},
 		"nightly-db-backup": {
 			{
 				Id:  aws.String("LambdaBackupFunction"),
@@ -191,6 +236,12 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 				Arn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
 			},
 		},
+		EBRuleForOneClustersService: {
+			{
+				Id:  aws.String("SNSBatchTaskStateTopic"),
+				Arn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+			},
+		},
 		// S3 healthy-bucket rule targets.
 		"a9s-demo-s3-events-rule": {
 			{
@@ -231,7 +282,17 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 	}
 
 	return &EventBridgeFixtures{
-		Rules:         rules,
+		Rules: rules,
+		EventBuses: []eventbridgetypes.EventBus{
+			{
+				Name: aws.String("default"),
+				Arn:  aws.String("arn:aws:events:us-east-1:123456789012:event-bus/default"),
+			},
+			{
+				Name: aws.String(EBCustomBus),
+				Arn:  aws.String("arn:aws:events:us-east-1:123456789012:event-bus/" + EBCustomBus),
+			},
+		},
 		TargetsByRule: targetsByRule,
 	}
 })
@@ -241,5 +302,5 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "eb-rule", Rows: 12, Issues: 0})
+	Register(Pin{ShortName: "eb-rule", Rows: 14, Issues: 0})
 }

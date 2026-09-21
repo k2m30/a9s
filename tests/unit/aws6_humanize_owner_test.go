@@ -44,8 +44,8 @@ var humanizedDetailWitnesses = []struct {
 	{"mwaa", "prod-airflow-etl", "EndpointManagement", "SERVICE", "service", false},
 
 	{"apigw", "efg567hij8", "protocol", "WEBSOCKET", "websocket", false},
-	{"ecs-svc", "api-gateway", "LaunchType", "FARGATE", "fargate", false},
-	{"ecs-svc", "api-gateway", "status", "ACTIVE", "active", true},
+	{"ecs-svc", "acme-services/api-gateway", "LaunchType", "FARGATE", "fargate", false},
+	{"ecs-svc", "acme-services/api-gateway", "status", "ACTIVE", "active", true},
 	// a node group's row id is "<cluster>/<nodegroup>".
 	{"ng", "acme-prod/acme-prod-degraded-pool", "status", "DEGRADED", "degraded", false},
 }

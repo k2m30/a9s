@@ -499,8 +499,10 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 	if result.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (spec pipeline.md — Fields[arn] must be populated so ListRuleNamesByTarget resolves)", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "checkout-deploy-trigger" {
-		t.Fatalf("ResourceIDs = %v, want [checkout-deploy-trigger]", result.ResourceIDs())
+	// ListRuleNamesByTarget answers for one bus and defaults to the default
+	// one, so the names it hands back are that bus's.
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "default/checkout-deploy-trigger" {
+		t.Fatalf("ResourceIDs = %v, want [default/checkout-deploy-trigger]", result.ResourceIDs())
 	}
 }
 

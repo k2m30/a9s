@@ -539,13 +539,13 @@ func TestFetchIAMPolicies_Pagination(t *testing.T) {
 				IsTruncated: true,
 				Marker:      aws.String("page2-marker"),
 				Policies: []iamtypes.Policy{
-					{PolicyName: aws.String("page1-policy-1"), PolicyId: aws.String("ANPAEXAMPLE1"), Path: aws.String("/")},
+					{PolicyName: aws.String("page1-policy-1"), PolicyId: aws.String("ANPAEXAMPLE1"), Arn: aws.String("arn:aws:iam::123456789012:policy/page1-policy-1"), Path: aws.String("/")},
 				},
 			},
 			{
 				IsTruncated: false,
 				Policies: []iamtypes.Policy{
-					{PolicyName: aws.String("page2-policy-1"), PolicyId: aws.String("ANPAEXAMPLE2"), Path: aws.String("/")},
+					{PolicyName: aws.String("page2-policy-1"), PolicyId: aws.String("ANPAEXAMPLE2"), Arn: aws.String("arn:aws:iam::123456789012:policy/page2-policy-1"), Path: aws.String("/")},
 				},
 			},
 		},
@@ -565,14 +565,14 @@ func TestFetchIAMPolicies_Pagination(t *testing.T) {
 	})
 
 	t.Run("page1_policy", func(t *testing.T) {
-		if resources[0].ID != "page1-policy-1" {
-			t.Errorf("expected %q, got %q", "page1-policy-1", resources[0].ID)
+		if resources[0].ID != "arn:aws:iam::123456789012:policy/page1-policy-1" {
+			t.Errorf("expected %q, got %q", "arn:aws:iam::123456789012:policy/page1-policy-1", resources[0].ID)
 		}
 	})
 
 	t.Run("page2_policy", func(t *testing.T) {
-		if resources[1].ID != "page2-policy-1" {
-			t.Errorf("expected %q, got %q", "page2-policy-1", resources[1].ID)
+		if resources[1].ID != "arn:aws:iam::123456789012:policy/page2-policy-1" {
+			t.Errorf("expected %q, got %q", "arn:aws:iam::123456789012:policy/page2-policy-1", resources[1].ID)
 		}
 	})
 

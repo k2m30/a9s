@@ -101,8 +101,9 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 	}
 
 	var resources []resource.Resource
+	var ids eventRowIDs
 
-	for i, event := range output.Events {
+	for _, event := range output.Events {
 		message := ""
 		if event.Message != nil {
 			message = *event.Message
@@ -120,8 +121,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 			ingestionTime = formatEpochMillis(*event.IngestionTime)
 		}
 
-		// ID: use timestamp + index for uniqueness
-		id := fmt.Sprintf("evt-%d-%d", tsVal, i)
+		id := ids.at(tsVal, message)
 
 		name := logEventDisplayName(message)
 

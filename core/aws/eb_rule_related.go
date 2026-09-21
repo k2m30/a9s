@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -26,8 +27,10 @@ func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cach
 }
 
 // ebRuleTargets calls events:ListTargetsByRule(rule) and returns, as target,
-// the targets whose ARN is one of service's (e.g. "states" for sfn).
-func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCache, ruleName, target, service string) resource.RelatedCheckResult {
+// the targets whose ARN is one of service's (e.g. "states" for sfn). A rule
+// name is unique on its own bus, so the bus goes with it.
+func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCache, res resource.Resource, target, service string) resource.RelatedCheckResult {
+	ruleName := res.Fields["name"]
 	if ruleName == "" {
 		return resource.KnownRelated(target, nil, false)
 	}
@@ -36,10 +39,14 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 		return resource.UnknownRelated(target)
 	}
 	targets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Target, *string, error) {
-		out, err := c.EventBridge.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{
+		in := &eventbridge.ListTargetsByRuleInput{
 			Rule:      aws.String(ruleName),
 			NextToken: token,
-		})
+		}
+		if bus := res.Fields["event_bus"]; bus != "" {
+			in.EventBusName = aws.String(bus)
+		}
+		out, err := c.EventBridge.ListTargetsByRule(ctx, in)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -63,32 +70,35 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 }
 
 func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "kinesis", "kinesis")
+	return ebRuleTargets(ctx, clients, cache, res, "kinesis", "kinesis")
 }
 
 func checkEbRuleLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "lambda", "lambda")
+	return ebRuleTargets(ctx, clients, cache, res, "lambda", "lambda")
 }
 
 func checkEbRuleLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "logs", "logs")
+	return ebRuleTargets(ctx, clients, cache, res, "logs", "logs")
 }
 
 func checkEbRuleSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "sfn", "states")
+	return ebRuleTargets(ctx, clients, cache, res, "sfn", "states")
 }
 
 func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "sns", "sns")
+	return ebRuleTargets(ctx, clients, cache, res, "sns", "sns")
 }
 
 func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return ebRuleTargets(ctx, clients, cache, res.ID, "sqs", "sqs")
+	return ebRuleTargets(ctx, clients, cache, res, "sqs", "sqs")
 }
 
 // ebRulesTargeting is the eb-rule pivot of a resource EventBridge rules can
-// target: the rules events:ListRuleNamesByTarget names for targetARN.
-func ebRulesTargeting(ctx context.Context, clients any, targetARN string) resource.RelatedCheckResult {
+// target: the rules events:ListRuleNamesByTarget names for targetARN. The
+// call answers for one bus and hands back bare names, and a rule row is keyed
+// by the bus it sits on, so it is asked once per bus of the account and each
+// name it returns belongs to the bus it was asked about.
+func ebRulesTargeting(ctx context.Context, clients any, cache resource.ResourceCache, targetARN string) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
 		return resource.UnknownRelated("eb-rule")
@@ -97,15 +107,32 @@ func ebRulesTargeting(ctx context.Context, clients any, targetARN string) resour
 	if !ok {
 		return resource.UnknownRelated("eb-rule")
 	}
-	names, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
-		out, err := api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &targetARN, NextToken: token})
-		if err != nil {
-			return nil, nil, err
-		}
-		return out.RuleNames, out.NextToken, nil
-	})
+	buses, complete, err := ebRuleBuses(ctx, c.EventBridge)
 	if err != nil {
 		return resource.ErrorRelated("eb-rule", err)
 	}
-	return relatedResultTrunc("eb-rule", names, !complete)
+	var ids []string
+	for _, bus := range buses {
+		names, busComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+			in := &eventbridge.ListRuleNamesByTargetInput{TargetArn: &targetARN, NextToken: token}
+			if bus != "" {
+				in.EventBusName = aws.String(bus)
+			}
+			out, err := api.ListRuleNamesByTarget(ctx, in)
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.RuleNames, out.NextToken, nil
+		})
+		if err != nil {
+			return resource.ErrorRelated("eb-rule", err)
+		}
+		complete = complete && busComplete
+		for _, name := range names {
+			if id := ebRuleID(bus, name); !slices.Contains(ids, id) {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return relatedResultTrunc("eb-rule", ids, !complete)
 }

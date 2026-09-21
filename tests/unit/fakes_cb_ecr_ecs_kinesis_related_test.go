@@ -196,6 +196,7 @@ func pipelineDeclarationWithECSSvcAction(pipelineName, serviceName string) *cpty
 							Version:  aws.String("1"),
 						},
 						Configuration: map[string]string{
+							"ClusterName": "acme-prod",
 							"ServiceName": serviceName,
 						},
 					},

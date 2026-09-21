@@ -170,6 +170,12 @@ type ResourceTypeDef struct {
 	// type whose question needs more than one attribute is answered by the
 	// attribute that narrows it most. Empty string means no CloudTrail support.
 	CloudTrailKey string
+	// CloudTrailQualifier names the parent a row of this type belongs to,
+	// for a type whose CloudTrail key is a name AWS scopes to that parent.
+	// LookupEvents takes one attribute, so the parent cannot ride the
+	// server-side key: an event whose body names a different parent is left
+	// out on the way in, and an event naming none is kept.
+	CloudTrailQualifier CloudTrailQualifier
 	// CloudTrailRegion returns the Region whose event history holds this row's
 	// events. CloudTrail keeps event history per Region, and a global service
 	// records its events in one Region wherever the operator is browsing:
@@ -204,6 +210,15 @@ type ResourceTypeDef struct {
 
 	// Findings is the declarative table of finding codes for this type.
 	Findings []FindingDef
+}
+
+// CloudTrailQualifier is how a row of a parent-scoped type is told from its
+// namesake under another parent: the row field naming its parent, and the
+// paths into an event's JSON body that carry the parent of what the event
+// acted on. A path's value may be a bare name or an ARN.
+type CloudTrailQualifier struct {
+	ParentField string
+	EventPaths  []string
 }
 
 // ResolveColor classifies r using d.Color, defaulting to a generic

@@ -88,9 +88,12 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 		t.Fatalf("expected 4 resources, got %d", len(resources))
 	}
 
+	// One target may be registered several times on different ports, and
+	// ELB checks each registration on its own, so the row is keyed by the
+	// registration and not by the target.
 	t.Run("target_0_ID", func(t *testing.T) {
-		if resources[0].ID != "i-0abc1234def56789a" {
-			t.Errorf("ID: expected %q, got %q", "i-0abc1234def56789a", resources[0].ID)
+		if resources[0].ID != "i-0abc1234def56789a:80@us-east-1a" {
+			t.Errorf("ID: expected %q, got %q", "i-0abc1234def56789a:80@us-east-1a", resources[0].ID)
 		}
 	})
 
@@ -328,8 +331,8 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 
 	t.Run("ip_target_0", func(t *testing.T) {
 		r := resources[0]
-		if r.ID != "10.0.1.47" {
-			t.Errorf("ID: expected %q, got %q", "10.0.1.47", r.ID)
+		if r.ID != "10.0.1.47:8080@us-west-2a" {
+			t.Errorf("ID: expected %q, got %q", "10.0.1.47:8080@us-west-2a", r.ID)
 		}
 		if r.Name != "10.0.1.47" {
 			t.Errorf("Name: expected %q, got %q", "10.0.1.47", r.Name)
@@ -347,8 +350,8 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 
 	t.Run("ip_target_1_unhealthy", func(t *testing.T) {
 		r := resources[1]
-		if r.ID != "10.0.2.103" {
-			t.Errorf("ID: expected %q, got %q", "10.0.2.103", r.ID)
+		if r.ID != "10.0.2.103:9090@us-west-2b" {
+			t.Errorf("ID: expected %q, got %q", "10.0.2.103:9090@us-west-2b", r.ID)
 		}
 		if r.Fields["health"] != "unhealthy" {
 			t.Errorf("Fields[\"health\"]: expected %q, got %q", "unhealthy", r.Fields["health"])
@@ -411,8 +414,8 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 
 	t.Run("nil_TargetHealth", func(t *testing.T) {
 		r := resources[0]
-		if r.ID != "i-nil-health" {
-			t.Errorf("ID: expected %q, got %q", "i-nil-health", r.ID)
+		if r.ID != "i-nil-health:80" {
+			t.Errorf("ID: expected %q, got %q", "i-nil-health:80", r.ID)
 		}
 		if r.Fields["health"] != "" {
 			t.Errorf("Fields[health]: expected empty with nil TargetHealth, got %q", r.Fields["health"])

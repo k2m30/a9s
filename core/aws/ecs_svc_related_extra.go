@@ -20,12 +20,16 @@ import (
 )
 
 // checkECSSvcTasks scans the ecs-task cache for tasks belonging to this
-// service (task.Group == "service:{svcName}").
+// service. A task names its service by the bare name in Group, which is the
+// name of a service in the task's own cluster — another cluster's service of
+// that name runs none of these tasks. A row that cannot say which cluster it
+// is in holds every task of the name, since nothing says otherwise.
 func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	svcName := res.ID
+	svcName := ecsSvcName(res)
 	if svcName == "" {
 		return resource.ProvenZero("ecs-task", "svcName")
 	}
+	cluster := res.Fields["cluster"]
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return resource.ErrorRelated("ecs-task", err)
@@ -39,7 +43,11 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 		if !ok {
 			continue
 		}
-		if task.Group != nil && *task.Group == "service:"+svcName {
+		ref, ofService := ecsSvcRefFromTask(tRes, task)
+		if !ofService {
+			continue
+		}
+		if ref == ecsSvcID(cluster, svcName) || (cluster == "" && aws.ToString(task.Group) == "service:"+svcName) {
 			ids = append(ids, tRes.ID)
 		}
 	}
@@ -114,7 +122,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 // has source ["aws.ecs"] and detail.clusterArn / detail.group matching this service,
 // add the rule name. NeedsTargetCache: true.
 func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	svcName := res.ID
+	svcName := ecsSvcName(res)
 	if svcName == "" {
 		return resource.ProvenZero("eb-rule", "svcName")
 	}
@@ -158,6 +166,9 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 		return false
 	}
 
+	// Every filter the pattern names has to match: a rule that names both a
+	// service group and a cluster fires for one cluster's service, and a
+	// service name is the name of a service in a cluster.
 	hasFilter := false
 	if detail, ok := p["detail"]; ok {
 		var d map[string]json.RawMessage
@@ -165,29 +176,34 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 			if grp, ok := d["group"]; ok {
 				hasFilter = true
 				var groups []string
-				if err := json.Unmarshal(grp, &groups); err == nil {
-					for _, g := range groups {
-						if g == "service:"+svcName || g == svcName {
-							return true
-						}
-					}
+				if err := json.Unmarshal(grp, &groups); err != nil {
+					return false
+				}
+				if !slices.Contains(groups, "service:"+svcName) && !slices.Contains(groups, svcName) {
+					return false
 				}
 			}
 			if carn, ok := d["clusterArn"]; ok {
 				hasFilter = true
 				var carns []string
-				if err := json.Unmarshal(carn, &carns); err == nil {
-					for _, c := range carns {
-						if clusterName != "" && strings.Contains(c, clusterName) {
-							return true
-						}
-					}
+				if err := json.Unmarshal(carn, &carns); err != nil {
+					return false
+				}
+				// A row that cannot say which cluster it is in is not held to
+				// one, the way an alarm's qualifier leaves an unanswerable
+				// question unanswered.
+				named := clusterName == ""
+				for _, c := range carns {
+					named = named || lastSegment(c, "/") == clusterName
+				}
+				if !named {
+					return false
 				}
 			}
 		}
 	}
 	if hasFilter {
-		return false
+		return true
 	}
 	// Source matches aws.ecs with no narrowing filter — treat as broad match.
 	return true

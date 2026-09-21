@@ -11,6 +11,7 @@ package unit_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -47,7 +48,9 @@ func ctPivotDef(shortName string) (resource.RelatedDef, bool) {
 
 // ctRecorded reports whether CloudTrail would return ev for filter: every
 // LookupEvents attribute equals the recorded value exactly. Keys that are not
-// a lookup attribute are ignored.
+// a lookup attribute are ignored, except the qualifier: a lookup attribute
+// names a resource whose name AWS scopes to a parent, and the event of a
+// namesake under another parent is another row's.
 func ctRecorded(ev resource.Resource, filter map[string]string) bool {
 	raw, _ := ev.RawStruct.(cloudtrailtypes.Event)
 	matchedAny := false
@@ -66,7 +69,42 @@ func ctRecorded(ev resource.Resource, filter map[string]string) bool {
 		}
 		matchedAny = true
 	}
-	return matchedAny
+	return matchedAny && ctOfParent(raw, filter)
+}
+
+// ctOfParent is the client-side half of the pivot: the parent the row
+// belongs to against the parent the event's body names.
+func ctOfParent(raw cloudtrailtypes.Event, filter map[string]string) bool {
+	parent := filter[resource.CTQualifierFilterKey]
+	paths := filter[resource.CTQualifierPathsKey]
+	if parent == "" || paths == "" {
+		return true
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(aws.ToString(raw.CloudTrailEvent)), &parsed); err != nil {
+		return true
+	}
+	named := false
+	for _, path := range strings.Split(paths, ",") {
+		node := any(parsed)
+		for _, key := range strings.Split(path, ".") {
+			m, ok := node.(map[string]any)
+			if !ok {
+				node = nil
+				break
+			}
+			node = m[key]
+		}
+		value, _ := node.(string)
+		if value == "" {
+			continue
+		}
+		named = true
+		if value[strings.LastIndex(value, "/")+1:] == parent {
+			return true
+		}
+	}
+	return !named
 }
 
 func ctRecordedIDs(events []resource.Resource, filter map[string]string) []string {

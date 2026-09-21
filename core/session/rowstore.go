@@ -9,12 +9,13 @@
 // below for how that entry distinguishes those roles.
 //
 // Semantics mirror the reconciliation rules for the per-screen ListState
-// (core/app/list_body.go: dedupAgainstExisting) and the on-disk TypeFile
+// (core/app/list_body.go: applyResourcesLoaded) and the on-disk TypeFile
 // (core/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset). Wave-2
 // finding carry is reconcileTypeFile's concern at the disk chokepoint.
 package session
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -143,16 +144,6 @@ func NewRowStore() *RowStore {
 	return &RowStore{types: make(map[string]TypeRows)}
 }
 
-// dedupAgainstExistingRows mirrors core/app/list_body.go's
-// dedupAgainstExisting: returns the subset of incoming whose ID is not
-// already present in existing, preserving incoming's order. Delegates to
-// resource.DedupByID, the single-source implementation shared with
-// core/app (session already imports core/resource; no new
-// dependency introduced).
-func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource.Resource {
-	return resource.DedupByID(existing, incoming)
-}
-
 // cloneRows returns a defensive copy of rows: a fresh slice of Resource.Clone
 // results — so a caller that mutates a Snapshot/SnapshotAll result in place
 // (rows[i].Name = ..., rows[i].Fields[k] = ..., rows[i].Findings =
@@ -235,7 +226,7 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 //     load-more. Probe replacing Probe, or Probe replacing Disk, is still
 //     allowed; Fetch replacing Fetch is untouched by this rule.
 //  2. Append: incoming is deduped against the existing rows by stable ID
-//     (mirrors dedupAgainstExisting) and appended. Append always accepts —
+//     (resource.DedupByID) and appended. Append always accepts —
 //     dedup happens to the row set, not to the observation.
 //  3. Replace (append=false): incoming rows replace the existing rows
 //     wholesale. Ordering between two fetch results for one list is decided
@@ -280,7 +271,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 
 	var newRows []resource.Resource
 	if appendPage {
-		newRows = append(append([]resource.Resource(nil), existing.Rows...), dedupAgainstExistingRows(existing.Rows, rows)...)
+		newRows, _ = resource.DedupByID(append(slices.Clone(existing.Rows), rows...))
 	} else {
 		newRows = rows
 	}
@@ -363,7 +354,7 @@ func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]res
 
 	rows, _ = cloneIncomingRows(rows)
 	existing := s.types[canon]
-	merged := append(append([]resource.Resource(nil), existing.Rows...), dedupAgainstExistingRows(existing.Rows, rows)...)
+	merged, _ := resource.DedupByID(append(slices.Clone(existing.Rows), rows...))
 
 	// Partial is a TYPE-level flag: a sparse add against an already-full
 	// entry (Gen!=0 && !Partial) is genuine deeper coverage, not a

@@ -59,14 +59,14 @@ func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 		},
 	}
 	cache := resource.ResourceCache{"codeartifact": resource.ResourceCacheEntry{Resources: []resource.Resource{
-		{ID: "acme-npm"}, {ID: "acme-pypi"},
+		{ID: "acme-artifacts/acme-npm", Name: "acme-npm"}, {ID: "acme-artifacts/acme-pypi", Name: "acme-pypi"},
 	}}}
 
 	checker := secretsCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 || result.ResourceIDs()[0] != "acme-npm" {
-		t.Errorf("Count = %d, IDs %v, want [acme-npm]", result.Count(), result.ResourceIDs())
+	if result.Count() != 1 || result.ResourceIDs()[0] != "acme-artifacts/acme-npm" {
+		t.Errorf("Count = %d, IDs %v, want [acme-artifacts/acme-npm]", result.Count(), result.ResourceIDs())
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())

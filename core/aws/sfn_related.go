@@ -159,10 +159,10 @@ func sfnCollectLambdaRefs(def []byte, refs *[]string) {
 // checkSFNEbRule resolves EventBridge rules that target this state machine.
 // Pattern C: one events:ListRuleNamesByTarget call using the state machine ARN
 // from res.Fields["arn"]. Count = len(RuleNames).
-func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sfnARN := res.Fields["arn"]
 	if sfnARN == "" {
 		return resource.ProvenZero("eb-rule", "sfnARN")
 	}
-	return ebRulesTargeting(ctx, clients, sfnARN)
+	return ebRulesTargeting(ctx, clients, cache, sfnARN)
 }

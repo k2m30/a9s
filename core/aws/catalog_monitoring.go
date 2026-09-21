@@ -325,8 +325,9 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 	},
 	{
-		Name:      "Alarm History",
-		ShortName: "alarm_history",
+		Name:         "Alarm History",
+		ShortName:    "alarm_history",
+		TitleOmitsID: true,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := r.Fields["alarm_name"]
 			if name == "" {

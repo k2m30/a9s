@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -72,10 +73,10 @@ func FetchAlarmHistory(
 // so the console-link builder can deep-link to the parent alarm's page.
 func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) resource.Resource {
 	timestamp := ""
-	id := ""
+	at := time.Time{}
 	if item.Timestamp != nil {
-		timestamp = item.Timestamp.UTC().Format("2006-01-02 15:04")
-		id = timestamp
+		at = *item.Timestamp
+		timestamp = at.UTC().Format("2006-01-02 15:04")
 	}
 
 	historyItemType := string(item.HistoryItemType)
@@ -92,8 +93,8 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) re
 	}
 
 	return resource.Resource{
-		ID:   id,
-		Name: id,
+		ID:   eventRowID(at, historyItemType, historySummary, historyData),
+		Name: timestamp,
 		Fields: map[string]string{
 			"timestamp":         timestamp,
 			"history_item_type": historyItemType,

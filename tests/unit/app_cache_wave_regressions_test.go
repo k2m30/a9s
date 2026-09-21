@@ -12,6 +12,7 @@
 package unit_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -92,7 +93,7 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 
 	rows := make([]cache.Row, 50)
 	for i := range rows {
-		id := "i-0npluswarm" + string(rune('a'+i%26))
+		id := fmt.Sprintf("i-0npluswarm%02d", i)
 		rows[i] = cache.Row{ID: id, Name: id, Fields: map[string]string{"state": "running"}}
 	}
 	store := cache.LoadDirForTest(profile, region)

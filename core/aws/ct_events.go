@@ -63,13 +63,14 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 // with different attributes.
 const ctAltPageToken = "alt|"
 
-// ctServerFilter returns the LookupAttributes to send for filter. The keys
-// that select an endpoint or carry the row's other spelling are a9s's own and
-// name no attribute, so they are left out.
+// ctServerFilter returns the LookupAttributes to send for filter. A key
+// beginning with "_" is a9s's own — the endpoint's Region, the row's other
+// spelling, the parent an event has to name — and no LookupAttributeKey
+// begins with one, so those are left out.
 func ctServerFilter(filter map[string]string) map[string]string {
 	server := make(map[string]string, len(filter))
 	for k, v := range filter {
-		if k == resource.CTRegionFilterKey || k == resource.CTAltNameFilterKey {
+		if strings.HasPrefix(k, "_") {
 			continue
 		}
 		server[k] = v
@@ -92,23 +93,29 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 	server := ctServerFilter(filter)
 	alt := filter[resource.CTAltNameFilterKey]
 
-	if token, isAlt := strings.CutPrefix(continuationToken, ctAltPageToken); isAlt {
-		server["ResourceName"] = alt
-		return ctLookupPage(ctx, api, server, token, ctAltPageToken)
+	parent := filter[resource.CTQualifierFilterKey]
+	var paths []string
+	if p := filter[resource.CTQualifierPathsKey]; p != "" {
+		paths = strings.Split(p, ",")
 	}
 
-	page, err := ctLookupPage(ctx, api, server, continuationToken, "")
+	if token, isAlt := strings.CutPrefix(continuationToken, ctAltPageToken); isAlt {
+		server["ResourceName"] = alt
+		return ctLookupPage(ctx, api, server, token, ctAltPageToken, parent, paths)
+	}
+
+	page, err := ctLookupPage(ctx, api, server, continuationToken, "", parent, paths)
 	if err != nil || alt == "" || continuationToken != "" || len(page.Resources) > 0 {
 		return page, err
 	}
 	server["ResourceName"] = alt
-	return ctLookupPage(ctx, api, server, "", ctAltPageToken)
+	return ctLookupPage(ctx, api, server, "", ctAltPageToken, parent, paths)
 }
 
 // ctLookupPage fetches one LookupEvents page and marks the continuation token
 // it returns with tokenPrefix, which tells a later page which spelling this
 // one was asked under.
-func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map[string]string, continuationToken, tokenPrefix string) (resource.FetchResult, error) {
+func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map[string]string, continuationToken, tokenPrefix, parent string, paths []string) (resource.FetchResult, error) {
 	input := &cloudtrail.LookupEventsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -129,6 +136,9 @@ func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map
 
 	resources := make([]resource.Resource, 0, len(output.Events))
 	for _, event := range output.Events {
+		if !ctEventIsOfParent(event, parent, paths) {
+			continue
+		}
 		resources = append(resources, buildCTResource(event))
 	}
 
@@ -844,4 +854,47 @@ func ctLocalPrincipals(c *ServiceClients) func(resource.FetchResult, error) (res
 		}
 		return res, err
 	}
+}
+
+// ctEventIsOfParent reports whether the event acted on something belonging to
+// parent. An event whose body names a different parent belongs to the row of
+// that name under that parent, not to this one; an event that names none
+// answers nothing either way and is kept, the rule an alarm's qualifier
+// dimension already follows. The value a path carries is a bare name or an
+// ARN of it.
+func ctEventIsOfParent(event cloudtrailtypes.Event, parent string, paths []string) bool {
+	if parent == "" || len(paths) == 0 {
+		return true
+	}
+	parsed := parseCTEventJSON(event.CloudTrailEvent)
+	if parsed == nil {
+		return true
+	}
+	named := false
+	for _, path := range paths {
+		value := ctEventPathValue(parsed, path)
+		if value == "" {
+			continue
+		}
+		named = true
+		if lastSegment(value, "/") == parent {
+			return true
+		}
+	}
+	return !named
+}
+
+// ctEventPathValue reads a dotted path out of a parsed event body, and ""
+// when the path names nothing or names something that is not a string.
+func ctEventPathValue(parsed map[string]any, path string) string {
+	var node any = parsed
+	for key := range strings.SplitSeq(path, ".") {
+		m, ok := node.(map[string]any)
+		if !ok {
+			return ""
+		}
+		node = m[key]
+	}
+	s, _ := node.(string)
+	return s
 }

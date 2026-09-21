@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -66,8 +67,10 @@ func FetchRDSEvents(ctx context.Context, api RDSDescribeEventsAPI, dbIdentifier 
 // convertRDSEvent converts a single RDS Event into a generic Resource.
 func convertRDSEvent(event rdstypes.Event) resource.Resource {
 	timestamp := ""
+	at := time.Time{}
 	if event.Date != nil {
-		timestamp = event.Date.UTC().Format("2006-01-02 15:04")
+		at = *event.Date
+		timestamp = at.UTC().Format("2006-01-02 15:04")
 	}
 
 	categories := strings.Join(event.EventCategories, ", ")
@@ -92,10 +95,8 @@ func convertRDSEvent(event rdstypes.Event) resource.Resource {
 		sourceArn = *event.SourceArn
 	}
 
-	id := timestamp + "/" + sourceIdentifier
-
 	return resource.Resource{
-		ID:   id,
+		ID:   eventRowID(at, sourceIdentifier, sourceType, categories, message),
 		Name: timestamp,
 		Fields: map[string]string{
 			"timestamp":         timestamp,

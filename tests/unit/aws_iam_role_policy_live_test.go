@@ -50,7 +50,10 @@ func TestCheckRolePolicy_HappyPath(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 
-	wantPolicies := map[string]bool{"acme-cloudwatch-logs": false, "acme-s3-read-only": false}
+	wantPolicies := map[string]bool{
+		"arn:aws:iam::123456789012:policy/acme-cloudwatch-logs": false,
+		"arn:aws:iam::123456789012:policy/acme-s3-read-only":    false,
+	}
 	for _, id := range result.ResourceIDs() {
 		wantPolicies[id] = true
 	}

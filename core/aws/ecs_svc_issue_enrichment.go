@@ -82,6 +82,8 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
+	// A service name is unique inside its cluster only, so the row a name
+	// belongs to is looked up under the cluster it was grouped by.
 	clusterServices := make(map[string][]string)
 	resourceByService := make(map[string]resource.Resource)
 	for _, r := range resources {
@@ -91,7 +93,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			continue
 		}
 		clusterServices[cluster] = append(clusterServices[cluster], svcName)
-		resourceByService[svcName] = r
+		resourceByService[ecsSvcID(cluster, svcName)] = r
 	}
 
 	truncated := false
@@ -115,7 +117,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			})
 			if err != nil {
 				for _, svcName := range batch {
-					if r, ok := resourceByService[svcName]; ok {
+					if r, ok := resourceByService[ecsSvcID(clusterName, svcName)]; ok {
 						MarkSkipped(&result, r.ID, &failures, err)
 					} else {
 						failures = append(failures, FailedCall(svcName, err))
@@ -133,18 +135,15 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			// list call (Failures "MISSING"); it was not inspected, and
 			// nothing failed.
 			for _, svcName := range batch {
-				if r, ok := resourceByService[svcName]; ok && !returned[svcName] {
+				if r, ok := resourceByService[ecsSvcID(clusterName, svcName)]; ok && !returned[svcName] {
 					markUninspected(&result, r.ID, op)
 				}
 			}
 
 			now := time.Now()
 			for _, svc := range out.Services {
-				svcName := ""
-				if svc.ServiceName != nil {
-					svcName = *svc.ServiceName
-				}
-				if svcName == "" {
+				row, known := resourceByService[ecsSvcID(clusterName, aws.ToString(svc.ServiceName))]
+				if !known {
 					continue
 				}
 
@@ -215,7 +214,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				if nc := svc.NetworkConfiguration; ecsServiceScheduling(aws.ToString(svc.Status)) &&
 					nc != nil && nc.AwsvpcConfiguration != nil &&
 					nc.AwsvpcConfiguration.AssignPublicIp == ecstypes.AssignPublicIpEnabled {
-					setWave2Finding(&result, svcName, ecsSvcCodePublicIP, []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(ecsSvcCodePublicIP)}})
+					setWave2Finding(&result, row.ID, ecsSvcCodePublicIP, []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(ecsSvcCodePublicIP)}})
 
 				}
 
@@ -233,7 +232,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				}
 				rows = append(rows, eventRows...)
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, rows)
+				setWave2Finding(&result, row.ID, ecsSvcCodeDeploymentFailed, rows)
 			}
 		}
 	}

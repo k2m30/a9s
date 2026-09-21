@@ -229,7 +229,7 @@ func w45ColumnByTitle(t *testing.T, td resource.ResourceTypeDef, title string) a
 func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 	alarmTD, alarmRow := w45DemoRow(t, "alarm", "api-high-error-rate")
 	redshiftTD, redshiftRow := w45DemoRow(t, "redshift", "acme-warehouse")
-	codeartifactTD, codeartifactRow := w45DemoRow(t, "codeartifact", "acme-npm")
+	codeartifactTD, codeartifactRow := w45DemoRow(t, "codeartifact", "acme-artifacts/acme-npm")
 	// a node group's row id is "<cluster>/<nodegroup>".
 	ngTD, ngRow := w45DemoRow(t, "ng", "acme-prod/general-pool")
 

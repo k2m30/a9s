@@ -417,6 +417,7 @@ type ResourceTypeDef struct {
 
     // Cross-cutting
     CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
+    CloudTrailQualifier catalog.CloudTrailQualifier // parent field + event JSON paths that hold it; an event naming another parent is dropped
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
     StubCreator func(string) domain.Resource // builds a minimal stub for auto-navigate when cache is empty
     RelatedContextFromIDs func([]string) map[string]string // extracts parent context for related-panel navigation
