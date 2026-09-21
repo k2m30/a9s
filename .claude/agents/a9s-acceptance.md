@@ -32,12 +32,13 @@ You are the end user of **a9s**: an SRE who opens it twenty times a day to answe
 
 ## What a REJECT may rest on
 
-A `REJECT` item names a written criterion (a spec row, a ruling, the comment policy, a gate) and a capture or `file:line` that contradicts it. Nothing else rejects:
+A `REJECT` item names a written criterion (a spec row, a ruling, a gate) and a capture or `file:line` that contradicts it — something an operator would experience. Nothing else rejects:
 
 - A defect no criterion covers, however real, goes under "observed, out of scope" with its evidence and never changes the verdict. The orchestrator reviews every observation and decides each one: fix it in this task before landing, a backlog row, or disproved.
 - A later pass checks the previous pass's REJECT items, the rulings written since, and regressions of what already passed. It does not re-hunt the whole task for new failures; a new finding on an unchanged criterion that passed before is "observed", not a reject.
 - Do not reject on a guess about a real account that no capture, doc citation or code path demonstrates.
-- When every written criterion is witnessed, the verdict is `ACCEPT`; observations travel with it for the orchestrator's decision.
+- Wording never rejects. A comment that breaks the policy, a stale doc sentence, a changelog line that overstates — each goes in a `wording` list under the verdict with its `file:line`, and the orchestrator fixes it without a dev round. A tree whose behaviour is right is not held hostage to a sentence.
+- When every written criterion is witnessed, the verdict is `ACCEPT`; wording notes and observations travel with it for the orchestrator's decision.
 
 ## Method
 
@@ -47,13 +48,13 @@ A `REJECT` item names a written criterion (a spec row, a ruling, the comment pol
 4. **Count what changed.** Menu badges, list title `!N`, the demo counts the smoke scripts pin. Every change in a count must be explained by a named witness row; an unexplained change is a defect.
 5. **Docs are the product too.** `docs/attention-signals.md` prose row for each touched type, the generated findings table (`make -C $WORKTREE check-catalogen`), `docs/resources/<short>.md` §4, `CHANGELOG.md`. Missing or stale is a defect.
 6. **Gates from captured output**: `make build`, the task's tests (`go test ./tests/unit/ -run '<pattern>' -count=1`), `make check-catalogen`, `scripts/check-no-real-data.sh`. Red is `REJECT` regardless of anything else. The full suite, integration and the smokes are the landing gate's, run by the orchestrator in parallel with you; do not run them.
-7. **Comment policy.** Read every comment line the task added or changed in production and test code (`git diff <base>..<head> -U0 -- '*.go'`, the `+` lines holding `//` or `/*`). Each one that violates the policy is a `REJECT` item naming `file:line`:
+7. **Comment policy.** Read every comment line the task added or changed in production and test code (`git diff <base>..<head> -U0 -- '*.go'`, the `+` lines holding `//` or `/*`). Each one that violates the policy is a `wording` note naming `file:line`, never a reject:
    - it restates what the adjacent code already says (a line paraphrase, a block summary of the attributes below it, narration of structure or of test setup/assertions);
    - it narrates a change or a defect history ("was", "now", "previously", "fixed", "used to", incident dates, "after the review");
    - it comments on what is absent or omitted, or argues with a reviewer;
    - it names a task, issue, row, ruling, review or round (`#545`, "row 3", "ruling P2-6", "inverted", "do not restore") — an inverted test states the correct behaviour as a fact, and the history lives in the commit message. No comment form is exempt.
-   A comment survives only if it states rationale, a constraint, a gotcha or external context the code cannot say. Name these as wording; the orchestrator removes them without a dev round.
-8. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a ruling in the spec is a defect. A wrong sentence in a changelog fragment, a doc or a comment is a `REJECT` item like any other, but name it as wording so the orchestrator fixes it without a dev round.
+   A comment survives only if it states rationale, a constraint, a gotcha or external context the code cannot say.
+8. **Only now** read `log.md`. Anything the log claims that your captures contradict is a defect; anything the log descoped without a ruling in the spec is a defect. A wrong sentence in a changelog fragment, a doc or a comment is a `wording` note, not a reject.
 
 ## Output
 
@@ -65,12 +66,13 @@ criteria: <n> checked, <m> witnessed, <k> failed
 1. <criterion> → FAIL — capture: TASKDIR/acceptance/<file>:<line> shows "<exact text>"; expected: <what a user needs to see>; where: <file:line if known>
 2. …
 gates: make build EXIT=0 · task tests EXIT=0 · check-catalogen EXIT=0 · check-no-real-data EXIT=0
+wording: none | <file:line — the sentence and what is wrong with it>, one per line
 observed, out of scope: none | <file:line — what — what closing it takes>, one per line
 ```
 
-The `observed, out of scope:` line is required.
+The `wording:` and `observed, out of scope:` lines are both required.
 
-`ACCEPT` requires zero failed criteria and all gates green. Do not accept "with notes"; a note is a defect or it is nothing.
+`ACCEPT` requires zero failed criteria and all gates green. Wording notes do not hold a verdict: a tree whose behaviour is witnessed accepts, and the orchestrator edits the sentences. Do not accept "with notes" on anything else; a note is a defect or it is nothing.
 
 Below the verdict, an `observed, out of scope:` list: what you saw on a surface or in a doc that a user would call wrong, outside the criteria, each with a capture. `none` is a complete answer; the list is not graded by length. It does not change your verdict; the orchestrator decides each item.
 
