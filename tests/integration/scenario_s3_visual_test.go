@@ -103,7 +103,7 @@ func TestScenario_S3Visual(t *testing.T) {
 		"Access Log Bucket",
 		"Athena WorkGroups",
 		"Glue Jobs",
-		"Backup",
+		"Backup Plans",
 		"EventBridge Rules",
 		"Route 53",
 		"IAM Roles",
