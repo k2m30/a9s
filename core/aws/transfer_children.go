@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"time"
@@ -261,7 +262,9 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 	if cert.InactiveDate != nil {
 		remaining := time.Until(*cert.InactiveDate)
 		if remaining > 0 && remaining <= transferCertExpiringWindow {
-			days := int(remaining.Hours() / 24)
+			// Round up: a certificate with any time left has at least one day
+			// on it, and truncation would report the last hours as "0d".
+			days := int(math.Ceil(remaining.Hours() / 24))
 			return wave1Finding(transferCodeCertExpiring, strconv.Itoa(days)), true, nil
 		}
 	}

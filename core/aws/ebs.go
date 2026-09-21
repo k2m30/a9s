@@ -232,6 +232,18 @@ func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, id
 	return resources, AggregateMissing("ebs-snap FetchByIDs", failures, len(filtered))
 }
 
+// ebsSnapshotUnusable reports a snapshot nothing can be restored from. The
+// single place that set is spelled: the ebs-snap state finding and the volume
+// enricher's snapshot-coverage join both call it, so a snapshot the list shows
+// as broken is never counted as cover for its volume.
+func ebsSnapshotUnusable(state ec2types.SnapshotState) bool {
+	switch state {
+	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
+		return true
+	}
+	return false
+}
+
 // snapshotToResource converts an ec2types.Snapshot to our generic Resource.
 // Extracted so FetchEBSSnapshotsPage and FetchEBSSnapshotsByIDs agree on
 // shape — the lazy-add path must emit the same field keys that the paginated
@@ -293,10 +305,10 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	switch snap.State {
-	case ec2types.SnapshotStatePending:
+	switch {
+	case snap.State == ec2types.SnapshotStatePending:
 		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending)}
-	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
+	case ebsSnapshotUnusable(snap.State):
 		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError)}
 	}
 

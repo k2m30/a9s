@@ -85,6 +85,11 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			if name == "" {
 				continue
 			}
+			// Task counts only describe a running cluster; a PROVISIONING or
+			// DEPROVISIONING one carries its lifecycle finding instead.
+			if aws.ToString(cluster.Status) != "ACTIVE" {
+				continue
+			}
 
 			pending := cluster.PendingTasksCount
 			running := cluster.RunningTasksCount

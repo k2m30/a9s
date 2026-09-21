@@ -79,7 +79,12 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		if len(knownIDs) > 0 && !knownIDs[volID] {
 			continue
 		}
-		if v.VolumeStatus == nil || v.VolumeStatus.Status == ec2types.VolumeStatusInfoStatusOk {
+		// impaired and warning are the two verdicts AWS reaches about the
+		// volume itself; insufficient-data means the checks have not finished
+		// yet and says nothing about its health.
+		if v.VolumeStatus == nil ||
+			(v.VolumeStatus.Status != ec2types.VolumeStatusInfoStatusImpaired &&
+				v.VolumeStatus.Status != ec2types.VolumeStatusInfoStatusWarning) {
 			continue
 		}
 		ioState := domain.HumanizeStatusPhrase(string(v.VolumeStatus.Status))
@@ -178,6 +183,9 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 	listed := ok && !entry.IsTruncated
 	snapshotted := make(map[string]bool, len(entry.Resources))
 	for _, snap := range entry.Resources {
+		if ebsSnapshotUnusable(ec2types.SnapshotState(snap.Fields["state"])) {
+			continue
+		}
 		if v := snap.Fields["volume_id"]; v != "" {
 			snapshotted[v] = true
 		}

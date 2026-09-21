@@ -159,6 +159,12 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 		// NotBeforeDeadline is the hard deadline (forced retirement/reboot).
 		// NotBefore is the earliest scheduled start — also within 7d is actionable.
 		for _, ev := range is.Events {
+			// AWS keeps a finished event describable for a week and marks it
+			// by prefixing the description with "[Completed]"; there is
+			// nothing left for the operator to plan around.
+			if strings.HasPrefix(aws.ToString(ev.Description), "[Completed]") {
+				continue
+			}
 			var eventDate *time.Time
 			if ev.NotBeforeDeadline != nil && ev.NotBeforeDeadline.Before(cutoff) {
 				eventDate = ev.NotBeforeDeadline

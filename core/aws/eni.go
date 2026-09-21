@@ -16,8 +16,13 @@ import (
 
 // FetchNetworkInterfacesPage fetches a single page of network interfaces.
 func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInterfacesAPI, continuationToken string) (resource.FetchResult, error) {
+	// Service-managed interfaces (NAT gateways, VPC endpoints, RDS, Lambda)
+	// are hidden by default once an account opts into hidden managed-resource
+	// visibility; without them a security group in use by one of them reads as
+	// unused.
 	input := &ec2.DescribeNetworkInterfacesInput{
-		MaxResults: aws.Int32(DefaultPageSize),
+		MaxResults:              aws.Int32(DefaultPageSize),
+		IncludeManagedResources: aws.Bool(true),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

@@ -51,9 +51,11 @@ func fetchECSTasksPageWithJoin(
 			return out.TaskArns, out.NextToken, nil
 		},
 		describe: func(ctx context.Context, clusterArn string, taskArns []string) ([]resource.Resource, error) {
+			// Tags are returned only when named in Include.
 			descOutput, err := describeTasksAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: aws.String(clusterArn),
 				Tasks:   taskArns,
+				Include: []ecstypes.TaskField{ecstypes.TaskFieldTags},
 			})
 			if err != nil {
 				return nil, fmt.Errorf("describing ECS tasks: %w", err)

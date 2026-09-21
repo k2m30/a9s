@@ -24,6 +24,19 @@ func asgDeleting(status string) bool {
 	return status == "Delete in progress"
 }
 
+// asgChecksELBHealth reports whether the group replaces instances the load
+// balancer calls unhealthy. HealthCheckType is a comma-separated list, so a
+// group set to "ELB,EBS" checks load-balancer health as much as a plain "ELB"
+// one does.
+func asgChecksELBHealth(healthCheckType string) bool {
+	for t := range strings.SplitSeq(healthCheckType, ",") {
+		if strings.TrimSpace(t) == "ELB" {
+			return true
+		}
+	}
+	return false
+}
+
 // FetchAutoScalingGroupsPage fetches a single page of Auto Scaling groups.
 func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingGroupsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &autoscaling.DescribeAutoScalingGroupsInput{
@@ -135,7 +148,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			})
 		}
 		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
-			aws.ToString(asg.HealthCheckType) != "ELB" {
+			!asgChecksELBHealth(aws.ToString(asg.HealthCheckType)) {
 			r.Findings = append(r.Findings, wave1Finding(CodeASGNoELBHealthCheck))
 			// The API spells the type "EC2"/"ELB"; the row says which check the
 			// group runs, not how the SDK spells it.

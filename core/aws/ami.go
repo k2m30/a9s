@@ -39,13 +39,15 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 	if len(filtered) == 0 {
 		return nil, nil
 	}
-	// IncludeDeprecated: a batch drill from a related-panel pivot (ec2→ami,
-	// asg→ami, etc.) may reference a deprecated AMI; without this flag those
+	// IncludeDeprecated / IncludeDisabled: a batch drill from a related-panel
+	// pivot (ec2→ami, asg→ami, etc.) may reference a deprecated or disabled
+	// AMI; DescribeImages omits both by default, so without these flags those
 	// IDs silently vanish from results.
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
 		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
 			ImageIds:          filtered,
 			IncludeDeprecated: aws.Bool(true),
+			IncludeDisabled:   aws.Bool(true),
 		})
 	})
 	if err != nil {
@@ -73,9 +75,12 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 // of AMIs. Only returns AMIs owned by the caller ("self").
 // Pass an empty continuationToken for the first page.
 func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationToken string) (resource.FetchResult, error) {
+	// A disabled AMI is excluded by default, so without IncludeDisabled an
+	// image the account still owns and pays for is missing from the list.
 	input := &ec2.DescribeImagesInput{
-		Owners:     []string{"self"},
-		MaxResults: aws.Int32(DefaultPageSize),
+		Owners:          []string{"self"},
+		MaxResults:      aws.Int32(DefaultPageSize),
+		IncludeDisabled: aws.Bool(true),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

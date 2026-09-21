@@ -196,7 +196,11 @@ func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID strin
 	if lc.MetadataOptions != nil {
 		tokens = string(lc.MetadataOptions.HttpTokens)
 	}
-	if lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired {
+	// HttpEndpoint == disabled means the metadata service is unreachable
+	// entirely; HttpTokens is moot and produces no signal regardless of its
+	// value.
+	endpointDisabled := lc.MetadataOptions != nil && lc.MetadataOptions.HttpEndpoint == asgtypes.InstanceMetadataEndpointStateDisabled
+	if !endpointDisabled && (lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired) {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, []domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: tierOf(asgCodeLaunchConfigIMDSv1)}})
 
 	}

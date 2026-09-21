@@ -78,6 +78,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 				return clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
 					OwnerIds:            []string{"self"},
 					RestorableByUserIds: []string{"all"},
+					MaxResults:          aws.Int32(DefaultPageSize),
 					NextToken:           token,
 				})
 			})

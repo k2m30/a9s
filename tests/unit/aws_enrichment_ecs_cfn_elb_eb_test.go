@@ -317,6 +317,7 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 			Clusters: []ecstypes.Cluster{
 				{
 					ClusterName:                       aws.String(clusterName),
+					Status:                            aws.String("ACTIVE"),
 					PendingTasksCount:                 5,
 					RunningTasksCount:                 10,
 					RegisteredContainerInstancesCount: 3,
@@ -361,6 +362,7 @@ func TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding(t *testing.T)
 			Clusters: []ecstypes.Cluster{
 				{
 					ClusterName:                       aws.String(clusterName),
+					Status:                            aws.String("ACTIVE"),
 					PendingTasksCount:                 0,
 					RunningTasksCount:                 0,
 					RegisteredContainerInstancesCount: 2,
@@ -439,6 +441,7 @@ func TestEnrichECSClusters_HealthyClusterNoFinding(t *testing.T) {
 			Clusters: []ecstypes.Cluster{
 				{
 					ClusterName:                       aws.String(clusterName),
+					Status:                            aws.String("ACTIVE"),
 					PendingTasksCount:                 0,
 					RunningTasksCount:                 5,
 					RegisteredContainerInstancesCount: 2,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -45,9 +46,12 @@ func FetchECSServicesPage(
 			return out.ServiceArns, out.NextToken, nil
 		},
 		describe: func(ctx context.Context, clusterArn string, serviceArns []string) ([]resource.Resource, error) {
+			// Tags are returned only when named in Include; the CloudFormation
+			// pivot matches on the stack-name tag.
 			descOutput, err := describeServicesAPI.DescribeServices(ctx, &ecs.DescribeServicesInput{
 				Cluster:  aws.String(clusterArn),
 				Services: serviceArns,
+				Include:  []ecstypes.ServiceField{ecstypes.ServiceFieldTags},
 			})
 			if err != nil {
 				return nil, fmt.Errorf("describing ECS services: %w", err)

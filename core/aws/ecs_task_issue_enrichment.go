@@ -243,12 +243,15 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 func applyTaskDefinitionFindings(result *IssueEnricherResult, taskID string, td ecstypes.TaskDefinition) {
 	var privileged, writableRoot, noLogging []domain.DetailRow
 	var secretRows []domain.DetailRow
+	// ReadonlyRootFilesystem is not supported for Windows containers, so a
+	// Windows definition has no setting to change.
+	windows := td.RuntimePlatform != nil && strings.HasPrefix(string(td.RuntimePlatform.OperatingSystemFamily), "WINDOWS_")
 	for _, c := range td.ContainerDefinitions {
 		name := aws.ToString(c.Name)
 		if c.Privileged != nil && *c.Privileged {
 			privileged = append(privileged, domain.DetailRow{Label: "Container", Value: name, Tier: "!"})
 		}
-		if c.ReadonlyRootFilesystem == nil || !*c.ReadonlyRootFilesystem {
+		if !windows && (c.ReadonlyRootFilesystem == nil || !*c.ReadonlyRootFilesystem) {
 			writableRoot = append(writableRoot, domain.DetailRow{Label: "Container", Value: name, Tier: "~"})
 		}
 		if c.LogConfiguration == nil {

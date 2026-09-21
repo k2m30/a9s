@@ -134,9 +134,11 @@ func FetchEcsSvcTasks(
 	var allTasks []ecstypes.Task
 	for i := 0; i < len(allTaskArns); i += descBatchSize {
 		end := min(i+descBatchSize, len(allTaskArns))
+		// Tags are returned only when named in Include.
 		descOutput, err := describeAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 			Cluster: aws.String(cluster),
 			Tasks:   allTaskArns[i:end],
+			Include: []ecstypes.TaskField{ecstypes.TaskFieldTags},
 		})
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("describing ECS tasks for %s: %w", serviceName, err)

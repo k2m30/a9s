@@ -174,7 +174,11 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 	// Posture signals. Independently evaluated and appended, so an instance
 	// that is both IMDSv1-permissive and publicly addressed carries both.
 	if !ec2InstanceGone(state) {
-		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional {
+		// HttpEndpoint == disabled means the metadata service is unreachable
+		// entirely; HttpTokens is moot and produces no signal regardless of
+		// its value.
+		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional &&
+			inst.MetadataOptions.HttpEndpoint != ec2types.InstanceMetadataEndpointStateDisabled {
 			r.Findings = append(r.Findings, wave1Finding(CodeEC2IMDSv1Allowed))
 			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
 				Label: "Metadata tokens", Value: "optional", Tier: "~",

@@ -186,6 +186,7 @@ func TestECSClusterBothConditionsNameBothUnderOnePhrase(t *testing.T) {
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{{
 				ClusterName:                       aws.String(clusterName),
+				Status:                            aws.String("ACTIVE"),
 				PendingTasksCount:                 4,
 				RunningTasksCount:                 0,
 				RegisteredContainerInstancesCount: 2,
@@ -227,6 +228,7 @@ func TestECSClusterPendingOnlyNamesOnlyPending(t *testing.T) {
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{{
 				ClusterName:                       aws.String(clusterName),
+				Status:                            aws.String("ACTIVE"),
 				PendingTasksCount:                 4,
 				RunningTasksCount:                 9,
 				RegisteredContainerInstancesCount: 2,
