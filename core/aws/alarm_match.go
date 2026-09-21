@@ -93,7 +93,32 @@ type AlarmMatchSpec struct {
 	// RawStruct, so a row restored without one may be named by alarms this
 	// scan cannot recognise.
 	ValuesFromRawStruct bool
+	// MetricsRegion returns the region a row's metrics are published in, and
+	// so the only region an alarm over them can live in. Nil for a type whose
+	// metrics are in the region its rows are, and a nil answer of "" says the
+	// same of one row.
+	MetricsRegion func(resource.Resource) string
 }
+
+// metricsRegionOf is MetricsRegion for a spec that declares none.
+func (s AlarmMatchSpec) metricsRegionOf(row resource.Resource) string {
+	if s.MetricsRegion == nil {
+		return ""
+	}
+	return s.MetricsRegion(row)
+}
+
+// metricsRegionUSEast1 is the MetricsRegion of a global service: CloudFront
+// publishes its per-distribution metrics in us-east-1 whatever region the
+// operator is browsing.
+func metricsRegionUSEast1(resource.Resource) string { return "us-east-1" }
+
+// metricsRegionOfWebACL is the MetricsRegion of a web ACL: AWS publishes a
+// CloudFront-scope ACL's metrics in us-east-1, and documents the Region
+// dimension as required for every protected resource type except CloudFront
+// distributions
+// (docs.aws.amazon.com/waf/latest/developerguide/waf-metrics.html).
+func metricsRegionOfWebACL(row resource.Resource) string { return wafRegionOf(row.Fields["scope"]) }
 
 // alarmValuesOf returns what a dimension or an action must carry to name the
 // row, and whether the row's identity could be read.
@@ -195,7 +220,7 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"apigw":      {Namespaces: []string{"AWS/ApiGateway"}, DimensionNames: []string{"ApiId", "ApiName"}},
 	"asg":        {Namespaces: []string{"AWS/AutoScaling", "AWS/EC2"}, DimensionNames: []string{"AutoScalingGroupName"}, ActionService: "autoscaling"},
 	"cb":         {Namespaces: []string{"AWS/CodeBuild"}, DimensionNames: []string{"ProjectName"}},
-	"cf":         {Namespaces: []string{"AWS/CloudFront"}, DimensionNames: []string{"DistributionId"}},
+	"cf":         {Namespaces: []string{"AWS/CloudFront"}, DimensionNames: []string{"DistributionId"}, MetricsRegion: metricsRegionUSEast1},
 	"dbc":        {Namespaces: []string{"AWS/RDS", "AWS/DocDB"}, DimensionNames: []string{"DBClusterIdentifier"}},
 	"dbi":        {Namespaces: []string{"AWS/RDS"}, DimensionNames: []string{"DBInstanceIdentifier"}},
 	"ddb":        {Namespaces: []string{"AWS/DynamoDB"}, DimensionNames: []string{"TableName"}},
@@ -226,7 +251,7 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"sqs":        {Namespaces: []string{"AWS/SQS"}, DimensionNames: []string{"QueueName"}},
 	"tg":         {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB"}, DimensionNames: []string{"TargetGroup"}, Values: tgAlarmValues},
 	"vpce":       {Namespaces: []string{"AWS/PrivateLinkEndpoints"}, DimensionNames: []string{"VPC Endpoint Id", "VpcEndpointId"}},
-	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL"}},
+	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL"}, MetricsRegion: metricsRegionOfWebACL},
 }
 
 // AlarmMatchSpecFor returns how an alarm names a resource of the type, and

@@ -417,6 +417,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				RelatedIDs:     row.ResourceIDs,
 				FetchFilter:    row.FetchFilter,
 				Truncated:      row.Truncated,
+				Region:         row.Region,
 				Checker:        checker,
 			}
 			return m, func() tea.Msg { return nav }
@@ -509,7 +510,11 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				SourceResource: res,
 				SourceType:     rt,
 				TargetID:       targetID,
-				DirectDetail:   true,
+				// A field naming an ARN of another Region names a row the
+				// session's own Region does not hold; the reference, not the
+				// resolved ID, is what carries the Region.
+				Region:       resource.RefRegion(field.Value),
+				DirectDetail: true,
 			}
 		}
 

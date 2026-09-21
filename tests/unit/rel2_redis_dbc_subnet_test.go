@@ -322,7 +322,7 @@ func rel2AssertRenderedRedisZeros(t *testing.T, groupID string, targets ...strin
 		}
 		c.ApplyDetailRelatedResultForResource("redis", group.ID, def.DisplayName, def.TargetType,
 			result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(),
-			result.ResourceIDs(), result.FetchFilter())
+			result.ResourceIDs(), result.FetchFilter(), "")
 	}
 
 	body := c.Snapshot().Body.Detail

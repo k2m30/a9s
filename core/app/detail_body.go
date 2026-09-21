@@ -243,6 +243,10 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 // on the next build. A field whose NavigableField has Resolve is read through
 // it from src instead. A value that names no row of the target stops being
 // navigable. Rows a projector already gave a NavID keep it.
+//
+// A reference is read against the Region its own ARN names, not the
+// session's: an ARN of another Region names a real row there, and holding
+// it to the session's Region would strike the field off as naming nothing.
 func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items []fieldpath.FieldItem) {
 	accountID := ""
 	if c.identityResult != nil {
@@ -253,7 +257,11 @@ func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items 
 		if !it.IsNavigable || it.NavID != "" {
 			continue
 		}
-		rc := domain.RefContext{AccountID: accountID, Region: c.core.Region(), Targets: c.core.AnyLaneResources(it.TargetType)}
+		region := c.core.Region()
+		if named := resource.RefRegion(strings.TrimPrefix(strings.TrimSpace(it.Value), "- ")); named != "" {
+			region = named
+		}
+		rc := domain.RefContext{AccountID: accountID, Region: region, Targets: c.core.AnyLaneResources(it.TargetType)}
 		var id string
 		if d := slices.IndexFunc(navDefs, func(nf resource.NavigableField) bool {
 			return nf.Resolve != nil && nf.FieldPath == it.Path && nf.TargetType == it.TargetType

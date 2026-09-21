@@ -110,7 +110,7 @@ func TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots
 		c.ApplyDetailRelatedResultForResource(
 			"ct-events", res.ID, def.DisplayName, "ct-events",
 			domain.RelatedResolved, i+1, false, "", false,
-			[]string{"evt-related-a", "evt-related-b"}, nil,
+			[]string{"evt-related-a", "evt-related-b"}, nil, "",
 		)
 	}
 

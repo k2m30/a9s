@@ -294,6 +294,7 @@ func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequ
 				RelatedIDs:     focusedRow.ResourceIDs,
 				FetchFilter:    focusedRow.FetchFilter,
 				Truncated:      focusedRow.Truncated,
+				Region:         focusedRow.Region,
 				Checker:        checker,
 			}
 			tasks := c.dispatchRelatedNavigate(ev)
@@ -511,6 +512,7 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 		RelatedIDs:     targetRow.ResourceIDs,
 		FetchFilter:    targetRow.FetchFilter,
 		Truncated:      targetRow.Truncated,
+		Region:         targetRow.Region,
 		Checker:        checker,
 	}
 	tasks := c.dispatchRelatedNavigate(ev)
@@ -552,6 +554,10 @@ func (c *Controller) handleActionFieldSelect(a Action) (ViewState, []runtime.Tas
 		SourceResource: ds.Resource,
 		SourceType:     ds.ResourceType,
 		TargetID:       targetID,
+		// A field naming an ARN of another Region names a row the session's
+		// own Region does not hold; the reference, not the resolved ID, is
+		// what carries the Region.
+		Region: resource.RefRegion(field.Value),
 	}
 	tasks := c.dispatchRelatedNavigate(ev)
 	return c.snapshot(), tasks

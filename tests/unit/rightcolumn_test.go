@@ -121,7 +121,7 @@ func deliverRightColResult(c *app.Controller, displayName, targetType string, co
 		errMsg = err.Error()
 		state = domain.RelatedError
 	}
-	c.ApplyDetailRelatedResultForResource("ec2", "i-test123", displayName, targetType, state, count, false, errMsg, false, nil, nil)
+	c.ApplyDetailRelatedResultForResource("ec2", "i-test123", displayName, targetType, state, count, false, errMsg, false, nil, nil, "")
 }
 
 func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {

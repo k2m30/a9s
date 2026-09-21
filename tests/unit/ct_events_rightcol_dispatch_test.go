@@ -137,7 +137,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 						errMsg = result.Err().Error()
 					}
 					c.ApplyDetailRelatedResultForResource("ct-events", fixture.ID, def.DisplayName, def.TargetType,
-						result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(), result.ResourceIDs(), result.FetchFilter())
+						result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(), result.ResourceIDs(), result.FetchFilter(), "")
 
 					body := c.Snapshot().Body.Detail
 					if body == nil {

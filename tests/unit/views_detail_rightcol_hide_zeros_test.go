@@ -47,7 +47,7 @@ func rel2RightColumnBlocks(t *testing.T, fixture resource.Resource) []app.Relate
 		}
 		c.ApplyDetailRelatedResultForResource("ct-events", fixture.ID, def.DisplayName, def.TargetType,
 			result.EffectiveState(), result.Count(), false, errMsg, result.Truncated(),
-			result.ResourceIDs(), result.FetchFilter())
+			result.ResourceIDs(), result.FetchFilter(), "")
 	}
 	body := c.Snapshot().Body.Detail
 	if body == nil {

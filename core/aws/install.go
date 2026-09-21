@@ -37,6 +37,11 @@ func ctRegionUSEast1(domain.Resource) string { return "us-east-1" }
 // configuration calls are recorded in its home Region.
 func ctRegionOfTrail(r domain.Resource) string { return r.Fields["home_region"] }
 
+// ctRegionOfWebACL is the CloudTrailRegion of a web ACL: every wafv2 call
+// about it is served by the endpoint of the Region its scope names, and that
+// is where the call is recorded.
+func ctRegionOfWebACL(r domain.Resource) string { return wafRegionOf(r.Fields["scope"]) }
+
 // Install loads the AWS resource catalog into core/catalog. MUST be called
 // exactly once at program start (main() / TestMain) before any
 // catalog.Find / catalog.All call.

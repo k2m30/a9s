@@ -389,17 +389,21 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		var typeGen domain.Gen
 		provenance := messages.FetchProvenanceCanonicalList
+		region := ""
 		if p, ok := req.Payload.(FetchResourcesPayload); ok {
 			typeGen = p.TypeGen
+			region = p.Region
 			if p.Provenance != messages.FetchProvenanceUnknown {
 				provenance = p.Provenance
 			}
 		}
+		// A drill into a count found in another Region reads its rows there.
+		clients := snap.Clients.InRegion(region)
 		out := FetchOutcome{
 			ResourceType: resourceType, Gen: gen, TypeGen: typeGen,
 			ListSeq: req.ListSeq, ScreenID: req.ScreenID, Lane: provenance,
 		}
-		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
+		res, err := c.FetchResources(ctx, clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
 			return out.Msg(res, err), nil
 		}
@@ -412,7 +416,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		for err == nil && res.Pagination != nil && res.Pagination.IsTruncated &&
 			res.Pagination.NextToken != "" && len(res.Resources) < c.CachedListDepth(resourceType) {
 			var more resource.FetchResult
-			more, err = c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
+			more, err = c.FetchMoreResources(ctx, clients, FetchMoreParams{
 				ResourceType: resourceType,
 				Token:        res.Pagination.NextToken,
 			})
@@ -458,7 +462,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ListSeq: req.ListSeq, ScreenID: req.ScreenID, Lane: p.Lane(),
 			Append: true, LoadingMore: !p.ContinuesInitialLoad,
 		}
-		return out.Msg(c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
+		return out.Msg(c.FetchMoreResources(ctx, snap.Clients.InRegion(p.Region), FetchMoreParams{
 			ResourceType: resourceType,
 			Token:        p.ContinuationToken,
 			ParentCtx:    p.ParentContext,
@@ -505,7 +509,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if fn == nil {
 			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("no by-id fetcher for %s", p.TargetType)}, nil
 		}
-		res, err := fn(ctx, snap.Clients, []string{p.ID})
+		res, err := fn(ctx, snap.Clients.InRegion(p.Region), []string{p.ID})
 		if err != nil {
 			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: err.Error()}, nil
 		}

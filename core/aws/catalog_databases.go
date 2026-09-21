@@ -179,7 +179,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			// — so the list path must run it per-bucket. Accepts N+1 per page
 			// (cheap API, typically ≤50 buckets per AWS account) in exchange
 			// for having the notification pivots actually work.
-			return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
+			return FetchS3BucketsPageWithNotifications(ctx, s3PerBucket{c}, s3PerBucket{c}, continuationToken)
 		}),
 		Wave2: IssueEnricher{Fn: EnrichS3Posture, Priority: 100},
 		FieldKeys: []string{

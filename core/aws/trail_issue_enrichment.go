@@ -16,8 +16,9 @@ import (
 )
 
 // trailLogBucketAPI is the pair of read-only S3 calls the log-bucket rows
-// need. Asserted off clients.S3 rather than folded into the aggregate, so a
-// client without these two calls still satisfies the aggregate.
+// need. Asserted off the bucket's own S3 client rather than folded into the
+// aggregate, so a client without these two calls still satisfies the
+// aggregate.
 type trailLogBucketAPI interface {
 	S3GetBucketPolicyStatusAPI
 	S3GetBucketLoggingAPI
@@ -38,8 +39,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]string),
 	}
-	api, ok := clients.S3.(trailLogBucketAPI)
-	if !ok {
+	if clients.S3 == nil {
 		return result, nil
 	}
 
@@ -51,6 +51,12 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		r := resources[i]
 		bucket := r.Fields["s3_bucket"]
 		if bucket == "" {
+			return
+		}
+		// A trail commonly delivers to a bucket in another region than the
+		// one the session is browsing.
+		api, ok := clients.s3For(ctx, bucket).(trailLogBucketAPI)
+		if !ok {
 			return
 		}
 

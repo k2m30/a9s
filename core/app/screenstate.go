@@ -52,6 +52,11 @@ type ListState struct {
 	AttentionOnly    bool   `json:"attention_only,omitempty"`
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
 
+	// Region is the Region this list's rows are read in, when that is not the
+	// session's: a drill into a count found elsewhere lists, pages and
+	// announces that Region.
+	Region string `json:"region,omitempty"`
+
 	HasPagination bool `json:"has_pagination,omitempty"`
 	// PopulationUnconfirmed is true when this list cannot assert that its rows
 	// are the type's whole population. HasPagination implies it — a page left
@@ -250,6 +255,9 @@ type DetailRelatedRow struct {
 	Truncated   bool                   `json:"truncated,omitempty"`
 	ResourceIDs []string               `json:"resource_ids,omitempty"`
 	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
+	// Region is the Region the count was read in, when that is not the
+	// session's. Enter on the row fetches its rows there.
+	Region string `json:"region,omitempty"`
 }
 
 // TextState holds the mutable display state for a YAML/JSON text screen.

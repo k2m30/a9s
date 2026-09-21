@@ -50,6 +50,9 @@ type NavigationResult struct {
 	// lower bound the reapply-checker extends as later pages load, so navigation
 	// seeds the list with them and fetches the population. "(0+)" is not special.
 	Truncated bool
+	// Region is the Region the related count was read in, when that is not
+	// the session's. The fetch it produces reads the same one.
+	Region string
 }
 
 // RelatedNavigateEvent is the runtime-side event for related-resource navigation.
@@ -66,6 +69,9 @@ type RelatedNavigateEvent struct {
 	// Truncated is the source row's truncation flag, routing "(0+)"/"(N+)" to the
 	// reverse-scan scoped path.
 	Truncated bool
+	// Region is the Region the related row's count was read in, when that is
+	// not the session's.
+	Region string
 }
 
 // TaskKind constants for fetch operations emitted by HandleRelatedNavigate.
@@ -116,6 +122,10 @@ const (
 type FetchResourcesPayload struct {
 	TypeGen    domain.Gen
 	Provenance messages.FetchProvenance
+	// Region is the Region to read the list in, when that is not the
+	// session's: a drill into a count found elsewhere has to look where the
+	// count was found.
+	Region string
 }
 
 func (FetchResourcesPayload) isTaskPayload() {}
@@ -143,6 +153,9 @@ type FetchMorePayload struct {
 	ParentContext     map[string]string
 	FetchFilter       map[string]string
 	Provenance        messages.FetchProvenance
+	// Region is the Region to continue the list in, carried from the drill
+	// that opened it.
+	Region string
 	// ContinuesInitialLoad records which of the list's activity flags this
 	// request raised, so its completion retires that one instead of guessing
 	// from Append. True is the drill that opens ON a continuation
@@ -170,6 +183,9 @@ func (p FetchMorePayload) Lane() messages.FetchProvenance {
 type FetchByIDDetailPayload struct {
 	TargetType string
 	ID         string
+	// Region is the Region to look the row up in, when that is not the
+	// session's: a reference into another Region names no row of this one.
+	Region string
 }
 
 func (FetchByIDDetailPayload) isTaskPayload() {}
@@ -201,13 +217,13 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 				return result, []TaskRequest{{
 					Key:     TaskKey{Kind: KindFetchByIDDetail, Scope: ev.TargetType},
 					Cache:   CacheNone,
-					Payload: FetchByIDDetailPayload{TargetType: ev.TargetType, ID: result.TargetID},
+					Payload: FetchByIDDetailPayload{TargetType: ev.TargetType, ID: result.TargetID, Region: result.Region},
 				}}
 			}
 			return result, []TaskRequest{{
 				Key:     TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
 				Cache:   CacheNone,
-				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
+				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList, Region: result.Region},
 			}}
 		}
 		if result.Truncated {
@@ -217,11 +233,11 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 			return result, []TaskRequest{{
 				Key:     TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
 				Cache:   CacheNone,
-				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
+				Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList, Region: result.Region},
 			}}
 		}
 		if len(result.RelatedIDs) > 0 {
-			tasks := relatedFetchTasks(c.session, ev.TargetType, result.RelatedIDs)
+			tasks := relatedFetchTasks(c.session, ev.TargetType, result.RelatedIDs, result.Region)
 			return result, tasks
 		}
 		return result, nil
@@ -255,7 +271,18 @@ func (c *Core) RelatedCachedResource(targetType, id string) (resource.Resource, 
 // relatedFetchTasks decides what fetch task (if any) is needed for a
 // RelatedIDs-based filtered list. Reads RowStore directly (a type's rows
 // live in exactly one RowStore entry, full or Partial alike).
-func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []string) []TaskRequest {
+func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []string, region string) []TaskRequest {
+	// A count read in another Region names rows the session's own list for
+	// the type does not hold — a row of that name in it belongs to another
+	// resource — and the list's continuation token resumes the session's
+	// Region, so the drill reads its own Region from the first page.
+	if region != "" {
+		return []TaskRequest{{
+			Key:     TaskKey{Kind: KindFetchResources, Scope: targetType},
+			Cache:   CacheNone,
+			Payload: FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList, Region: region},
+		}}
+	}
 	tr := s.RowStore.Snapshot(targetType)
 
 	covered := make(map[string]struct{}, len(relatedIDs))
@@ -355,6 +382,23 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			TargetType: ev.TargetType,
 			RelatedIDs: ev.RelatedIDs,
 			Truncated:  true,
+			Region:     ev.Region,
+		}
+	}
+
+	// A reference into another Region names rows of that Region. The session's
+	// cache holds its own Region's, where a row of the same ID is a different
+	// resource, so neither cache-hit fast path below may answer for one. The
+	// scope the reference carries travels with it, so the list Enter opens is
+	// still the one the operator asked for.
+	if ev.Region != "" {
+		return NavigationResult{
+			Kind:       NavigationKindFilteredList,
+			TargetType: ev.TargetType,
+			TargetID:   ev.TargetID,
+			RelatedIDs: ev.RelatedIDs,
+			FilterText: ev.TargetID,
+			Region:     ev.Region,
 		}
 	}
 
@@ -402,6 +446,7 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			Kind:       NavigationKindFilteredList,
 			TargetType: ev.TargetType,
 			RelatedIDs: ev.RelatedIDs,
+			Region:     ev.Region,
 		}
 	}
 

@@ -125,7 +125,11 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    `identityCacheMu` (caller identity), and `sesRuleSetCacheMu` (SES rule
    sets) — and replaced them with `PolicyStore` / `IdentityStore` /
    `RuleSetStore` capabilities owned by `session.Session`. `core/aws/`
-   is now globals-free.
+   is now globals-free. What *does* belong on `ServiceClients` is the state
+   that picks a client: `InRegion(region)` builds and caches one client set
+   per region from the session's own config, and the bucket→region map
+   feeding `s3For` is the routing table behind it. Both die with the client
+   set, which a reconnect replaces wholesale.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local

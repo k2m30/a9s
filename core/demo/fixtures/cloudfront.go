@@ -80,10 +80,10 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					},
 				},
 				// WebACLId — required for the cf:waf related-panel pivot
-				// (checkCfWAF). Matches the acme-cloudfront-waf ACL's
-				// ARN in waf.go (ResourcesByWebACL already reverse-maps this
-				// same distribution for the waf→cf direction).
-				WebACLId: aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
+				// (checkCfWAF), and the only place the waf:cf direction reads
+				// the association from: cloudfront:ListDistributionsByWebACLId
+				// matches on this field.
+				WebACLId: aws.String(WAFCloudFrontACLArn),
 				// ViewerCertificate.ACMCertificateArn — required for the
 				// cf:acm related-panel pivot (checkCfACM). ProdACMCertARN1
 				// (acm.go) covers acme-corp.com, this distribution's alias.

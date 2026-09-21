@@ -307,13 +307,14 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 	},
 	{
-		Name:           "WAF Web ACLs",
-		ShortName:      "waf",
-		RefToID:        wafRefToID,
-		HumanizeFields: []string{"scope"},
-		Aliases:        []string{"waf", "webacl", "web-acl"},
-		Category:       "SECURITY & IAM",
-		CloudTrailKey:  "ResourceName:ID",
+		Name:             "WAF Web ACLs",
+		ShortName:        "waf",
+		RefToID:          wafRefToID,
+		HumanizeFields:   []string{"scope"},
+		Aliases:          []string{"waf", "webacl", "web-acl"},
+		Category:         "SECURITY & IAM",
+		CloudTrailKey:    "ResourceName:ID",
+		CloudTrailRegion: ctRegionOfWebACL,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			scope := r.Fields["scope"]
 			if r.Name == "" || scope == "" {
@@ -334,7 +335,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		Color: colorWAF,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
-			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.WAFv2CloudFront, continuationToken)
+			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.wafIn(wafScopeCloudFront), continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
 		FieldKeys:              []string{"name", "id", "description", "scope", "arn", "lock_token"},

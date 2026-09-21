@@ -18,6 +18,9 @@ type relatedListOpts struct {
 	relatedIDs           []string
 	autoOpenSingleDetail bool
 	reapplyChecker       resource.RelatedChecker
+	// region is the Region the count being drilled was read in, when that is
+	// not the session's.
+	region string
 }
 
 // newRelatedList creates a ResourceList configured for related-resource
@@ -29,13 +32,15 @@ type relatedListOpts struct {
 // app_stack.go pops m.ctrl when this ResourceListModel is later removed.
 func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resource, opts relatedListOpts) tea.Cmd {
 	m.ctrl.PushChildListScreen(rt.ShortName)
+	m.ctrl.SetListRegion(opts.region)
 	rl := views.NewResourceList(rt, m.viewConfig, m.keys, m.ctrl)
 	rl.SetTitleSuffix(runtime.RelatedTitleSuffix(src))
 	if opts.pendingFilter != "" {
 		rl.SetPendingFilter(opts.pendingFilter)
 	}
 	covered := false
-	if opts.reapplyChecker != nil {
+	switch {
+	case opts.reapplyChecker != nil:
 		// Reverse-scan seed (truncated "(0+)"/"(N+)"): a NON-nil set (empty for
 		// "(0+)") scopes to the found IDs so it renders ZERO rows, never "all",
 		// until the reapply-checker extends it as later pages load. The population
@@ -46,7 +51,12 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 		}
 		rl.SetRelatedIDFilter(ids)
 		rl.SetReapplyChecker(opts.reapplyChecker, src)
-	} else if len(opts.relatedIDs) > 0 {
+	case len(opts.relatedIDs) > 0 && opts.region != "":
+		// Rows read in another Region: the session's cache for the type holds
+		// none of them, and a row carrying one of these IDs in it belongs to
+		// another resource. The set scopes the list the Region fetch fills.
+		rl.SetRelatedIDFilter(opts.relatedIDs)
+	case len(opts.relatedIDs) > 0:
 		// Exact-ID list: seed the found rows from the any-lane cache (Partial lane
 		// included) so a hit renders with no fetch. Shared with the web renderer
 		// via SeedRelatedExactRows — the two cannot diverge.

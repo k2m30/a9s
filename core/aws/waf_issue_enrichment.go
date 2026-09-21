@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -61,9 +62,11 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		total++
 		mu.Unlock()
 		var loggingRows, orphanRows []domain.DetailRow
+		scope := cmp.Or(r.Fields["scope"], string(wafv2types.ScopeRegional))
+		api := clients.wafIn(scope)
 
 		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetLoggingConfigurationOutput, error) {
-			return clients.WAFv2.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
+			return api.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
 				ResourceArn: aws.String(arn),
 			})
 		})
@@ -83,18 +86,14 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			}
 		}
 
-		assocOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.ListResourcesForWebACLOutput, error) {
-			return clients.WAFv2.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
-				WebACLArn: aws.String(arn),
-			})
-		})
+		associations, err := wafAssociations(ctx, clients, scope, arn)
 		if err != nil {
 			mu.Lock()
 			MarkSkipped(&result, r.ID, &failures, err)
 			mu.Unlock()
 			return
 		}
-		if len(assocOut.ResourceArns) == 0 {
+		if len(associations) == 0 {
 			orphanRows = append(orphanRows, domain.DetailRow{
 				Label: "Associations",
 				Value: "none",
@@ -106,11 +105,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		// implements WAFv2GetWebACLAPI.
 		rulesSummary := "0 rules"
 		noRules := false
-		if getACLAPI, ok := clients.WAFv2.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
-			scope := r.Fields["scope"]
-			if scope == "" {
-				scope = "REGIONAL"
-			}
+		if getACLAPI, ok := api.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
 			getOut, gerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetWebACLOutput, error) {
 				return getACLAPI.GetWebACL(ctx, &wafv2svc.GetWebACLInput{
 					Name:  aws.String(r.Fields["name"]),
@@ -163,4 +158,21 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	// All WAF logging findings are severity "~" (informational).
 	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("web ACL logging and associations", failures, total))
+}
+
+// wafAssociations returns the resources this web ACL protects, from the
+// service that reports them for its scope.
+func wafAssociations(ctx context.Context, clients *ServiceClients, scope, arn string) ([]string, error) {
+	if scope == wafScopeCloudFront {
+		return wafDistributionIDs(ctx, clients, arn)
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.ListResourcesForWebACLOutput, error) {
+		return clients.WAFv2.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
+			WebACLArn: aws.String(arn),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.ResourceArns, nil
 }

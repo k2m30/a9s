@@ -195,6 +195,10 @@ type RelatedCheckResult struct {
 	// coverage is how far a RelatedResolved lookup searched; Coverage derives
 	// the answer for every other state.
 	coverage RelatedCoverage
+	// region is the Region the lookup read its answer in, when that is not
+	// the session's. A drill into the row has to read the same Region, or it
+	// lists another one and finds none of what the count names.
+	region string
 }
 
 // RelatedCoverage states how far a related lookup searched, and so whether a
@@ -264,6 +268,18 @@ func (r RelatedCheckResult) Truncated() bool { return r.truncated }
 // unchanged, so this cannot be used to smuggle a count alongside an error.
 func (r RelatedCheckResult) WithTargetType(targetType string) RelatedCheckResult {
 	r.targetType = targetType
+	return r
+}
+
+// Region returns the Region this result was read in, or "" for the session's
+// own. Whatever reads a Region off a result must fetch its rows there.
+func (r RelatedCheckResult) Region() string { return r.region }
+
+// WithRegion returns a copy of r marked as read in region. Only where the
+// count came from, never what it counted: a Region carries no rows of its
+// own, so this cannot turn an unknown into a number.
+func (r RelatedCheckResult) WithRegion(region string) RelatedCheckResult {
+	r.region = region
 	return r
 }
 

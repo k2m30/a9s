@@ -651,6 +651,27 @@ func (c *Controller) GetListParentContext() map[string]string {
 	return ls.ParentContext
 }
 
+// SetListRegion records the Region the top list screen's rows are read in.
+func (c *Controller) SetListRegion(region string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if ls := c.topListState(); ls != nil {
+		ls.Region = region
+	}
+}
+
+// GetListRegion returns the Region the top list screen's rows are read in,
+// or "" for the session's own.
+func (c *Controller) GetListRegion() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ls := c.topListState()
+	if ls == nil {
+		return ""
+	}
+	return ls.Region
+}
+
 // GetListFetchFilter returns the server-side fetch filter of the top list screen.
 func (c *Controller) GetListFetchFilter() map[string]string {
 	c.mu.RLock()

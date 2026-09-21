@@ -273,7 +273,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return map[string]string{"bucket": "", "prefix": ""}
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"], continuationToken)
+			return FetchS3Objects(ctx, s3PerBucket{c}, parentCtx["bucket"], parentCtx["prefix"], continuationToken)
 		}),
 	},
 }

@@ -87,58 +87,58 @@ type ServiceClients struct {
 	// a client for another Region can be built from it on demand. Zero value
 	// when the struct is assembled field by field.
 	cfg aws.Config
-	// ctFromConfig is the CloudTrail client CreateServiceClients built, held
-	// to recognise a CloudTrail field a caller has replaced with its own.
-	ctFromConfig CloudTrailAPI
+	// pinned marks a set whose clients a caller has replaced with its own, so
+	// every Region is served by those replacements.
+	pinned bool
+	// parent is the set this one was derived from by InRegion, and which
+	// holds the session's capability stores. Nil on the session's own set.
+	parent *ServiceClients
 
-	ctRegionMu sync.Mutex
-	ctByRegion map[string]CloudTrailAPI
+	regionMu sync.Mutex
+	byRegion map[string]*ServiceClients
+
+	bucketRegionMu sync.Mutex
+	bucketRegions  map[string]string
 
 	// Region is the region resolved from the session's AWS config at
 	// construction time (profile config, AWS_REGION/AWS_DEFAULT_REGION env,
 	// or the SDK default). Immutable after CreateServiceClients returns — safe
 	// to read from fetcher/related-checker goroutines without locking. Used to
-	// construct ARNs (e.g. pipeline, glue) and to detect when a us-east-1-only
-	// global API (WAFv2 CLOUDFRONT scope) needs a dedicated client.
+	// construct ARNs (e.g. pipeline, glue) and to route a read of data that
+	// lives in another Region through InRegion.
 	Region string
 
-	EC2            EC2API
-	S3             S3API
-	RDS            RDSAPI
-	ElastiCache    ElastiCacheAPI
-	DocDB          DocDBAPI
-	EKS            EKSAPI
-	SecretsManager SecretsManagerAPI
-	Lambda         LambdaAPI
-	CloudWatch     CloudWatchAPI
-	SNS            SNSAPI
-	SQS            SQSAPI
-	ELBv2          ELBv2API
-	ECS            ECSAPI
-	CloudFormation CFNAPI
-	IAM            IAMAPI
-	CloudWatchLogs CWLogsAPI
-	SSM            SSMAPI
-	DynamoDB       DynamoDBAPI
-	ACM            ACMAPI
-	AutoScaling    ASGAPI
-	CloudFront     CloudFrontAPI
-	Route53        Route53API
-	APIGatewayV1   APIGatewayV1API
-	APIGatewayV2   APIGatewayV2API
-	ECR            ECRAPI
-	EFS            EFSAPI
-	EventBridge    EventBridgeAPI
-	SFN            SFNAPI
-	CodePipeline   CodePipelineAPI
-	Kinesis        KinesisAPI
-	WAFv2          WAFv2API
-	// WAFv2CloudFront is a second WAFv2 client pinned to us-east-1.
-	// wafv2:ListWebACLs/GetWebACL with Scope=CLOUDFRONT is a global operation
-	// that AWS only serves from the us-east-1 endpoint regardless of the
-	// session's selected region (AWS SDK Go v2 — wafv2 CLOUDFRONT-scope
-	// operations require Region=us-east-1).
-	WAFv2CloudFront  WAFv2API
+	EC2              EC2API
+	S3               S3API
+	RDS              RDSAPI
+	ElastiCache      ElastiCacheAPI
+	DocDB            DocDBAPI
+	EKS              EKSAPI
+	SecretsManager   SecretsManagerAPI
+	Lambda           LambdaAPI
+	CloudWatch       CloudWatchAPI
+	SNS              SNSAPI
+	SQS              SQSAPI
+	ELBv2            ELBv2API
+	ECS              ECSAPI
+	CloudFormation   CFNAPI
+	IAM              IAMAPI
+	CloudWatchLogs   CWLogsAPI
+	SSM              SSMAPI
+	DynamoDB         DynamoDBAPI
+	ACM              ACMAPI
+	AutoScaling      ASGAPI
+	CloudFront       CloudFrontAPI
+	Route53          Route53API
+	APIGatewayV1     APIGatewayV1API
+	APIGatewayV2     APIGatewayV2API
+	ECR              ECRAPI
+	EFS              EFSAPI
+	EventBridge      EventBridgeAPI
+	SFN              SFNAPI
+	CodePipeline     CodePipelineAPI
+	Kinesis          KinesisAPI
+	WAFv2            WAFv2API
 	Glue             GlueAPI
 	ElasticBeanstalk ElasticBeanstalkAPI
 	SES              SESV1API
@@ -179,12 +179,10 @@ func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Conf
 
 // CreateServiceClients creates all service clients from the given AWS config.
 func CreateServiceClients(cfg aws.Config) *ServiceClients {
-	ct := cloudtrail.NewFromConfig(cfg)
 	return &ServiceClients{
-		cfg:          cfg,
-		ctFromConfig: ct,
-		Region:       cfg.Region,
-		EC2:          ec2.NewFromConfig(cfg),
+		cfg:    cfg,
+		Region: cfg.Region,
+		EC2:    ec2.NewFromConfig(cfg),
 		// S3/SNS/SFN/Lambda are wrapped with in-flight call coalescing
 		// (coalesce.go) — a detail open fires the same read (GetBucketPolicy/
 		// GetTopicAttributes/DescribeStateMachine/GetFunction) from a related
@@ -225,13 +223,12 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		CodePipeline:     codepipeline.NewFromConfig(cfg),
 		Kinesis:          kinesis.NewFromConfig(cfg),
 		WAFv2:            wafv2.NewFromConfig(cfg),
-		WAFv2CloudFront:  wafv2.NewFromConfig(cfg, func(o *wafv2.Options) { o.Region = "us-east-1" }),
 		Glue:             glue.NewFromConfig(cfg),
 		ElasticBeanstalk: elasticbeanstalk.NewFromConfig(cfg),
 		SES:              ses.NewFromConfig(cfg),
 		SESv2:            sesv2.NewFromConfig(cfg),
 		Redshift:         redshift.NewFromConfig(cfg),
-		CloudTrail:       ct,
+		CloudTrail:       cloudtrail.NewFromConfig(cfg),
 		Athena:           athena.NewFromConfig(cfg),
 		CodeArtifact:     codeartifact.NewFromConfig(cfg),
 		CodeBuild:        codebuild.NewFromConfig(cfg),
@@ -259,26 +256,64 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 // thread-safe per the session-side concrete store implementations'
 // contracts.
 
+// InRegion returns the client set that reads region. The receiver answers for
+// its own Region, for an empty region, for a nil receiver, and for every
+// region when it cannot
+// reach another one; any other region is a set built from the session's own
+// config, once per region, reading the session's one set of capability
+// stores. Concurrency-safe.
+func (c *ServiceClients) InRegion(region string) *ServiceClients {
+	if c == nil {
+		return nil
+	}
+	if region == "" || region == c.Region || c.oneRegion() {
+		return c
+	}
+	c.regionMu.Lock()
+	defer c.regionMu.Unlock()
+	if other, ok := c.byRegion[region]; ok {
+		return other
+	}
+	cfg := c.cfg.Copy()
+	cfg.Region = region
+	other := CreateServiceClients(cfg)
+	other.parent = c.storeOwner()
+	if c.byRegion == nil {
+		c.byRegion = map[string]*ServiceClients{}
+	}
+	c.byRegion[region] = other
+	return other
+}
+
+// oneRegion reports whether this set is the whole world it can see: a set
+// assembled field by field carries no config to build another region's
+// clients from, and a pinned one is serving a caller's own clients, which are
+// what the session is meant to talk to wherever a read is routed.
+func (c *ServiceClients) oneRegion() bool {
+	return c.pinned || c.cfg.Region == ""
+}
+
+// storeOwner is the set that holds the session's capability stores. A session
+// has one store of each kind however many Regions it reads, so a derived set
+// keeps none of its own and a rewire of the session's stores reaches every
+// Region's clients.
+func (c *ServiceClients) storeOwner() *ServiceClients {
+	if c.parent != nil {
+		return c.parent
+	}
+	return c
+}
+
+// PinToSessionRegion makes every InRegion lookup answer with this set, for a
+// caller that has replaced its clients with substitutes of its own.
+func (c *ServiceClients) PinToSessionRegion() {
+	c.pinned = true
+}
+
 // CloudTrailIn returns the CloudTrail client that reads region's event
-// history. The session's own client answers for the session Region, for an
-// empty region, and for every Region when a caller has substituted it (the
-// demo fake, a test) — a substituted client is the one the session is meant
-// to talk to. Concurrency-safe; clients are built once per Region.
+// history.
 func (c *ServiceClients) CloudTrailIn(region string) CloudTrailAPI {
-	if region == "" || region == c.Region || c.CloudTrail != c.ctFromConfig {
-		return c.CloudTrail
-	}
-	c.ctRegionMu.Lock()
-	defer c.ctRegionMu.Unlock()
-	if api, ok := c.ctByRegion[region]; ok {
-		return api
-	}
-	api := cloudtrail.NewFromConfig(c.cfg, func(o *cloudtrail.Options) { o.Region = region })
-	if c.ctByRegion == nil {
-		c.ctByRegion = map[string]CloudTrailAPI{}
-	}
-	c.ctByRegion[region] = api
-	return api
+	return c.InRegion(region).CloudTrail
 }
 
 // IAMPolicies returns the session-scoped IAM policy store, or nil if not
@@ -287,9 +322,10 @@ func (c *ServiceClients) IAMPolicies() iamPolicyStore {
 	if c == nil {
 		return nil
 	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.iamPolicies
+	o := c.storeOwner()
+	o.storesMu.RLock()
+	defer o.storesMu.RUnlock()
+	return o.iamPolicies
 }
 
 // SetIAMPolicies replaces the session-scoped IAM policy store. Concurrency-
@@ -300,9 +336,10 @@ func (c *ServiceClients) SetIAMPolicies(s iamPolicyStore) {
 	if c == nil {
 		return
 	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.iamPolicies = s
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.iamPolicies = s
 }
 
 // IdentityStore returns the session-scoped caller-identity store, or nil if
@@ -311,9 +348,10 @@ func (c *ServiceClients) IdentityStore() identityStore {
 	if c == nil {
 		return nil
 	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.identityStore
+	o := c.storeOwner()
+	o.storesMu.RLock()
+	defer o.storesMu.RUnlock()
+	return o.identityStore
 }
 
 // SetIdentityStore replaces the session-scoped caller-identity store.
@@ -322,9 +360,10 @@ func (c *ServiceClients) SetIdentityStore(s identityStore) {
 	if c == nil {
 		return
 	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.identityStore = s
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.identityStore = s
 }
 
 // RuleSets returns the session-scoped SES rule set store, or nil if not yet
@@ -337,9 +376,10 @@ func (c *ServiceClients) RuleSets() ruleSetStore {
 	if c == nil {
 		return nil
 	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.ruleSets
+	o := c.storeOwner()
+	o.storesMu.RLock()
+	defer o.storesMu.RUnlock()
+	return o.ruleSets
 }
 
 // SetRuleSets replaces the session-scoped SES rule set store. The previous
@@ -350,9 +390,10 @@ func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
 	if c == nil {
 		return
 	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.ruleSets = s
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.ruleSets = s
 }
 
 // svcClients asserts clients holds an initialized *ServiceClients, the

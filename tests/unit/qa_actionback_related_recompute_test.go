@@ -69,7 +69,7 @@ func TestActionBack_AfterTransientUnknownRelatedDrill_RedispatchesRelatedCheck(t
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 	ctrl.EnsureDetailState(ngRes, "ng")
 	ctrl.InitDetailRelatedRows("ng")
-	ctrl.ApplyDetailRelatedResultForResource("ng", ngRes.ID, ebsDef.DisplayName, "ebs", domain.RelatedUnknown, 0, false, "", false, nil, nil)
+	ctrl.ApplyDetailRelatedResultForResource("ng", ngRes.ID, ebsDef.DisplayName, "ebs", domain.RelatedUnknown, 0, false, "", false, nil, nil, "")
 
 	preDrill := ctrl.Snapshot()
 	if preDrill.Body.Detail == nil || len(preDrill.Body.Detail.Related) != 1 {

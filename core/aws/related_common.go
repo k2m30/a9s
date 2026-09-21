@@ -270,7 +270,7 @@ func alarmIDsByDimension(ctx context.Context, clients any, cache resource.Resour
 		return unreadZero(res, resource.ProvenZero("alarm", "the row's identity"))
 	}
 
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
+	alarmList, _, truncated, err := relatedListIn(ctx, clients, cache, "alarm", spec.metricsRegionOf(res))
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -315,8 +315,14 @@ func alarmRowsNaming(ctx context.Context, clients any, cache resource.ResourceCa
 	if rows == nil {
 		return resource.UnknownRelated(target)
 	}
+	// An alarm watches the metrics of its own region, so a row whose metrics
+	// are published elsewhere is none of this alarm's business.
+	alarmRegion := arnRegionOf(aws.ToString(alarm.AlarmArn), "cloudwatch")
 	var ids []string
 	for _, row := range rows {
+		if region := spec.metricsRegionOf(row); region != "" && alarmRegion != "" && region != alarmRegion {
+			continue
+		}
 		if spec.names(alarm, row) || anyMatch(also, row) {
 			ids = append(ids, row.ID)
 		}

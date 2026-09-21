@@ -150,6 +150,7 @@ func (c *Controller) handleActionLoadMore(_ Action) (ViewState, []runtime.TaskRe
 			ParentContext:     ls.ParentContext,
 			FetchFilter:       ls.FetchFilter,
 			Provenance:        listLane(c.topScreenID(), ls),
+			Region:            ls.Region,
 		},
 	}}
 	return c.snapshot(), tasks

@@ -189,7 +189,7 @@ func TestDetailWorkload_RelatedRowRetry_BothTasksSameOp(t *testing.T) {
 
 	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
 	c.ApplyDetailRelatedResultForResource(workloadSrcType, id, def0.DisplayName, def0.TargetType,
-		domain.RelatedUnknown, 0, false, "", false, nil, nil)
+		domain.RelatedUnknown, 0, false, "", false, nil, nil, "")
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
 	assertCompleteWorkload(t, tasks)
@@ -226,7 +226,7 @@ func TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_Still
 	// Put the retried row into RelatedUnknown focus — the resolve-in-place
 	// trigger (resource.RelatedEnter returns RelatedEnterResolveInPlace).
 	c.ApplyDetailRelatedResultForResource(workloadSrcType, id, def0.DisplayName, def0.TargetType,
-		domain.RelatedUnknown, 0, false, "", false, nil, nil)
+		domain.RelatedUnknown, 0, false, "", false, nil, nil, "")
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
 
@@ -271,7 +271,7 @@ func TestDetailWorkload_OpenRelatedDetail_BothTasksSameOp(t *testing.T) {
 
 	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
 	c.ApplyDetailRelatedResultForResource(workloadSrcType, srcID, def0.DisplayName, def0.TargetType,
-		domain.RelatedResolved, 1, false, "", false, []string{targetID}, nil)
+		domain.RelatedResolved, 1, false, "", false, []string{targetID}, nil, "")
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
 	assertCompleteWorkload(t, tasks)
@@ -535,7 +535,7 @@ func mintSuccessorWorkload(t *testing.T, c *app.Controller, id string) []runtime
 	t.Helper()
 	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
 	c.ApplyDetailRelatedResultForResource(workloadSrcType, id, def0.DisplayName, def0.TargetType,
-		domain.RelatedUnknown, 0, false, "", false, nil, nil)
+		domain.RelatedUnknown, 0, false, "", false, nil, nil, "")
 	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
 	return tasks
 }

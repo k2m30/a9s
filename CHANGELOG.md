@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Data that lives in another region is now read where it lives, instead of
+  being reported missing. A CloudFront distribution shows its us-east-1
+  certificate and its CloudFront alarms from any session region; a CloudFront
+  web ACL shows its distributions, its logging and its rule summary instead of
+  a blank row; a bucket in another region shows its posture, policy, CORS,
+  lifecycle, encryption key, access-log target and objects rather than errors
+  or zeroes; a trail shows the log group and the log bucket in its own home
+  region. A call to another region that fails now renders as unknown rather
+  than as a proven zero, so an empty answer and an answer nobody could ask are
+  no longer the same row.
+- Enter on a related count found in another region opens that region's list.
+  The panel would say "Log Groups (1)", "Certificates (1)" and then the screen
+  would come up empty, because the list behind it was still read in the
+  session's own region — an empty screen the operator could not tell from a
+  real zero. A trail's log group, a hosted zone's query-log group, a
+  distribution's certificate and a CloudFront web ACL's log group now list,
+  page and open where they live, with the region named above the rows, and a
+  region that refuses the read says so instead of showing an empty list.
+- A CloudFront web ACL's CloudTrail events and CloudWatch alarms are looked up
+  in us-east-1, where AWS serves and records everything about it. From any
+  other session region it used to report no events and no alarms for an ACL
+  that had both.
+- A bucket whose region could not be read once is asked again. A single
+  timeout or throttle used to leave that bucket's tags, encryption, logging,
+  policy and public-access unreadable for the rest of the session.
+- `a9s-snapshot` records CloudFront-scope web ACLs whatever region the profile
+  names, instead of writing an empty list outside us-east-1.
+- A CloudFront web ACL is no longer reported as attached to nothing. Its
+  associations are read from CloudFront, which is the only service that
+  reports them, and its "Load Balancers" and "API Gateways" pivots now show a
+  definite 0, which is what a CloudFront-scope ACL can ever have.
+
 - Two resources that share a name no longer show as one row. AWS scopes an ECS
   service name to its cluster, a CodeArtifact repository name to its domain, an
   EventBridge rule name to its event bus and a group's inline policy name to

@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"maps"
 	"slices"
 	"strconv"
@@ -422,9 +423,11 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 // listLookupRegionLocked returns the Region the list's own lookup was sent to
 // when it differs from the session's, so the screen can say where the rows
 // came from: without it, a lookup answered by another Region and an empty
-// history read the same. Callers must hold c.mu.
+// history read the same. A drill into a count found elsewhere carries its
+// Region on the screen; a CloudTrail window carries it in its filter.
+// Callers must hold c.mu.
 func (c *Controller) listLookupRegionLocked(ls *ListState) string {
-	region := ls.FetchFilter[resource.CTRegionFilterKey]
+	region := cmp.Or(ls.Region, ls.FetchFilter[resource.CTRegionFilterKey])
 	if region == c.core.Region() {
 		return ""
 	}

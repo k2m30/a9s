@@ -54,7 +54,9 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 		fetch: func(ctx context.Context, c *ServiceClients, id string, _ s3types.Bucket, _ resource.Resource) (s3DetailPayload, error) {
 			var payload s3DetailPayload
 
-			policyAPI, ok := c.S3.(S3GetBucketPolicyAPI)
+			bucketS3 := c.s3For(ctx, id)
+
+			policyAPI, ok := bucketS3.(S3GetBucketPolicyAPI)
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketPolicy")
 			}
@@ -68,7 +70,7 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 				payload.Policy = parseJSONOrRaw(*policyOut.Policy)
 			}
 
-			corsAPI, ok := c.S3.(S3GetBucketCorsAPI)
+			corsAPI, ok := bucketS3.(S3GetBucketCorsAPI)
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketCors")
 			}
@@ -82,7 +84,7 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 				payload.CORSRules = corsOut.CORSRules
 			}
 
-			lifecycleAPI, ok := c.S3.(S3GetBucketLifecycleAPI)
+			lifecycleAPI, ok := bucketS3.(S3GetBucketLifecycleAPI)
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketLifecycleConfiguration")
 			}

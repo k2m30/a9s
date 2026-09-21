@@ -980,6 +980,7 @@ func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) message
 		SourceType:     s.currentResourceType,
 		RelatedIDs:     append([]string(nil), msg.Result.ResourceIDs()...),
 		FetchFilter:    cloneStringMap(msg.Result.FetchFilter()),
+		Region:         msg.Result.Region(),
 	}
 }
 

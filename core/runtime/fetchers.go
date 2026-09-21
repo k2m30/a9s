@@ -40,6 +40,9 @@ type FetchMoreParams struct {
 	Token        string
 	ParentCtx    map[string]string
 	FetchFilter  map[string]string
+	// Region is the Region to continue the list in, when that is not the
+	// session's.
+	Region string
 }
 
 // FetchResources calls the registered paginated fetcher for resourceType

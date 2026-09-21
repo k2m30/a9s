@@ -80,7 +80,7 @@ func TestDetailController_RelatedCheckResult_EnablesRelatedSelect(t *testing.T) 
 	}
 
 	c.ApplyDetailRelatedResultForResource(ctrlDetailResourceType, "i-ctrl001", "Target Groups", "tg",
-		domain.RelatedResolved, 3, false, "", false, []string{"tg-1", "tg-2", "tg-3"}, nil)
+		domain.RelatedResolved, 3, false, "", false, []string{"tg-1", "tg-2", "tg-3"}, nil, "")
 
 	postBody := c.Snapshot().Body.Detail
 	if postBody.Related[0].Loading {

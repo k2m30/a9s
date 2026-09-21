@@ -631,7 +631,7 @@ func TestLiveGap_ApplyDetailRelatedResultForResource_AmbiguousTargetTypeWithoutD
 	}
 	c.ApplyDetailRelated(rows)
 
-	c.ApplyDetailRelatedResultForResource("ct-events", res.ID, "", "ct-events", domain.RelatedResolved, 5, false, "", false, nil, nil)
+	c.ApplyDetailRelatedResultForResource("ct-events", res.ID, "", "ct-events", domain.RelatedResolved, 5, false, "", false, nil, nil, "")
 
 	body := c.Snapshot().Body.Detail
 	if body == nil {
@@ -661,7 +661,7 @@ func TestLiveGap_ApplyDetailRelatedResultForResource_UnambiguousTargetTypeFallba
 
 	// DefDisplayName omitted, but exactly one row carries TargetType "tg" —
 	// the tight fallback must bind it.
-	c.ApplyDetailRelatedResultForResource("ec2", res.ID, "", "tg", domain.RelatedResolved, 7, false, "", false, []string{"tg-1"}, nil)
+	c.ApplyDetailRelatedResultForResource("ec2", res.ID, "", "tg", domain.RelatedResolved, 7, false, "", false, []string{"tg-1"}, nil, "")
 
 	body := c.Snapshot().Body.Detail
 	if body == nil {

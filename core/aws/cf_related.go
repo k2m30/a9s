@@ -152,7 +152,10 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	certARN := *dist.ViewerCertificate.ACMCertificateArn
 
-	acmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
+	// CloudFront serves a custom viewer certificate from us-east-1 alone, so
+	// the certificate is never on the session region's own list.
+	certRegion := arnRegionOf(certARN, "acm")
+	acmList, _, truncated, err := relatedListIn(ctx, clients, cache, "acm", certRegion)
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
 	}
@@ -166,7 +169,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, acmRes.ID)
 		}
 	}
-	return relatedResultTrunc("acm", ids, truncated)
+	return inRegion(clients, certRegion, relatedResultTrunc("acm", ids, truncated))
 }
 
 // checkCfR53 reports the Route 53 hosted zones with an alias record

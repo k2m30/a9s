@@ -331,6 +331,7 @@ type S3FullAPI interface {
 	S3GetBucketTaggingAPI
 	S3GetBucketEncryptionAPI
 	S3GetBucketLoggingAPI
+	S3GetBucketLocationAPI
 }
 
 // coalescingS3 wraps S3FullAPI, coalescing concurrent identical

@@ -139,8 +139,8 @@ func (f *coalesceSnsFake) ListSubscriptions(_ context.Context, _ *sns.ListSubscr
 var _ awsclient.SNSFullAPI = (*coalesceSnsFake)(nil)
 
 // ---------------------------------------------------------------------------
-// coalesceS3Fake — implements awsclient.S3FullAPI (S3API plus the six
-// narrow operations S3FullAPI widens for).
+// coalesceS3Fake — implements awsclient.S3FullAPI (S3API plus the narrow
+// operations S3FullAPI widens for).
 // ---------------------------------------------------------------------------
 
 type coalesceS3Fake struct {
@@ -207,6 +207,10 @@ func (f *coalesceS3Fake) GetBucketEncryption(_ context.Context, _ *s3.GetBucketE
 func (f *coalesceS3Fake) GetBucketLogging(_ context.Context, _ *s3.GetBucketLoggingInput, _ ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error) {
 	f.getLoggingCalls.Add(1)
 	return &s3.GetBucketLoggingOutput{}, nil
+}
+
+func (f *coalesceS3Fake) GetBucketLocation(_ context.Context, _ *s3.GetBucketLocationInput, _ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+	return &s3.GetBucketLocationOutput{}, nil
 }
 
 var _ awsclient.S3FullAPI = (*coalesceS3Fake)(nil)

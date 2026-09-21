@@ -48,6 +48,9 @@ type LoadMore struct {
 	// otherwise call itself the type's canonical list and be refused by the
 	// delivery gate on the very screen that asked for the page.
 	Provenance FetchProvenance
+	// Region is the Region the list that pressed "m" reads its rows in, when
+	// that is not the session's: its next page comes from the same one.
+	Region string
 }
 
 func (LoadMore) isCmd() {}
@@ -116,6 +119,10 @@ type RelatedNavigate struct {
 	// "(N+)". Carried so the adapter routes them through the identical scoped
 	// reverse-scan path; the zero count is never special-cased.
 	Truncated bool
+	// Region is the Region the related row's count was read in, when that is
+	// not the session's. Without it the navigation lists the session's own
+	// Region and finds none of what the count named.
+	Region string
 	// Checker is the originating RelatedDef.Checker. Carried forward so
 	// each subsequent page of the target type (m-loads-more) can re-run
 	// the predicate and extend the visible ID set — essential for

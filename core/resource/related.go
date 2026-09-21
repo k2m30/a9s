@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -20,6 +22,18 @@ type RelatedDef = domain.RelatedDef
 // NavigableField associates a detail view field path with a target resource type.
 // Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type NavigableField = domain.NavigableField
+
+// RefRegion returns the Region an AWS reference names, and "" for one that
+// names none: a bare name, or an ARN of a global service, which carries no
+// Region at all. A reference naming another Region is read there — the
+// session's own holds no row of it.
+func RefRegion(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
+		return ""
+	}
+	return a.Region
+}
 
 // ResolveRef reads ref — any AWS reference to targetType — as the ID the
 // target's rows are keyed by, through the target's own RefToID. ok is false

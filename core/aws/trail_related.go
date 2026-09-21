@@ -52,17 +52,21 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ProvenZero("logs", "trail.CloudWatchLogsLogGroupArn")
 	}
 
-	logGroupName, local := resource.ResolveRef("logs", *trail.CloudWatchLogsLogGroupArn, refContext(clients, cache, "logs"))
-	if !local {
-		return relatedResultTrunc("logs", nil, true)
-	}
-
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
+	// A trail delivers to a log group in its own home region, which a
+	// multi-region trail browsed from elsewhere does not share with the
+	// session; the group's ARN names the region holding it.
+	groupARN := *trail.CloudWatchLogsLogGroupArn
+	region := arnRegionOf(groupARN, "logs")
+	logList, rc, truncated, err := relatedListIn(ctx, clients, cache, "logs", region)
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.UnknownRelated("logs")
+	}
+	logGroupName, local := resource.ResolveRef("logs", groupARN, rc)
+	if !local {
+		return relatedResultTrunc("logs", nil, true)
 	}
 
 	var ids []string
@@ -71,7 +75,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, logRes.ID)
 		}
 	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return inRegion(clients, region, relatedResultTrunc("logs", ids, truncated))
 }
 
 // checkTrailSNS searches the sns cache for the topic this trail publishes to.

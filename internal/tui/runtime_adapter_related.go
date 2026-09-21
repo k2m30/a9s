@@ -49,6 +49,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		RelatedIDs:     msg.RelatedIDs,
 		FetchFilter:    msg.FetchFilter,
 		Truncated:      msg.Truncated,
+		Region:         msg.Region,
 		Checker:        msg.Checker,
 	}
 	result, tasks := m.core.HandleRelatedNavigate(ev)
@@ -138,6 +139,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 				relatedIDs:           []string{result.TargetID},
 				autoOpenSingleDetail: true,
 				reapplyChecker:       msg.Checker,
+				region:               result.Region,
 			})
 			fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 			return m, tea.Batch(initCmd, fetchCmd)
@@ -150,7 +152,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		// inside newRelatedList so a hit needs no fetch; a truncated "(0+)"/"(N+)"
 		// carries the reapply-checker and fetches the population. A lone exact miss
 		// auto-opens its detail once the fetch lands.
-		opts := relatedListOpts{relatedIDs: result.RelatedIDs}
+		opts := relatedListOpts{relatedIDs: result.RelatedIDs, region: result.Region}
 		if result.Truncated {
 			opts.reapplyChecker = msg.Checker
 		} else if len(result.RelatedIDs) == 1 {
@@ -246,7 +248,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// CloudTrail event). Fall back to a by-ID fetch that navigates
 			// straight to the detail rather than silently no-op'ing.
 			if targetID != "" && resource.GetFetchByIDs(msg.TargetType) != nil {
-				cmds = append(cmds, m.fetchByIDDetail(msg.TargetType, targetID))
+				cmds = append(cmds, m.fetchByIDDetail(msg.TargetType, targetID, msg.Region))
 			}
 			if len(cmds) == 0 {
 				return m, nil

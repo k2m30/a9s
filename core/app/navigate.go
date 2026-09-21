@@ -351,7 +351,7 @@ func (c *Controller) mergeRelatedCacheIntoDetail(resourceType string, res resour
 	for _, entry := range cached {
 		errMsg := relatedRowErrorText(entry.Result)
 		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType(),
-			entry.Result.EffectiveState(), entry.Result.Count(), false, errMsg, entry.Result.Truncated(), entry.Result.ResourceIDs(), entry.Result.FetchFilter())
+			entry.Result.EffectiveState(), entry.Result.Count(), false, errMsg, entry.Result.Truncated(), entry.Result.ResourceIDs(), entry.Result.FetchFilter(), entry.Result.Region())
 	}
 }
 
@@ -586,6 +586,7 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 		// ResolveRelatedNavigate never sets both TargetID and FetchFilter on
 		// the same NavigationResult, so the gate order does not matter.
 		if ls := c.pushByIDPlaceholderList(res.TargetType, res.TargetID); ls != nil {
+			ls.Region = res.Region
 			if res.FilterText != "" {
 				ls.Filter = res.FilterText
 			}
@@ -604,17 +605,20 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				}}
 			}
 			if res.TargetID == "" {
-				if !res.Truncated && len(res.RelatedIDs) > 0 {
+				if !res.Truncated && len(res.RelatedIDs) > 0 && res.Region == "" {
 					// Exact-ID list: seed rows from the any-lane cache (Partial lane
 					// included) so a hit renders without a fetch, and clear Loading.
 					// Shared with the TUI via seedRelatedExactRows so the two
 					// renderers cannot diverge. Already under c.mu.
 					c.seedRelatedExactRows(ls, res.TargetType, res.RelatedIDs)
 				} else {
-					// Truncated "(0+)"/"(N+)": a non-nil (even EMPTY) set filters to
-					// the found IDs, so "(0+)" renders a scoped list with zero rows —
-					// never the full target list. The population fetch + reapply-
-					// checker extend the set as later pages load.
+					// Truncated "(0+)"/"(N+)", and an exact answer read in
+					// another Region, whose rows the session's own cache for
+					// the type does not hold: a non-nil (even EMPTY) set
+					// filters to the found IDs, so "(0+)" renders a scoped
+					// list with zero rows — never the full target list. The
+					// population fetch + reapply-checker extend the set as
+					// later pages load.
 					set := make(map[string]struct{}, len(res.RelatedIDs))
 					for _, id := range res.RelatedIDs {
 						if id != "" {

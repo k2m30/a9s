@@ -24,6 +24,12 @@ const WAFOrphan = "acme-unattached-waf"
 // every other logging ACL delivers to a Firehose stream.
 const WAFProdAPILogGroup = "aws-waf-logs-acme-prod-api"
 
+// WAFCloudFrontACLArn is the ARN of the CLOUDFRONT-scope Web ACL. AWS writes
+// "global/webacl/" into the ARN of an ACL of that scope and "regional/webacl/"
+// into every other, and the distribution carrying this ACL (cloudfront.go)
+// names it verbatim, so the two read one value.
+const WAFCloudFrontACLArn = "arn:aws:wafv2:us-east-1:123456789012:global/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"
+
 // WAFFixtures holds typed fixture data for WAFv2.
 type WAFFixtures struct {
 	// WebACLSummaries holds REGIONAL-scope Web ACLs (served by ListWebACLs
@@ -32,7 +38,11 @@ type WAFFixtures struct {
 	// CloudFrontWebACLSummaries holds CLOUDFRONT-scope Web ACLs (served by
 	// ListWebACLs when Scope=CLOUDFRONT — a us-east-1-only global listing).
 	CloudFrontWebACLSummaries []wafv2types.WebACLSummary
-	// ResourcesByWebACL maps WebACL ARN to associated resource ARNs.
+	// ResourcesByWebACL maps WebACL ARN to associated resource ARNs, the
+	// answer to wafv2:ListResourcesForWebACL. Its resource types are the
+	// regional ones; a CLOUDFRONT-scope ACL's distributions are reported by
+	// cloudfront:ListDistributionsByWebACLId, off the WebACLId each
+	// distribution carries.
 	ResourcesByWebACL map[string][]string
 }
 
@@ -77,7 +87,7 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 			{
 				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-222222222222"),
 				Name:        aws.String("acme-cloudfront-waf"),
-				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
+				ARN:         aws.String(WAFCloudFrontACLArn),
 				Description: aws.String("WAF for CloudFront distributions"),
 				LockToken:   aws.String("lock-token-222"),
 			},
@@ -85,9 +95,6 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 		ResourcesByWebACL: map[string][]string{
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-prod-api-waf/a1b2c3d4-5678-90ab-cdef-111111111111": {
 				"arn:aws:apigateway:us-east-1::/restapis/abc123def4/stages/prod",
-			},
-			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222": {
-				"arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7",
 			},
 			// staging-web-alb — matches the real elb.go fixture ARN exactly
 			// so checkELBWAF's GetWebACLForResource reverse lookup resolves.

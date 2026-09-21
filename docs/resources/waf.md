@@ -81,7 +81,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `ListResourcesForWebACL` returns no associations.
+- **Signal**: the web ACL protects nothing — `ListResourcesForWebACL` returns no associations for a `REGIONAL` ACL, `cloudfront:ListDistributionsByWebACLId` no distributions for a `CLOUDFRONT` one.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -104,7 +104,7 @@ One row per signal from §3 that has operator-readable surface text:
 |---|---|---|---|---|---|
 | `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
 | `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
-| `ListResourcesForWebACL` returns no associations | 2 | Warning | `~` | S2, S3, S4, S5 | `not associated with any resource` |
+| the web ACL protects nothing (`ListResourcesForWebACL` for `REGIONAL`, `ListDistributionsByWebACLId` for `CLOUDFRONT`) | 2 | Warning | `~` | S2, S3, S4, S5 | `not associated with any resource` |
 
 ## 4.1 UX review (two sentences)
 

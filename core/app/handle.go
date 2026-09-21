@@ -717,6 +717,7 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 					ParentContext:     ls.ParentContext,
 					FetchFilter:       ls.FetchFilter,
 					Provenance:        listLane(top.ID, ls),
+					Region:            ls.Region,
 				},
 			}}
 		}
@@ -809,14 +810,14 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 			continue
 		}
 		mergeDetailRelatedRow(ds, result.DefDisplayName, result.Result.TargetType(),
-			result.Result.EffectiveState(), result.Result.Count(), false, errMsg, result.Result.Truncated(), result.Result.ResourceIDs(), result.Result.FetchFilter())
+			result.Result.EffectiveState(), result.Result.Count(), false, errMsg, result.Result.Truncated(), result.Result.ResourceIDs(), result.Result.FetchFilter(), result.Result.Region())
 	}
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
 // DisplayName and preserving ResourceIDs. The single merge used by every
 // related-result path (result lane, cache replay, batch, async adapter).
-func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string) {
+func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string, region string) {
 	targetIdx := -1
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
@@ -853,6 +854,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, stat
 		ds.RelatedRows[targetIdx].Truncated = truncated
 		ds.RelatedRows[targetIdx].ResourceIDs = resourceIDs
 		ds.RelatedRows[targetIdx].FetchFilter = fetchFilter
+		ds.RelatedRows[targetIdx].Region = region
 		return
 	}
 	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
@@ -865,5 +867,6 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, stat
 		Truncated:   truncated,
 		ResourceIDs: resourceIDs,
 		FetchFilter: fetchFilter,
+		Region:      region,
 	})
 }

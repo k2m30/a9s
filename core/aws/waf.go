@@ -8,11 +8,59 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// wafScopeCloudFront is the scope of a web ACL that protects CloudFront
+// distributions, as the fetcher writes it into Fields["scope"].
+const wafScopeCloudFront = string(wafv2types.ScopeCloudfront)
+
+// wafRegionOf returns the region a web ACL of scope, and the logging
+// destination AWS requires to sit beside it, live in. AWS serves every
+// CLOUDFRONT-scope operation from the us-east-1 endpoint alone, whatever
+// region the session is browsing; a REGIONAL ACL is in the session's own.
+func wafRegionOf(scope string) string {
+	if scope == wafScopeCloudFront {
+		return "us-east-1"
+	}
+	return ""
+}
+
+// wafIn returns the WAFv2 client that reads a web ACL of scope.
+func (c *ServiceClients) wafIn(scope string) WAFv2API {
+	return c.InRegion(wafRegionOf(scope)).WAFv2
+}
+
+// wafDistributionIDs returns the CloudFront distributions the web ACL at
+// webACLArn is associated with. AWS answers this through CloudFront alone:
+// wafv2:ListResourcesForWebACL covers the regional resource types and its
+// reference directs CloudFront callers to ListDistributionsByWebACLId.
+func wafDistributionIDs(ctx context.Context, c *ServiceClients, webACLArn string) ([]string, error) {
+	api, ok := c.CloudFront.(CloudFrontListDistributionsByWebACLIdAPI)
+	if !ok || c.CloudFront == nil {
+		return nil, errClientMissing
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn})
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out.DistributionList == nil {
+		return nil, UnusableAnswerErr{Call: "ListDistributionsByWebACLId", Field: "distribution list"}
+	}
+	var ids []string
+	for _, d := range out.DistributionList.Items {
+		if d.Id != nil && *d.Id != "" {
+			ids = append(ids, *d.Id)
+		}
+	}
+	return ids, nil
+}
 
 // wafMergedCursor encodes the two independent pagination lanes
 // FetchWAFWebACLsPageWithCloudFront combines: the REGIONAL scope's own

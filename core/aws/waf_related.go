@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
@@ -18,11 +17,16 @@ import (
 )
 
 // checkWAFELB calls wafv2:ListResourcesForWebACL with ALB resource type and
-// returns the load balancers it names (Pattern A — direct API call).
+// returns the load balancers it names (Pattern A — direct API call). A load
+// balancer takes a REGIONAL-scope ACL; a CLOUDFRONT-scope one attaches to
+// distributions alone.
 func checkWAFELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
 		return resource.UnknownRelated("elb")
+	}
+	if res.Fields["scope"] == wafScopeCloudFront {
+		return resource.ProvenZero("elb", "scope")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -57,8 +61,10 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok || c == nil || c.WAFv2 == nil {
 		return resource.UnknownRelated("logs")
 	}
+	region := wafRegionOf(res.Fields["scope"])
+	api := c.wafIn(res.Fields["scope"])
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetLoggingConfigurationOutput, error) {
-		return c.WAFv2.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn})
+		return api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn})
 	})
 	if err != nil {
 		// WAFNonexistentItemException = no logging configured → real 0.
@@ -76,7 +82,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 			groups = append(groups, d)
 		}
 	}
-	return relatedRefs("logs", groups, refContext(clients, cache, "logs"))
+	return inRegion(clients, region, relatedRefs("logs", groups, refContext(c.InRegion(region), cache, "logs")))
 }
 
 // checkWAFCF reports CloudFront distributions associated with this Web ACL.
@@ -85,7 +91,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 // via cloudfront:ListDistributionsByWebACLId (1 call).
 func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	scope := res.Fields["scope"]
-	if scope != string(wafv2types.ScopeCloudfront) {
+	if scope != wafScopeCloudFront {
 		return resource.ProvenZero("cf", "scope")
 	}
 	webACLArn := res.Fields["arn"]
@@ -99,37 +105,31 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.ProvenZero("cf", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.CloudFront == nil {
+	if !ok || c == nil {
 		return resource.UnknownRelated("cf")
 	}
-	api, ok := c.CloudFront.(CloudFrontListDistributionsByWebACLIdAPI)
-	if !ok {
+	ids, err := wafDistributionIDs(ctx, c, webACLArn)
+	var noList UnusableAnswerErr
+	switch {
+	case errors.Is(err, errClientMissing), errors.As(err, &noList):
 		return resource.UnknownRelated("cf")
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn})
-	})
-	if err != nil {
+	case err != nil:
 		return resource.ErrorRelated("cf", err)
-	}
-	if out.DistributionList == nil {
-		return resource.UnknownRelated("cf")
-	}
-	var ids []string
-	for _, d := range out.DistributionList.Items {
-		if d.Id != nil && *d.Id != "" {
-			ids = append(ids, *d.Id)
-		}
 	}
 	return relatedResultTrunc("cf", ids, false)
 }
 
 // checkWAFAPIGW calls wafv2:ListResourcesForWebACL with API Gateway resource type
-// and returns matching API IDs (Pattern A — direct API call).
+// and returns matching API IDs (Pattern A — direct API call). A gateway stage
+// takes a REGIONAL-scope ACL; a CLOUDFRONT-scope one attaches to distributions
+// alone.
 func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
 		return resource.UnknownRelated("apigw")
+	}
+	if res.Fields["scope"] == wafScopeCloudFront {
+		return resource.ProvenZero("apigw", "scope")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {

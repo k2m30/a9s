@@ -491,16 +491,23 @@ type wafWebACL struct {
 	DefaultActionIsAllow bool       `json:"default_action_is_allow"`
 }
 
-// captureWAF lists Web ACLs in both the REGIONAL scope and, when the current
-// region is us-east-1 (the only region CLOUDFRONT-scope ACLs can be listed
-// from), the CLOUDFRONT scope, then captures GetWebACL's Rules/DefaultAction.
+// captureWAF lists Web ACLs in both the REGIONAL and the CLOUDFRONT scope,
+// then captures GetWebACL's Rules/DefaultAction. AWS serves every
+// CLOUDFRONT-scope operation from the us-east-1 endpoint alone, whatever
+// region the profile names, so that scope is read through a client of its
+// own.
 func captureWAF(ctx context.Context, cfg aws.Config) (any, error) {
-	client := wafv2.NewFromConfig(cfg)
-
-	scopes := []wafv2types.Scope{wafv2types.ScopeRegional}
-	if cfg.Region == "us-east-1" {
-		scopes = append(scopes, wafv2types.ScopeCloudfront)
+	edgeCfg := cfg.Copy()
+	edgeCfg.Region = "us-east-1"
+	regional, edge := wafv2.NewFromConfig(cfg), wafv2.NewFromConfig(edgeCfg)
+	clientFor := func(scope wafv2types.Scope) *wafv2.Client {
+		if scope == wafv2types.ScopeCloudfront {
+			return edge
+		}
+		return regional
 	}
+
+	scopes := []wafv2types.Scope{wafv2types.ScopeRegional, wafv2types.ScopeCloudfront}
 
 	var acls []wafWebACL
 	for _, scope := range scopes {
@@ -510,7 +517,7 @@ func captureWAF(ctx context.Context, cfg aws.Config) (any, error) {
 			if marker != "" {
 				in.NextMarker = aws.String(marker)
 			}
-			out, err := client.ListWebACLs(ctx, in)
+			out, err := clientFor(scope).ListWebACLs(ctx, in)
 			if err != nil {
 				return nil, err
 			}
@@ -534,7 +541,7 @@ func captureWAF(ctx context.Context, cfg aws.Config) (any, error) {
 		if acls[i].Scope == string(wafv2types.ScopeCloudfront) {
 			scope = wafv2types.ScopeCloudfront
 		}
-		out, err := client.GetWebACL(ctx, &wafv2.GetWebACLInput{
+		out, err := clientFor(scope).GetWebACL(ctx, &wafv2.GetWebACLInput{
 			Name:  aws.String(acls[i].Name),
 			Id:    aws.String(acls[i].Id),
 			Scope: scope,

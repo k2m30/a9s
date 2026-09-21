@@ -91,7 +91,7 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 		if bucketName == "" {
 			return
 		}
-		p := scanS3BucketPosture(ctx, clients.S3, bucketName)
+		p := scanS3BucketPosture(ctx, clients.s3For(ctx, bucketName), bucketName)
 
 		mu.Lock()
 		defer mu.Unlock()

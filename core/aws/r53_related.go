@@ -316,7 +316,19 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return relatedResultTrunc("logs", nil, !configsComplete)
 	}
 
-	logList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
+	var arns []string
+	for _, cfg := range configs {
+		if cfg.CloudWatchLogsLogGroupArn != nil {
+			arns = append(arns, *cfg.CloudWatchLogsLogGroupArn)
+		}
+	}
+	// Route 53 is a global service and writes public-zone query logs to a
+	// us-east-1 log group; the config's ARN names the region holding it.
+	region := ""
+	if len(arns) > 0 {
+		region = arnRegionOf(arns[0], "logs")
+	}
+	logList, rc, _, fetchErr := relatedListIn(ctx, clients, cache, "logs", region)
 	if logList == nil {
 		if fetchErr != nil {
 			return resource.ErrorRelated("logs", fetchErr)
@@ -326,15 +338,8 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		// offer the operator a row that navigates to nothing.
 		return resource.UnknownRelated("logs")
 	}
-
-	var arns []string
-	for _, cfg := range configs {
-		if cfg.CloudWatchLogsLogGroupArn != nil {
-			arns = append(arns, *cfg.CloudWatchLogsLogGroupArn)
-		}
-	}
-	ids, lowerBound := listedRefs("logs", arns, refContext(clients, cache, "logs"), logList)
-	return relatedResultTrunc("logs", ids, lowerBound || !configsComplete)
+	ids, lowerBound := listedRefs("logs", arns, rc, logList)
+	return inRegion(clients, region, relatedResultTrunc("logs", ids, lowerBound || !configsComplete))
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.

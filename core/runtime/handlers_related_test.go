@@ -65,7 +65,7 @@ func TestRelatedFetchTasks_FullCoverage_NoTask(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}, {ID: "i-2"}}, nil, session.OriginFetch, false)
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"}, "")
 	if tasks != nil {
 		t.Errorf("tasks = %v, want nil — full coverage should not request a fetch", tasks)
 	}
@@ -75,7 +75,7 @@ func TestRelatedFetchTasks_LazyFullCoverage_NoTask(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.ObservePartial("kms", []resource.Resource{{ID: "alias/aws/managed-1"}, {ID: "alias/aws/managed-2"}})
 
-	tasks := relatedFetchTasks(s, "kms", []string{"alias/aws/managed-1", "alias/aws/managed-2"})
+	tasks := relatedFetchTasks(s, "kms", []string{"alias/aws/managed-1", "alias/aws/managed-2"}, "")
 	if tasks != nil {
 		t.Errorf("tasks = %v, want nil — lazy-cache full coverage should not request a fetch", tasks)
 	}
@@ -85,7 +85,7 @@ func TestRelatedFetchTasks_PartialCoverage_TruncatedCache_FetchMore(t *testing.T
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-2"}, session.OriginFetch, false)
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(tasks) != 1 {
 		t.Fatalf("len(tasks) = %d, want 1", len(tasks))
 	}
@@ -113,7 +113,7 @@ func TestRelatedFetchTasks_FetchMore_EmptyToken(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: ""}, session.OriginFetch, false)
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(tasks) != 1 || tasks[0].Key.Kind != KindFetchMore {
 		t.Fatalf("tasks = %+v, want one KindFetchMore task", tasks)
 	}
@@ -134,7 +134,7 @@ func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(tasks) != 1 || tasks[0].Key.Kind != KindFetchResources {
 		t.Fatalf("tasks = %+v, want one KindFetchResources task", tasks)
 	}
@@ -150,7 +150,7 @@ func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
 func TestRelatedFetchTasks_FullMiss_FetchAll(t *testing.T) {
 	s := newTestSession()
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"}, "")
 	if len(tasks) != 1 {
 		t.Fatalf("len(tasks) = %d, want 1", len(tasks))
 	}
@@ -165,7 +165,7 @@ func TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
-	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(tasks) != 1 {
 		t.Fatalf("len(tasks) = %d, want 1", len(tasks))
 	}
@@ -301,7 +301,7 @@ func TestRelatedFetchTasks_MixedFullCoverage_Nil(t *testing.T) {
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
 	s.RowStore.ObservePartial("ec2", []resource.Resource{{ID: "i-2"}})
 
-	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"})
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"}, "")
 	if got != nil {
 		t.Errorf("got %+v, want nil — full mixed coverage should not request a fetch", got)
 	}
@@ -314,7 +314,7 @@ func TestRelatedFetchTasks_MissPaginationNil_FetchResources(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
 
-	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(got) != 1 {
 		t.Fatalf("len(tasks) = %d, want 1", len(got))
 	}
@@ -333,7 +333,7 @@ func TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources(t *testin
 	s := newTestSession()
 	s.RowStore.ObservePartial("ec2", []resource.Resource{{ID: "i-1"}})
 
-	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"}, "")
 	if len(got) != 1 {
 		t.Fatalf("len(tasks) = %d, want 1", len(got))
 	}

@@ -89,7 +89,7 @@ func (m *Model) dispatchCostsByIDTask(payload runtime.FetchByIDDetailPayload) te
 	placeholder.width, placeholder.height = w, h
 	m.pushRS(placeholder)
 
-	inner := m.fetchByIDDetail(payload.TargetType, payload.ID)
+	inner := m.fetchByIDDetail(payload.TargetType, payload.ID, payload.Region)
 	if inner == nil {
 		return nil
 	}

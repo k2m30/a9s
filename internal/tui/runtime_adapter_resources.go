@@ -138,6 +138,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 						ContinuationToken: token,
 						ParentContext:     pc,
 						Provenance:        lane,
+						Region:            m.ctrl.GetListRegion(),
 					}
 				})
 			}
@@ -297,6 +298,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		msg.Result.Truncated(),
 		msg.Result.ResourceIDs(),
 		msg.Result.FetchFilter(),
+		msg.Result.Region(),
 	)
 	return m, tea.Batch(flashCmd, cmd)
 }

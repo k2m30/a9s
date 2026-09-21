@@ -379,6 +379,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				// calls itself the type's canonical list and the delivery gate
 				// refuses it on the very screen that asked for the page.
 				lane := m.ctrl.GetListLane()
+				region := m.ctrl.GetListRegion()
 				return m, func() tea.Msg {
 					return messages.LoadMore{
 						ResourceType:      rt,
@@ -386,6 +387,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 						ParentContext:     pc,
 						FetchFilter:       ff,
 						Provenance:        lane,
+						Region:            region,
 					}
 				}
 			}

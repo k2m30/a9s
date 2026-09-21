@@ -299,7 +299,7 @@ func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
 			if !ok {
 				continue
 			}
-			cmds = append(cmds, m.fetchByIDDetail(payload.TargetType, payload.ID))
+			cmds = append(cmds, m.fetchByIDDetail(payload.TargetType, payload.ID, payload.Region))
 
 		case runtime.KindFetchMore:
 			// FetchMorePayload is set by the runtime — ExecuteTask can

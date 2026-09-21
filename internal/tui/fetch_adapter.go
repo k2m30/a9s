@@ -112,7 +112,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 // registered FetchByIDs helper and navigates straight to its detail view. The
 // runtime emits KindFetchByIDDetail for any by-ID-capable type on a
 // cache-miss exact-ID drill.
-func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
+func (m *Model) fetchByIDDetail(targetType, id, region string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
 	if clients == nil {
 		// Clients() is nil until the Init()/ClientsReady round trip installs
@@ -125,6 +125,7 @@ func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 		// resource lookup that has everything it needs.
 		clients = m.core.PreSuppliedClients()
 	}
+	clients = clients.InRegion(region)
 	fn := resource.GetFetchByIDs(targetType)
 	if fn == nil {
 		return func() tea.Msg {
@@ -168,7 +169,9 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 		Token:        msg.ContinuationToken,
 		ParentCtx:    msg.ParentContext,
 		FetchFilter:  msg.FetchFilter,
+		Region:       msg.Region,
 	}
+	clients = clients.InRegion(p.Region)
 	// The lane the list that pressed "m" recorded on the message, not a
 	// re-derivation from the two maps above — see messages.LoadMore.
 	provenance := msg.Provenance
