@@ -100,10 +100,10 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 					value += fmt.Sprintf(":%d", *t.Target.Port)
 				}
 			}
-			// humanizeTargetHealthReason (tg_health.go) strips the Target./Elb.
-			// namespace prefix before humanizing — plain
-			// domain.HumanizeStatusPhrase would emit "target. failed health
-			// checks" for "Target.FailedHealthChecks".
+			// humanizeTargetHealthReason (tg_health.go) drops the Target./Elb.
+			// namespace: the row already says which target it is about, so
+			// "failed health checks" reads better than "target failed health
+			// checks", which is what the shared humanizer gives.
 			switch reason := humanizeTargetHealthReason(string(t.TargetHealth.Reason)); {
 			case value == "":
 				value = reason

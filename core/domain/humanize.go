@@ -13,6 +13,9 @@ import "strings"
 //     lowercase each word.
 //   - CamelCase (e.g. "PendingConfirmation") — split before each interior
 //     uppercase letter and lowercase each word.
+//   - A dotted namespace on either shape (e.g. "Gateway.NotAttached",
+//     "Target.FailedHealthChecks") — the dot is a word boundary, not
+//     punctuation to keep.
 //
 // A value that is already lowercase, or already contains a space (mixed
 // prose composed elsewhere, e.g. "unhealthy targets: 2/5"), passes through
@@ -31,6 +34,13 @@ func HumanizeStatusPhrase(s string) string {
 	}
 	if strings.Contains(s, " ") {
 		return s
+	}
+	if strings.Contains(s, ".") {
+		parts := strings.Split(s, ".")
+		for i, p := range parts {
+			parts[i] = HumanizeStatusPhrase(p)
+		}
+		return strings.Join(parts, " ")
 	}
 	if strings.Contains(s, "_") {
 		return humanizeSnakeCase(s)

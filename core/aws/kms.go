@@ -116,18 +116,19 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		nextToken = *listOutput.NextMarker
 	}
 
+	err = errors.Join(
+		kmsAliasFailure(aliasFailures),
+		AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys)),
+	)
 	return resource.FetchResult{
-			Resources: resources,
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: isTruncated,
-				NextToken:   nextToken,
-				PageSize:    len(resources),
-				TotalHint:   -1,
-			},
-		}, errors.Join(
-			kmsAliasFailure(aliasFailures),
-			AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys)),
-		)
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   -1,
+		},
+	}, err
 }
 
 // buildKMSAliasMap fully paginates ListAliases and returns the KeyId→
