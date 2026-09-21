@@ -51,9 +51,17 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     Wave-1 row shows for a policy it could not read. AWS validates both on write, so there is no
     operator witness today.
 
+11. **The Lambda invocation list shows the oldest 50 REPORT lines, not the newest.**
+    `core/aws/lambda_invocations.go:69` sends `Limit: 50` with `StartTime` at −24h, so
+    FilterLogEvents answers from the start of the window; the reversal at `:108` and `:130`
+    turns that oldest slice around and presents it as newest-first. `StartFromHead` is on
+    `GetLogEventsInput`, not `FilterLogEventsInput`, so there is no flag fix. Needs a window or
+    paging strategy — walk the lookback keeping a trailing 50, or narrow `StartTime` — which
+    changes the call cost.
+
 ## Structure
 
-11. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+12. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.

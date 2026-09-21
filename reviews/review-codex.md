@@ -711,3 +711,195 @@ Findings:
   **Trigger:** An ECS service-action rule filters `detail.serviceName` or `detail.service`; neither is examined, so it is treated as related to every ECS service. Separately, a `clusterArn` for `prod-blue` matches services in `prod` through substring comparison.  
   **Impact:** ECS service related panels show unrelated EventBridge rules.  
   **Fix:** Recognize `serviceName` and `service`, and compare canonical cluster ARNs/names exactly. [AWS ECS event fields](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_cwe_events.html)
+
+## eb
+
+Findings:
+
+- P2 — [eb_issue_enrichment.go:52](/Users/k2m30/projects/a9s/core/aws/eb_issue_enrichment.go:52), [89](/Users/k2m30/projects/a9s/core/aws/eb_issue_enrichment.go:89)  
+  Trigger: the first 50 listed environments are `Terminating`/`Terminated`, followed by active environments.  
+  Impact: the health pass consumes the cap before configuration posture filters lifecycle-ended rows, so no active environment receives managed-updates, enhanced-health, or log-streaming checks.  
+  Fix: retain the original resource slice for `ebConfigurationPosture`, allowing it to filter first and then apply its own cap.
+
+- P2 — [eb_related_extra.go:348](/Users/k2m30/projects/a9s/core/aws/eb_related_extra.go:348)  
+  Trigger: an application retains versions whose source bundles are in different S3 buckets, while an environment runs only one version.  
+  Impact: the environment’s S3 relationship lists buckets for unrelated application versions, producing incorrect counts and navigation. AWS defines `VersionLabel` as the version deployed in the environment, and `DescribeApplicationVersions` supports filtering by it. [AWS documentation](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html) [API reference](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_DescribeApplicationVersions.html)  
+  Fix: pass the environment’s `VersionLabel` through `VersionLabels` and relate only that version’s source bundle.
+
+- P2 — [eb_related_extra.go:312](/Users/k2m30/projects/a9s/core/aws/eb_related_extra.go:312)  
+  Trigger: an environment has an `OperationsRole` configured.  
+  Impact: the IAM-role relationship omits the operations role, so users cannot discover or navigate to a role the environment uses. `OperationsRole` is an environment role ARN. [AWS documentation](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)  
+  Fix: add `EnvironmentDescription.OperationsRole` to the collected role references; persist it in fields if cache-backed resolution is required.
+
+- P2 — [secrets_related_extra.go:94](/Users/k2m30/projects/a9s/core/aws/secrets_related_extra.go:94)  
+  Trigger: checking a secret’s Elastic Beanstalk relationship while EB rows are restored from the disk cache.  
+  Impact: every EB row is skipped because it has no `RawStruct`, yet the function can return a definitive zero, hiding real secret references.  
+  Fix: use persisted `application_name` and `environment_name` fields for cache-backed rows, or return unknown/refetch when the EB cache is fields-only.
+
+- P2 — [eb.go:17](/Users/k2m30/projects/a9s/core/aws/eb.go:17)  
+  Trigger: an environment has completed termination.  
+  Impact: terminated environments are excluded because `IncludeDeleted` is unset, despite the resource defining terminated-state rendering and findings. AWS specifies that `IncludeDeleted=false` excludes deleted environments. [AWS documentation](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_DescribeEnvironments.html)  
+  Fix: enable `IncludeDeleted` and choose an explicit `IncludedDeletedBackTo` retention window.
+
+## ebs-snap
+
+1. **P1 — Recycle Bin snapshots are reported as failed.**
+
+   - Exact: [core/aws/ebs.go](/Users/k2m30/projects/a9s/core/aws/ebs.go:294), [core/aws/catalog_compute.go](/Users/k2m30/projects/a9s/core/aws/catalog_compute.go:811)
+   - Trigger: An EBS snapshot is `recoverable` or `recovering`.
+   - Impact: The UI marks a recoverable snapshot broken and advises deletion, though AWS defines these as Recycle Bin recovery states, not creation failures.
+   - Fix: Handle `recoverable` and `recovering` separately from `error`, with recovery-specific status/remediation. [AWS snapshot states](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-describing-snapshots.html)
+
+2. **P1 — Loading later pages bypasses ebs-snap Wave 2 findings.**
+
+   - Exact: [core/runtime/handlers_resources.go](/Users/k2m30/projects/a9s/core/runtime/handlers_resources.go:163)
+   - Trigger: Open `ebs-snap`, allow the first page to enrich, then load another page.
+   - Impact: Newly appended snapshots never receive orphan or public-share findings; a public snapshot on a later page can appear healthy.
+   - Fix: Enrich appended `ebs-snap` rows and merge their results, rather than suppressing enrichment solely because the result is an append.
+
+3. **P2 — Free-text descriptions are treated as proof of automated retention.**
+
+   - Exact: [core/aws/ebs.go](/Users/k2m30/projects/a9s/core/aws/ebs.go:329), [core/aws/ebs.go](/Users/k2m30/projects/a9s/core/aws/ebs.go:330)
+   - Trigger: A snapshot older than 365 days has a description containing `automated`, or is created by a normal `CreateImage` request.
+   - Impact: Manually created recovery or AMI-backing snapshots receive a false “automated” cost warning and deletion advice.
+   - Fix: Do not infer automation or retention from description text; emit the finding only from authoritative lifecycle metadata, or omit it when unavailable. [CreateImage creates backing snapshots](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateImage.html), [snapshot descriptions are caller-supplied](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateSnapshot.html)
+
+4. **P2 — Public-share enrichment has no requested page bound.**
+
+   - Exact: [core/aws/ebs_snap_issue_enrichment.go](/Users/k2m30/projects/a9s/core/aws/ebs_snap_issue_enrichment.go:78)
+   - Trigger: An account has many public self-owned snapshots.
+   - Impact: The first public-share query can return an unbounded response before the walker’s page cap applies, causing latency, throttling, or enrichment timeout.
+   - Fix: Set `MaxResults` to `DefaultPageSize` on this `DescribeSnapshots` request. [AWS recommends paginated DescribeSnapshots requests](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSnapshots.html)
+
+## ebs
+
+- **P1 — [core/aws/ebs.go:294](/Users/k2m30/projects/a9s/core/aws/ebs.go:294)**  
+  Trigger: a snapshot is `recoverable` (Recycle Bin) or `recovering`. AWS defines these as recoverable/transitional states, not creation failures. [AWS documentation](https://docs.aws.amazon.com/en_en/ebs/latest/userguide/ebs-describing-snapshots.html)  
+  User impact: it is shown as a broken failed snapshot with advice to replace and delete it.  
+  Fix: handle these states separately with accurate Recycle Bin/recovery guidance; reserve the error finding for `error`.
+
+- **P2 — [core/aws/ebs_issue_enrichment.go:82](/Users/k2m30/projects/a9s/core/aws/ebs_issue_enrichment.go:82)**  
+  Trigger: `DescribeVolumeStatus` returns `insufficient-data` for a newly attached or still-checking volume.  
+  User impact: a normal transient state becomes a broken “volume I/O degraded” finding, warning of possible corruption. AWS says `insufficient-data` means checks may still be running. [AWS documentation](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-volume-status.html)  
+  Fix: emit the degraded finding only for impaired status; model warning/insufficient-data distinctly or retry/report them as pending.
+
+- **P2 — [core/aws/ebs_snap_issue_enrichment.go:127](/Users/k2m30/projects/a9s/core/aws/ebs_snap_issue_enrichment.go:127)**  
+  Trigger: a `CopySnapshot` result has an arbitrary source volume ID such as `vol-ffff`, rather than exactly `vol-ffffffff`.  
+  User impact: the copy can be falsely reported as an orphan and linked to a nonexistent EBS volume. AWS explicitly says copied snapshots’ volume IDs are arbitrary and must not be used. [AWS documentation](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-copy-snapshot.html)  
+  Fix: identify copies via the SDK’s copy-specific metadata (for example, `TransferType`), persist that fact for cached rows, and suppress source-volume relations/orphan checks for copies.
+
+- **P2 — [core/aws/ebs.go:76](/Users/k2m30/projects/a9s/core/aws/ebs.go:76)**  
+  Trigger: a Multi-Attach EBS volume is attached to multiple instances.  
+  User impact: the list and EBS→EC2 related panel retain only the first attachment, concealing the other consuming instances. Multi-Attach supports up to 16 attachments. [AWS documentation](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes-multi.html)  
+  Fix: preserve all attachment instance IDs for display and relationship resolution.
+
+- **P2 — [core/aws/ebs.go:329](/Users/k2m30/projects/a9s/core/aws/ebs.go:329)**  
+  Trigger: an old manual snapshot has “automated” in its user-supplied description, or is an AMI-backing snapshot with AWS’s `Created by CreateImage(...)` description.  
+  User impact: it is falsely labeled as an aged automated snapshot and advised for deletion, despite potentially backing a registered AMI. [AWS example](https://docs.aws.amazon.com/ec2/latest/devguide/example_ec2_DescribeSnapshots_section.html)  
+  Fix: do not infer lifecycle automation or retention from description text; require authoritative lifecycle provenance and exclude active AMI backing snapshots.
+
+- **P3 — [core/aws/backup_coverage.go:48](/Users/k2m30/projects/a9s/core/aws/backup_coverage.go:48)**  
+  Trigger: caller identity cannot be resolved, but the complete Backup plan list is empty.  
+  User impact: EBS volumes receive no “not covered by a backup plan” finding, even though an empty plan list conclusively proves no plan covers them.  
+  Fix: when the Backup list is complete and empty, emit the uncovered finding without requiring a constructible volume ARN.
+
+## ec2
+
+Findings:
+
+- P1 — IPv6 exposure is not modeled. [`core/aws/ec2.go:108`](/Users/k2m30/projects/a9s/core/aws/ec2.go:108), [`core/aws/ec2_issue_enrichment.go:222`](/Users/k2m30/projects/a9s/core/aws/ec2_issue_enrichment.go:222), [`core/aws/sg.go:94`](/Users/k2m30/projects/a9s/core/aws/sg.go:94). Trigger: an instance has public IPv6 and `::/0` ingress but no public IPv4. Impact: it can be internet-reachable without the public-address or internet-exposure findings; IPv6-only rules can also be attributed to IPv4-only instances. Fix: model reachable IPv6 addresses and preserve address-family-specific SG risk. [AWS IPv6 guidance](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-ip-addressing.html)
+
+- P1 — A truncated SG cache can produce a clean EC2 exposure result. [`core/aws/ec2_issue_enrichment.go:208`](/Users/k2m30/projects/a9s/core/aws/ec2_issue_enrichment.go:208), [`core/aws/ec2_issue_enrichment.go:239`](/Users/k2m30/projects/a9s/core/aws/ec2_issue_enrichment.go:239). Trigger: an instance’s SG is on an unloaded SG page. Impact: public instances exposed through that SG receive neither a finding nor an uninspected marker. Fix: when an attached SG is absent from a partial cache, mark exposure uninspected unless a known SG already proves exposure.
+
+- P2 — EC2 internet-exposure findings ignore subnet routing and IGW availability. [`core/aws/ec2_issue_enrichment.go:222`](/Users/k2m30/projects/a9s/core/aws/ec2_issue_enrichment.go:222). Trigger: an instance has a public IPv4 and open SG port, but its subnet has no route to an internet gateway. Impact: the UI states the port is internet-reachable when inbound internet traffic cannot reach it. Fix: require an applicable IGW route before emitting the reachability finding; retain the separate public-address signal. [AWS internet-gateway requirements](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html)
+
+- P2 — Multi-Attach EBS volumes expose only their first EC2 attachment. [`core/aws/ebs.go:75`](/Users/k2m30/projects/a9s/core/aws/ebs.go:75), [`core/aws/ebs_related.go:16`](/Users/k2m30/projects/a9s/core/aws/ebs_related.go:16). Trigger: an `io1`/`io2` Multi-Attach volume is attached to multiple instances. Impact: the EBS-to-EC2 relation and drill omit every attachment after the first. Fix: retain all attachment instance IDs and build the relation from `Volume.Attachments`. [AWS Multi-Attach documentation](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes-multi.html)
+
+- P2 — By-ID EC2 retrieval sends an unbounded ID list in one request. [`core/aws/ec2_by_ids.go:96`](/Users/k2m30/projects/a9s/core/aws/ec2_by_ids.go:96), reached from [`core/runtime/executor.go:980`](/Users/k2m30/projects/a9s/core/runtime/executor.go:980). Trigger: a related-resource result, such as a large EKS cluster, yields over 1,000 missing EC2 IDs. Impact: lazy EC2 materialization fails instead of loading the related instances. Fix: split requests into batches of at most 1,000 IDs and aggregate results/errors. [AWS pagination guidance](https://docs.aws.amazon.com/ec2/latest/devguide/ec2-api-pagination.html)
+
+- P3 — `insufficient-data` status checks are rendered as neutral. [`core/aws/catalog_compute.go:270`](/Users/k2m30/projects/a9s/core/aws/catalog_compute.go:270), [`core/aws/catalog_compute.go:214`](/Users/k2m30/projects/a9s/core/aws/catalog_compute.go:214). Trigger: an instance or system check returns `insufficient-data`. Impact: its list-state and detail status-check value lack the warning indicator despite being classified as a warning. Fix: map `insufficient-data` to the warning decorator and detail tier.
+
+## ecr
+
+- P1 — ECR scan findings are invisible with new Basic Scanning. Exact locations: [ecr_images.go:129](/Users/k2m30/projects/a9s/core/aws/ecr_images.go:129), [ecr_images.go:178](/Users/k2m30/projects/a9s/core/aws/ecr_images.go:178), [ecr_issue_enrichment.go:139](/Users/k2m30/projects/a9s/core/aws/ecr_issue_enrichment.go:139), [compute.go:463](/Users/k2m30/projects/a9s/cmd/snapshot/compute.go:463). Trigger: a registry uses the new ECR Basic Scanning, which does not populate `DescribeImages` scan fields. User impact: critical/high findings, scan state, and scanned-image counts render as clean/empty. Fix: obtain findings with `DescribeImageScanFindings` and normalize Basic and enhanced results. [AWS documentation](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html)
+
+- P2 — Registry-level scanning produces false “scan on push off” findings. Exact locations: [ecr.go:114](/Users/k2m30/projects/a9s/core/aws/ecr.go:114), [compute.go:417](/Users/k2m30/projects/a9s/cmd/snapshot/compute.go:417). Trigger: registry-level enhanced scanning continuously scans a repository while its deprecated per-repository setting is absent or false. User impact: scanned repositories are incorrectly flagged and reported as unscanned. Fix: read and evaluate the registry scanning configuration and its matching rules before setting this field/finding. [AWS documentation](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced-enabling.html)
+
+- P2 — Exclusion-based mutable tag modes evade the mutable-tag finding. Exact location: [ecr.go:121](/Users/k2m30/projects/a9s/core/aws/ecr.go:121). Trigger: a repository uses `MUTABLE_WITH_EXCLUSION`, or `IMMUTABLE_WITH_EXCLUSION` with a mutable exception such as `latest`. User impact: movable deployed tags receive no warning. Fix: flag every mode that permits any tag overwrite and expose its exclusion filters. [AWS documentation](https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-tag-mutability.html)
+
+- P2 — ECR-to-EventBridge relationships are matched incorrectly. Exact locations: [ecr_related.go:273](/Users/k2m30/projects/a9s/core/aws/ecr_related.go:273), [ecr_related.go:286](/Users/k2m30/projects/a9s/core/aws/ecr_related.go:286). Trigger: a valid rule uses an operator such as `prefix` for `repository-name`, or a literal resource ARN for `repo-prod` when examining `repo`. User impact: matching rules are omitted, while prefix-sharing repositories can be incorrectly shown as related. Fix: evaluate supported EventBridge pattern operators; use exact equality for literal ARN values rather than substring matching. [AWS documentation](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-pattern-operators.html)
+
+## ecs-svc
+
+- P2 — [core/aws/ecs_svc_logs.go:61](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:61), [line 78](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:78)  
+  Trigger: another workload shares the log group, or the service has multiple awslogs containers.  
+  User impact: “Service Logs” mixes unrelated logs and omits all but the first awslogs container.  
+  Fix: enumerate all container log configurations and filter to actual service task streams; do not query an entire log group. AWS stream names include prefix, container, and task ID. [AWS docs](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html)
+
+- P2 — [core/aws/ecs_svc_logs.go:78](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:78), [line 89](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:89)  
+  Trigger: a retained log group has more than 200 events.  
+  User impact: the view retrieves the oldest events and can render up to AWS’s default 10,000-event response, despite claiming a 200-event cap and recent logs.  
+  Fix: set `Limit` to remaining capacity and request newest-first with an explicit recent `StartTime`. [AWS docs](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_FilterLogEvents.html)
+
+- P2 — [core/aws/ecs_svc_logs.go:61](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:61), [core/aws/catalog_containers.go:343](/Users/k2m30/projects/a9s/core/aws/catalog_containers.go:343)  
+  Trigger: the task definition’s `awslogs-region` differs from the selected ECS region.  
+  User impact: service logs fail to load or show an identically named log group from the wrong region.  
+  Fix: read `awslogs-region`, use the regional CloudWatch Logs client, and retain that region for console links. [AWS docs](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html)
+
+- P2 — [core/aws/ecs_svc.go:48](/Users/k2m30/projects/a9s/core/aws/ecs_svc.go:48)  
+  Trigger: an ECS service has tags, including CloudFormation tags.  
+  User impact: `Tags` renders empty and the CloudFormation related-resource check always misses tag-based links.  
+  Fix: pass `Include: []ServiceField{ServiceFieldTags}` to `DescribeServices`. [AWS docs](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeServices.html)
+
+- P2 — [core/aws/ecs_svc_related_extra.go:399](/Users/k2m30/projects/a9s/core/aws/ecs_svc_related_extra.go:399)  
+  Trigger: a Step Functions ECS `RunTask` state uses the current `Arguments.TaskDefinition` form.  
+  User impact: the ECS service’s Step Functions relationship is reported as zero.  
+  Fix: inspect `Arguments` as well as legacy `Parameters`. [AWS docs](https://docs.aws.amazon.com/step-functions/latest/dg/connect-ecs.html)
+
+- P3 — [core/aws/ecs_svc_related_extra.go:401](/Users/k2m30/projects/a9s/core/aws/ecs_svc_related_extra.go:401)  
+  Trigger: a service task-definition family is a substring of another state machine task definition, such as `api` and `api-worker`.  
+  User impact: unrelated state machines appear related to the ECS service.  
+  Fix: parse static task-definition references and compare family names exactly; do not substring-match dynamic expressions.
+
+- P2 — [core/aws/pipeline_related.go:193](/Users/k2m30/projects/a9s/core/aws/pipeline_related.go:193)  
+  Trigger: a CodePipeline ECS blue/green deployment action.  
+  User impact: the pipeline→ECS-service relationship is absent: AWS uses provider `CodeDeployToECS`, while the code checks `ECSBlueGreen` and fields that action does not contain.  
+  Fix: recognize `CodeDeployToECS` and resolve its CodeDeploy deployment group to the ECS service. [AWS docs](https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-ECSbluegreen.html)
+
+- P2 — [core/aws/ecs_svc_related_extra.go:298](/Users/k2m30/projects/a9s/core/aws/ecs_svc_related_extra.go:298), [core/aws/parse.go:64](/Users/k2m30/projects/a9s/core/aws/parse.go:64)  
+  Trigger: a same-region Secrets Manager secret is referenced by name in `ValueFrom` or `RepositoryCredentials`.  
+  User impact: the service’s Secrets relationship incorrectly reports no secret.  
+  Fix: resolve supported bare secret names against Secrets Manager rows, retaining ambiguity when the value could instead name SSM. [AWS docs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters_ec2.html)
+
+- P2 — [core/aws/ecs_svc_related_extra.go:292](/Users/k2m30/projects/a9s/core/aws/ecs_svc_related_extra.go:292)  
+  Trigger: a container’s logging driver uses `LogConfiguration.SecretOptions`.  
+  User impact: credentials used by the service’s log driver are omitted from the Secrets relationship.  
+  Fix: collect and resolve `LogConfiguration.SecretOptions[].ValueFrom` alongside environment and repository-credential secrets. [AWS docs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-logconfig.html)
+
+## ecs-task
+
+## Findings
+
+- **P1** — [core/aws/ecs_task.go:43](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:43). **Trigger:** viewing top-level `ecs-task` resources; `ListTasks` omits `DesiredStatus`, whose AWS default is `RUNNING`. **Impact:** stopped—including recently failed—tasks are absent. **Fix:** enumerate and merge `RUNNING` and `STOPPED` with status-aware continuation state. [AWS ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
+
+- **P2** — [core/aws/ecs_task.go:208](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:208), [core/aws/ecs_task.go:227](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:227), [core/aws/ecs_task_related.go:72](/Users/k2m30/projects/a9s/core/aws/ecs_task_related.go:72), [core/aws/ecs_task_related_extra.go:105](/Users/k2m30/projects/a9s/core/aws/ecs_task_related_extra.go:105). **Trigger:** a non-`ClientException` task-definition lookup fails for a revision shared by multiple tasks. The failed revision is cached as `nil`; subsequent tasks get no join-error marker, and role/secret/SSM panels return a definitive zero. **Impact:** missing relationships are presented as confirmed absence. **Fix:** cache an error/unknown state and propagate it to every task using that revision; relation checkers must return partial/unknown for it.
+
+- **P2** — [core/aws/ecs_task_issue_enrichment.go:141](/Users/k2m30/projects/a9s/core/aws/ecs_task_issue_enrichment.go:141). **Trigger:** a non-essential container exits nonzero while the essential workload remains healthy. **Impact:** the task is labeled `task failed`, although an unsuccessful non-essential container does not stop or fail the task. **Fix:** require an essential-container failure before adding the task-level finding, or render this solely as a container-level condition. [AWS ContainerDefinition](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html)
+
+- **P2** — [core/aws/ecs_task.go:54](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:54), [core/aws/ecs_svc_tasks.go:137](/Users/k2m30/projects/a9s/core/aws/ecs_svc_tasks.go:137), [core/config/defaults_compute.go:45](/Users/k2m30/projects/a9s/core/config/defaults_compute.go:45), [core/config/defaults_compute.go:92](/Users/k2m30/projects/a9s/core/config/defaults_compute.go:92). **Trigger:** opening task details containing tags. Neither `DescribeTasks` request asks for `TAGS`. **Impact:** both task detail views render tags as empty. **Fix:** pass `Include: []TaskField{TaskFieldTags}` in both calls. [AWS DescribeTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeTasks.html)
+
+- **P2** — [core/aws/ecs_task.go:54](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:54), [core/aws/ecs_svc_tasks.go:137](/Users/k2m30/projects/a9s/core/aws/ecs_svc_tasks.go:137). **Trigger:** AWS returns a successful `DescribeTasks` response with entries in `Failures`, such as when a listed task disappears before description. **Impact:** those listed tasks are silently omitted from the result. **Fix:** inspect `Failures`; retry appropriate transient cases and surface the result as partial when requested tasks cannot be described. [AWS DescribeTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeTasks.html)
+
+- **P2** — [core/aws/ecs_task.go:266](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:266), [core/aws/ecs_task.go:276](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:276), [core/aws/ssm.go:65](/Users/k2m30/projects/a9s/core/aws/ssm.go:65). **Trigger:** a secret references a same-Region SSM parameter by a bare name such as `MyParameter1`, or by an ARN for that name. Bare names without `/` are ignored; ARN-derived names are incorrectly changed to `/MyParameter1`. **Impact:** ECS-task → SSM relations fail for valid parameter references. **Fix:** retain the exact parameter name from `ValueFrom`/the ARN resource component, without forcing a leading slash. [AWS ECS Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html), [AWS Parameter Store naming](https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-a-parameter.html)
+
+- **P2** — [core/aws/ecs_task.go:260](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:260), [core/aws/secrets_related_extra.go:244](/Users/k2m30/projects/a9s/core/aws/secrets_related_extra.go:244). **Trigger:** a container uses `LogConfiguration.SecretOptions`. **Impact:** the task-to-secret and secret-to-task relations omit credentials used by the logging driver. **Fix:** collect and resolve `LogConfiguration.SecretOptions[].ValueFrom` alongside container secrets and repository credentials. [AWS log-configuration secrets](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-logconfig.html)
+
+- **P2** — [core/aws/secrets_related_extra.go:166](/Users/k2m30/projects/a9s/core/aws/secrets_related_extra.go:166), [core/aws/secrets_related_extra.go:185](/Users/k2m30/projects/a9s/core/aws/secrets_related_extra.go:185). **Trigger:** the `ecs-task` cache entry is marked `FieldsOnly`. The checker skips every task before reaching its field fallback. **Impact:** a Secret’s related ECS Tasks panel can return a false zero. **Fix:** use the generic related-resource loader, or read `Fields["task_definition"]` before requiring `RawStruct`.
+
+- **P2** — [core/aws/ecs_task_issue_enrichment.go:251](/Users/k2m30/projects/a9s/core/aws/ecs_task_issue_enrichment.go:251). **Trigger:** a Windows task definition is enriched. `readonlyRootFilesystem` is unsupported for Windows and therefore cannot satisfy this rule. **Impact:** every Windows container is incorrectly flagged for a writable root filesystem, with an impossible remediation. **Fix:** skip this rule when `RuntimePlatform.OperatingSystemFamily` is Windows. [AWS ContainerDefinition](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html)
+
+- **P2** — [core/aws/alarm_match.go:141](/Users/k2m30/projects/a9s/core/aws/alarm_match.go:141), [core/aws/alarm_match.go:232](/Users/k2m30/projects/a9s/core/aws/alarm_match.go:232). **Trigger:** a Container Insights alarm is scoped only to a cluster, or to a cluster and service. Matching accepts `ClusterName` as task identity. **Impact:** a cluster-wide alarm links to every task in that cluster; a service-wide alarm links to every task in that service. **Fix:** require a `TaskId` dimension for an ECS-task alarm relation. [AWS Container Insights metrics](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-metrics-ECS.html)
+
+- **P3** — [core/aws/logs_related.go:188](/Users/k2m30/projects/a9s/core/aws/logs_related.go:188), [core/aws/logs_related.go:205](/Users/k2m30/projects/a9s/core/aws/logs_related.go:205). **Trigger:** a log group happens to be named `/ecs/<task-family>` but is not configured as that task definition’s `awslogs-group`. **Impact:** unrelated tasks are reported as related to that log group. **Fix:** resolve the task definition and match its explicit `awslogs-group` option; retain naming only as a clearly non-definitive fallback. [AWS LogConfiguration](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html)
+
+- **P3** — [core/aws/ecs_task.go:45](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:45), [core/aws/ecs_svc_tasks.go:74](/Users/k2m30/projects/a9s/core/aws/ecs_svc_tasks.go:74), [core/resource/accessors.go:14](/Users/k2m30/projects/a9s/core/resource/accessors.go:14). **Trigger:** a cluster has over 50 tasks, or a service has up to 100 running plus 100 stopped tasks. The top-level path requests 100; the service-child path leaves the AWS maximum unspecified and combines both status pages. **Impact:** a nominal 50-row page can contain 100 or 200 rows, making pagination boundaries and load-more behavior inconsistent. **Fix:** request and emit at most `DefaultPageSize`, carrying undisplayed task ARNs in the continuation state.
