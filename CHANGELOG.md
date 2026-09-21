@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.58.0] - 2026-09-21
+
 ### Fixed
 
 - A DynamoDB table's Billing column now reads `provisioned` on a table that has
