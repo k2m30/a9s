@@ -487,7 +487,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN, Truncated: true},
-			{TargetType: "ddb", DisplayName: "DynamoDB Streams", Checker: checkKinesisDDB, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkKinesisDDB, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kinesis")},
 		},

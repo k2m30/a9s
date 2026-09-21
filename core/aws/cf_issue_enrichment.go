@@ -153,13 +153,17 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 	}
 
 	if vc := cfg.ViewerCertificate; vc != nil {
-		if word := cfTLSBelow12Word(vc.MinimumProtocolVersion); word != "" {
+		// CloudFront sets the security policy to TLSv1 on a default
+		// certificate whatever the config says, so there is no minimum to
+		// change on such a distribution.
+		usesDefaultCert := aws.ToBool(vc.CloudFrontDefaultCertificate)
+		if word := cfTLSBelow12Word(vc.MinimumProtocolVersion); word != "" && !usesDefaultCert {
 			emit(CodeCFDeprecatedTLS,
 				domain.DetailRow{Label: "Minimum TLS version", Value: word, Tier: "~"})
 		}
 		// A distribution with no alias legitimately serves on its
 		// cloudfront.net name with the default certificate.
-		if aws.ToBool(vc.CloudFrontDefaultCertificate) && cfg.Aliases != nil && len(cfg.Aliases.Items) > 0 {
+		if usesDefaultCert && cfg.Aliases != nil && len(cfg.Aliases.Items) > 0 {
 			emit(CodeCFDefaultCertificate,
 				domain.DetailRow{Label: "Alias", Value: cfg.Aliases.Items[0], Tier: "~"})
 		}

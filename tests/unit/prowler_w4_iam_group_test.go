@@ -6,6 +6,7 @@ package unit
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -69,6 +70,11 @@ func w4GroupResource(name string) resource.Resource {
 	return resource.Resource{
 		ID: name, Name: name, Type: "iam-group",
 		Fields: map[string]string{"group_name": name},
+		// The orphan signal is scoped to groups older than 30 days.
+		RawStruct: iamtypes.Group{
+			GroupName:  aws.String(name),
+			CreateDate: aws.Time(time.Now().Add(-365 * 24 * time.Hour)),
+		},
 	}
 }
 

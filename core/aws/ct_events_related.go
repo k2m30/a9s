@@ -556,7 +556,8 @@ func ctSelfPivot(res resource.Resource, filter map[string]string) resource.Relat
 
 // checkCtEventsPivotByAccessKeyId returns a self-pivot FetchFilter for the
 // accessKeyId found in the event's userIdentity JSON blob. Returns Count=0 when
-// the event has no accessKeyId or the caller is Root (Root has no access key).
+// the event carries no accessKeyId. The root user can hold access keys, and a
+// root key in use is the case this pivot exists to trace.
 func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	if !ok {
@@ -567,10 +568,6 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	ui, _ := parsed["userIdentity"].(map[string]any)
-	uiType, _ := ui["type"].(string)
-	if uiType == "Root" {
-		return resource.ProvenZero("ct-events", "uiType")
-	}
 	accessKeyID, _ := ui["accessKeyId"].(string)
 	if accessKeyID == "" {
 		return resource.ProvenZero("ct-events", "accessKeyID")

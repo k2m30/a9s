@@ -17,7 +17,12 @@ import (
 // FetchSecretsPage calls the SecretsManager ListSecrets API and returns a single
 // page of secrets. Pass an empty continuationToken for the first page.
 func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, continuationToken string) (resource.FetchResult, error) {
-	input := &secretsmanager.ListSecretsInput{MaxResults: aws.Int32(DefaultPageSize)}
+	// Without this, ListSecrets omits secrets inside their recovery window,
+	// so the one state an operator can still reverse is invisible.
+	input := &secretsmanager.ListSecretsInput{
+		MaxResults:             aws.Int32(DefaultPageSize),
+		IncludePlannedDeletion: aws.Bool(true),
+	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
 	}
@@ -141,6 +146,11 @@ func RevealSecret(ctx context.Context, api SecretsManagerGetSecretValueAPI, secr
 
 	if output.SecretString != nil {
 		return *output.SecretString, nil
+	}
+	if len(output.SecretBinary) > 0 {
+		// Binary secrets are not text and rendering the raw bytes would
+		// corrupt the view; an empty string would read as an empty secret.
+		return fmt.Sprintf("binary secret (%d bytes)", len(output.SecretBinary)), nil
 	}
 
 	return "", nil

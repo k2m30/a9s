@@ -95,8 +95,11 @@ func iamRoleWithLastUsed(name, path string, offset time.Duration) *iamtypes.Role
 // iamRoleNeverUsed builds a Role with RoleLastUsed nil (no LastUsedDate).
 func iamRoleNeverUsed(name, path string) *iamtypes.Role {
 	return &iamtypes.Role{
-		RoleName:     aws.String(name),
-		Path:         aws.String(path),
+		RoleName: aws.String(name),
+		Path:     aws.String(path),
+		// With no last-used date, role age is what separates a dormant
+		// role from one created moments ago.
+		CreateDate:   aws.Time(time.Now().Add(-365 * 24 * time.Hour)),
 		RoleLastUsed: nil,
 	}
 }

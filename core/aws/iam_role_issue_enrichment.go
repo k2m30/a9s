@@ -81,7 +81,10 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		}
 		isDormant := false
 		if out.Role.RoleLastUsed == nil || out.Role.RoleLastUsed.LastUsedDate == nil {
-			isDormant = true
+			// IAM never records a last-used date for a role nobody has
+			// assumed yet, so age since creation is the only evidence that
+			// the role has had time to be used at all.
+			isDormant = out.Role.CreateDate != nil && time.Since(*out.Role.CreateDate) > 90*24*time.Hour
 		} else if time.Since(*out.Role.RoleLastUsed.LastUsedDate) > 90*24*time.Hour {
 			isDormant = true
 		}

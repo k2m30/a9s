@@ -1560,7 +1560,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | s3 | s3 | Access Log Bucket | no |
 | s3 | athena | Athena WorkGroups | no |
 | s3 | glue | Glue Jobs | no |
-| s3 | backup | Backup | no |
+| s3 | backup | Backup Plans | no |
 | s3 | eb-rule | EventBridge Rules | no |
 | s3 | r53 | Route 53 | no |
 | s3 | role | IAM Roles | no |
@@ -1628,7 +1628,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbi-snap | kms | KMS Keys | yes |
 | dbi-snap | backup | Backup Plans | no |
 | dbi-snap | ct-events | CloudTrail Events | no |
-| dbc-snap | dbc | DocumentDB Cluster | yes |
+| dbc-snap | dbc | DB Cluster | yes |
 | dbc-snap | kms | KMS Key | no |
 | dbc-snap | vpc | VPC | no |
 | dbc-snap | backup | Backup Plans | no |
@@ -1717,7 +1717,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | kinesis | alarm | CW Alarms | yes |
 | kinesis | lambda | Lambda Functions | yes |
 | kinesis | cfn | CloudFormation | no |
-| kinesis | ddb | DynamoDB Streams | yes |
+| kinesis | ddb | DynamoDB Tables | yes |
 | kinesis | kms | KMS Key | no |
 | kinesis | ct-events | CloudTrail Events | no |
 | msk | alarm | CW Alarms | yes |

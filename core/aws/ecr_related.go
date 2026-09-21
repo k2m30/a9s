@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
@@ -281,12 +280,10 @@ func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
 		if resources, ok := p["resources"]; ok {
 			hasRepoFilter = true
 			var res []string
-			if err := json.Unmarshal(resources, &res); err == nil {
-				for _, r := range res {
-					if strings.Contains(r, repoARN) {
-						return true
-					}
-				}
+			// The whole ARN has to match: a prefix would let a rule scoped
+			// to ".../app-worker" answer for repository "app".
+			if err := json.Unmarshal(resources, &res); err == nil && slices.Contains(res, repoARN) {
+				return true
 			}
 		}
 	}

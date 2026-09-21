@@ -649,13 +649,17 @@ func TestW6ACF_ConditionsAreIndependent(t *testing.T) {
 	res := w6aCFOne(t, "ED3M4N5O6P7Q8R", cfg, w6aS3NameCache(false, "acme-live-origin"))
 	fs := res.Findings["ED3M4N5O6P7Q8R"]
 	for _, code := range []string{
-		w6aCFOriginMissing, w6aCFDeprecatedTLS, w6aCFLoggingOff,
+		w6aCFOriginMissing, w6aCFLoggingOff,
 		w6aCFNoRootObject, w6aCFNoOAC, w6aCFDefaultCert, w6aCFNoGeoRestriction,
 	} {
 		if _, ok := w2Find(fs, code); !ok {
 			t.Errorf("missing %q; got %v", code, w2Codes(fs))
 		}
 	}
+	// CloudFront pins the security policy to TLSv1 on a default-certificate
+	// distribution whatever the config says, so the minimum-TLS condition is
+	// not true of one and cannot join the set above.
+	w2AssertNoCode(t, fs, w6aCFDeprecatedTLS)
 }
 
 // TestW6ACF_ConfigFailureTruncatesTheDistribution pins that a distribution

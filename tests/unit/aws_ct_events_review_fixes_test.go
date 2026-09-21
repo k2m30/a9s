@@ -2,7 +2,6 @@ package unit
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -97,15 +96,11 @@ func TestCTTarget_BatchGetItem_JoinsTableNames(t *testing.T) {
 
 	target := result.Resources[0].Fields["_ct.target"]
 
-	// Map iteration order is non-deterministic; assert both table names are present.
-	if !strings.Contains(target, "Users") {
-		t.Errorf("_ct.target = %q, want to contain %q — BatchGetItem must extract requestItems keys; "+
-			"bug: no extractTargetByEventName case for BatchGetItem, catch-all cannot handle map values",
-			target, "Users")
-	}
-	if !strings.Contains(target, "Sessions") {
-		t.Errorf("_ct.target = %q, want to contain %q — BatchGetItem must extract requestItems keys",
-			target, "Sessions")
+	// The requestItems keys are sorted, and the cell names the first of them
+	// and counts the rest.
+	if target != "Sessions +1 more" {
+		t.Errorf("_ct.target = %q, want %q — BatchGetItem must extract requestItems keys",
+			target, "Sessions +1 more")
 	}
 	if target == "" || target == "(none)" {
 		t.Errorf("_ct.target = %q, must not be empty or (none) for BatchGetItem with known requestItems",

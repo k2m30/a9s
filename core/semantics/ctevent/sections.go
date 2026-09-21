@@ -124,8 +124,11 @@ func buildActorRows(event *Event) []Row {
 		rows = append(rows, Row{Key: "As", Value: ui.SessionContext.SourceIdentity})
 	}
 
-	// Federation: row — when WebIDFederationData is present.
-	if ui.SessionContext != nil && ui.SessionContext.WebIDFederationData != nil {
+	// Federation: row — when a provider is named. CloudTrail emits an empty
+	// webIdFederationData object on most assumed-role events, which names
+	// none.
+	if ui.SessionContext != nil && ui.SessionContext.WebIDFederationData != nil &&
+		ui.SessionContext.WebIDFederationData.FederatedProvider != "" {
 		rows = append(rows, Row{Key: "Federation", Value: ui.SessionContext.WebIDFederationData.FederatedProvider})
 	}
 

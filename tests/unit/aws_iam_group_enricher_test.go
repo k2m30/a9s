@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -85,6 +86,12 @@ func iamGroupResources(names ...string) []resource.Resource {
 				"group_id":   "AGPA" + name,
 				"path":       "/",
 				"arn":        "arn:aws:iam::123456789012:group/" + name,
+			},
+			// ListGroups always carries a creation date, and the orphan
+			// signal is scoped to groups older than 30 days.
+			RawStruct: iamtypes.Group{
+				GroupName:  aws.String(name),
+				CreateDate: aws.Time(time.Now().Add(-365 * 24 * time.Hour)),
 			},
 		})
 	}

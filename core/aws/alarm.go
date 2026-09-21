@@ -50,7 +50,9 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 
 		threshold := ""
 		if alarm.Threshold != nil {
-			threshold = fmt.Sprintf("%.2f", *alarm.Threshold)
+			// A fixed precision hides the thresholds that matter most: an
+			// error-rate alarm at 0.005 is not "0.00".
+			threshold = strconv.FormatFloat(*alarm.Threshold, 'f', -1, 64)
 		}
 
 		actionsCount := len(alarm.AlarmActions)
@@ -77,9 +79,11 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
 			addWave1Finding(&r, CodeAlarmActionsDisabled)
 			// The phrase already says the actions are off; the row says how
-			// much is wired behind the switch.
+			// much is wired behind the switch — every transition, not just
+			// the one alarm.no_actions is scoped to.
+			wired := len(alarm.AlarmActions) + len(alarm.OKActions) + len(alarm.InsufficientDataActions)
 			addWave1Rows(&r, CodeAlarmActionsDisabled, domain.DetailRow{
-				Label: "Configured actions", Value: strconv.Itoa(actionsCount), Tier: "~",
+				Label: "Configured actions", Value: strconv.Itoa(wired), Tier: "~",
 			})
 		}
 

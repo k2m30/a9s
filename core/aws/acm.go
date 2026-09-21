@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -86,6 +87,10 @@ func acmKeyAlgorithmWords(alg string) string {
 func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &acm.ListCertificatesInput{
 		MaxItems: aws.Int32(DefaultPageSize),
+		// Unfiltered, ListCertificates returns only RSA_1024 and RSA_2048
+		// certificates, so RSA-3072/4096 and every EC certificate would be
+		// missing from the list entirely.
+		Includes: &acmtypes.Filters{KeyTypes: acmtypes.KeyAlgorithm("").Values()},
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken

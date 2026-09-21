@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -52,7 +53,8 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	// soft-fallback (aliases become empty) but must surface to the operator
 	// via the composite error — silently stopping would hide a permissions
 	// issue or throttling that's actively degrading the view.
-	aliasMap, failures := buildKMSAliasMap(ctx, c)
+	aliasMap, aliasFailures := buildKMSAliasMap(ctx, c)
+	var failures []Failure
 
 	var resources []resource.Resource
 	for _, key := range listOutput.Keys {
@@ -115,14 +117,17 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	}
 
 	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
-			PageSize:    len(resources),
-			TotalHint:   -1,
-		},
-	}, AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys))
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
+		}, errors.Join(
+			kmsAliasFailure(aliasFailures),
+			AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys)),
+		)
 }
 
 // buildKMSAliasMap fully paginates ListAliases and returns the KeyId→
@@ -187,7 +192,8 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 
 	// Soft-fallback: aliases become empty strings, but any ListAliases
 	// failure is recorded so operators know aliases may be missing.
-	aliasMap, failures := buildKMSAliasMap(ctx, c)
+	aliasMap, aliasFailures := buildKMSAliasMap(ctx, c)
+	var failures []Failure
 
 	var resources []resource.Resource
 	for _, id := range ids {
@@ -245,7 +251,16 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		})
 	}
 
-	return resources, AggregateFailures("kms FetchByIDs", failures, len(ids))
+	return resources, errors.Join(
+		kmsAliasFailure(aliasFailures),
+		AggregateFailures("kms FetchByIDs", failures, len(ids)),
+	)
+}
+
+// kmsAliasFailure keeps the ListAliases walk out of the per-key failure
+// count: one alias-map error is not one key that could not be read.
+func kmsAliasFailure(failures []Failure) error {
+	return AggregateFailures("kms aliases", failures, len(failures))
 }
 
 // kmsAliasFields returns the alias a row displays, the last one ListAliases

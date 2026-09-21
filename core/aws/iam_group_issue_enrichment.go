@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
+
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -23,7 +26,7 @@ const (
 // (capped at EnrichmentCap) to surface orphan groups and no-op groups.
 //
 // Findings:
-//   - GetGroup.Users empty → "~" finding "group has no members (orphan)"
+//   - GetGroup.Users empty on a group older than 30 days → "~" finding "group has no members (orphan)"
 //   - ListAttachedGroupPolicies empty AND ListGroupPolicies empty → "~" finding "group has no policies (no-op group)"
 func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -86,7 +89,12 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 
 		var rows []domain.DetailRow
 
-		if memberCount == 0 && !memberTruncated {
+		// A group created minutes ago has no members yet by construction;
+		// only one left empty for a month is evidence of an orphan.
+		grp, _ := assertStruct[iamtypes.Group](r.RawStruct)
+		aged := grp.CreateDate != nil && time.Since(*grp.CreateDate) > 30*24*time.Hour
+
+		if memberCount == 0 && !memberTruncated && aged {
 			rows = append(rows, domain.DetailRow{
 				Label: "Members",
 				Value: "group has no members (orphan)",

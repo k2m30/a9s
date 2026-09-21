@@ -167,8 +167,9 @@ func buildCTEventWithRequestParams(id, eventName, eventSource, requestParamsJSON
 	}
 }
 
-// TestCTTargetFallback_DescribeInstances_WithItems — DescribeInstances with
-// instancesSet.items populated → "i-abc,i-def".
+// TestCTTargetFallback_DescribeInstances_WithItems — DescribeInstances over
+// several instances names the first and counts the rest, so a wide call
+// cannot cut an identifier in half in the fixed-width column.
 func TestCTTargetFallback_DescribeInstances_WithItems(t *testing.T) {
 	event := buildCTEventWithRequestParams(
 		"tf-di-01", "DescribeInstances", "ec2.amazonaws.com",
@@ -179,8 +180,8 @@ func TestCTTargetFallback_DescribeInstances_WithItems(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
 	}
 	target := result.Resources[0].Fields["_ct.target"]
-	if target != "i-abc,i-def" {
-		t.Errorf("_ct.target = %q, want %q per §4 DescribeInstances with items", target, "i-abc,i-def")
+	if target != "i-abc +1 more" {
+		t.Errorf("_ct.target = %q, want %q", target, "i-abc +1 more")
 	}
 }
 
@@ -232,7 +233,8 @@ func TestCTTargetFallback_GetParameter(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_GetParameters — multiple SSM parameter names joined.
+// TestCTTargetFallback_GetParameters — several SSM parameter names: the
+// first is named and the rest are counted.
 func TestCTTargetFallback_GetParameters(t *testing.T) {
 	event := buildCTEventWithRequestParams(
 		"tf-gps-01", "GetParameters", "ssm.amazonaws.com",
@@ -243,8 +245,8 @@ func TestCTTargetFallback_GetParameters(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
 	}
 	target := result.Resources[0].Fields["_ct.target"]
-	if target != "/a,/b" {
-		t.Errorf("_ct.target = %q, want %q per §4 GetParameters", target, "/a,/b")
+	if target != "/a +1 more" {
+		t.Errorf("_ct.target = %q, want %q", target, "/a +1 more")
 	}
 }
 

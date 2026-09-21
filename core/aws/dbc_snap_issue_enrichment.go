@@ -29,6 +29,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -167,6 +168,24 @@ func dbcSnapParentID(raw any) (string, bool) {
 func dbcSnapParentIsLocal(raw any) bool {
 	p, _ := dbcSnapParentOf(raw)
 	return p.local()
+}
+
+// dbcSnapParentRow names the dbc row the snapshot's DBClusterIdentifier
+// opens. A cluster that was deleted, or that lives in another Region or
+// account, has no row here, and the field stays unnavigable rather than
+// offering a link to nothing.
+func dbcSnapParentRow(src resource.Resource, clusters []resource.Resource) string {
+	p, ok := dbcSnapParentOf(src.RawStruct)
+	if !ok || !p.local() {
+		return ""
+	}
+	if clusters == nil {
+		return p.cluster
+	}
+	if i := slices.IndexFunc(clusters, func(c resource.Resource) bool { return dbcSnapTakenFrom(src.RawStruct, c) }); i >= 0 {
+		return clusters[i].ID
+	}
+	return ""
 }
 
 // dbcSnapTakenFrom reports whether cluster is the cluster snap was taken

@@ -384,7 +384,9 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			ContextKeys:    map[string]string{"log_group_name": "log_group_name", "log_stream_name": "log_stream_name", "build_number": "build_number"},
 			DisplayNameKey: "build_number",
 			DrillCondition: func(r domain.Resource) bool {
-				return r.Fields["log_group_name"] != ""
+				// A build that never reached provisioning has a group but no
+				// stream, and GetLogEvents refuses an empty stream name.
+				return r.Fields["log_group_name"] != "" && r.Fields["log_stream_name"] != ""
 			},
 			DrillBlockMessage: "Build logs not available in CloudWatch",
 		}},

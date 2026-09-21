@@ -183,9 +183,9 @@ var replayShadowedCells = []replayShadowedCell{
 	{"cf", "E1A2B3C4D5E6F7", "Enabled", "Yes"},
 	{"cf", "E3C4D5E6F7G8H9", "Enabled", "No"},
 	// float64: the defaults read the fetcher's own value for this column, so
-	// both frames show the precision CloudWatch reports the threshold at
-	// rather than the %g the reflect formatter leaves.
-	{"alarm", "cf-e1a2b3c4d5e6f7-error-rate", "Threshold", "5.00"},
+	// both frames show the threshold in full, rather than the exponent form
+	// ("1e+10") the reflect formatter leaves.
+	{"alarm", "rds-prod-dbi-1-free-storage", "Threshold", "10000000000"},
 	// int over a phrase: the fetcher's Fields value is not a retention at all.
 	// The retention policy is one field carrying words: "30 days".
 	{"logs", "/aws/lambda/process-orders", "Retention", "30 days"},

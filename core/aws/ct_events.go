@@ -338,7 +338,8 @@ func ctTargetCell(event cloudtrailtypes.Event, parsed map[string]any) string {
 		return ""
 	}
 	// A call over several instances or parameters yields one row each, and all
-	// of them are its subject.
+	// of them are its subject. The cell is one column wide, so it names the
+	// first and counts the rest; the detail view lists them all.
 	rows, _ := ctevent.ExtractTarget(ev.EventName, ev.EventSource, ev.RecipientAccountID, nil, ev.RequestParameters)
 	values := make([]string, 0, len(rows))
 	for _, row := range rows {
@@ -346,7 +347,14 @@ func ctTargetCell(event cloudtrailtypes.Event, parsed map[string]any) string {
 			values = append(values, row.Value)
 		}
 	}
-	return strings.Join(values, ",")
+	if len(values) == 0 {
+		return ""
+	}
+	first := ctevent.FormatCTTarget(values[0], ev.RecipientAccountID)
+	if len(values) == 1 {
+		return first
+	}
+	return fmt.Sprintf("%s +%d more", first, len(values)-1)
 }
 
 // ctCategoryTarget describes the events whose subject is not a resource: an
@@ -509,28 +517,35 @@ func computeCTActorInner(parsed map[string]any, topLevelUser string) string {
 	return "-"
 }
 
-// computeCTOrigin derives the _ct.origin label from userAgent and sessionCredentialFromConsole.
-// Returns one of: "Console", "CLI", "SDK", "Service", "TF", "Boto", "Browser", "VPCE", "?"
+// computeCTOrigin derives the _ct.origin label from userAgent and
+// sessionCredentialFromConsole. Returns one of: "Console", "CLI", "SDK",
+// "Service", "TF", "Boto", "Browser", "VPCE", or "" when the record carries
+// nothing to derive an origin from.
 func computeCTOrigin(parsed map[string]any) string {
 	if parsed == nil {
-		return "?"
+		return ""
 	}
 	ua, _ := parsed["userAgent"].(string)
 	uaLow := strings.ToLower(ua)
 
 	// sessionCredentialFromConsole overrides UA for Console detection.
-	// In CloudTrail JSON this lives under userIdentity.sessionContext.
+	// CloudTrail records it as a top-level record field; older and
+	// service-specific records carry it under userIdentity.sessionContext.
+	flags := []any{parsed["sessionCredentialFromConsole"]}
 	if ui, ok := parsed["userIdentity"].(map[string]any); ok {
 		if sc, ok := ui["sessionContext"].(map[string]any); ok {
-			switch v := sc["sessionCredentialFromConsole"].(type) {
-			case string:
-				if v == "true" {
-					return "Console"
-				}
-			case bool:
-				if v {
-					return "Console"
-				}
+			flags = append(flags, sc["sessionCredentialFromConsole"])
+		}
+	}
+	for _, flag := range flags {
+		switch v := flag.(type) {
+		case string:
+			if v == "true" {
+				return "Console"
+			}
+		case bool:
+			if v {
+				return "Console"
 			}
 		}
 	}
@@ -559,7 +574,7 @@ func computeCTOrigin(parsed map[string]any) string {
 				return "Service"
 			}
 		}
-		return "?"
+		return ""
 	case strings.Contains(uaLow, "amazonaws.com") || strings.Contains(uaLow, ".internal"):
 		return "Service"
 	case strings.Contains(uaLow, "aws-sdk"):

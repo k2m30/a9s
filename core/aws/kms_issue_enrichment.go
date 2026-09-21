@@ -120,7 +120,7 @@ func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resourc
 // operator's move on such a key is to wait or cancel the deletion, so a
 // posture row about its policy would outlive the key it describes.
 func kmsKeyIsGoingAway(r resource.Resource) bool {
-	meta, ok := r.RawStruct.(kmstypes.KeyMetadata)
+	meta, ok := assertStruct[kmstypes.KeyMetadata](r.RawStruct)
 	if !ok {
 		return false
 	}
@@ -132,6 +132,6 @@ func kmsKeyIsGoingAway(r resource.Resource) bool {
 // fetcher stashed. FetchKMSKeysPage filters AWS-managed keys out, while
 // FetchKMSKeysByIDs keeps them, so a drilled-into key can still arrive here.
 func kmsKeyIsAWSManaged(r resource.Resource) bool {
-	meta, ok := r.RawStruct.(kmstypes.KeyMetadata)
+	meta, ok := assertStruct[kmstypes.KeyMetadata](r.RawStruct)
 	return ok && meta.KeyManager == kmstypes.KeyManagerTypeAws
 }

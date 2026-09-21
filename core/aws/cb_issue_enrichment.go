@@ -52,9 +52,11 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, names, EnrichmentParallelism, func(i int) {
 		name := names[i]
+		// Descending is already the default, and setting the sort order at
+		// all is an error once a project has more than 100 builds — exactly
+		// the busy projects whose latest build matters most.
 		out, err := clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
 			ProjectName: aws.String(name),
-			SortOrder:   cbtypes.SortOrderTypeDescending,
 		})
 		mu.Lock()
 		defer mu.Unlock()
@@ -104,8 +106,13 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			continue
 		}
 		switch b.BuildStatus {
-		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
+		case cbtypes.StatusTypeSucceeded:
 			result.FieldUpdates[projectName] = map[string]string{"last_build": "OK"}
+			continue
+		case cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
+			// Neither one succeeded: the first has not finished, the second
+			// was cancelled, and "OK" would claim a result for both.
+			result.FieldUpdates[projectName] = map[string]string{"last_build": string(b.BuildStatus)}
 			continue
 		}
 		statusVal := string(b.BuildStatus)
@@ -129,14 +136,14 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		} else {
 			for i := len(b.Phases) - 1; i >= 0; i-- {
 				ph := b.Phases[i]
-				if ph.PhaseStatus == cbtypes.StatusTypeFailed {
+				// A build can end on FAULT or TIMED_OUT as well as FAILED,
+				// and the phase that ended it is the one to name.
+				if ph.PhaseStatus != "" && ph.PhaseStatus != cbtypes.StatusTypeSucceeded &&
+					ph.PhaseStatus != cbtypes.StatusTypeInProgress {
 					rows = append(rows, domain.DetailRow{Label: "Phase", Value: cbPhaseWords(string(ph.PhaseType)), Tier: "!"})
 					break
 				}
 			}
-		}
-		if b.EndTime != nil {
-			rows = append(rows, domain.DetailRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02"), Tier: "!"})
 		}
 		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, rows, statusPhrase)
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}

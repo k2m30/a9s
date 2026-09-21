@@ -132,9 +132,15 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			MarkSkipped(&result, r.ID, &failures, keyUseErr)
 		}
 
-		mfaVal := "false"
-		if hasMFA || !hasConsolePassword {
-			mfaVal = "true"
+		// ListMFADevices is only called for console users, so for a
+		// programmatic-only user MFA was never looked at — "true" would
+		// claim coverage nobody checked.
+		mfaVal := "n/a"
+		if hasConsolePassword {
+			mfaVal = "false"
+			if hasMFA {
+				mfaVal = "true"
+			}
 		}
 		consolePasswordVal := "false"
 		if hasConsolePassword {

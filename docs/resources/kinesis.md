@@ -182,7 +182,7 @@ kinesis — MESSAGING. Status key: `status` — the key the status cell reads, a
 | alarm | CW Alarms | yes |
 | lambda | Lambda Functions | yes |
 | cfn | CloudFormation | yes |
-| ddb | DynamoDB Streams | yes |
+| ddb | DynamoDB Tables | yes |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

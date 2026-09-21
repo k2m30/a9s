@@ -128,10 +128,12 @@ func FetchCodeBuildProjectsPage(
 // commands, so an S3 archive or a NO_SOURCE project — which nobody can open a
 // pull request against — is out of scope however its buildspec is set.
 var cbContributorSourceTypes = map[cbtypes.SourceType]bool{ //nolint:gochecknoglobals // static SDK enum set
-	cbtypes.SourceTypeGithub:           true,
-	cbtypes.SourceTypeGithubEnterprise: true,
-	cbtypes.SourceTypeBitbucket:        true,
-	cbtypes.SourceTypeCodecommit:       true,
+	cbtypes.SourceTypeGithub:            true,
+	cbtypes.SourceTypeGithubEnterprise:  true,
+	cbtypes.SourceTypeBitbucket:         true,
+	cbtypes.SourceTypeCodecommit:        true,
+	cbtypes.SourceTypeGitlab:            true,
+	cbtypes.SourceTypeGitlabSelfManaged: true,
 }
 
 // cbBuildspecFromSource reports whether the buildspec lives in the source

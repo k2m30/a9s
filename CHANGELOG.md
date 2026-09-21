@@ -43,6 +43,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claiming `OK`, which read as health for pipelines that had never run.
 - An Athena workgroup storing results in Athena owned storage is no longer
   reported as writing them unencrypted; that storage is always encrypted.
+- An alarm's threshold now reads as the number CloudWatch reports it at. A
+  fixed two decimals hid the thresholds that matter most: an error-rate alarm
+  at 0.005 showed `0.00`, which reads as firing on anything above nothing.
+- An alarm whose actions are switched off now says how much is wired behind
+  the switch on every transition. It counted only the actions on the alarm
+  transition, so one paging on recovery or on insufficient data read as wired
+  to nothing.
+- The certificate list now includes RSA-3072, RSA-4096 and every EC
+  certificate. Unasked, ACM answers with RSA-1024 and RSA-2048 alone, so the
+  rest were missing from the list and from every pivot resolving one.
+- A group is called an orphan only once it has been empty for a month. One
+  created this week, which has no members yet by construction, read as one.
+- A role IAM has recorded no use for is called dormant only once it is more
+  than ninety days old. A role created today read as `dormant role (>90d)`,
+  with advice to delete it.
+- The MFA column reads `n/a` for a user with no console password. It read
+  `true`, though MFA is never looked up for such a user — coverage nobody had
+  checked.
+- A KMS key scheduled for deletion is no longer asked for its key policy, and
+  an AWS-managed key is skipped as intended. Both guards read the key's state
+  in a way that never matched, so a key on its way out still carried a
+  "policy open to anyone" row nobody could act on.
+- A failure to read the KMS alias list is counted on its own. It was counted
+  against the keys that were read, so a single key could report
+  `failed for 2 of 1 IDs`.
+- Secrets inside their recovery window appear in the list, so a secret
+  scheduled for deletion can be seen — and restored — while there is still
+  time.
+- Revealing a secret held as binary says so and gives its size, instead of
+  rendering as an empty value that reads like a blank secret.
+- A state machine whose latest execution is still running shows that, instead
+  of `OK`.
+- A CodeBuild project's latest build reads `OK` only when it succeeded. A
+  build still running, and one that was cancelled, both claimed success.
+- Latest-build status works again for a project with more than a hundred
+  builds. CodeBuild refuses the request a9s was sending for exactly those, so
+  the busiest projects showed no build status at all.
+- The latest-build panel names the phase that ended a build that timed out or
+  faulted, not only one that failed, and gives the completion date once
+  instead of twice.
+- A GitLab or self-managed-GitLab project now gets the warning that its build
+  commands come from a file a contributor controls.
+- Build log timestamps carry seconds, so lines logged inside the same minute
+  no longer share one timestamp.
+- Build logs open only once the build has a log stream. Opening them earlier
+  asked CloudWatch for an empty stream name and returned an error.
+- A distribution served on its own cloudfront.net name no longer warns that
+  its minimum TLS is below 1.2. AWS pins that setting to TLSv1 on the default
+  certificate whatever the config says, so there was nothing to change.
+- The CloudTrail pivot on an access key works for a root call — the
+  key-compromise case the pivot exists for.
+- A call made from the console is labelled Console wherever CloudTrail
+  recorded that fact, which is at the top of the record.
+- The ORIGIN column is blank when the record names nothing to derive an origin
+  from, rather than showing a `?` that reads like an origin of its own.
+- An event acting on several subjects names the first and counts the rest.
+  They were joined into one string the column cut mid-identifier.
+- An assumed-role event no longer shows a blank `Federation:` line. CloudTrail
+  puts an empty federation object on most of them.
+- An EventBridge rule scoped to one repository no longer counts for another
+  whose ARN is a prefix of it — a rule for `app-worker` was matching `app`.
+- A cluster snapshot's source cluster opens from its detail view, when that
+  cluster still exists.
 
 - A load balancer now names every certificate its listeners serve. A listener
   carries one default certificate and serves the rest by SNI, so a
@@ -511,6 +574,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the event's own verdict in a new Status column beside it. A failed event
   names the kind of failure it was — a Lambda error, an execution timeout, a
   manual abort — instead of every one of them reading `task failed`.
+
+### Changed
+
+- Three related-panel rows are renamed to say what they list: a stream's
+  "DynamoDB Streams" is "DynamoDB Tables", a cluster snapshot's "DocumentDB
+  Cluster" is "DB Cluster" (the type covers Aurora and Multi-AZ RDS clusters
+  too), and a bucket's "Backup" is "Backup Plans", as on every other type.
 
 ### Removed
 

@@ -94,7 +94,12 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if len(out.Executions) > 0 {
 			s := out.Executions[0].Status
 			exec := out.Executions[0]
-			lastRunVal := "OK"
+			// Only a completed execution earns "OK"; a RUNNING or PENDING_REDRIVE
+			// one has not finished and has nothing to report yet.
+			lastRunVal := string(s)
+			if s == sfntypes.ExecutionStatusSucceeded {
+				lastRunVal = "OK"
+			}
 			if s == sfntypes.ExecutionStatusFailed || s == sfntypes.ExecutionStatusTimedOut || s == sfntypes.ExecutionStatusAborted {
 				statusVal := string(s)
 				statusPhrase := domain.HumanizeStatusPhrase(statusVal)

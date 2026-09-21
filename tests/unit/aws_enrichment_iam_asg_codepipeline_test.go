@@ -159,7 +159,10 @@ func (f *iamGetRoleFakeCombo) GetRole(
 	if name == f.errForRole {
 		return nil, errors.New("iam: NoSuchEntity for " + name)
 	}
-	role := &iamtypes.Role{RoleName: aws.String(name)}
+	role := &iamtypes.Role{
+		RoleName:   aws.String(name),
+		CreateDate: aws.Time(time.Now().Add(-365 * 24 * time.Hour)),
+	}
 	if f.nilLastUsedFor[name] {
 		role.RoleLastUsed = nil
 	} else {

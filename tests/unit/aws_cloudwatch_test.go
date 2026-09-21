@@ -91,8 +91,10 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	if r0.Fields["namespace"] != "AWS/EC2" {
 		t.Errorf("resource[0].Fields[\"namespace\"]: expected %q, got %q", "AWS/EC2", r0.Fields["namespace"])
 	}
-	if r0.Fields["threshold"] != "80.00" {
-		t.Errorf("resource[0].Fields[\"threshold\"]: expected %q, got %q", "80.00", r0.Fields["threshold"])
+	// The threshold is rendered at its own precision, so a fractional
+	// threshold is not flattened to two decimals.
+	if r0.Fields["threshold"] != "80" {
+		t.Errorf("resource[0].Fields[\"threshold\"]: expected %q, got %q", "80", r0.Fields["threshold"])
 	}
 
 	r1 := resources[1]
@@ -105,8 +107,8 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	if len(r1.Findings) == 0 || string(r1.Findings[0].Code) != "alarm.no_actions" {
 		t.Errorf("resource[1].Findings: expected alarm.no_actions finding, got %v", r1.Findings)
 	}
-	if r1.Fields["threshold"] != "100.00" {
-		t.Errorf("resource[1].Fields[\"threshold\"]: expected %q, got %q", "100.00", r1.Fields["threshold"])
+	if r1.Fields["threshold"] != "100" {
+		t.Errorf("resource[1].Fields[\"threshold\"]: expected %q, got %q", "100", r1.Fields["threshold"])
 	}
 }
 
