@@ -810,3 +810,64 @@ func (m *tokenCapturingEcsSvcLogsMock) FilterLogEvents(ctx context.Context, para
 	m.capturedNextToken = params.NextToken
 	return m.inner.FilterLogEvents(ctx, params, optFns...)
 }
+
+// A service log line carries the ingestion instant in the same settled form as
+// its timestamp. CloudWatch answers with epoch milliseconds, and a cell showing
+// 1711036801000 tells an operator nothing about when the line arrived.
+func TestFetchEcsSvcLogs_IngestionTimeIsFormatted(t *testing.T) {
+	taskDefMock := &mockECSDescribeTaskDefinitionClient{
+		output: &ecs.DescribeTaskDefinitionOutput{
+			TaskDefinition: &ecstypes.TaskDefinition{
+				ContainerDefinitions: []ecstypes.ContainerDefinition{
+					{
+						Name: aws.String("web"),
+						LogConfiguration: &ecstypes.LogConfiguration{
+							LogDriver: ecstypes.LogDriverAwslogs,
+							Options: map[string]string{
+								"awslogs-group":         "/ecs/web-service",
+								"awslogs-stream-prefix": "ecs",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cwLogsMock := &mockCWLogsFilterLogEventsClient{
+		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+			{
+				Events: []cwlogstypes.FilteredLogEvent{
+					{
+						Timestamp:     aws.Int64(1711036800000),
+						Message:       aws.String("INFO Starting application server on port 8080"),
+						LogStreamName: aws.String("ecs/web/abc123def456"),
+						IngestionTime: aws.Int64(1711036801000),
+						EventId:       aws.String("evt-svc-001"),
+					},
+				},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchEcsSvcLogs(
+		context.Background(),
+		taskDefMock,
+		cwLogsMock,
+		"arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster",
+		"web-service",
+		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:5",
+		"",
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Resources) == 0 {
+		t.Fatal("expected at least one log event")
+	}
+
+	got := result.Resources[0].Fields["ingestion_time"]
+	if got != "2024-03-21 16:00" {
+		t.Errorf("Fields[ingestion_time] = %q, want the settled form %q", got, "2024-03-21 16:00")
+	}
+}

@@ -59,9 +59,32 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     paging strategy — walk the lookback keeping a trailing 50, or narrow `StartTime` — which
     changes the call cost.
 
+12. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
+    NextToken. Both branches report `truncated=true` for different reasons: the cache branch from
+    `anyDegraded(rows)` alone, the fetch branch from a composite `DescribeCluster failed for 2 of
+    12` that `FetchRelatedTarget` swallows, so the caller sees `truncated=true, err=nil` and
+    cannot tell a per-item detail failure from a lost page. Excluding `anyDegraded` for an
+    ID/Name-only spec fixes the cache branch alone, and a half-fix still renders `0+` whenever the
+    operator has not already opened the EKS list. A correct fix has `FetchIsPartial` separate
+    "some rows' details are unread" from "the list is a subset", across 22 `FetchRelatedTarget`
+    and 197 `relatedResourcesFor` call sites. A spec reads beyond ID and Name exactly when
+    `Values != nil || QualifierValue != nil || MetricsRegion != nil` — 10 of 35 specs do, audited
+    by hand; whoever takes this should assert that `ValuesFromRawStruct` implies that predicate so
+    the two cannot drift.
+13. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
+    a snapshot's parent through `DbiResourceId`, while `dbiRefToID` (`core/aws/ref_ids.go:567`)
+    matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
+    has a row that leads nowhere. `TestRefConformance_NavigableFieldsOpenTargetRows` reproduces it
+    the moment a fixture carries a pre-rename `DBInstanceIdentifier`.
+14. **`TestWarmSnapshot_TwoReadersOverlap` fails on machine load, not on the code.** It compares
+    wall-clock time for two concurrent warm snapshots against one, with a 1.50 ceiling; observed
+    at 2.65 and at 2.00 while other gates ran on the same machine, green every time in isolation.
+    It can fail any landing gate and CI. Needs a measure that is not wall clock, or a load-aware
+    ceiling — weakening the ratio silently would retire the lock-scope guard it exists to be.
+
 ## Structure
 
-12. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+15. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.
