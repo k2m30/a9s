@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A snapshot deleted into the Recycle Bin now says so, instead of reading as a
+  failed snapshot and carrying a failed one's advice: take a fresh copy and
+  delete this. It still holds the volume's data, and a retention rule deletes
+  it for good when the period ends.
 - A DynamoDB table's Billing column now reads `provisioned` on a table that has
   never switched billing mode. DynamoDB reports no billing summary for those,
   and the column was blank.
