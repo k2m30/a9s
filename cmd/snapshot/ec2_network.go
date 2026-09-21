@@ -180,8 +180,11 @@ func captureAMI(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ec2.NewFromConfig(cfg)
 
 	var images []amiImage
+	// The fetcher's list path passes IncludeDisabled; a collector without it
+	// would call a disabled AMI a row a9s invented.
 	pager := ec2.NewDescribeImagesPaginator(client, &ec2.DescribeImagesInput{
-		Owners: []string{"self"},
+		Owners:          []string{"self"},
+		IncludeDisabled: aws.Bool(true),
 	})
 	for pager.HasMorePages() {
 		out, err := pager.NextPage(ctx)
