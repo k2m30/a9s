@@ -110,7 +110,10 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			sizeBytesRaw = strconv.FormatInt(*table.TableSizeBytes, 10)
 		}
 
-		billingMode := ""
+		// DynamoDB omits BillingModeSummary entirely for a table that has
+		// never switched mode, and PROVISIONED is the mode a table gets when
+		// CreateTable names none.
+		billingMode := domain.HumanizeStatusPhrase(string(ddbtypes.BillingModeProvisioned))
 		if table.BillingModeSummary != nil {
 			billingMode = domain.HumanizeStatusPhrase(string(table.BillingModeSummary.BillingMode))
 		}

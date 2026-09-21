@@ -263,8 +263,12 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 		if actionProvider(a) != "S3" {
 			return
 		}
-		if name := a.Configuration["BucketName"]; name != "" {
-			seen[name] = struct{}{}
+		// A deploy action names its target under BucketName; a source action
+		// names the bucket it polls under S3Bucket.
+		for _, key := range []string{"BucketName", "S3Bucket"} {
+			if name := a.Configuration[key]; name != "" {
+				seen[name] = struct{}{}
+			}
 		}
 	})
 	return relatedResultTrunc("s3", mapKeys(seen), false)

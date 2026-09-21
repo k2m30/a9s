@@ -120,6 +120,14 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 // executor output to CloudWatch as the run happens.
 const glueContinuousLogArgument = "--enable-continuous-cloudwatch-log"
 
+// glueVersionBefore5 reports whether a job's GlueVersion ("0.9", "4.0", "5.0")
+// predates 5.0. An unparseable or absent version reads as older: GetJobs omits
+// the field on jobs created before it existed, which are 0.9.
+func glueVersionBefore5(version string) bool {
+	v, err := strconv.ParseFloat(version, 64)
+	return err != nil || v < 5
+}
+
 // addGluePostureFindings evaluates the three posture signals against the
 // GetJobs response the fetcher already holds.
 func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
@@ -131,7 +139,9 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	}
 
 	// The flag is a string, so "false" is off exactly as surely as absent.
-	if job.DefaultArguments[glueContinuousLogArgument] != "true" {
+	// Glue 5.0 streams executor output without it, so the argument is only
+	// something to add on 4.0 and earlier.
+	if glueVersionBefore5(aws.ToString(job.GlueVersion)) && job.DefaultArguments[glueContinuousLogArgument] != "true" {
 		addWave1Finding(r, CodeGlueContinuousLoggingOff)
 		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
 			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",

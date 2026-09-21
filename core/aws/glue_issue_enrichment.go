@@ -61,7 +61,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		if len(out.JobRuns) > 0 {
 			run := out.JobRuns[0]
 			s := run.JobRunState
-			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout {
+			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout || s == gluetypes.JobRunStateExpired {
 				stateVal := string(s)
 				statePhrase := domain.HumanizeStatusPhrase(stateVal)
 				var rows []domain.DetailRow

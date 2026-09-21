@@ -60,7 +60,9 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		input.Marker = &continuationToken
 	}
 
-	output, err := api.DescribeDBClusterSnapshots(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+		return api.DescribeDBClusterSnapshots(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching DocumentDB cluster snapshots: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -23,10 +24,15 @@ const (
 	tgwCodeAttachmentTransitional domain.FindingCode = "tgw.attachment-transitional"
 )
 
+// tgwPendingAcceptanceGrace is how long a cross-account attachment may sit
+// unaccepted before it reads as stuck rather than in progress.
+const tgwPendingAcceptanceGrace = 24 * time.Hour
+
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
 // per-TGW pagination up to PerParentPageCap pages) and returns a Finding for any TGW with
 // attachments in a failed or transitional state.
-// Severity "!" for failed/failing; severity "~" for modifying/pendingAcceptance/rollingBack.
+// Severity "!" for failed/failing/rejected/rejecting; severity "~" for
+// modifying/rollingBack and for pendingAcceptance older than tgwPendingAcceptanceGrace.
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
 // Per-TGW errors are aggregated and returned as a composite error alongside partial findings.
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -90,9 +96,17 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			humanState := domain.HumanizeStatusPhrase(state)
 			code := domain.FindingCode("")
 			switch state {
-			case "failed", "failing":
+			case "failed", "failing", "rejected", "rejecting":
 				code = tgwCodeAttachmentFailed
-			case "modifying", "pendingAcceptance", "rollingBack":
+			case "pendingAcceptance":
+				// The owning account has a request waiting, which is the
+				// normal first minutes of every cross-account attachment.
+				// Only one left sitting is something to chase.
+				if att.CreationTime == nil || time.Since(*att.CreationTime) <= tgwPendingAcceptanceGrace {
+					continue
+				}
+				code = tgwCodeAttachmentTransitional
+			case "modifying", "rollingBack":
 				code = tgwCodeAttachmentTransitional
 			default:
 				continue

@@ -30,7 +30,8 @@ const (
 // Findings:
 //   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false → "~",
 //     athenaCodeSettingsNotEnforced.
-//   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil → "~",
+//   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil,
+//     on a workgroup not using Athena owned storage → "~",
 //     athenaCodeResultsUnencrypted, carrying the result location so the row
 //     names where the unencrypted output lands.
 //
@@ -79,8 +80,11 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced, nil)
 
 		}
-		// Missing encryption on result configuration is a security concern.
-		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
+		// Results in Athena owned storage are encrypted whatever the
+		// workgroup asks for — an AWS owned key when it names none — so the
+		// S3-side encryption setting decides nothing for such a workgroup.
+		managedResults := cfg.ManagedQueryResultsConfiguration != nil && cfg.ManagedQueryResultsConfiguration.Enabled
+		if !managedResults && (cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil) {
 			var rows []domain.DetailRow
 			if loc := aws.ToString(resultOutputLocation(cfg)); loc != "" {
 				rows = append(rows, domain.DetailRow{Label: "Results written to", Value: loc, Tier: "~"})

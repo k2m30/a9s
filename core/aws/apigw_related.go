@@ -108,12 +108,14 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	executionPrefix := "API-Gateway-Execution-Logs_" + apiID + "/"
-	accessLogPrefix := "/aws/apigateway/" + apiName
+	// One API's name is the prefix of another's ("orders" of "orders-v2"), so
+	// the group either is the API's own or sits under it on a path boundary.
+	accessLogName := "/aws/apigateway/" + apiName
 
 	var ids []string
 	for _, logRes := range logList {
 		if (apiID != "" && strings.HasPrefix(logRes.ID, executionPrefix)) ||
-			(apiName != "" && strings.HasPrefix(logRes.ID, accessLogPrefix)) {
+			(apiName != "" && (logRes.ID == accessLogName || strings.HasPrefix(logRes.ID, accessLogName+"/"))) {
 			ids = append(ids, logRes.ID)
 		}
 	}

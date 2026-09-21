@@ -88,7 +88,9 @@ Transcribed from `docs/attention-signals.md § Signals § DATA & ANALYTICS` row 
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: the job's default arguments do not enable continuous CloudWatch logging.
+- **Signal**: on `GlueVersion` earlier than 5.0, the job's default arguments do
+  not enable continuous CloudWatch logging. Glue 5.0 streams executor output
+  without the argument.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -135,7 +137,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Job.SecurityConfiguration` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no security configuration` |
-| the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `continuous logging off` |
+| on Glue 4.0 and earlier, the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `continuous logging off` |
 | a default argument value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in job arguments` |
 | latest run `FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |
 | latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |

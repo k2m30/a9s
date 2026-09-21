@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -562,7 +563,7 @@ func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 			"type":         "Gateway",
 		},
 	}
-	ddbInterfaceDecoy := resource.Resource{
+	ddbInterface := resource.Resource{
 		ID:   "vpce-ddb-interface-0001",
 		Name: "vpce-ddb-interface-0001",
 		Fields: map[string]string{
@@ -572,17 +573,17 @@ func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 	}
 	cache := resource.ResourceCache{
 		"vpce": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{ddbGateway, s3Decoy, ddbInterfaceDecoy},
+			Resources: []resource.Resource{ddbGateway, s3Decoy, ddbInterface},
 		},
 	}
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (only DDB Gateway endpoint)", result.Count())
+	if result.Count() != 2 {
+		t.Errorf("Count = %d, want 2 (both DynamoDB endpoints)", result.Count())
 	}
-	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "vpce-ddb-gateway-0001" {
-		t.Errorf("ResourceIDs = %v, want [vpce-ddb-gateway-0001]", result.ResourceIDs())
+	if want := []string{"vpce-ddb-gateway-0001", "vpce-ddb-interface-0001"}; !slices.Equal(result.ResourceIDs(), want) {
+		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs(), want)
 	}
 }
 
@@ -611,7 +612,10 @@ func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
 	}
 }
 
-func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
+// AWS PrivateLink for DynamoDB puts an interface endpoint on the same
+// com.amazonaws.<region>.dynamodb service name as the gateway endpoint, and a
+// table reached through one is reached privately just the same.
+func TestDDB_Related_VPCE_InterfaceTypeMatches(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "vpce")
 
@@ -631,8 +635,8 @@ func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (Interface type must not match — only Gateway)", result.Count())
+	if result.Count() != 1 {
+		t.Errorf("Count = %d, want 1 (a PrivateLink interface endpoint for DynamoDB)", result.Count())
 	}
 }
 

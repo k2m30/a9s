@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A DynamoDB table's Billing column now reads `provisioned` on a table that has
+  never switched billing mode. DynamoDB reports no billing summary for those,
+  and the column was blank.
+- A table now lists the PrivateLink interface endpoint reaching DynamoDB
+  privately, alongside the gateway endpoint. Only gateway endpoints counted.
+- A DocumentDB cluster snapshot list no longer comes back empty when the first
+  call is throttled; the call is retried like every sibling list call.
+- A cache with encryption at rest on now reads as encrypted. ElastiCache
+  reports the at-rest flag false on some encrypted groups and names the
+  effective state separately, so those were told to turn encryption on.
+- A cache using RBAC user groups is no longer reported as having no
+  authentication. ElastiCache refuses an AUTH token alongside a user group, so
+  the most secure setup was the one flagged.
+- A transit gateway attachment the owning account rejected now shows red and
+  says so; it showed no colour and no finding at all.
+- A cross-account attachment waiting for acceptance now turns yellow only after
+  a day. Every freshly requested attachment turned yellow immediately.
+- An API's Related panel no longer counts another API's log group: API `orders`
+  counted `orders-v2`'s.
+- Opening the targets of a rule on the default event bus now works. EventBridge
+  rejects an explicitly empty bus name, so those rules showed a validation
+  error.
+- A rule enabled for all CloudTrail management events is now flagged when it
+  has no targets, like any other enabled rule.
+- A Glue 5.0 job no longer carries a "continuous logging off" warning. Glue 5.0
+  streams executor output without the argument the warning asks for.
+- A Glue job whose latest run expired now reads broken, matching what the job
+  runs list already says about that run.
+- A pipeline's S3 related count now includes the bucket a source action polls,
+  not only a deploy action's target bucket.
+- A pipeline with no failed stage now leaves its Status column blank instead of
+  claiming `OK`, which read as health for pipelines that had never run.
+- An Athena workgroup storing results in Athena owned storage is no longer
+  reported as writing them unencrypted; that storage is always encrypted.
+
 - A load balancer now names every certificate its listeners serve. A listener
   carries one default certificate and serves the rest by SNI, so a
   multi-domain ALB listed one of them while each of the others listed the load

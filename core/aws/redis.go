@@ -207,7 +207,15 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
-	if !aws.ToBool(rg.AtRestEncryptionEnabled) {
+	// AtRestEncryptionEnabled is false on some encrypted groups; the SDK
+	// points at StorageEncryptionType for the effective state, where "none"
+	// is the only value that means off. The bool decides only when
+	// ElastiCache reports no type at all.
+	atRestOff := !aws.ToBool(rg.AtRestEncryptionEnabled)
+	if rg.StorageEncryptionType != "" {
+		atRestOff = rg.StorageEncryptionType == elasticachetypes.StorageEncryptionTypeNone
+	}
+	if atRestOff {
 		add(CodeRedisAtRestOff, domain.SevWarn, nil)
 	}
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
@@ -217,8 +225,11 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported
 	// by the row above — reporting a missing AUTH token there too would name
-	// the same misconfiguration twice.
-	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) {
+	// the same misconfiguration twice. A user group is the other way to
+	// authenticate and ElastiCache refuses it alongside an AUTH token
+	// ("User group can't be associated with auth token enabled"), so an RBAC
+	// group has authentication precisely because the token is absent.
+	if transitOn && !aws.ToBool(rg.AuthTokenEnabled) && len(rg.UserGroupIds) == 0 {
 		add(CodeRedisNoAuth, domain.SevBroken,
 			[]domain.DetailRow{{Label: "Authentication token", Value: "none", Tier: "!"}})
 	}

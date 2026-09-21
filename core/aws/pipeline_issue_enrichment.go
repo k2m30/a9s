@@ -62,7 +62,10 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		if key == "" {
 			key = r.Name
 		}
-		lastStatus := "OK"
+		// The column names the stage that failed. A pipeline with none —
+		// healthy, never run and mid-execution alike — has no such stage to
+		// name, and this pass cannot tell those three apart.
+		lastStatus := ""
 		for _, stage := range out.StageStates {
 			if stage.LatestExecution == nil || stage.LatestExecution.Status != cptypes.StageExecutionStatusFailed {
 				continue
@@ -71,7 +74,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			if stage.StageName != nil {
 				stageName = *stage.StageName
 			}
-			if lastStatus == "OK" {
+			if lastStatus == "" {
 				lastStatus = stageName
 			}
 			rows := []domain.DetailRow{

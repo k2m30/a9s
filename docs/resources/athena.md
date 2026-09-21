@@ -79,7 +79,9 @@ One bullet per distinct signal.
   - **API call**: `GetWorkGroup` per workgroup.
   - **Cost shape**: per-resource. A workgroup that does not force its settings leaves every setting it defines advisory — the client chooses.
 
-- **Signal**: `Configuration.ResultConfiguration.EncryptionConfiguration == nil`.
+- **Signal**: `Configuration.ResultConfiguration.EncryptionConfiguration == nil`
+  on a workgroup that does not store results in Athena owned storage
+  (`ManagedQueryResultsConfiguration.Enabled`), where they are always encrypted.
   - **State bucket**: Warning.
   - **API call**: same `GetWorkGroup` per workgroup — no additional call.
   - **Cost shape**: per-resource. Query results land in S3 unencrypted, so whatever a query returns is readable by anyone who can read the bucket. Evaluated independently of enforcement: a workgroup can fail either without the other.
@@ -102,7 +104,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
 | `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `settings can be overridden per query` |
-| `ResultConfiguration.EncryptionConfiguration == nil` | 2 | Warning | `~` | S2, S3, S4, S5 | `query results stored unencrypted` |
+| `ResultConfiguration.EncryptionConfiguration == nil` without Athena owned storage | 2 | Warning | `~` | S2, S3, S4, S5 | `query results stored unencrypted` |
 
 Rules for filling list and detail text:
 

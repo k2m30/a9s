@@ -37,11 +37,11 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResultTrunc("logs", ids, truncated)
 }
 
-// checkDdbVPCE scans the vpce cache for DynamoDB Gateway endpoints in this
-// region. DynamoDB endpoints are service-scoped (not per-table), so every
-// matching gateway endpoint is surfaced. Matching requires both:
-//   - service_name ending in ".dynamodb" (e.g. "com.amazonaws.us-east-1.dynamodb")
-//   - type == "Gateway" (the vpce fetcher stores VpcEndpointType in Fields["type"])
+// checkDdbVPCE scans the vpce cache for DynamoDB endpoints in this region.
+// DynamoDB endpoints are service-scoped (not per-table), so every matching
+// endpoint is surfaced. Matching is on service_name ending in ".dynamodb"
+// (e.g. "com.amazonaws.us-east-1.dynamodb"), which both the gateway endpoint
+// and the PrivateLink interface endpoint carry.
 func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	_ = res
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
@@ -53,8 +53,7 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {
-		if strings.HasSuffix(vpceRes.Fields["service_name"], ".dynamodb") &&
-			vpceRes.Fields["type"] == "Gateway" {
+		if strings.HasSuffix(vpceRes.Fields["service_name"], ".dynamodb") {
 			ids = append(ids, vpceRes.ID)
 		}
 	}

@@ -139,7 +139,9 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
   - **State bucket**: Warning.
   - **How obtained**: list-response fields `AutomaticFailover` and `MultiAZ` on `DescribeReplicationGroups` (multi-AZ detected via `MultiAZ == "enabled"` per `elasticache/types.MultiAZStatus`).
 
-- **Signal**: `AtRestEncryptionEnabled` not true.
+- **Signal**: `StorageEncryptionType == none`, or, when ElastiCache reports no
+  type, `AtRestEncryptionEnabled` not true. The flag reads false on some
+  encrypted groups; the type carries the effective state.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -147,7 +149,9 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `AuthTokenEnabled` not true while in-transit encryption is on.
+- **Signal**: `AuthTokenEnabled` not true while in-transit encryption is on and
+  no user group is attached. ElastiCache refuses an AUTH token alongside a user
+  group, so an RBAC group authenticates by having no token.
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -190,9 +194,9 @@ Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type regi
 | `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <shard id>: <status>` |
 | `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <shard id>: <status>` |
 | `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `multi-AZ without auto-failover` |
-| `AtRestEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
+| `StorageEncryptionType == none`, else `AtRestEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
 | `TransitEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption in transit off` |
-| `AuthTokenEnabled` not true while in-transit encryption is on | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no authentication token` |
+| `AuthTokenEnabled` not true while in-transit encryption is on and no user group is attached | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no authentication token` |
 | `SnapshotRetentionLimit` 0 or absent | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automatic backups off` |
 
 Notes for fillers:

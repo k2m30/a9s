@@ -78,7 +78,9 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 		var rows []domain.DetailRow
 
-		noTargets := fetchErr == nil && state == "ENABLED" && len(targets) == 0 && !targetsTruncated
+		// A rule is either DISABLED or firing: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
+		// is a second enabled state, and a rule in it delivers like any other.
+		noTargets := fetchErr == nil && state != "DISABLED" && state != "" && len(targets) == 0 && !targetsTruncated
 
 		if state == "DISABLED" && len(targets) > 0 {
 			rows = append(rows, domain.DetailRow{

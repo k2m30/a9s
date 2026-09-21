@@ -31,8 +31,12 @@ func FetchEventBridgeRuleTargets(
 	}
 
 	input := &eventbridge.ListTargetsByRuleInput{
-		Rule:         &ruleName,
-		EventBusName: &eventBus,
+		Rule: &ruleName,
+	}
+	// EventBusName has a minimum length of 1, so a rule on the default bus
+	// has to omit the field rather than send it empty.
+	if eventBus != "" {
+		input.EventBusName = &eventBus
 	}
 
 	output, err := api.ListTargetsByRule(ctx, input)
