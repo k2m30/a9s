@@ -11,13 +11,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkEBSEC2 returns the EC2 instance this volume is attached to (Pattern F).
+// checkEBSEC2 returns the EC2 instances this volume is attached to (Pattern F).
 func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	instanceID := res.Fields["attached_to"]
-	if instanceID == "" {
-		return resource.ProvenZero("ec2", "instanceID")
+	attachedTo := res.Fields["attached_to"]
+	if attachedTo == "" {
+		return resource.ProvenZero("ec2", "attachedTo")
 	}
-	return relatedResultTrunc("ec2", []string{instanceID}, false)
+	return relatedResultTrunc("ec2", splitCSV(attachedTo), false)
 }
 
 // checkEBSSnap searches the ebs-snap cache for snapshots of this volume (Pattern C).

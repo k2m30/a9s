@@ -68,11 +68,11 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Wave2:     IssueEnricher{Fn: EnrichGlueJobStatus, Priority: 10},
 		FieldKeys: []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified", "command", "created_on", "max_retries", "role"},
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkGlueLogs, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN, Truncated: true},
-			{TargetType: "s3", DisplayName: "S3 (script bucket)", Checker: checkGlueS3},
+			{TargetType: "s3", DisplayName: "S3 (script bucket)", Checker: checkGlueS3, Mirror: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkGlueKMS},
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkGlueSecrets},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("glue")},
@@ -112,7 +112,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Wave2:     IssueEnricher{Fn: EnrichAthenaWorkGroup, Priority: 100},
 		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location", "creation_time", "cost_cap"},
 		Related: []domain.RelatedDef{
-			{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3},
+			{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3, Mirror: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAthenaLogs},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAthenaRole},

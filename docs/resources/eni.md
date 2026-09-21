@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ec2`, `
 ### `eip`
 
 - **Why related**: Public IP or allocated Elastic IP bound to this ENI — tells the operator whether the interface is internet-reachable and whether the EIP is billed.
-- **How discovered**: read field `NetworkInterface.Association.AllocationId` (or `Association.PublicIp`) on the resource; cross-reference the already-loaded `eip` list by `Address.AllocationId` / `Address.PublicIp`. Absent when `Association == nil`.
+- **How discovered**: read `NetworkInterface.Association.AllocationId` (or `Association.PublicIp`), which carries the primary private address's association, and every `PrivateIpAddresses[].Association.AllocationId`, which carries the association of each secondary address; cross-reference the already-loaded `eip` list by `Address.AllocationId` / `Address.PublicIp`.
 - **Count shown**: yes.
 
 ### `elb`

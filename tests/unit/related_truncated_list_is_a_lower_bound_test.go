@@ -39,7 +39,7 @@ var truncatedUnknownAllowed = map[string]string{
 	"dbc_snap_related.go:126":       "dbc is the join list; the backup target is unread until the parent ARN resolves",
 	"dbi_snap_related.go:107":       "dbi is the join list; the backup target is unread until the parent ARN resolves",
 	"ecs_svc_related.go:146":        "tg is the join list; the elb target is unread until the load balancer ARNs resolve",
-	"ecs_task_related_extra.go:210": "eni is the join list; the sg target is unread until the group ids resolve",
+	"ecs_task_related_extra.go:216": "eni is the join list; the sg target is unread until the group ids resolve",
 	"eip_related.go:150":            "ec2 is the join list; asg is never fetched, the name comes off an instance tag",
 	"msk_related.go:139":            "subnet is the join list; vpc is never fetched, the id comes off a subnet struct",
 }

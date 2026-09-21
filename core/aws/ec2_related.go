@@ -11,7 +11,6 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
@@ -168,11 +167,12 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	if instanceID == "" {
 		return unreadZero(res, resource.ProvenZero("ng", "instanceID"))
 	}
-	tags := ec2Tags(res)
-	clusterName := tags["eks:cluster-name"]
-	nodegroupName := tags["eks:nodegroup-name"]
-	if clusterName == "" && nodegroupName == "" {
-		return unreadZero(res, resource.ProvenZero("ng", "nodegroupName"))
+	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
+	if !ok {
+		return unreadZero(res, resource.KnownRelated("ng", nil, false))
+	}
+	if tagValue(inst.Tags, "eks:nodegroup-name") == "" {
+		return unreadZero(res, resource.ProvenZero("ng", "the eks:nodegroup-name tag"))
 	}
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
@@ -183,24 +183,8 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	}
 	var ids []string
 	for _, ngRes := range ngList {
-		raw, ok := assertStruct[ekstypes.Nodegroup](ngRes.RawStruct)
-		rawClusterName := ngRes.Fields["cluster_name"]
-		rawNodegroupName := ngRes.Fields["nodegroup_name"]
-		if ok {
-			if raw.ClusterName != nil {
-				rawClusterName = *raw.ClusterName
-			}
-			if raw.NodegroupName != nil {
-				rawNodegroupName = *raw.NodegroupName
-			}
-		}
-		if clusterName != "" && rawClusterName != "" && clusterName != rawClusterName {
-			continue
-		}
-		if nodegroupName != "" && rawNodegroupName != "" && nodegroupName != rawNodegroupName {
-			continue
-		}
-		if rawNodegroupName != "" {
+		nodegroupName, clusterName := ngIdentity(ngRes)
+		if ngOwnsInstance(inst.Tags, nodegroupName, clusterName) {
 			ids = append(ids, ngRes.ID)
 		}
 	}
@@ -272,21 +256,6 @@ func ec2Identity(res resource.Resource) (instanceID, vpcID, stackName string) {
 		}
 	}
 	return instanceID, vpcID, stackName
-}
-
-func ec2Tags(res resource.Resource) map[string]string {
-	tags := map[string]string{}
-	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
-	if !ok {
-		return tags
-	}
-	for _, tag := range raw.Tags {
-		if tag.Key == nil || tag.Value == nil {
-			continue
-		}
-		tags[*tag.Key] = *tag.Value
-	}
-	return tags
 }
 
 func ec2VolumeIDs(res resource.Resource) map[string]struct{} {

@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `acm`
 
 - **Why related**: HTTPS listener certificate — the ACM cert that terminates TLS on this LB's HTTPS/TLS listeners.
-- **How discovered**: call `elbv2:DescribeListeners(LoadBalancerArn=<this>)` and collect `Certificates[].CertificateArn` from each listener; cross-reference against the already-loaded `acm` list by ARN. `docs/related-resources.md` § `elb` does not say whether discovery happens at detail-open time or earlier; the contract row does not fix the moment.
+- **How discovered**: call `elbv2:DescribeListeners(LoadBalancerArn=<this>)` and collect each listener's default `Certificates[].CertificateArn`, then `elbv2:DescribeListenerCertificates` per HTTPS/TLS listener for the SNI certificates the default field does not carry; cross-reference against the already-loaded `acm` list by ARN. `docs/related-resources.md` § `elb` does not say whether discovery happens at detail-open time or earlier; the contract row does not fix the moment.
 - **Count shown**: yes.
 
 ### `alarm`

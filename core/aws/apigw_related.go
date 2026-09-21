@@ -69,9 +69,10 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
 	if len(ids) == 0 {
-		// Nothing was confirmed: any failures are a plain fetch failure, not
-		// a truncation signal (there is no larger population left unseen).
-		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil {
+		// Every function refused its read: nothing was established about any
+		// of them, which is a fetch failure rather than a lower bound over
+		// what was read.
+		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil && len(failures) == total {
 			return resource.ErrorRelated("kms", aggErr)
 		}
 		if err != nil {
@@ -225,9 +226,10 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	ids, dropped := resolveRefs("acm", refs, refContext(clients, cache, "acm"))
 	if len(ids) == 0 {
-		// Nothing was confirmed: any failures are a plain fetch failure, not
-		// a truncation signal (there is no larger population left unseen).
-		if aggErr := AggregateFailures("apigw-related: GetApiMappings", failures, total); aggErr != nil {
+		// Every domain refused its read: nothing was established about any of
+		// them, which is a fetch failure rather than a lower bound over what
+		// was read.
+		if aggErr := AggregateFailures("apigw-related: GetApiMappings", failures, total); aggErr != nil && len(failures) == total {
 			return resource.ErrorRelated("acm", aggErr)
 		}
 	}

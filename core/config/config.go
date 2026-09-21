@@ -106,7 +106,7 @@ type ViewsConfig struct {
 // The merge only adds and re-sources: a removed built-in column stays on the
 // operator's disk, and a renamed one arrives as a new title beside the old
 // column.
-const GeneratedViewsVersion = 9
+const GeneratedViewsVersion = 10
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {

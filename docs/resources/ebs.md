@@ -51,7 +51,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ec2`
 
-- **Why related**: Which instance this volume is attached to — answers "whose workload does this carry?". Cited in `docs/related-resources.md` §`ebs` as "Volume.Attachments[].InstanceId."
+- **Why related**: Which instances this volume is attached to — answers "whose workload does this carry?". Multi-Attach puts one io1/io2 volume on up to 16 instances at once. Cited in `docs/related-resources.md` §`ebs` as "Volume.Attachments[].InstanceId".
 - **How discovered**: read `Volume.Attachments[].InstanceId` directly on the list-response (`AWS SDK Go v2 — ec2/types.VolumeAttachment § InstanceId`). No extra API call. `available` volumes return an empty `Attachments[]`.
 - **Count shown**: yes (0 for available/orphan volumes, 1+ when multi-attach is enabled).
 
@@ -203,7 +203,7 @@ ebs — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| ec2 | EC2 Instance | no |
+| ec2 | EC2 Instances | no |
 | ebs-snap | EBS Snapshots | yes |
 | kms | KMS Key | no |
 | alarm | CW Alarms | yes |

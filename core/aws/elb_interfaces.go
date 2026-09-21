@@ -28,6 +28,13 @@ type ELBv2DescribeListenersAPI interface {
 	DescribeListeners(ctx context.Context, params *elbv2.DescribeListenersInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error)
 }
 
+// ELBv2DescribeListenerCertificatesAPI defines the interface for the ELBv2
+// DescribeListenerCertificates operation, which answers for the SNI
+// certificates of an HTTPS or TLS listener beside its default one.
+type ELBv2DescribeListenerCertificatesAPI interface {
+	DescribeListenerCertificates(ctx context.Context, params *elbv2.DescribeListenerCertificatesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeListenerCertificatesOutput, error)
+}
+
 // ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
 type ELBv2DescribeRulesAPI interface {
 	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)

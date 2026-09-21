@@ -1074,9 +1074,13 @@ func buildIAMRelations(f *IAMFixtures) {
 		{UserName: aws.String("bob.smith"), UserId: aws.String("AIDAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:user/bob.smith"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 9, 1, 10, 30, 0, 0, time.UTC))},
 	}
 
-	f.GroupsForUser["alice.johnson"] = []iamtypes.Group{
-		{GroupName: aws.String("admins"), GroupId: aws.String("AGPAEXAMPLE111111111"), Arn: aws.String("arn:aws:iam::123456789012:group/admins"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 0, 0, 0, time.UTC))},
-		{GroupName: aws.String("developers"), GroupId: aws.String("AGPAEXAMPLE222222222"), Arn: aws.String("arn:aws:iam::123456789012:group/developers"), Path: aws.String("/"), CreateDate: aws.Time(time.Date(2024, 3, 1, 8, 5, 0, 0, time.UTC))},
+	// iam:GetGroup and iam:ListGroupsForUser answer for one membership, so the
+	// user's end is the group's end read the other way round.
+	for _, g := range f.Groups {
+		for _, u := range f.GroupUsers[aws.ToString(g.GroupName)] {
+			userName := aws.ToString(u.UserName)
+			f.GroupsForUser[userName] = append(f.GroupsForUser[userName], g)
+		}
 	}
 
 	buildEntitiesForPolicy(f)

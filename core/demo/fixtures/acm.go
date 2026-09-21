@@ -269,8 +269,14 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 		InUseBy: map[string][]string{
 			ProdACMCertARN1: {
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef",
+				// ELBWeakTLS terminates both its HTTPS listeners on this
+				// certificate (elb.go), so ACM records it as a user of it.
+				lbARNByName(NewELBFixtures().LoadBalancers, ELBWeakTLS),
 				"arn:aws:apigateway:us-east-1::/restapis/abc123def4",
 			},
+			// The prod ALB's HTTPS listener serves this wildcard by SNI
+			// (elb.go ListenerSNICerts).
+			ProdACMCertARN2: {fixtProdELBARN},
 		},
 		// DomainValidationOptions — backs the acm→r53 related-panel pivot.
 		// The validation CNAME for ProdACMCertARN1 lives under

@@ -25,8 +25,10 @@ import (
 )
 
 // trunc232Instance is the EC2 instance used across all truncation-contract tests.
-// It belongs to cluster "cluster-A" and stack "stack-trunc" so that node-group
-// and CFN checkers can enter their matching loops.
+// It is a node of node group "workers" in cluster "cluster-A", and belongs to
+// stack "stack-trunc", so that node-group and CFN checkers can enter their
+// matching loops. EKS writes both node-group tags on every instance a managed
+// node group launches.
 var trunc232Instance = resource.Resource{
 	ID: "i-test-trunc",
 	RawStruct: ec2types.Instance{
@@ -34,6 +36,7 @@ var trunc232Instance = resource.Resource{
 		VpcId:      aws.String("vpc-trunc"),
 		Tags: []ec2types.Tag{
 			{Key: aws.String("eks:cluster-name"), Value: aws.String("cluster-A")},
+			{Key: aws.String("eks:nodegroup-name"), Value: aws.String("workers")},
 			{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("stack-trunc")},
 		},
 	},
@@ -120,9 +123,10 @@ func TestContract_TruncatedZeroMatch_EIP_ReturnsTruncated(t *testing.T) {
 // when the cache entry is truncated and the only node group in the partial list
 // belongs to a different cluster.
 //
-// The instance has tag eks:cluster-name=cluster-A; the fixture NG has
-// ClusterName=cluster-B so the checker skips it via the clusterName != rawClusterName
-// guard — but because the cache is truncated it returns the honest lower bound, not -1.
+// The instance is a node of "workers" in cluster-A; the fixture NG is the
+// "workers" group of cluster-B, which is a different group, so nothing
+// matches — but because the cache is truncated the answer is the honest lower
+// bound, not -1.
 func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsTruncated(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ng": {

@@ -18,6 +18,10 @@ type ELBFixtures struct {
 	TargetGroups  []elbv2types.TargetGroup
 	// Listeners keyed by load balancer ARN
 	Listeners map[string][]elbv2types.Listener
+	// ListenerSNICerts are the certificate ARNs a listener serves by SNI,
+	// keyed by listener ARN, beside the default certificate the listener
+	// itself carries. elbv2:DescribeListenerCertificates answers with both.
+	ListenerSNICerts map[string][]string
 	// TargetHealth keyed by target group ARN
 	TargetHealth map[string][]elbv2types.TargetHealthDescription
 	// Rules keyed by listener ARN
@@ -81,7 +85,13 @@ const (
 // NewELBFixtures builds and returns a fully-populated ELBFixtures struct.
 var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 	f := &ELBFixtures{
-		Listeners:    make(map[string][]elbv2types.Listener),
+		Listeners: make(map[string][]elbv2types.Listener),
+		ListenerSNICerts: map[string][]string{
+			// The wildcard acme-corp.com certificate the prod ALB's HTTPS
+			// listener serves beside its apex default; ACM records the load
+			// balancer under it (acm.go InUseBy).
+			fixtProdListenerARN: {ProdACMCertARN2},
+		},
 		TargetHealth: make(map[string][]elbv2types.TargetHealthDescription),
 		Rules:        make(map[string][]elbv2types.Rule),
 		// ResourceTags — the prod ALB and its web TG both carry the stack tag,

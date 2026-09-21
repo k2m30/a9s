@@ -375,6 +375,14 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 // its FunctionArn values are the definitive answer,
 // each read as the function name the lambda list is keyed by.
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
+	return lambdaEventSourceMappingsNaming(ctx, clients, cache, lambda.ListEventSourceMappingsInput{EventSourceArn: aws.String(eventSourceArn)}, nil)
+}
+
+// lambdaEventSourceMappingsNaming reports the functions behind the event
+// source mappings filter returns whose source keep accepts. A nil keep takes
+// every mapping filter returned, for an event source whose ARN is the same
+// one for as long as it exists.
+func lambdaEventSourceMappingsNaming(ctx context.Context, clients any, cache resource.ResourceCache, filter lambda.ListEventSourceMappingsInput, keep func(eventSourceARN string) bool) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("lambda")
@@ -384,13 +392,16 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.UnknownRelated("lambda")
 	}
 
-	mappings, complete, err := listEventSourceMappings(ctx, api, lambda.ListEventSourceMappingsInput{EventSourceArn: aws.String(eventSourceArn)})
+	mappings, complete, err := listEventSourceMappings(ctx, api, filter)
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
 
 	var functionArns []string
 	for _, m := range mappings {
+		if keep != nil && !keep(aws.ToString(m.EventSourceArn)) {
+			continue
+		}
 		functionArns = append(functionArns, aws.ToString(m.FunctionArn))
 	}
 	ids, dropped := resolveRefs("lambda", functionArns, refContext(clients, cache, "lambda"))

@@ -249,7 +249,7 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 		// A task whose DescribeTaskDefinition failed has incomplete
 		// efs_file_system_ids; treat its contribution as unknown and mark
 		// the overall result Truncated instead of a silently-wrong zero.
-		if tRes.Fields["task_def_join_error"] == "true" {
+		if !taskDefJoined(tRes) {
 			joinIncomplete = true
 		}
 		joined := tRes.Fields["efs_file_system_ids"]

@@ -178,6 +178,12 @@ func (f *ECSFake) DescribeContainerInstances(_ context.Context, input *ecs.Descr
 
 func (f *ECSFake) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	arn := aws.ToString(input.TaskDefinition)
+	if f.fix.DeniedTaskDefinitions[arn] {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "User is not authorized to perform: ecs:DescribeTaskDefinition on " + arn,
+		}
+	}
 	tdef, ok := f.fix.TaskDefinitions[arn]
 	if !ok {
 		return nil, &smithy.GenericAPIError{

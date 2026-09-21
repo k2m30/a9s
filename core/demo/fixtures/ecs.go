@@ -21,6 +21,9 @@ type ECSFixtures struct {
 	Tasks []ecstypes.Task
 	// TaskDefinitions maps task definition ARN → TaskDefinition.
 	TaskDefinitions map[string]*ecstypes.TaskDefinition
+	// DeniedTaskDefinitions are the ARNs ecs:DescribeTaskDefinition refuses,
+	// the shape a read-only role denied that one call meets.
+	DeniedTaskDefinitions map[string]bool
 	// ContainerInstances is the list DescribeContainerInstances answers from.
 	ContainerInstances []ecstypes.ContainerInstance
 }
@@ -32,10 +35,11 @@ var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
 	tasks := buildECSTasks()
 	tdefs := buildECSTaskDefinitions()
 	return &ECSFixtures{
-		Clusters:        clusters,
-		Services:        services,
-		Tasks:           tasks,
-		TaskDefinitions: tdefs,
+		Clusters:              clusters,
+		Services:              services,
+		Tasks:                 tasks,
+		TaskDefinitions:       tdefs,
+		DeniedTaskDefinitions: map[string]bool{ecsDeniedTaskDefARN: true},
 		ContainerInstances: []ecstypes.ContainerInstance{{
 			ContainerInstanceArn: aws.String(ecsBatchContainerInstanceArn),
 			Ec2InstanceId:        aws.String(ECSBatchHostInstanceID),
@@ -84,6 +88,15 @@ const (
 	// stop-code finding: capacity being reclaimed after its warning is the
 	// platform working, not the task failing.
 	ECSTaskSpotReclaimed = "0a1b2c3d4e5f60010001000100010006"
+
+	// ECSTaskDefinitionUnreadable is the one task whose task definition
+	// ecs:DescribeTaskDefinition refuses. Its secrets, its SSM parameters and
+	// its roles live on that definition, so each of them reads as unknown
+	// rather than as none. It is STOPPED, which is the shape a definition
+	// outlives; every other task names a definition the fixture registers.
+	ECSTaskDefinitionUnreadable = "0a1b2c3d4e5f60010001000100010007"
+
+	ecsDeniedTaskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/legacy-collector:1"
 )
 
 // Superseded revisions the posture tasks above still run.
@@ -609,6 +622,22 @@ func buildECSTasks() []ecstypes.Task {
 			Group:             aws.String("service:log-aggregator"),
 			StartedAt:         aws.Time(mustTime("2026-03-20T06:00:00Z")),
 			StoppedAt:         aws.Time(mustTime("2026-03-21T08:30:00Z")),
+			StoppedReason:     aws.String("Service draining"),
+			StopCode:          ecstypes.TaskStopCodeServiceSchedulerInitiated,
+			AvailabilityZone:  aws.String("us-east-1b"),
+		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/" + ECSTaskDefinitionUnreadable),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("STOPPED"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String(ecsDeniedTaskDefARN),
+			LaunchType:        ecstypes.LaunchTypeEc2,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			Group:             aws.String("family:legacy-collector"),
+			StartedAt:         aws.Time(mustTime("2026-03-20T04:00:00Z")),
+			StoppedAt:         aws.Time(mustTime("2026-03-21T04:30:00Z")),
 			StoppedReason:     aws.String("Service draining"),
 			StopCode:          ecstypes.TaskStopCodeServiceSchedulerInitiated,
 			AvailabilityZone:  aws.String("us-east-1b"),
@@ -1180,5 +1209,5 @@ func init() {
 	// acme-svc-stalled wants tasks and runs none, so it is one of the 26 rows
 	// and one of the 7 Broken badges.
 	Register(Pin{ShortName: "ecs-svc", Rows: 27, Issues: 7, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ecs-task", Rows: 18, Issues: 8})
+	Register(Pin{ShortName: "ecs-task", Rows: 19, Issues: 8})
 }

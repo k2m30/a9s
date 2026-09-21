@@ -116,6 +116,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	amiSet := make(map[string]struct{})
 	var failures []Failure
+	refused := 0
 	for _, ngName := range ngNames {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
@@ -125,6 +126,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 		if descErr != nil {
 			failures = append(failures, FailedCall(ngName, descErr))
+			refused++
 			continue
 		}
 		if descOut.Nodegroup == nil {
@@ -145,6 +147,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 				continue
 			}
 			failures = append(failures, FailedCall(ngName+"/lt", ltErr))
+			refused++
 			continue
 		}
 		for _, v := range versions {
@@ -159,14 +162,15 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		// Nothing was confirmed. A failure here means the resolution attempt
-		// itself failed — that does not establish "the population is larger
-		// than what we saw" (Truncated's contract); it establishes nothing.
-		// Surface it as an error, not a lower bound of zero.
-		if aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngNames)); aggErr != nil {
+		// Every node group refused the read: nothing was established about
+		// any of them, which is a fetch failure rather than a lower bound
+		// over what was read. One that answered leaves the rest a lower
+		// bound instead.
+		aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngNames))
+		if aggErr != nil && refused == len(ngNames) {
 			return resource.ErrorRelated("ami", aggErr)
 		}
-		return relatedResultTrunc("ami", nil, !ngComplete)
+		return relatedResultTrunc("ami", nil, aggErr != nil || !ngComplete)
 	}
 	// Some DescribeNodegroup/DescribeLaunchTemplateVersions calls may have
 	// failed: ids is a proven subset, not necessarily exhaustive. Truncated
@@ -232,10 +236,13 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	ngAggErr := AggregateFailures("eks-related: DescribeNodegroup", ngFailures, ngTotal)
 	if len(asgNames) == 0 {
-		if ngAggErr != nil {
+		// Every node group refused its read: nothing was established about
+		// any of them, which is a fetch failure rather than a lower bound
+		// over what was read.
+		if ngAggErr != nil && len(ngFailures) == ngTotal {
 			return resource.ErrorRelated("ec2", ngAggErr)
 		}
-		return relatedResultTrunc("ec2", nil, !ngComplete)
+		return relatedResultTrunc("ec2", nil, ngAggErr != nil || !ngComplete)
 	}
 	if c.AutoScaling == nil {
 		// ASG names are known but cannot be resolved to instances without an

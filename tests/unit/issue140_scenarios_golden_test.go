@@ -9,6 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -243,9 +246,9 @@ func scenarioEC2029FilteredAlarmsList(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 30)
 	source := mustDemoEC2(t)[0]
 	m = issue140ApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "alarm", Resources: []resource.Resource{
-		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "alarm"}},
-		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "ok"}},
-		{ID: "unrelated-alarm", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},
+		scenarioAlarmRow("web-prod-cpu-high", "ALARM", "CPUUtilization", "AWS/EC2"),
+		scenarioAlarmRow("web-prod-status-check", "OK", "StatusCheckFailed", "AWS/EC2"),
+		scenarioAlarmRow("unrelated-alarm", "OK", "RequestCount", "AWS/ApplicationELB"),
 	}})
 	m = issue140ApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "alarm",
@@ -254,6 +257,32 @@ func scenarioEC2029FilteredAlarmsList(t *testing.T) string {
 		RelatedIDs:     []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 	return m.View().Content
+}
+
+// scenarioAlarmRow builds an alarm row the way FetchCloudWatchAlarmsPage does,
+// so the list's Alarm Name, Status, Actions On, Metric and Namespace columns
+// each read a value off it.
+func scenarioAlarmRow(name, state, metric, namespace string) resource.Resource {
+	return resource.Resource{
+		ID:   name,
+		Name: name,
+		Fields: map[string]string{
+			"alarm_name":    name,
+			"state":         state,
+			"metric_name":   metric,
+			"namespace":     namespace,
+			"threshold":     "80",
+			"actions_count": "1",
+		},
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName:      aws.String(name),
+			StateValue:     cwtypes.StateValue(state),
+			MetricName:     aws.String(metric),
+			Namespace:      aws.String(namespace),
+			ActionsEnabled: aws.Bool(true),
+			Threshold:      aws.Float64(80),
+		},
+	}
 }
 
 func scenarioEC2033OnlyAlarmAvailableFocus(t *testing.T) string {

@@ -102,6 +102,9 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 // to the secretsmanager ARN prefix) and cross-references the already-loaded
 // secrets cache, per docs/resources/ecs-task.md.
 func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if !taskDefJoined(res) {
+		return resource.UnknownRelated("secrets")
+	}
 	joined := res.Fields["secret_arns"]
 	if joined == "" {
 		return resource.ProvenZero("secrets", "joined")
@@ -124,6 +127,9 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 // or a bare "/"-prefixed parameter name) and cross-references the
 // already-loaded ssm cache by name, per docs/resources/ecs-task.md.
 func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if !taskDefJoined(res) {
+		return resource.UnknownRelated("ssm")
+	}
 	joined := res.Fields["ssm_param_names"]
 	if joined == "" {
 		return resource.ProvenZero("ssm", "joined")

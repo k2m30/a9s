@@ -1,4 +1,4 @@
-generated: 9
+generated: 10
 list:
   Name:
     key: name
@@ -30,7 +30,7 @@ list:
   Attached To:
     path: Attachments
     key: attached_to
-    width: 20
+    width: 40
   AZ:
     path: AvailabilityZone
     key: az

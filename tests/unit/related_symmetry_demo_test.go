@@ -21,20 +21,22 @@ var symmetryOutOfScope = map[string]bool{"alarm": true, "ct-events": true}
 // relatedDefinite reports whether a result is a complete answer about the
 // relation. A lookup that stopped short is a lower bound, one that searched
 // nothing knows nothing, and heuristic matches are candidates that share a
-// property rather than links AWS records: none of the three is a claim that a
-// row is present or absent.
+// property rather than links AWS records: none of the three can claim a row is
+// absent. Completeness is what an absence claim needs; a result that names a
+// row names it whatever its coverage.
 func relatedDefinite(r resource.RelatedCheckResult) bool {
 	return r.Coverage() == domain.CoverageComplete
 }
 
 // mirrorPairsRequired are the pairs whose two directions read one AWS fact
 // through one predicate (image URI, route target, ENI owner, mount-target
-// file system, DNS name), so each must be declared Mirror on both ends.
-var mirrorPairsRequired = [][2]string{
+// file system, DNS name), so each must be declared Mirror on both ends. The
+// pairs relatedPairFacts records as one fact are held to the same thing.
+var mirrorPairsRequired = append([][2]string{
 	{"ecr", "cb"}, {"ecr", "ecs-task"}, {"ecr", "lambda"},
 	{"igw", "rtb"}, {"tgw", "rtb"}, {"nat", "rtb"},
 	{"eni", "lambda"}, {"efs", "subnet"}, {"cf", "elb"}, {"cf", "r53"},
-}
+}, oneFactPairs()...)
 
 func relatedDefFor(src, target string) (resource.RelatedDef, bool) {
 	for _, def := range resource.GetRelated(src) {
@@ -119,19 +121,22 @@ func TestRelatedSymmetry_DemoPairsListEachOther(t *testing.T) {
 
 		// (b) a lists b exactly when b lists a, between two complete answers:
 		// the side that lists must be claiming a link, and the silent side
-		// must be claiming absence.
+		// must be claiming absence. A link the two sides agree on needs no
+		// such completeness — a scan that stopped short still returns the
+		// rows it did reach, so each naming the other is a fact about the
+		// data either way.
 		links := 0
 		var oneSided []string
 		for _, ra := range rowsA {
 			for _, rb := range rowsB {
+				if slices.Contains(ab[ra.ID].ResourceIDs(), rb.ID) && slices.Contains(ba[rb.ID].ResourceIDs(), ra.ID) {
+					links++
+				}
 				if !relatedDefinite(ab[ra.ID]) && !relatedDefinite(ba[rb.ID]) {
 					continue
 				}
 				aListsB := relatedDefinite(ab[ra.ID]) && slices.Contains(ab[ra.ID].ResourceIDs(), rb.ID)
 				bListsA := relatedDefinite(ba[rb.ID]) && slices.Contains(ba[rb.ID].ResourceIDs(), ra.ID)
-				if aListsB && bListsA {
-					links++
-				}
 				if aListsB && !bListsA && relatedDefinite(ba[rb.ID]) {
 					oneSided = append(oneSided, fmt.Sprintf("%s %s lists %s %s; %s %s does not list it (lists %v)",
 						p.a, ra.ID, p.b, rb.ID, p.b, rb.ID, ba[rb.ID].ResourceIDs()))

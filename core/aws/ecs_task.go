@@ -306,3 +306,12 @@ func ecsJoinTaskDefinition(
 
 	return out, nil
 }
+
+// taskDefJoined reports whether the list fetcher read this task's task
+// definition. The EFS volumes, the roles, and the Secrets Manager and SSM
+// references of a task live on its definition rather than on the task, so a
+// task whose join failed carries none of them: a reader that takes the empty
+// field for "none" states a zero about a definition nobody read.
+func taskDefJoined(res resource.Resource) bool {
+	return res.Fields["task_def_join_error"] != "true"
+}

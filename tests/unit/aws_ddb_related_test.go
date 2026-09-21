@@ -436,7 +436,7 @@ func TestDDB_Related_Lambda_OneMapping(t *testing.T) {
 
 	lambdaClient := &mockLambdaESMClient{
 		mappings: []lambdatypes.EventSourceMappingConfiguration{
-			{FunctionArn: aws.String(fixtures.OrdersProdLambdaARN)},
+			{FunctionArn: aws.String(fixtures.OrdersProdLambdaARN), EventSourceArn: aws.String(fixtures.OrdersProdStreamARN)},
 		},
 	}
 	clients := &awsclient.ServiceClients{Lambda: lambdaClient}

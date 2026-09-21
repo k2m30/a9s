@@ -154,13 +154,9 @@ func ngIdentity(res resource.Resource) (nodegroupName, clusterName string) {
 func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, clusterName string) []typedRow[ec2types.Instance] {
 	var matches []typedRow[ec2types.Instance]
 	for _, row := range ec2List {
-		if tagValue(row.Raw.Tags, "eks:nodegroup-name") != nodegroupName {
-			continue
+		if ngOwnsInstance(row.Raw.Tags, nodegroupName, clusterName) {
+			matches = append(matches, row)
 		}
-		if clusterName != "" && tagValue(row.Raw.Tags, "eks:cluster-name") != clusterName {
-			continue
-		}
-		matches = append(matches, row)
 	}
 	return matches
 }

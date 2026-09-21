@@ -120,14 +120,15 @@ func (f *EC2Fake) DescribeTransitGateways(_ context.Context, _ *ec2.DescribeTran
 	return &ec2.DescribeTransitGatewaysOutput{TransitGateways: f.fix.TransitGateways}, nil
 }
 
-// DescribeTransitGatewayAttachments filters by transit-gateway-id and resource-type
-// when those filters are present (matching the live checkTGWVPC call pattern).
+// DescribeTransitGatewayAttachments filters by transit-gateway-id, resource-id
+// and resource-type when those filters are present (matching the live
+// checkTGWVPC and checkVPCTGW call patterns).
 func (f *EC2Fake) DescribeTransitGatewayAttachments(_ context.Context, input *ec2.DescribeTransitGatewayAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
 	if len(input.Filters) == 0 {
 		return &ec2.DescribeTransitGatewayAttachmentsOutput{TransitGatewayAttachments: f.fix.TGWAttachments}, nil
 	}
 
-	var tgwIDs, resourceTypes []string
+	var tgwIDs, resourceIDs, resourceTypes []string
 	for _, filter := range input.Filters {
 		if filter.Name == nil {
 			continue
@@ -135,18 +136,26 @@ func (f *EC2Fake) DescribeTransitGatewayAttachments(_ context.Context, input *ec
 		switch *filter.Name {
 		case "transit-gateway-id":
 			tgwIDs = filter.Values
+		case "resource-id":
+			resourceIDs = filter.Values
 		case "resource-type":
 			resourceTypes = filter.Values
 		}
 	}
 
 	tgwSet := toSet(tgwIDs)
+	ridSet := toSet(resourceIDs)
 	rtSet := toSet(resourceTypes)
 
 	var out []ec2types.TransitGatewayAttachment
 	for _, att := range f.fix.TGWAttachments {
 		if len(tgwSet) > 0 {
 			if att.TransitGatewayId == nil || !tgwSet[*att.TransitGatewayId] {
+				continue
+			}
+		}
+		if len(ridSet) > 0 {
+			if att.ResourceId == nil || !ridSet[*att.ResourceId] {
 				continue
 			}
 		}

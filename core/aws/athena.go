@@ -61,10 +61,11 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 
 		outputLocation := ""
 		costCap := ""
+		configRead := false
 		if getAPI != nil && wgName != "" {
-			if wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)}); wgErr == nil &&
-				wgOut != nil && wgOut.WorkGroup != nil &&
-				wgOut.WorkGroup.Configuration != nil {
+			wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)})
+			configRead = wgErr == nil && wgOut != nil && wgOut.WorkGroup != nil
+			if configRead && wgOut.WorkGroup.Configuration != nil {
 				cfg := wgOut.WorkGroup.Configuration
 				if cfg.ResultConfiguration != nil && cfg.ResultConfiguration.OutputLocation != nil {
 					outputLocation = *cfg.ResultConfiguration.OutputLocation
@@ -90,6 +91,14 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 				"cost_cap":               costCap,
 			},
 			RawStruct: wg,
+		}
+		// The result location and the cost cap live on the workgroup's
+		// configuration, which ListWorkGroups does not carry: a row whose
+		// GetWorkGroup did not answer holds neither, and a reader that takes
+		// the empty cell for "none configured" states it about a
+		// configuration nobody read.
+		if !configRead {
+			r.Fields[athenaConfigUnreadField] = "true"
 		}
 
 		r.Findings = athenaStateFindings(state)
@@ -128,4 +137,14 @@ func athenaStateFindings(state string) []domain.Finding {
 		return []domain.Finding{wave1Finding(athenaCodeWorkgroupDisabled)}
 	}
 	return nil
+}
+
+// athenaConfigUnreadField marks a workgroup row whose GetWorkGroup call did
+// not answer during the list fetch.
+const athenaConfigUnreadField = "result_config_unread"
+
+// athenaConfigRead reports whether res carries the workgroup configuration
+// the list fetcher joins: its result location and its cost cap.
+func athenaConfigRead(res resource.Resource) bool {
+	return res.Fields[athenaConfigUnreadField] != "true"
 }

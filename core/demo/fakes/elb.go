@@ -76,6 +76,33 @@ func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeList
 	return &elbv2.DescribeListenersOutput{Listeners: listeners}, nil
 }
 
+// DescribeListenerCertificates answers with the listener's default
+// certificate and the certificates it serves by SNI, which is what the real
+// API returns for an HTTPS or TLS listener.
+func (f *ELBFake) DescribeListenerCertificates(_ context.Context, input *elbv2.DescribeListenerCertificatesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeListenerCertificatesOutput, error) {
+	if input.ListenerArn == nil {
+		return nil, fmt.Errorf("DescribeListenerCertificates: listener ARN is required")
+	}
+	if err := validateARN(*input.ListenerArn); err != nil {
+		return nil, err
+	}
+	var certs []elbv2types.Certificate
+	for _, listeners := range f.fix.Listeners {
+		for _, ls := range listeners {
+			if aws.ToString(ls.ListenerArn) != *input.ListenerArn {
+				continue
+			}
+			for _, cert := range ls.Certificates {
+				certs = append(certs, elbv2types.Certificate{CertificateArn: cert.CertificateArn, IsDefault: aws.Bool(true)})
+			}
+		}
+	}
+	for _, arn := range f.fix.ListenerSNICerts[*input.ListenerArn] {
+		certs = append(certs, elbv2types.Certificate{CertificateArn: aws.String(arn), IsDefault: aws.Bool(false)})
+	}
+	return &elbv2.DescribeListenerCertificatesOutput{Certificates: certs}, nil
+}
+
 func (f *ELBFake) DescribeRules(_ context.Context, input *elbv2.DescribeRulesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error) {
 	if input.ListenerArn == nil {
 		return &elbv2.DescribeRulesOutput{}, nil

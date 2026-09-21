@@ -13,9 +13,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkRTBSubnet searches the subnet cache for subnets associated with this route table.
-// It extracts SubnetIds from ec2types.RouteTable.Associations[].
-func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkRTBSubnet searches the subnet cache for subnets associated with this
+// route table. It extracts SubnetIds from ec2types.RouteTable.Associations[],
+// and, for the VPC's main table, adds the subnets implicitly associated with
+// it through subnetRouteTableIDs.
+func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		if res.RawStruct == nil {
@@ -23,14 +25,43 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		}
 		return resource.KnownRelated("subnet", nil, false)
 	}
-	// RouteTable.Associations[].SubnetId are the associated subnets.
 	var ids []string
+	isMain := false
 	for _, assoc := range rtb.Associations {
 		if assoc.SubnetId != nil && *assoc.SubnetId != "" {
 			ids = append(ids, *assoc.SubnetId)
 		}
+		if assoc.Main != nil && *assoc.Main {
+			isMain = true
+		}
 	}
-	return relatedResultTrunc("subnet", ids, false)
+	if !isMain {
+		return relatedResultTrunc("subnet", ids, false)
+	}
+
+	subnetList, subnetTrunc, err := relatedResourcesFor(ctx, clients, cache, "subnet")
+	if err != nil {
+		return resource.ErrorRelated("subnet", err)
+	}
+	rtbList, rtbTrunc, err := relatedResourcesFor(ctx, clients, cache, "rtb")
+	if err != nil {
+		return resource.ErrorRelated("subnet", err)
+	}
+	if subnetList == nil || rtbList == nil {
+		// Which subnets fall to this table implicitly is unreadable without
+		// both lists: the subnets of its VPC, and the tables that name one
+		// explicitly.
+		return resource.UnknownRelated("subnet")
+	}
+	for _, subnetRes := range subnetList {
+		if slices.Contains(ids, subnetRes.ID) {
+			continue
+		}
+		if slices.Contains(subnetRouteTableIDs(subnetRes.ID, subnetRes.Fields["vpc_id"], rtbList), res.ID) {
+			ids = append(ids, subnetRes.ID)
+		}
+	}
+	return relatedResultTrunc("subnet", ids, subnetTrunc || rtbTrunc)
 }
 
 // checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.

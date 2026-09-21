@@ -142,11 +142,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id", "encryption"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true, Distinct: "the function this group's /aws/lambda/<name> name carries"},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
-			{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "the API id in this group's API-Gateway-Execution-Logs_<id> name"},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true, Truncated: true, Distinct: "tasks whose task-definition family this group's /ecs/<family> name carries"},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLogsKinesis, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 (exports)", Checker: checkLogsS3, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("logs")},
@@ -206,7 +206,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Wave2:     IssueEnricher{Fn: EnrichTrailLogBucket, Priority: 200},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn", "latest_delivery_time", "org_trail"},
 		Related: []domain.RelatedDef{
-			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTrailKMS, NeedsTargetCache: true, Truncated: true},

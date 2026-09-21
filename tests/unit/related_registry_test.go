@@ -483,7 +483,8 @@ func TestRelated_EBS_Registered(t *testing.T) {
 		hasChecker  bool
 	}
 	expected := map[string]expectation{
-		"ec2":      {"EC2 Instance", true},
+		// Multi-Attach puts one volume on several instances at once.
+		"ec2":      {"EC2 Instances", true},
 		"ebs-snap": {"EBS Snapshots", true},
 		"kms":      {"KMS Key", true},
 	}

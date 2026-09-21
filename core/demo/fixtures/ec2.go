@@ -52,6 +52,17 @@ type EC2Fixtures struct {
 }
 
 const (
+	// EBSMultiAttached is the one volume attached to more than one instance
+	// at a time, which EBS Multi-Attach allows for an io1 or io2 volume on up
+	// to 16 Nitro instances. Every other volume names at most one instance.
+	EBSMultiAttached = "vol-0multi0000000e5f"
+
+	// EIPOnSecondaryAddress is the one Elastic IP associated with a secondary
+	// private address of a network interface rather than with its primary
+	// one. NetworkInterface.Association carries the primary address's
+	// association alone, so this one lives under PrivateIpAddresses[].
+	EIPOnSecondaryAddress = "eipalloc-0a1b2c3d4e5f60a2d"
+
 	fixtProdVPCID    = "vpc-0abc123def456789a"
 	fixtStagingVPCID = "vpc-0def456789abc123d"
 	// VPCSubnetScopedFlowLog is the VPC whose only flow log is attached to a
@@ -505,19 +516,51 @@ func privateDNS(ip string) string {
 	return "ip-" + dashed.String() + ".ec2.internal"
 }
 
-func volumeIDForInstance(instanceID string) string {
-	volIDs := []string{
-		"vol-0a1b2c3d4e5f60001",
-		"vol-0a1b2c3d4e5f60002",
-		"vol-0a1b2c3d4e5f60003",
-		"vol-0a1b2c3d4e5f60005",
+// instanceNetworkInterfaces are the interfaces of each instance, built from
+// the ENIs whose own Attachment names it: the attachment is one fact, and an
+// ENI an instance does not list is an account AWS cannot produce.
+var instanceNetworkInterfaces = func() map[string][]ec2types.InstanceNetworkInterface {
+	out := map[string][]ec2types.InstanceNetworkInterface{}
+	for _, eni := range namedNetworkInterfaces() {
+		if eni.Attachment == nil || aws.ToString(eni.Attachment.InstanceId) == "" {
+			continue
+		}
+		instanceID := *eni.Attachment.InstanceId
+		out[instanceID] = append(out[instanceID], ec2types.InstanceNetworkInterface{
+			NetworkInterfaceId: eni.NetworkInterfaceId,
+			SubnetId:           eni.SubnetId,
+			VpcId:              eni.VpcId,
+			PrivateIpAddress:   eni.PrivateIpAddress,
+			Description:        eni.Description,
+		})
 	}
-	idx := 0
-	for _, ch := range instanceID {
-		idx += int(ch)
+	return out
+}()
+
+// instanceBlockDevices are the block device mappings of each instance, built
+// from the volumes that name it in their own Attachments: the attachment is
+// one fact, and an instance mounting a volume the volume does not name is an
+// account AWS cannot produce.
+var instanceBlockDevices = func() map[string][]ec2types.InstanceBlockDeviceMapping {
+	devices := []string{"/dev/xvda", "/dev/xvdf", "/dev/xvdg", "/dev/xvdh"}
+	out := map[string][]ec2types.InstanceBlockDeviceMapping{}
+	for _, vol := range buildVolumes() {
+		for _, att := range vol.Attachments {
+			instanceID := aws.ToString(att.InstanceId)
+			if instanceID == "" {
+				continue
+			}
+			out[instanceID] = append(out[instanceID], ec2types.InstanceBlockDeviceMapping{
+				DeviceName: aws.String(devices[len(out[instanceID])%len(devices)]),
+				Ebs: &ec2types.EbsInstanceBlockDevice{
+					VolumeId: vol.VolumeId,
+					Status:   ec2types.AttachmentStatusAttached,
+				},
+			})
+		}
 	}
-	return volIDs[idx%len(volIDs)]
-}
+	return out
+}()
 
 func makeInstance(
 	instanceID, name, state string,
@@ -549,15 +592,8 @@ func makeInstance(
 		IamInstanceProfile: &ec2types.IamInstanceProfile{
 			Arn: aws.String(fixtProdInstanceProfileARN),
 		},
-		BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
-			{
-				DeviceName: aws.String("/dev/xvda"),
-				Ebs: &ec2types.EbsInstanceBlockDevice{
-					VolumeId: aws.String(volumeIDForInstance(instanceID)),
-					Status:   ec2types.AttachmentStatusAttached,
-				},
-			},
-		},
+		BlockDeviceMappings: instanceBlockDevices[instanceID],
+		NetworkInterfaces:   instanceNetworkInterfaces[instanceID],
 		Tags: []ec2types.Tag{
 			{Key: aws.String("Name"), Value: aws.String(name)},
 		},
@@ -591,9 +627,6 @@ func makeInstance(
 			Key:   aws.String("backup"),
 			Value: aws.String("daily"),
 		})
-		inst.NetworkInterfaces = []ec2types.InstanceNetworkInterface{
-			{NetworkInterfaceId: aws.String("eni-0aaa111111111111a")},
-		}
 	}
 	if instanceID == "i-0a1b2c3d4e5f60003" {
 		inst.Tags = append(inst.Tags,
@@ -2329,6 +2362,18 @@ func buildAddresses() []ec2types.Address {
 			},
 		},
 		{
+			AllocationId: aws.String(EIPOnSecondaryAddress), PublicIp: aws.String("54.210.33.118"),
+			AssociationId: aws.String("eipassoc-0a1b2c3d4e5f60a2d"),
+			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			// Address.NetworkInterfaceId names the interface whichever of its
+			// private addresses the Elastic IP sits on.
+			NetworkInterfaceId: aws.String("eni-0aaa111111111111a"), PrivateIpAddress: aws.String("10.0.1.12"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("web-prod-01-secondary-eip")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
 			AllocationId: aws.String("eipalloc-0bbb222222222222b"), PublicIp: aws.String("54.210.33.201"),
 			AssociationId: aws.String("eipassoc-0bbb222222222222b"),
 			Domain:        ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
@@ -2945,6 +2990,25 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 				PublicIp: aws.String("54.210.33.112"), PublicDnsName: aws.String("ec2-54-210-33-112.compute-1.amazonaws.com"),
 				IpOwnerId: aws.String("amazon"), AllocationId: aws.String("eipalloc-0fff666666666666f"),
 			},
+			// The secondary address carries an Elastic IP of its own, which
+			// Association above does not name: it answers for the primary
+			// address alone.
+			PrivateIpAddresses: []ec2types.NetworkInterfacePrivateIpAddress{
+				{
+					Primary: aws.Bool(true), PrivateIpAddress: aws.String("10.0.1.10"),
+					Association: &ec2types.NetworkInterfaceAssociation{
+						PublicIp: aws.String("54.210.33.112"), IpOwnerId: aws.String("amazon"),
+						AllocationId: aws.String("eipalloc-0fff666666666666f"),
+					},
+				},
+				{
+					Primary: aws.Bool(false), PrivateIpAddress: aws.String("10.0.1.12"),
+					Association: &ec2types.NetworkInterfaceAssociation{
+						PublicIp: aws.String("54.210.33.118"), IpOwnerId: aws.String("amazon"),
+						AllocationId: aws.String(EIPOnSecondaryAddress),
+					},
+				},
+			},
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-01-primary")}},
 		},
 		{
@@ -3157,6 +3221,14 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			Groups: []ec2types.GroupIdentifier{
 				{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
 			},
+			// The Elastic IP the NAT gateway runs behind: eipalloc-0bbb222222222222b
+			// names this interface in its own Address (this file, buildAddresses).
+			Association: &ec2types.NetworkInterfaceAssociation{
+				AllocationId:  aws.String("eipalloc-0bbb222222222222b"),
+				AssociationId: aws.String("eipassoc-0bbb222222222222b"),
+				PublicIp:      aws.String("54.210.33.201"),
+				IpOwnerId:     aws.String("123456789012"),
+			},
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1b-2")}},
 		},
 		// VPC-endpoint-owned ENI — required for eni→vpce related-panel pivot
@@ -3313,6 +3385,21 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60004")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("retired-cache-volume")}},
 		},
+		// EBSMultiAttached is the one volume attached to more than one
+		// instance at a time. Multi-Attach is io1/io2 only, and each of the
+		// instances carries the volume in its own block device mappings.
+		{
+			VolumeId: aws.String(EBSMultiAttached), State: ec2types.VolumeStateInUse,
+			Size: aws.Int32(400), VolumeType: ec2types.VolumeTypeIo2, Iops: aws.Int32(12000),
+			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1c"), CreateTime: aws.Time(t4),
+			KmsKeyId:           aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			MultiAttachEnabled: aws.Bool(true),
+			Attachments: []ec2types.VolumeAttachment{
+				{InstanceId: aws.String("i-0ccc333333333333c"), Device: aws.String("/dev/xvdf"), State: ec2types.VolumeAttachmentStateAttached},
+				{InstanceId: aws.String("i-0ddd444444444444d"), Device: aws.String("/dev/xvdf"), State: ec2types.VolumeAttachmentStateAttached},
+			},
+			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("batch-shared-scratch")}},
+		},
 		// Orphan: Available, no attachments, well over 7 days old (fixed past
 		// date, not relative to time.Now()) → ebs.orphan-unattached finding.
 		{
@@ -3374,6 +3461,17 @@ func buildSnapshots() []ec2types.Snapshot {
 	t3 := time.Date(2026, 3, 21, 4, 0, 0, 0, time.UTC)
 	t4 := time.Date(2026, 3, 28, 4, 0, 0, 0, time.UTC)
 	return []ec2types.Snapshot{
+		// The Multi-Attach volume's recovery point. It keeps EBSMultiAttached
+		// out of the no-snapshot finding, which its own witness carries.
+		{
+			SnapshotId: aws.String("snap-0multi000000e5f"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String(EBSMultiAttached), VolumeSize: aws.Int32(400),
+			Encrypted:   aws.Bool(true),
+			Description: aws.String("Nightly snapshot of batch-shared-scratch"),
+			StartTime:   aws.Time(t4), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("batch-shared-scratch-nightly")}},
+		},
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"), State: ec2types.SnapshotStateCompleted,
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
@@ -3641,10 +3739,10 @@ func buildImages() []ec2types.Image {
 
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 41, Issues: 16})
-	Register(Pin{ShortName: "ebs", Rows: 9, Issues: 6, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs", Rows: 10, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs-snap", Rows: 10, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
-	Register(Pin{ShortName: "eip", Rows: 9, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "eip", Rows: 10, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "eni", Rows: 55, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "igw", Rows: 5, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})

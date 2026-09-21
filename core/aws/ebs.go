@@ -72,10 +72,15 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			encrypted = "true"
 		}
 
-		attachedTo := ""
-		if len(vol.Attachments) > 0 && vol.Attachments[0].InstanceId != nil {
-			attachedTo = *vol.Attachments[0].InstanceId
+		// Multi-Attach puts one io1/io2 volume on up to 16 instances at once,
+		// and each of them carries the volume in its own block device mappings.
+		var attached []string
+		for _, att := range vol.Attachments {
+			if att.InstanceId != nil && *att.InstanceId != "" {
+				attached = append(attached, *att.InstanceId)
+			}
 		}
+		attachedTo := strings.Join(attached, ",")
 
 		az := ""
 		if vol.AvailabilityZone != nil {

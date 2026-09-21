@@ -177,6 +177,11 @@ var viewColumnChanges = []viewColumnChange{
 	{Version: 8, View: "athena", Was: ListColumn{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12}},
 	{Version: 8, View: "kms", Was: ListColumn{Title: "Alias", Path: "AliasName", Width: 32}},
 	{Version: 9, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	{Version: 10, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	// Both spellings of the ebs column a file can hold: one written before the
+	// key move carries no key beside the path.
+	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Width: 20}},
+	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Key: "attached_to", Width: 20}},
 }
 
 // keyMoveVersion is the stamp at which every built-in column took the key its

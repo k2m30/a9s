@@ -131,9 +131,11 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	if len(ids) == 0 && !entry.IsTruncated {
-		// Nothing was confirmed and the eb cache page was complete: any
-		// failures here are a plain fetch failure, not a truncation signal.
-		if aggErr := AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, len(entry.Resources)); aggErr != nil {
+		// Every environment refused its read and the cache page was complete:
+		// nothing was established about any of them, which is a fetch failure
+		// rather than a lower bound over what was read.
+		if aggErr := AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, len(entry.Resources)); aggErr != nil &&
+			len(failures) == len(entry.Resources) {
 			return resource.ErrorRelated("eb", aggErr)
 		}
 	}
@@ -180,6 +182,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	var ids []string
 	var failures []Failure
+	attempted := 0
 	for _, taskRes := range entry.Resources {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
@@ -196,6 +199,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		if taskDefARN == "" {
 			continue
 		}
+		attempted++
 		tdOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecspkg.DescribeTaskDefinitionOutput, error) {
 			return ecsAPI.DescribeTaskDefinition(ctx, &ecspkg.DescribeTaskDefinitionInput{
 				TaskDefinition: &taskDefARN,
@@ -222,12 +226,12 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	// Some DescribeTaskDefinition calls may have failed: ids is a proven
 	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
 	// row actionable rather than discarding confirmed matches as a dead end.
-	if len(ids) == 0 && !entry.IsTruncated {
-		// Nothing was confirmed and the ecs-task cache page was complete: any
-		// failures here are a plain fetch failure, not a truncation signal.
-		if aggErr := AggregateFailures("secrets-related: DescribeTaskDefinition", failures, len(entry.Resources)); aggErr != nil {
-			return resource.ErrorRelated("ecs-task", aggErr)
-		}
+	if aggErr := AggregateFailures("secrets-related: DescribeTaskDefinition", failures, attempted); aggErr != nil &&
+		len(ids) == 0 && !entry.IsTruncated && len(failures) == attempted {
+		// Every definition refused its read and the ecs-task cache page was
+		// complete: nothing was established about any task, which is a fetch
+		// failure rather than a lower bound over what was read.
+		return resource.ErrorRelated("ecs-task", aggErr)
 	}
 	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
 }

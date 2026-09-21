@@ -31,5 +31,5 @@
 │     - DeviceName: /dev/xvda                                                                                          │
 │       Ebs:                                                                                                           │
 │         Status: attached                                                                                             │
-│         VolumeId: vol-0a1b2c3d4e5f60002                                                                              │
+│         VolumeId: vol-0a1b2c3d4e5f60001                                                                              │
 └─────────────────────────────────────────────y YAML──J JSON──o Open──t CloudTrail──r Related──ctrl+r Refresh──w Wrap──┘

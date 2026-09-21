@@ -68,10 +68,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true, Truncated: true, Mirror: true},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, Truncated: true},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM, Truncated: true, Distinct: "certificates a CNAME in this zone validates against acm-validations.aws"},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs, Truncated: true},
-			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkR53VPC},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("r53")},
 		},
@@ -114,13 +114,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// but no RawStruct.
 		FieldKeys: []string{"distribution_id", "arn", "domain_name", "status", "enabled", "aliases", "price_class", "lambda_function_arns"},
 		Related: []domain.RelatedDef{
-			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfS3, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfS3, NeedsTargetCache: true, Truncated: true, Distinct: "the buckets this distribution's origins address, and its log bucket in DistributionConfig.Logging.Bucket"},
 			{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true, Truncated: true, Mirror: true},
-			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkCfWAF, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkCfACM, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkCfR53, Truncated: true, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCfAlarm, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda},
+			{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda, Mirror: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cf")},
 		},
 		Findings: []catalog.FindingDef{
@@ -166,10 +166,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		}),
 		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left", "certificate_arn", "key_algorithm"},
 		Related: []domain.RelatedDef{
-			{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
-			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW},
-			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53, Truncated: true},
+			{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB, Mirror: true},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW, Distinct: "the API Gateway resources in CertificateDetail.InUseBy"},
+			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53, Truncated: true, Distinct: "the public zones that hold this certificate's DomainValidationOptions records"},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("acm")},
 		},
 		Findings: []catalog.FindingDef{
@@ -212,9 +212,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		FieldKeys:              []string{"api_id", "name", "protocol", "endpoint", "description"},
 		IssueEnricherFieldKeys: []string{"stages_count"},
 		Related: []domain.RelatedDef{
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda, Truncated: true},
-			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM, Truncated: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true, Truncated: true, Distinct: "groups named for this API by convention, API-Gateway-Execution-Logs_<id>/ or /aws/apigateway/<name>"},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda, Truncated: true, Distinct: "the functions this API's integrations invoke, from GetIntegrations IntegrationUri"},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM, Truncated: true, Distinct: "the certificates on this API's mapped custom domains, from DomainNameConfigurations"},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkApigwAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkApigwCF, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkApigwELB, Truncated: true},

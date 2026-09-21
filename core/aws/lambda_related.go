@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -271,24 +270,13 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cac
 // a separate events:ListTargetsByRule call. We iterate the cached rules and
 // look for Lambda ARN targets when live clients are available.
 func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
-	if !ok {
+	if _, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); !ok {
 		return resource.UnknownRelated("eb-rule")
 	}
-	functionARN := ""
-	if fn.FunctionArn != nil {
-		functionARN = *fn.FunctionArn
+	if res.ID == "" {
+		return resource.ProvenZero("eb-rule", "res.ID")
 	}
-	functionName := ""
-	if fn.FunctionName != nil {
-		functionName = *fn.FunctionName
-	}
-	if functionName == "" {
-		functionName = res.ID
-	}
-	if functionARN == "" && functionName == "" {
-		return resource.ProvenZero("eb-rule", "functionName")
-	}
+	rc := refContext(clients, cache, "lambda")
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.EventBridge == nil {
 		// Without live EventBridge access there is no cached field on the rule
@@ -319,8 +307,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 			if arn == "" {
 				continue
 			}
-			if (functionARN != "" && arn == functionARN) ||
-				(functionName != "" && strings.HasSuffix(arn, ":function:"+functionName)) {
+			if lambdaRefNamesFunction(arn, res.ID, rc) {
 				idSet[ruleRes.ID] = struct{}{}
 				break
 			}
@@ -331,9 +318,9 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		ids = append(ids, id)
 	}
 	if aggErr := AggregateFailures("lambda-related: ListTargetsByRule", failures, len(ruleList)); aggErr != nil {
-		if len(ids) == 0 {
-			// Nothing was confirmed: the failures establish nothing about the
-			// population size, only that the attempt failed.
+		if len(ids) == 0 && len(failures) == len(ruleList) {
+			// Every rule refused its read: the failures establish nothing
+			// about any of them, only that the attempt failed.
 			return resource.ErrorRelated("eb-rule", aggErr)
 		}
 		// Some ListTargetsByRule calls failed: ids is a proven subset, not the

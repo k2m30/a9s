@@ -71,17 +71,17 @@ func TestCheckUserGroup_EmptyID(t *testing.T) {
 }
 
 // TestCheckUserGroup_NoGroups verifies that a user with no groups in the fixture
-// returns Count=0 (not -1). "bob.smith" is defined as a user in the IAM fixture
-// but has no GroupsForUser entry, so ListGroupsForUser returns an empty list.
+// returns Count=0 (not -1). "ci-service-account" is defined as a user in the IAM
+// fixture and belongs to no group, so ListGroupsForUser returns an empty list.
 func TestCheckUserGroup_NoGroups(t *testing.T) {
 	clients := demo.NewServiceClients()
 	checker := iamUserGroupChecker(t)
 
-	res := resource.Resource{ID: "bob.smith", Name: "bob.smith"}
+	res := resource.Resource{ID: "ci-service-account", Name: "ci-service-account"}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
 	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (bob.smith has no groups in fixture)", result.Count())
+		t.Errorf("Count = %d, want 0 (ci-service-account belongs to no group)", result.Count())
 	}
 	if result.TargetType() != "iam-group" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-group")

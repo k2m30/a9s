@@ -11,6 +11,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // imageRefersToRepo reports whether a container image URI names the ECR
@@ -141,4 +144,32 @@ func dnsAliasNames(name, host string) bool {
 // or gateway load balancer, after it for an application or classic one.
 func maybeELBDNS(name string) bool {
 	return strings.Contains(canonicalDNS(name), ".elb.")
+}
+
+// lambdaRefNamesFunction reports whether ref — an EventBridge target ARN, an
+// SNS subscription endpoint, an S3 notification destination, a registered ALB
+// target or a Lambda@Edge association — names the Lambda function row fnID.
+// Those services all accept an alias- or version-qualified ARN, which names
+// the function the alias or version belongs to; a row of this type is a
+// function of the session's own account and Region, so a reference AWS
+// attributes to another one names a different function of the same name.
+func lambdaRefNamesFunction(ref, fnID string, rc domain.RefContext) bool {
+	if ref == "" || fnID == "" {
+		return false
+	}
+	id, local := resource.ResolveRef("lambda", ref, rc)
+	return local && id == fnID
+}
+
+// ngOwnsInstance reports whether an EC2 instance carrying tags is a node of
+// the managed node group nodegroupName of cluster clusterName. EKS writes
+// eks:nodegroup-name, and eks:cluster-name beside it, on every instance a
+// managed node group launches, so an instance missing the tag is a node of
+// no group rather than a node of every group of that name. Both directions
+// of the ec2 ↔ ng pair read it.
+func ngOwnsInstance(tags []ec2types.Tag, nodegroupName, clusterName string) bool {
+	if nodegroupName == "" || tagValue(tags, "eks:nodegroup-name") != nodegroupName {
+		return false
+	}
+	return clusterName == "" || tagValue(tags, "eks:cluster-name") == clusterName
 }

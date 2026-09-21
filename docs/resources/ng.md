@@ -53,7 +53,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `ec2`
 
 - **Why related**: individual worker-node instances — state, IP, SSM reachability. When a node group is `DEGRADED` the operator wants to see which specific nodes are bad.
-- **How discovered**: node group → `Resources.AutoScalingGroups[0].Name` → `autoscaling:DescribeAutoScalingGroups.Instances[].InstanceId` (cross-reference the already-loaded `ec2` list when present) — a9s-devops: pivot via ASG is the only first-class path; EKS API does not list nodes directly.
+- **How discovered**: read the already-loaded `ec2` list for instances tagged `eks:nodegroup-name` = this node group, and `eks:cluster-name` = its cluster when the node group names one — EKS Managed Node Groups tag every launched instance with these reserved keys, so both ends of the pair read the tag with no extra API call.
 - **Count shown**: yes (equals the ASG's in-service count).
 
 ### `eks`

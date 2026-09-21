@@ -124,8 +124,12 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 }
 
 // checkELBACM reports ACM certificates attached to this ELB's HTTPS/TLS
-// listeners. Pattern C: one elbv2:DescribeListeners call per ELB; extract
-// Certificates[].CertificateArn from each listener.
+// listeners. Pattern C: one elbv2:DescribeListeners call per ELB, plus one
+// elbv2:DescribeListenerCertificates per HTTPS/TLS listener. Listener
+// .Certificates carries the listener's default certificate alone; the
+// certificates it serves by SNI are what DescribeListenerCertificates
+// answers with, and ACM records the load balancer as a user of every one of
+// them.
 func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	elbARN := res.Fields["load_balancer_arn"]
 	if elbARN == "" {
@@ -153,20 +157,54 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	var ids []string
 	seen := make(map[string]bool)
-	for _, ls := range listeners {
-		for _, cert := range ls.Certificates {
-			if cert.CertificateArn == nil || *cert.CertificateArn == "" {
-				continue
-			}
-			arn := *cert.CertificateArn
-			if seen[arn] {
+	add := func(certs []elbv2types.Certificate) {
+		for _, cert := range certs {
+			arn := aws.ToString(cert.CertificateArn)
+			if arn == "" || seen[arn] {
 				continue
 			}
 			seen[arn] = true
 			ids = append(ids, arn)
 		}
 	}
-	return relatedResultTrunc("acm", ids, !complete)
+	certAPI, sniReadable := c.ELBv2.(ELBv2DescribeListenerCertificatesAPI)
+	var failures []Failure
+	for _, ls := range listeners {
+		add(ls.Certificates)
+		if ls.Protocol != elbv2types.ProtocolEnumHttps && ls.Protocol != elbv2types.ProtocolEnumTls {
+			continue
+		}
+		if !sniReadable {
+			complete = false
+			continue
+		}
+		listenerARN := aws.ToString(ls.ListenerArn)
+		if listenerARN == "" {
+			continue
+		}
+		sni, sniComplete, sniErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.Certificate, *string, error) {
+			out, err := certAPI.DescribeListenerCertificates(ctx, &elbv2.DescribeListenerCertificatesInput{ListenerArn: &listenerARN, Marker: marker})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.Certificates, out.NextMarker, nil
+		})
+		if sniErr != nil {
+			failures = append(failures, FailedCall(listenerARN, sniErr))
+			continue
+		}
+		complete = complete && sniComplete
+		add(sni)
+	}
+	if aggErr := AggregateFailures("elb-related: DescribeListenerCertificates", failures, len(listeners)); aggErr != nil && len(ids) == 0 {
+		// Nothing was read at all: the failures establish nothing about how
+		// many certificates the listeners carry, only that the attempt failed.
+		return resource.ErrorRelated("acm", aggErr)
+	}
+	// A listener whose certificate list could not be read may serve one this
+	// count does not name, so what was read is a lower bound rather than a
+	// dead end.
+	return relatedResultTrunc("acm", ids, !complete || len(failures) > 0)
 }
 
 // checkELBCF reports CloudFront distributions using this ELB as an origin.

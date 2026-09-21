@@ -157,9 +157,11 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	if len(tgARNs) == 0 {
-		// Nothing was confirmed: any failures are a plain fetch failure, not
-		// a truncation signal (there is no larger population left unseen).
-		if aggErr := AggregateFailures("eb-related: LB/Listener lookup", failures, len(resOut.EnvironmentResources.LoadBalancers)); aggErr != nil {
+		// Every load balancer refused its read: nothing was established about
+		// any of them, which is a fetch failure rather than a lower bound
+		// over what was read.
+		if aggErr := AggregateFailures("eb-related: LB/Listener lookup", failures, len(resOut.EnvironmentResources.LoadBalancers)); aggErr != nil &&
+			len(failures) == len(resOut.EnvironmentResources.LoadBalancers) {
 			return resource.ErrorRelated("tg", aggErr)
 		}
 	}

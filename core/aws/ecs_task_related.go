@@ -62,6 +62,9 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 // docs/resources/ecs-task.md so the returned IDs resolve to real role rows
 // (0, 1, or 2 roles).
 func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if !taskDefJoined(res) {
+		return resource.UnknownRelated("role")
+	}
 	var arns []string
 	if v := strings.TrimSpace(res.Fields["task_role"]); v != "" {
 		arns = append(arns, v)

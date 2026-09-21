@@ -263,6 +263,13 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var ids []string
 	for _, wg := range wgList {
+		// A workgroup whose configuration was not read may well write here,
+		// and its empty result location says nothing either way, so the count
+		// is a lower bound.
+		if !athenaConfigRead(wg) {
+			truncated = true
+			continue
+		}
 		if s3URINames(wg.Fields["result_output_location"], bucket) {
 			ids = append(ids, wg.ID)
 		}

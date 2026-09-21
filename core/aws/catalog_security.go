@@ -93,12 +93,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return FetchRolesByIDs(ctx, getRoleAPI, ids)
 		}),
 		Related: []domain.RelatedDef{
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkRoleLambda, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkRoleLambda, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkRoleNG, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false, Truncated: true, Mirror: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true, Truncated: true, Distinct: "instances whose instance-profile name equals this role's name"},
+			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "iam-group", DisplayName: "IAM Groups (trust)", Checker: checkRoleIamGroup, NeedsTargetCache: false},
 			{TargetType: "iam-user", DisplayName: "IAM Users (trust)", Checker: checkRoleIamUser, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("role"), NeedsTargetCache: false},
@@ -206,9 +206,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies(), PartitionForRegion(c.Region))
 		}),
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkPolicyUser, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkPolicyGroup, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false, Truncated: true, Mirror: true},
+			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkPolicyUser, NeedsTargetCache: false, Truncated: true, Mirror: true},
+			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkPolicyGroup, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("policy"), NeedsTargetCache: false},
 		},
 		DetailEnrich: enrichPolicy,
@@ -249,8 +249,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		IssueEnricherFieldKeys: []string{"mfa", "risk", "has_console_password"},
 		Related: []domain.RelatedDef{
-			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false, Truncated: true, Mirror: true},
+			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("iam-user")},
 		},
 		Findings: []catalog.FindingDef{
@@ -297,8 +297,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		FieldKeys:              []string{"group_name", "group_id", "path", "create_date", "arn"},
 		IssueEnricherFieldKeys: []string{"member_count"},
 		Related: []domain.RelatedDef{
-			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false, Truncated: true},
+			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false, Truncated: true, Mirror: true},
+			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("iam-group"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
@@ -341,9 +341,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		FieldKeys:              []string{"name", "id", "description", "scope", "arn", "lock_token"},
 		IssueEnricherFieldKeys: []string{"rules_summary"},
 		Related: []domain.RelatedDef{
-			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
-			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkWAFAlarm, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("waf")},

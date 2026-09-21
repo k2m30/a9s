@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -78,8 +79,11 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream
 // (live API). DDB Streams are consumed through
-// lambda:ListEventSourceMappings; the EventSourceArn on each mapping matches
-// the table's LatestStreamArn. Lambda FunctionConfiguration does not embed
+// lambda:ListEventSourceMappings. A stream ARN carries the moment the stream
+// was created, and disabling and re-enabling streams on a table mints a new
+// one while a mapping built against the old stream keeps the old ARN, so the
+// mappings are matched on the table each source ARN names rather than on the
+// table's current stream. Lambda FunctionConfiguration does not embed
 // event-source info, so there is no cache-only path. Returns an unknown
 // result when no live clients are available.
 func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -91,5 +95,9 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, cac
 		// Streams not enabled on this table — no Lambda triggers are possible.
 		return resource.ProvenZero("lambda", "table.LatestStreamArn")
 	}
-	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *table.LatestStreamArn, cache)
+	rc := refContext(clients, cache, "ddb")
+	return lambdaEventSourceMappingsNaming(ctx, clients, cache, lambda.ListEventSourceMappingsInput{}, func(sourceARN string) bool {
+		id, ok := resource.ResolveRef("ddb", sourceARN, rc)
+		return ok && id == res.ID
+	})
 }

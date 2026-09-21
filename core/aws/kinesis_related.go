@@ -139,11 +139,13 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	var failures []Failure
+	attempted := 0
 	for _, ddbRes := range entry.Resources {
 		tableName := ddbRes.ID
 		if tableName == "" {
 			continue
 		}
+		attempted++
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 			return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{
 				TableName: aws.String(tableName),
@@ -160,13 +162,12 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if len(ids) == 0 && !entry.IsTruncated {
-		// Nothing was confirmed and the cache page was complete: any failures
-		// here are a plain fetch failure, not a truncation signal (there is
-		// no larger population left unseen to justify "(0+)").
-		if aggErr := AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, len(entry.Resources)); aggErr != nil {
-			return resource.ErrorRelated("ddb", aggErr)
-		}
+	if aggErr := AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, attempted); aggErr != nil &&
+		len(ids) == 0 && !entry.IsTruncated && len(failures) == attempted {
+		// Every table refused its read and the cache page was complete:
+		// nothing was established about any of them, which is a fetch failure
+		// rather than a lower bound over what was read.
+		return resource.ErrorRelated("ddb", aggErr)
 	}
 	// Some DescribeKinesisStreamingDestination calls may have failed: ids is a
 	// proven subset, not necessarily exhaustive. Truncated (not Errored) keeps

@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A load balancer now names every certificate its listeners serve. A listener
+  carries one default certificate and serves the rest by SNI, so a
+  multi-domain ALB listed one of them while each of the others listed the load
+  balancer back.
+- A function now shows the triggers wired to an alias or a published version of
+  it — an EventBridge rule, an SNS subscription, an S3 notification, an ALB
+  target group or a Lambda@Edge association that names a qualified ARN. It
+  showed none of them, and showed instead any of them that named another
+  account's function of the same name.
+- An instance and a node group now agree about membership. An instance
+  carrying one of the two EKS tags listed every node group of that name in
+  every cluster, while each of those node groups listed no instance.
+- A bucket no longer states that no Athena workgroup writes to it when a
+  workgroup's configuration could not be read; the count says it is a lower
+  bound.
+- A task whose task definition could not be read no longer reports that it
+  uses no secrets, no SSM parameters and no IAM role. Those live on the
+  definition, and the rows now read as unknown.
+- A table now names the functions consuming it through a stream it has since
+  replaced. Disabling and re-enabling streams mints a new stream, and a
+  consumer built against the old one kept listing the table while the table
+  listed nothing.
+
+- A volume attached to several instances at once now names all of them. EBS
+  Multi-Attach puts one io1/io2 volume on up to 16 instances, and the volume
+  listed only the first, while each instance listed the volume. The volume's
+  related row is labelled "EC2 Instances" and the list's Attached To column
+  is wide enough to show more than one.
+- A VPC's main route table now lists the subnets that route through it. A
+  subnet with no route table of its own follows the main table, and AWS
+  returns no subnet id for that association, so the table showed no subnets
+  while every one of those subnets showed the table.
+- A network interface now lists the Elastic IPs bound to its secondary private
+  addresses, not just the one on its primary address. The Elastic IP listed
+  the interface either way.
 - Data that lives in another region is now read where it lives, instead of
   being reported missing. A CloudFront distribution shows its us-east-1
   certificate and its CloudFront alarms from any session region; a CloudFront

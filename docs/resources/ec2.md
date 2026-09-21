@@ -94,7 +94,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ng`
 
 - **Why related**: Nodegroup owning this instance.
-- **How discovered**: read field `Instance.Tags[]` for key `eks:nodegroup-name` (plus `aws:eks:cluster-name`); cross-reference the already-loaded `ng` list by `Nodegroup.NodegroupName` — a9s-devops: EKS Managed Node Groups tag every launched instance with these reserved keys, so tag lookup is the clean pivot with no extra API call.
+- **How discovered**: read field `Instance.Tags[]` for key `eks:nodegroup-name` (plus `eks:cluster-name`); cross-reference the already-loaded `ng` list by `Nodegroup.NodegroupName` — a9s-devops: EKS Managed Node Groups tag every launched instance with these reserved keys, so tag lookup is the clean pivot with no extra API call.
 - **Count shown**: yes.
 
 ### `role`

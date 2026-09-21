@@ -359,9 +359,11 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && !entry.IsTruncated {
-		// Nothing was confirmed and the sfn cache page was complete: any
-		// failures here are a plain fetch failure, not a truncation signal.
-		if aggErr := AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources)); aggErr != nil {
+		// Every state machine refused its read and the cache page was
+		// complete: nothing was established about any of them, which is a
+		// fetch failure rather than a lower bound over what was read.
+		if aggErr := AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources)); aggErr != nil &&
+			len(failures) == len(entry.Resources) {
 			return resource.ErrorRelated("sfn", aggErr)
 		}
 	}

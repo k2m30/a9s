@@ -175,8 +175,8 @@ func TestD4Row27_EveryInstanceStatesOnePublicAddress(t *testing.T) {
 // change that would move one without anyone noticing.
 func TestD4Row27_EIPCountAndFindingsAreDerived(t *testing.T) {
 	eips := d4Rows(t, "eip")
-	if len(eips) != 9 {
-		t.Errorf("demo Elastic IP list = %d rows, want 9", len(eips))
+	if len(eips) != 10 {
+		t.Errorf("demo Elastic IP list = %d rows, want 10", len(eips))
 	}
 
 	want := map[string]map[domain.FindingCode]int{

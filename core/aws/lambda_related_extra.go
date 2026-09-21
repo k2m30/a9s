@@ -97,8 +97,8 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 // DefaultCacheBehavior and CacheBehaviors[] LambdaFunctionAssociations at
 // fetch time (zero extra calls) into the comma-joined
 // Fields["lambda_function_arns"]. Lambda@Edge associations always reference a
-// specific published VERSION (never $LATEST), so matching requires an
-// unversioned-ARN-prefix comparison against this function's base ARN.
+// specific published VERSION (never $LATEST), which the lambda resolver reads
+// back to the function the version belongs to.
 func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnARN := ""
 	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
@@ -114,7 +114,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 	if cfList == nil {
 		return resource.UnknownRelated("cf")
 	}
-	wantPrefix := fnARN + ":"
+	rc := refContext(clients, cache, "lambda")
 	var ids []string
 	for _, cfRes := range cfList {
 		joined := cfRes.Fields["lambda_function_arns"]
@@ -122,7 +122,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 			continue
 		}
 		for assocARN := range strings.SplitSeq(joined, ",") {
-			if strings.HasPrefix(assocARN, wantPrefix) {
+			if lambdaRefNamesFunction(assocARN, res.ID, rc) {
 				ids = append(ids, cfRes.ID)
 				break
 			}
@@ -188,14 +188,10 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 // number of Lambda TGs in the account (typically small). Per-TG failures are
 // aggregated per the error contract rather than silently skipped.
 func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnARN := ""
-	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
-		fnARN = *fn.FunctionArn
+	if res.ID == "" {
+		return resource.ProvenZero("tg", "res.ID")
 	}
-	fnName := res.ID
-	if fnARN == "" && fnName == "" {
-		return resource.ProvenZero("tg", "fnName")
-	}
+	rc := refContext(clients, cache, "lambda")
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("tg", err)
@@ -249,20 +245,18 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 			if thd.Target == nil || thd.Target.Id == nil {
 				continue
 			}
-			targetID := *thd.Target.Id
-			if (fnARN != "" && targetID == fnARN) ||
-				(fnName != "" && strings.HasSuffix(targetID, ":function:"+fnName)) {
+			if lambdaRefNamesFunction(*thd.Target.Id, res.ID, rc) {
 				ids = append(ids, tgRes.ID)
 				break
 			}
 		}
 	}
-	if len(ids) == 0 && !truncated {
-		// Nothing was confirmed and the tg cache page was complete: any
-		// failures here are a plain fetch failure, not a truncation signal.
-		if aggErr := AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs)); aggErr != nil {
-			return resource.ErrorRelated("tg", aggErr)
-		}
+	if aggErr := AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs)); aggErr != nil &&
+		len(ids) == 0 && !truncated && len(failures) == len(lambdaTGs) {
+		// Every target group refused its read and the tg cache page was
+		// complete: nothing was established about any of them, which is a
+		// fetch failure rather than a lower bound over what was read.
+		return resource.ErrorRelated("tg", aggErr)
 	}
 	// Some DescribeTargetHealth calls may have failed: ids is a proven subset,
 	// not necessarily exhaustive. Truncated (not Errored) keeps the row
@@ -274,14 +268,10 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 // Lambda (i.e. where this function is a subscription endpoint).
 // DescribeTopic alone doesn't list subscriptions, so we check the sns-sub cache.
 func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnARN := ""
-	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
-		fnARN = *fn.FunctionArn
+	if res.ID == "" {
+		return resource.ProvenZero("sns", "res.ID")
 	}
-	fnName := res.ID
-	if fnARN == "" && fnName == "" {
-		return resource.ProvenZero("sns", "fnName")
-	}
+	rc := refContext(clients, cache, "lambda")
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
@@ -298,8 +288,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 		if endpoint == "" {
 			continue
 		}
-		if (fnARN != "" && endpoint == fnARN) ||
-			(fnName != "" && strings.HasSuffix(endpoint, ":function:"+fnName)) {
+		if lambdaRefNamesFunction(endpoint, res.ID, rc) {
 			if topic := subRes.Fields["topic_arn"]; topic != "" {
 				topicSet[topic] = struct{}{}
 			}
@@ -315,14 +304,10 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 // checkLambdaSNSSub scans the sns-sub cache for subscriptions where this
 // Lambda is the endpoint.
 func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnARN := ""
-	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
-		fnARN = *fn.FunctionArn
+	if res.ID == "" {
+		return resource.ProvenZero("sns-sub", "res.ID")
 	}
-	fnName := res.ID
-	if fnARN == "" && fnName == "" {
-		return resource.ProvenZero("sns-sub", "fnName")
-	}
+	rc := refContext(clients, cache, "lambda")
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns-sub", err)
@@ -335,9 +320,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 		if subRes.Fields["protocol"] != "lambda" {
 			continue
 		}
-		endpoint := subRes.Fields["endpoint"]
-		if (fnARN != "" && endpoint == fnARN) ||
-			(fnName != "" && strings.HasSuffix(endpoint, ":function:"+fnName)) {
+		if lambdaRefNamesFunction(subRes.Fields["endpoint"], res.ID, rc) {
 			ids = append(ids, subRes.ID)
 		}
 	}
@@ -348,14 +331,10 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 // target equal to this Lambda. The bucket cache entry populates
 // Fields["notification_lambda"] if the fetcher enriched it.
 func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnARN := ""
-	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
-		fnARN = *fn.FunctionArn
+	if res.ID == "" {
+		return resource.ProvenZero("s3", "res.ID")
 	}
-	fnName := res.ID
-	if fnARN == "" && fnName == "" {
-		return resource.ProvenZero("s3", "fnName")
-	}
+	rc := refContext(clients, cache, "lambda")
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
@@ -379,8 +358,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 			if n == "" {
 				continue
 			}
-			if (fnARN != "" && n == fnARN) ||
-				(fnName != "" && strings.HasSuffix(n, ":function:"+fnName)) {
+			if lambdaRefNamesFunction(n, res.ID, rc) {
 				ids = append(ids, bRes.ID)
 				break
 			}

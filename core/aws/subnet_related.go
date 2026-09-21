@@ -132,27 +132,14 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("elb", ids, truncated)
 }
 
-// checkSubnetRTB searches the rtb cache for route tables associated with this
-// subnet either explicitly (via SubnetId in Associations) or implicitly via the
-// main route table for the subnet's VPC.
-func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	subnetID := res.ID
-	vpcID := res.Fields["vpc_id"]
-	if subnetID == "" {
-		return resource.ProvenZero("rtb", "subnetID")
-	}
-
-	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
-	if err != nil {
-		return resource.ErrorRelated("rtb", err)
-	}
-	if rtbList == nil {
-		return resource.UnknownRelated("rtb")
-	}
-
+// subnetRouteTableIDs names the route tables in rtbList that a subnet routes
+// through: the tables whose Associations name it, or, when none does, its
+// VPC's main table — AWS associates a subnet with no explicit association to
+// the main table, and RouteTableAssociation carries no SubnetId for that
+// implicit association. Both directions of the rtb ↔ subnet pair read it.
+func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource) []string {
 	var ids []string
-	hasExplicit := false
-	var mainRTBID string
+	mainRTBID := ""
 	for _, rtbRes := range rtbList {
 		raw, ok := assertStruct[ec2types.RouteTable](rtbRes.RawStruct)
 		if !ok {
@@ -165,18 +152,35 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 		for _, assoc := range raw.Associations {
 			if assoc.SubnetId != nil && *assoc.SubnetId == subnetID {
 				ids = append(ids, rtbRes.ID)
-				hasExplicit = true
 			}
 			if assoc.Main != nil && *assoc.Main && rtbVpcID == vpcID {
 				mainRTBID = rtbRes.ID
 			}
 		}
 	}
-	// If no explicit association, the main route table for the VPC applies.
-	if !hasExplicit && mainRTBID != "" {
+	if len(ids) == 0 && mainRTBID != "" {
 		ids = append(ids, mainRTBID)
 	}
-	return relatedResultTrunc("rtb", ids, truncated)
+	return ids
+}
+
+// checkSubnetRTB searches the rtb cache for route tables associated with this
+// subnet either explicitly (via SubnetId in Associations) or implicitly via the
+// main route table for the subnet's VPC.
+func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	subnetID := res.ID
+	if subnetID == "" {
+		return resource.ProvenZero("rtb", "subnetID")
+	}
+
+	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
+	if err != nil {
+		return resource.ErrorRelated("rtb", err)
+	}
+	if rtbList == nil {
+		return resource.UnknownRelated("rtb")
+	}
+	return relatedResultTrunc("rtb", subnetRouteTableIDs(subnetID, res.Fields["vpc_id"], rtbList), truncated)
 }
 
 // checkSubnetCFN checks the subnet's tags for aws:cloudformation:stack-name.

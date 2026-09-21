@@ -48,8 +48,12 @@ func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResultTrunc("sg", ids, false)
 }
 
-// checkENIEIP extracts Association.AllocationId from the ENI RawStruct and searches
-// the eip cache for a matching Elastic IP.
+// checkENIEIP extracts the allocation IDs associated with the ENI and searches
+// the eip cache for matching Elastic IPs. NetworkInterface.Association carries
+// the association of the primary private IPv4 address alone; an Elastic IP on
+// a secondary private address appears only in that address's own entry under
+// PrivateIpAddresses, while Address.NetworkInterfaceId names the interface
+// either way.
 func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
@@ -58,11 +62,24 @@ func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("eip", nil, false)
 	}
-	if raw.Association == nil || raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {
+	// In-body: Association.AllocationId IS the eip resource id (eip keyed by AllocationId).
+	var ids []string
+	add := func(assoc *ec2types.NetworkInterfaceAssociation) {
+		if assoc == nil || assoc.AllocationId == nil || *assoc.AllocationId == "" {
+			return
+		}
+		if !slices.Contains(ids, *assoc.AllocationId) {
+			ids = append(ids, *assoc.AllocationId)
+		}
+	}
+	add(raw.Association)
+	for _, addr := range raw.PrivateIpAddresses {
+		add(addr.Association)
+	}
+	if len(ids) == 0 {
 		return resource.ProvenZero("eip", "raw.Association.AllocationId")
 	}
-	// In-body: Association.AllocationId IS the eip resource id (eip keyed by AllocationId).
-	return relatedResultTrunc("eip", []string{*raw.Association.AllocationId}, false)
+	return relatedResultTrunc("eip", ids, false)
 }
 
 // checkENIVPC returns the VPC this network interface belongs to (Pattern F).

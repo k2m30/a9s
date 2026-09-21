@@ -126,17 +126,22 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		topicARNs = append(topicARNs, arn)
 	}
 	aggErr := AggregateFailures("backup-related: GetBackupVaultNotifications", failures, len(vaults))
+	// Every vault refused its read: nothing was established about any of
+	// them, which is a fetch failure rather than a lower bound over what was
+	// read.
+	allRefused := aggErr != nil && len(failures) == len(vaults)
 	if len(topicARNs) == 0 {
-		if aggErr != nil {
+		if allRefused {
 			return resource.ErrorRelated("sns", aggErr)
+		}
+		if aggErr != nil {
+			return relatedResultTrunc("sns", nil, true)
 		}
 		return resource.ProvenZero("sns", "topicARNs")
 	}
 
 	ids, dropped := resolveRefs("sns", topicARNs, refContext(clients, cache, "sns"))
-	if len(ids) == 0 && aggErr != nil {
-		// Nothing was confirmed: the vault-notification failures are a plain
-		// fetch failure, not a truncation signal.
+	if len(ids) == 0 && allRefused {
 		return resource.ErrorRelated("sns", aggErr)
 	}
 	// Some GetBackupVaultNotifications calls may have failed: ids is a proven

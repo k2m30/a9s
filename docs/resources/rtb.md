@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `subnet`
 
 - **Why related**: Explicitly-associated subnets — which subnets actually use this RTB (and, for the VPC main RTB, which subnets implicitly fall back to it).
-- **How discovered**: read `Associations[].SubnetId` on the route table; cross-reference the already-loaded `subnet` list by subnet ID. (For the main RTB, `Associations[].Main==true` covers every subnet in the VPC that has no explicit association — the reverse join is done on the `subnet` side.)
+- **How discovered**: read `Associations[].SubnetId` on the route table; cross-reference the already-loaded `subnet` list by subnet ID. (For the main RTB, `Associations[].Main==true` covers every subnet in the VPC that has no explicit association: AWS returns no `SubnetId` for an implicit association, so both ends read it through the one predicate that holds the VPC's subnets against the tables naming one explicitly.)
 - **Count shown**: unknown.
 
 ### `tgw`
@@ -167,7 +167,7 @@ rtb — NETWORKING. Status key: `state` — the column naming it is the status c
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| subnet | Subnets | no |
+| subnet | Subnets | yes |
 | nat | NAT Gateways | no |
 | igw | Internet Gateways | no |
 | cfn | CloudFormation | yes |

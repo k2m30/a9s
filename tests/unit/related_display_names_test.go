@@ -150,7 +150,8 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"s3", "lambda"}: "Lambda (notifications)",
 		{"s3", "cfn"}:    "CloudFormation",
 
-		{"ebs", "ec2"}:      "EC2 Instance",
+		// Multi-Attach puts one volume on several instances at once.
+		{"ebs", "ec2"}:      "EC2 Instances",
 		{"ebs", "ebs-snap"}: "EBS Snapshots",
 		{"ebs", "kms"}:      "KMS Key",
 

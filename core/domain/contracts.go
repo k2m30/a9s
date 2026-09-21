@@ -69,6 +69,13 @@ type RelatedDef struct {
 	// read the same AWS fact from its two ends, so on any data A lists B
 	// exactly when B lists A. Set on both directions or neither.
 	Mirror bool
+	// Distinct names, in one phrase, the AWS fact this direction reads, for a
+	// direction whose reverse reads a different one: the two are two
+	// relationships between the same pair of types, and a row one side lists
+	// while the other does not is the answer, not a defect. Empty on a Mirror
+	// direction; a direction that is neither is undecided, which the pair
+	// gate rejects.
+	Distinct string
 }
 
 // NavigableField associates a detail view field path with a target resource type.
