@@ -83,6 +83,17 @@ type ServiceClients struct {
 	identityStore identityStore
 	ruleSets      ruleSetStore
 
+	// cfg is the session config CreateServiceClients was called with, kept so
+	// a client for another Region can be built from it on demand. Zero value
+	// when the struct is assembled field by field.
+	cfg aws.Config
+	// ctFromConfig is the CloudTrail client CreateServiceClients built, held
+	// to recognise a CloudTrail field a caller has replaced with its own.
+	ctFromConfig CloudTrailAPI
+
+	ctRegionMu sync.Mutex
+	ctByRegion map[string]CloudTrailAPI
+
 	// Region is the region resolved from the session's AWS config at
 	// construction time (profile config, AWS_REGION/AWS_DEFAULT_REGION env,
 	// or the SDK default). Immutable after CreateServiceClients returns — safe
@@ -168,9 +179,12 @@ func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Conf
 
 // CreateServiceClients creates all service clients from the given AWS config.
 func CreateServiceClients(cfg aws.Config) *ServiceClients {
+	ct := cloudtrail.NewFromConfig(cfg)
 	return &ServiceClients{
-		Region: cfg.Region,
-		EC2:    ec2.NewFromConfig(cfg),
+		cfg:          cfg,
+		ctFromConfig: ct,
+		Region:       cfg.Region,
+		EC2:          ec2.NewFromConfig(cfg),
 		// S3/SNS/SFN/Lambda are wrapped with in-flight call coalescing
 		// (coalesce.go) — a detail open fires the same read (GetBucketPolicy/
 		// GetTopicAttributes/DescribeStateMachine/GetFunction) from a related
@@ -217,7 +231,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		SES:              ses.NewFromConfig(cfg),
 		SESv2:            sesv2.NewFromConfig(cfg),
 		Redshift:         redshift.NewFromConfig(cfg),
-		CloudTrail:       cloudtrail.NewFromConfig(cfg),
+		CloudTrail:       ct,
 		Athena:           athena.NewFromConfig(cfg),
 		CodeArtifact:     codeartifact.NewFromConfig(cfg),
 		CodeBuild:        codebuild.NewFromConfig(cfg),
@@ -244,6 +258,28 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 // only the field itself — methods on the returned store are independently
 // thread-safe per the session-side concrete store implementations'
 // contracts.
+
+// CloudTrailIn returns the CloudTrail client that reads region's event
+// history. The session's own client answers for the session Region, for an
+// empty region, and for every Region when a caller has substituted it (the
+// demo fake, a test) — a substituted client is the one the session is meant
+// to talk to. Concurrency-safe; clients are built once per Region.
+func (c *ServiceClients) CloudTrailIn(region string) CloudTrailAPI {
+	if region == "" || region == c.Region || c.CloudTrail != c.ctFromConfig {
+		return c.CloudTrail
+	}
+	c.ctRegionMu.Lock()
+	defer c.ctRegionMu.Unlock()
+	if api, ok := c.ctByRegion[region]; ok {
+		return api
+	}
+	api := cloudtrail.NewFromConfig(c.cfg, func(o *cloudtrail.Options) { o.Region = region })
+	if c.ctByRegion == nil {
+		c.ctByRegion = map[string]CloudTrailAPI{}
+	}
+	c.ctByRegion[region] = api
+	return api
+}
 
 // IAMPolicies returns the session-scoped IAM policy store, or nil if not
 // yet wired. Concurrency-safe.

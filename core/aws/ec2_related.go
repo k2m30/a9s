@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -208,43 +207,6 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	return unreadZeroScanned(res, len(ngList), relatedResultTrunc("ng", ids, truncated))
 }
 
-// checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
-// instance. Returns an unknown result when the cache is truncated — the partial
-// list cannot yield a definitive count. FetchFilter["ResourceName"] is always set
-// so the caller can do a filtered re-fetch.
-func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	instanceID, _, _ := ec2Identity(res)
-	if instanceID == "" {
-		return resource.ProvenZero("ct-events", "instanceID")
-	}
-	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if eventList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, eventRes := range eventList {
-		raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct)
-		if ok {
-			if cloudTrailEventMentionsInstance(raw, instanceID) {
-				ids = append(ids, eventRes.ID)
-			}
-			continue
-		}
-		if eventRes.Fields["resource_name"] == instanceID {
-			ids = append(ids, eventRes.ID)
-		}
-	}
-	fetchFilter := map[string]string{"ResourceName": instanceID}
-	if truncated {
-		// Cache is partial — the filtered fetch will determine the real count.
-		return resource.DeferredRelated("ct-events", fetchFilter)
-	}
-	return relatedResultTrunc("ct-events", ids, false).WithFetchFilter(fetchFilter)
-}
-
 // checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
 func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volumeIDs := ec2VolumeIDs(res)
@@ -325,15 +287,6 @@ func ec2Tags(res resource.Resource) map[string]string {
 		tags[*tag.Key] = *tag.Value
 	}
 	return tags
-}
-
-func cloudTrailEventMentionsInstance(event cloudtrailtypes.Event, instanceID string) bool {
-	for _, rr := range event.Resources {
-		if rr.ResourceName != nil && *rr.ResourceName == instanceID {
-			return true
-		}
-	}
-	return false
 }
 
 func ec2VolumeIDs(res resource.Resource) map[string]struct{} {

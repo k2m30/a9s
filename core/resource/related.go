@@ -685,6 +685,18 @@ func AppendRelated(shortName string, def RelatedDef) {
 	relatedTestOverrides[shortName] = append(existing, def)
 }
 
+// CTRegionFilterKey carries the Region a CloudTrail filter must be looked up
+// in. It is not a LookupAttribute: the CloudTrail fetchers strip it and send
+// the request to that Region's endpoint instead.
+const CTRegionFilterKey = "_region"
+
+// CTAltNameFilterKey carries the other spelling of the resource the lookup
+// names — the ARN when the key sends the bare name, the bare name when it
+// sends the ARN. CloudTrail records a resource under one or the other per API
+// call, so a lookup that comes back empty can be worth one retry under this
+// value. Like CTRegionFilterKey it is not a LookupAttribute.
+const CTAltNameFilterKey = "_altname"
+
 // BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
 // The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
 // Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
@@ -693,7 +705,39 @@ func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string 
 	if rt == nil || rt.CloudTrailKey == "" {
 		return nil
 	}
-	return buildFilterFromKey(res, rt.CloudTrailKey)
+	filter := buildFilterFromKey(res, rt.CloudTrailKey)
+	if filter == nil {
+		return nil
+	}
+	if rt.CloudTrailRegion != nil {
+		if region := rt.CloudTrailRegion(res); region != "" {
+			filter[CTRegionFilterKey] = region
+		}
+	}
+	if alt := ctAltName(res, filter); alt != "" {
+		filter[CTAltNameFilterKey] = alt
+	}
+	return filter
+}
+
+// ctAltName returns the spelling of res that a ResourceName lookup is not
+// already sending: its ARN when the filter carries the bare name, its ID when
+// the filter carries the ARN. Empty when the row holds only one of the two, or
+// when the lookup is not by resource name — a Username is a caller, and an ARN
+// is not another spelling of one.
+func ctAltName(res Resource, filter map[string]string) string {
+	sent, byName := filter["ResourceName"]
+	if !byName {
+		return ""
+	}
+	arn := res.Fields["arn"]
+	if sent != arn {
+		return arn
+	}
+	if sent != res.ID {
+		return res.ID
+	}
+	return ""
 }
 
 func buildFilterFromKey(res Resource, ctKey string) map[string]string {

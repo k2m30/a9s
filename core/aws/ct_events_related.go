@@ -83,7 +83,7 @@ func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []strin
 	}
 
 	// Fallback: Username may encode a service role path ("AWSServiceRole/RoleName").
-	if username := res.Fields["user"]; strings.Contains(username, "/") {
+	if username := res.Fields["_ct.username"]; strings.Contains(username, "/") {
 		return ctRoleAlternatives(username, rc)
 	}
 
@@ -540,6 +540,20 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 // Self-pivot checkers (ct-events → ct-events)
 // ---------------------------------------------------------------------------
 
+// ctSelfPivot completes a ct-events → ct-events filter with the Region the
+// event was recorded in: a drill off an event is a lookup for more of that
+// event's own history, which lives in the Region the event names, not in the
+// one the session is browsing. An event that names no Region cannot say where
+// to look, so the pivot answers unknown rather than searching the wrong one.
+func ctSelfPivot(res resource.Resource, filter map[string]string) resource.RelatedCheckResult {
+	region := res.Fields["_ct.region"]
+	if region == "" {
+		return resource.UnknownRelated("ct-events")
+	}
+	filter[resource.CTRegionFilterKey] = region
+	return resource.DeferredRelated("ct-events", filter)
+}
+
 // checkCtEventsPivotByAccessKeyId returns a self-pivot FetchFilter for the
 // accessKeyId found in the event's userIdentity JSON blob. Returns Count=0 when
 // the event has no accessKeyId or the caller is Root (Root has no access key).
@@ -561,18 +575,18 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 	if accessKeyID == "" {
 		return resource.ProvenZero("ct-events", "accessKeyID")
 	}
-	return resource.DeferredRelated("ct-events", map[string]string{"AccessKeyId": accessKeyID})
+	return ctSelfPivot(res, map[string]string{"AccessKeyId": accessKeyID})
 }
 
-// checkCtEventsPivotByUsername returns a self-pivot FetchFilter for the Username
-// derived from the event. The Username field is always derivable from any event
-// that has a non-empty user.
+// checkCtEventsPivotByUsername returns a self-pivot FetchFilter for the
+// caller CloudTrail recorded, which is the value its Username attribute
+// matches for an assumed role, a service and a federated user alike.
 func checkCtEventsPivotByUsername(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	username := res.Fields["user"]
+	username := res.Fields["_ct.username"]
 	if username == "" {
 		return resource.ProvenZero("ct-events", "username")
 	}
-	return resource.DeferredRelated("ct-events", map[string]string{"Username": username})
+	return ctSelfPivot(res, map[string]string{"Username": username})
 }
 
 // checkCtEventsPivotByEventName returns a self-pivot FetchFilter for the EventName.
@@ -585,37 +599,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 	if eventName == "" {
 		return resource.ProvenZero("ct-events", "eventName")
 	}
-	return resource.DeferredRelated("ct-events", map[string]string{"EventName": eventName})
-}
-
-// checkCtEventsPivotBySharedEventId returns a self-pivot FetchFilter for the
-// SharedEventId. This only applies to cross-account events where accountId differs
-// from recipientAccountId. The SharedEventId links events across accounts for the
-// same API call.
-func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.Fields["_ct.cross_account"] != "true" {
-		return resource.ProvenZero("ct-events", "res.Fields[_ct.cross_account]")
-	}
-	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
-	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("ct-events")
-		}
-		return resource.KnownRelated("ct-events", nil, false)
-	}
-	parsed := parseCTEventJSON(event.CloudTrailEvent)
-	if sharedEventID, _ := parsed["sharedEventID"].(string); sharedEventID != "" {
-		// LookupEvents has no SharedEventId attribute key — sending one fails
-		// the call — so the drill filters on the built row's field instead.
-		return resource.DeferredRelated("ct-events",
-			map[string]string{ctLocalFieldPrefix + "shared_event_id": sharedEventID})
-	}
-	// Cross-account event without a sharedEventID in the JSON — scope the drill
-	// by the event's own id so the pivot is still offered to the user.
-	if event.EventId != nil && *event.EventId != "" {
-		return resource.DeferredRelated("ct-events", map[string]string{"EventId": *event.EventId})
-	}
-	return resource.ProvenZero("ct-events", "the lookup completed")
+	return ctSelfPivot(res, map[string]string{"EventName": eventName})
 }
 
 // checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail

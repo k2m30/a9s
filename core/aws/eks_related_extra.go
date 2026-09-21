@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -71,40 +70,6 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	return relatedResultTrunc("asg", ids, truncated)
-}
-
-// checkEKSCTEvents scans ct-events for events involving this cluster.
-func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
-		return resource.ProvenZero("ct-events", "clusterName")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		// Cluster names routinely share a prefix ("prod", "prod-blue"), and an
-		// event's Resources slice carries every service's entries — a substring
-		// test attributes a sibling's events to this cluster. Each group holds
-		// the event's resource name as written and its forms stripped back to
-		// the cluster name, so the comparison is an equality.
-		for _, group := range extractCTResourceIDs(ev, "AWS::EKS::Cluster") {
-			if slices.Contains(group, clusterName) {
-				ids = append(ids, evRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // listClusterNodegroups walks the ListNodegroups pages of one cluster.

@@ -75,9 +75,9 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 
 ### `ct-events`
 
-- **Why related**: Audit trail for role AssumeRole / policy attach events — who's been using this role, who changed its permissions. Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
-- **How discovered**: `LookupEvents` filtered by `userIdentity.sessionContext.sessionIssuer.arn == this role's ARN` (for AssumeRole usage) and by `resources.ARN == this role's ARN` (for policy-attach / trust-policy edits) — a9s-devops: both filters are documented CloudTrail pivots.
-- **Count shown**: yes.
+- **Why related**: Audit trail for the role's own configuration — who created it, who attached or detached its policies, who edited its trust policy. Universal pivot — applies to every registered type; see docs/related-resources.md §Policy.
+- **How discovered**: `LookupEvents` filtered by `ResourceName == this role's ARN`, in us-east-1 where IAM records its events. `AssumeRole` calls naming this role are recorded in the Region the STS call was made in and under the caller's identity, so they belong to the caller's own history rather than to this row.
+- **Count shown**: no — the row carries the row's own lookup, taken when it is opened.
 
 ## 3. Attention / Issues Algorithm
 

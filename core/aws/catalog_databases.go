@@ -68,7 +68,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		RefToID:       dbiRefToID,
 		Aliases:       []string{"dbi", "rds", "databases", "db-instances"},
 		Category:      "DATABASES & STORAGE",
-		CloudTrailKey: "ResourceName:Fields.arn",
+		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=false")
@@ -110,7 +110,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("dbi")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
@@ -245,7 +245,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("redis")},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS, NeedsTargetCache: false},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets, NeedsTargetCache: true, Truncated: true},
@@ -276,7 +276,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		ShortName:     "dbc",
 		Aliases:       []string{"dbc", "docdb", "clusters", "db-clusters"},
 		Category:      "DATABASES & STORAGE",
-		CloudTrailKey: "ResourceName:Fields.arn",
+		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			engine := strings.ToLower(r.Fields["engine"])
@@ -369,7 +369,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "dbc-snap", DisplayName: "DB Cluster Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcCTEvents},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("dbc")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
@@ -673,7 +673,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkDBISnapKMS, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDBISnapBackup, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDBISnapCTEvents, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("dbi-snap")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "DBInstanceIdentifier", TargetType: "dbi", Resolve: dbiSnapParentRow},
@@ -773,7 +773,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcSnapCTEvents},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("dbc-snap")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},

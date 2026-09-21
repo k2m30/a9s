@@ -34,12 +34,13 @@ func colorAPIGW(r domain.Resource) domain.Color {
 
 var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "Route 53 Hosted Zones",
-		ShortName:     "r53",
-		RefToID:       r53RefToID,
-		Aliases:       []string{"r53", "route53", "dns", "hosted-zones"},
-		Category:      "DNS & CDN",
-		CloudTrailKey: "ResourceName:ID",
+		Name:             "Route 53 Hosted Zones",
+		ShortName:        "r53",
+		RefToID:          r53RefToID,
+		Aliases:          []string{"r53", "route53", "dns", "hosted-zones"},
+		Category:         "DNS & CDN",
+		CloudTrailKey:    "ResourceName:ID",
+		CloudTrailRegion: ctRegionUSEast1,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			zone := strings.TrimPrefix(r.ID, "/hostedzone/")
 			return consolelink.Global(region, "route53/v2/hostedzones#ListRecordSets/"+zone)
@@ -82,13 +83,14 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 	},
 	{
-		Name:           "CloudFront Distributions",
-		ShortName:      "cf",
-		HumanizeFields: []string{"status"},
-		Aliases:        []string{"cf", "cloudfront", "cdn"},
-		Category:       "DNS & CDN",
-		CloudTrailKey:  "ResourceName:ID",
-		LifecycleKey:   "status",
+		Name:             "CloudFront Distributions",
+		ShortName:        "cf",
+		HumanizeFields:   []string{"status"},
+		Aliases:          []string{"cf", "cloudfront", "cdn"},
+		Category:         "DNS & CDN",
+		CloudTrailKey:    "ResourceName:Fields.arn",
+		CloudTrailRegion: ctRegionUSEast1,
+		LifecycleKey:     "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "cloudfront/v4/home#/distributions/"+r.ID)
 		},
@@ -110,7 +112,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// checkLambdaCF (the lambda:cf pivot) matches on lambda_function_arns
 		// read off cf rows replayed from the disk cache, which carries Fields
 		// but no RawStruct.
-		FieldKeys: []string{"distribution_id", "domain_name", "status", "enabled", "aliases", "price_class", "lambda_function_arns"},
+		FieldKeys: []string{"distribution_id", "arn", "domain_name", "status", "enabled", "aliases", "price_class", "lambda_function_arns"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCfS3, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers (origin)", Checker: checkCfELB, NeedsTargetCache: true, Truncated: true, Mirror: true},

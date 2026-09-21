@@ -344,5 +344,5 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbc | RDS Clusters | no |
 | role | IAM Roles | no |
 | eni | Network Interfaces | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -99,7 +99,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmS3, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmSFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("alarm")},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1", Detail: "The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself."},
@@ -162,11 +162,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:          "CloudTrail Trails",
-		ShortName:     "trail",
-		Aliases:       []string{"trail", "cloudtrail", "trails"},
-		Category:      "MONITORING",
-		CloudTrailKey: "ResourceName:ID",
+		Name:             "CloudTrail Trails",
+		ShortName:        "trail",
+		Aliases:          []string{"trail", "cloudtrail", "trails"},
+		Category:         "MONITORING",
+		CloudTrailKey:    "ResourceName:ID",
+		CloudTrailRegion: ctRegionOfTrail,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["trail_arn"]
 			if arn == "" {
@@ -253,9 +254,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return ctLocalPrincipals(c)(FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken))
 		}),
 		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
-			return ctLocalPrincipals(c)(FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken))
+			return ctLocalPrincipals(c)(FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrailIn(filter[resource.CTRegionFilterKey]), filter, continuationToken))
 		}),
-		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome", "_ct.cause", "_ct.error_code", "_ct.account_id", "_ct.cross_account", "_ct.event_category", "_ct.event_type", "_ct.is_root", "_ct.recipient_account", "_ct.region", "_ct.source_ip", "shared_event_id"},
+		FieldKeys: []string{"event_name", "time", "event_time", "user", "_ct.username", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.outcome", "_ct.cause", "_ct.error_code", "_ct.account_id", "_ct.cross_account", "_ct.event_category", "_ct.event_type", "_ct.is_root", "_ct.recipient_account", "_ct.region", "_ct.source_ip", "shared_event_id"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: false, Truncated: true},
@@ -273,7 +274,6 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CT events by AccessKeyId", Checker: checkCtEventsPivotByAccessKeyId, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: checkCtEventsPivotByUsername, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CT events by EventName", Checker: checkCtEventsPivotByEventName, NeedsTargetCache: false},
-			{TargetType: "ct-events", DisplayName: "CT events by SharedEventId", Checker: checkCtEventsPivotBySharedEventId, NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeCTEventDanger, Phrase: "destructive call", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudTrail recorded a call that deletes or tears something down. Verify it was expected and, if not, find out who made it."},

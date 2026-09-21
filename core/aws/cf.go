@@ -38,6 +38,11 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 				distID = *dist.Id
 			}
 
+			distARN := ""
+			if dist.ARN != nil {
+				distARN = *dist.ARN
+			}
+
 			domainName := ""
 			if dist.DomainName != nil {
 				domainName = *dist.DomainName
@@ -89,6 +94,7 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 				Name: distID,
 				Fields: map[string]string{
 					"distribution_id":      distID,
+					"arn":                  distARN,
 					"domain_name":          domainName,
 					"status":               status,
 					"enabled":              enabled,

@@ -36,35 +36,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// FetchCloudTrailEventsPage writes the AWS EventSource under
-// Fields["source"]; checkAlarmCTEvents matches on that key.
-
-func TestAlarm_Related_CTEvents_MatchesBySourceField(t *testing.T) {
-	alarmRes := resource.Resource{ID: "high-cpu-alarm", Name: "high-cpu-alarm"}
-
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{
-				{
-					ID:   "event-1",
-					Name: "PutMetricAlarm",
-					Fields: map[string]string{
-						"source":     "monitoring.amazonaws.com",
-						"event_name": "PutMetricAlarm",
-					},
-				},
-			},
-		},
-	}
-
-	checker := checkerByTarget(t, "alarm", "ct-events")
-	result := checker(context.Background(), nil, alarmRes, cache)
-
-	if result.Count() < 1 {
-		t.Fatalf("Count = %d, want >=1 (checker must read Fields[\"source\"], the key ct_events.go actually writes)", result.Count())
-	}
-}
-
 // checkECRCFN calls ecr:ListTagsForResource once for the open repository
 // and matches the aws:cloudformation:stack-name tag against the cfn cache.
 

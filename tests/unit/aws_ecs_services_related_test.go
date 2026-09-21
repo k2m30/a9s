@@ -830,44 +830,6 @@ func TestRelated_ECSSvc_Secrets_NonSMARNSkipped(t *testing.T) {
 	}
 }
 
-func TestRelated_ECSSvc_CTEvents_MatchByResourceName(t *testing.T) {
-	const svcName = "api-service"
-	evRes := resource.Resource{
-		ID:   "evt-abc123",
-		Name: "evt-abc123",
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("evt-abc123"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:service/prod/api-service")},
-			},
-		},
-	}
-	otherEvRes := resource.Resource{
-		ID:   "evt-other",
-		Name: "evt-other",
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("evt-other"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:service/prod/other-service")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes, otherEvRes}},
-	}
-	source := resource.Resource{ID: svcName, Name: svcName}
-
-	checker := ecsSvcCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "evt-abc123" {
-		t.Errorf("ResourceIDs = %v, want [evt-abc123]", result.ResourceIDs())
-	}
-}
-
 func TestRelated_ECSSvc_CTEvents_NoMatch(t *testing.T) {
 	evRes := resource.Resource{
 		ID:   "evt-other",
@@ -889,17 +851,6 @@ func TestRelated_ECSSvc_CTEvents_NoMatch(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
-	}
-}
-
-func TestRelated_ECSSvc_CTEvents_CacheMissNoClients(t *testing.T) {
-	source := resource.Resource{ID: "api-service", Name: "api-service"}
-
-	checker := ecsSvcCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
 

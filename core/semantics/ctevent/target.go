@@ -35,7 +35,7 @@ func ExtractTarget(eventName string, eventSource string, recipientAccountID stri
 		return rows, cleanedParams
 	}
 
-	rows, cleanedParams = extractByEventName(eventName, params, cleanedParams)
+	rows, cleanedParams = extractByEventName(eventName, recipientAccountID, params, cleanedParams)
 	if len(rows) > 0 {
 		return rows, cleanedParams
 	}
@@ -58,6 +58,27 @@ func removeKeys(m map[string]any, keys ...string) map[string]any {
 		delete(out, k)
 	}
 	return out
+}
+
+// namesRecordingAccount reports whether ref names a resource of the account
+// the event was recorded in. The comparison is between the ARN's own account
+// segment and the event's recipientAccountId — both carried by the event — so
+// it says nothing about which account the operator is browsing. A reference
+// that is not an ARN, or an ARN with no account segment (an S3 bucket), names
+// no account and is left to the resolver the detail runs afterwards.
+//
+// A row naming another account's resource must not navigate: the list there
+// holds this account's rows, and the row of that name is a different
+// resource.
+func namesRecordingAccount(ref, recipientAccountID string) bool {
+	if !strings.HasPrefix(ref, "arn:") || recipientAccountID == "" {
+		return true
+	}
+	parts := strings.SplitN(ref, ":", 6)
+	if len(parts) < 6 || parts[4] == "" {
+		return true
+	}
+	return parts[4] == recipientAccountID
 }
 
 // navFromLabel returns (IsNavigable, TargetType) for a TARGET row label.
@@ -103,6 +124,9 @@ func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
 		val = ref.ARN
 	}
 	isNav, target := navFromLabel(key)
+	if !namesRecordingAccount(ref.ARN, recipientAccountID) {
+		return Row{Key: key, Value: val}
+	}
 	// NavID strips the type prefix, which is what precedes the FIRST
 	// separator: "instance/i-0abc" → "i-0abc", "secret:prod/api/stripe-key" →
 	// "prod/api/stripe-key". No prefix leaves it empty and navigation falls
@@ -187,7 +211,7 @@ func labelFromARN(arn string) string {
 // extractByEventName implements the per-event-name fallback lookup table.
 // params is the requestParameters map (may be nil).
 // cleanedParams is a clone of the input params; this function removes lifted keys.
-func extractByEventName(eventName string, params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
+func extractByEventName(eventName, recipientAccountID string, params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
 	switch eventName {
 	case "PutObject", "GetObject", "DeleteObject", "CopyObject":
 		return extractS3ObjectEvent(params, cleanedParams)
@@ -227,15 +251,21 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 
 	case "GetSecretValue":
 		if id, _ := params["secretId"].(string); id != "" {
-			val := FormatCTTarget(id, "")
+			val := FormatCTTarget(id, recipientAccountID)
 			isNav, target := navFromLabel("Secret")
+			if !namesRecordingAccount(id, recipientAccountID) {
+				isNav, target = false, ""
+			}
 			return []Row{{Key: "Secret", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "secretId")
 		}
 
 	case "Decrypt":
 		if id, _ := params["keyId"].(string); id != "" {
-			val := FormatCTTarget(id, "")
+			val := FormatCTTarget(id, recipientAccountID)
 			isNav, target := navFromLabel("Key")
+			if !namesRecordingAccount(id, recipientAccountID) {
+				isNav, target = false, ""
+			}
 			return []Row{{Key: "Key", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "keyId")
 		}
 		isNav, target := navFromLabel("Key")
@@ -243,7 +273,10 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 
 	case "AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
 		if arn, _ := params["roleArn"].(string); arn != "" {
-			val := FormatCTTarget(arn, "")
+			val := FormatCTTarget(arn, recipientAccountID)
+			if !namesRecordingAccount(arn, recipientAccountID) {
+				return []Row{{Key: "Role", Value: val}}, removeKeys(cleanedParams, "roleArn")
+			}
 			isNav, target := navFromLabel("Role")
 			return []Row{{Key: "Role", Value: val, IsNavigable: isNav, TargetType: target, NavID: roleNavID(val)}}, removeKeys(cleanedParams, "roleArn")
 		}

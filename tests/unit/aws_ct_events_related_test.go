@@ -261,36 +261,6 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_CtEvents_IAMUser_FetchFilterSet verifies that checkIAMUserCtEvents
-// sets FetchFilter["Username"] to the user's ID on all return paths (match found).
-func TestRelated_CtEvents_IAMUser_FetchFilterSet(t *testing.T) {
-	userName := "alice"
-	eventRes := resource.Resource{
-		ID:     "evt-iam-user-001",
-		Fields: map[string]string{"user": userName},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{eventRes}},
-	}
-	iamUser := resource.Resource{
-		ID:   userName,
-		Name: userName,
-	}
-
-	checker := iamUserCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, iamUser, cache)
-
-	if result.Count() <= 0 {
-		t.Errorf("Count = %d, want > 0 (event matched)", result.Count())
-	}
-	if result.FetchFilter() == nil {
-		t.Fatal("FetchFilter is nil, want non-nil")
-	}
-	if result.FetchFilter()["Username"] != userName {
-		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter()["Username"], userName)
-	}
-}
-
 // TestRelated_CtEvents_IAMUser_FetchFilterSet_NoMatch_Truncated verifies that
 // FetchFilter["Username"] is set even when no match is found in a truncated cache.
 func TestRelated_CtEvents_IAMUser_FetchFilterSet_NoMatch_Truncated(t *testing.T) {
@@ -415,43 +385,6 @@ func ec2CtEventsCheckerByTarget(t *testing.T) resource.RelatedChecker {
 		t.Fatal("ec2 ct-events checker not captured at init — verify ec2 SetRelatedForTest includes ct-events")
 	}
 	return ec2CtEventsRelatedChecker
-}
-
-// TestRelated_CtEvents_EC2_FetchFilterSet verifies that checkEC2CloudTrailEvents
-// sets FetchFilter["ResourceName"] to the instance ID when a match is found.
-func TestRelated_CtEvents_EC2_FetchFilterSet(t *testing.T) {
-	instanceID := "i-0abcdef1234567890"
-	eventRes := resource.Resource{
-		ID:     "evt-ec2-001",
-		Fields: map[string]string{"resource_name": instanceID},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String(instanceID),
-					ResourceType: aws.String("AWS::EC2::Instance"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{eventRes}},
-	}
-	ec2Res := resource.Resource{
-		ID: instanceID,
-	}
-
-	checker := ec2CtEventsCheckerByTarget(t)
-	result := checker(context.Background(), nil, ec2Res, cache)
-
-	if result.Count() <= 0 {
-		t.Errorf("Count = %d, want > 0 (event matched)", result.Count())
-	}
-	if result.FetchFilter() == nil {
-		t.Fatal("FetchFilter is nil, want non-nil")
-	}
-	if result.FetchFilter()["ResourceName"] != instanceID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], instanceID)
-	}
 }
 
 // TestRelated_CtEvents_EC2_FetchFilterSet_NoMatch_Truncated verifies that
@@ -1043,15 +976,15 @@ func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	}
 }
 
-// TestCtEventsRelatedGroups_PivotsRegistered asserts that the "ct-events" related
-// registry contains exactly 4 self-pivot entries (TargetType == "ct-events") with
-// the expected DisplayNames.
+// TestCtEventsRelatedGroups_PivotsRegistered asserts that the "ct-events"
+// related registry contains exactly the self-pivot entries
+// (TargetType == "ct-events") whose value CloudTrail can look up: each names a
+// LookupEvents attribute.
 func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
 	expectedPivots := []string{
 		"CT events by AccessKeyId",
 		"CT events by Username",
 		"CT events by EventName",
-		"CT events by SharedEventId",
 	}
 
 	defs := resource.GetRelated("ct-events")

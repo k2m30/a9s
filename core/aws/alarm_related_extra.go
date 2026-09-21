@@ -6,7 +6,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
@@ -75,28 +74,4 @@ func checkAlarmSFN(ctx context.Context, clients any, res resource.Resource, cach
 
 func checkAlarmWAF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmRowsNaming(ctx, clients, cache, "waf", res)
-}
-
-// checkAlarmCTEvents scans the ct-events cache for events that reference this
-// alarm (DescribeAlarms / PutMetricAlarm etc).
-func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	name := res.ID
-	if name == "" {
-		return resource.ProvenZero("ct-events", "name")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		if strings.Contains(evRes.Fields["source"], "monitoring.amazonaws.com") &&
-			strings.Contains(evRes.Fields["event_name"], "Alarm") {
-			ids = append(ids, evRes.ID)
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
 }

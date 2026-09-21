@@ -84,10 +84,12 @@ func TestScenario_RedisVisual(t *testing.T) {
 	prod := selectRedisByID(t, scenario, demofixtures.ProdRedisID)
 	scenario.OpenDetailResource("redis", prod)
 	scenario.ExpectNoAPIError()
+	// The CloudTrail row carries no count: a row's events are read from
+	// CloudTrail with the row's own lookup when the operator opens the row.
+	scenario.ExpectRelatedRow("CloudTrail Events")
 	for _, displayName := range []string{
 		"CW Alarms",
 		"CloudFormation",
-		"CloudTrail Events",
 		"KMS Key",
 		"Log Groups",
 		"Secrets Manager",

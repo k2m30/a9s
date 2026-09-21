@@ -911,39 +911,6 @@ func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {
 	}
 }
 
-func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
-	// checkAlarmCTEvents matches on Fields["source"] (not "event_source") and
-	// Fields["event_name"] — docs/resources/alarm.md, `ct-events`.
-	evRes := resource.Resource{
-		ID: "ct-event-abc",
-		Fields: map[string]string{
-			"source":     "monitoring.amazonaws.com",
-			"event_name": "PutMetricAlarm",
-		},
-	}
-	otherEv := resource.Resource{
-		ID: "ct-event-def",
-		Fields: map[string]string{
-			"source":     "lambda.amazonaws.com",
-			"event_name": "InvokeFunction",
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes, otherEv}},
-	}
-	src := resource.Resource{ID: "my-alarm", Fields: map[string]string{}}
-
-	checker := alarmCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, src, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ct-event-abc" {
-		t.Errorf("ResourceIDs = %v, want [ct-event-abc]", result.ResourceIDs())
-	}
-}
-
 func TestRelated_Alarm_CTEvents_NoMatchWhenEventNameLacksAlarm(t *testing.T) {
 	// docs/resources/alarm.md, `ct-events`: the field is Fields["source"].
 	evRes := resource.Resource{
@@ -972,14 +939,5 @@ func TestRelated_Alarm_CTEvents_EmptySourceID(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (empty alarm name)", result.Count())
-	}
-}
-
-func TestRelated_Alarm_CTEvents_NilCache(t *testing.T) {
-	checker := alarmCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, resource.Resource{ID: "my-alarm"}, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }

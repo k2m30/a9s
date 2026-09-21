@@ -402,21 +402,3 @@ func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	keyID = kmsRefFromField(keyID, res.Type)
 	return unreadZero(res, kmsRelated(ctx, clients, cache, []string{keyID}))
 }
-
-// checkDbcCTEvents looks up cached CloudTrail events for the cluster's
-// DBClusterIdentifier. Universal pivot — every registered type gets one;
-// see the Policy section of docs/related-resources.md. FetchFilter["ResourceName"] is always
-// set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
-// — the panel renders the visible page count rather than a total.
-// ResourceType is "AWS::RDS::DBCluster" — both DocDB and Aurora clusters share
-// this CloudTrail resource type (docs/resources/dbc.md).
-// Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
-var checkDbcCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
-	IDExtractor: func(res resource.Resource) string {
-		id := dbcClusterIdentifier(res.RawStruct)
-		if id == "" {
-			id = res.ID
-		}
-		return id
-	},
-})

@@ -512,40 +512,6 @@ func TestRelated_ECS_EC2_NilCache(t *testing.T) {
 	}
 }
 
-func TestRelated_ECS_CTEvents_Match(t *testing.T) {
-	clusterName := "my-cluster"
-	evRes := resource.Resource{
-		ID: "event-abc123",
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster")},
-			},
-		},
-	}
-	otherEv := resource.Resource{
-		ID: "event-def456",
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/other-cluster")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes, otherEv}},
-	}
-	source := resource.Resource{ID: clusterName, Fields: map[string]string{}}
-
-	checker := ecsCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "event-abc123" {
-		t.Errorf("ResourceIDs = %v, want [event-abc123]", result.ResourceIDs())
-	}
-}
-
 func TestRelated_ECS_CTEvents_NoMatch(t *testing.T) {
 	evRes := resource.Resource{
 		ID: "event-abc123",
@@ -574,15 +540,6 @@ func TestRelated_ECS_CTEvents_EmptySourceID(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (empty cluster ID)", result.Count())
-	}
-}
-
-func TestRelated_ECS_CTEvents_NilCache(t *testing.T) {
-	checker := ecsCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 

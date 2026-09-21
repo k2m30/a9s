@@ -1153,8 +1153,8 @@ func TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType(t *testing.T) 
 			if principalRow.TargetType != tc.wantTarget {
 				t.Errorf("Principal row TargetType = %q, want %q", principalRow.TargetType, tc.wantTarget)
 			}
-			if principalRow.NavID != tc.wantNavID {
-				t.Errorf("Principal row NavID = %q, want %q", principalRow.NavID, tc.wantNavID)
+			if principalRow.NavID != "" {
+				t.Errorf("Principal row NavID = %q, want empty: the row carries the whole ARN and the detail resolves it, which is what reads the account in it", principalRow.NavID)
 			}
 		})
 	}

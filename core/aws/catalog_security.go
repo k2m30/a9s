@@ -51,12 +51,13 @@ func colorWAF(r domain.Resource) domain.Color {
 
 var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "IAM Roles",
-		ShortName:     "role",
-		RefToID:       roleRefToID,
-		Aliases:       []string{"role", "roles", "iam-roles", "iam_roles"},
-		Category:      "SECURITY & IAM",
-		CloudTrailKey: "_localfield.role_name:Fields.role_name",
+		Name:             "IAM Roles",
+		ShortName:        "role",
+		RefToID:          roleRefToID,
+		Aliases:          []string{"role", "roles", "iam-roles", "iam_roles"},
+		Category:         "SECURITY & IAM",
+		CloudTrailKey:    "ResourceName:Fields.arn",
+		CloudTrailRegion: ctRegionUSEast1,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(r.ID))
 		},
@@ -81,7 +82,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		}),
 		Wave2: IssueEnricher{Fn: EnrichIAMRoleLastUsed, Priority: 100},
 		FieldKeys: []string{
-			"role_name", "role_id", "path", "create_date", "description",
+			"role_name", "role_id", "arn", "path", "create_date", "description",
 			"assume_role_policy_document", "trust_wildcard", "trust_summary",
 		},
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
@@ -120,6 +121,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:             []string{"policy", "policies", "iam-policies", "iam_policies"},
 		Category:            "SECURITY & IAM",
 		CloudTrailKey:       "ResourceName:ID",
+		CloudTrailRegion:    ctRegionUSEast1,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {
@@ -248,7 +250,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("iam-user")},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA", Severity: domain.SevBroken, Source: "wave2", Detail: "This user signs in to the console with a password alone, so a leaked or guessed password is a full takeover. Register an MFA device for the user, or remove the console password if the user only needs programmatic access."},
@@ -261,12 +263,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 	},
 	{
-		Name:          "IAM Groups",
-		ShortName:     "iam-group",
-		RefToID:       iamGroupRefToID,
-		Aliases:       []string{"iam-group", "iam-groups", "groups", "iam_groups"},
-		Category:      "SECURITY & IAM",
-		CloudTrailKey: "ResourceName:ID",
+		Name:             "IAM Groups",
+		ShortName:        "iam-group",
+		RefToID:          iamGroupRefToID,
+		Aliases:          []string{"iam-group", "iam-groups", "groups", "iam_groups"},
+		Category:         "SECURITY & IAM",
+		CloudTrailKey:    "ResourceName:ID",
+		CloudTrailRegion: ctRegionUSEast1,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "iam/home#/groups/details/"+url.PathEscape(r.ID))
 		},

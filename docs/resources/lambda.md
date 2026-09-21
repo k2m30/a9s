@@ -378,7 +378,7 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 | ddb | DynamoDB Tables | yes |
 | kinesis | Kinesis Streams | yes |
 | msk | MSK Clusters | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | tg | Target Groups | yes |
 | sns | SNS Topics | yes |
 | sns-sub | SNS Subscriptions | yes |

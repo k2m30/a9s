@@ -845,8 +845,8 @@ func TestCtEvents_FetchedEventDetailOffersTheActorAsNavigable(t *testing.T) {
 			if item.TargetType != tc.targetType {
 				t.Errorf("Principal TargetType = %q, want %q", item.TargetType, tc.targetType)
 			}
-			if item.NavID != tc.navID {
-				t.Errorf("Principal NavID = %q, want %q", item.NavID, tc.navID)
+			if item.NavID != "" {
+				t.Errorf("Principal NavID = %q, want empty: the detail resolves the ARN the row carries", item.NavID)
 			}
 		})
 	}
@@ -869,123 +869,8 @@ func ctPrincipalItem(sections []domain.Section) (domain.Item, bool) {
 	return domain.Item{}, false
 }
 
-// TestFetchCloudTrailEventsPageFiltered_LocalFieldKeysExcludedFromLookupAttributes
-// verifies that filter keys prefixed with "_localfield." are never turned into
-// CloudTrail LookupAttributes — only the remaining plain keys are, exercising the
-// server/local partition ("_localfield." keys are a local post-filter, applied
-// after fetch, because CloudTrail's LookupEvents API cannot filter on them).
-func TestFetchCloudTrailEventsPageFiltered_LocalFieldKeysExcludedFromLookupAttributes(t *testing.T) {
-	mock := &capturingCloudTrailClient{
-		output: &cloudtrail.LookupEventsOutput{},
-	}
-
-	filter := map[string]string{
-		"Username":              "svc-deploy",
-		"ResourceName":          "i-0abc123",
-		"_localfield.role_name": "SomeRole",
-		"_localfield.env":       "prod",
-	}
-	_, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, filter, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if mock.captured == nil {
-		t.Fatal("LookupEvents was not called")
-	}
-
-	if len(mock.captured.LookupAttributes) != 2 {
-		t.Fatalf("LookupAttributes length = %d, want 2 (only non-\"_localfield.\" keys); got %+v", len(mock.captured.LookupAttributes), mock.captured.LookupAttributes)
-	}
-
-	got := map[string]string{}
-	for _, attr := range mock.captured.LookupAttributes {
-		key := string(attr.AttributeKey)
-		val := ""
-		if attr.AttributeValue != nil {
-			val = *attr.AttributeValue
-		}
-		got[key] = val
-	}
-	want := map[string]string{
-		"Username":     "svc-deploy",
-		"ResourceName": "i-0abc123",
-	}
-	for k, v := range want {
-		if got[k] != v {
-			t.Errorf("LookupAttributes[%q] = %q, want %q", k, got[k], v)
-		}
-	}
-	if _, ok := got["_localfield.role_name"]; ok {
-		t.Error("LookupAttributes contains \"_localfield.role_name\" — local-field keys must never reach the server-side filter")
-	}
-	if _, ok := got["_localfield.env"]; ok {
-		t.Error("LookupAttributes contains \"_localfield.env\" — local-field keys must never reach the server-side filter")
-	}
-}
-
-// TestFetchCloudTrailEventsPageFiltered_LocalFieldFilter_AssumedRoleSessionName
-// covers the IAM Role -> CloudTrail Events pivot: CloudTrail's
-// top-level Username for an assumed-role session is the session name, not the
-// role name, so a "_localfield.role_name" filter must be applied locally against
-// Fields["role_name"] (extracted from userIdentity.sessionContext.sessionIssuer.userName)
-// after fetch, not sent to CloudTrail as a server-side LookupAttribute.
-func TestFetchCloudTrailEventsPageFiltered_LocalFieldFilter_AssumedRoleSessionName(t *testing.T) {
-	matchJSON := `{"userIdentity":{"type":"AssumedRole","sessionContext":{"sessionIssuer":{"userName":"DeployRole"}}}}`
-	otherJSON := `{"userIdentity":{"type":"AssumedRole","sessionContext":{"sessionIssuer":{"userName":"OtherRole"}}}}`
-
-	mock := &capturingCloudTrailClient{
-		output: &cloudtrail.LookupEventsOutput{
-			Events: []cloudtrailtypes.Event{
-				{
-					EventId:         aws.String("evt-role-match-deploy"),
-					EventName:       aws.String("PutObject"),
-					Username:        aws.String("AROAEXAMPLE:jenkins-ci-session-8842"),
-					CloudTrailEvent: aws.String(matchJSON),
-					Resources:       []cloudtrailtypes.Resource{},
-				},
-				{
-					EventId:         aws.String("evt-role-nomatch-other"),
-					EventName:       aws.String("PutObject"),
-					Username:        aws.String("AROAEXAMPLE:jenkins-ci-session-9931"),
-					CloudTrailEvent: aws.String(otherJSON),
-					Resources:       []cloudtrailtypes.Resource{},
-				},
-			},
-		},
-	}
-
-	filter := map[string]string{"_localfield.role_name": "DeployRole"}
-	result, err := awsclient.FetchCloudTrailEventsPageFiltered(context.Background(), mock, filter, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if mock.captured == nil {
-		t.Fatal("LookupEvents was not called")
-	}
-
-	if len(mock.captured.LookupAttributes) != 0 {
-		t.Errorf("LookupAttributes = %+v, want empty (an all-\"_localfield.\" filter sends no server-side attributes)", mock.captured.LookupAttributes)
-	}
-
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 surviving resource, got %d: %+v", len(result.Resources), result.Resources)
-	}
-	if result.Resources[0].ID != "evt-role-match-deploy" {
-		t.Errorf("Resource ID = %q, want %q", result.Resources[0].ID, "evt-role-match-deploy")
-	}
-	if roleName := result.Resources[0].Fields["role_name"]; roleName != "DeployRole" {
-		t.Errorf("Fields[\"role_name\"] = %q, want %q", roleName, "DeployRole")
-	}
-	for _, r := range result.Resources {
-		if r.ID == "evt-role-nomatch-other" {
-			t.Error("evt-role-nomatch-other survived the local filter — its role_name (OtherRole) does not match DeployRole")
-		}
-	}
-}
-
 // TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering: a
-// filter with no "_localfield." keys produces a server-side LookupAttribute and
-// drops no fetched resource via local filtering.
+// filter produces a server-side LookupAttribute and drops no fetched resource.
 func TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering(t *testing.T) {
 	mock := &capturingCloudTrailClient{
 		output: &cloudtrail.LookupEventsOutput{
@@ -1023,36 +908,5 @@ func TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering(t *
 	}
 	if result.Resources[1].ID != "evt-b" {
 		t.Errorf("Resources[1].ID = %q, want %q", result.Resources[1].ID, "evt-b")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Role CloudTrailKey wiring: BuildCloudTrailFilter must emit the reserved
-// "_localfield.role_name" key, not a server-side "Username" attribute.
-// ---------------------------------------------------------------------------
-
-// TestBuildCloudTrailFilter_Role_UsesLocalFieldRoleName verifies that the "role"
-// resource type's CloudTrailKey builds a "_localfield.role_name" filter from
-// Fields["role_name"] instead of a server-side "Username" LookupAttribute — the
-// server-side value on a role resource is the role's own name, which never
-// matches an assumed-role session's CloudTrail Username (a session name).
-func TestBuildCloudTrailFilter_Role_UsesLocalFieldRoleName(t *testing.T) {
-	res := resource.Resource{
-		ID:   "arn:aws:iam::000000000000:role/DeployRole",
-		Name: "DeployRole",
-		Fields: map[string]string{
-			"role_name": "DeployRole",
-		},
-	}
-
-	got := resource.BuildCloudTrailFilter(res, "role")
-	if len(got) != 1 {
-		t.Fatalf("filter length = %d, want 1; got %v", len(got), got)
-	}
-	if got["_localfield.role_name"] != "DeployRole" {
-		t.Errorf("filter[\"_localfield.role_name\"] = %q, want %q", got["_localfield.role_name"], "DeployRole")
-	}
-	if _, ok := got["Username"]; ok {
-		t.Error("filter contains a server-side \"Username\" key — role's CloudTrail filter must be local-only (Username there is a session name, not the role name)")
 	}
 }

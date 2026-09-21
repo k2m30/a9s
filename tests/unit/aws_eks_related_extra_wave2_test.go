@@ -219,45 +219,6 @@ func TestRelated_EKS_ASG_DeduplicatesAcrossNodeGroups(t *testing.T) {
 	}
 }
 
-func TestRelated_EKS_CTEvents_MatchByResourceName(t *testing.T) {
-	const clusterName = "acme-services"
-	const eventID = "ct-event-abc123"
-
-	evRes := resource.Resource{
-		ID: eventID,
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String(eventID),
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String("arn:aws:eks:us-east-1:123456789012:cluster/" + clusterName),
-					ResourceType: aws.String("AWS::EKS::Cluster"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes}},
-	}
-
-	src := resource.Resource{
-		ID:   clusterName,
-		Name: clusterName,
-		RawStruct: ekstypes.Cluster{
-			Name: aws.String(clusterName),
-		},
-	}
-
-	checker := eksCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, src, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != eventID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), eventID)
-	}
-}
-
 func TestRelated_EKS_CTEvents_NoMatchDifferentCluster(t *testing.T) {
 	const clusterName = "acme-services"
 

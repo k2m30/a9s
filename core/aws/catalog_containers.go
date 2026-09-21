@@ -48,7 +48,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"eks", "kubernetes", "k8s"},
 		Category:       "CONTAINERS",
-		CloudTrailKey:  "ResourceName:Fields.arn",
+		CloudTrailKey:  "ResourceName:ID",
 		LifecycleKey:   "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(r.ID))
@@ -80,7 +80,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkEKSAMI, Truncated: true},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2, Truncated: true},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEKSCTEvents, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eks")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "ResourcesVpcConfig.VpcId", TargetType: "vpc"},

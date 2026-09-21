@@ -415,7 +415,20 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		LoadingMore:         ls.LoadingMore,
 		Refreshing:          ls.Refreshing,
 		LastFetchError:      ls.LastFetchError,
+		LookupRegion:        c.listLookupRegionLocked(ls),
 	}
+}
+
+// listLookupRegionLocked returns the Region the list's own lookup was sent to
+// when it differs from the session's, so the screen can say where the rows
+// came from: without it, a lookup answered by another Region and an empty
+// history read the same. Callers must hold c.mu.
+func (c *Controller) listLookupRegionLocked(ls *ListState) string {
+	region := ls.FetchFilter[resource.CTRegionFilterKey]
+	if region == c.core.Region() {
+		return ""
+	}
+	return region
 }
 
 // listBodyMemoStale reports whether a memo was built from inputs that have

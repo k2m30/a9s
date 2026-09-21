@@ -57,37 +57,58 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 	}, nil
 }
 
-// ctLocalFieldPrefix marks a filter key that CloudTrail's LookupEvents API
-// cannot filter on server-side. The value it maps to is instead the key of a
-// Fields entry on the built resource, checked with a local equality match
-// after the page is fetched. See splitCTFilter.
-const ctLocalFieldPrefix = "_localfield."
+// ctAltPageToken marks a continuation token as belonging to the lookup under
+// the alternate spelling, so every later page of a list is asked for with the
+// spelling that answered its first page. CloudTrail rejects a token presented
+// with different attributes.
+const ctAltPageToken = "alt|"
 
-// splitCTFilter partitions a CloudTrail filter map into the subset CloudTrail's
-// LookupEvents API can filter on server-side (server) and the subset that must
-// be checked locally against Resource.Fields after the page is fetched (local,
-// with the ctLocalFieldPrefix stripped from each key).
-func splitCTFilter(filter map[string]string) (server, local map[string]string) {
-	server = make(map[string]string, len(filter))
-	local = make(map[string]string, len(filter))
+// ctServerFilter returns the LookupAttributes to send for filter. The keys
+// that select an endpoint or carry the row's other spelling are a9s's own and
+// name no attribute, so they are left out.
+func ctServerFilter(filter map[string]string) map[string]string {
+	server := make(map[string]string, len(filter))
 	for k, v := range filter {
-		if key, ok := strings.CutPrefix(k, ctLocalFieldPrefix); ok {
-			local[key] = v
+		if k == resource.CTRegionFilterKey || k == resource.CTAltNameFilterKey {
 			continue
 		}
 		server[k] = v
 	}
-	return server, local
+	return server
 }
 
-// FetchCloudTrailEventsPageFiltered calls the CloudTrail LookupEvents API with server-side
-// attribute filters and returns a single page of matching events.
-// filter keys must be valid CloudTrail LookupAttributeKey values (e.g., "Username", "ResourceName"),
-// or carry the ctLocalFieldPrefix for a local post-fetch equality check against Resource.Fields
-// (see splitCTFilter) when the target value is not queryable via LookupAttributes.
+// FetchCloudTrailEventsPageFiltered calls the CloudTrail LookupEvents API with
+// server-side attribute filters and returns a single page of matching events.
+// filter keys must be valid CloudTrail LookupAttributeKey values (e.g.
+// "Username", "ResourceName").
+//
+// CloudTrail records a resource under its bare name or under its ARN per API
+// call, and an account can hold both spellings for one resource. A first page
+// that comes back empty is therefore asked once more under the spelling on
+// resource.CTAltNameFilterKey, and the list then pages whichever spelling
+// answered. Where both spellings occur in one account the list is what the
+// answering one holds — see docs/related-resources.md §4.
 func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookupEventsAPI, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
-	server, local := splitCTFilter(filter)
+	server := ctServerFilter(filter)
+	alt := filter[resource.CTAltNameFilterKey]
 
+	if token, isAlt := strings.CutPrefix(continuationToken, ctAltPageToken); isAlt {
+		server["ResourceName"] = alt
+		return ctLookupPage(ctx, api, server, token, ctAltPageToken)
+	}
+
+	page, err := ctLookupPage(ctx, api, server, continuationToken, "")
+	if err != nil || alt == "" || continuationToken != "" || len(page.Resources) > 0 {
+		return page, err
+	}
+	server["ResourceName"] = alt
+	return ctLookupPage(ctx, api, server, "", ctAltPageToken)
+}
+
+// ctLookupPage fetches one LookupEvents page and marks the continuation token
+// it returns with tokenPrefix, which tells a later page which spelling this
+// one was asked under.
+func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map[string]string, continuationToken, tokenPrefix string) (resource.FetchResult, error) {
 	input := &cloudtrail.LookupEventsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -108,34 +129,13 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 
 	resources := make([]resource.Resource, 0, len(output.Events))
 	for _, event := range output.Events {
-		r := buildCTResource(event)
-		resources = append(resources, r)
+		resources = append(resources, buildCTResource(event))
 	}
 
-	if len(local) > 0 {
-		filtered := resources[:0]
-		for _, r := range resources {
-			match := true
-			for k, v := range local {
-				if r.Fields[k] != v {
-					match = false
-					break
-				}
-			}
-			if match {
-				filtered = append(filtered, r)
-			}
-		}
-		resources = filtered
-	}
-
-	// IsTruncated and NextToken reflect the SERVER page, not the locally
-	// filtered slice: a local drop must never make a truncated server page
-	// look complete, or lose the token needed to fetch the next page.
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
-		nextToken = *output.NextToken
+		nextToken = tokenPrefix + *output.NextToken
 		isTruncated = true
 	}
 
@@ -234,13 +234,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 
 	actor := computeCTActor(parsed, user, crossAccount == "true", accountID)
 	origin := computeCTOrigin(parsed)
-	target := ExtractCTTarget(parsed)
-	if target == "(none)" || target == "" {
-		eventNameForTarget, _ := parsed["eventName"].(string)
-		if t := extractTargetByEventName(eventNameForTarget, parsed); t != "" {
-			target = t
-		}
-	}
+	target := ctTargetCell(event, parsed)
 	if target == "(none)" || target == "" {
 		// LookupEvents fallback: use event.Resources from the SDK convenience slice.
 		for _, res := range event.Resources {
@@ -250,8 +244,10 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			}
 		}
 	}
-	targetRaw := target
 	target = ctevent.FormatCTTarget(target, recipientAccount)
+	if target == "" {
+		target = "(none)"
+	}
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
@@ -276,15 +272,19 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"resource_name": resourceName,
 			"read_only":     readOnly,
 			"role_name":     roleName,
-			// CloudTrail has no LookupAttributeKey for the shared event id, so
-			// the SharedEventId pivot filters on this field locally instead.
+			// The caller as CloudTrail's Username attribute records it, which
+			// is a session name for an assumed role and a service principal
+			// for a service — the value the Username lookup matches, unlike
+			// Fields["user"], which names an IAM user or nothing.
+			"_ct.username": user,
+			// CloudTrail assigns one shared event id to the events a single
+			// customer action produced across accounts or services.
 			"shared_event_id": strFromMap(parsed, "sharedEventID"),
 			// _ct.* keys carry the computed display values.
 			"_ct.verb":              verb,
 			"_ct.actor":             actor,
 			"_ct.origin":            origin,
 			"_ct.target":            target,
-			"_ct.target_raw":        targetRaw,
 			"_ct.outcome":           outcome,
 			"_ct.cause":             cause,
 			"_ct.error_code":        errorCode,
@@ -300,6 +300,84 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		RawStruct: event,
 	}
 	return r
+}
+
+// ctTargetCell is the TARGET column's value: the first row of the same
+// extraction the detail's TARGET section renders, so a cell and the detail it
+// opens cannot name different resources. A category that names no resource at
+// all — an Insight, a network-activity call, a service event — is described
+// by ctCategoryTarget instead, ahead of the request parameters, which for
+// those events hold the call's arguments rather than its subject.
+func ctTargetCell(event cloudtrailtypes.Event, parsed map[string]any) string {
+	ev, err := ctevent.Parse(aws.ToString(event.CloudTrailEvent))
+	// no finding: an unreadable blob says nothing about the resource the event names.
+	if err != nil || ev == nil {
+		return ctCategoryTarget(parsed)
+	}
+	if len(ev.Resources) > 0 {
+		// One row per resource the event lists; the cell is as wide as a
+		// column, so it names the first and the detail lists the rest.
+		if rows, _ := ctevent.ExtractTarget(ev.EventName, ev.EventSource, ev.RecipientAccountID, ev.Resources, nil); len(rows) > 0 {
+			return rows[0].Value
+		}
+	}
+	if v := ctCategoryTarget(parsed); v != "" {
+		return v
+	}
+	if ev.RequestParameters == nil {
+		return ""
+	}
+	// A call over several instances or parameters yields one row each, and all
+	// of them are its subject.
+	rows, _ := ctevent.ExtractTarget(ev.EventName, ev.EventSource, ev.RecipientAccountID, nil, ev.RequestParameters)
+	values := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row.Value != "" {
+			values = append(values, row.Value)
+		}
+	}
+	return strings.Join(values, ",")
+}
+
+// ctCategoryTarget describes the events whose subject is not a resource: an
+// Insight names the call it found unusual and how far off its baseline it
+// ran, a network-activity event names the endpoint and the service reached
+// through it, and a service event names the service that acted.
+func ctCategoryTarget(parsed map[string]any) string {
+	switch {
+	case strFromMap(parsed, "eventCategory") == "Insight":
+		name := strFromMap(parsed, "eventName")
+		if ratio := extractInsightRatio(parsed); ratio != "" {
+			return name + " \u00d7" + ratio
+		}
+		if name != "" {
+			return name
+		}
+		return "(insight)"
+
+	case strFromMap(parsed, "eventCategory") == "NetworkActivity":
+		vpce := strFromMap(parsed, "vpcEndpointId")
+		svc := strings.TrimSuffix(strFromMap(parsed, "eventSource"), ".amazonaws.com")
+		if idx := strings.Index(svc, "."); idx > 0 {
+			svc = svc[:idx]
+		}
+		switch {
+		case vpce != "" && svc != "":
+			return vpce + " \u2192 " + svc
+		case vpce != "":
+			return vpce
+		case svc != "":
+			return svc
+		}
+		return "(vpce)"
+
+	case strFromMap(parsed, "eventType") == "AwsServiceEvent":
+		if src := strFromMap(parsed, "eventSource"); src != "" {
+			return src
+		}
+		return "(service)"
+	}
+	return ""
 }
 
 // parseCTEventJSON parses the raw CloudTrailEvent JSON blob into a map.
@@ -479,76 +557,6 @@ func computeCTOrigin(parsed map[string]any) string {
 	default:
 		return "SDK"
 	}
-}
-
-// ExtractCTTarget derives the _ct.target string from the parsed CloudTrailEvent JSON.
-// Never returns blank — falls back to "(none)" for management events with no resources.
-func ExtractCTTarget(parsed map[string]any) string {
-	if parsed == nil {
-		return "(none)"
-	}
-
-	// 1. resources[] — use first non-empty resource.
-	if res, ok := parsed["resources"].([]any); ok && len(res) > 0 {
-		if first, ok := res[0].(map[string]any); ok {
-			// Prefer ARN, then resourceName.
-			if arn, _ := first["ARN"].(string); arn != "" {
-				return arn
-			}
-			if name, _ := first["resourceName"].(string); name != "" {
-				return name
-			}
-		}
-	}
-
-	eventCategory, _ := parsed["eventCategory"].(string)
-	eventType, _ := parsed["eventType"].(string)
-
-	// 2. Insight category → "<eventName> ×<ratio>"
-	if eventCategory == "Insight" {
-		eventName, _ := parsed["eventName"].(string)
-		ratio := extractInsightRatio(parsed)
-		if ratio != "" {
-			return eventName + " \u00d7" + ratio
-		}
-		if eventName != "" {
-			return eventName
-		}
-		return "(insight)"
-	}
-
-	// 3. NetworkActivity → "<vpce-id> → <svc>"
-	if eventCategory == "NetworkActivity" {
-		vpce, _ := parsed["vpcEndpointId"].(string)
-		svc := ""
-		if src, _ := parsed["eventSource"].(string); src != "" {
-			svc = strings.TrimSuffix(src, ".amazonaws.com")
-			if idx := strings.Index(svc, "."); idx > 0 {
-				svc = svc[:idx]
-			}
-		}
-		if vpce != "" && svc != "" {
-			return vpce + " \u2192 " + svc
-		}
-		if vpce != "" {
-			return vpce
-		}
-		if svc != "" {
-			return svc
-		}
-		return "(vpce)"
-	}
-
-	// 4. AwsServiceEvent → service principal (eventSource).
-	if eventType == "AwsServiceEvent" {
-		if src, _ := parsed["eventSource"].(string); src != "" {
-			return src
-		}
-		return "(service)"
-	}
-
-	// 5. Management event with no resources → "(none)".
-	return "(none)"
 }
 
 // extractInsightRatio computes the ratio string for Insight events.

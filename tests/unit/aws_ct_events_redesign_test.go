@@ -617,151 +617,98 @@ func TestCTFlatten_NilCTEventPointer_NoPanic(t *testing.T) {
 	}
 }
 
-func TestExtractCTTarget_ResourcesArrayNonEmpty_ReturnsFirstResource(t *testing.T) {
-	// When resources[] has entries, the first resource ARN/name is returned.
-	parsed := map[string]any{
-		"resources": []any{
-			map[string]any{
-				"ARN":          "arn:aws:s3:::my-bucket",
-				"accountId":    "111122223333",
-				"type":         "AWS::S3::Bucket",
-				"resourceName": "my-bucket",
-			},
-			map[string]any{
-				"ARN":          "arn:aws:s3:::second-bucket",
-				"accountId":    "111122223333",
-				"type":         "AWS::S3::Bucket",
-				"resourceName": "second-bucket",
-			},
-		},
-		"eventCategory": "Management",
-		"eventType":     "AwsApiCall",
+// ctTargetCellFor builds one event from its CloudTrail JSON and returns the
+// TARGET cell the list renders for it.
+func ctTargetCellFor(t *testing.T, cloudTrailEventJSON string) string {
+	t.Helper()
+	event := cloudtrailtypes.Event{
+		EventId:         aws.String("target-cell-01"),
+		EventName:       aws.String("DescribeInstances"),
+		EventTime:       aws.Time(time.Date(2026, 3, 28, 14, 0, 0, 0, time.UTC)),
+		EventSource:     aws.String("ec2.amazonaws.com"),
+		CloudTrailEvent: aws.String(cloudTrailEventJSON),
 	}
-	got := awsclient.ExtractCTTarget(parsed)
+	result, err := awsclient.FetchCloudTrailEventsPage(context.Background(), &singleEventCTMock{event: event}, "")
+	if err != nil {
+		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	return result.Resources[0].Fields["_ct.target"]
+}
+
+// TestCTTargetCell_ResourcesArrayNonEmpty_ReturnsFirstResource: the cell names
+// the first resource the event lists, not a later one.
+func TestCTTargetCell_ResourcesArrayNonEmpty_ReturnsFirstResource(t *testing.T) {
+	got := ctTargetCellFor(t, `{"eventVersion":"1.08","eventName":"GetObject","eventSource":"s3.amazonaws.com","eventCategory":"Management","eventType":"AwsApiCall","recipientAccountId":"111122223333","resources":[{"ARN":"arn:aws:s3:::my-bucket","accountId":"111122223333","type":"AWS::S3::Bucket"},{"ARN":"arn:aws:s3:::second-bucket","accountId":"111122223333","type":"AWS::S3::Bucket"}]}`)
 	if got == "" || got == "(none)" {
-		t.Errorf("ExtractCTTarget with resources[] = %q, want first resource ARN/name", got)
+		t.Errorf("TARGET with resources[] = %q, want the first resource", got)
 	}
-	if got == "arn:aws:s3:::second-bucket" || got == "second-bucket" {
-		t.Errorf("ExtractCTTarget returned second resource %q, want first", got)
+	if strContains(got, "second-bucket") {
+		t.Errorf("TARGET = %q, want the first resource, not the second", got)
 	}
 }
 
-func TestExtractCTTarget_InsightCategory_ReturnsEventNameWithRatio(t *testing.T) {
-	// Insight events: return "<eventName> ×<ratio>" from insightDetails.
-	parsed := map[string]any{
-		"resources":     []any{},
-		"eventCategory": "Insight",
-		"eventType":     "AwsApiCall",
-		"eventName":     "DescribeInstances",
-		"insightDetails": map[string]any{
-			"state": "Start",
-			"insightContext": map[string]any{
-				"statistics": map[string]any{
-					"baseline": map[string]any{
-						"average": float64(2.5),
-					},
-					"insight": map[string]any{
-						"average": float64(12.0),
-					},
-				},
-			},
-		},
-	}
-	got := awsclient.ExtractCTTarget(parsed)
+// TestCTTargetCell_InsightCategory_ReturnsEventNameWithRatio: an Insight names
+// the call it found unusual and how far off its baseline it ran.
+func TestCTTargetCell_InsightCategory_ReturnsEventNameWithRatio(t *testing.T) {
+	got := ctTargetCellFor(t, `{"eventVersion":"1.08","eventName":"DescribeInstances","eventCategory":"Insight","eventType":"AwsApiCall","resources":[],"insightDetails":{"state":"Start","insightContext":{"statistics":{"baseline":{"average":2.5},"insight":{"average":12.0}}}}}`)
 	if got == "" || got == "(none)" {
-		t.Errorf("ExtractCTTarget Insight = %q, want non-empty target with event name and ratio", got)
+		t.Errorf("Insight TARGET = %q, want the event name and its ratio", got)
 	}
 	if !strContains(got, "DescribeInstances") {
-		t.Errorf("ExtractCTTarget Insight = %q, must contain eventName DescribeInstances", got)
+		t.Errorf("Insight TARGET = %q, must name DescribeInstances", got)
 	}
 }
 
-func TestExtractCTTarget_NetworkActivity_ReturnsVpceAndService(t *testing.T) {
-	// NetworkActivity: "<vpce-id> → <svc>" format.
-	parsed := map[string]any{
-		"resources":     []any{},
-		"eventCategory": "NetworkActivity",
-		"eventType":     "AwsApiCall",
-		"eventSource":   "s3.amazonaws.com",
-		"vpcEndpointId": "vpce-0a1b2c3d4e5f60001",
-	}
-	got := awsclient.ExtractCTTarget(parsed)
-	if got == "" || got == "(none)" {
-		t.Errorf("ExtractCTTarget NetworkActivity = %q, want vpce → service format", got)
-	}
+// TestCTTargetCell_NetworkActivity_ReturnsVpceAndService: a network-activity
+// event names the endpoint and the service reached through it.
+func TestCTTargetCell_NetworkActivity_ReturnsVpceAndService(t *testing.T) {
+	got := ctTargetCellFor(t, `{"eventVersion":"1.08","eventName":"GetObject","eventSource":"s3.amazonaws.com","eventCategory":"NetworkActivity","eventType":"AwsApiCall","resources":[],"vpcEndpointId":"vpce-0a1b2c3d4e5f60001"}`)
 	if !strContains(got, "vpce-0a1b2c3d4e5f60001") {
-		t.Errorf("ExtractCTTarget NetworkActivity = %q, must contain vpce ID", got)
+		t.Errorf("NetworkActivity TARGET = %q, must name the endpoint", got)
 	}
-	// Service prefix (strip .amazonaws.com).
 	if !strContains(got, "s3") {
-		t.Errorf("ExtractCTTarget NetworkActivity = %q, must contain service prefix s3", got)
+		t.Errorf("NetworkActivity TARGET = %q, must name the service reached", got)
 	}
 }
 
-func TestExtractCTTarget_AwsServiceEvent_ReturnsServicePrincipal(t *testing.T) {
-	// AwsServiceEvent: return the eventSource (service principal).
-	parsed := map[string]any{
-		"resources":     []any{},
-		"eventCategory": "Management",
-		"eventType":     "AwsServiceEvent",
-		"eventSource":   "kms.amazonaws.com",
-	}
-	got := awsclient.ExtractCTTarget(parsed)
-	if got == "" || got == "(none)" {
-		t.Errorf("ExtractCTTarget AwsServiceEvent = %q, want service principal", got)
-	}
+// TestCTTargetCell_AwsServiceEvent_ReturnsServicePrincipal: a service event
+// names the service that acted.
+func TestCTTargetCell_AwsServiceEvent_ReturnsServicePrincipal(t *testing.T) {
+	got := ctTargetCellFor(t, `{"eventVersion":"1.08","eventName":"RotateKey","eventSource":"kms.amazonaws.com","eventCategory":"Management","eventType":"AwsServiceEvent","resources":[]}`)
 	if !strContains(got, "kms") {
-		t.Errorf("ExtractCTTarget AwsServiceEvent = %q, must reference kms service", got)
+		t.Errorf("AwsServiceEvent TARGET = %q, must name the kms service", got)
 	}
 }
 
-func TestExtractCTTarget_ManagementNoResources_ReturnsNone(t *testing.T) {
-	// Management event with empty resources[] → "(none)".
-	parsed := map[string]any{
-		"resources":     []any{},
-		"eventCategory": "Management",
-		"eventType":     "AwsApiCall",
-	}
-	got := awsclient.ExtractCTTarget(parsed)
-	if got != "(none)" {
-		t.Errorf("ExtractCTTarget management+no resources = %q, want (none)", got)
-	}
-}
-
-func TestExtractCTTarget_ManagementNilResources_ReturnsNone(t *testing.T) {
-	// Management event with absent resources key → "(none)".
-	parsed := map[string]any{
-		"eventCategory": "Management",
-		"eventType":     "AwsApiCall",
-	}
-	got := awsclient.ExtractCTTarget(parsed)
-	if got != "(none)" {
-		t.Errorf("ExtractCTTarget management+nil resources = %q, want (none)", got)
+// TestCTTargetCell_ManagementNoResources_ReturnsNone: a management call that
+// names no resource and carries no parameters reads "(none)", never blank.
+func TestCTTargetCell_ManagementNoResources_ReturnsNone(t *testing.T) {
+	for name, blob := range map[string]string{
+		"empty resources": `{"eventVersion":"1.08","eventName":"ListBuckets","eventCategory":"Management","eventType":"AwsApiCall","resources":[]}`,
+		"no resources":    `{"eventVersion":"1.08","eventName":"ListBuckets","eventCategory":"Management","eventType":"AwsApiCall"}`,
+		"empty object":    `{}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := ctTargetCellFor(t, blob); got != "(none)" {
+				t.Errorf("TARGET = %q, want (none)", got)
+			}
+		})
 	}
 }
 
-func TestExtractCTTarget_EmptyMap_ReturnsNoneNeverBlank(t *testing.T) {
-	// Empty map — must return "(none)", never blank, never panic.
+// TestCTTargetCell_UnparsableJSON_ReturnsNoneNeverPanics pins the shape of the
+// cell when the blob cannot be read at all.
+func TestCTTargetCell_UnparsableJSON_ReturnsNoneNeverPanics(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Errorf("ExtractCTTarget panicked on empty input: %v", r)
+			t.Errorf("building a row from an unparsable blob panicked: %v", r)
 		}
 	}()
-	got := awsclient.ExtractCTTarget(map[string]any{})
-	if got == "" {
-		t.Error("ExtractCTTarget empty input returned blank string, want (none)")
-	}
-}
-
-func TestExtractCTTarget_NilInput_ReturnsNoneNeverPanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("ExtractCTTarget panicked on nil input: %v", r)
-		}
-	}()
-	got := awsclient.ExtractCTTarget(nil)
-	if got == "" {
-		t.Error("ExtractCTTarget nil input returned blank string, want (none)")
+	if got := ctTargetCellFor(t, "not json at all"); got != "(none)" {
+		t.Errorf("TARGET = %q, want (none)", got)
 	}
 }
 

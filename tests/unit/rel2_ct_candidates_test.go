@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -40,6 +43,24 @@ func rel2CTFixtureByID(t *testing.T, id string) resource.Resource {
 	return resource.Resource{}
 }
 
+// rel2SecretARNEvent is a GetSecretValue event whose Resources entry names the
+// secret by the full ARN, the spelling whose confirmation the candidate rules
+// below are about.
+func rel2SecretARNEvent(arn string) resource.Resource {
+	return resource.Resource{
+		ID:   "evt-rel2-secret-arn",
+		Name: "GetSecretValue",
+		RawStruct: cloudtrailtypes.Event{
+			EventId:     aws.String("evt-rel2-secret-arn"),
+			EventName:   aws.String("GetSecretValue"),
+			EventSource: aws.String("secretsmanager.amazonaws.com"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String(arn)},
+			},
+		},
+	}
+}
+
 // rel2DemoList fetches the demo rows of a type through its registered fetcher,
 // so the candidate rule is matched against the list the panel really holds.
 func rel2DemoList(t *testing.T, shortName string) []resource.Resource {
@@ -64,7 +85,7 @@ func rel2DemoList(t *testing.T, shortName string) []resource.Resource {
 // matching the list's own ARN. Guessing the suffix away would be inventing a
 // name AWS never promised.
 func TestRel2SecretNamedByARNResolves(t *testing.T) {
-	event := rel2CTFixtureByID(t, "evt-secrets-get-001")
+	event := rel2SecretARNEvent("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf")
 	cache := resource.ResourceCache{
 		"secrets": resource.ResourceCacheEntry{Resources: rel2DemoList(t, "secrets")},
 	}
@@ -101,7 +122,7 @@ func TestRel2SecretNamedByNameStillResolves(t *testing.T) {
 // secret this account does not hold confirms nothing, and matching on the ARN
 // field must not turn a miss into a match.
 func TestRel2UnknownSecretARNResolvesZero(t *testing.T) {
-	event := rel2CTFixtureByID(t, "evt-secrets-get-001")
+	event := rel2SecretARNEvent("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf")
 	cache := resource.ResourceCache{
 		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{{
 			ID:   "acme-unrelated-secret",

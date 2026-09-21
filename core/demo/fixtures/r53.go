@@ -27,6 +27,10 @@ type R53Fixtures struct {
 // r53:logs related-panel pivot (checkR53Logs).
 const PublicZoneQueryLogGroupARN = "arn:aws:logs:us-east-1:123456789012:log-group:/app/custom/no-retention:*"
 
+// PublicZoneID is the hosted zone the CloudTrail fixture records a record-set
+// change for, in the spelling the zone list carries as its row id.
+const PublicZoneID = "/hostedzone/Z0123456789ABCDEFGHIJ"
+
 // NewR53Fixtures constructs R53Fixtures from the canonical demo data.
 var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 	return &R53Fixtures{

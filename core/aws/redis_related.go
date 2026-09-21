@@ -10,11 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -97,63 +94,6 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return truncatedResultRedis("cfn", ids)
 	}
 	return relatedResultTrunc("cfn", ids, false)
-}
-
-// checkRedisCtEvents scans the ct-events cache for CloudTrail events whose
-// ResourceName exactly matches the replication group ID or ARN.
-// Matching is exact: a substring match of "prod-redis" would also hit
-// events for "prod-redis-sessions".
-func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	var rgID, rgARN string
-	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
-	if ok {
-		if rg.ReplicationGroupId != nil {
-			rgID = *rg.ReplicationGroupId
-		}
-		if rg.ARN != nil {
-			rgARN = *rg.ARN
-		}
-	} else {
-		// Fall back to resource ID — may still match ResourceName in ct-events.
-		rgID = res.ID
-	}
-	if rgID == "" {
-		return resource.ProvenZero("ct-events", "rgID")
-	}
-
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		matched := false
-		for _, r := range ev.Resources {
-			name := strings.TrimSpace(strings.ToLower(aws.ToString(r.ResourceName)))
-			if name == strings.ToLower(rgID) || (rgARN != "" && name == strings.ToLower(rgARN)) {
-				matched = true
-				break
-			}
-		}
-		if matched {
-			ids = append(ids, evRes.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("ct-events", nil, true)
-	}
-	if truncated {
-		return truncatedResultRedis("ct-events", ids)
-	}
-	return relatedResultTrunc("ct-events", ids, false)
 }
 
 // checkRedisKMS reads KmsKeyId directly from the ReplicationGroup RawStruct.

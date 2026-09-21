@@ -113,7 +113,7 @@ func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.
 // graph-connected pivot in the sense the UI actually cares about: the row
 // would be drillable. Delegates directly to resource.IsRelatedActionable for
 // the FetchFilter-bearing branch (the ct-events "search CloudTrail" affordance
-// family, per BuildCTEventsPivotChecker) since that family can legitimately
+// family) since that family can legitimately
 // reach every State — RelatedDeferred (absent/truncated cache — always
 // actionable regardless of Count, "re-fetch server-side"), RelatedError
 // (never actionable, even though FetchFilter is still populated for

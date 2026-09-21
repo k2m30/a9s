@@ -15,7 +15,7 @@
  rotationType:         AUTOMATIC                                                                                                                   │  CT events by AccessKeyId
  ENVELOPE                                                                                                                                          │  CT events by Username
  EventId:              e-d4e5f6a7                                                                                                                  │  CT events by EventName
- EventName:            RotateKey                                                                                                                   │  CT events by SharedEventId
+ EventName:            RotateKey                                                                                                                   │
  EventSource:          kms.amazonaws.com                                                                                                           │
  EventTime:            2026-04-07 02:00                                                                                                            │
  ReadOnly:             No                                                                                                                          │

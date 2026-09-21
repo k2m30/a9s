@@ -296,5 +296,5 @@ eks — CONTAINERS. Status key: `status` — the key the status cell reads, and 
 | ami | AMI | yes |
 | asg | Auto Scaling Groups | yes |
 | ec2 | EC2 Instances | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

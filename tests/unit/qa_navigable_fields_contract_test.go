@@ -481,8 +481,8 @@ func TestCtEventsPrincipalRowNavigatesByARNShape(t *testing.T) {
 			if row.TargetType != tc.targetType {
 				t.Errorf("Principal TargetType = %q, want %q", row.TargetType, tc.targetType)
 			}
-			if row.NavID != tc.navID {
-				t.Errorf("Principal NavID = %q, want %q", row.NavID, tc.navID)
+			if row.NavID != "" {
+				t.Errorf("Principal NavID = %q, want empty: the row carries the whole ARN and the detail resolves it, which is what reads the account in it", row.NavID)
 			}
 		})
 	}

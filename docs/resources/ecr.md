@@ -223,7 +223,7 @@ ecr — CI/CD. Status key: `state` — the column naming it is the status column
 | cb | CodeBuild Projects | yes |
 | cfn | CloudFormation Stacks | yes |
 | kms | KMS Key | no |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | eb-rule | EventBridge Rules | yes |
 | ecs-task | ECS Tasks | yes |
 | pipeline | CodePipelines | yes |

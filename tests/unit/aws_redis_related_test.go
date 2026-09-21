@@ -251,37 +251,6 @@ func TestRelated_Redis_CFN(t *testing.T) {
 	}
 }
 
-func TestRelated_Redis_CtEvents(t *testing.T) {
-	ctEventRes := resource.Resource{
-		ID:   "abc123-evt-id",
-		Name: "ModifyReplicationGroup",
-		Fields: map[string]string{
-			"resource_name": "prod-redis-sessions",
-			"event_source":  "elasticache.amazonaws.com",
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId:   aws.String("abc123-evt-id"),
-			EventName: aws.String("ModifyReplicationGroup"),
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String("prod-redis-sessions"),
-					ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{ctEventRes}},
-	}
-
-	checker := redisCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, redisGraphRoot(), cache)
-
-	if result.Count() < 1 {
-		t.Errorf("Count = %d, want >= 1", result.Count())
-	}
-}
-
 func TestRelated_Redis_KMS(t *testing.T) {
 	const keyID = "11111111-1111-1111-1111-111111111111"
 	clients := &awsclient.ServiceClients{
@@ -684,104 +653,6 @@ func prodRedisSessionsSubRG() resource.Resource {
 	}
 }
 
-func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
-	ctEvent := resource.Resource{
-		ID:   "evt-exact-id",
-		Name: "ModifyReplicationGroup",
-		Fields: map[string]string{
-			"event_source": "elasticache.amazonaws.com",
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId:   aws.String("evt-exact-id"),
-			EventName: aws.String("ModifyReplicationGroup"),
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String("prod-redis-sessions"),
-					ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{ctEvent}},
-	}
-
-	checker := redisCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
-
-	if result.Count() < 1 {
-		t.Errorf("Count = %d, want >= 1 (exact ResourceName == rgID should match)", result.Count())
-	}
-}
-
-func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
-	const rgARN = "arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"
-	ctEvent := resource.Resource{
-		ID:   "evt-arn-match",
-		Name: "DescribeReplicationGroups",
-		Fields: map[string]string{
-			"event_source": "elasticache.amazonaws.com",
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId:   aws.String("evt-arn-match"),
-			EventName: aws.String("DescribeReplicationGroups"),
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String(rgARN),
-					ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{ctEvent}},
-	}
-
-	checker := redisCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
-
-	if result.Count() < 1 {
-		t.Errorf("Count = %d, want >= 1 (ResourceName == RG ARN should match)", result.Count())
-	}
-}
-
-// A ResourceName matches exactly: the "prod-redis-sessions" RG must not
-// claim an event naming "prod-redis-sessions-sessions".
-func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
-	ctEvent := resource.Resource{
-		ID:   "evt-sub-name",
-		Name: "ModifyReplicationGroup",
-		Fields: map[string]string{
-			"event_source": "elasticache.amazonaws.com",
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId:   aws.String("evt-sub-name"),
-			EventName: aws.String("ModifyReplicationGroup"),
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceName: aws.String("prod-redis-sessions-sessions"),
-					ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{ctEvent}},
-	}
-
-	checker := redisCheckerByTarget(t, "ct-events")
-
-	resultShort := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
-	if resultShort.Count() != 0 {
-		t.Errorf("prod-redis-sessions: Count = %d, want 0 (substring overmatch — event names a different RG)", resultShort.Count())
-	}
-
-	resultLong := checker(context.Background(), nil, prodRedisSessionsSubRG(), cache)
-	if resultLong.Count() < 1 {
-		t.Errorf("prod-redis-sessions-sessions: Count = %d, want >= 1 (exact match)", resultLong.Count())
-	}
-}
-
 // An elasticache.amazonaws.com EventSource alone does not tie an event to
 // this RG.
 func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T) {
@@ -820,7 +691,7 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 	wantNeedsCache := map[string]bool{
 		"alarm":     true,
 		"cfn":       true,
-		"ct-events": true,
+		"ct-events": false,
 		"kms":       false,
 		"logs":      true,
 		"secrets":   true,

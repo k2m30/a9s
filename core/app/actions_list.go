@@ -300,6 +300,16 @@ func (c *Controller) activeListRefreshTasks(typeGen domain.Gen) []runtime.TaskRe
 		return nil
 	}
 	ls.Refreshing = true
+	// A filtered list (the `t` hotkey's event list, a related drill) is the
+	// answer to one lookup: re-running it means asking that lookup again, not
+	// fetching the type's whole list under the filtered screen.
+	if len(ls.FetchFilter) > 0 {
+		return []runtime.TaskRequest{{
+			Key:     runtime.TaskKey{Kind: runtime.KindFetchFiltered, Scope: typeName},
+			Cache:   runtime.CacheNone,
+			Payload: runtime.FetchFilteredPayload{Filter: ls.FetchFilter},
+		}}
+	}
 	// A Ctrl+R issued while the top-of-stack list is a related-navigation
 	// drill (filtered/child/by-ID placeholder, never the type's canonical
 	// top-level list) must not let the resulting ResourcesLoaded default to

@@ -202,7 +202,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		RefToID:             sqsRefToID,
 		Aliases:             []string{"sqs", "queues"},
 		Category:            "MESSAGING",
-		CloudTrailKey:       "ResourceName:Fields.arn",
+		CloudTrailKey:       "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["arn"]
 			if arn == "" {

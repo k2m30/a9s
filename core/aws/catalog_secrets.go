@@ -52,7 +52,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"secrets", "secretsmanager", "sm"},
 		Category:       "SECRETS & CONFIG",
-		CloudTrailKey:  "ResourceName:Fields.arn",
+		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "secretsmanager/secret?region="+region+"&name="+url.QueryEscape(r.ID))
 		},

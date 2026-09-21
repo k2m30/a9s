@@ -107,14 +107,15 @@ func buildActorRows(event *Event) []Row {
 	// Principal row — always present for non-service events with an ARN.
 	// Only navigable when arnTargetType resolves to a known type (e.g. role, iam-user).
 	// Root ARNs (arn:*:root) return "" from arnTargetType and must stay display-only.
+	// The row carries the whole ARN and no NavID, so the detail resolves it
+	// through the target type's own reference resolver, which reads the
+	// account in it and refuses a principal of another one.
 	principalTargetType := arnTargetType(ui.ARN)
-	principalNavID := arnNavID(ui.ARN)
 	principalRow := Row{
 		Key:         "Principal",
 		Value:       ui.ARN,
-		IsNavigable: principalTargetType != "" && principalNavID != "",
+		IsNavigable: principalTargetType != "" && arnNamesAPrincipal(ui.ARN),
 		TargetType:  principalTargetType,
-		NavID:       principalNavID,
 	}
 	rows = append(rows, principalRow)
 
@@ -146,6 +147,13 @@ func buildActorRows(event *Event) []Row {
 	return rows
 }
 
+// arnNamesAPrincipal reports whether an ARN carries a principal after its type
+// marker. An ARN that ends at the marker ("…:role/") names a type and nobody,
+// and a row that opens nothing must not offer to open.
+func arnNamesAPrincipal(arn string) bool {
+	return !strings.HasSuffix(arn, "/")
+}
+
 // arnTargetType derives the navigable resource type from an ARN.
 // Returns "role" for assumed-role and role ARNs, "iam-user" for :user/ ARNs, "" otherwise.
 func arnTargetType(arn string) string {
@@ -154,35 +162,6 @@ func arnTargetType(arn string) string {
 	}
 	if strings.Contains(arn, ":user/") {
 		return "iam-user"
-	}
-	return ""
-}
-
-// arnNavID extracts the bare navigable name from an ARN for use as NavID.
-// The display Value remains the full ARN; NavID is used only for navigation dispatch.
-//
-//   - arn:aws:sts::*:assumed-role/<role>/<session> → <role>
-//   - arn:aws:iam::*:role/<path>/<name>            → <name>
-//   - arn:aws:iam::*:user/<path>/<name>            → <name>
-//   - arn:aws:iam::*:root                          → "" (not navigable by name)
-//   - anything else                                → "" (falls back to Value)
-//
-// An IAM name cannot contain "/", so everything ahead of the last one is the
-// IAM path, which the catalogue does not key on.
-func arnNavID(arn string) string {
-	if _, after, ok := strings.Cut(arn, ":assumed-role/"); ok {
-		rest := after
-		// rest is "<role>/<session>" — take only the role part
-		if before, _, ok := strings.Cut(rest, "/"); ok {
-			return before
-		}
-		return rest
-	}
-	if _, after, ok := strings.Cut(arn, ":role/"); ok {
-		return after[strings.LastIndex(after, "/")+1:]
-	}
-	if _, after, ok := strings.Cut(arn, ":user/"); ok {
-		return after[strings.LastIndex(after, "/")+1:]
 	}
 	return ""
 }

@@ -10,12 +10,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ctEventsCheckerFor returns the generic RelatedChecker for the CloudTrail
-// Events pivot. Every top-level catalog entry declares its ct-events
-// RelatedDef in its own struct literal, wiring either this checker or a
-// bespoke check*CTEvents function. The returned closure captures the owning
-// resource type's short name so BuildCloudTrailFilter routes the
-// LookupEvents call against the right ResourceName/Fields key.
+// ctEventsCheckerFor returns the RelatedChecker every type's CloudTrail
+// Events pivot is wired to in its own catalog literal. The returned closure
+// captures the owning type's short name, which is what BuildCloudTrailFilter
+// reads the lookup key and Region from, so the row defers to the same lookup
+// the `t` hotkey sends.
 func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 	sn := shortName
 	return func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -26,6 +25,17 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 		return resource.DeferredRelated("ct-events", filter)
 	}
 }
+
+// ctRegionUSEast1 is the CloudTrailRegion of a global service: IAM, STS,
+// CloudFront and Route 53 record their events in us-east-1 whatever Region
+// the operator is browsing
+// (docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html
+// §Global service events).
+func ctRegionUSEast1(domain.Resource) string { return "us-east-1" }
+
+// ctRegionOfTrail is the CloudTrailRegion of a trail: a trail's own
+// configuration calls are recorded in its home Region.
+func ctRegionOfTrail(r domain.Resource) string { return r.Fields["home_region"] }
 
 // Install loads the AWS resource catalog into core/catalog. MUST be called
 // exactly once at program start (main() / TestMain) before any

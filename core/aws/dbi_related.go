@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
@@ -268,46 +267,4 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.ErrorRelated("eni", err)
 	}
 	return heuristicResult("eni", ids, !complete)
-}
-
-// checkDbiCTEvents checks cached CloudTrail events for references to the DB instance.
-// Returns an unknown result when the cache is truncated or a cache miss occurs.
-// FetchFilter["ResourceName"] is always set so the caller can do a filtered re-fetch.
-func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	dbID := res.ID
-	if dbID == "" {
-		return resource.ProvenZero("ct-events", "dbID")
-	}
-	fetchFilter := map[string]string{"ResourceName": dbID}
-	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err).WithFetchFilter(fetchFilter)
-	}
-	if eventList == nil {
-		return resource.DeferredRelated("ct-events", fetchFilter)
-	}
-	var ids []string
-	for _, eventRes := range eventList {
-		raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct)
-		if ok {
-			matched := false
-			for _, rr := range raw.Resources {
-				if rr.ResourceName != nil && *rr.ResourceName == dbID {
-					matched = true
-					break
-				}
-			}
-			if matched {
-				ids = append(ids, eventRes.ID)
-			}
-			continue
-		}
-		if eventRes.Fields["resource_name"] == dbID {
-			ids = append(ids, eventRes.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return relatedResultTrunc("ct-events", nil, true).WithFetchFilter(fetchFilter)
-	}
-	return relatedResultTrunc("ct-events", ids, truncated).WithFetchFilter(fetchFilter)
 }

@@ -255,12 +255,15 @@ func visibleRelatedRowCount(ds *DetailState) int {
 	return count
 }
 
-// isSelfPivotZeroDetailRow reports a self-targeted related row that
-// resolved to nothing; the panel hides those.
+// isSelfPivotZeroDetailRow reports a self-targeted related row that resolved
+// to nothing; the panel hides those. A row that carries a lookup of its own
+// has not resolved to nothing — it has not been counted yet, and taking it
+// runs that lookup — so actionability decides before the count does.
 func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 	return !row.Loading &&
 		row.Err == "" &&
 		row.Count == 0 &&
+		!isActionableDetailRow(row) &&
 		sourceType != "" &&
 		row.TargetType == sourceType
 }

@@ -116,6 +116,11 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			roleID = *role.RoleId
 		}
 
+		roleARN := ""
+		if role.Arn != nil {
+			roleARN = *role.Arn
+		}
+
 		path := ""
 		if role.Path != nil {
 			path = *role.Path
@@ -152,6 +157,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			Fields: map[string]string{
 				"role_name":                   roleName,
 				"role_id":                     roleID,
+				"arn":                         roleARN,
 				"path":                        path,
 				"create_date":                 createDate,
 				"description":                 description,
@@ -259,6 +265,11 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		roleID = *role.RoleId
 	}
 
+	roleARN := ""
+	if role.Arn != nil {
+		roleARN = *role.Arn
+	}
+
 	path := ""
 	if role.Path != nil {
 		path = *role.Path
@@ -298,6 +309,7 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		Fields: map[string]string{
 			"role_name":                   roleName,
 			"role_id":                     roleID,
+			"arn":                         roleARN,
 			"path":                        path,
 			"create_date":                 createDate,
 			"description":                 description,

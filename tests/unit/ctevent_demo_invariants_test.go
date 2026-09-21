@@ -227,7 +227,19 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 					// because their IDs encode composite keys or are filter-only.
 					navID := row.NavID
 					if navID == "" {
-						navID = row.Value
+						// The row carries the reference; the detail resolves it
+						// through the target type's own resolver, which is what
+						// reads the account in an ARN. Resolve it the same way
+						// here, or an ARN would be looked up as if it were an id.
+						navID = resource.NavIDFromValue(row.TargetType, row.Value,
+							domain.RefContext{AccountID: "123456789012", Targets: cache[row.TargetType].Resources})
+						if navID == "" {
+							// The reference names nothing this account holds —
+							// another account's principal, a deleted resource.
+							// The detail drops navigability for those, so there
+							// is no row here to reach a fixture.
+							continue
+						}
 					}
 					if navID == "" {
 						t.Errorf("L3 FAIL: navigable row has empty NavID and Value — %s", rowLabel)

@@ -7,7 +7,6 @@ package fakes
 import (
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
@@ -76,8 +75,7 @@ func matchesLookupAttributes(evt cloudtrailtypes.Event, attrs []cloudtrailtypes.
 		case cloudtrailtypes.LookupAttributeKeyResourceName:
 			found := false
 			for _, r := range evt.Resources {
-				rn := aws.ToString(r.ResourceName)
-				if rn == val || strings.HasSuffix(rn, "/"+val) || strings.HasSuffix(rn, ":"+val) {
+				if aws.ToString(r.ResourceName) == val {
 					found = true
 					break
 				}

@@ -294,7 +294,7 @@ ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and
 | sg | Security Groups | no |
 | role | IAM Role | no |
 | cfn | CloudFormation Stacks | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | eb-rule | EventBridge Rules | yes |
 | ecr | ECR Repositories | yes |
 | ecs-task | ECS Tasks | yes |

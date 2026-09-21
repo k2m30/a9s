@@ -199,7 +199,7 @@ ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | kms | KMS Key | no |
 | asg | Auto Scaling Groups | yes |
 | ec2 | EC2 Instances | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | ecs-task | ECS Tasks | yes |
 | logs | Log Groups | yes |
 <!-- END GENERATED: related -->

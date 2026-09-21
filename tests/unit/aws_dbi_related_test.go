@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -438,65 +437,6 @@ func TestDBI_Related_ENI_NilEC2Client(t *testing.T) {
 
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for nil EC2 client", result.Count())
-	}
-}
-
-func TestDBI_Related_CTEvents_MatchesByResourceName(t *testing.T) {
-	res := dbiProdResource(t)
-	checker := dbiCheckerByTarget(t, "ct-events")
-
-	ev1 := resource.Resource{
-		ID:   "evt-dbi-001",
-		Name: "evt-dbi-001",
-		Fields: map[string]string{
-			"resource_name": fixtures.ProdDbiID,
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("evt-dbi-001"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String(fixtures.ProdDbiID)},
-			},
-		},
-	}
-	ev2 := resource.Resource{
-		ID:   "evt-dbi-002",
-		Name: "evt-dbi-002",
-		Fields: map[string]string{
-			"resource_name": fixtures.ProdDbiID,
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("evt-dbi-002"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String(fixtures.ProdDbiID)},
-			},
-		},
-	}
-	otherEv := resource.Resource{
-		ID:   "evt-other",
-		Name: "evt-other",
-		Fields: map[string]string{
-			"resource_name": "some-other-db",
-		},
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("evt-other"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("some-other-db")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{ev1, ev2, otherEv},
-		},
-	}
-
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count() < 2 {
-		t.Errorf("Count = %d, want >=2 (events matching prod-dbi-1)", result.Count())
-	}
-	if result.FetchFilter() == nil || result.FetchFilter()["ResourceName"] != fixtures.ProdDbiID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter()["ResourceName"], fixtures.ProdDbiID)
 	}
 }
 

@@ -403,6 +403,26 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	return m, nil
 }
 
+// lookupRegionMarker names the Region the rows were read from when it is not
+// the session Region the header shows. Empty for every other list.
+func lookupRegionMarker(body app.ListBody) string {
+	if body.LookupRegion == "" {
+		return ""
+	}
+	return styles.DimText.Render("── from " + body.LookupRegion + " ──")
+}
+
+// emptyListView is the whole screen for a list that holds no rows. It carries
+// the Region marker too: a lookup answered by another Region and a history
+// with nothing in it are the same empty screen without it, and telling them
+// apart is the marker's whole job.
+func emptyListView(body app.ListBody) string {
+	if marker := lookupRegionMarker(body); marker != "" {
+		return "No resources found\n" + marker
+	}
+	return "No resources found"
+}
+
 // RenderList renders the list body from a controller-supplied ListBody. Every
 // value it paints comes from body — the cells, their colours, the sort, the
 // horizontal scroll, the pagination hint. The model supplies only the terminal
@@ -414,7 +434,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		return m.spinner.View() + " Loading..."
 	}
 	if len(body.Rows) == 0 {
-		return "No resources found"
+		return emptyListView(body)
 	}
 
 	// Build listCol slice from body.Columns, mirroring resolveColumns output.
@@ -444,7 +464,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	cols = m.fitColumns(cols)
 
 	if len(cols) == 0 {
-		return "No resources found"
+		return emptyListView(body)
 	}
 
 	headerLine := renderHeaderRow(cols, body.Sort.Col, body.Sort.Dir != "desc", scrollX)
@@ -491,6 +511,11 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	if body.Refreshing {
 		sb.WriteString("\n")
 		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
+	}
+
+	if marker := lookupRegionMarker(body); marker != "" {
+		sb.WriteString("\n")
+		sb.WriteString(marker)
 	}
 
 	// A fetch failure over cached content swaps the refreshing

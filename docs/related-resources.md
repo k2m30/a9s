@@ -34,6 +34,15 @@
 4. **Universal pivots** — `ct-events` (CloudTrail audit trail) is implicitly
    relevant for every registered type; its presence is verified by the test
    suite directly against `resource.GetRelated`, not by per-type rows here.
+   Its checker is `ctEventsCheckerFor(<shortName>)` for every type, and the
+   lookup it defers to is built from the type's `CloudTrailKey` and
+   `CloudTrailRegion` — the same filter the `t` hotkey sends. A per-type
+   CloudTrail checker is a second way to name the same events and must not be
+   registered. CloudTrail records a resource under its bare name or under its
+   ARN per API call, and an account can hold both spellings for one resource:
+   a lookup whose first page is empty is retried once under the other
+   spelling, and the list then holds what the answering spelling holds. Where
+   both occur in one account the list is a subset.
 5. **Never bypass** — do NOT "temporarily" remove a row to unblock a refactor.
    Previous drift happened exactly this way. If the registration is blocking
    you, fix the registration, not the contract.
@@ -307,7 +316,6 @@ AWS API: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Look
 - **`ct-events` (by AccessKeyId)** — Self-pivot: convenience filter within ct-events by `userIdentity.accessKeyId`.
 - **`ct-events` (by Username)** — Self-pivot: convenience filter within ct-events by `userIdentity.userName`.
 - **`ct-events` (by EventName)** — Self-pivot: convenience filter within ct-events by `eventName`.
-- **`ct-events` (by SharedEventId)** — Self-pivot: convenience filter within ct-events by `sharedEventId`.
 
 ### `dbc`
 
@@ -880,7 +888,7 @@ AWS API: <https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.h
 
 AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html>
 
-- **`ct-events`** — Events performed *under* this role. Uses local verification, not a server-side `LookupEvents` filter: CloudTrail's [`LookupAttributeKey`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupAttribute.html) exposes only `{EventId, EventName, ReadOnly, Username, ResourceType, ResourceName, EventSource, AccessKeyId}`, none of which is the role identity — for `Type=AssumedRole`, `Username` is the *session* name and the role lives only in `userIdentity.sessionContext.sessionIssuer.userName` (a non-lookup-able field). The pivot therefore issues a broad time-bounded [`LookupEvents`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) page and locally verifies `sessionIssuer.userName == roleName` (CloudTrailKey `_localfield.role_name:Fields.role_name`); counts/results are best-effort within the fetched window.
+- **`ct-events`** — Configuration events *for* this role: who created it, who attached or detached its policies, who changed its trust. The lookup is [`LookupEvents`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) on `ResourceName` = the role ARN, in us-east-1 where IAM records its events. The other question — what the role *did* — is not answerable through one lookup attribute: [`LookupAttributeKey`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupAttribute.html) exposes `{EventId, EventName, ReadOnly, Username, ResourceType, ResourceName, EventSource, AccessKeyId}`, and for `Type=AssumedRole` the role lives only in `userIdentity.sessionContext.sessionIssuer.userName`, which none of them selects.
 - **`ec2`** — EC2 instances assuming this role via instance profile.
 - **`eks`** — EKS service role.
 - **`glue`** — Glue jobs assuming this role.
@@ -1290,7 +1298,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs-svc | sg | Security Groups | no |
 | ecs-svc | role | IAM Role | no |
 | ecs-svc | cfn | CloudFormation Stacks | yes |
-| ecs-svc | ct-events | CloudTrail Events | yes |
+| ecs-svc | ct-events | CloudTrail Events | no |
 | ecs-svc | eb-rule | EventBridge Rules | yes |
 | ecs-svc | ecr | ECR Repositories | yes |
 | ecs-svc | ecs-task | ECS Tasks | yes |
@@ -1304,7 +1312,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs | kms | KMS Key | no |
 | ecs | asg | Auto Scaling Groups | yes |
 | ecs | ec2 | EC2 Instances | yes |
-| ecs | ct-events | CloudTrail Events | yes |
+| ecs | ct-events | CloudTrail Events | no |
 | ecs | ecs-task | ECS Tasks | yes |
 | ecs | logs | Log Groups | yes |
 | ecs-task | ecs-svc | ECS Services | no |
@@ -1312,7 +1320,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs-task | logs | Log Groups | yes |
 | ecs-task | role | IAM Role | yes |
 | ecs-task | alarm | CloudWatch Alarms | yes |
-| ecs-task | ct-events | CloudTrail Events | yes |
+| ecs-task | ct-events | CloudTrail Events | no |
 | ecs-task | ec2 | EC2 Instances | no |
 | ecs-task | ecr | ECR Repositories | yes |
 | ecs-task | eni | Network Interfaces | no |
@@ -1336,7 +1344,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | lambda | ddb | DynamoDB Tables | no |
 | lambda | kinesis | Kinesis Streams | no |
 | lambda | msk | MSK Clusters | no |
-| lambda | ct-events | CloudTrail Events | yes |
+| lambda | ct-events | CloudTrail Events | no |
 | lambda | tg | Target Groups | yes |
 | lambda | sns | SNS Topics | yes |
 | lambda | sns-sub | SNS Subscriptions | yes |
@@ -1397,7 +1405,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eks | ami | AMI | no |
 | eks | asg | Auto Scaling Groups | yes |
 | eks | ec2 | EC2 Instances | no |
-| eks | ct-events | CloudTrail Events | yes |
+| eks | ct-events | CloudTrail Events | no |
 | ng | eks | EKS Clusters | yes |
 | ng | role | IAM Roles | no |
 | ng | asg | Auto Scaling Groups | yes |
@@ -1536,7 +1544,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbi | dbc | RDS Clusters | no |
 | dbi | role | IAM Roles | no |
 | dbi | eni | Network Interfaces | no |
-| dbi | ct-events | CloudTrail Events | yes |
+| dbi | ct-events | CloudTrail Events | no |
 | s3 | trail | CloudTrail Trails | yes |
 | s3 | cf | CloudFront | yes |
 | s3 | lambda | Lambda (notifications) | no |
@@ -1554,7 +1562,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | s3 | ct-events | CloudTrail Events | no |
 | redis | alarm | CW Alarms | yes |
 | redis | cfn | CloudFormation | yes |
-| redis | ct-events | CloudTrail Events | yes |
+| redis | ct-events | CloudTrail Events | no |
 | redis | kms | KMS Key | no |
 | redis | logs | Log Groups | yes |
 | redis | secrets | Secrets Manager | yes |
@@ -1614,7 +1622,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbi-snap | dbi | DB Instances | yes |
 | dbi-snap | kms | KMS Keys | yes |
 | dbi-snap | backup | Backup Plans | no |
-| dbi-snap | ct-events | CloudTrail Events | yes |
+| dbi-snap | ct-events | CloudTrail Events | no |
 | dbc-snap | dbc | DocumentDB Cluster | yes |
 | dbc-snap | kms | KMS Key | no |
 | dbc-snap | vpc | VPC | no |
@@ -1634,7 +1642,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | alarm | s3 | S3 Buckets | yes |
 | alarm | sfn | Step Functions | yes |
 | alarm | waf | WAF Web ACLs | yes |
-| alarm | ct-events | CloudTrail Events | yes |
+| alarm | ct-events | CloudTrail Events | no |
 | logs | lambda | Lambda Functions | yes |
 | logs | alarm | CW Alarms | yes |
 | logs | kms | KMS Key | no |
@@ -1665,7 +1673,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ct-events | ct-events | CT events by AccessKeyId | no |
 | ct-events | ct-events | CT events by Username | no |
 | ct-events | ct-events | CT events by EventName | no |
-| ct-events | ct-events | CT events by SharedEventId | no |
 | sqs | alarm | CloudWatch Alarms | yes |
 | sqs | lambda | Lambda Functions | no |
 | sqs | sqs | Dead Letter Queues | yes |
@@ -1840,7 +1847,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecr | cb | CodeBuild Projects | yes |
 | ecr | cfn | CloudFormation Stacks | yes |
 | ecr | kms | KMS Key | no |
-| ecr | ct-events | CloudTrail Events | yes |
+| ecr | ct-events | CloudTrail Events | no |
 | ecr | eb-rule | EventBridge Rules | yes |
 | ecr | ecs-task | ECS Tasks | yes |
 | ecr | pipeline | CodePipelines | yes |

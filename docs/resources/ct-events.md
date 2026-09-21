@@ -114,7 +114,6 @@ The self-pivot carries four facets, all convenience filters that re-launch `Look
 - **By AccessKeyId** — filter by `userIdentity.accessKeyId` to see every call made by the same credential (key-compromise forensics).
 - **By Username** — filter by `userIdentity.userName` to see every call made by the same IAM user across services.
 - **By EventName** — filter by `eventName` to see every occurrence of the same API call across the account (e.g. every `ConsoleLogin`, every `DeleteObject`).
-- **By SharedEventId** — filter by `sharedEventId` to group events that share a cross-service request (CloudTrail assigns a common id when one customer action produces multiple events).
 - **Count shown**: yes for each facet.
 - **Discovery**: parse the four fields out of `Event.CloudTrailEvent` JSON on the currently-selected event; no extra AWS call is made until the operator picks a facet.
 
@@ -208,7 +207,7 @@ At 3am, glancing at a ct-events list filtered by an anxious operator, can they t
 
 - a9s golden doc — the `ct-events` findings — `docs/attention-signals.md § Signals § MONITORING` row `ct-events`.
 - a9s golden doc — per-type contract lists `cfn, ct-events, dbi, ddb, ec2, iam-user, kms, lambda, role, s3, secrets, sg, trail, vpce` — `docs/related-resources.md` § `Per-type contract`, row `ct-events`.
-- a9s golden doc — four self-pivot facets (AccessKeyId / Username / EventName / SharedEventId) — `docs/related-resources.md` § `Per-target reasoning` → `### ct-events`.
+- a9s golden doc — three self-pivot facets (AccessKeyId / Username / EventName) — `docs/related-resources.md` § `Per-target reasoning` → `### ct-events`.
 - a9s golden doc — universal-pivot rule (ct-events applies to every registered type) — `docs/related-resources.md` § `Policy`, rule 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - AWS Go SDK v2 — `Event.ReadOnly` is `*string` (confirms the `=="false"` string comparison the read-only check makes) — `AWS SDK Go v2 — cloudtrail/types.Event § ReadOnly`.
@@ -257,5 +256,4 @@ ct-events — MONITORING. Status key: `status` — the key the status cell reads
 | ct-events | CT events by AccessKeyId | no |
 | ct-events | CT events by Username | no |
 | ct-events | CT events by EventName | no |
-| ct-events | CT events by SharedEventId | no |
 <!-- END GENERATED: related -->

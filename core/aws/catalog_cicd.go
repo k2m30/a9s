@@ -236,7 +236,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		HumanizeFields: []string{"tag_mutability", "ImageTagMutability"},
 		Aliases:        []string{"ecr", "container-registry"},
 		Category:       "CI/CD",
-		CloudTrailKey:  "ResourceName:ID",
+		CloudTrailKey:  "ResourceName:Fields.arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(r.ID)+"/?region="+region)
 		},
@@ -263,7 +263,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		}),
 		Wave2: IssueEnricher{Fn: EnrichECRRepository, Priority: 100},
 		FieldKeys: []string{
-			"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at",
+			"repository_name", "arn", "uri", "tag_mutability", "scan_on_push", "created_at",
 		},
 		IssueEnricherFieldKeys: []string{"critical_vulns", "high_vulns", "images_scanned"},
 		Related: []domain.RelatedDef{
@@ -271,7 +271,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
-			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ecr")},
 			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline, NeedsTargetCache: true, Truncated: true},

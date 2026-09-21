@@ -57,7 +57,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 		arn       string
 		wantNav   bool
 		wantType  string
-		wantNavID string
 		wantValue string
 	}{
 		{
@@ -66,7 +65,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:iam::123456789012:role/Deployer",
 			wantNav:   true,
 			wantType:  "role",
-			wantNavID: "Deployer",
 			wantValue: "arn:aws:iam::123456789012:role/Deployer",
 		},
 		{
@@ -75,7 +73,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:iam::123456789012:role/service/ops/Deployer",
 			wantNav:   true,
 			wantType:  "role",
-			wantNavID: "Deployer",
 			wantValue: "arn:aws:iam::123456789012:role/service/ops/Deployer",
 		},
 		{
@@ -84,7 +81,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:sts::123456789012:assumed-role/Deployer/session1",
 			wantNav:   true,
 			wantType:  "role",
-			wantNavID: "Deployer",
 			wantValue: "arn:aws:sts::123456789012:assumed-role/Deployer/session1",
 		},
 		{
@@ -93,7 +89,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:iam::123456789012:user/team/alice",
 			wantNav:   true,
 			wantType:  "iam-user",
-			wantNavID: "alice",
 			wantValue: "arn:aws:iam::123456789012:user/team/alice",
 		},
 		{
@@ -102,7 +97,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:iam::123456789012:user/alice",
 			wantNav:   true,
 			wantType:  "iam-user",
-			wantNavID: "alice",
 			wantValue: "arn:aws:iam::123456789012:user/alice",
 		},
 		{
@@ -112,7 +106,6 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			arn:       "arn:aws:iam::123456789012:root",
 			wantNav:   false,
 			wantType:  "",
-			wantNavID: "",
 			wantValue: "arn:aws:iam::123456789012:root",
 		},
 	}
@@ -126,8 +119,8 @@ func TestCT_0916_PrincipalRow_NavigatesForEveryIAMPrincipalARNForm(t *testing.T)
 			if row.TargetType != tc.wantType {
 				t.Errorf("Principal.TargetType for %q = %q, want %q", tc.arn, row.TargetType, tc.wantType)
 			}
-			if row.NavID != tc.wantNavID {
-				t.Errorf("Principal.NavID for %q = %q, want %q", tc.arn, row.NavID, tc.wantNavID)
+			if row.NavID != "" {
+				t.Errorf("Principal.NavID for %q = %q, want empty: the row carries the whole ARN and the detail resolves it, which is what reads the account in it", tc.arn, row.NavID)
 			}
 			if row.Value != tc.wantValue {
 				t.Errorf("Principal.Value for %q = %q, want the full ARN %q", tc.arn, row.Value, tc.wantValue)

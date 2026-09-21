@@ -45,6 +45,11 @@ func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAP
 			uri = *repo.RepositoryUri
 		}
 
+		repoARN := ""
+		if repo.RepositoryArn != nil {
+			repoARN = *repo.RepositoryArn
+		}
+
 		tagMutability := string(repo.ImageTagMutability)
 
 		scanOnPush := "false"
@@ -62,6 +67,7 @@ func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAP
 			Name: repoName,
 			Fields: map[string]string{
 				"repository_name": repoName,
+				"arn":             repoARN,
 				"uri":             uri,
 				"tag_mutability":  tagMutability,
 				"scan_on_push":    scanOnPush,

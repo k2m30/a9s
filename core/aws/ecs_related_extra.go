@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -87,39 +86,6 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	return relatedResultTrunc("ec2", ids, truncated)
-}
-
-// checkECSCTEvents scans the ct-events cache for events whose Resources or
-// requestParameters reference this ECS cluster.
-func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
-		return resource.ProvenZero("ct-events", "clusterName")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, r := range ev.Resources {
-			if r.ResourceName == nil {
-				continue
-			}
-			if strings.Contains(*r.ResourceName, clusterName) {
-				ids = append(ids, evRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkECSTasks scans the ecs-task cache for tasks whose ClusterArn refers

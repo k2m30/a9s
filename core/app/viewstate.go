@@ -221,6 +221,12 @@ type ListBody struct {
 	// is cleared in the same event so the two markers never show together.
 	// Renderers (web list.html, TUI RenderList) consume this field verbatim.
 	LastFetchError string `json:"last_fetch_error,omitempty"`
+	// LookupRegion is the Region this list was read from when that is not the
+	// session Region — a CloudTrail list of a global service's resource, or of
+	// a trail, is answered by the Region that records those events. Empty for
+	// every list read from the session Region, so a renderer showing it can
+	// show it unconditionally. Renderers consume it verbatim.
+	LookupRegion string `json:"lookup_region,omitempty"`
 }
 
 // FieldRow is one key-value pair in a detail view, extended with render-time

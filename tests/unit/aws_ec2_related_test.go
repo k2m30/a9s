@@ -1008,34 +1008,6 @@ func TestRelated_EC2_NG_EmptySourceID(t *testing.T) {
 	}
 }
 
-func TestRelated_EC2_CTEvents_Found(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-match",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-match"),
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{
-				ID: "evt-1",
-				RawStruct: cloudtrailtypes.Event{
-					Resources: []cloudtrailtypes.Resource{
-						{ResourceName: aws.String("i-match")},
-					},
-				},
-			},
-		}},
-	}
-
-	checker := ec2CheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, instance, cache)
-
-	if result.Count() <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count())
-	}
-}
-
 func TestRelated_EC2_CTEvents_NotFound(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-match",
@@ -1061,22 +1033,6 @@ func TestRelated_EC2_CTEvents_NotFound(t *testing.T) {
 
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0", result.Count())
-	}
-}
-
-func TestRelated_EC2_CTEvents_CacheMissNoClients(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-match",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-match"),
-		},
-	}
-
-	checker := ec2CheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count())
 	}
 }
 

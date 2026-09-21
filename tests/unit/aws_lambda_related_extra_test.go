@@ -429,55 +429,6 @@ func TestRelated_Lambda_DDB_NilClients(t *testing.T) {
 	}
 }
 
-func TestRelated_Lambda_CTEvents_MatchByExactName(t *testing.T) {
-	const fnName = "my-function"
-	evRes := resource.Resource{
-		ID:   "event-id-abc123",
-		Name: "event-id-abc123",
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("event-id-abc123"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String(fnName)},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes}},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, src, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (exact ResourceName match)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "event-id-abc123" {
-		t.Errorf("ResourceIDs = %v, want [event-id-abc123]", result.ResourceIDs())
-	}
-}
-
-func TestRelated_Lambda_CTEvents_MatchByARNSuffix(t *testing.T) {
-	const fnName = "my-function"
-	evRes := resource.Resource{
-		ID:   "event-id-def456",
-		Name: "event-id-def456",
-		RawStruct: cloudtrailtypes.Event{
-			EventId: aws.String("event-id-def456"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceName: aws.String("arn:aws:lambda:us-east-1:123:function:" + fnName)},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ct-events": resource.ResourceCacheEntry{Resources: []resource.Resource{evRes}},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, src, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (ARN suffix match)", result.Count())
-	}
-}
-
 func TestRelated_Lambda_CTEvents_NoMatch(t *testing.T) {
 	const fnName = "my-function"
 	evRes := resource.Resource{
@@ -498,15 +449,6 @@ func TestRelated_Lambda_CTEvents_NoMatch(t *testing.T) {
 	result := checker(context.Background(), nil, src, cache)
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (no matching event)", result.Count())
-	}
-}
-
-func TestRelated_Lambda_CTEvents_NilCache(t *testing.T) {
-	src := resource.Resource{ID: "my-function", Name: "my-function"}
-	checker := lambdaExtraCheckerByTarget(t, "ct-events")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
 

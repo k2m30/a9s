@@ -54,7 +54,7 @@ func TestRel2SecretARNIsNotMatchedByPrefixOrSuffix(t *testing.T) {
 		"database/primary-shadow":     "arn:aws:secretsmanager:us-east-1:123456789012:secret:database/primary-AbCdEf",
 	})
 
-	event := rel2CTFixtureByID(t, "evt-secrets-get-001")
+	event := rel2SecretARNEvent(named)
 	result := rel2CTCheckerByTarget(t, "secrets")(context.Background(), nil, event, cache)
 
 	if result.State() != domain.RelatedResolved {
@@ -77,7 +77,7 @@ func TestRel2SecretARNDoesNotOutrankAnExactIDMatch(t *testing.T) {
 		"prod/database/primary":        named,
 	})
 
-	event := rel2CTFixtureByID(t, "evt-secrets-get-001")
+	event := rel2SecretARNEvent(named)
 	result := rel2CTCheckerByTarget(t, "secrets")(context.Background(), nil, event, cache)
 
 	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "prod/database/primary-AbCdEf" {

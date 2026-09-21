@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -18,35 +17,6 @@ import (
 
 func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "ecs-task", res)
-}
-
-// checkECSTaskCTEvents scans ct-events for events involving this task.
-func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	taskID := res.ID
-	if taskID == "" {
-		return resource.ProvenZero("ct-events", "taskID")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, r := range ev.Resources {
-			if r.ResourceName != nil && strings.Contains(*r.ResourceName, taskID) {
-				ids = append(ids, evRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkECSTaskEC2 reports the EC2 instance an EC2-launch-type task runs on:

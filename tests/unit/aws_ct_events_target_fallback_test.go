@@ -53,8 +53,8 @@ func TestCTTargetFallback_NilJSON_UsesSDKResources(t *testing.T) {
 	}
 	target := result.Resources[0].Fields["_ct.target"]
 	if target == "(none)" {
-		t.Errorf("_ct.target = %q; expected non-(none) value from event.Resources (arn:aws:s3:::demo-bucket); "+
-			"bug at ct_events.go:224 — ExtractCTTarget(parsed) never falls back to event.Resources", target)
+		t.Errorf("_ct.target = %q; expected the value of event.Resources (arn:aws:s3:::demo-bucket), "+
+			"which names the target when the event JSON carries no resources[]", target)
 	}
 	if target == "" {
 		t.Errorf("_ct.target is empty; expected arn:aws:s3:::demo-bucket from LookupEvents event.Resources")
@@ -83,8 +83,7 @@ func TestCTTargetFallback_EmptyJSONResources_UsesSDKResources(t *testing.T) {
 	}
 	target := result.Resources[0].Fields["_ct.target"]
 	if target == "(none)" {
-		t.Errorf("_ct.target = %q; expected value from event.Resources when JSON resources[] is empty; "+
-			"bug at ct_events.go:224", target)
+		t.Errorf("_ct.target = %q; expected the value of event.Resources when the JSON resources[] is empty", target)
 	}
 }
 
@@ -136,16 +135,14 @@ func TestCTTargetFallback_BothEmpty_IsNone_RegressionGuard(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
 	}
 	target := result.Resources[0].Fields["_ct.target"]
-	// When nothing is available, ExtractCTTarget falls through to a non-resources path
-	// (e.g. Management event with no resources → may return "(none)" or a request-id based value).
-	// The important invariant is that it is NOT empty string.
+	// A management event naming no resource still gets a cell: "(none)" or a
+	// value derived from the request, never an empty string.
 	if target == "" {
 		t.Errorf("_ct.target is empty string; expected a non-empty fallback (at minimum '(none)')")
 	}
 }
 
-// Per-event-name fallback table: _ct.target resolves from requestParameters
-// (ExtractCTTarget / buildCTResource).
+// Per-event-name fallback table: _ct.target resolves from requestParameters.
 
 // buildCTEventWithRequestParams constructs a cloudtrailtypes.Event whose
 // CloudTrailEvent JSON contains the given requestParameters JSON object.

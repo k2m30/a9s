@@ -12,42 +12,12 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// checkECSSvcCTEvents scans ct-events cache for events referencing this service.
-func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	svcName := res.ID
-	if svcName == "" {
-		return resource.ProvenZero("ct-events", "svcName")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, r := range ev.Resources {
-			if r.ResourceName != nil && strings.Contains(*r.ResourceName, svcName) {
-				ids = append(ids, evRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
-}
 
 // checkECSSvcTasks scans the ecs-task cache for tasks belonging to this
 // service (task.Group == "service:{svcName}").

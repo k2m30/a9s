@@ -69,19 +69,20 @@ func TestAppendRelated_NoDuplicate(t *testing.T) {
 	}
 }
 
-// TestBuildCloudTrailFilter_FieldsArn verifies that SQS (CloudTrailKey "ResourceName:Fields.arn")
-// uses the Fields["arn"] value as the filter.
-func TestBuildCloudTrailFilter_FieldsArn(t *testing.T) {
+// TestBuildCloudTrailFilter_FieldsSource verifies that a type whose
+// CloudTrailKey names a Fields entry (ng, "ResourceName:Fields.nodegroup_name")
+// takes the filter value from that entry rather than from the row's ID.
+func TestBuildCloudTrailFilter_FieldsSource(t *testing.T) {
 	res := resource.Resource{
-		ID: "my-queue",
+		ID: "acme-prod/workers",
 		Fields: map[string]string{
-			"arn": "arn:aws:sqs:us-east-1:000000000000:my-queue",
+			"nodegroup_name": "workers",
 		},
 	}
 
-	got := resource.BuildCloudTrailFilter(res, "sqs")
+	got := resource.BuildCloudTrailFilter(res, "ng")
 	want := map[string]string{
-		"ResourceName": "arn:aws:sqs:us-east-1:000000000000:my-queue",
+		"ResourceName": "workers",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("filter length = %d, want %d; got %v", len(got), len(want), got)
@@ -113,30 +114,35 @@ func TestBuildCloudTrailFilter_IAMUser(t *testing.T) {
 	}
 }
 
-// TestBuildCloudTrailFilter_IAMRole verifies that role
-// (CloudTrailKey "_localfield.role_name:Fields.role_name") returns a local-verify
-// filter keyed on the built event's role_name field, not a server-side Username
-// LookupAttribute — assumed-role sessions carry the session name in Username,
-// while the role name lives only in sessionContext.sessionIssuer.userName, which
-// CloudTrail LookupEvents cannot filter on.
+// TestBuildCloudTrailFilter_IAMRole pins the question a role's CloudTrail row
+// answers: the events recorded FOR the role — its creation, its policy
+// attachments, its trust changes — looked up by the role's own ARN in
+// us-east-1, where IAM records them. What a role DID cannot be asked through
+// one lookup attribute: for an assumed-role session CloudTrail's Username is
+// the session name, and the role lives only in a field no attribute selects.
 func TestBuildCloudTrailFilter_IAMRole(t *testing.T) {
 	res := resource.Resource{
-		ID:   "arn:aws:iam::000000000000:role/MyRole",
+		ID:   "MyRole",
 		Name: "MyRole",
 		Fields: map[string]string{
 			"role_name": "MyRole",
+			"arn":       "arn:aws:iam::000000000000:role/MyRole",
 		},
 	}
 
 	got := resource.BuildCloudTrailFilter(res, "role")
 	want := map[string]string{
-		"_localfield.role_name": "MyRole",
+		"ResourceName":              "arn:aws:iam::000000000000:role/MyRole",
+		resource.CTRegionFilterKey:  "us-east-1",
+		resource.CTAltNameFilterKey: "MyRole",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("filter length = %d, want %d; got %v", len(got), len(want), got)
 	}
-	if got["_localfield.role_name"] != want["_localfield.role_name"] {
-		t.Errorf("filter[_localfield.role_name] = %q, want %q", got["_localfield.role_name"], want["_localfield.role_name"])
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("filter[%q] = %q, want %q", k, got[k], v)
+		}
 	}
 	if _, ok := got["Username"]; ok {
 		t.Errorf("role filter must not carry a server-side Username key: got %v", got)
@@ -168,8 +174,11 @@ func TestBuildCloudTrailFilter_EmptyID(t *testing.T) {
 	}
 }
 
-func TestBuildCloudTrailFilter_SQSUsesFieldsArn(t *testing.T) {
-	// SQS stores ARN in Fields["arn"] — CloudTrailKey "ResourceName:Fields.arn"
+// TestBuildCloudTrailFilter_SQSUsesQueueName pins the value a LookupEvents
+// ResourceName lookup matches: the user-created name of the resource — a queue
+// name for SQS, "i-1234567" for an EC2 instance — not its ARN
+// (docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Resource.html).
+func TestBuildCloudTrailFilter_SQSUsesQueueName(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-queue",
 		Fields: map[string]string{"arn": "arn:aws:sqs:us-east-1:000000000000:my-queue"},
@@ -178,8 +187,8 @@ func TestBuildCloudTrailFilter_SQSUsesFieldsArn(t *testing.T) {
 	if filter == nil {
 		t.Fatal("expected non-nil filter")
 	}
-	if filter["ResourceName"] != "arn:aws:sqs:us-east-1:000000000000:my-queue" {
-		t.Errorf("expected SQS ARN, got %q", filter["ResourceName"])
+	if filter["ResourceName"] != "my-queue" {
+		t.Errorf("expected the queue name, got %q", filter["ResourceName"])
 	}
 }
 
@@ -260,114 +269,41 @@ func TestIAMUserStillHasCloudTrailRelated(t *testing.T) {
 	}
 }
 
-// TestCloudTrailFilter_DemoMode_Lambda verifies that BuildCloudTrailFilter for
-// a lambda resource produces a ResourceName filter containing the full ARN.
-func TestCloudTrailFilter_DemoMode_Lambda(t *testing.T) {
-	res := resource.Resource{
-		ID:   "process-orders",
-		Name: "process-orders",
-		Fields: map[string]string{
-			"arn": "arn:aws:lambda:us-east-1:123456789012:function:process-orders",
-		},
+// TestCloudTrailFilter_LooksUpTheRowsName pins the value these types' `t`
+// hotkey sends as the ResourceName lookup: the user-created name, which is the
+// shape CloudTrail records for each of them
+// (docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Resource.html).
+// A service that records the ARN instead is keyed on the ARN, as ECR is.
+func TestCloudTrailFilter_LooksUpTheRowsName(t *testing.T) {
+	cases := []struct {
+		shortName string
+		id        string
+		arn       string
+	}{
+		{"lambda", "process-orders", "arn:aws:lambda:us-east-1:123456789012:function:process-orders"},
+		{"dbi", "prod-api-primary", "arn:aws:rds:us-east-1:123456789012:db:prod-api-primary"},
+		{"eks", "acme-prod", "arn:aws:eks:us-east-1:123456789012:cluster/acme-prod"},
+		{"secrets", "prod/database/primary", "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"},
+		{"dbc", "acme-docdb-prod", "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod"},
 	}
-	filter := resource.BuildCloudTrailFilter(res, "lambda")
-	if filter == nil {
-		t.Fatal("BuildCloudTrailFilter(lambda) returned nil")
-	}
-	want := "arn:aws:lambda:us-east-1:123456789012:function:process-orders"
-	if got := filter["ResourceName"]; got != want {
-		t.Errorf("ResourceName = %q, want %q", got, want)
-	}
-}
-
-// TestCloudTrailFilter_DemoMode_RDS verifies that BuildCloudTrailFilter for a
-// dbi resource produces a ResourceName filter containing the full RDS ARN.
-func TestCloudTrailFilter_DemoMode_RDS(t *testing.T) {
-	res := resource.Resource{
-		ID:   "prod-api-primary",
-		Name: "prod-api-primary",
-		Fields: map[string]string{
-			"arn": "arn:aws:rds:us-east-1:123456789012:db:prod-api-primary",
-		},
-	}
-	filter := resource.BuildCloudTrailFilter(res, "dbi")
-	if filter == nil {
-		t.Fatal("BuildCloudTrailFilter(dbi) returned nil")
-	}
-	want := "arn:aws:rds:us-east-1:123456789012:db:prod-api-primary"
-	if got := filter["ResourceName"]; got != want {
-		t.Errorf("ResourceName = %q, want %q", got, want)
+	for _, tc := range cases {
+		t.Run(tc.shortName, func(t *testing.T) {
+			res := resource.Resource{ID: tc.id, Name: tc.id, Fields: map[string]string{"arn": tc.arn}}
+			filter := resource.BuildCloudTrailFilter(res, tc.shortName)
+			if filter == nil {
+				t.Fatalf("BuildCloudTrailFilter(%s) returned nil", tc.shortName)
+			}
+			if got := filter["ResourceName"]; got != tc.id {
+				t.Errorf("ResourceName = %q, want %q", got, tc.id)
+			}
+		})
 	}
 }
 
-// TestCloudTrailFilter_DemoMode_EKS verifies that BuildCloudTrailFilter for an
-// eks resource produces a ResourceName filter containing the full EKS ARN.
-func TestCloudTrailFilter_DemoMode_EKS(t *testing.T) {
-	res := resource.Resource{
-		ID:   "acme-prod",
-		Name: "acme-prod",
-		Fields: map[string]string{
-			"arn": "arn:aws:eks:us-east-1:123456789012:cluster/acme-prod",
-		},
-	}
-	filter := resource.BuildCloudTrailFilter(res, "eks")
-	if filter == nil {
-		t.Fatal("BuildCloudTrailFilter(eks) returned nil")
-	}
-	want := "arn:aws:eks:us-east-1:123456789012:cluster/acme-prod"
-	if got := filter["ResourceName"]; got != want {
-		t.Errorf("ResourceName = %q, want %q", got, want)
-	}
-}
-
-// TestCloudTrailFilter_DemoMode_Secrets verifies that BuildCloudTrailFilter for
-// a secrets resource produces a ResourceName filter with the full Secrets ARN.
-func TestCloudTrailFilter_DemoMode_Secrets(t *testing.T) {
-	res := resource.Resource{
-		ID:   "prod/database/primary",
-		Name: "prod/database/primary",
-		Fields: map[string]string{
-			"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
-		},
-	}
-	filter := resource.BuildCloudTrailFilter(res, "secrets")
-	if filter == nil {
-		t.Fatal("BuildCloudTrailFilter(secrets) returned nil")
-	}
-	want := "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"
-	if got := filter["ResourceName"]; got != want {
-		t.Errorf("ResourceName = %q, want %q", got, want)
-	}
-}
-
-// TestCloudTrailFilter_DemoMode_DocDB verifies that BuildCloudTrailFilter for a
-// dbc (DocDB) resource produces a ResourceName filter with the full RDS ARN.
-// Note: the demo CT fixture has no DocDB events, so this only verifies filter
-// construction — not event lookup.
-func TestCloudTrailFilter_DemoMode_DocDB(t *testing.T) {
-	res := resource.Resource{
-		ID:   "acme-docdb-prod",
-		Name: "acme-docdb-prod",
-		Fields: map[string]string{
-			"arn": "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod",
-		},
-	}
-	filter := resource.BuildCloudTrailFilter(res, "dbc")
-	if filter == nil {
-		t.Fatal("BuildCloudTrailFilter(dbc) returned nil")
-	}
-	want := "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod"
-	if got := filter["ResourceName"]; got != want {
-		t.Errorf("ResourceName = %q, want %q", got, want)
-	}
-}
-
-// TestCloudTrailFake_SuffixMatching verifies that the CloudTrailFake matches
-// events by bare resource name via the ":<name>" suffix rule. The demo fixture
-// contains a lambda event with ResourceName
-// "arn:aws:lambda:us-east-1:123456789012:function:process-orders"; looking up
-// by the bare name "process-orders" must return at least one event.
-func TestCloudTrailFake_SuffixMatching(t *testing.T) {
+// TestCloudTrailFake_MatchesTheRecordedName verifies that the demo
+// CloudTrailFake answers a ResourceName lookup the way LookupEvents does:
+// only an event whose recorded ResourceName equals the attribute value.
+func TestCloudTrailFake_MatchesTheRecordedName(t *testing.T) {
 	fake := fakes.NewCloudTrail()
 	input := &cloudtrail.LookupEventsInput{
 		LookupAttributes: []cloudtrailtypes.LookupAttribute{
@@ -382,6 +318,15 @@ func TestCloudTrailFake_SuffixMatching(t *testing.T) {
 		t.Fatalf("LookupEvents error: %v", err)
 	}
 	if len(out.Events) == 0 {
-		t.Error("expected at least one event matching suffix ':process-orders', got 0")
+		t.Error("expected at least one event recorded for \"process-orders\", got 0")
+	}
+
+	input.LookupAttributes[0].AttributeValue = aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders")
+	byARN, err := fake.LookupEvents(context.Background(), input)
+	if err != nil {
+		t.Fatalf("LookupEvents error: %v", err)
+	}
+	if len(byARN.Events) != 0 {
+		t.Errorf("a lookup for the ARN returned %d events; the fixture records the name", len(byARN.Events))
 	}
 }

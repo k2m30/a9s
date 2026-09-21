@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A CloudTrail event that names another account's principal or resource no
+  longer opens this account's role, secret or key of the same name. The
+  detail's Principal, Role, Secret and Key rows carry the reference the event
+  recorded and are opened through the same account-aware resolution the list
+  and the related panel already used, so a foreign-account reference is shown
+  with its account and offers nothing to open.
+- An IAM role's CloudTrail row now answers with the events recorded for the
+  role — who created it, who attached its policies, who changed its trust —
+  looked up by its ARN in us-east-1. It previously sent no filter at all and
+  paged the account's whole 90-day history fifty events at a time, which read
+  as "no activity".
+- An IAM user's CloudTrail events are read in the Region the operator is
+  browsing. The lookup selects the caller, and a user's calls are recorded
+  where they were made, so pinning it to us-east-1 hid everything else.
+- A CloudTrail list read from another Region says so on the screen, and a
+  "CT events by …" pivot taken off an event searches the Region that event was
+  recorded in rather than the session's.
+- The TARGET column and the detail's TARGET section are one extraction: the
+  column used a second copy whose fallback returned a random request
+  parameter, so the same event's cell changed between refreshes and disagreed
+  with its own detail.
+- A "CT events by Username" pivot now works on the assumed-role, service and
+  federated events that are most of an account's history; it read a field that
+  is deliberately empty for all of them. A self-pivot row that carries a lookup
+  is no longer hidden as if it had resolved to nothing.
+
+- A resource's CloudTrail events are now the same set wherever they are
+  reached. The `t` hotkey, the detail's CloudTrail Events row and the drilled
+  event list all send one lookup, built from the resource type's CloudTrail
+  key — a repository ARN for ECR, the resource's name everywhere else — and it
+  matches what CloudTrail recorded exactly. CloudTrail records a resource by
+  its name or by its ARN depending on the call, so a lookup that comes back
+  empty is retried once under the other spelling and then paged under whichever
+  answered. An ECS cluster
+  `prod` no longer counts the events of `prod-batch`, an ECR repository or ECS
+  service no longer counts every event whose name merely contains its own, and
+  a CloudWatch alarm no longer shows every alarm-configuration event in the
+  account. A DocumentDB cluster's `t` key and its CloudTrail row now name the
+  same events.
+- CloudTrail events of a global service are now looked up where AWS records
+  them. A Route 53 hosted zone, a CloudFront distribution and an IAM user,
+  role, group or policy read their events from us-east-1, and a trail from its
+  home Region, so their CloudTrail row is no longer empty for an operator
+  browsing any other Region.
+- Ctrl+R on a filtered list — the `t` event list, a related drill — re-runs
+  that list's own lookup instead of fetching the whole type.
+
 - Columns and detail rows that could never carry a value now do. Athena's Cost
   Cap reads the per-query scan limit the workgroup configures, and a CodeBuild
   or CloudWatch log line's Event ID row shows the event's id. A Launch Template,

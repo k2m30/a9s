@@ -151,15 +151,3 @@ func dbcResourceARN(raw any) string {
 	}
 	return ""
 }
-
-// checkDbcSnapCTEvents looks up cached CloudTrail events for the snapshot's
-// DBClusterSnapshotIdentifier. Universal pivot — every registered type gets one;
-// see the Policy section of docs/related-resources.md. FetchFilter["ResourceName"] is always
-// set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
-// — the panel renders the visible page count rather than a total.
-// ResourceType is "AWS::RDS::DBClusterSnapshot" — both DocDB and Aurora cluster
-// snapshots share this CloudTrail resource type (docs/resources/dbc-snap.md).
-// Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
-var checkDbcSnapCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
-	IDExtractor: func(res resource.Resource) string { return res.ID },
-})

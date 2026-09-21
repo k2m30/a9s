@@ -21,6 +21,10 @@ type CloudFrontFixtures struct {
 }
 
 // NewCloudFrontFixtures constructs CloudFrontFixtures from the canonical demo data.
+// PublicDistributionARN is the distribution the CloudTrail fixture records an
+// update for, in the spelling CloudFront records it under.
+const PublicDistributionARN = "arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7"
+
 var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 	return &CloudFrontFixtures{
 		Distributions: []cftypes.DistributionSummary{

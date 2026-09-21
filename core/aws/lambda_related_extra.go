@@ -13,7 +13,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -173,39 +172,6 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("msk")
 	}
 	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "msk", ":kafka:", refContext(clients, cache, "msk"))
-}
-
-// checkLambdaCTEvents scans the ct-events cache for events whose Resources
-// include this Lambda function.
-func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnName := res.ID
-	if fnName == "" {
-		return resource.ProvenZero("ct-events", "fnName")
-	}
-	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.ErrorRelated("ct-events", err)
-	}
-	if evList == nil {
-		return resource.UnknownRelated("ct-events")
-	}
-	var ids []string
-	for _, evRes := range evList {
-		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, r := range ev.Resources {
-			if r.ResourceName == nil {
-				continue
-			}
-			if *r.ResourceName == fnName || strings.HasSuffix(*r.ResourceName, ":function:"+fnName) {
-				ids = append(ids, evRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // The following checkers reverse-look the target cache for references back to

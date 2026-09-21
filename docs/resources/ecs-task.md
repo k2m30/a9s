@@ -304,7 +304,7 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 | logs | Log Groups | yes |
 | role | IAM Role | yes |
 | alarm | CloudWatch Alarms | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | ec2 | EC2 Instances | yes |
 | ecr | ECR Repositories | yes |
 | eni | Network Interfaces | no |
