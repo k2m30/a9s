@@ -104,9 +104,18 @@ async function openTargetHealthChildView(page: Page): Promise<void> {
     ),
   ]);
   await expect(page.locator(".list-table")).toBeVisible();
-  // acme-web-tg has 3 registered targets (2 healthy + 1 unhealthy); the count
-  // assertion auto-retries across the async child fetch + SSE body reload.
-  await expect(page.locator(".list-table tbody tr")).toHaveCount(3, { timeout: 10_000 });
+  // acme-web-tg holds 4 registrations: one instance is registered twice, on
+  // its own port each time, and ELB health-checks each registration alone.
+  // The count assertion auto-retries across the async child fetch + SSE reload.
+  await expect(page.locator(".list-table tbody tr")).toHaveCount(4, { timeout: 10_000 });
+}
+
+// i-0a1b2c3d4e5f60003 holds two registrations and only the :443 one is
+// unhealthy, so the id alone matches two rows.
+function unhealthyTargetRow(page: Page) {
+  return page
+    .locator(".list-table tbody tr", { hasText: "i-0a1b2c3d4e5f60003" })
+    .filter({ has: page.locator("td", { hasText: /^443$/ }) });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -199,14 +208,14 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     await command(page, "tg");
     const statusCol = await statusColIndex(page);
     const tgRow = page.locator(".list-table tbody tr", { hasText: "acme-web-tg" });
-    await expect(tgRow.locator("td").nth(statusCol)).toHaveText("unhealthy targets: 1/3");
+    await expect(tgRow.locator("td").nth(statusCol)).toHaveText("unhealthy targets: 1/4");
     // Partially unhealthy (a rolling deploy shape) is SevWarning per the
     // attention-signals contract; row-broken is reserved for zero healthy.
     await expect(tgRow).toHaveClass(/row-warning/);
 
     await openTargetHealthChildView(page);
 
-    const unhealthy = page.locator(".list-table tbody tr", { hasText: "i-0a1b2c3d4e5f60003" });
+    const unhealthy = unhealthyTargetRow(page);
     await expect(unhealthy).toHaveCount(1);
     await expect(
       unhealthy,
@@ -226,7 +235,7 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     // handleActionChildView registers the child typeDef as the fallback, so
     // buildListBody resolves the same color tag both lanes render.
     await openTargetHealthChildView(page);
-    const unhealthy = page.locator(".list-table tbody tr", { hasText: "i-0a1b2c3d4e5f60003" });
+    const unhealthy = unhealthyTargetRow(page);
     await expect(unhealthy).toHaveCount(1);
     await expect(
       unhealthy,

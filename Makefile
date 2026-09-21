@@ -258,7 +258,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: verify-hooks check-no-real-data test-race integration lint security check-deps gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs smoke-enrichers
+ready-to-push: verify-hooks check-no-real-data test-race integration lint security check-deps gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot e2e mdlint smoke smoke-related smoke-costs smoke-enrichers
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run
