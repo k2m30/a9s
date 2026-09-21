@@ -903,3 +903,89 @@ Findings:
 - **P3** — [core/aws/logs_related.go:188](/Users/k2m30/projects/a9s/core/aws/logs_related.go:188), [core/aws/logs_related.go:205](/Users/k2m30/projects/a9s/core/aws/logs_related.go:205). **Trigger:** a log group happens to be named `/ecs/<task-family>` but is not configured as that task definition’s `awslogs-group`. **Impact:** unrelated tasks are reported as related to that log group. **Fix:** resolve the task definition and match its explicit `awslogs-group` option; retain naming only as a clearly non-definitive fallback. [AWS LogConfiguration](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html)
 
 - **P3** — [core/aws/ecs_task.go:45](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:45), [core/aws/ecs_svc_tasks.go:74](/Users/k2m30/projects/a9s/core/aws/ecs_svc_tasks.go:74), [core/resource/accessors.go:14](/Users/k2m30/projects/a9s/core/resource/accessors.go:14). **Trigger:** a cluster has over 50 tasks, or a service has up to 100 running plus 100 stopped tasks. The top-level path requests 100; the service-child path leaves the AWS maximum unspecified and combines both status pages. **Impact:** a nominal 50-row page can contain 100 or 200 rows, making pagination boundaries and load-more behavior inconsistent. **Fix:** request and emit at most `DefaultPageSize`, carrying undisplayed task ARNs in the continuation state.
+
+## ecs
+
+- **P1** — [ecs_svc_logs.go:78](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:78)  
+  **Trigger:** Multiple services or containers write to the same CloudWatch log group.  
+  **Impact:** A service’s Logs view includes unrelated workloads’ events; it also ignores every `awslogs` container after the first.  
+  **Fix:** Collect all configured container log groups and scope each query to the service’s actual task log streams, rather than querying the entire group. [AWS FilterLogEvents](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_FilterLogEvents.html)
+
+- **P2** — [ecs_svc_logs.go:78](/Users/k2m30/projects/a9s/core/aws/ecs_svc_logs.go:78)  
+  **Trigger:** A log group contains more than 200 retained events.  
+  **Impact:** “Service Logs” starts with the oldest retained events, so current failures are absent.  
+  **Fix:** Request newest-first results (`StartFromHead: false`) with an appropriate bounded start time and preserve cursor semantics. [AWS FilterLogEvents](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_FilterLogEvents.html)
+
+- **P2** — [ecs.go:45](/Users/k2m30/projects/a9s/core/aws/ecs.go:45)  
+  **Trigger:** Viewing an ECS cluster’s `Settings` detail.  
+  **Impact:** Settings, including Container Insights configuration, are always missing because `SETTINGS` is not requested in `DescribeClusters.Include`.  
+  **Fix:** Include `ecstypes.ClusterFieldSettings`. [AWS DescribeClusters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeClusters.html)
+
+- **P2** — [ecs_task.go:43](/Users/k2m30/projects/a9s/core/aws/ecs_task.go:43)  
+  **Trigger:** A task stops and no longer appears in the default `ListTasks` response.  
+  **Impact:** The top-level ECS Tasks resource omits stopped/failed tasks and their stop diagnostics, despite modeling them.  
+  **Fix:** Enumerate both `RUNNING` and `STOPPED` task statuses with a composite cursor, as the service-task path does. [AWS ListTasks](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html)
+
+- **P2** — [ecs_issue_enrichment.go:108](/Users/k2m30/projects/a9s/core/aws/ecs_issue_enrichment.go:108)  
+  **Trigger:** An EC2-backed cluster has registered capacity but is intentionally idle.  
+  **Impact:** A healthy empty or pre-warmed cluster is marked with a cluster issue.  
+  **Fix:** Only flag this when there is evidence of unmet workload demand, such as desired service tasks exceeding running tasks.
+
+- **P2** — [ecs_related_extra.go:44](/Users/k2m30/projects/a9s/core/aws/ecs_related_extra.go:44)  
+  **Trigger:** An account has multiple ECS clusters using managed-scaling capacity providers.  
+  **Impact:** Every ASG tagged `AmazonECSManaged` is related to every cluster, producing incorrect navigation and capacity attribution.  
+  **Fix:** Resolve the cluster’s capacity providers and compare their configured ASG ARNs; do not use the generic ECS-managed tag as a cluster selector. [AWS ECS managed scaling](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-auto-scaling.html)
+
+- **P2** — [ecs_related_extra.go:82](/Users/k2m30/projects/a9s/core/aws/ecs_related_extra.go:82)  
+  **Trigger:** An ECS Managed Instances capacity provider creates EC2 instances.  
+  **Impact:** Cluster-to-instance relations are absent because the code checks `aws:ecs:cluster-name` instead of AWS’s `aws:ecs:clusterName` tag.  
+  **Fix:** Match `aws:ecs:clusterName`, retaining legacy/custom aliases only if needed. [AWS ECS Managed Instances tags](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/instance-details-tags-managed-instances.html)
+
+- **P2** — [secrets_related_extra.go:188](/Users/k2m30/projects/a9s/core/aws/secrets_related_extra.go:188)  
+  **Trigger:** ECS task entries are present only as persisted fields rather than live `RawStruct` values.  
+  **Impact:** A secret can incorrectly report zero related ECS tasks even when task definitions reference it.  
+  **Fix:** Match persisted `secret_arns` fields when raw task data is unavailable, or fetch the missing target before returning a definitive empty result.
+
+- **P2** — [ecs_svc_related_extra.go:138](/Users/k2m30/projects/a9s/core/aws/ecs_svc_related_extra.go:138)  
+  **Trigger:** EventBridge rule entries are persisted without live `RawStruct` values.  
+  **Impact:** ECS services incorrectly report no related EventBridge rules despite having stored event patterns that match them.  
+  **Fix:** Parse the persisted `event_pattern` field as a fallback, or fetch unavailable rule targets before returning zero relations.
+
+## efs
+
+- **P1** — [core/aws/efs_issue_enrichment.go:164](/Users/k2m30/projects/a9s/core/aws/efs_issue_enrichment.go:164)  
+  Trigger: an EFS file system has no user-defined file-system policy, so `DescribeFileSystemPolicy` returns `PolicyNotFound`.  
+  Impact: the code reports it clean, although EFS’s default policy grants full access to anonymous clients that can reach a mount target.  
+  Fix: classify the normal no-policy response as public-default exposure (while preserving unknown/error handling for inaccessible policies). [AWS documentation](https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html)
+
+- **P1** — [core/iampolicy/evaluate.go:336](/Users/k2m30/projects/a9s/core/iampolicy/evaluate.go:336)  
+  Trigger: a wildcard-principal EFS policy is constrained only by a fixed `elasticfilesystem:AccessPointArn`.  
+  Impact: it is treated as non-public and the critical finding is omitted, but AWS does not consider that condition sufficient to make an EFS policy non-public.  
+  Fix: use an EFS-specific public-policy evaluator based on EFS’s documented non-public criteria rather than the generic condition list. [AWS documentation](https://docs.aws.amazon.com/efs/latest/ug/access-control-block-public-access.html)
+
+- **P2** — [core/iampolicy/evaluate.go:332](/Users/k2m30/projects/a9s/core/iampolicy/evaluate.go:332)  
+  Trigger: a wildcard-principal EFS policy limits access with `elasticfilesystem:AccessedViaMountTarget: true`.  
+  Impact: the application raises a critical public-policy finding even though AWS explicitly classifies this policy shape as non-public.  
+  Fix: have the EFS evaluator recognize that condition as a non-public constraint. [AWS documentation](https://docs.aws.amazon.com/efs/latest/ug/access-control-block-public-access.html)
+
+- **P2** — [core/aws/efs.go:37](/Users/k2m30/projects/a9s/core/aws/efs.go:37)  
+  Trigger: a newly created file system is in `creating` with zero mount targets.  
+  Impact: it is marked broken for having no mount targets, despite AWS requiring the file system to become `available` before mount targets can be created; the suggested remediation is impossible at that point.  
+  Fix: suppress the no-mount-target finding while the file system is creating. [AWS documentation](https://docs.aws.amazon.com/efs/latest/APIReference/API_CreateFileSystem.html)
+
+- **P3** — [core/aws/catalog_databases.go:644](/Users/k2m30/projects/a9s/core/aws/catalog_databases.go:644)  
+  Trigger: a public policy grants only `elasticfilesystem:ClientMount`.  
+  Impact: the finding says clients can “read and write,” although `ClientMount` grants read-only access.  
+  Fix: make the detail action-aware, or describe the exposure neutrally as client access. [AWS documentation](https://docs.aws.amazon.com/efs/latest/ug/security_iam_resource-based-policy-examples.html)
+
+## eip
+
+- P1 — [core/aws/eip.go:73](/Users/k2m30/projects/a9s/core/aws/eip.go:73)  
+  Trigger: an account has two or more `Domain=standard` Elastic IPs. AWS documents these addresses without an `AllocationId`.  
+  Impact: every such row gets `ID == ""`, so downstream ID-keyed handling retains only one ([resource.go:25](/Users/k2m30/projects/a9s/core/resource/resource.go:25)); inventory, findings, navigation, console links, and CloudTrail lookup are incorrect or unavailable.  
+  Fix: use `AllocationId` when present, otherwise use `PublicIp` as the canonical ID; branch ID-dependent console/CloudTrail handling for standard addresses. [AWS DescribeAddresses documentation](https://docs.aws.amazon.com/ec2/latest/devguide/example_ec2_DescribeAddresses_section.html)
+
+- P2 — [core/aws/alarm_match.go:234](/Users/k2m30/projects/a9s/core/aws/alarm_match.go:234)  
+  Trigger: an EIP is associated with an EC2 instance that has a normal `AWS/EC2` CloudWatch alarm, such as `NetworkIn`, dimensioned by `InstanceId`.  
+  Impact: the EIP’s CloudWatch Alarms relation always misses that alarm because it looks for an unsupported `NetworkInterfaceId` dimension and ignores `Address.InstanceId`.  
+  Fix: match EC2 alarms using the EIP’s associated instance ID and the `InstanceId` dimension; resolve NAT/NLB ownership separately if their native alarms should also appear. [AWS EC2 metric dimensions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html)
