@@ -989,3 +989,108 @@ Findings:
   Trigger: an EIP is associated with an EC2 instance that has a normal `AWS/EC2` CloudWatch alarm, such as `NetworkIn`, dimensioned by `InstanceId`.  
   Impact: the EIP’s CloudWatch Alarms relation always misses that alarm because it looks for an unsupported `NetworkInterfaceId` dimension and ignores `Address.InstanceId`.  
   Fix: match EC2 alarms using the EIP’s associated instance ID and the `InstanceId` dimension; resolve NAT/NLB ownership separately if their native alarms should also appear. [AWS EC2 metric dimensions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html)
+
+## eks
+
+- P1 — [core/aws/eks_related_extra.go:39](/Users/k2m30/projects/a9s/core/aws/eks_related_extra.go:39), [core/aws/eks_related_extra.go:112](/Users/k2m30/projects/a9s/core/aws/eks_related_extra.go:112), [core/aws/eks_related_extra.go:208](/Users/k2m30/projects/a9s/core/aws/eks_related_extra.go:208)  
+  Trigger: an EKS cluster uses self-managed nodes (or Auto Mode) without managed node groups. `ListNodegroups` excludes self-managed nodes, yet the ASG, AMI, and EC2 checkers treat an empty managed-node-group result as a proven zero. AWS requires self-managed nodes to carry `kubernetes.io/cluster/<cluster>` tags. [AWS documentation](https://docs.aws.amazon.com/eks/latest/APIReference/API_ListNodegroups.html), [tag guidance](https://docs.aws.amazon.com/eks/latest/userguide/worker.html)  
+  Impact: the EKS detail panel shows non-navigable `(0)` EC2 instances, AMIs, and Auto Scaling groups despite real cluster compute.  
+  Fix: discover self-managed compute via the cluster tag; account for Auto Mode separately, and return unknown/partial rather than a proven zero when managed-node-group discovery is the only source.
+
+- P2 — [core/aws/ng_related.go:167](/Users/k2m30/projects/a9s/core/aws/ng_related.go:167)  
+  Trigger: a managed node group uses a launch template with security groups. The checker only reads `Resources.RemoteAccessSecurityGroup`; launch-template node groups cannot use the EKS `remoteAccess` setting, so their actual instance security groups are omitted. [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/launch-templates.html)  
+  Impact: the generic “Security Groups” relation reports zero and cannot navigate to the groups controlling node traffic.  
+  Fix: resolve the launch-template version and union its instance-level and network-interface security groups with remote-access security groups.
+
+- P2 — [core/aws/catalog_containers.go:228](/Users/k2m30/projects/a9s/core/aws/catalog_containers.go:228), [core/aws/ng_related.go:187](/Users/k2m30/projects/a9s/core/aws/ng_related.go:187), [core/aws/eks_related_extra.go:136](/Users/k2m30/projects/a9s/core/aws/eks_related_extra.go:136)  
+  Trigger: a managed node group uses a custom AMI. EKS returns that AMI ID in `ReleaseVersion`, but the code ignores it and instead requires `LaunchTemplate.Id` plus a separate EC2 launch-template read. Template name is also a valid EKS identifier. [AWS CLI reference](https://docs.aws.amazon.com/cli/v1/reference/eks/describe-nodegroup.html), [EKS API reference](https://docs.aws.amazon.com/eks/latest/APIReference/API_LaunchTemplateSpecification.html)  
+  Impact: AMI enrichment and both node-group/cluster AMI relations are blank, unknown, or error-prone despite EKS already providing the canonical AMI ID.  
+  Fix: use an `ami-*` `ReleaseVersion` for custom-AMI node groups before any EC2 lookup; support launch-template name when an EC2 lookup remains necessary.
+
+- P2 — [core/aws/eks_related.go:169](/Users/k2m30/projects/a9s/core/aws/eks_related.go:169), [core/aws/iam_roles_related.go:39](/Users/k2m30/projects/a9s/core/aws/iam_roles_related.go:39)  
+  Trigger: EKS Auto Mode is enabled with `ComputeConfig.NodeRoleArn`. The code only models the control-plane `RoleArn`.  
+  Impact: the Node IAM role is neither rendered nor reachable from the cluster, and its reverse IAM-role relationship omits the cluster. This hides the identity assigned to Auto Mode worker instances. [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/auto-learn-iam.html)  
+  Fix: include `ComputeConfig.NodeRoleArn` in the EKS role relation, reverse lookup, detail rendering, and navigation.
+
+- P3 — [core/aws/eks.go:180](/Users/k2m30/projects/a9s/core/aws/eks.go:180)  
+  Trigger: `DescribeClusterVersions` returns a `NextToken`. The code reads only the first page.  
+  Impact: clusters whose Kubernetes version appears later are classified as support-state unknown, suppressing the unsupported-version finding.  
+  Fix: paginate `DescribeClusterVersions` through all tokens before building the version catalogue. [AWS API reference](https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeClusterVersions.html)
+
+## elb
+
+- **P1 — `core/aws/apigw_related.go:347`**  
+  **Trigger:** An HTTP API private integration targets an ALB/NLB listener, while another load balancer shares the VPC link’s subnets or security groups.  
+  **Impact:** The API can be related to unrelated load balancers, or miss its actual target. API Gateway provides the listener ARN directly in `IntegrationUri`; subnet/SG overlap is not an ownership relation. [AWS documentation](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html)  
+  **Fix:** Parse each VPC-link integration’s listener ARN, derive its parent load-balancer ARN, and resolve that exact ELB row; remove the subnet/SG heuristic.
+
+- **P2 — `core/aws/eb_related_extra.go:52`**  
+  **Trigger:** An Elastic Beanstalk environment uses a Classic Load Balancer.  
+  **Impact:** The related panel emits the CLB name as an `elb` ID even though this resource type fetches ELBv2 load balancers only, creating a phantom or wrongly matched relation. Elastic Beanstalk still supports CLBs. [AWS documentation](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.managing.elb.html)  
+  **Fix:** Either model Classic Load Balancers in `elb`, or resolve and return only ELBv2 rows; do not emit unresolvable CLB names.
+
+- **P2 — `core/aws/elb_listener_rules.go:160` and `core/aws/elb_listeners.go:89`**  
+  **Trigger:** A rule has an authentication/JWT action followed by its required routing action, or a forward action distributes traffic to multiple weighted target groups.  
+  **Impact:** The listener/rule table shows only the first action and, for weighted forwarding, only the first target group—hiding the actual routing destination or traffic split. [AWS documentation](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-action-types.html)  
+  **Fix:** Summarize all actions in execution order and every forward target group with its weight.
+
+- **P3 — `core/aws/elb_listener_rules.go:226`, `:229`, `:233`, `:243`**  
+  **Trigger:** An ALB rule uses regex matching for a host, path, or HTTP-header condition, or an NLB rule uses a source-IP address type.  
+  **Impact:** The Conditions column is blank or materially incomplete, obscuring the rule’s match behavior. AWS supports regex condition forms and NLB source-IP address-type conditions. [AWS documentation](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html)  
+  **Fix:** Render `RegexValues` alongside value matches and render `SourceIpConfig.IpAddressType` when present.
+
+- **P2 — `core/config/defaults_networking.go:123`**  
+  **Trigger:** An ALB listener rule has a host-header or URL rewrite transform.  
+  **Impact:** The rule detail view omits `Transforms`, so users cannot see behavior that changes the host header, path, or query before traffic reaches targets. [AWS documentation](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-transforms.html)  
+  **Fix:** Add `Transforms` to the default listener-rule detail fields, ideally with a compact rewrite summary in the list view.
+
+## eni
+
+- **P1** — [core/aws/catalog_networking.go:644](/Users/k2m30/projects/a9s/core/aws/catalog_networking.go:644)  
+  Trigger: navigating to an exact ENI relationship when that ENI is not already cached—especially an ENI beyond page one.  
+  Impact: the related-resource drill can open an empty filtered ENI list and requires manually paging to find the known ID. ENI has no `FetchByIDs` registration, so the navigation fallback fetches only the ordinary first page.  
+  Fix: add and register a `FetchNetworkInterfacesByIDs` helper using `NetworkInterfaceIds` (batched as needed), including managed resources.
+
+- **P2** — [core/aws/dbi_related.go:250](/Users/k2m30/projects/a9s/core/aws/dbi_related.go:250)  
+  Trigger: AWS managed-resource visibility is hidden and an operator opens an RDS DB instance’s Network Interfaces relation.  
+  Impact: the lookup omits RDS-managed ENIs and can report no candidates even though they exist. AWS requires `IncludeManagedResources=true` to return managed interfaces when visibility is hidden. [AWS API documentation](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html)  
+  Fix: set `IncludeManagedResources: aws.Bool(true)` on this filtered `DescribeNetworkInterfaces` request.
+
+- **P2** — [cmd/snapshot/ec2_network.go:413](/Users/k2m30/projects/a9s/cmd/snapshot/ec2_network.go:413)  
+  Trigger: creating an ENI snapshot while AWS managed-resource visibility is hidden.  
+  Impact: the generated production snapshot omits AWS-managed ENIs, producing incomplete ENI inventory and relationship data. [AWS API documentation](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html)  
+  Fix: initialize the paginator with `IncludeManagedResources: aws.Bool(true)`.
+
+## glue
+
+6 findings:
+
+- P1 — [cmd/snapshot/ops.go:999](/Users/k2m30/projects/a9s/cmd/snapshot/ops.go:999) and [main.go:215](/Users/k2m30/projects/a9s/cmd/snapshot/main.go:215)  
+  Trigger: a Glue job has a credential in `DefaultArguments`.  
+  Impact: the snapshot serializes the plaintext value into JSON on disk.  
+  Fix: omit argument values or redact sensitive values before serialization.
+
+- P2 — [core/aws/glue_issue_enrichment.go:77](/Users/k2m30/projects/a9s/core/aws/glue_issue_enrichment.go:77)  
+  Trigger: the latest run is `RUNNING`, `WAITING`, `STARTING`, `STOPPING`, or `STOPPED`.  
+  Impact: the parent job’s “Last Run” cell says `OK`, concealing an active, queued, cancelled, or otherwise non-successful run.  
+  Fix: reserve `OK` for `SUCCEEDED`; retain and display every other actual state. [AWS job-run states](https://docs.aws.amazon.com/glue/latest/webapi/API_JobRun.html)
+
+- P2 — [core/aws/glue.go:144](/Users/k2m30/projects/a9s/core/aws/glue.go:144)  
+  Trigger: a Python Shell (`pythonshell`) job has no continuous-logging argument.  
+  Impact: it receives an actionable “continuous logging off” warning even though Python Shell jobs do not support that feature.  
+  Fix: exclude `pythonshell` from this posture check. [AWS Glue job properties](https://docs.aws.amazon.com/glue/latest/dg/managing-jobs-chapter.html)
+
+- P2 — [core/aws/glue.go:137](/Users/k2m30/projects/a9s/core/aws/glue.go:137)  
+  Trigger: a Ray (`glueray`) job has no security configuration.  
+  Impact: it is warned to attach a security configuration, which AWS does not support for Ray jobs.  
+  Fix: suppress this finding for Ray jobs or provide a Ray-applicable posture signal. [AWS Glue security configurations](https://docs.aws.amazon.com/glue/latest/dg/console-security-configurations.html)
+
+- P2 — [core/aws/glue_related.go:52](/Users/k2m30/projects/a9s/core/aws/glue_related.go:52)  
+  Trigger: a Glue job uses a security configuration or a custom log-group prefix.  
+  Impact: the Log Groups relation omits the job’s real log groups and instead associates the legacy shared defaults.  
+  Fix: derive configured group names, including security-configuration naming, or retain `JobRun.LogGroupName` from the latest run. [AWS Glue logging](https://docs.aws.amazon.com/glue/latest/dg/monitor-continuous-logging.html)
+
+- P2 — [core/aws/glue_runs.go:29](/Users/k2m30/projects/a9s/core/aws/glue_runs.go:29), [glue_issue_enrichment.go:64](/Users/k2m30/projects/a9s/core/aws/glue_issue_enrichment.go:64), and [catalog_data.go:223](/Users/k2m30/projects/a9s/core/aws/catalog_data.go:223)  
+  Trigger: routine maintenance expires a streaming Glue job run.  
+  Impact: the run and potentially its parent job are marked broken, despite Glue automatically starting a successor from checkpoints.  
+  Fix: classify `EXPIRED` neutrally for streaming jobs, using the job command or run maintenance metadata; keep the broken classification for non-streaming jobs. [AWS Glue streaming maintenance](https://docs.aws.amazon.com/glue/latest/dg/glue-streaming-maintenance.html)

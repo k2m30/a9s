@@ -76,15 +76,9 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
     has a row that leads nowhere. `TestRefConformance_NavigableFieldsOpenTargetRows` reproduces it
     the moment a fixture carries a pre-rename `DBInstanceIdentifier`.
-14. **`TestWarmSnapshot_TwoReadersOverlap` fails on machine load, not on the code.** It compares
-    wall-clock time for two concurrent warm snapshots against one, with a 1.50 ceiling; observed
-    at 2.65 and at 2.00 while other gates ran on the same machine, green every time in isolation.
-    It can fail any landing gate and CI. Needs a measure that is not wall clock, or a load-aware
-    ceiling — weakening the ratio silently would retire the lock-scope guard it exists to be.
-
 ## Structure
 
-15. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+14. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.

@@ -11,6 +11,7 @@
 package unit
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -82,12 +83,26 @@ func TestWarmSnapshot_TwoReadersOverlap(t *testing.T) {
 		t.Skip("a shared runner's timing says nothing about the lock")
 	}
 	c := wipfixWarmController(t, 6000)
-	ratio, serial, parallel := wipfixSnapshotOverlapRatio(t, c, 200)
-	if ratio > wipfixSnapshotOverlapCeiling {
-		t.Errorf("two concurrent warm snapshots cost %v against %v for one goroutine "+
-			"(ratio %.2f, ceiling %.2f) — they are serialising, so reading a screen that "+
-			"changes nothing takes the write lock", parallel, serial, ratio, wipfixSnapshotOverlapCeiling)
+
+	// Best of three. The measure is wall clock, so anything else running on
+	// the machine inflates it — but a read that queues behind a write lock
+	// inflates every attempt, and this one has been seen at 1.59, 2.00 and
+	// 2.65 on a busy machine while passing at ~1.1 on an idle one. Taking the
+	// lowest ratio keeps the serialising implementation failing (it has no
+	// fast attempt to offer) without failing the gate on a neighbour's build.
+	best, serial, parallel := math.Inf(1), time.Duration(0), time.Duration(0)
+	for range 3 {
+		ratio, s, p := wipfixSnapshotOverlapRatio(t, c, 200)
+		if ratio < best {
+			best, serial, parallel = ratio, s, p
+		}
+		if best <= wipfixSnapshotOverlapCeiling {
+			return
+		}
 	}
+	t.Errorf("two concurrent warm snapshots cost %v against %v for one goroutine "+
+		"(best ratio of 3 attempts %.2f, ceiling %.2f) — they are serialising, so reading "+
+		"a screen that changes nothing takes the write lock", parallel, serial, best, wipfixSnapshotOverlapCeiling)
 }
 
 // TestColdSnapshot_ConcurrentFirstReadsAreWellFormed is the negative half:
