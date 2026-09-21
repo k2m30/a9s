@@ -3580,6 +3580,18 @@ func buildSnapshots() []ec2types.Snapshot {
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{},
 		},
+		// A snapshot in the Recycle Bin: deleted, still holding the volume's
+		// data, and counting down a retention rule. It is the witness that the
+		// bin is not a failure — the advice an errored snapshot carries would
+		// destroy the only copy.
+		{
+			SnapshotId: aws.String("snap-0recycle0000c3e"), State: ec2types.SnapshotStateRecoverable,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60002"), VolumeSize: aws.Int32(100),
+			Encrypted: aws.Bool(true), Description: aws.String("Nightly snapshot of app-data-volume"),
+			StartTime: aws.Time(t2), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("app-data-nightly")}},
+		},
 		// AWS Backup-created snapshot — required for the ebs-snap:backup
 		// related-panel pivot. Description prefix + the
 		// aws:backup:source-resource tag are the real AWS Backup signature;
@@ -3809,7 +3821,7 @@ func buildImages() []ec2types.Image {
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 41, Issues: 16})
 	Register(Pin{ShortName: "ebs", Rows: 10, Issues: 6, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ebs-snap", Rows: 12, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs-snap", Rows: 13, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 10, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "eni", Rows: 57, Issues: 3, CoverageGaps: []string{"broken", "dim"}})

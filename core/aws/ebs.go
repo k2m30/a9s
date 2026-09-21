@@ -232,16 +232,24 @@ func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, id
 	return resources, AggregateMissing("ebs-snap FetchByIDs", failures, len(filtered))
 }
 
-// ebsSnapshotUnusable reports a snapshot nothing can be restored from. The
-// single place that set is spelled: the ebs-snap state finding and the volume
-// enricher's snapshot-coverage join both call it, so a snapshot the list shows
-// as broken is never counted as cover for its volume.
+// ebsSnapshotUnusable reports a snapshot nothing can be restored from as it
+// stands. The single place that set is spelled: the ebs-snap state findings and
+// the volume enricher's snapshot-coverage join both call it, so a snapshot the
+// list shows as unusable is never counted as cover for its volume.
 func ebsSnapshotUnusable(state ec2types.SnapshotState) bool {
 	switch state {
 	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
 		return true
 	}
 	return false
+}
+
+// ebsSnapshotInRecycleBin separates the two Recycle Bin states from a failure.
+// A snapshot in the bin still holds the volume's data and a retention rule is
+// counting down on it; the advice a failed snapshot gets — take a fresh one and
+// delete this — would destroy the only copy.
+func ebsSnapshotInRecycleBin(state ec2types.SnapshotState) bool {
+	return state == ec2types.SnapshotStateRecoverable || state == ec2types.SnapshotStateRecovering
 }
 
 // snapshotToResource converts an ec2types.Snapshot to our generic Resource.
@@ -308,6 +316,8 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	switch {
 	case snap.State == ec2types.SnapshotStatePending:
 		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending)}
+	case ebsSnapshotInRecycleBin(snap.State):
+		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateRecycleBin)}
 	case ebsSnapshotUnusable(snap.State):
 		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError)}
 	}

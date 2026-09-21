@@ -17,10 +17,10 @@ import (
 //  2. "Checker: nil" — a RelatedDef with a nil checker is a structural bug;
 //     use the demo harness or a properly wired checker.
 //
-//  3. Lines passing nil for a checker's clients or resource argument — such
-//     a call bypasses the demo transport entirely. The last argument is the
-//     target cache, and nil there is what a checker needing none is called
-//     with.
+//  3. Lines passing nil for the clients or resource argument of a checker
+//     reached through a RelatedDef's Checker field — such a call bypasses the
+//     demo transport entirely. The last argument is the target cache, and nil
+//     there is what a checker needing none is called with.
 //
 // Rule 3 has an audited exception list, nilClientIsTheSubject: a test whose
 // assertion is about what a checker answers with nothing to read hands it nil
@@ -31,13 +31,17 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 
 	selfName := "testhelpers_forbidden_test.go"
 
-	// Compiled once; matches direct nil-client checker calls such as:
-	//   SomeChecker(ctx, nil, res)
-	//   resource.CheckVPC(context.Background(), nil, r)
+	// Compiled once; matches a nil client passed to a checker invoked through
+	// a registered RelatedDef, such as:
+	//   def.Checker(ctx, nil, res, cache)
 	//
 	// The trailing comma is what makes the position the test: a nil the call
 	// ends on is the target cache, which a checker needing none is called
 	// with, and a nil with an argument after it is neither.
+	//
+	// Scoped to the .Checker field deliberately. A checker held in a local
+	// variable is most often a cache-only pivot that takes no client at all,
+	// and matching those reports 1673 legitimate calls across 161 files.
 	nilCheckerCallRE := regexp.MustCompile(`\.Checker\(.*,\s*nil\s*,`)
 
 	// Each of these asserts what a checker answers when it can read nothing:

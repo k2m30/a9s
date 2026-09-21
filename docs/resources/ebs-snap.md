@@ -79,6 +79,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. `StateMessage` carries AWS's human-readable cause (e.g. KMS permission failure on an encrypted copy) and is used for S4/S5 text.
 
+- **Signal**: `State == recoverable` or `State == recovering` — the Recycle Bin.
+  - **State bucket**: Warning.
+  - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. The
+    snapshot was deleted into a Recycle Bin retention rule: it still holds the
+    volume's data, nothing can be restored from it until it is recovered, and the
+    rule deletes it for good when the period ends. It is not a failed snapshot and
+    must not carry the failed one's advice to take a fresh copy and delete it.
+
 - **Signal**: snapshot age > 365d with automated description — cost concern.
   - **State bucket**: Warning.
   - **How obtained**: `now() - Snapshot.StartTime > 365d` AND `Snapshot.Description` begins with `"Created by ..."` (automated-snapshot tell). Pure computation over the list response.
@@ -119,6 +127,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
 | `State == error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `error` |
+| `State == recoverable` or `recovering` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `in recycle bin` |
 | age > 365d AND automated description | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automated, <N>d old` |
 | `Encrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
 | orphan: source volume deleted | 2 | Warning | `~` | S2, S3, S4, S5 | `orphan: source volume deleted` |
@@ -167,6 +176,7 @@ ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and
 | --- | --- | --- | --- | --- |
 | ebs-snap.state.pending | pending | warn | wave1 | The snapshot is still being written and cannot be used to restore a volume or copied to another region yet. Wait for it to complete before relying on it as the recovery point for anything. |
 | ebs-snap.state.error | error | broken | wave1 | This snapshot failed and holds no usable copy of the volume, so any recovery plan naming it has a hole in it. Take a fresh snapshot of the source volume and delete this one. |
+| ebs-snap.state.recycle-bin | in recycle bin | warn | wave1 | This snapshot was deleted and is being held in the Recycle Bin, so nothing can be restored from it until it is recovered, and a retention rule will remove it for good when the period ends. Recover it from the Recycle Bin if the recovery point is still wanted. |
 | ebs-snap.encryption.disabled | unencrypted | warn | wave1 | The snapshot's contents are stored unencrypted, and any volume restored from it starts unencrypted too. Copy it with a KMS key, restore from the copy, then delete this one. |
 | ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |
 | ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | The volume this snapshot came from no longer exists, so nothing is refreshing it and it will never get any newer. Keep it deliberately as an archive with an owner, or delete it — either way its stored data is billed every month. |

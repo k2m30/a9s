@@ -22,9 +22,10 @@ func TestDemoMoreThanOneECSServiceResolvesLogs(t *testing.T) {
 	}
 
 	var def *resource.RelatedDef
-	for i, d := range resource.GetRelated("ecs-svc") {
-		if d.TargetType == "logs" {
-			def = &resource.GetRelated("ecs-svc")[i]
+	defs := resource.GetRelated("ecs-svc")
+	for i := range defs {
+		if defs[i].TargetType == "logs" {
+			def = &defs[i]
 			break
 		}
 	}

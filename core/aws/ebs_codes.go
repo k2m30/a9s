@@ -28,9 +28,14 @@ const (
 	// CodeEBSSnapStatePending — EBS snapshot is in the "pending" state.
 	CodeEBSSnapStatePending domain.FindingCode = "ebs-snap.state.pending"
 
-	// CodeEBSSnapStateError — EBS snapshot is in the "error", "recoverable", or
-	// "recovering" state. Severity: SevBroken.
+	// CodeEBSSnapStateError — EBS snapshot is in the "error" state.
+	// Severity: SevBroken.
 	CodeEBSSnapStateError domain.FindingCode = "ebs-snap.state.error"
+
+	// CodeEBSSnapStateRecycleBin — EBS snapshot is in the "recoverable" or
+	// "recovering" state, which is the Recycle Bin, not a failure.
+	// Severity: SevWarn.
+	CodeEBSSnapStateRecycleBin domain.FindingCode = "ebs-snap.state.recycle-bin"
 
 	// CodeEBSSnapUnencrypted — snapshot is not encrypted at rest, violating
 	// CIS EC2.1. Severity: SevWarn.
