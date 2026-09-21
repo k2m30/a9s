@@ -1032,6 +1032,13 @@ func buildIAMRelations(f *IAMFixtures) {
 		{PolicyName: aws.String(RetiredManagedPolicyName), PolicyArn: aws.String("arn:aws:iam::aws:policy/" + RetiredManagedPolicyName)},
 	}
 
+	// The build pipeline role PolicyPrivEsc's document is written for. It is
+	// what makes the escalation reachable, and it keeps
+	// orphan-unattached-policy the only demo policy nothing attaches.
+	f.AttachedRolePolicies["acme-ci-deploy-role"] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String(PolicyPrivEsc), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/" + PolicyPrivEsc)},
+	}
+
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("acme-s3-read-only"), PolicyArn: aws.String("arn:aws:iam::123456789012:policy/acme-s3-read-only")},
 		{PolicyName: aws.String(PolicyNameAlsoAWSManaged), PolicyArn: aws.String(LocalPowerUserAccessARN)},
@@ -1084,6 +1091,18 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 
 	buildEntitiesForPolicy(f)
+
+	// AttachmentCount is AWS's count of the principals attaching the policy,
+	// so it is read off the same attachments ListEntitiesForPolicy answers
+	// from. Stated on the policy instead, it drifts, and the row's count then
+	// disagrees with the principals its own detail view lists.
+	for i := range f.Policies {
+		n := 0
+		if e := f.EntitiesForPolicy[aws.ToString(f.Policies[i].Arn)]; e != nil {
+			n = len(e.Roles) + len(e.Users) + len(e.Groups)
+		}
+		f.Policies[i].AttachmentCount = aws.Int32(int32(n))
+	}
 
 	// The generated least-privilege policies: one read-only document each,
 	// named after the service in the policy's own name. Nothing here is a

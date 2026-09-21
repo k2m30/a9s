@@ -3320,6 +3320,49 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 			},
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("db-proxy-01-eni-detaching")}},
 		},
+		// RDS-managed interfaces, one per AZ of acme-rds-subnet-group. RDS
+		// names every one of them "RDSNetworkInterface" and that literal, plus
+		// the instance's security groups, is the whole of what checkDBIENI has
+		// to find them by — a DB instance's own API response names no
+		// interface of its own.
+		{
+			NetworkInterfaceId: aws.String("eni-0rds00000000001a"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(rdsProdVPCID),
+			SubnetId:           aws.String(fixtProdPrivateSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.3.210"),
+			PrivateDnsName:     aws.String("ip-10-0-3-210.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:d1"),
+			Description:        aws.String("RDSNetworkInterface"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterId:        aws.String("amazon-rds"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(rdsProdRDSSGID), GroupName: aws.String("acme-rds-sg")},
+			},
+		},
+		{
+			NetworkInterfaceId: aws.String("eni-0rds00000000002b"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(rdsProdVPCID),
+			SubnetId:           aws.String(fixtProdPrivateSubnetB),
+			AvailabilityZone:   aws.String("us-east-1b"),
+			PrivateIpAddress:   aws.String("10.0.4.210"),
+			PrivateDnsName:     aws.String("ip-10-0-4-210.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:d2"),
+			Description:        aws.String("RDSNetworkInterface"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterId:        aws.String("amazon-rds"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(rdsProdRDSSGID), GroupName: aws.String("acme-rds-sg")},
+			},
+		},
 	}
 }
 
@@ -3502,6 +3545,32 @@ func buildSnapshots() []ec2types.Snapshot {
 			StartTime: aws.Time(t3), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("c3d4e5f6-7890-12ab-cdef-333333333333"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphaned-vol-snapshot")}},
+		},
+		// CopySnapshot's result: AWS gives a copy the placeholder volume id
+		// vol-ffffffff, which names no volume in any account, so the Source
+		// Volume row has nothing to point at and the snapshot is not an
+		// orphan either.
+		{
+			SnapshotId: aws.String("snap-0copy00000000a1c"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-ffffffff"), VolumeSize: aws.Int32(200),
+			Encrypted:   aws.Bool(true),
+			Description: aws.String("Copied snap-0a1b2c3d4e5f60002 from us-west-2 for the DR account"),
+			StartTime:   aws.Time(t3), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("api-data-dr-copy")}},
+		},
+		// i-0f9e8d7c6b5a40012 is in no instance list: CreateImage writes the
+		// instance id into the description and nothing rewrites it when that
+		// instance is terminated, which is the usual state of a golden image
+		// old enough to be worth keeping.
+		{
+			SnapshotId: aws.String("snap-0gone00000000b2d"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60002"), VolumeSize: aws.Int32(30),
+			Encrypted:   aws.Bool(true),
+			Description: aws.String("Created by CreateImage(i-0f9e8d7c6b5a40012) for ami-0f9e8d7c6b5a40012 from vol-0f9e8d7c6b5a40012"),
+			StartTime:   aws.Time(t2), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("retired-worker-golden-image")}},
 		},
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60004"), State: ec2types.SnapshotStatePending,
@@ -3740,10 +3809,10 @@ func buildImages() []ec2types.Image {
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 41, Issues: 16})
 	Register(Pin{ShortName: "ebs", Rows: 10, Issues: 6, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ebs-snap", Rows: 10, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs-snap", Rows: 12, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 10, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
-	Register(Pin{ShortName: "eni", Rows: 55, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "eni", Rows: 57, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "igw", Rows: 5, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})
 	Register(Pin{ShortName: "rtb", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})

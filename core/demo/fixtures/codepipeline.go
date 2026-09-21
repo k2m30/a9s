@@ -62,8 +62,7 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 		// every pipeline:* related-panel pivot and the reverse
 		// cb:pipeline pivot. RoleArn + Stages/actions reference real sibling
 		// fixtures: acme-ci-deploy-role (iam.go), acme-api-build
-		// (codebuild.go), acme-npm/acme-artifacts (codeartifact.go),
-		// acme/api-service (ecr.go), api-gateway/acme-services (ecs.go),
+		// (codebuild.go), acme/api-service (ecr.go), api-gateway/acme-services (ecs.go),
 		// acme-eks-cluster (cfn.go), api-gateway-authorizer (lambda.go),
 		// a9s-demo-healthy (s3.go), ops-alerts (cloudwatch.go
 		// relatedAlarmSNSARN topic name).
@@ -85,17 +84,16 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 						Name: aws.String("Source"),
 						Actions: []cptypes.ActionDeclaration{
 							{
-								Name: aws.String("CodeArtifactSource"),
+								Name: aws.String("ImagePushed"),
 								ActionTypeId: &cptypes.ActionTypeId{
 									Category: cptypes.ActionCategorySource,
 									Owner:    cptypes.ActionOwnerAws,
-									Provider: aws.String("CodeArtifact"),
+									Provider: aws.String("ECR"),
 									Version:  aws.String("1"),
 								},
 								Configuration: map[string]string{
-									"RepositoryName": "acme-npm",
-									"DomainName":     "acme-artifacts",
-									"PackageName":    "acme-api-service",
+									"RepositoryName": "acme/api-service",
+									"ImageTag":       "latest",
 								},
 							},
 						},
@@ -113,18 +111,6 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 								},
 								Configuration: map[string]string{
 									"ProjectName": "acme-api-build",
-								},
-							},
-							{
-								Name: aws.String("PublishImage"),
-								ActionTypeId: &cptypes.ActionTypeId{
-									Category: cptypes.ActionCategoryBuild,
-									Owner:    cptypes.ActionOwnerAws,
-									Provider: aws.String("ECR"),
-									Version:  aws.String("1"),
-								},
-								Configuration: map[string]string{
-									"RepositoryName": "acme/api-service",
 								},
 							},
 						},

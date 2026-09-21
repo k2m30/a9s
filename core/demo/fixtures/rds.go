@@ -35,11 +35,16 @@ type RDSFixtures struct {
 // DBInstances are sourced from DBIFixtures (single source of truth) plus the
 // bulk-generated pool. Callers that only need DBInstances should use
 // NewDBIFixtures() directly.
+//
+// Order is what decides which rows Wave 2 reaches: the enricher stops at
+// EnrichmentCap rows, and a row past it carries its verdict only in its own
+// detail view. Every instance that witnesses a Wave-2 finding is ahead of the
+// bulk pool's tail for that reason.
 var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        append(append(dbi.Instances, normalizeRDSInstancePosture(legacy)...), dbiDocDBClusterMember()),
+		DBInstances:        append(append(dbi.Instances, dbiDocDBClusterMember()), normalizeRDSInstancePosture(legacy)...),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
 		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
@@ -81,7 +86,7 @@ var rdsNamePool = []string{
 	"payment-db-01", "payment-db-02", "user-service-db", "inventory-db",
 	"order-history-db", "notification-db", "session-db", "audit-db",
 	"reporting-db", "metrics-db", "config-db", "integration-db",
-	"partner-db", "archive-db", "sandbox-db-01", "sandbox-db-02",
+	"partner-db", "archive-db", "sandbox-db-02", "sandbox-db-01",
 	"canary-db",
 }
 
@@ -720,7 +725,7 @@ func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
 	Register(Pin{ShortName: "dbi", Rows: 52, Issues: 29, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "dbi-snap", Rows: 12, Issues: 7, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi-snap", Rows: 13, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.
 	Register(Pin{ShortName: "dbc", Rows: 17, Issues: 14, CoverageGaps: []string{"dim"}})

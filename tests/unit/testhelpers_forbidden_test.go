@@ -21,6 +21,11 @@ import (
 //     a call bypasses the demo transport entirely. The last argument is the
 //     target cache, and nil there is what a checker needing none is called
 //     with.
+//
+// Rule 3 has an audited exception list, nilClientIsTheSubject: a test whose
+// assertion is about what a checker answers with nothing to read hands it nil
+// on purpose, and demo clients there would answer the question the test is
+// asking.
 func TestNoForbiddenTestHelpers(t *testing.T) {
 	t.Helper()
 
@@ -29,7 +34,23 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 	// Compiled once; matches direct nil-client checker calls such as:
 	//   SomeChecker(ctx, nil, res)
 	//   resource.CheckVPC(context.Background(), nil, r)
-	nilCheckerCallRE := regexp.MustCompile(`\.Checker\([^)]*nil\s*,`)
+	//
+	// The trailing comma is what makes the position the test: a nil the call
+	// ends on is the target cache, which a checker needing none is called
+	// with, and a nil with an argument after it is neither.
+	nilCheckerCallRE := regexp.MustCompile(`\.Checker\(.*,\s*nil\s*,`)
+
+	// Each of these asserts what a checker answers when it can read nothing:
+	// Unknown rather than a guessed zero, a valid result shape, and no panic
+	// on a row carrying no RawStruct. The nil is the subject of the
+	// assertion, so a client that answers makes the assertion vacuous.
+	nilClientIsTheSubject := map[string]bool{
+		"aws_ddb_related_test.go":                  true,
+		"ct_events_rightcol_dispatch_test.go":      true,
+		"qa_related_garbage_ids_test.go":           true,
+		"related_validate_test.go":                 true,
+		"views_detail_rightcol_hide_zeros_test.go": true,
+	}
 
 	type literalCheck struct {
 		substr string
@@ -75,7 +96,7 @@ func TestNoForbiddenTestHelpers(t *testing.T) {
 				}
 			}
 
-			if nilCheckerCallRE.MatchString(line) {
+			if nilCheckerCallRE.MatchString(line) && !nilClientIsTheSubject[filepath.Base(path)] {
 				t.Errorf("%s:%d: direct nil-client Checker call (use demo harness)\n\t%s",
 					path, lineNo, strings.TrimSpace(line))
 			}

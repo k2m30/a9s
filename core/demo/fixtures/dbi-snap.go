@@ -34,6 +34,11 @@ const (
 	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
+	// ResourceIDDBISnapID is the manual snapshot that carries DbiResourceId,
+	// the field a snapshot's parent is matched on when it has one.
+	ResourceIDDBISnapID  = "prod-dbi-1-manual-2026-02-11"
+	ResourceIDDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:prod-dbi-1-manual-2026-02-11"
+
 	// WarnDBISnapCopyingID carries dbi-snap.warn.transitional: a cross-Region
 	// copy from us-west-2 still being copied, whose source instance is not in
 	// this Region's dbi list.
@@ -134,6 +139,30 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			EngineVersion:        aws.String("16.2"),
 			SnapshotType:         aws.String("automated"),
 			SnapshotCreateTime:   aws.Time(recentSnapTime),
+			AllocatedStorage:     aws.Int32(100),
+			StorageType:          aws.String("gp3"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(100),
+			SourceRegion:         aws.String("us-east-1"),
+		},
+
+		// Carries DbiResourceId, which AWS keeps with an instance across a
+		// rename and never reissues, so it is matched on that alone and the
+		// name beside it is not read.
+		{
+			DBSnapshotIdentifier: aws.String(ResourceIDDBISnapID),
+			DBSnapshotArn:        aws.String(ResourceIDDBISnapARN),
+			DBInstanceIdentifier: aws.String(ProdDbiID),
+			DbiResourceId:        aws.String(ProdDbiResourceID),
+			Status:               aws.String("available"),
+			Engine:               aws.String("postgres"),
+			EngineVersion:        aws.String("16.2"),
+			SnapshotType:         aws.String("manual"),
+			SnapshotCreateTime:   aws.Time(mustTime("2026-02-11T02:15:00Z")),
 			AllocatedStorage:     aws.Int32(100),
 			StorageType:          aws.String("gp3"),
 			Encrypted:            aws.Bool(true),

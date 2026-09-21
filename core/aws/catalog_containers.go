@@ -338,7 +338,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 		Columns:   resource.EcsSvcLogColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"timestamp", "stream_short", "message", "log_group", "log_stream", "status"},
+		FieldKeys: []string{"timestamp", "ingestion_time", "stream_short", "message", "log_group", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),

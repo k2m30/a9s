@@ -97,6 +97,11 @@ func FetchEcsSvcLogs(
 				timestamp = formatEpochMillis(*event.Timestamp)
 			}
 
+			ingestionTime := ""
+			if event.IngestionTime != nil {
+				ingestionTime = formatEpochMillis(*event.IngestionTime)
+			}
+
 			streamShort := ""
 			logStream := ""
 			if event.LogStreamName != nil {
@@ -124,12 +129,13 @@ func FetchEcsSvcLogs(
 				Name:     name,
 				Findings: logEventFindings(status),
 				Fields: map[string]string{
-					"timestamp":    timestamp,
-					"stream_short": streamShort,
-					"message":      message,
-					"status":       status,
-					"log_group":    logGroup,
-					"log_stream":   logStream,
+					"timestamp":      timestamp,
+					"ingestion_time": ingestionTime,
+					"stream_short":   streamShort,
+					"message":        message,
+					"status":         status,
+					"log_group":      logGroup,
+					"log_stream":     logStream,
 				},
 				RawStruct: event,
 			}

@@ -34,6 +34,7 @@ func dataDefaultViews() map[string]ViewDef {
 				{Path: "EndpointManagement"}, {Path: "WeeklyMaintenanceWindowStart"}, {Path: "WebserverUrl"},
 				{Path: "Arn"}, {Path: "KmsKey"}, {Path: "SourceBucketArn"}, {Path: "DagS3Path"},
 				{Path: "ExecutionRoleArn"}, {Path: "ServiceRoleArn"}, {Path: "CeleryExecutorQueue"},
+				{Path: "LoggingConfiguration"},
 				{Path: "CreatedAt"}, {Path: "LastUpdate"},
 			},
 		},

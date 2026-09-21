@@ -173,8 +173,45 @@ func (f *EC2Fake) DescribeVpcEndpoints(_ context.Context, _ *ec2.DescribeVpcEndp
 	return &ec2.DescribeVpcEndpointsOutput{VpcEndpoints: f.fix.VpcEndpoints}, nil
 }
 
-func (f *EC2Fake) DescribeNetworkInterfaces(_ context.Context, _ *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
-	return &ec2.DescribeNetworkInterfacesOutput{NetworkInterfaces: f.fix.NetworkInterfaces}, nil
+// DescribeNetworkInterfaces filters by description and group-id when those
+// filters are present (matching the checkDBIENI call pattern). AWS matches
+// group-id against any of the interface's security groups.
+func (f *EC2Fake) DescribeNetworkInterfaces(_ context.Context, input *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
+	if len(input.Filters) == 0 {
+		return &ec2.DescribeNetworkInterfacesOutput{NetworkInterfaces: f.fix.NetworkInterfaces}, nil
+	}
+
+	var descriptions, groupIDs []string
+	for _, filter := range input.Filters {
+		if filter.Name == nil {
+			continue
+		}
+		switch *filter.Name {
+		case "description":
+			descriptions = filter.Values
+		case "group-id":
+			groupIDs = filter.Values
+		}
+	}
+
+	descSet := toSet(descriptions)
+	groupSet := toSet(groupIDs)
+
+	var out []ec2types.NetworkInterface
+	for _, ni := range f.fix.NetworkInterfaces {
+		if len(descSet) > 0 {
+			if ni.Description == nil || !descSet[*ni.Description] {
+				continue
+			}
+		}
+		if len(groupSet) > 0 && !slices.ContainsFunc(ni.Groups, func(g ec2types.GroupIdentifier) bool {
+			return g.GroupId != nil && groupSet[*g.GroupId]
+		}) {
+			continue
+		}
+		out = append(out, ni)
+	}
+	return &ec2.DescribeNetworkInterfacesOutput{NetworkInterfaces: out}, nil
 }
 
 func (f *EC2Fake) DescribeVolumes(_ context.Context, _ *ec2.DescribeVolumesInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error) {

@@ -107,6 +107,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A cluster snapshot's source cluster opens from its detail view, when that
   cluster still exists.
 
+- A copied RDS snapshot now says what it was copied from. Its detail view
+  showed a parent identifier beside "DB Instances (0)" and nothing that named
+  it a copy.
+- An MWAA environment's detail view now shows its logging configuration —
+  whether task, scheduler, worker and webserver logging is on, and at what
+  level. It was visible nowhere.
+- In demo mode, an Auto Scaling group's network interfaces, and a database's,
+  are the ones that belong to it. Drilling into either listed every interface
+  in the account.
+- In demo mode, a DocumentDB cluster member's backup coverage now shows in the
+  DB instance list. It sat past the point where the second pass stops, so the
+  verdict appeared only when that one row was opened.
+- In demo mode, three ECS services now show a log count instead of one, and
+  the demo pipeline no longer declares two actions AWS would reject.
+- In demo mode, an IAM policy's attachment count is the number of principals
+  that attach it. 27 policies advertised attachments — up to 12 — that the
+  drill into them could not show.
 - A load balancer now names every certificate its listeners serve. A listener
   carries one default certificate and serves the rest by SNI, so a
   multi-domain ALB listed one of them while each of the others listed the load

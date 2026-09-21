@@ -25,6 +25,10 @@ const (
 	ProdDbiID  = "prod-dbi-1"
 	ProdDbiARN = "arn:aws:rds:us-east-1:123456789012:db:prod-dbi-1"
 
+	// ProdDbiResourceID is prod-dbi-1's DbiResourceId, which AWS keeps with
+	// the instance through a rename and never reissues.
+	ProdDbiResourceID = "db-XKZQ4T7NPWYB2MHR6VJD8LSCFA"
+
 	// prod-dbi-aurora-1 — Aurora cluster member
 	ProdDbiAuroraID  = "prod-dbi-aurora-1"
 	ProdDbiAuroraARN = "arn:aws:rds:us-east-1:123456789012:db:prod-dbi-aurora-1"
@@ -235,6 +239,10 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	}
 	prodDbi1.MonitoringRoleArn = aws.String(dbiEnhancedMonitorARN)
 	prodDbi1.EnabledCloudwatchLogsExports = []string{"postgresql", "upgrade"}
+	// The identifier that stays with the instance across a rename. A snapshot
+	// taken before one carries the name of the day and this id, and only the
+	// id still leads back here.
+	prodDbi1.DbiResourceId = aws.String(ProdDbiResourceID)
 
 	// prod-dbi-aurora-1 — Aurora cluster member, Healthy, and the graph
 	// root for dbi: every related pivot is non-zero. Aurora

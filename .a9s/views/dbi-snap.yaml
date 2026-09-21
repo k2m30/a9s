@@ -42,4 +42,5 @@ detail:
   - LicenseModel
   - Iops
   - PercentProgress
+  - SourceDBSnapshotIdentifier
   - SourceRegion

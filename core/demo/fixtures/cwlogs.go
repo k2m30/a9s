@@ -279,6 +279,23 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1750100000000),
 		},
+		// The other two families the acme-services cluster runs. One family
+		// with a log group would let a reader take the ecs-svc→logs count for
+		// a property of the pivot rather than of the service's own definition.
+		{
+			LogGroupName:    aws.String("/ecs/web-frontend"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/web-frontend:*"),
+			StoredBytes:     aws.Int64(41943040),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750110000000),
+		},
+		{
+			LogGroupName:    aws.String("/ecs/order-worker"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/order-worker:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750120000000),
+		},
 		// acme-public-api execution log group — required for apigw:logs
 		// related-panel pivot. checkApigwLogs matches log groups whose ID
 		// has the "API-Gateway-Execution-Logs_{apiID}/" prefix.
@@ -498,6 +515,26 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				StoredBytes:         aws.Int64(8192),
 			},
 		},
+		// The stream prefix is the container's name, not the family's: web
+		// and worker are what web-frontend:8 and order-worker:5 declare.
+		"/ecs/web-frontend": {
+			{
+				LogStreamName:       aws.String("ecs/web/8b2e4d6a0c1f47539ae6b2d8c04f1e73"),
+				CreationTime:        aws.Int64(1774253600000),
+				FirstEventTimestamp: aws.Int64(1774253600000),
+				LastEventTimestamp:  aws.Int64(1774253640000),
+				StoredBytes:         aws.Int64(6144),
+			},
+		},
+		"/ecs/order-worker": {
+			{
+				LogStreamName:       aws.String("ecs/worker/1d3f5a7b9c2e46088f4a6c8e0b2d4f69"),
+				CreationTime:        aws.Int64(1774253500000),
+				FirstEventTimestamp: aws.Int64(1774253500000),
+				LastEventTimestamp:  aws.Int64(1774253560000),
+				StoredBytes:         aws.Int64(4096),
+			},
+		},
 		"/aws/codebuild/acme-api-build": {
 			{
 				LogStreamName:       aws.String("build-142/acme-api-build"),
@@ -692,6 +729,42 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		},
 	}
 
+	logEvents["/ecs/web-frontend"] = []cwlogstypes.OutputLogEvent{
+		{
+			Timestamp:     aws.Int64(1774253600000),
+			Message:       aws.String("INFO  [server] listening on 0.0.0.0:3000"),
+			IngestionTime: aws.Int64(1774253600100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253620000),
+			Message:       aws.String("WARN  [assets] bundle main.js is 2.4MB, above the 1MB budget"),
+			IngestionTime: aws.Int64(1774253620100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253640000),
+			Message:       aws.String("INFO  [http] GET /checkout 200 in 44ms"),
+			IngestionTime: aws.Int64(1774253640100),
+		},
+	}
+
+	logEvents["/ecs/order-worker"] = []cwlogstypes.OutputLogEvent{
+		{
+			Timestamp:     aws.Int64(1774253500000),
+			Message:       aws.String("INFO  [queue] claimed 12 orders from acme-orders-queue"),
+			IngestionTime: aws.Int64(1774253500100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253530000),
+			Message:       aws.String("ERROR [queue] order 7842 failed after 3 attempts, sent to acme-orders-dlq"),
+			IngestionTime: aws.Int64(1774253530100),
+		},
+		{
+			Timestamp:     aws.Int64(1774253560000),
+			Message:       aws.String("INFO  [queue] 11 orders settled in 58s"),
+			IngestionTime: aws.Int64(1774253560100),
+		},
+	}
+
 	logEvents["/aws/lambda/a9s-demo-s3-notifier"] = lambdaInvocationReport("a9s-demo-s3-notifier")
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
@@ -761,7 +834,7 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 177
+const LogGroupsPageSize = 179
 
 // derivedLogGroups returns a log group for every one the other demo fixtures
 // name and have does not hold yet: each MWAA environment's component groups,
@@ -847,5 +920,5 @@ const ECSExecLogGroup = "/ecs/exec/acme-services"
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 177, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 179, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

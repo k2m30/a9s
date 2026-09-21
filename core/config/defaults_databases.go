@@ -84,7 +84,8 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "SnapshotCreateTime"}, {Path: "AllocatedStorage"}, {Path: "StorageType"},
 				{Path: "Encrypted"}, {Path: "KmsKeyId"}, {Path: "AvailabilityZone"},
 				{Path: "MasterUsername"}, {Path: "LicenseModel"}, {Path: "Iops"},
-				{Path: "PercentProgress"}, {Path: "SourceRegion"},
+				{Path: "PercentProgress"},
+				{Path: "SourceDBSnapshotIdentifier"}, {Path: "SourceRegion"},
 			},
 		},
 		"dbc-snap": {

@@ -33,7 +33,7 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 	}
 
 	if len(cacheBackedTypes) == 0 {
-		t.Skip("no NeedsTargetCache defs registered for ct-events — Bug E test is vacuous")
+		t.Skip("no NeedsTargetCache defs registered for ct-events — nothing to exercise")
 	}
 
 	// Target resource lists have not loaded yet.
@@ -55,11 +55,14 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 					continue
 				}
 
-				if result.State() == domain.RelatedUnknown && len(result.FetchFilter()) == 0 && result.Err() == nil {
-					t.Errorf("Bug E: event=%s targetType=%s: checker returned State: RelatedUnknown with nil clients"+
-						" and empty cache — short-circuit ignores nil error from failed paginated fetcher."+
-						" Expected a resolved Count=0 (no match) because nil-client fetcher should not be treated as unknown.",
-						fixture.ID, result.TargetType())
+				// A cache-backed checker reads the target list to answer. With
+				// an empty cache and no client, nothing read that list, so
+				// neither a count nor a zero is established and Unknown is the
+				// only answer the row can carry.
+				if result.State() != domain.RelatedUnknown && len(result.FetchFilter()) == 0 && result.Err() == nil {
+					t.Errorf("event=%s targetType=%s: state = %v, Count=%d with nil clients and an empty cache,"+
+						" want RelatedUnknown — no list was read, so a count is a guess dressed as a fact",
+						fixture.ID, result.TargetType(), result.State(), result.Count())
 				}
 			}
 		})

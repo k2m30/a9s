@@ -11,6 +11,7 @@
 package unit
 
 import (
+	"strings"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
@@ -29,6 +30,16 @@ import (
 // cannot be left with is a table where every title that reads as a status
 // names some other key, because then no cell on the row ever shows a finding
 // phrase.
+// looksLikeLifecycleKey reports whether a key names a lifecycle verdict rather
+// than something that merely reads like one. sfn_execution_history's "State"
+// column over "state_name" is the name of a step in the operator's state
+// machine, not a verdict, and a raw AWS enum stored under "state",
+// "cluster_status" or the like is.
+func looksLikeLifecycleKey(key string) bool {
+	return key == "state" || key == "status" ||
+		strings.HasSuffix(key, "_state") || strings.HasSuffix(key, "_status")
+}
+
 func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 	types := append(resource.AllResourceTypes(), resource.AllChildTypes()...)
 	for _, td := range types {
@@ -47,6 +58,12 @@ func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 			if col.Title == "Status" || col.Title == "State" {
 				titled++
 				titledIsDeclared = titledIsDeclared || isStatus
+				if !isStatus && looksLikeLifecycleKey(col.Key) {
+					t.Errorf("%s titles a column %q over the key %q, beside the declared lifecycle key %q — "+
+						"two cells an operator reads as the verdict, and only one of them ever carries a "+
+						"finding phrase",
+						td.ShortName, col.Title, col.Key, lifecycleKey)
+				}
 			}
 		}
 

@@ -882,6 +882,33 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("AutoScalingGroupName"), Value: aws.String("acme-web-prod-asg")},
 				},
 			},
+			// A step-scaling alarm on queue depth: the group it scales is named
+			// only by the scaling policy the action runs, which carries it
+			// after "autoScalingGroupName/". An alarm like this is how most
+			// scaling on a metric other than the group's own is written, and
+			// nothing in its dimensions says which group it moves.
+			{
+				AlarmName:             aws.String("acme-web-prod-asg-scale-out-on-backlog"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-web-prod-asg-scale-out-on-backlog"),
+				AlarmDescription:      aws.String("Adds capacity to acme-web-prod-asg when order-processing-queue backlog exceeds 100 messages"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 2 datapoints were less than the threshold (100.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 40, 0, 0, time.UTC)),
+				MetricName:            aws.String("ApproximateNumberOfMessagesVisible"),
+				Namespace:             aws.String("AWS/SQS"),
+				Threshold:             aws.Float64(100.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(2),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions: []string{
+					"arn:aws:autoscaling:us-east-1:123456789012:scalingPolicy:8f2c1d4a-6b90-4e73-9c15-2a7d3e6b0f41:autoScalingGroupName/acme-web-prod-asg:policyName/scale-out-on-backlog",
+				},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("QueueName"), Value: aws.String("order-processing-queue")},
+				},
+			},
 			// KMS key-usage alarm — required for alarm:kms related-panel pivot.
 			// checkAlarmKMS matches dimension KeyId against the primary
 			// production KMS key fixture (kms.go).
@@ -1246,5 +1273,5 @@ const MetricMathELBAlarmName = "elb-acme-prod-web-5xx-ratio"
 const AlarmActionsDisabled = "acme-actions-disabled-alarm"
 
 func init() {
-	Register(Pin{ShortName: "alarm", Rows: 50, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "alarm", Rows: 51, Issues: 6, CoverageGaps: []string{"dim"}})
 }
