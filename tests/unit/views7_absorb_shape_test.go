@@ -37,9 +37,13 @@ import (
 // with the controller lock held. It separates two shapes, not two machines:
 // doing the row work under the lock spends about a third to a half of the
 // absorption there (0.46 ordinary, 0.30 under -race), and swapping a body
-// built outside it spends 0.05 to 0.07 in either build. A loaded machine
-// stretches the hold and the absorption together, so the reading stays on its
-// own side of the bound.
+// built outside it spends 0.05 to 0.07 in either build.
+//
+// What the probe times is a blocked reader's wait, which is the hold plus
+// whatever the scheduler added, and on a busy runner the second term is not
+// small: this read 0.20 on a loaded macOS runner where the swap shape is 0.07.
+// So the noise is measured on the same probe with nothing to block against and
+// taken off the reading, rather than assumed to scale with the absorption.
 const views7LockedFraction = 0.2
 
 // wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
@@ -109,20 +113,48 @@ func views7AbsorbSpans(t *testing.T, n int) (held, total time.Duration) {
 	return held, total
 }
 
+// views7ProbeNoise runs the same probe loop against an idle controller for the
+// same kind of window, and returns the longest it waited. Nothing holds the
+// write lock, so whatever it measures is the scheduler, not a hold.
+func views7ProbeNoise(t *testing.T) time.Duration {
+	t.Helper()
+	c := newTestController(t)
+	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+
+	var stop atomic.Bool
+	worst := make(chan time.Duration, 1)
+	go func() {
+		var longest time.Duration
+		for !stop.Load() {
+			start := time.Now()
+			c.GetListLane()
+			if d := time.Since(start); d > longest {
+				longest = d
+			}
+		}
+		worst <- longest
+	}()
+	time.Sleep(50 * time.Millisecond)
+	stop.Store(true)
+	return <-worst
+}
+
 // views7MinLockedShare returns the smallest locked share observed over a few
-// absorptions. A blocked reader's wait is the writer's hold plus whatever the
-// scheduler added, never less, so the smallest reading is the closest one to
-// the hold itself.
+// absorptions, with the probe's own scheduler noise taken off each reading. A
+// blocked reader's wait is the writer's hold plus whatever the scheduler
+// added, never less, so the smallest reading is the closest one to the hold.
 func views7MinLockedShare(t *testing.T, n int) (share float64, held, total time.Duration) {
 	t.Helper()
+	noise := views7ProbeNoise(t)
 	share = math.MaxFloat64
 	for range 3 {
 		h, tot := views7AbsorbSpans(t, n)
 		if tot <= 0 {
 			t.Fatalf("absorbing %d rows took no measurable time", n)
 		}
-		if s := float64(h) / float64(tot); s < share {
-			share, held, total = s, h, tot
+		attributable := max(h-noise, 0)
+		if s := float64(attributable) / float64(tot); s < share {
+			share, held, total = s, attributable, tot
 		}
 	}
 	return share, held, total
