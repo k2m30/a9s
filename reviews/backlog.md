@@ -75,9 +75,14 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
     has a row that leads nowhere. `TestRefConformance_NavigableFieldsOpenTargetRows` reproduces it
     the moment a fixture carries a pre-rename `DBInstanceIdentifier`.
+13. **A views file written by an older build never gains a new detail field.** `EnsureViewsDir`
+    (`core/config/ensure_views.go:75-100`) merges new columns into an existing
+    `~/.a9s/views/<type>.yaml` but not new `detail:` entries, so a field a later build adds to a
+    detail view (for example `error_type` and `restore_duration_ms` on Lambda invocations) never
+    reaches that operator's detail until the file is regenerated. Applies to every type.
 ## Structure
 
-13. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+14. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.
