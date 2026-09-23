@@ -32,26 +32,36 @@ Small, obvious fixes do not live here — they are done directly rather than fil
    registration with its AWS-field citation in `docs/related-resources.md`, resolving through
    `ctIDAlternatives`, which already offers both shapes.
 
+7. **A detail opened on a row read in another Region runs against the session Region.**
+   `core/runtime/detail_op.go:73` hands the detail operation `c.session.Clients`, and the list's
+   Region never reaches `BeginDetailOperation` (`core/app/navigate.go:502`, `:589`). A pivot that
+   drills into another Region (cf → acm in us-east-1, r53/trail/waf → logs, the alarm pivot)
+   reads its list correctly through `InRegion`, but the detail of a row in it runs its enricher,
+   every related checker and the CloudTrail row against the session Region: an ACM certificate is
+   asked for in the wrong Region and its load-balancer and API Gateway rows error, and the
+   CloudTrail row reports a confident 0. The detail operation should run on
+   `c.session.Clients.InRegion(<the row's list Region>)`.
+
 ## Rendering and enrichment
 
-7. **A metric-math or anomaly-detection alarm never shows what it watches.** The detail renders
+8. **A metric-math or anomaly-detection alarm never shows what it watches.** The detail renders
    `MetricName: -`, `Namespace: -`, `Dimensions: -` and no `Metrics[]`, and the list's Metric and
    Namespace cells are empty. Needs the metric queries rendered, with the list columns falling
    back to them.
-8. **The lazy-add drill hides an unreadable id.** A drill showing `policy(1)` under
+9. **The lazy-add drill hides an unreadable id.** A drill showing `policy(1)` under
    `IAM Policies (2)` gives no sign on the list that one id could not be read — it appears only
    in the `!` log.
-9. **Wave-2 account walks re-run whole enrichers on a throttle.** ebs, ec2 and dbi should fold
+10. **Wave-2 account walks re-run whole enrichers on a throttle.** ebs, ec2 and dbi should fold
    walk errors through `FailedOnPage` + `AggregateFailures` and wrap `next` in `RetryOnThrottle`
    as dbc does; today ec2 repeats up to 50 `DescribeInstanceAttribute` calls and the `!` log
    shows raw SDK text.
-10. **An unparseable policy reads as safe.** Wave-1 OpenSearch access policies and IAM role trust
+11. **An unparseable policy reads as safe.** Wave-1 OpenSearch access policies and IAM role trust
     policies that fail to parse render as not-public / not-wildcard with no mark
     (`core/aws/opensearch.go:86-88`, `core/aws/iam_roles.go:50-53`). Needs a ruling on what a
     Wave-1 row shows for a policy it could not read. AWS validates both on write, so there is no
     operator witness today.
 
-11. **The Lambda invocation list shows the oldest 50 REPORT lines, not the newest.**
+12. **The Lambda invocation list shows the oldest 50 REPORT lines, not the newest.**
     `core/aws/lambda_invocations.go:69` sends `Limit: 50` with `StartTime` at −24h, so
     FilterLogEvents answers from the start of the window; the reversal at `:108` and `:130`
     turns that oldest slice around and presents it as newest-first. `StartFromHead` is on
@@ -59,7 +69,7 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     paging strategy — walk the lookback keeping a trailing 50, or narrow `StartTime` — which
     changes the call cost.
 
-12. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
+13. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
     NextToken. Both branches report `truncated=true` for different reasons: the cache branch from
     `anyDegraded(rows)` alone, the fetch branch from a composite `DescribeCluster failed for 2 of
     12` that `FetchRelatedTarget` swallows, so the caller sees `truncated=true, err=nil` and
@@ -71,14 +81,14 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     `Values != nil || QualifierValue != nil || MetricsRegion != nil` — 10 of 35 specs do, audited
     by hand; whoever takes this should assert that `ValuesFromRawStruct` implies that predicate so
     the two cannot drift.
-13. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
+14. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
     a snapshot's parent through `DbiResourceId`, while `dbiRefToID` (`core/aws/ref_ids.go:567`)
     matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
     has a row that leads nowhere. `TestRefConformance_NavigableFieldsOpenTargetRows` reproduces it
     the moment a fixture carries a pre-rename `DBInstanceIdentifier`.
 ## Structure
 
-14. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+15. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.
