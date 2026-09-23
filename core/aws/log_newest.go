@@ -30,13 +30,15 @@ const maxLogScanCalls = 100
 const newestLogFirstSpan = 5 * time.Minute
 
 // logSource is one place a view's lines are written: a log group, narrowed to
-// the streams under streamPrefix and the events matching pattern when set.
-// region is the Region the group is read in, "" for the session's.
+// the streams under streamPrefix, or to the named streams, and to the events
+// matching pattern, when set. region is the Region the group is read in, ""
+// for the session's.
 type logSource struct {
 	api          CWLogsFilterLogEventsAPI
 	region       string
 	group        string
 	streamPrefix string
+	streams      []string
 	pattern      string
 }
 
@@ -49,37 +51,56 @@ type sourcedLogEvent struct {
 }
 
 // logCursor is where a newestLogEvents read starts: the newest millisecond it
-// reads and the width of its first window (0 for newestLogFirstSpan). When
+// reads and the width of its first window (0 for newestLogFirstSpan), and the
+// oldest millisecond of the list's window (start, 0 for none), fixed when the
+// list opens so Load More pressed later reaches the same oldest events. When
 // one source's single millisecond did not fit a read's call budget, resume is
 // that source's FilterLogEvents NextToken inside it and source its index, so
 // the next read continues the millisecond instead of starting it over. Load
 // More carries it as "<end>", "<end>/<span>" or
-// "<end>/<span>/<source>/<resume>".
+// "<end>/<span>/<source>/<resume>", after "<start>," when start is set.
 type logCursor struct {
-	end, span int64
-	source    int
-	resume    string
+	start, end, span int64
+	source           int
+	resume           string
 }
 
 func (c logCursor) String() string {
+	lower := ""
+	if c.start != 0 {
+		lower = strconv.FormatInt(c.start, 10) + ","
+	}
 	switch {
 	case c.resume != "":
-		return fmt.Sprintf("%d/%d/%d/%s", c.end, c.span, c.source, c.resume)
+		return fmt.Sprintf("%s%d/%d/%d/%s", lower, c.end, c.span, c.source, c.resume)
 	case c.span != 0:
-		return fmt.Sprintf("%d/%d", c.end, c.span)
+		return fmt.Sprintf("%s%d/%d", lower, c.end, c.span)
 	}
-	return strconv.FormatInt(c.end, 10)
+	return lower + strconv.FormatInt(c.end, 10)
 }
 
-// parseLogCursor reads a Load More token back, or starts at now for "".
-func parseLogCursor(continuationToken string) (logCursor, error) {
+// parseLogCursor reads a Load More token back, or for "" opens a list at now
+// whose window reaches lookback into the past (0 for no lower edge).
+func parseLogCursor(continuationToken string, lookback time.Duration) (logCursor, error) {
 	if continuationToken == "" {
-		return logCursor{end: time.Now().UnixMilli()}, nil
+		now := time.Now()
+		c := logCursor{end: now.UnixMilli()}
+		if lookback > 0 {
+			c.start = now.Add(-lookback).UnixMilli()
+		}
+		return c, nil
 	}
-	parts := strings.SplitN(continuationToken, "/", 4)
 	var c logCursor
 	var err error
-	c.end, err = strconv.ParseInt(parts[0], 10, 64)
+	position := continuationToken
+	if lower, rest, ok := strings.Cut(continuationToken, ","); ok && !strings.Contains(lower, "/") {
+		c.start, err = strconv.ParseInt(lower, 10, 64)
+		position = rest
+	}
+	parts := strings.SplitN(position, "/", 4)
+	if err == nil {
+		c.end, err = strconv.ParseInt(parts[0], 10, 64)
+	}
 	if err == nil && len(parts) > 1 {
 		c.span, err = strconv.ParseInt(parts[1], 10, 64)
 	}
@@ -87,14 +108,14 @@ func parseLogCursor(continuationToken string) (logCursor, error) {
 		c.source, err = strconv.Atoi(parts[2])
 		c.resume = parts[3]
 	}
-	if err != nil || c.span < 0 || c.source < 0 || len(parts) == 3 || len(parts) == 4 && c.resume == "" {
+	if err != nil || c.start < 0 || c.span < 0 || c.source < 0 || len(parts) == 3 || len(parts) == 4 && c.resume == "" {
 		return logCursor{}, fmt.Errorf("continuation token %q is not a log read position", continuationToken)
 	}
 	return c, nil
 }
 
 // newestLogEvents returns the newest n events of sources with a timestamp in
-// [start, cur.end] (epoch milliseconds), newest first.
+// [cur.start, cur.end] (epoch milliseconds), newest first.
 //
 // FilterLogEvents answers oldest-first, so the first pages of a window hold
 // its oldest events. Each source is read back from cur.end in windows of
@@ -106,11 +127,12 @@ func parseLogCursor(continuationToken string) (logCursor, error) {
 // never splits them.
 //
 // next is the Load More token for the read that continues where this one
-// stopped, or "" when nothing in [start, cur.end] is left unread. It always
+// stopped, or "" when nothing in [cur.start, cur.end] is left unread. It always
 // moves: past the cut, past what was read, to a narrower first window when a
 // window did not fit the call budget, or further into a millisecond that did
 // not fit it.
-func newestLogEvents(ctx context.Context, sources []logSource, start int64, cur logCursor, n int) (events []sourcedLogEvent, next string, err error) {
+func newestLogEvents(ctx context.Context, sources []logSource, cur logCursor, n int) (events []sourcedLogEvent, next string, err error) {
+	start := cur.start
 	eventTime := func(e sourcedLogEvent) int64 { return aws.ToInt64(e.Timestamp) }
 	read := make([][]sourcedLogEvent, len(sources))
 	frontiers := make([]logCursor, len(sources))
@@ -162,6 +184,7 @@ func newestLogEvents(ctx context.Context, sources []logSource, start int64, cur 
 		}
 	}
 	if unread.end >= start {
+		unread.start = start
 		next = unread.String()
 	}
 	return events, next, nil
@@ -230,6 +253,9 @@ func readLogWindow(ctx context.Context, src logSource, lo, hi int64, resume stri
 	}
 	if src.streamPrefix != "" {
 		input.LogStreamNamePrefix = aws.String(src.streamPrefix)
+	}
+	if len(src.streams) > 0 {
+		input.LogStreamNames = src.streams
 	}
 	if resume != "" {
 		input.NextToken = aws.String(resume)

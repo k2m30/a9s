@@ -30,4 +30,6 @@ detail:
   - memory_size_mb
   - memory_used_mb
   - init_duration_ms
+  - restore_duration_ms
+  - error_type
   - xray_trace_id

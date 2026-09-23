@@ -193,8 +193,17 @@ const (
 
 // classifyLogEventStatus classifies a log event message into a status category.
 // The tokens it matches on are what a runtime writes into the LINE; the class
-// it returns is what a9s says about the line.
+// it returns is what a9s says about the line. A Lambda system log event in
+// JSON format (a platform.* type) is classed as its text-format line is: a
+// report (platform.report, platform.initReport, platform.restoreReport) as
+// REPORT, any other platform event as START and END.
 func classifyLogEventStatus(message string) string {
+	if e, ok := parsePlatformEvent(message); ok {
+		if strings.HasSuffix(strings.ToLower(e.Type), "report") {
+			return logStatusReport
+		}
+		return logStatusMeta
+	}
 	switch {
 	case strings.Contains(message, "ERROR") ||
 		strings.Contains(message, "FATAL") ||

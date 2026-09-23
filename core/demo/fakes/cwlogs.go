@@ -73,19 +73,35 @@ func (f *CWLogsFake) GetLogEvents(_ context.Context, input *cloudwatchlogs.GetLo
 }
 
 func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.FilterLogEventsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
-	var logGroupName string
-	if input != nil && input.LogGroupName != nil {
-		logGroupName = *input.LogGroupName
+	if input == nil {
+		input = &cloudwatchlogs.FilterLogEventsInput{}
 	}
+	logGroupName := aws.ToString(input.LogGroupName)
+	match, err := termPattern(aws.ToString(input.FilterPattern))
+	if err != nil {
+		return nil, err
+	}
+	// FilterLogEvents answers in timestamp order; an event keeps its fixture
+	// index, which names its id and its stream.
 	events := f.fix.LogEvents[logGroupName]
+	order := make([]int, len(events))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int {
+		return cmp.Compare(aws.ToInt64(events[a].Timestamp), aws.ToInt64(events[b].Timestamp))
+	})
 	filtered := make([]cwlogstypes.FilteredLogEvent, 0, len(events))
-	for i, e := range events {
+	for _, i := range order {
+		e := events[i]
 		ts := aws.ToInt64(e.Timestamp)
-		if input != nil && (input.StartTime != nil && ts < *input.StartTime || input.EndTime != nil && ts > *input.EndTime) {
+		if input.StartTime != nil && ts < *input.StartTime || input.EndTime != nil && ts > *input.EndTime {
 			continue
 		}
 		stream := f.filteredStreamName(logGroupName, i)
-		if input != nil && !strings.HasPrefix(stream, aws.ToString(input.LogStreamNamePrefix)) {
+		if !strings.HasPrefix(stream, aws.ToString(input.LogStreamNamePrefix)) ||
+			len(input.LogStreamNames) > 0 && !slices.Contains(input.LogStreamNames, stream) ||
+			!match(aws.ToString(e.Message)) {
 			continue
 		}
 		// EventId and LogStreamName are what FilterLogEvents adds over
@@ -139,10 +155,14 @@ func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloud
 	return &cloudwatchlogs.DescribeSubscriptionFiltersOutput{SubscriptionFilters: f.fix.SubscriptionFilters[logGroupName]}, nil
 }
 
-// filteredStreamName names the stream the i-th event of a group came from,
-// cycling the group's fixture streams, and "" for a group the fixtures give
-// no streams — the same empty value a real event without one carries.
+// filteredStreamName names the stream the i-th event of a group came from:
+// the group's EventStreams entry, or its fixture streams in turn, and "" for
+// a group the fixtures give no streams — the same empty value a real event
+// without one carries.
 func (f *CWLogsFake) filteredStreamName(logGroupName string, i int) string {
+	if stream, ok := f.fix.EventStreams[logGroupName]; ok {
+		return stream
+	}
 	streams := f.fix.LogStreams[logGroupName]
 	if len(streams) == 0 {
 		return ""
@@ -156,4 +176,50 @@ func (f *CWLogsFake) hasLogGroup(name string) bool {
 	return slices.ContainsFunc(f.fix.LogGroups, func(g cwlogstypes.LogGroup) bool {
 		return aws.ToString(g.LogGroupName) == name
 	})
+}
+
+// termPattern returns the matcher FilterLogEvents applies for a filter
+// pattern of terms over unstructured events
+// (docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html,
+// "Match terms in unstructured log events"): each term, a word or a quoted
+// phrase, case-sensitive, must appear; a term after "-" must not; terms after
+// "?" are alternatives, one of which must appear, and are ignored when the
+// pattern also has a term without "?". The JSON, space-delimited and regex
+// forms are refused: the app sends none of them.
+func termPattern(pattern string) (func(string) bool, error) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return func(string) bool { return true }, nil
+	}
+	if strings.ContainsAny(pattern[:1], "{[%") {
+		return nil, fmt.Errorf("demo FilterLogEvents reads term patterns only, not %q", pattern)
+	}
+	var required, excluded, optional []string
+	for rest := pattern; rest != ""; rest = strings.TrimSpace(rest) {
+		kind := rest[0]
+		if kind == '?' || kind == '-' {
+			rest = rest[1:]
+		}
+		var term string
+		if strings.HasPrefix(rest, `"`) {
+			term, rest, _ = strings.Cut(rest[1:], `"`)
+		} else {
+			term, rest, _ = strings.Cut(rest, " ")
+		}
+		switch kind {
+		case '?':
+			optional = append(optional, term)
+		case '-':
+			excluded = append(excluded, term)
+		default:
+			required = append(required, term)
+		}
+	}
+	return func(msg string) bool {
+		has := func(term string) bool { return strings.Contains(msg, term) }
+		if len(required) == 0 && len(excluded) == 0 {
+			return slices.ContainsFunc(optional, has)
+		}
+		return !slices.ContainsFunc(required, func(t string) bool { return !has(t) }) && !slices.ContainsFunc(excluded, has)
+	}, nil
 }

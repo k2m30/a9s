@@ -3993,7 +3993,9 @@ lambda_invocations:  # synthetic (parsed from CloudWatch Logs)
   - memory_used_mb
   - memory_used
   - init_duration_ms
+  - restore_duration_ms
   - cold_start
+  - error_type
   - xray_trace_id
 
 lambda_invocation_logs:  # synthetic (CloudWatch log lines)

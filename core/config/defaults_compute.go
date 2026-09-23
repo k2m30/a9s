@@ -107,7 +107,8 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "request_id"}, {Path: "timestamp"}, {Path: "status"},
 				{Path: "duration_ms"}, {Path: "billed_duration_ms"},
 				{Path: "memory_size_mb"}, {Path: "memory_used_mb"},
-				{Path: "init_duration_ms"}, {Path: "xray_trace_id"},
+				{Path: "init_duration_ms"}, {Path: "restore_duration_ms"},
+				{Path: "error_type"}, {Path: "xray_trace_id"},
 			},
 		},
 		"lambda_invocation_logs": {

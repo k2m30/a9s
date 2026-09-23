@@ -5,10 +5,13 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -23,31 +26,102 @@ const maxInvocationLogLines = 500
 // matching logs scans the full 24h lookback window page by page forever.
 const maxInvocationLogScanPages = 100
 
-// FetchLambdaInvocationLogs calls the CloudWatchLogs FilterLogEvents API with
-// a filter pattern containing the request ID, returning individual log lines
-// for a specific Lambda invocation as a FetchResult. It paginates through
-// empty pages (CloudWatch Logs returns these when scanning across log streams
-// that don't match) until events are found or the API signals no more pages.
-func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, requestID string, continuationToken string) (resource.FetchResult, error) {
-	filterPattern := fmt.Sprintf("%q", requestID)
-	startTime := time.Now().Add(-24 * time.Hour).UnixMilli()
+// lambdaMaxInvocation is the longest an invocation can run: a function's
+// timeout goes "up to a maximum value of 900 seconds (15 minutes)"
+// (docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html).
+const lambdaMaxInvocation = 15 * time.Minute
 
-	var nextToken *string
-	if continuationToken != "" {
-		nextToken = &continuationToken
+// FetchLambdaInvocationLogs reads the log of an invocation whose stream is not
+// known: the lines of the group in the last 24 hours that carry its request
+// ID.
+func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, requestID string, continuationToken string) (resource.FetchResult, error) {
+	input := &cloudwatchlogs.FilterLogEventsInput{
+		LogGroupName:  aws.String(logGroup),
+		FilterPattern: aws.String(fmt.Sprintf("%q", requestID)),
+		StartTime:     aws.Int64(time.Now().Add(-24 * time.Hour).UnixMilli()),
+	}
+	return readInvocationLog(ctx, api, input, logGroup, "", continuationToken)
+}
+
+// fetchInvocationStreamLog reads an invocation's log from its own stream:
+// every line from its START to its REPORT, those its runtime wrote without
+// the request ID (a print, an uncaught stack trace) included. An execution
+// environment runs one invocation at a time and writes one stream, so what
+// lies between the two lines is this invocation's. The START is found by the
+// request ID in the stream within the longest an invocation can run before
+// the REPORT; the lines are then the stream's in [START, REPORT].
+func fetchInvocationStreamLog(ctx context.Context, api CWLogsFilterLogEventsAPI, logGroup, logStream, requestID string, reportMs int64, continuationToken string) (resource.FetchResult, error) {
+	find := &cloudwatchlogs.FilterLogEventsInput{
+		LogGroupName:   aws.String(logGroup),
+		LogStreamNames: []string{logStream},
+		FilterPattern:  aws.String(fmt.Sprintf("%q", requestID)),
+		StartTime:      aws.Int64(reportMs - lambdaMaxInvocation.Milliseconds() - time.Minute.Milliseconds()),
+		EndTime:        aws.Int64(reportMs),
+	}
+	startMs := aws.ToInt64(find.StartTime)
+	calls := 0
+	for calls < maxInvocationLogScanPages {
+		out, err := api.FilterLogEvents(ctx, find)
+		calls++
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
+		}
+		if i := slices.IndexFunc(out.Events, func(e cwlogstypes.FilteredLogEvent) bool {
+			return invocationMarker(aws.ToString(e.Message), requestID) == "start"
+		}); i >= 0 {
+			startMs = aws.ToInt64(out.Events[i].Timestamp)
+			break
+		}
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+		find.NextToken = out.NextToken
 	}
 
+	input := &cloudwatchlogs.FilterLogEventsInput{
+		LogGroupName:   aws.String(logGroup),
+		LogStreamNames: []string{logStream},
+		StartTime:      aws.Int64(startMs),
+		EndTime:        aws.Int64(reportMs),
+	}
+	return readInvocationLog(ctx, api, input, logGroup, requestID, continuationToken)
+}
+
+// invocationMarker reports whether message is the "start" or "report" line of
+// requestID, in either log format: text "START RequestId: <id>" and
+// "REPORT RequestId: <id>", or JSON platform.start and platform.report
+// (docs.aws.amazon.com/lambda/latest/dg/telemetry-schema-reference.html).
+func invocationMarker(message, requestID string) string {
+	switch {
+	case strings.HasPrefix(message, "START RequestId: "+requestID):
+		return "start"
+	case strings.HasPrefix(message, "REPORT RequestId: "+requestID):
+		return "report"
+	}
+	if e, ok := parsePlatformEvent(message); ok && e.Record.RequestID == requestID {
+		switch e.Type {
+		case "platform.start":
+			return "start"
+		case "platform.report":
+			return "report"
+		}
+	}
+	return ""
+}
+
+// readInvocationLog pages through input from continuationToken into log rows.
+// With bounded set, rows begin at that invocation's START line and end at
+// its REPORT line: the edges of [START, REPORT] can share a millisecond with
+// the invocations before and after it.
+func readInvocationLog(ctx context.Context, api CWLogsFilterLogEventsAPI, input *cloudwatchlogs.FilterLogEventsInput, logGroup, bounded, continuationToken string) (resource.FetchResult, error) {
+	if continuationToken != "" {
+		input.NextToken = aws.String(continuationToken)
+	}
+	started := bounded == "" || continuationToken != ""
 	var resources []resource.Resource
 
 	pages := 0
 	for {
-		input := &cloudwatchlogs.FilterLogEventsInput{
-			LogGroupName:  &logGroup,
-			FilterPattern: &filterPattern,
-			StartTime:     &startTime,
-			NextToken:     nextToken,
-		}
-
 		output, err := api.FilterLogEvents(ctx, input)
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("fetching lambda invocation logs: %w", err)
@@ -58,6 +132,16 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 			message := ""
 			if event.Message != nil {
 				message = strings.TrimRight(*event.Message, "\n\r")
+			}
+			marker := ""
+			if bounded != "" {
+				marker = invocationMarker(message, bounded)
+			}
+			if !started {
+				if marker != "start" {
+					continue
+				}
+				started = true
 			}
 
 			ts := ""
@@ -72,69 +156,33 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 				id = eventRowIDFromMillis(*event.Timestamp, message)
 			}
 
-			name := logEventDisplayName(message)
-
 			status := classifyLogEventStatus(message)
-
-			logStream := ""
-			if event.LogStreamName != nil {
-				logStream = *event.LogStreamName
-			}
 
 			resources = append(resources, resource.Resource{
 				ID:       id,
-				Name:     name,
+				Name:     logEventDisplayName(message),
 				Findings: logEventFindings(status),
 				Fields: map[string]string{
 					"timestamp":  ts,
 					"message":    message,
 					"status":     status,
 					"log_group":  logGroup,
-					"log_stream": logStream,
+					"log_stream": aws.ToString(event.LogStreamName),
 				},
 				RawStruct: event,
 			})
+			if marker == "report" {
+				return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), "")}, nil
+			}
 		}
 
-		if len(resources) >= maxInvocationLogLines || pages >= maxInvocationLogScanPages {
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			// IsTruncated must only ever claim what apiNextToken can actually
-			// resume: hitting either cap exactly on AWS's terminal page (no
-			// NextToken) means this result IS complete, not truncated — a dead
-			// cursor (IsTruncated=true, NextToken="") would make load-more
-			// restart from page 1 forever instead of recognizing there is
-			// nothing left to fetch.
-			isTruncated := apiNextToken != ""
-			totalHint := len(resources)
-			if isTruncated {
-				totalHint = -1
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: isTruncated,
-					NextToken:   apiNextToken,
-					TotalHint:   totalHint,
-					PageSize:    len(resources),
-				},
-			}, nil
+		apiNextToken := aws.ToString(output.NextToken)
+		if len(resources) >= maxInvocationLogLines || pages >= maxInvocationLogScanPages || apiNextToken == "" {
+			// IsTruncated only ever claims what apiNextToken can resume: a
+			// dead cursor (IsTruncated=true, NextToken="") would make Load
+			// More restart from page 1 forever.
+			return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), apiNextToken)}, nil
 		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
+		input.NextToken = output.NextToken
 	}
-
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
-	}, nil
 }

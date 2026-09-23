@@ -74,7 +74,7 @@ func (f *fakeLogGroup) FilterLogEvents(_ context.Context, in *cloudwatchlogs.Fil
 		return nil, &smithy.GenericAPIError{Code: "InvalidParameterException", Message: "logStreamNames and logStreamNamePrefix are mutually exclusive"}
 	}
 	pattern := aws.ToString(in.FilterPattern)
-	if strings.ContainsAny(pattern, "{[%?") {
+	if _, isJSON, err := parseJSONLogPattern(pattern); err != nil || (!isJSON && strings.ContainsAny(pattern, "{[%")) {
 		return nil, fmt.Errorf("fake FilterLogEvents: filter pattern %q is not modelled", pattern)
 	}
 	query := fmt.Sprintf("%d|%d|%s|%v|%s", aws.ToInt64(in.StartTime), aws.ToInt64(in.EndTime), pattern, in.LogStreamNames, aws.ToString(in.LogStreamNamePrefix))
@@ -127,22 +127,67 @@ func (f *fakeLogGroup) FilterLogEvents(_ context.Context, in *cloudwatchlogs.Fil
 	return out, nil
 }
 
-// logPatternMatches implements CloudWatch Logs term matching: a quoted
-// pattern matches as one phrase, otherwise every space-separated term must
-// appear.
+// logPatternMatches implements CloudWatch Logs pattern matching: a JSON
+// pattern selects JSON events by their properties; any other pattern is term
+// matching over the raw message, text or JSON alike — every required term
+// present and no excluded term present. A pattern of ? terms alone matches an
+// event holding any of them (AWS's example: ?ERROR ?ARGUMENTS); beside a
+// required or excluded term the ? terms are ignored, so ?ERROR ?ARGUMENTS
+// REQUEST matches as REQUEST does.
 func logPatternMatches(pattern, msg string) bool {
 	if pattern == "" {
 		return true
 	}
-	if strings.HasPrefix(pattern, `"`) && strings.HasSuffix(pattern, `"`) && len(pattern) > 1 {
-		return strings.Contains(msg, pattern[1:len(pattern)-1])
+	if clauses, isJSON, _ := parseJSONLogPattern(pattern); isJSON {
+		return jsonLogPatternMatches(clauses, msg)
 	}
-	for _, term := range strings.Fields(pattern) {
-		if !strings.Contains(msg, term) {
-			return false
+	terms := logPatternTerms(pattern)
+	onlyOptional := !slices.ContainsFunc(terms, func(t logPatternTerm) bool { return t.kind != '?' })
+	for _, term := range terms {
+		hit := strings.Contains(msg, term.text)
+		switch term.kind {
+		case '?':
+			if onlyOptional && hit {
+				return true
+			}
+		case '-':
+			if hit {
+				return false
+			}
+		default:
+			if !hit {
+				return false
+			}
 		}
 	}
-	return true
+	return !onlyOptional
+}
+
+type logPatternTerm struct {
+	kind byte // 0 required, '?' optional, '-' excluded
+	text string
+}
+
+// logPatternTerms splits a term pattern into its terms: a quoted phrase is
+// one term, a bare word another; a leading ? makes a term optional and a
+// leading - excludes it.
+func logPatternTerms(pattern string) []logPatternTerm {
+	var terms []logPatternTerm
+	for rest := strings.TrimSpace(pattern); rest != ""; rest = strings.TrimSpace(rest) {
+		var t logPatternTerm
+		if rest[0] == '?' || rest[0] == '-' {
+			t.kind, rest = rest[0], rest[1:]
+		}
+		if strings.HasPrefix(rest, `"`) {
+			phrase, after, _ := strings.Cut(rest[1:], `"`)
+			t.text, rest = phrase, after
+		} else {
+			word, after, _ := strings.Cut(rest, " ")
+			t.text, rest = word, after
+		}
+		terms = append(terms, t)
+	}
+	return terms
 }
 
 func logEventAt(i int, ts time.Time, stream, msg string) cwlogstypes.FilteredLogEvent {

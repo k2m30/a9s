@@ -50,22 +50,30 @@ lambda_invocations:
     - memory_size_mb
     - memory_used_mb
     - init_duration_ms
+    - restore_duration_ms
+    - error_type
     - xray_trace_id
 ```
 
-Note: This view is NOT backed by a single AWS SDK struct. It is parsed from CloudWatch Logs REPORT lines. Fields use `key:` (computed) rather than `path:` (struct field). Each REPORT line from `/aws/lambda/{FunctionName}` is parsed into these fields:
+Note: This view is NOT backed by a single AWS SDK struct. It is parsed from each invocation's report in the function's log group. Fields use `key:` (computed) rather than `path:` (struct field). A function on the text log format writes a REPORT line:
 
 ```
 REPORT RequestId: abc123  Duration: 2103.45 ms  Billed Duration: 2200 ms  Memory Size: 256 MB  Max Memory Used: 128 MB  Init Duration: 312.52 ms
 ```
 
+The line ends with `Status: timeout`, or `Status: error Error Type: Runtime.ExitError` when the runtime or an extension crashed ([failures during the invoke phase](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html#runtimes-lifecycle-invoke-with-errors)); the older form of the line carries no status. A SnapStart function's invocation in a newly restored execution environment has no `Init Duration`; its line carries `Restore Duration` and `Billed Restore Duration`, and its cold start is `Restore Duration` + `Duration` ([SnapStart monitoring](https://docs.aws.amazon.com/lambda/latest/dg/snapstart-monitoring.html)).
+
+A function on the JSON log format (`LoggingConfig.LogFormat = JSON`) writes a `platform.report` system log event, `{"time", "type": "platform.report", "record": {"requestId", "status", "errorType"?, "metrics": {"durationMs", "billedDurationMs", "memorySizeMB", "maxMemoryUsedMB", "initDurationMs"?, "restoreDurationMs"?}}}` ([log formats](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-logformat.html), [`platform.report`](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-schema-reference.html#platform-report)). Its numbers are read as written, so a JSON row reads as the same report in text would; `record.status` is `success`, `failure`, `error` or `timeout`, with `errorType` on `failure` and `error` ([`Status`](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-schema-reference.html#Status)), and is read as the text line's `Status:` is.
+
 ### AWS API
 
 - **Primary:** `logs:FilterLogEvents` on log group `/aws/lambda/{FunctionName}` (or the custom group from parent's `LoggingConfig.LogGroup`)
-- **Filter pattern:** `"REPORT RequestId"` — extracts invocation summary lines only
-- **Window and limit:** the newest 50 REPORT lines of the last 24 hours, newest first. `FilterLogEvents` answers oldest-first, so the group is read back from now in windows of doubling width (5 minutes first), each window whole, until 50 are held.
+- **Filter pattern:** `?"REPORT RequestId" ?"platform.report"` — either quoted phrase ([optional terms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntax.html)), so one query per window matches the text REPORT line and the JSON `platform.report` record. Changing a function's log format leaves its existing logs in the old format, so a function that switched lists invocations of both shapes; each event is parsed by its own shape.
+- **Shared custom group:** several functions can write one custom group; Lambda names their streams `YYYY/MM/DD/<function_name>[<version>][<environment GUID>]` ([log groups](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-loggroups.html)). In a group other than `/aws/lambda/<name>`, the read is limited (`logStreamNames`, 100 per call) to the function's own streams, listed with `logs:DescribeLogStreams`: by the prefix `YYYY/MM/DD/<name>[` for each day of the window, and by `LastEventTime`, newest first, down to the window's start less an hour, since a stream opened on an earlier day still holds this window's events. That second listing rests on `lastEventTimestamp`, which AWS updates on an eventual-consistency basis: it "typically updates in less than an hour from ingestion, but in rare situations might take longer" ([DescribeLogStreams](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html)). In those rare cases a stream opened on an earlier day whose timestamp still lags by more than an hour is not listed, and its invocations in the window are missing. A stream listing cut at its page cap reports a partial failure on the page that ends the read, beside its rows, so the list is never taken for the whole window.
+- **Window and limit:** the newest 50 REPORT lines of the 24 hours before the list opened, newest first; the window's oldest millisecond is fixed when the list opens and travels in the Load More token. `FilterLogEvents` answers oldest-first, so the group is read back from now in windows of doubling width (5 minutes first), each window whole, until 50 are held.
 - **Latency warning:** Can take 1-3 seconds depending on log group size. The filter pattern is server-side, so only matching events are returned.
-- **Status:** read from the REPORT line itself — `Status: timeout` marks a timed-out invocation; there is no second call.
+- **Status:** read from the report itself; there is no second call. `timeout` reads `TIMEOUT` and `error` or `failure` reads `ERROR`, each with a broken finding (`timed out`, `failed`); the error type is its own field. A report with no status, or `success`, reads `OK`.
+- **Cold start:** `yes` when the report carries an init duration or, for SnapStart, a restore duration; each is shown in its own field.
 - **Pagination:** Load More continues with the next older 50 in the window. A window that does not fit one read's call budget (100 calls) leaves the page marked partial, and Load More retries it narrowed, or continues a single busy millisecond from its `nextToken`.
 
 ### ASCII Wireframe
@@ -440,10 +448,10 @@ Note: `width: 0` means fill remaining width. Same structure as log_events but sc
 
 ### AWS API
 
-- `logs:FilterLogEvents` on the same log group, with filter pattern `"RequestId: {request-id}"` (where `{request-id}` is the full UUID from the selected invocation)
-- This returns all log lines for that specific invocation: START, application output, ERROR/Exception if any, END, REPORT
-- Typically 5-50 lines per invocation. No pagination needed for most cases.
-- **Latency:** Fast (<1 second) since FilterLogEvents with a specific RequestId pattern is highly selective
+- The invocation's own stream (the row's `log_stream`), up to its REPORT (the row's timestamp): an execution environment runs one invocation at a time and writes one stream, so its lines lie between its START and its REPORT, including those the runtime writes without the request ID (a `print`, an uncaught stack trace)
+- `logs:FilterLogEvents` with `logStreamNames=[stream]` and the quoted request ID finds the START (text `START RequestId:` or JSON `platform.start`) within 15 minutes and one before the REPORT — a function's timeout goes up to 900 seconds ([timeout](https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html)); a second `FilterLogEvents` on that stream reads `[START, REPORT]`, trimmed to the START line and the REPORT line of this request where the edges share a millisecond with its neighbours
+- Up to 500 lines per page; Load More continues the stream read
+- An invocation row with no stream name falls back to the group's lines carrying the quoted request ID over the last 24 hours
 
 ### ASCII Wireframe
 
@@ -467,6 +475,7 @@ Row coloring (same as log_events):
 - Lines containing `WARN`: YELLOW `#e0af68`
 - `REPORT` lines: GREEN `#9ece6a`
 - `START`/`END` lines: DIM `#565f89`
+- A JSON-format function's system log events are colored as their text lines: `platform.report` (and the init and restore reports) as `REPORT`, `platform.start` and every other `platform.*` event as `START`/`END`
 - All other lines: PLAIN `#c0caf5`
 
 ### Copy Behavior

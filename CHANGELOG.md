@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A Lambda function on the JSON log format lists its invocations, read from
+  its `platform.report` records with the same columns as a text REPORT line,
+  and a timed-out one is flagged. It used to list none. A function that
+  switched format lists the invocations it logged in either.
+- An invocation's log shows every line of its stream from START to REPORT,
+  including output its runtime writes without the request ID, such as a
+  Python `print` or an uncaught stack trace. It used to show only the lines
+  carrying the request ID.
+- A function logging to a custom log group shared with other functions lists
+  only its own invocations. It used to list theirs as well.
+- A Lambda invocation that failed, with `Status: error` on its REPORT line or
+  `failure` or `error` in its `platform.report` record, reads `ERROR`, shows
+  its error type and is flagged broken. It used to read `OK`.
+- A SnapStart invocation in a newly restored execution environment reads as a
+  cold start and shows its restore duration. It used to read as warm.
+- Load More on the Lambda invocation list reaches every invocation of the 24
+  hours before the list opened, however late it is pressed. The oldest
+  invocations used to drop off as time passed.
+- A Lambda function whose streams in a shared log group run past the stream
+  listing's page cap gets a list that ends, with a partial-failure notice.
+  Load More used to stay on offer forever, rereading the newest page.
+- In an invocation's log, a JSON-format function's `platform.start` and
+  `platform.report` lines are colored as the text START and REPORT lines are.
 - An EKS cluster's EC2 Instances, AMIs and Auto Scaling Groups rows count its
   self-managed, Karpenter and Auto Mode nodes, found by the cluster tags AWS
   puts on them, alongside the managed node groups' own. A cluster whose only

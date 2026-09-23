@@ -980,14 +980,14 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		FieldKeys: []string{
 			"request_id", "timestamp", "status", "duration_ms",
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
-			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
-			"log_group", "log_stream",
+			"memory_used", "init_duration_ms", "restore_duration_ms", "cold_start",
+			"error_type", "xray_trace_id", "log_group", "log_stream", "report_ms",
 			"billed_duration_ms_raw", "duration_ms_raw",
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "lambda_invocation_logs",
 			Key:            "enter",
-			ContextKeys:    map[string]string{"log_group": "@parent.log_group", "request_id": "request_id"},
+			ContextKeys:    map[string]string{"log_group": "@parent.log_group", "request_id": "request_id", "log_stream": "log_stream", "report_ms": "report_ms"},
 			DisplayNameKey: "request_id",
 		}},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
@@ -995,6 +995,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeLambdaInvocationTimeout, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1", Detail: "This invocation was cut off at the function's configured timeout, so its work stopped part-way and anything it had not yet written was lost. Find what it was waiting on in the logs — usually a downstream call with no timeout of its own — and either fix that or raise the function's limit."},
+			{Code: CodeLambdaInvocationError, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This invocation ended in an error rather than a result: the function or its runtime crashed, ran out of memory, or returned an error, and the caller got that error instead. The error type names which kind; open the invocation's log for the message and stack trace."},
 		},
 	},
 	{
@@ -1008,6 +1009,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Color:     colorAnyFindingOrHealthy,
 		FieldKeys: []string{"timestamp", "message", "log_group", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			if reportMs, err := strconv.ParseInt(parentCtx["report_ms"], 10, 64); err == nil && parentCtx["log_stream"] != "" {
+				return fetchInvocationStreamLog(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["log_stream"], parentCtx["request_id"], reportMs, continuationToken)
+			}
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
 		}),
 	},

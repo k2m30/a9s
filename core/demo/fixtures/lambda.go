@@ -50,6 +50,9 @@ const (
 	// LambdaFunctionURLPublic is the only function with a function URL whose
 	// AuthType is NONE.
 	LambdaFunctionURLPublic = "cloudwatch-slack-notifier"
+	// LambdaJSONLogFormat is the only function writing the JSON log format;
+	// its invocations are platform.report records (cwlogs.go).
+	LambdaJSONLogFormat = "data-pipeline-transform"
 )
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
@@ -196,8 +199,8 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			KMSKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
-			FunctionName:     aws.String("data-pipeline-transform"),
-			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform"),
+			FunctionName:     aws.String(LambdaJSONLogFormat),
+			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + LambdaJSONLogFormat),
 			Role:             aws.String(lambdaProdRoleARN),
 			Runtime:          lambdatypes.RuntimePython312,
 			MemorySize:       aws.Int32(512),
@@ -212,8 +215,8 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
 			TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
 			LoggingConfig: &lambdatypes.LoggingConfig{
-				LogGroup:  aws.String("/aws/lambda/data-pipeline-transform"),
-				LogFormat: lambdatypes.LogFormatText,
+				LogGroup:  aws.String("/aws/lambda/" + LambdaJSONLogFormat),
+				LogFormat: lambdatypes.LogFormatJson,
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},

@@ -210,7 +210,8 @@ func main() {
 		{"lambda_invocations", "synthetic (parsed from CloudWatch Logs)", []string{
 			"request_id", "timestamp", "status", "duration_ms",
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
-			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
+			"memory_used", "init_duration_ms", "restore_duration_ms", "cold_start",
+			"error_type", "xray_trace_id",
 		}},
 		{"lambda_invocation_logs", "synthetic (CloudWatch log lines)", []string{
 			"timestamp", "message",

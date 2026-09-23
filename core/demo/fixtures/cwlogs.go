@@ -29,6 +29,11 @@ type CWLogsFixtures struct {
 	// logs:DescribeMetricFilters for the logs↔alarm bridge, where the alarm
 	// watches the metric a filter emits and names no log group at all.
 	MetricFilters map[string][]cwlogstypes.MetricFilter
+	// EventStreams names the one stream every event of a group was written
+	// to, for a group whose events are not spread over its streams in turn:
+	// a Lambda execution environment writes each invocation, START to
+	// REPORT, to one stream.
+	EventStreams map[string]string
 }
 
 // OrphanOldLogGroupName is the log group whose metric filter bridges it to an
@@ -50,6 +55,13 @@ const (
 	BuildLogRepeatedLineAt = int64(1774149432000)
 )
 
+// LambdaFailedRequestID is the one invocation whose REPORT line says it
+// failed, out of memory.
+const LambdaFailedRequestID = "ord-896"
+
+// LambdaJSONTimeoutRequestID is the one JSON-format invocation that timed out.
+const LambdaJSONTimeoutRequestID = "d7a1c3e5-0b2d-4f6a-8c9e-1a3b5c7d9e02"
+
 // ECSAPIGatewayHistoryLines is how many older access lines the api-gateway
 // service's log group holds behind its four newest events.
 const ECSAPIGatewayHistoryLines = 236
@@ -69,6 +81,13 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			MetricFilterCount:         aws.Int32(2),
 			DataProtectionStatus:      cwlogstypes.DataProtectionStatusActivated,
 			DeletionProtectionEnabled: aws.Bool(false),
+		},
+		{
+			LogGroupName:    aws.String("/aws/lambda/" + LambdaJSONLogFormat),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/" + LambdaJSONLogFormat + ":*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1705067200000),
 		},
 		{
 			LogGroupName:    aws.String("/aws/lambda/process-orders"),
@@ -466,6 +485,15 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				StoredBytes:         aws.Int64(2048),
 			},
 		},
+		"/aws/lambda/" + LambdaJSONLogFormat: {
+			{
+				LogStreamName:       aws.String("2026/03/22/[$LATEST]dpt4c1e"),
+				CreationTime:        aws.Int64(1774252800000),
+				FirstEventTimestamp: aws.Int64(1774252800000),
+				LastEventTimestamp:  aws.Int64(1774253316875),
+				StoredBytes:         aws.Int64(4096),
+			},
+		},
 		"/aws/lambda/process-orders": {
 			{
 				LogStreamName:       aws.String("2026/03/22/[$LATEST]ord789"),
@@ -636,6 +664,11 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				Message:       aws.String("REPORT RequestId: ord-897 Duration: 67.42 ms Billed Duration: 68 ms Memory Size: 128 MB Max Memory Used: 72 MB Status: timeout"),
 				IngestionTime: aws.Int64(1774253400100),
 			},
+			{
+				Timestamp:     aws.Int64(1774253300000),
+				Message:       aws.String("REPORT RequestId: " + LambdaFailedRequestID + " Duration: 812.33 ms Billed Duration: 813 ms Memory Size: 128 MB Max Memory Used: 128 MB Status: error Error Type: Runtime.OutOfMemory"),
+				IngestionTime: aws.Int64(1774253300100),
+			},
 		},
 	}
 
@@ -789,6 +822,33 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
 
+	// Every text-format invocation carries its START and END lines beside its
+	// REPORT, as a runtime writes them; one a fixture leaves out is written a
+	// second before the REPORT (START) or a millisecond before it (END).
+	for group, events := range logEvents {
+		if !strings.HasPrefix(group, "/aws/lambda/") {
+			continue
+		}
+		has := map[string]bool{}
+		for _, e := range events {
+			has[aws.ToString(e.Message)] = true
+		}
+		for _, e := range events {
+			rid, ok := strings.CutPrefix(aws.ToString(e.Message), "REPORT RequestId: ")
+			if !ok {
+				continue
+			}
+			rid, _, _ = strings.Cut(rid, " ")
+			at := aws.ToInt64(e.Timestamp)
+			if start := "START RequestId: " + rid + " Version: $LATEST"; !has[start] {
+				logEvents[group] = append(logEvents[group], cwlogstypes.OutputLogEvent{Timestamp: aws.Int64(at - 1000), Message: aws.String(start), IngestionTime: aws.Int64(at - 900)})
+			}
+			if end := "END RequestId: " + rid; !has[end] {
+				logEvents[group] = append(logEvents[group], cwlogstypes.OutputLogEvent{Timestamp: aws.Int64(at - 1), Message: aws.String(end), IngestionTime: aws.Int64(at + 99)})
+			}
+		}
+	}
+
 	// The invocation list reads the last 24 hours, so every Lambda group's
 	// events are moved to end five minutes before the demo starts, keeping
 	// their spacing.
@@ -809,6 +869,42 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			}
 		}
 	}
+
+	// LambdaJSONLogFormat writes the JSON log format: each system log event is
+	// {"time", "type", "record"} and each application log line
+	// {"timestamp", "level", "message", "requestId"}
+	// (docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-logformat.html).
+	// LambdaJSONTimeoutRequestID's report carries status timeout, and a
+	// traceback its runtime printed without the request ID sits between its
+	// platform.start and platform.report. Its events take the same shift as
+	// the other Lambda groups', so the times inside the records agree with
+	// the events'.
+	jsonLine := func(at int64, line string) cwlogstypes.OutputLogEvent {
+		return cwlogstypes.OutputLogEvent{Timestamp: aws.Int64(at + shift), Message: aws.String(line), IngestionTime: aws.Int64(at + shift + 100)}
+	}
+	jsonInvocation := func(rid string, at, span int64, status, report string, extra ...cwlogstypes.OutputLogEvent) []cwlogstypes.OutputLogEvent {
+		t := func(ms int64) string { return time.UnixMilli(ms + shift).UTC().Format("2006-01-02T15:04:05.000Z") }
+		events := []cwlogstypes.OutputLogEvent{
+			jsonLine(at, `{"time":"`+t(at)+`","type":"platform.start","record":{"requestId":"`+rid+`","version":"$LATEST"}}`),
+			jsonLine(at+5, `{"timestamp":"`+t(at+5)+`","level":"INFO","message":"transforming batch s3://acme-raw-events/2026/03/22/","requestId":"`+rid+`"}`),
+		}
+		events = append(events, extra...)
+		end := at + span
+		return append(events,
+			jsonLine(end, `{"time":"`+t(end)+`","type":"platform.runtimeDone","record":{"requestId":"`+rid+`","status":"`+status+`"}}`),
+			jsonLine(end+1, `{"time":"`+t(end+1)+`","type":"platform.report","record":{"requestId":"`+rid+`","status":"`+status+`","metrics":{`+report+`}}}`),
+		)
+	}
+	logEvents["/aws/lambda/"+LambdaJSONLogFormat] = slices.Concat(
+		jsonInvocation("d7a1c3e5-0b2d-4f6a-8c9e-1a3b5c7d9e01", 1774252800000, 2413, "success",
+			`"durationMs":2412.55,"billedDurationMs":2413,"memorySizeMB":512,"maxMemoryUsedMB":211,"initDurationMs":842.17`),
+		jsonInvocation(LambdaJSONTimeoutRequestID, 1774252900000, 300000, "timeout",
+			`"durationMs":300000.00,"billedDurationMs":300000,"memorySizeMB":512,"maxMemoryUsedMB":498`,
+			jsonLine(1774252900900, "Traceback (most recent call last):\n  File \"/var/task/transform.py\", line 88, in lambda_handler\n    rows = fetch_partition(event)\nTimeoutError: read from s3://acme-raw-events timed out"),
+		),
+		jsonInvocation("d7a1c3e5-0b2d-4f6a-8c9e-1a3b5c7d9e03", 1774253315000, 1874, "success",
+			`"durationMs":1873.40,"billedDurationMs":1874,"memorySizeMB":512,"maxMemoryUsedMB":230`),
+	)
 
 	// SubscriptionFilters — required for the logs:kinesis and logs:s3
 	// related-panel pivots (checkLogsKinesis / checkLogsS3 via
@@ -859,6 +955,10 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		LogEvents:           logEvents,
 		SubscriptionFilters: subscriptionFilters,
 		MetricFilters:       metricFilters,
+		EventStreams: map[string]string{
+			"/aws/lambda/api-gateway-authorizer": "2026/03/22/[$LATEST]abc123",
+			"/aws/lambda/process-orders":         "2026/03/22/[$LATEST]ord789",
+		},
 	}
 })
 
@@ -875,7 +975,7 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 179
+const LogGroupsPageSize = 180
 
 // derivedLogGroups returns a log group for every one the other demo fixtures
 // name and have does not hold yet: each MWAA environment's component groups,
@@ -961,5 +1061,5 @@ const ECSExecLogGroup = "/ecs/exec/acme-services"
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 179, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 180, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

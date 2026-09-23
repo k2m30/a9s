@@ -90,11 +90,11 @@ func FetchEcsSvcLogs(
 		return resource.FetchResult{}, fmt.Errorf("no container with awslogs log driver in task definition for %s", serviceName)
 	}
 
-	cur, err := parseLogCursor(continuationToken)
+	cur, err := parseLogCursor(continuationToken, 0)
 	if err != nil {
 		return resource.FetchResult{}, err
 	}
-	events, next, err := newestLogEvents(ctx, sources, 0, cur, maxLogEvents)
+	events, next, err := newestLogEvents(ctx, sources, cur, maxLogEvents)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
 	}
