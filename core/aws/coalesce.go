@@ -154,7 +154,8 @@ const coalescedFlightTimeout = 30 * time.Second
 // deduplicated across its own lifetime, so every non-operation flow
 // re-fetches every time. A failed fetch is
 // also never memoized unless the caller's shouldMemoize predicate says
-// otherwise (S3's benign NoSuchBucketPolicy) — an AWS error is otherwise
+// otherwise (S3's benign NoSuchBucketPolicy, an ECS refusal AWS returned) —
+// any other AWS error is
 // retryable on the next call within the same operation, not permanently
 // pinned to a transient failure for the operation's remaining lifetime.
 type completedResultMemo struct {
@@ -377,8 +378,7 @@ func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucket
 		},
 		// A benign NoSuchBucketPolicy (most buckets have no policy) is a
 		// definitive, memoizable answer for the rest of the operation, not a
-		// transient failure — the only one of the four decorators whose
-		// shouldMemoize predicate accepts a non-nil error.
+		// transient failure.
 		func(_ *s3.GetBucketPolicyOutput, err error) bool {
 			return err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")
 		},
@@ -495,8 +495,8 @@ func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFu
 	)
 }
 
-// alwaysMemoizeSuccess is the shouldMemoize predicate shared by every
-// decorator except coalescingS3: memoize exactly when the call succeeded.
+// alwaysMemoizeSuccess is the shouldMemoize predicate of the decorators
+// that keep no error: memoize exactly when the call succeeded.
 func alwaysMemoizeSuccess[T any](_ T, err error) bool {
 	return err == nil
 }
