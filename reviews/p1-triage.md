@@ -49,20 +49,20 @@ F11/F37 are the same defect found by both reviewers.
 
 ## Tasks, in order
 
-1. **The snapshot collector persists secret values.** Glue `DefaultArguments` and CodeBuild
+1. (#560) **The snapshot collector persists secret values.** Glue `DefaultArguments` and CodeBuild
    plaintext environment variables are written to `snapshot.json` verbatim.
-2. **A value read in a shape AWS does not send.** VPC endpoint state spelling, Lambda status
+2. (#561) **A value read in a shape AWS does not send.** VPC endpoint state spelling, Lambda status
    fields absent from `ListFunctions`, ECR scan results under Basic Scanning, the stale Lambda
    end-of-life runtime list.
-3. **An exposure verdict judged on part of the evidence.** EC2 IPv6 exposure, a partial
+3. (#562) **An exposure verdict judged on part of the evidence.** EC2 IPv6 exposure, a partial
    security-group list, CloudFront's non-default cache behaviours, the missing-origin-bucket
    check lost behind the S3 client wrapper, and the trail log bucket judged by a second
    classifier.
-4. **A request that asks AWS for less than the screen shows.** ACM's ACME origin and the
+4. (#563) **A request that asks AWS for less than the screen shows.** ACM's ACME origin and the
    collector's key types, the WAF association check per resource type, OpenSearch's
    five-domain describe limit.
-5. **RDS lifecycle and engine scope.** Terminal cluster and instance states, and the
+5. (#564) **RDS lifecycle and engine scope.** Terminal cluster and instance states, and the
    cluster list's engine set.
-6. **A related pivot or child view that answers without reading.** EKS nodes outside managed
+6. (#565) **A related pivot or child view that answers without reading.** EKS nodes outside managed
    node groups, the Athena log-group pivot, and the oldest-first log windows of the ECS service
    log view and the Lambda invocation list (`backlog.md` row 11).
