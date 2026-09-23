@@ -5,7 +5,9 @@ package fixtures
 import (
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 )
 
 // ExpectedTopLevelTruncationForTest reports which demo types answer their first
@@ -68,13 +70,13 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"dbi":        len(rds.DBInstances),
 		"s3":         len(s3.Buckets),
 		"redis":      countRedisEngineReplicationGroups(NewRedisFixtures()),
-		"dbc":        len(docdb.DBClusters) + len(rds.DBClusters),
+		"dbc":        len(docdb.DBClusters) + countRDSSide(rds.DBClusters, func(c rdstypes.DBCluster) *string { return c.Engine }),
 		"ddb":        len(ddb.Tables) + len(ddb.DeniedNames) + len(ddb.UnavailableNames),
 		"opensearch": len(openSearch.Domains) + len(openSearch.UnavailableNames),
 		"redshift":   len(NewRedshiftFixtures().Clusters),
 		"efs":        len(NewEFSFixtures().FileSystems),
 		"dbi-snap":   len(rds.DBSnapshots),
-		"dbc-snap":   len(docdb.DBClusterSnapshots) + len(rds.DBClusterSnapshots),
+		"dbc-snap":   len(docdb.DBClusterSnapshots) + countRDSSide(rds.DBClusterSnapshots, func(c rdstypes.DBClusterSnapshot) *string { return c.Engine }),
 		"alarm":      len(NewCloudWatchFixtures().Alarms),
 		"logs":       min(len(NewCWLogsFixtures().LogGroups), LogGroupsPageSize),
 		"trail":      len(NewCloudTrailFixtures().Trails),
@@ -184,4 +186,18 @@ func countTopLevelIAMPolicies(f *IAMFixtures) int {
 		total += len(names)
 	}
 	return total
+}
+
+// countRDSSide counts the clusters or cluster snapshots the RDS call answers
+// that DB Clusters lists from it: DescribeDBClusters also returns DocumentDB
+// and Neptune clusters, and DB Clusters reads DocumentDB from its own endpoint
+// and lists no Neptune.
+func countRDSSide[T any](items []T, engine func(T) *string) int {
+	n := 0
+	for _, it := range items {
+		if e := strings.ToLower(aws.ToString(engine(it))); e != "docdb" && e != "neptune" {
+			n++
+		}
+	}
+	return n
 }

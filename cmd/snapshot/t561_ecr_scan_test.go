@@ -230,4 +230,9 @@ func TestCaptureECR_RecordsTheScanEvidenceTheAppReads(t *testing.T) {
 	if len(worker.Images[0].FindingSeverityCounts) != 0 {
 		t.Errorf("acme/batch-worker: counts = %v for an image whose scan read was denied", worker.Images[0].FindingSeverityCounts)
 	}
+	// The only image's findings were never read, so the repository's totals
+	// are unknown: absent, never a 0/0 that reads as a clean scan.
+	if worker.CriticalTotal != nil || worker.HighTotal != nil {
+		t.Errorf("acme/batch-worker: critical/high totals = %v/%v after the scan read was denied, want both absent", worker.CriticalTotal, worker.HighTotal)
+	}
 }

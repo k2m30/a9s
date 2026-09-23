@@ -243,7 +243,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 		}
 		var all ec2Exposure
 		var addresses, groupIDs []string
-		groupUnread, routeUnread := false, false
+		groupUnread, routeUnread := false, ""
 		for _, ifc := range ifaces {
 			for _, fam := range []struct {
 				ipv6  bool
@@ -272,8 +272,10 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 				if !e.exposed() {
 					continue
 				}
-				routed, decided := ec2RoutedToInternet(aws.ToString(inst.VpcId), ifc.subnet, fam.dest, rtbEntry, rtbLoaded)
-				routeUnread = routeUnread || !decided
+				routed, unread := ec2RoutedToInternet(aws.ToString(inst.VpcId), ifc.subnet, fam.dest, rtbEntry, rtbLoaded)
+				if routeUnread == "" || unread == checkInspectionEndpointRoute {
+					routeUnread = unread
+				}
 				if !routed {
 					continue
 				}
@@ -284,8 +286,8 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 		switch {
 		case groupUnread:
 			markUninspected(result, r.ID, checkListIncomplete("sg"))
-		case routeUnread:
-			markUninspected(result, r.ID, checkListIncomplete("rtb"))
+		case routeUnread != "":
+			markUninspected(result, r.ID, routeUnread)
 		}
 		if !all.exposed() {
 			continue
@@ -407,14 +409,29 @@ func appendNew(list []string, s string) []string {
 	return append(list, s)
 }
 
+// checkInspectionEndpointRoute is what an instance records when its subnet
+// sends a default route to a VPC endpoint: a Gateway Load Balancer endpoint
+// in front of an inspection appliance, or a Network Firewall endpoint
+// (docs.aws.amazon.com/elasticloadbalancing/latest/gateway/getting-started-cli.html#configure-routing-aws-cli,
+// docs.aws.amazon.com/network-firewall/latest/developerguide/vpc-config-route-tables.html).
+// The appliance's rules decide what reaches the instance, and neither the
+// security groups nor the route tables say what they are. DescribeRouteTables
+// reports the endpoint ID in the route's GatewayId
+// (docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Route.html). A gateway
+// endpoint (S3, DynamoDB) carries a vpce- GatewayId too, on a prefix-list
+// destination, so only the default route's target is read this way.
+const checkInspectionEndpointRoute = "default route through an inspection endpoint"
+
 // ec2RoutedToInternet reports whether subnet's route table sends dest (an
 // address family's default route, "0.0.0.0/0" or "::/0") to an internet
-// gateway, and whether the loaded rtb list can tell. subnetRouteTableIDs owns
-// which table serves the subnet, falling back to the VPC's main table only on
-// a complete list.
-func ec2RoutedToInternet(vpc, subnet, dest string, rtb resource.ResourceCacheEntry, loaded bool) (routed, decided bool) {
+// gateway. unread is "" when the loaded rtb list tells, and otherwise the
+// check the route could not decide: the rtb list, or a default route to an
+// inspection endpoint. subnetRouteTableIDs owns which table serves the
+// subnet, falling back to the VPC's main table only on a complete list.
+func ec2RoutedToInternet(vpc, subnet, dest string, rtb resource.ResourceCacheEntry, loaded bool) (routed bool, unread string) {
+	unread = checkListIncomplete("rtb")
 	if !loaded {
-		return false, false
+		return false, unread
 	}
 	ids := subnetRouteTableIDs(subnet, vpc, rtb.Resources, !rtb.IsTruncated)
 	for _, row := range rtb.Resources {
@@ -425,18 +442,22 @@ func ec2RoutedToInternet(vpc, subnet, dest string, rtb resource.ResourceCacheEnt
 		if !ok {
 			continue
 		}
-		decided = true
+		unread = ""
 		for _, route := range table.Routes {
 			to := aws.ToString(route.DestinationCidrBlock)
 			if dest == "::/0" {
 				to = aws.ToString(route.DestinationIpv6CidrBlock)
 			}
-			if to == dest && routeGatewayTarget(route, "igw") != "" {
-				return true, true
+			switch {
+			case to != dest || route.State == ec2types.RouteStateBlackhole:
+			case routeGatewayTarget(route, "igw") != "":
+				return true, ""
+			case strings.HasPrefix(aws.ToString(route.GatewayId), "vpce-"):
+				return false, checkInspectionEndpointRoute
 			}
 		}
 	}
-	return false, decided
+	return false, unread
 }
 
 // ec2UserDataSecrets reads each instance's user-data script via

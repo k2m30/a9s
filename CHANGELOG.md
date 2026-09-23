@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An EC2 instance whose subnet sends its default route to a VPC endpoint (a
+  Gateway Load Balancer or Network Firewall endpoint) reads not inspected: the
+  appliance behind it decides what reaches the instance, and its rules are not
+  read. It used to read clean.
 - A Lambda function on the JSON log format lists its invocations, read from
   its `platform.report` records with the same columns as a text REPORT line,
   and a timed-out one is flagged. It used to list none. A function that

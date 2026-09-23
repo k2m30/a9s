@@ -780,5 +780,5 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 }
 
 func init() {
-	Register(Pin{ShortName: "lambda", Rows: 39, Issues: 16})
+	Register(Pin{ShortName: "lambda", Rows: 39, Issues: 13})
 }
