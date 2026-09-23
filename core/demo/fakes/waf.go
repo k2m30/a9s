@@ -42,15 +42,16 @@ func (f *WAFFake) ListResourcesForWebACL(_ context.Context, input *wafv2.ListRes
 	if err := validateARN(*input.WebACLArn); err != nil {
 		return nil, err
 	}
-	// A named type answers only resources of that type; an unnamed one
-	// answers every association.
+	// Each call answers one resource type, APPLICATION_LOAD_BALANCER when
+	// none is named; the fixtures associate no type outside this map.
 	marker := map[wafv2types.ResourceType]string{
+		"": ":loadbalancer/app/",
 		wafv2types.ResourceTypeApplicationLoadBalancer: ":loadbalancer/app/",
 		wafv2types.ResourceTypeApiGateway:              ":apigateway:",
 	}[input.ResourceType]
 	var arns []string
 	for _, arn := range f.fix.ResourcesByWebACL[*input.WebACLArn] {
-		if marker == "" || strings.Contains(arn, marker) {
+		if marker != "" && strings.Contains(arn, marker) {
 			arns = append(arns, arn)
 		}
 	}

@@ -39,27 +39,28 @@ func (c *ServiceClients) wafIn(scope string) WAFv2API {
 // webACLArn is associated with. AWS answers this through CloudFront alone:
 // wafv2:ListResourcesForWebACL covers the regional resource types and its
 // reference directs CloudFront callers to ListDistributionsByWebACLId.
-func wafDistributionIDs(ctx context.Context, c *ServiceClients, webACLArn string) ([]string, error) {
+// complete is false when the answer stopped at PerParentPageCap pages.
+func wafDistributionIDs(ctx context.Context, c *ServiceClients, webACLArn string) (ids []string, complete bool, err error) {
 	api, ok := c.CloudFront.(CloudFrontListDistributionsByWebACLIdAPI)
 	if !ok || c.CloudFront == nil {
-		return nil, errClientMissing
+		return nil, false, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn})
-	})
-	if err != nil {
-		return nil, err
-	}
-	if out.DistributionList == nil {
-		return nil, UnusableAnswerErr{Call: "ListDistributionsByWebACLId", Field: "distribution list"}
-	}
-	var ids []string
-	for _, d := range out.DistributionList.Items {
-		if d.Id != nil && *d.Id != "" {
-			ids = append(ids, *d.Id)
+	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]string, *string, error) {
+		out, err := api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn, Marker: marker})
+		if err != nil {
+			return nil, nil, err
 		}
-	}
-	return ids, nil
+		if out.DistributionList == nil {
+			return nil, nil, UnusableAnswerErr{Call: "ListDistributionsByWebACLId", Field: "distribution list"}
+		}
+		var ids []string
+		for _, d := range out.DistributionList.Items {
+			if d.Id != nil && *d.Id != "" {
+				ids = append(ids, *d.Id)
+			}
+		}
+		return ids, out.DistributionList.NextMarker, nil
+	})
 }
 
 // wafMergedCursor encodes the two independent pagination lanes

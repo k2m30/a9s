@@ -32,14 +32,11 @@ func checkWAFELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if !ok || c == nil || c.WAFv2 == nil {
 		return resource.UnknownRelated("elb")
 	}
-	out, err := c.WAFv2.ListResourcesForWebACL(ctx, &wafv2.ListResourcesForWebACLInput{
-		WebACLArn:    &webACLArn,
-		ResourceType: wafv2types.ResourceTypeApplicationLoadBalancer,
-	})
+	arns, err := wafResourcesOfType(ctx, c.WAFv2, webACLArn, wafv2types.ResourceTypeApplicationLoadBalancer)
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
-	return relatedRefs("elb", out.ResourceArns, refContext(clients, cache, "elb"))
+	return relatedRefs("elb", arns, refContext(clients, cache, "elb"))
 }
 
 // checkWAFAlarm reports CloudWatch alarms on this Web ACL's metrics. WAF
@@ -108,7 +105,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !ok || c == nil {
 		return resource.UnknownRelated("cf")
 	}
-	ids, err := wafDistributionIDs(ctx, c, webACLArn)
+	ids, complete, err := wafDistributionIDs(ctx, c, webACLArn)
 	var noList UnusableAnswerErr
 	switch {
 	case errors.Is(err, errClientMissing), errors.As(err, &noList):
@@ -116,7 +113,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 	case err != nil:
 		return resource.ErrorRelated("cf", err)
 	}
-	return relatedResultTrunc("cf", ids, false)
+	return relatedResultTrunc("cf", ids, !complete)
 }
 
 // checkWAFAPIGW calls wafv2:ListResourcesForWebACL with API Gateway resource type
@@ -135,12 +132,9 @@ func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok || c == nil || c.WAFv2 == nil {
 		return resource.UnknownRelated("apigw")
 	}
-	out, err := c.WAFv2.ListResourcesForWebACL(ctx, &wafv2.ListResourcesForWebACLInput{
-		WebACLArn:    &webACLArn,
-		ResourceType: wafv2types.ResourceTypeApiGateway,
-	})
+	arns, err := wafResourcesOfType(ctx, c.WAFv2, webACLArn, wafv2types.ResourceTypeApiGateway)
 	if err != nil {
 		return resource.ErrorRelated("apigw", err)
 	}
-	return relatedRefs("apigw", out.ResourceArns, refContext(clients, cache, "apigw"))
+	return relatedRefs("apigw", arns, refContext(clients, cache, "apigw"))
 }

@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `cf`
 
 - **Why related**: CloudFront distributions with this Web ACL attached (docs/related-resources.md §`waf`).
-- **How discovered**: only ACLs with `Scope=CLOUDFRONT` (us-east-1 global) can bind to CloudFront; for those, call `cloudfront:ListDistributionsByWebACLId(WebACLId=<ACL ARN>)` — one call per ACL — and match the returned distributions against the already-loaded `cf` list. `REGIONAL`-scope ACLs resolve to 0 without a call. — a9s-devops: `wafv2:ListResourcesForWebACL` covers regional resource types only, so the CloudFront association is enumerated from the CloudFront side; deterministic and bounded per ACL.
+- **How discovered**: only ACLs with `Scope=CLOUDFRONT` (us-east-1 global) can bind to CloudFront; for those, call `cloudfront:ListDistributionsByWebACLId(WebACLId=<ACL ARN>)` — paged through `NextMarker` up to the per-parent page cap, past which the count reads as a lower bound (`N+`) — and match the returned distributions against the already-loaded `cf` list. `REGIONAL`-scope ACLs resolve to 0 without a call. — a9s-devops: `wafv2:ListResourcesForWebACL` covers regional resource types only, so the CloudFront association is enumerated from the CloudFront side; deterministic and bounded per ACL.
 - **Count shown**: yes.
 
 ### `elb`
@@ -81,7 +81,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: the web ACL protects nothing — `ListResourcesForWebACL` returns no associations for a `REGIONAL` ACL, `cloudfront:ListDistributionsByWebACLId` no distributions for a `CLOUDFRONT` one.
+- **Signal**: the web ACL protects nothing — `ListResourcesForWebACL` returns no associations for a `REGIONAL` ACL, `cloudfront:ListDistributionsByWebACLId` no distributions for a `CLOUDFRONT` one. `ListResourcesForWebACL` answers one resource type per call (`APPLICATION_LOAD_BALANCER` when none is named), so a `REGIONAL` ACL is asked once per regional type — `APPLICATION_LOAD_BALANCER`, `API_GATEWAY`, `APPSYNC`, `COGNITO_USER_POOL`, `APP_RUNNER_SERVICE`, `VERIFIED_ACCESS_INSTANCE`, `AGENTCORE_GATEWAY` — and protects nothing only when every answer is empty. A type the call fails for leaves the row not inspected.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -128,7 +128,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Rule` shape (`Name`, `Priority`, `Statement`, `Action`, `VisibilityConfig`) — `AWS SDK Go v2 — service/wafv2/types.Rule`.
 - `alarm` discovery via CloudWatch alarm `Dimensions` with `Namespace=AWS/WAFV2` and `WebACL` dimension — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudWatch's WAFV2 namespace emits `BlockedRequests`/`AllowedRequests` with a `WebACL` dimension on the ACL name; reverse-scan of the already-loaded alarm list matches the operator's pattern of binding alarms to their protected resource.
 - `apigw` / `elb` discovery via `ListResourcesForWebACL` per ACL (`ResourceType=API_GATEWAY` | `APPLICATION_LOAD_BALANCER`, Regional scope) — a9s-devops (2026-04-20): possible=yes, worth=yes. This is the only WAF-side API that enumerates protected regional resources; cost is one call per ACL per resource type, bounded and cheap.
-- `cf` discovery via `cloudfront:ListDistributionsByWebACLId` for `Scope=CLOUDFRONT` ACLs (REGIONAL ACLs resolve to 0 without a call) — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListResourcesForWebACL` does not cover the CloudFront scope, so the association is enumerated from the CloudFront side; one bounded call per ACL.
+- `cf` discovery via `cloudfront:ListDistributionsByWebACLId` for `Scope=CLOUDFRONT` ACLs (REGIONAL ACLs resolve to 0 without a call) — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListResourcesForWebACL` does not cover the CloudFront scope, so the association is enumerated from the CloudFront side; bounded pages per ACL.
 - `logs` discovery via `GetLoggingConfiguration` per ACL, filtering `LogDestinationConfigs[]` ARNs that begin with `arn:aws:logs:` — a9s-devops (2026-04-20): possible=yes, worth=yes. WAF logging also supports Kinesis Firehose and S3 sinks; only CW Logs destinations bind to the `logs` panel target.
 - `~` severity for `Rules==[]`: an empty ACL is a config hygiene concern, not an active security regression — the ACL simply does nothing — a9s-devops (2026-04-20): possible=yes, worth=yes. The allow-all default with zero rules is a separate condition, recorded under `docs/attention-signals.md § Not yet implemented`.
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, no jargon, state + cause).
@@ -140,7 +140,7 @@ waf — SECURITY & IAM. Status key: `state` — the column naming it is the stat
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| waf.orphan | not associated with any resource | warn | wave2 | This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it. |
+| waf.orphan | not associated with any resource | warn | wave2 | This web ACL is not attached to any resource it can protect — a load balancer, gateway stage, GraphQL endpoint, user pool, App Runner service, Verified Access instance or distribution — so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it. |
 | waf.no-logging | no logging configuration | warn | wave2 | This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group. |
 | waf.no-rules | web ACL has no rules | warn | wave2 | This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing. |
 <!-- END GENERATED: findings -->
@@ -150,7 +150,7 @@ waf — SECURITY & IAM. Status key: `state` — the column naming it is the stat
 | --- | --- | --- |
 | elb | Load Balancers | no |
 | apigw | API Gateways | no |
-| cf | CloudFront | no |
+| cf | CloudFront | yes |
 | alarm | CloudWatch Alarms | yes |
 | logs | Log Groups | no |
 | ct-events | CloudTrail Events | no |

@@ -87,7 +87,7 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 ### 3.1 Wave 1 — zero extra API calls
 
-`ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call). Every signal below is readable from the `DomainStatus` that call returns, so all of them are decided in the fetcher and none costs an extra call. A domain being deleted reports nothing else.
+`ListDomainNames` returns only `DomainName` and `EngineType`, so the fetcher pairs it with `DescribeDomains` (bounded fan-out, up to 5 names per call — the API rejects more). A batch that fails leaves only its own names as name-only rows. Every signal below is readable from the `DomainStatus` that call returns, so all of them are decided in the fetcher and none costs an extra call. A domain being deleted reports nothing else.
 
 One bullet per distinct signal.
 

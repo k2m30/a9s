@@ -43,9 +43,18 @@ func (f *OpenSearchFake) ListDomainNames(_ context.Context, _ *opensearch.ListDo
 	return &opensearch.ListDomainNamesOutput{DomainNames: domainNames}, nil
 }
 
-func (f *OpenSearchFake) DescribeDomains(_ context.Context, _ *opensearch.DescribeDomainsInput, _ ...func(*opensearch.Options)) (*opensearch.DescribeDomainsOutput, error) {
-	domains := make([]ostypes.DomainStatus, len(f.fix.Domains))
-	copy(domains, f.fix.Domains)
+// DescribeDomains answers only the named domains and, as AWS does, rejects
+// more than five names.
+func (f *OpenSearchFake) DescribeDomains(_ context.Context, in *opensearch.DescribeDomainsInput, _ ...func(*opensearch.Options)) (*opensearch.DescribeDomainsOutput, error) {
+	if len(in.DomainNames) > 5 {
+		return nil, &ostypes.ValidationException{Message: aws.String("1 validation error detected: Value at 'domainNames' failed to satisfy constraint: Member must have length less than or equal to 5")}
+	}
+	var domains []ostypes.DomainStatus
+	for _, d := range f.fix.Domains {
+		if slices.Contains(in.DomainNames, aws.ToString(d.DomainName)) {
+			domains = append(domains, d)
+		}
+	}
 	return &opensearch.DescribeDomainsOutput{DomainStatusList: domains}, nil
 }
 

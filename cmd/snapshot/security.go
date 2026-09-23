@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -430,7 +431,12 @@ func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 	client := acm.NewFromConfig(cfg)
 
 	var certs []acmCertificate
-	paginator := acm.NewListCertificatesPaginator(client, &acm.ListCertificatesInput{})
+	// The fetcher's filters: unfiltered, ListCertificates leaves out most key
+	// types and every ACME-issued certificate.
+	paginator := acm.NewListCertificatesPaginator(client, &acm.ListCertificatesInput{
+		Includes:                  &acmtypes.Filters{KeyTypes: acmtypes.KeyAlgorithm("").Values()},
+		CertificateKeyPairOrigins: acmtypes.CertificateKeyPairOrigin("").Values(),
+	})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
 		if err != nil {

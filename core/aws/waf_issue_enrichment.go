@@ -160,15 +160,47 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	return result, errors.Join(loopErr, AggregateFailures("web ACL logging and associations", failures, total))
 }
 
+// wafRegionalResourceTypes are the resource types a REGIONAL web ACL can
+// protect: every wafv2 ResourceType but AMPLIFY, whose applications take a
+// CLOUDFRONT-scope ACL.
+var wafRegionalResourceTypes = []wafv2types.ResourceType{
+	wafv2types.ResourceTypeApplicationLoadBalancer,
+	wafv2types.ResourceTypeApiGateway,
+	wafv2types.ResourceTypeAppsync,
+	wafv2types.ResourceTypeCognitioUserPool,
+	wafv2types.ResourceTypeAppRunnerService,
+	wafv2types.ResourceTypeVerifiedAccessInstance,
+	wafv2types.ResourceTypeAgentcoreGateway,
+}
+
 // wafAssociations returns the resources this web ACL protects, from the
-// service that reports them for its scope.
+// service that reports them for its scope. ListResourcesForWebACL answers
+// one resource type per call, so a REGIONAL ACL's answer is the union over
+// wafRegionalResourceTypes; a type that fails fails the whole answer.
 func wafAssociations(ctx context.Context, clients *ServiceClients, scope, arn string) ([]string, error) {
 	if scope == wafScopeCloudFront {
-		return wafDistributionIDs(ctx, clients, arn)
+		ids, _, err := wafDistributionIDs(ctx, clients, arn)
+		return ids, err
 	}
+	var all []string
+	for _, rt := range wafRegionalResourceTypes {
+		arns, err := wafResourcesOfType(ctx, clients.WAFv2, arn, rt)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, arns...)
+	}
+	return all, nil
+}
+
+// wafResourcesOfType returns the resources of one type a REGIONAL web ACL
+// protects. ResourceType is always named: omitted, it means
+// APPLICATION_LOAD_BALANCER.
+func wafResourcesOfType(ctx context.Context, api WAFv2ListResourcesForWebACLAPI, arn string, rt wafv2types.ResourceType) ([]string, error) {
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.ListResourcesForWebACLOutput, error) {
-		return clients.WAFv2.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
-			WebACLArn: aws.String(arn),
+		return api.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
+			WebACLArn:    aws.String(arn),
+			ResourceType: rt,
 		})
 	})
 	if err != nil {

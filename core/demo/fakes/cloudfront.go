@@ -5,6 +5,7 @@ package fakes
 import (
 	"context"
 	"slices"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
@@ -36,19 +37,30 @@ func (f *CloudFrontFake) ListDistributions(_ context.Context, _ *cloudfront.List
 // (checkWAFCF, which sends the Web ACL's ARN — cloudfront:ListDistributionsByWebACLId
 // expects the ARN form, not the bare Web ACL ID).
 func (f *CloudFrontFake) ListDistributionsByWebACLId(_ context.Context, input *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-	var webACLID string
-	if input != nil && input.WebACLId != nil {
-		webACLID = *input.WebACLId
+	if input == nil {
+		input = &cloudfront.ListDistributionsByWebACLIdInput{}
 	}
+	webACLID := aws.ToString(input.WebACLId)
 	var items []cftypes.DistributionSummary
 	for _, d := range f.fix.Distributions {
 		if d.WebACLId != nil && *d.WebACLId == webACLID {
 			items = append(items, d)
 		}
 	}
-	return &cloudfront.ListDistributionsByWebACLIdOutput{
-		DistributionList: &cftypes.DistributionList{Items: items},
-	}, nil
+	// As AWS does: MaxItems (default 100) bounds a page, and NextMarker
+	// continues where the page stopped.
+	start, _ := strconv.Atoi(aws.ToString(input.Marker)) //nolint:errcheck // an absent or foreign marker starts at the first page
+	start = min(max(start, 0), len(items))
+	pageSize := 100
+	if input.MaxItems != nil {
+		pageSize = int(*input.MaxItems)
+	}
+	end := min(start+pageSize, len(items))
+	list := &cftypes.DistributionList{Items: items[start:end], IsTruncated: aws.Bool(end < len(items))}
+	if end < len(items) {
+		list.NextMarker = aws.String(strconv.Itoa(end))
+	}
+	return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: list}, nil
 }
 
 // GetDistributionConfig returns a config carrying the Lambda@Edge

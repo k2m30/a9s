@@ -343,13 +343,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
-			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false, Mirror: true},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkWAFAlarm, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("waf")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: wafCodeOrphan, Phrase: "not associated with any resource", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it."},
+			{Code: wafCodeOrphan, Phrase: "not associated with any resource", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not attached to any resource it can protect — a load balancer, gateway stage, GraphQL endpoint, user pool, App Runner service, Verified Access instance or distribution — so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it."},
 			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group."},
 			{Code: wafCodeNoRules, Phrase: "web ACL has no rules", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL contains no rules, so every request reaches the protected resource and the ACL provides no protection at all. Add rule groups or custom rules, or remove the ACL so it does not read as coverage it is not providing."},
 		},

@@ -51,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   next row of the same detail screen instead of repeating the first error.
   A detail row no longer fails with a timeout that belonged to another row
   reading the same resource.
+- ACM lists certificates issued over ACME. The snapshot collector asks for the same certificates
+  as the app, including every key type.
+- A regional web ACL protecting only an API Gateway stage, an AppSync API, a Cognito user pool,
+  an App Runner service, a Verified Access instance or an AgentCore gateway no longer reads
+  "not associated with any resource".
+- OpenSearch lists every domain in a region with more than five, instead of showing each one
+  without its engine, instance type and endpoint.
+- A CloudFront-scope web ACL's related CloudFront row counts every distribution it protects, not
+  only the first 100, and past the page limit reads as a lower bound.
 
 ## [3.58.0] - 2026-09-21
 

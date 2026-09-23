@@ -33,7 +33,7 @@ per-finding evidence (`file:line` quotes, SDK doc comments, siblings) is in `p1-
 | F25, F26 | ssm | Parameter reads and secret scan | Fixed — `ssm.go:62-137` |
 | F27 | trail | Log-bucket exposure judged by a second classifier | Live → task 3 |
 | F28 | vpce | State compared in a spelling AWS does not send | Live → task 2 |
-| F29 | waf | Association check left on the API's default resource type | Live → task 4 (also `backlog.md` row 2) |
+| F29 | waf | Association check left on the API's default resource type | Live → task 4 |
 | F30 | waf | Web ACL listing | Fixed — `waf.go:22-60` |
 | F32 | cf | Only the default cache behaviour judged for TLS | Live → task 3 |
 | F33 | dbc | Cluster list left on the shared RDS endpoint's default engine set | Live → task 5 |
@@ -65,4 +65,4 @@ F11/F37 are the same defect found by both reviewers.
    cluster list's engine set.
 6. (#565) **A related pivot or child view that answers without reading.** EKS nodes outside managed
    node groups, the Athena log-group pivot, and the oldest-first log windows of the ECS service
-   log view and the Lambda invocation list (`backlog.md` row 12).
+   log view and the Lambda invocation list (`backlog.md` row 11).

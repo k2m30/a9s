@@ -23,8 +23,20 @@ func NewACM() *ACMFake {
 	return &ACMFake{fix: fixtures.NewACMFixtures()}
 }
 
-func (f *ACMFake) ListCertificates(_ context.Context, _ *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
-	return &acm.ListCertificatesOutput{CertificateSummaryList: f.fix.Certificates}, nil
+func (f *ACMFake) ListCertificates(_ context.Context, in *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
+	// As AWS does, an unnamed origin answers AWS_MANAGED and CUSTOMER_PROVIDED
+	// only, leaving out ACME-issued certificates.
+	origins := in.CertificateKeyPairOrigins
+	if len(origins) == 0 {
+		origins = []acmtypes.CertificateKeyPairOrigin{acmtypes.CertificateKeyPairOriginAwsManaged, acmtypes.CertificateKeyPairOriginCustomerProvided}
+	}
+	var certs []acmtypes.CertificateSummary
+	for _, c := range f.fix.Certificates {
+		if slices.Contains(origins, c.CertificateKeyPairOrigin) {
+			certs = append(certs, c)
+		}
+	}
+	return &acm.ListCertificatesOutput{CertificateSummaryList: certs}, nil
 }
 
 // DescribeCertificate returns a CertificateDetail derived from the matching

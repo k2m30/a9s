@@ -91,6 +91,8 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 		// certificates, so RSA-3072/4096 and every EC certificate would be
 		// missing from the list entirely.
 		Includes: &acmtypes.Filters{KeyTypes: acmtypes.KeyAlgorithm("").Values()},
+		// Unfiltered, it also leaves out every ACME-issued certificate.
+		CertificateKeyPairOrigins: acmtypes.CertificateKeyPairOrigin("").Values(),
 	}
 	if continuationToken != "" {
 		input.NextToken = &continuationToken
