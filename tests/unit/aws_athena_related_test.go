@@ -162,25 +162,6 @@ func TestRelated_Athena_KMS_NoKey(t *testing.T) {
 	}
 }
 
-// TestRelated_Athena_Logs_CWEnabled verifies that when PublishCloudWatchMetricsEnabled
-// is true the log group /aws/athena/<wgName> is returned.
-func TestRelated_Athena_Logs_CWEnabled(t *testing.T) {
-	res := resource.Resource{ID: "primary", Fields: map[string]string{}}
-	clients := &awsclient.ServiceClients{
-		Athena: newFakeAthenaWithCWLogsEnabled(),
-	}
-	checker := athenaCheckerByTarget(t, "logs")
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	want := "/aws/athena/primary"
-	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != want {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), want)
-	}
-}
-
 // TestRelated_Athena_Logs_CWDisabled verifies Count=0 when CW metrics are off.
 // Requires a non-nil Configuration so cfg != nil.
 func TestRelated_Athena_Logs_CWDisabled(t *testing.T) {

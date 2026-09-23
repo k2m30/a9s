@@ -3,8 +3,10 @@ package unit
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -35,32 +37,29 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		},
 	}
 
-	cwLogsMock := &mockCWLogsFilterLogEventsClient{
-		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+	cwLogsMock := &fakeLogGroup{
+		name: "/ecs/web-service",
+		events: []cwlogstypes.FilteredLogEvent{
 			{
-				Events: []cwlogstypes.FilteredLogEvent{
-					{
-						Timestamp:     aws.Int64(1711036800000), // 2024-03-21 16:00:00 UTC
-						Message:       aws.String("INFO Starting application server on port 8080"),
-						LogStreamName: aws.String("ecs/web/abc123def456"),
-						IngestionTime: aws.Int64(1711036801000),
-						EventId:       aws.String("evt-svc-001"),
-					},
-					{
-						Timestamp:     aws.Int64(1711036860000), // 2024-03-21 16:01:00 UTC
-						Message:       aws.String("INFO Health check passed"),
-						LogStreamName: aws.String("ecs/web/abc123def456"),
-						IngestionTime: aws.Int64(1711036861000),
-						EventId:       aws.String("evt-svc-002"),
-					},
-					{
-						Timestamp:     aws.Int64(1711036920000), // 2024-03-21 16:02:00 UTC
-						Message:       aws.String("ERROR Connection refused to database"),
-						LogStreamName: aws.String("ecs/web/xyz789uvw012"),
-						IngestionTime: aws.Int64(1711036921000),
-						EventId:       aws.String("evt-svc-003"),
-					},
-				},
+				Timestamp:     aws.Int64(1711036800000), // 2024-03-21 16:00:00 UTC
+				Message:       aws.String("INFO Starting application server on port 8080"),
+				LogStreamName: aws.String("ecs/web/abc123def456"),
+				IngestionTime: aws.Int64(1711036801000),
+				EventId:       aws.String("evt-svc-001"),
+			},
+			{
+				Timestamp:     aws.Int64(1711036860000), // 2024-03-21 16:01:00 UTC
+				Message:       aws.String("INFO Health check passed"),
+				LogStreamName: aws.String("ecs/web/abc123def456"),
+				IngestionTime: aws.Int64(1711036861000),
+				EventId:       aws.String("evt-svc-002"),
+			},
+			{
+				Timestamp:     aws.Int64(1711036920000), // 2024-03-21 16:02:00 UTC
+				Message:       aws.String("ERROR Connection refused to database"),
+				LogStreamName: aws.String("ecs/web/xyz789uvw012"),
+				IngestionTime: aws.Int64(1711036921000),
+				EventId:       aws.String("evt-svc-003"),
 			},
 		},
 	}
@@ -78,8 +77,8 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(result.Resources) != 3 {
-		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
+	if got, want := resourceIDs(result.Resources), []string{"evt-svc-003", "evt-svc-002", "evt-svc-001"}; !slices.Equal(got, want) {
+		t.Fatalf("event ids = %v, want newest first %v", got, want)
 	}
 
 	t.Run("event_0_ID_not_empty", func(t *testing.T) {
@@ -93,7 +92,7 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
-		if r.Fields["timestamp"] == "1711036800000" {
+		if r.Fields["timestamp"] == "1711036920000" {
 			t.Errorf("timestamp should be formatted, not raw epoch ms: %q", r.Fields["timestamp"])
 		}
 	})
@@ -117,8 +116,8 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		if r.Fields["message"] == "" {
 			t.Error("Fields[message] should not be empty")
 		}
-		if !strings.Contains(r.Fields["message"], "Starting application") {
-			t.Errorf("Fields[message]: expected to contain 'Starting application', got %q", r.Fields["message"])
+		if !strings.Contains(r.Fields["message"], "Connection refused") {
+			t.Errorf("Fields[message]: expected to contain 'Connection refused', got %q", r.Fields["message"])
 		}
 	})
 
@@ -131,7 +130,7 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		if !ok {
 			t.Fatalf("RawStruct should be cwlogstypes.FilteredLogEvent, got %T", r.RawStruct)
 		}
-		if raw.Message == nil || !strings.Contains(*raw.Message, "Starting application") {
+		if raw.Message == nil || !strings.Contains(*raw.Message, "Connection refused") {
 			t.Error("RawStruct.Message not preserved correctly")
 		}
 	})
@@ -740,75 +739,35 @@ func TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
 	}
 }
 
+// Load More continues toward older lines from where the view stopped: the
+// token is the view's own read position, never a FilterLogEvents NextToken
+// handed back to AWS, and the pages join without a gap or a repeat.
 func TestFetchEcsSvcLogs_ContinuationToken(t *testing.T) {
-	taskDefMock := &mockECSDescribeTaskDefinitionClient{
-		output: &ecs.DescribeTaskDefinitionOutput{
-			TaskDefinition: &ecstypes.TaskDefinition{
-				ContainerDefinitions: []ecstypes.ContainerDefinition{
-					{
-						Name: aws.String("web"),
-						LogConfiguration: &ecstypes.LogConfiguration{
-							LogDriver: ecstypes.LogDriverAwslogs,
-							Options: map[string]string{
-								"awslogs-group": "/ecs/web-service",
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	events := ecsWebEvents(time.Now(), 250, 7*time.Minute)
+	group := &fakeLogGroup{name: ecsWebGroup, events: events}
 
-	wrapper := &tokenCapturingEcsSvcLogsMock{
-		inner: &mockCWLogsFilterLogEventsClient{
-			outputs: []*cloudwatchlogs.FilterLogEventsOutput{
-				{
-					Events: []cwlogstypes.FilteredLogEvent{
-						{
-							Timestamp:     aws.Int64(1711036800000),
-							Message:       aws.String("Log from token page"),
-							LogStreamName: aws.String("ecs/web/abc123def456"),
-							EventId:       aws.String("evt-token-001"),
-						},
-					},
-				},
-			},
-		},
+	first := fetchEcsWebLogs(t, group)
+	if first.Pagination == nil || !first.Pagination.IsTruncated || first.Pagination.NextToken == "" {
+		t.Fatalf("first page of %d lines out of 250 offers no Load More: %+v", len(first.Resources), first.Pagination)
 	}
+	token := first.Pagination.NextToken
 
-	result, err := awsclient.FetchEcsSvcLogs(
-		context.Background(),
-		taskDefMock,
-		wrapper,
-		"arn:aws:ecs:us-east-1:123456789012:cluster/prod",
-		"web-service",
-		"arn:aws:ecs:us-east-1:123456789012:task-definition/web:1",
-		"my-continuation-token",
-	)
+	second, err := awsclient.FetchEcsSvcLogs(context.Background(), ecsWebTaskDefinition(), group,
+		"arn:aws:ecs:us-east-1:123456789012:cluster/acme-prod",
+		"acme-web",
+		"arn:aws:ecs:us-east-1:123456789012:task-definition/acme-web:42",
+		token)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("Load More: %v", err)
 	}
-
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	if slices.Contains(group.seenTokens, token) {
+		t.Errorf("the view's token %q was sent to FilterLogEvents as an AWS NextToken", token)
 	}
-
-	if wrapper.capturedNextToken == nil {
-		t.Fatal("expected NextToken to be set in FilterLogEvents call")
+	if len(second.Resources) == 0 {
+		t.Fatal("Load More returned no lines although older ones exist")
 	}
-	if *wrapper.capturedNextToken != "my-continuation-token" {
-		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
-	}
-}
-
-type tokenCapturingEcsSvcLogsMock struct {
-	inner             *mockCWLogsFilterLogEventsClient
-	capturedNextToken *string
-}
-
-func (m *tokenCapturingEcsSvcLogsMock) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
-	m.capturedNextToken = params.NextToken
-	return m.inner.FilterLogEvents(ctx, params, optFns...)
+	shown := append(resourceIDs(first.Resources), resourceIDs(second.Resources)...)
+	assertNewestPrefix(t, shown, newestFirstIDs(events, ecsEventID))
 }
 
 // A service log line carries the ingestion instant in the same settled form as

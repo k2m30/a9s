@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `logs`
 
 - **Why related**: CloudWatch Log group where the workgroup publishes query/session logs (Spark workgroups) — first stop when investigating why a query or session failed.
-- **How discovered**: call `GetWorkGroup`; read `Configuration.MonitoringConfiguration.CloudWatchLoggingConfiguration.LogGroup` (set only when `Enabled==true`). Cross-reference the loaded `logs` list by log-group name.
+- **How discovered**: call `GetWorkGroup`; read `Configuration.MonitoringConfiguration.CloudWatchLoggingConfiguration.LogGroup` when `Enabled==true`. Cross-reference the loaded `logs` list by log-group name. Logging disabled or not configured is a proven 0 — `PublishCloudWatchMetricsEnabled` is a metrics switch and names no log group, and no group name is derived from the workgroup name. Logging enabled with no `LogGroup`, or a `GetWorkGroup` that fails, leaves the row unknown.
 - **Count shown**: yes (0 or 1).
 
 ### `role`

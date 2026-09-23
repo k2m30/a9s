@@ -58,15 +58,7 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     Wave-1 row shows for a policy it could not read. AWS validates both on write, so there is no
     operator witness today.
 
-11. **The Lambda invocation list shows the oldest 50 REPORT lines, not the newest.**
-    `core/aws/lambda_invocations.go:69` sends `Limit: 50` with `StartTime` at −24h, so
-    FilterLogEvents answers from the start of the window; the reversal at `:108` and `:130`
-    turns that oldest slice around and presents it as newest-first. `StartFromHead` is on
-    `GetLogEventsInput`, not `FilterLogEventsInput`, so there is no flag fix. Needs a window or
-    paging strategy — walk the lookback keeping a trailing 50, or narrow `StartTime` — which
-    changes the call cost.
-
-12. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
+11. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
     NextToken. Both branches report `truncated=true` for different reasons: the cache branch from
     `anyDegraded(rows)` alone, the fetch branch from a composite `DescribeCluster failed for 2 of
     12` that `FetchRelatedTarget` swallows, so the caller sees `truncated=true, err=nil` and
@@ -78,14 +70,14 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     `Values != nil || QualifierValue != nil || MetricsRegion != nil` — 10 of 35 specs do, audited
     by hand; whoever takes this should assert that `ValuesFromRawStruct` implies that predicate so
     the two cannot drift.
-13. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
+12. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
     a snapshot's parent through `DbiResourceId`, while `dbiRefToID` (`core/aws/ref_ids.go:567`)
     matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
     has a row that leads nowhere. `TestRefConformance_NavigableFieldsOpenTargetRows` reproduces it
     the moment a fixture carries a pre-rename `DBInstanceIdentifier`.
 ## Structure
 
-14. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
+13. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
     `DescribeTaskDefinition` read; `core/aws/related_common.go:233` is where they would collapse.
     They map "no client" and "refused" to different results per row, so collapsing them needs a
     ruling on that mapping. No behavioural difference today.

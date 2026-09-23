@@ -102,6 +102,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 - **Why related**: CloudWatch Logs log group `/aws/lambda/<FunctionName>` where function logs land (or the custom group from `LoggingConfig.LogGroup`).
 - **How discovered**: read `FunctionConfiguration.LoggingConfig.LogGroup` when set; otherwise default `/aws/lambda/<FunctionName>`. Cross-reference the `logs` list. — a9s-devops: `LoggingConfig` added to `FunctionConfiguration` in the 2023 advanced logging release.
 - **Count shown**: yes.
+- **Invocation list**: the newest 50 `REPORT` lines of that group in the last 24 hours, newest first, read with the same windowed newest-first read as the ECS service log view, including its narrowing of a window that does not fit the call budget; Load More continues with the next older 50 in the window.
 
 ### `msk`
 

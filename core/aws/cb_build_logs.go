@@ -8,36 +8,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
-
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchCBBuildLogs calls the CloudWatch Logs GetLogEvents API for a given
-// log group and stream (from a CodeBuild build), converting the response
-// into a FetchResult. This is a single-call API, but uses FetchResult for consistency.
+// FetchCBBuildLogs reads one page of a CodeBuild build's log stream, the
+// newest first and each Load More the page before, converting it into a
+// FetchResult.
 func FetchCBBuildLogs(
 	ctx context.Context,
 	api CWLogsGetLogEventsAPI,
 	logGroupName, logStreamName string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	input := &cloudwatchlogs.GetLogEventsInput{
-		LogGroupName:  &logGroupName,
-		LogStreamName: &logStreamName,
-		StartFromHead: aws.Bool(false),
-	}
-
-	output, err := api.GetLogEvents(ctx, input)
+	events, next, err := readStreamPage(ctx, api, logGroupName, logStreamName, continuationToken)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching build log events: %w", err)
 	}
 
 	var resources []resource.Resource
-	var ids eventRowIDs
+	ids := streamPageRowIDs(continuationToken, events)
 
-	for _, event := range output.Events {
+	for _, event := range events {
 		message := ""
 		if event.Message != nil {
 			message = strings.ReplaceAll(strings.TrimRight(*event.Message, "\n"), "\n", " ")
@@ -82,14 +73,7 @@ func FetchCBBuildLogs(
 		resources = append(resources, r)
 	}
 
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
-	}, nil
+	return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), next)}, nil
 }
 
 // formatEpochMillisSec converts epoch milliseconds to a human-readable

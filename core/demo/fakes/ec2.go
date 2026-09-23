@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -39,8 +40,51 @@ func NewEC2() *EC2Fake {
 	return &EC2Fake{fix: fixtures.NewEC2Fixtures(), lt: fixtures.NewLTFixtures(), vpcPeer: fixtures.NewVpcPeerFixtures()}
 }
 
-func (f *EC2Fake) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
-	return &ec2.DescribeInstancesOutput{Reservations: f.fix.Reservations}, nil
+// DescribeInstances honours the tag:<key> and instance-state-name filters the
+// way AWS does — every filter must hold, any of its values may — so a read
+// that asks for one cluster's nodes is not handed the whole account's.
+func (f *EC2Fake) DescribeInstances(_ context.Context, input *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+	if input == nil || len(input.Filters) == 0 {
+		return &ec2.DescribeInstancesOutput{Reservations: f.fix.Reservations}, nil
+	}
+	for _, filter := range input.Filters {
+		if name := aws.ToString(filter.Name); name != "instance-state-name" && !strings.HasPrefix(name, "tag:") {
+			return nil, &smithy.GenericAPIError{Code: "InvalidParameterValue", Message: "demo DescribeInstances does not model the filter " + name}
+		}
+	}
+	var out []ec2types.Reservation
+	for _, r := range f.fix.Reservations {
+		var kept []ec2types.Instance
+		for _, inst := range r.Instances {
+			if instanceMatches(inst, input.Filters) {
+				kept = append(kept, inst)
+			}
+		}
+		if len(kept) > 0 {
+			r.Instances = kept
+			out = append(out, r)
+		}
+	}
+	return &ec2.DescribeInstancesOutput{Reservations: out}, nil
+}
+
+func instanceMatches(inst ec2types.Instance, filters []ec2types.Filter) bool {
+	for _, filter := range filters {
+		name := aws.ToString(filter.Name)
+		if name == "instance-state-name" {
+			if inst.State == nil || !slices.Contains(filter.Values, string(inst.State.Name)) {
+				return false
+			}
+			continue
+		}
+		key := strings.TrimPrefix(name, "tag:")
+		if !slices.ContainsFunc(inst.Tags, func(t ec2types.Tag) bool {
+			return aws.ToString(t.Key) == key && slices.Contains(filter.Values, aws.ToString(t.Value))
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func (f *EC2Fake) DescribeInstanceStatus(_ context.Context, input *ec2.DescribeInstanceStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error) {

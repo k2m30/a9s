@@ -5,11 +5,14 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"maps"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -35,41 +38,131 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 	return relatedResultTrunc("subnet", ids, false)
 }
 
-// checkEKSASG — ASGs are owned by NodeGroups; derive by scanning ng cache.
+// checkEKSASG resolves the cluster's Auto Scaling groups: those of its
+// managed node groups, and the one each tagged node names in
+// aws:autoscaling:groupName. With an EKS client the node groups are read as
+// the EC2 and AMI pivots read them, so the three agree on completeness;
+// without one, the loaded ng list is all there is to go on.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
 		return resource.ProvenZero("asg", "clusterName")
 	}
-	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
-	if err != nil {
-		return resource.ErrorRelated("asg", err)
-	}
-	if ngList == nil {
-		return resource.UnknownRelated("asg")
-	}
 	seen := make(map[string]struct{})
-	for _, ngRes := range ngList {
-		ng, ok := assertStruct[ekstypes.Nodegroup](ngRes.RawStruct)
-		if !ok {
-			continue
+	nodes, partial, err := clusterTaggedNodes(ctx, clients, clusterName)
+	for _, n := range nodes {
+		if name := tagValue(n.Tags, "aws:autoscaling:groupName"); name != "" {
+			seen[name] = struct{}{}
 		}
-		if ng.ClusterName == nil || *ng.ClusterName != clusterName {
-			continue
+	}
+
+	var ngs []ekstypes.Nodegroup
+	var ngPartial bool
+	var ngErr error
+	if c, ok := clients.(*ServiceClients); ok && c != nil && c.EKS != nil {
+		ngs, ngPartial, ngErr = clusterNodegroups(ctx, c, clusterName)
+	} else {
+		ngList, truncated, listErr := relatedResourcesFor(ctx, clients, cache, "ng")
+		if ngList == nil && listErr == nil && len(seen) == 0 {
+			return resource.UnknownRelated("asg")
 		}
-		if ng.Resources != nil {
-			for _, a := range ng.Resources.AutoScalingGroups {
-				if a.Name != nil && *a.Name != "" {
-					seen[*a.Name] = struct{}{}
-				}
+		ngPartial, ngErr = truncated || ngList == nil, listErr
+		for _, ngRes := range ngList {
+			if ng, ok := assertStruct[ekstypes.Nodegroup](ngRes.RawStruct); ok && aws.ToString(ng.ClusterName) == clusterName {
+				ngs = append(ngs, ng)
 			}
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
+	for _, name := range nodegroupASGNames(ngs) {
+		seen[name] = struct{}{}
 	}
-	return relatedResultTrunc("asg", ids, truncated)
+	return nodeSourcesResult("asg", seen, partial || ngPartial, errors.Join(err, ngErr))
+}
+
+// liveInstanceStates leaves out shutting-down and terminated instances, which
+// keep their tags for up to an hour after they stop being nodes.
+var liveInstanceStates = []string{"pending", "running", "stopping", "stopped"}
+
+// clusterTaggedNodes returns the EC2 instances whose tags name clusterName —
+// self-managed, Karpenter and Auto Mode nodes, and managed node group nodes
+// too. Each tag is read as an exact key/value match:
+//   - kubernetes.io/cluster/<name>=owned: propagated at launch by the
+//     self-managed node group CloudFormation template (amazon-eks-nodegroup.yaml,
+//     docs.aws.amazon.com/eks/latest/userguide/launch-workers.html) and a
+//     Karpenter default tag (karpenter.sh/docs/concepts/nodeclasses/).
+//   - eks:eks-cluster-name=<name>: a Karpenter default tag (same page), and the
+//     tag EKS Auto Mode must set on every instance it launches — the Auto Mode
+//     cluster role allows ec2:RunInstances only with
+//     aws:RequestTag/eks:eks-cluster-name
+//     (docs.aws.amazon.com/eks/latest/userguide/auto-cluster-iam-role.html).
+//   - eks:cluster-name=<name>: set by EKS on managed node group instances next
+//     to eks:nodegroup-name. The EKS user guide does not list it; it is read
+//     from DescribeInstances on live accounts.
+//
+// partial is true when a query stopped at the page cap or was refused, or
+// there is no EC2 client to ask; the nodes the other queries found are
+// returned with it. err is set only when every query was refused.
+// IncludeManagedResources lists Auto Mode instances, which EC2 hides from
+// DescribeInstances by default for instances launched from 2026-04-22
+// (docs.aws.amazon.com/eks/latest/userguide/automode-learn-instances.html).
+func clusterTaggedNodes(ctx context.Context, clients any, clusterName string) (nodes []ec2types.Instance, partial bool, err error) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EC2 == nil {
+		return nil, true, nil
+	}
+	seen := make(map[string]struct{})
+	tags := map[string]string{
+		"kubernetes.io/cluster/" + clusterName: "owned",
+		"eks:eks-cluster-name":                 clusterName,
+		"eks:cluster-name":                     clusterName,
+	}
+	var refused []error
+	for key, value := range tags {
+		insts, complete, qErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Instance, *string, error) {
+			out, err := c.EC2.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+				Filters: []ec2types.Filter{
+					{Name: aws.String("tag:" + key), Values: []string{value}},
+					{Name: aws.String("instance-state-name"), Values: liveInstanceStates},
+				},
+				IncludeManagedResources: aws.Bool(true),
+				NextToken:               token,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			var page []ec2types.Instance
+			for _, r := range out.Reservations {
+				page = append(page, r.Instances...)
+			}
+			return page, out.NextToken, nil
+		})
+		if qErr != nil {
+			refused = append(refused, qErr)
+		}
+		partial = partial || !complete || qErr != nil
+		for _, inst := range insts {
+			id := aws.ToString(inst.InstanceId)
+			if _, dup := seen[id]; id == "" || dup {
+				continue
+			}
+			seen[id] = struct{}{}
+			nodes = append(nodes, inst)
+		}
+	}
+	if len(refused) == len(tags) {
+		return nil, false, errors.Join(refused...)
+	}
+	return nodes, partial, nil
+}
+
+// nodeSourcesResult is the related row over every place a cluster's nodes are
+// recorded. err is a source that could not be read at all: with nothing found
+// elsewhere the row is that error, otherwise what was found is a lower bound.
+func nodeSourcesResult(target string, ids map[string]struct{}, partial bool, err error) resource.RelatedCheckResult {
+	if len(ids) == 0 && err != nil {
+		return resource.ErrorRelated(target, err)
+	}
+	return relatedResultTrunc(target, slices.Collect(maps.Keys(ids)), partial || err != nil)
 }
 
 // listClusterNodegroups walks the ListNodegroups pages of one cluster.
@@ -87,10 +180,11 @@ func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) 
 	})
 }
 
-// checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.
-// For each node group: if LaunchTemplate is set, call ec2:DescribeLaunchTemplateVersions
-// to get LaunchTemplateData.ImageId. Managed NGs without a LT use AmiType+ReleaseVersion
-// — those return no AMI, since resolving them needs SSM. Returns distinct AMI IDs.
+// checkEKSAMI resolves the AMIs the cluster's nodes run: the ImageId of every
+// tagged node, and for each managed node group with a launch template, the
+// LaunchTemplateData.ImageId of its versions. A managed node group without a
+// launch template records AmiType+ReleaseVersion only; its AMI is found
+// through its nodes' tags.
 func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
@@ -109,14 +203,29 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ami")
 	}
 
+	amiSet := make(map[string]struct{})
+	nodes, partial, nodesErr := clusterTaggedNodes(ctx, c, clusterName)
+	for _, n := range nodes {
+		if id := aws.ToString(n.ImageId); id != "" {
+			amiSet[id] = struct{}{}
+		}
+	}
+	ngs, ngPartial, ngErr := clusterNodegroups(ctx, c, clusterName)
+	ltPartial, ltErr := nodegroupLaunchTemplateAMIs(ctx, c, ngs, amiSet)
+	return nodeSourcesResult("ami", amiSet, partial || ngPartial || ltPartial, errors.Join(nodesErr, ngErr, ltErr))
+}
+
+// clusterNodegroups reads the cluster's managed node groups:
+// ListNodegroups, then DescribeNodegroup for each. The three node pivots all
+// read them here, so each is as complete as the others. partial is true when
+// the list stopped at the page cap or some DescribeNodegroup was refused;
+// err when the list or every DescribeNodegroup was refused.
+func clusterNodegroups(ctx context.Context, c *ServiceClients, clusterName string) (ngs []ekstypes.Nodegroup, partial bool, err error) {
 	ngNames, ngComplete, err := listClusterNodegroups(ctx, c.EKS, clusterName)
 	if err != nil {
-		return resource.ErrorRelated("ami", err)
+		return nil, false, err
 	}
-
-	amiSet := make(map[string]struct{})
 	var failures []Failure
-	refused := 0
 	for _, ngName := range ngNames {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
@@ -126,57 +235,67 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 		if descErr != nil {
 			failures = append(failures, FailedCall(ngName, descErr))
-			refused++
 			continue
 		}
-		if descOut.Nodegroup == nil {
-			continue
+		if descOut.Nodegroup != nil {
+			ngs = append(ngs, *descOut.Nodegroup)
 		}
-		ng := descOut.Nodegroup
-		if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
-			// Managed NG without custom LT: its AMI is only resolvable via SSM.
-			continue
-		}
+	}
+	aggErr := AggregateFailures("eks-related: DescribeNodegroup", failures, len(ngNames))
+	if aggErr != nil && len(failures) == len(ngNames) {
+		return nil, false, aggErr
+	}
+	return ngs, aggErr != nil || !ngComplete, nil
+}
 
+// nodegroupASGNames lists the Auto Scaling groups behind the node groups.
+func nodegroupASGNames(ngs []ekstypes.Nodegroup) []string {
+	var names []string
+	for _, ng := range ngs {
+		if ng.Resources == nil {
+			continue
+		}
+		for _, asg := range ng.Resources.AutoScalingGroups {
+			if name := aws.ToString(asg.Name); name != "" {
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}
+
+// nodegroupLaunchTemplateAMIs adds the launch-template AMIs of the node
+// groups to amiSet. partial is true when some launch template could not be
+// read; err when every one read was refused.
+func nodegroupLaunchTemplateAMIs(ctx context.Context, c *ServiceClients, ngs []ekstypes.Nodegroup, amiSet map[string]struct{}) (partial bool, err error) {
+	var failures []Failure
+	read := 0
+	for _, ng := range ngs {
+		if ng.LaunchTemplate == nil || aws.ToString(ng.LaunchTemplate.Id) == "" {
+			continue
+		}
+		read++
 		versions, ltErr := launchTemplateVersions(ctx, c.EC2, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
 		if ltErr != nil {
 			// Soft-skip when the launch template has been deleted upstream:
 			// AWS returns InvalidLaunchTemplateId.NotFound, which is a true
 			// "no AMI to relate to" rather than a fetch failure.
-			if ErrCodeIs(ltErr, "InvalidLaunchTemplateId.NotFound") {
-				continue
+			if !ErrCodeIs(ltErr, "InvalidLaunchTemplateId.NotFound") {
+				failures = append(failures, FailedCall(aws.ToString(ng.NodegroupName)+"/lt", ltErr))
 			}
-			failures = append(failures, FailedCall(ngName+"/lt", ltErr))
-			refused++
 			continue
 		}
 		for _, v := range versions {
-			if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
+			if v.LaunchTemplateData != nil && aws.ToString(v.LaunchTemplateData.ImageId) != "" {
 				amiSet[*v.LaunchTemplateData.ImageId] = struct{}{}
 			}
 		}
 	}
-
-	var ids []string
-	for id := range amiSet {
-		ids = append(ids, id)
+	aggErr := AggregateFailures("eks-related: DescribeLaunchTemplateVersions", failures, read)
+	if aggErr != nil && len(failures) == read {
+		return false, aggErr
 	}
-	if len(ids) == 0 {
-		// Every node group refused the read: nothing was established about
-		// any of them, which is a fetch failure rather than a lower bound
-		// over what was read. One that answered leaves the rest a lower
-		// bound instead.
-		aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngNames))
-		if aggErr != nil && refused == len(ngNames) {
-			return resource.ErrorRelated("ami", aggErr)
-		}
-		return relatedResultTrunc("ami", nil, aggErr != nil || !ngComplete)
-	}
-	// Some DescribeNodegroup/DescribeLaunchTemplateVersions calls may have
-	// failed: ids is a proven subset, not necessarily exhaustive. Truncated
-	// (not Errored) keeps the row actionable rather than discarding confirmed
-	// matches as a dead end.
-	return relatedResultTrunc("ami", ids, len(failures) > 0 || !ngComplete)
+	return aggErr != nil, nil
 }
 
 // asgNamesPerDescribe is the maximum number of names DescribeAutoScalingGroups
@@ -184,9 +303,8 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 // large cluster's whole EC2 row into an error.
 const asgNamesPerDescribe = 50
 
-// checkEKSEC2 resolves EC2 instances running in this EKS cluster via node group ASGs.
-// For each node group: get Resources.AutoScalingGroups, then call
-// autoscaling:DescribeAutoScalingGroups to read Instances[].InstanceId.
+// checkEKSEC2 resolves the cluster's EC2 nodes: every tagged node, and the
+// members of each managed node group's Auto Scaling groups.
 func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
@@ -205,55 +323,27 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ec2")
 	}
 
-	ngNames, ngComplete, err := listClusterNodegroups(ctx, c.EKS, clusterName)
-	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+	seen := make(map[string]struct{})
+	nodes, partial, nodesErr := clusterTaggedNodes(ctx, c, clusterName)
+	for _, n := range nodes {
+		seen[aws.ToString(n.InstanceId)] = struct{}{}
 	}
+	ngs, ngPartial, ngErr := clusterNodegroups(ctx, c, clusterName)
+	asgPartial, asgErr := asgInstances(ctx, c, nodegroupASGNames(ngs), seen)
+	return nodeSourcesResult("ec2", seen, partial || ngPartial || asgPartial, errors.Join(nodesErr, ngErr, asgErr))
+}
 
-	var asgNames []string
-	var ngFailures []Failure
-	ngTotal := len(ngNames)
-	for _, ngName := range ngNames {
-		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
-			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-				ClusterName:   aws.String(clusterName),
-				NodegroupName: aws.String(ngName),
-			})
-		})
-		if descErr != nil {
-			ngFailures = append(ngFailures, FailedCall(ngName, descErr))
-			continue
-		}
-		if descOut.Nodegroup == nil || descOut.Nodegroup.Resources == nil {
-			continue
-		}
-		for _, asg := range descOut.Nodegroup.Resources.AutoScalingGroups {
-			if asg.Name != nil && *asg.Name != "" {
-				asgNames = append(asgNames, *asg.Name)
-			}
-		}
-	}
-
-	ngAggErr := AggregateFailures("eks-related: DescribeNodegroup", ngFailures, ngTotal)
+// asgInstances adds the members of the named Auto Scaling groups to seen.
+// partial is true when an ASG page could not be read or there is no
+// AutoScaling client; err when an ASG read was refused.
+func asgInstances(ctx context.Context, c *ServiceClients, asgNames []string, seen map[string]struct{}) (partial bool, err error) {
 	if len(asgNames) == 0 {
-		// Every node group refused its read: nothing was established about
-		// any of them, which is a fetch failure rather than a lower bound
-		// over what was read.
-		if ngAggErr != nil && len(ngFailures) == ngTotal {
-			return resource.ErrorRelated("ec2", ngAggErr)
-		}
-		return relatedResultTrunc("ec2", nil, ngAggErr != nil || !ngComplete)
+		return false, nil
 	}
 	if c.AutoScaling == nil {
-		// ASG names are known but cannot be resolved to instances without an
-		// AutoScaling client — Unknown, not an error (any DescribeNodegroup
-		// failures are subsumed: we could not have proceeded past this point
-		// regardless of ngAggErr).
-		return resource.UnknownRelated("ec2")
+		return true, nil
 	}
 
-	seen := make(map[string]struct{})
-	complete := ngComplete
 	for batch := range slices.Chunk(asgNames, asgNamesPerDescribe) {
 		asgs, batchComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.AutoScalingGroup, *string, error) {
 			out, err := c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
@@ -266,9 +356,9 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 			return out.AutoScalingGroups, out.NextToken, nil
 		})
 		if err != nil {
-			return resource.ErrorRelated("ec2", err)
+			return false, err
 		}
-		complete = complete && batchComplete
+		partial = partial || !batchComplete
 		for _, asg := range asgs {
 			for _, inst := range asg.Instances {
 				if inst.InstanceId != nil && *inst.InstanceId != "" {
@@ -277,16 +367,5 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 			}
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	// Some DescribeNodegroup calls may have failed: ids is a proven subset of
-	// the cluster's EC2 instances, not necessarily exhaustive. Truncated (not
-	// Errored) keeps the row actionable rather than discarding confirmed
-	// matches as a dead end.
-	return relatedResultTrunc("ec2", ids, ngAggErr != nil || !complete)
+	return partial, nil
 }
-
-// Keeps the ec2types import in use.
-var _ ec2types.Instance

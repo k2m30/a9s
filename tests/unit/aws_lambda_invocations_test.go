@@ -3,7 +3,9 @@ package unit
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -585,48 +587,33 @@ func TestLambdaInvocationColumns(t *testing.T) {
 	})
 }
 
-// TestFetchLambdaInvocations_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as NextToken.
+// Load More continues toward older invocations from where the list stopped:
+// the token is the list's own read position, never a FilterLogEvents
+// NextToken handed back to AWS, and the pages join without a gap or a repeat.
 func TestFetchLambdaInvocations_ContinuationToken(t *testing.T) {
-	wrapper := &tokenCapturingLambdaInvocationsMock{
-		inner: &mockCWLogsFilterLogEventsClient{
-			outputs: []*cloudwatchlogs.FilterLogEventsOutput{
-				{
-					Events: []cwlogstypes.FilteredLogEvent{
-						{
-							Timestamp: aws.Int64(1711036800000),
-							Message:   aws.String("REPORT RequestId: abcd1234-5678-9012-abcd-ef0123456789\tDuration: 100.00 ms\tBilled Duration: 100.00 ms\tMemory Size: 128 MB\tMax Memory Used: 64 MB\n"),
-						},
-					},
-				},
-			},
-		},
-	}
+	now := time.Now()
+	events := lambdaInvocations(0, now.Add(-2*time.Minute), 120, 10*time.Minute)
+	group := &fakeLogGroup{name: lambdaOrdersGroup, events: events}
 
-	result, err := awsclient.FetchLambdaInvocations(context.Background(), wrapper, "my-func", "/aws/lambda/my-func", "my-continuation-token")
+	first, err := awsclient.FetchLambdaInvocations(context.Background(), group, "acme-orders-api", lambdaOrdersGroup, "")
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("first page: %v", err)
 	}
-
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	if first.Pagination == nil || !first.Pagination.IsTruncated || first.Pagination.NextToken == "" {
+		t.Fatalf("first page of %d invocations out of 120 offers no Load More: %+v", len(first.Resources), first.Pagination)
 	}
+	token := first.Pagination.NextToken
 
-	if wrapper.capturedNextToken == nil {
-		t.Fatal("expected NextToken to be set in API call")
+	second, err := awsclient.FetchLambdaInvocations(context.Background(), group, "acme-orders-api", lambdaOrdersGroup, token)
+	if err != nil {
+		t.Fatalf("Load More: %v", err)
 	}
-	if *wrapper.capturedNextToken != "my-continuation-token" {
-		t.Errorf("expected NextToken %q, got %q", "my-continuation-token", *wrapper.capturedNextToken)
+	if slices.Contains(group.seenTokens, token) {
+		t.Errorf("the list's token %q was sent to FilterLogEvents as an AWS NextToken", token)
 	}
-}
-
-// tokenCapturingLambdaInvocationsMock wraps the CWLogs mock to capture NextToken.
-type tokenCapturingLambdaInvocationsMock struct {
-	inner             *mockCWLogsFilterLogEventsClient
-	capturedNextToken *string
-}
-
-func (m *tokenCapturingLambdaInvocationsMock) FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
-	m.capturedNextToken = params.NextToken
-	return m.inner.FilterLogEvents(ctx, params, optFns...)
+	if len(second.Resources) == 0 {
+		t.Fatal("Load More returned no invocations although older ones exist")
+	}
+	shown := append(resourceIDs(first.Resources), resourceIDs(second.Resources)...)
+	assertNewestPrefix(t, shown, newestReportIDs(events, now.Add(-24*time.Hour)))
 }

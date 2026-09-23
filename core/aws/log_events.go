@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -85,25 +87,54 @@ func logEventFindings(status string) []domain.Finding {
 	return nil
 }
 
-// FetchLogEvents calls the CloudWatchLogs GetLogEvents API for a given
-// log group and stream, converting the response into a FetchResult.
-// This is a single-call API, but uses FetchResult for consistency.
-func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName, logStreamName string, continuationToken string) (resource.FetchResult, error) {
+// readStreamPage reads one GetLogEvents page of a stream: the newest page
+// for token "", otherwise the page before the one token came with. Events
+// are in chronological order within the page. next is the token of the page
+// before it, or "" at the stream's start, where AWS hands back the token it
+// was sent.
+func readStreamPage(ctx context.Context, api CWLogsGetLogEventsAPI, group, stream, token string) (events []cwlogstypes.OutputLogEvent, next string, err error) {
 	input := &cloudwatchlogs.GetLogEventsInput{
-		LogGroupName:  &logGroupName,
-		LogStreamName: &logStreamName,
-		StartFromHead: new(false),
+		LogGroupName:  aws.String(group),
+		LogStreamName: aws.String(stream),
+		StartFromHead: aws.Bool(false),
 	}
+	if token != "" {
+		input.NextToken = aws.String(token)
+	}
+	out, err := api.GetLogEvents(ctx, input)
+	if err != nil {
+		return nil, "", err
+	}
+	back := aws.ToString(out.NextBackwardToken)
+	if back == "" || back == token {
+		return out.Events, "", nil
+	}
+	// A backward token is handed out on every page, the first page of the
+	// stream included; only asking for the page before tells whether it
+	// exists, and one event of it is enough. A refused probe leaves Load More
+	// on offer, where the refusal surfaces.
+	probeInput := *input
+	probeInput.NextToken = aws.String(back)
+	probeInput.Limit = aws.Int32(1)
+	probe, err := api.GetLogEvents(ctx, &probeInput)
+	if err == nil && len(probe.Events) == 0 && aws.ToString(probe.NextBackwardToken) == back {
+		return out.Events, "", nil
+	}
+	return out.Events, back, nil
+}
 
-	output, err := api.GetLogEvents(ctx, input)
+// FetchLogEvents reads one page of a log stream, the newest first and each
+// Load More the page before, converting it into a FetchResult.
+func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName, logStreamName string, continuationToken string) (resource.FetchResult, error) {
+	events, next, err := readStreamPage(ctx, api, logGroupName, logStreamName, continuationToken)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching log events: %w", err)
 	}
 
 	var resources []resource.Resource
-	var ids eventRowIDs
+	ids := streamPageRowIDs(continuationToken, events)
 
-	for _, event := range output.Events {
+	for _, event := range events {
 		message := ""
 		if event.Message != nil {
 			message = *event.Message
@@ -146,14 +177,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 		resources = append(resources, r)
 	}
 
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
-	}, nil
+	return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), next)}, nil
 }
 
 // The classes classifyLogEventStatus sorts a log line into. These are a9s's

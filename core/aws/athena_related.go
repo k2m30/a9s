@@ -64,22 +64,27 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cac
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkAthenaLogs calls athena:GetWorkGroup and extracts the CloudWatch log
-// group used for Spark driver logs (CustomerContentEncryptionConfiguration is
-// storage-side; the spark driver log group is carried on the EngineConfiguration).
-// For SQL workgroups there is no log group; Count: 0.
+// checkAthenaLogs calls athena:GetWorkGroup and links the log group named by
+// Configuration.MonitoringConfiguration.CloudWatchLoggingConfiguration when it
+// is enabled — the only place Athena records where a workgroup writes logs.
 func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
 		return resource.UnknownRelated("logs")
 	}
-	if cfg.PublishCloudWatchMetricsEnabled == nil || !*cfg.PublishCloudWatchMetricsEnabled {
-		return resource.ProvenZero("logs", "cfg.PublishCloudWatchMetricsEnabled")
+	if cfg.MonitoringConfiguration == nil || cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration == nil {
+		return resource.ProvenZero("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration")
 	}
-	// Athena publishes metrics but the log group is implicit (/aws/athena/<WG>).
-	// Emit the conventional log-group name so detail-view drill-through works.
-	lg := "/aws/athena/" + res.ID
-	return relatedResultTrunc("logs", []string{lg}, false)
+	cw := cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration
+	if !aws.ToBool(cw.Enabled) {
+		return resource.ProvenZero("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration.Enabled")
+	}
+	// Logging on with no LogGroup leaves the group to Athena, which names none
+	// in the configuration.
+	if aws.ToString(cw.LogGroup) == "" {
+		return resource.UnknownRelated("logs")
+	}
+	return relatedResultTrunc("logs", []string{*cw.LogGroup}, false)
 }
 
 // checkAthenaRole calls athena:GetWorkGroup and extracts the ExecutionRole for

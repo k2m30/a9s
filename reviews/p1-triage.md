@@ -65,4 +65,4 @@ F11/F37 are the same defect found by both reviewers.
    cluster list's engine set.
 6. (#565) **A related pivot or child view that answers without reading.** EKS nodes outside managed
    node groups, the Athena log-group pivot, and the oldest-first log windows of the ECS service
-   log view and the Lambda invocation list (`backlog.md` row 11).
+   log view and the Lambda invocation list.

@@ -96,6 +96,16 @@ const (
 	// names no sibling fixture defines.
 	fixtProdEKSClusterName      = "acme-prod"
 	fixtRelatedEC2NGNodeGroupID = "general-pool"
+	// EKSSelfManagedClusterName has no managed node groups: its nodes are
+	// the two instances of EKSSelfManagedASGName, tagged
+	// kubernetes.io/cluster/<name>=owned as the self-managed node template
+	// tags them, and EKSKarpenterNodeID, tagged as Karpenter tags its nodes.
+	// The eks→ec2/ami/asg pivots find all three by those tags alone.
+	EKSSelfManagedClusterName = EKSPublicEndpoint
+	EKSSelfManagedASGName     = "acme-dev-nodes"
+	EKSSelfManagedNodeID1     = "i-0a1b2c3d4e5f60011"
+	EKSSelfManagedNodeID2     = "i-0a1b2c3d4e5f60013"
+	EKSKarpenterNodeID        = "i-0a1b2c3d4e5f60014"
 	// EC2 posture carriers — one demo instance per finding, every other
 	// instance explicitly set to the healthy counterpart so the
 	// demo bench shows exactly one row per signal.
@@ -669,6 +679,20 @@ func makeInstance(
 			Code:    aws.String("Server.SpotInstanceShutdown"),
 			Message: aws.String("Server.SpotInstanceShutdown: The instance was stopped because the Spot Instance was interrupted."),
 		}
+	}
+	if instanceID == EKSSelfManagedNodeID1 || instanceID == EKSSelfManagedNodeID2 {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("kubernetes.io/cluster/" + EKSSelfManagedClusterName), Value: aws.String("owned")},
+			ec2types.Tag{Key: aws.String("aws:autoscaling:groupName"), Value: aws.String(EKSSelfManagedASGName)},
+		)
+	}
+	if instanceID == EKSKarpenterNodeID {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("kubernetes.io/cluster/" + EKSSelfManagedClusterName), Value: aws.String("owned")},
+			ec2types.Tag{Key: aws.String("eks:eks-cluster-name"), Value: aws.String(EKSSelfManagedClusterName)},
+			ec2types.Tag{Key: aws.String("karpenter.sh/nodepool"), Value: aws.String("default")},
+			ec2types.Tag{Key: aws.String("karpenter.k8s.aws/ec2nodeclass"), Value: aws.String("default")},
+		)
 	}
 	if instanceID == ECSBatchHostInstanceID {
 		inst.Tags = append(inst.Tags,

@@ -133,7 +133,7 @@ Note: `width: 0` on Message means "fill remaining width" — log messages should
 ### AWS API
 
 - `logs:GetLogEvents` with `logGroupName`, `logStreamName`, `startFromHead=false` (most recent first)
-- Paginated via `nextForwardToken` / `nextBackwardToken`
+- Opens on the stream's newest page (up to 1 MB or 10,000 events), lines in chronological order within the page, marked truncated while older pages exist; Load More reads the page before through `nextBackwardToken` until AWS hands back the token it was sent (the stream's start). Whether a page before exists is checked with a one-event read, so a stream that fits in one page is shown whole with no Load More. The count is not claimed exact while more remain. The log-stream event view and the CodeBuild build log view share this reader. `GetLogEvents` gives events no id, so a row is keyed by its instant, a digest of its line and its count among identical lines in the page; the events at the newest millisecond of a page read through Load More also carry a digest of that page's token, so identical lines on either side of a page boundary stay two rows.
 - **Latency warning:** Large streams (>10MB) can be slow. Initial fetch returns ~1MB or 10,000 events, whichever comes first.
 - Alternative: `logs:FilterLogEvents` with `logStreamNames=[stream]` for single-stream filtered access
 

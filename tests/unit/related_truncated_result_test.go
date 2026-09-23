@@ -817,7 +817,6 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 // truncation rule has nothing to apply to.
 var reverseScanExpectsUnknown = map[string]string{
 	"ec2→kms":          "reads the ebs list to find the volumes whose keys answer",
-	"eks→asg":          "reads the ng list to find the node groups whose scaling groups answer",
 	"lambda→sns":       "reads the sns-subscription list to find the topics that answer",
 	"efs→vpc":          "reads the eni list to find the mount targets whose VPC answers",
 	"ecs-svc→elb":      "reads the tg list to find the load balancers the service's target groups belong to",

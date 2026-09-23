@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An EKS cluster's EC2 Instances, AMIs and Auto Scaling Groups rows count its
+  self-managed, Karpenter and Auto Mode nodes, found by the cluster tags AWS
+  puts on them, alongside the managed node groups' own. A cluster whose only
+  nodes are outside managed node groups used to read a proven 0; a node source
+  that cannot be read, in whole or in part, now makes the count a lower bound
+  that keeps every node that was read.
+- An Athena workgroup's Log Groups row links the log group its CloudWatch
+  logging configuration names, and shows none when logging is off. It used to
+  link `/aws/athena/<workgroup>` whenever metrics publishing was on.
+- The ECS service log view and the Lambda invocation list open on the newest
+  events, newest first, and Load More continues with older ones, even over a
+  group too busy to read in one go. They used to show the oldest events of
+  their window turned around. The ECS view reads only the service's own
+  streams, from every awslogs container, in the Region its `awslogs-region`
+  names; it used to show every stream in a shared log group, and to look for
+  the group in the session's Region. The console link of such a line opens
+  its own Region's console.
+- The log-stream event view and the CodeBuild build log view open on the
+  newest page of a long stream and offer Load More back to its start. They
+  used to show the newest page alone and present it as the whole log.
+  Identical lines on either side of a page boundary stay two rows.
 - DB clusters and DB instances in a failed state AWS documents now read broken
   with their own phrase: an encryption key that is recoverable, a failed clone,
   migration or engine upgrade, and on instances `incompatible-create` and

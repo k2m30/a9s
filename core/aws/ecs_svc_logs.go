@@ -7,29 +7,43 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// maxLogEvents caps the total number of log events fetched per service.
+// maxLogEvents caps the number of log events shown per service.
 const maxLogEvents = 200
 
-// maxLogScanPages caps the number of FilterLogEvents calls per invocation.
-// This scan has no FilterPattern and no start-time bound, so a page carrying
-// zero events plus a NextToken (CloudWatch Logs' normal signal for "no writes
-// in this time slice, keep scanning") is expected, not exceptional — the
-// maxLogEvents item cap alone never fires while that happens, and without a
-// page cap a quiet-but-long-retention log group scans forever.
-const maxLogScanPages = 100
+// regionalLogsAPI is a CloudWatch Logs client that can hand back its peer in
+// another Region, as the session's clients do.
+type regionalLogsAPI interface {
+	CWLogsFilterLogEventsAPI
+	logsIn(region string) CWLogsFilterLogEventsAPI
+}
 
-// FetchEcsSvcLogs is a cross-service child fetcher. It first calls
-// DescribeTaskDefinition to extract the awslogs-group and awslogs-stream-prefix
-// from the task definition's first container, then calls FilterLogEvents to
-// retrieve recent log lines. Returns a FetchResult with pagination support.
-// Each call returns up to maxLogEvents (200) items.
+// sessionLogs reads CloudWatch Logs through the session's clients, in any
+// Region through the session's per-Region clients.
+type sessionLogs struct{ c *ServiceClients }
+
+func (s sessionLogs) FilterLogEvents(ctx context.Context, in *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	return s.c.CloudWatchLogs.FilterLogEvents(ctx, in, optFns...)
+}
+
+func (s sessionLogs) logsIn(region string) CWLogsFilterLogEventsAPI {
+	return s.c.InRegion(region).CloudWatchLogs
+}
+
+// FetchEcsSvcLogs is a cross-service child fetcher. It calls
+// DescribeTaskDefinition, then reads the newest maxLogEvents (200) lines of
+// every awslogs container, newest first: each container's awslogs-group,
+// narrowed to its own streams by awslogs-stream-prefix, in its
+// awslogs-region when cwLogsAPI can reach other Regions. Load More continues
+// with the next older ones.
 func FetchEcsSvcLogs(
 	ctx context.Context,
 	taskDefAPI ECSDescribeTaskDefinitionAPI,
@@ -48,130 +62,103 @@ func FetchEcsSvcLogs(
 		return resource.FetchResult{}, fmt.Errorf("no containers in task definition for %s", serviceName)
 	}
 
-	var logGroup string
-	var found bool
-
+	type sourceKey struct{ region, group, streamPrefix string }
+	var sources []logSource
+	seen := map[sourceKey]bool{}
 	for _, container := range tdOutput.TaskDefinition.ContainerDefinitions {
-		if container.LogConfiguration == nil {
+		if container.LogConfiguration == nil || container.LogConfiguration.LogDriver != ecstypes.LogDriverAwslogs {
 			continue
 		}
-		if container.LogConfiguration.LogDriver != ecstypes.LogDriverAwslogs {
+		opts := container.LogConfiguration.Options
+		// awslogs names each stream <awslogs-stream-prefix>/<container>/<task-id>;
+		// without a prefix the stream names carry nothing to select by.
+		key := sourceKey{region: opts["awslogs-region"], group: opts["awslogs-group"]}
+		if p := opts["awslogs-stream-prefix"]; p != "" {
+			key.streamPrefix = p + "/" + aws.ToString(container.Name) + "/"
+		}
+		if key.group == "" || seen[key] {
 			continue
 		}
-		logGroup = container.LogConfiguration.Options["awslogs-group"]
-		found = true
-		break
+		seen[key] = true
+		api := cwLogsAPI
+		if r, ok := cwLogsAPI.(regionalLogsAPI); ok {
+			api = r.logsIn(key.region)
+		}
+		sources = append(sources, logSource{api: api, region: key.region, group: key.group, streamPrefix: key.streamPrefix})
 	}
-
-	if !found {
+	if len(sources) == 0 {
 		return resource.FetchResult{}, fmt.Errorf("no container with awslogs log driver in task definition for %s", serviceName)
 	}
 
-	var resources []resource.Resource
-	var nextToken *string
-	if continuationToken != "" {
-		nextToken = &continuationToken
+	cur, err := parseLogCursor(continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+	events, next, err := newestLogEvents(ctx, sources, 0, cur, maxLogEvents)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
 	}
 
-	pages := 0
-	for {
-		input := &cloudwatchlogs.FilterLogEventsInput{
-			LogGroupName: &logGroup,
-			NextToken:    nextToken,
+	resources := make([]resource.Resource, 0, len(events))
+	for _, event := range events {
+		id := ""
+		if event.EventId != nil {
+			id = *event.EventId
 		}
 
-		output, err := cwLogsAPI.FilterLogEvents(ctx, input)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching log events for %s: %w", serviceName, err)
-		}
-		pages++
-
-		for _, event := range output.Events {
-			id := ""
-			if event.EventId != nil {
-				id = *event.EventId
-			}
-
-			timestamp := ""
-			if event.Timestamp != nil {
-				timestamp = formatEpochMillis(*event.Timestamp)
-			}
-
-			ingestionTime := ""
-			if event.IngestionTime != nil {
-				ingestionTime = formatEpochMillis(*event.IngestionTime)
-			}
-
-			streamShort := ""
-			logStream := ""
-			if event.LogStreamName != nil {
-				logStream = *event.LogStreamName
-				streamShort = computeStreamShort(logStream)
-			}
-
-			message := ""
-			if event.Message != nil {
-				message = strings.ReplaceAll(*event.Message, "\n", " ")
-			}
-
-			name := message
-			if len(name) > 80 {
-				name = name[:80]
-			}
-
-			// Status classification using the shared classifier from
-			// log_events.go — ecs_svc_logs pulls the same shape of raw
-			// CloudWatch log lines as log_events/lambda_invocation_logs.
-			status := classifyLogEventStatus(message)
-
-			r := resource.Resource{
-				ID:       id,
-				Name:     name,
-				Findings: logEventFindings(status),
-				Fields: map[string]string{
-					"timestamp":      timestamp,
-					"ingestion_time": ingestionTime,
-					"stream_short":   streamShort,
-					"message":        message,
-					"status":         status,
-					"log_group":      logGroup,
-					"log_stream":     logStream,
-				},
-				RawStruct: event,
-			}
-
-			resources = append(resources, r)
+		timestamp := ""
+		if event.Timestamp != nil {
+			timestamp = formatEpochMillis(*event.Timestamp)
 		}
 
-		if len(resources) >= maxLogEvents || pages >= maxLogScanPages {
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: apiNextToken != "",
-					NextToken:   apiNextToken,
-					PageSize:    len(resources),
-				},
-			}, nil
+		ingestionTime := ""
+		if event.IngestionTime != nil {
+			ingestionTime = formatEpochMillis(*event.IngestionTime)
 		}
 
-		if output.NextToken == nil {
-			break
+		streamShort := ""
+		logStream := ""
+		if event.LogStreamName != nil {
+			logStream = *event.LogStreamName
+			streamShort = computeStreamShort(logStream)
 		}
-		nextToken = output.NextToken
+
+		message := ""
+		if event.Message != nil {
+			message = strings.ReplaceAll(*event.Message, "\n", " ")
+		}
+
+		name := message
+		if len(name) > 80 {
+			name = name[:80]
+		}
+
+		// Status classification using the shared classifier from
+		// log_events.go — ecs_svc_logs pulls the same shape of raw
+		// CloudWatch log lines as log_events/lambda_invocation_logs.
+		status := classifyLogEventStatus(message)
+
+		r := resource.Resource{
+			ID:       id,
+			Name:     name,
+			Findings: logEventFindings(status),
+			Fields: map[string]string{
+				"timestamp":      timestamp,
+				"ingestion_time": ingestionTime,
+				"stream_short":   streamShort,
+				"message":        message,
+				"status":         status,
+				"log_group":      event.group,
+				"log_region":     event.region,
+				"log_stream":     logStream,
+			},
+			RawStruct: event.FilteredLogEvent,
+		}
+
+		resources = append(resources, r)
 	}
 
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
-	}, nil
+	return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), next)}, nil
 }
 
 // computeStreamShort extracts "container/short-task-id" from a log stream name

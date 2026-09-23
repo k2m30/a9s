@@ -63,10 +63,10 @@ REPORT RequestId: abc123  Duration: 2103.45 ms  Billed Duration: 2200 ms  Memory
 
 - **Primary:** `logs:FilterLogEvents` on log group `/aws/lambda/{FunctionName}` (or the custom group from parent's `LoggingConfig.LogGroup`)
 - **Filter pattern:** `"REPORT RequestId"` — extracts invocation summary lines only
-- **Limit:** 25-50 most recent (configurable, no pagination needed for initial view)
+- **Window and limit:** the newest 50 REPORT lines of the last 24 hours, newest first. `FilterLogEvents` answers oldest-first, so the group is read back from now in windows of doubling width (5 minutes first), each window whole, until 50 are held.
 - **Latency warning:** Can take 1-3 seconds depending on log group size. The filter pattern is server-side, so only matching events are returned.
-- **Error detection:** A second parallel call with filter pattern `"ERROR"` or `"Task timed out"` cross-referenced by RequestId to determine status
-- **Pagination:** `logs:FilterLogEvents` supports `nextToken` for loading older invocations
+- **Status:** read from the REPORT line itself — `Status: timeout` marks a timed-out invocation; there is no second call.
+- **Pagination:** Load More continues with the next older 50 in the window. A window that does not fit one read's call budget (100 calls) leaves the page marked partial, and Load More retries it narrowed, or continues a single busy millisecond from its `nextToken`.
 
 ### ASCII Wireframe
 

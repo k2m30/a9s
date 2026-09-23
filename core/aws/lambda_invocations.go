@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -22,13 +20,6 @@ const maxInvocations = 50
 
 // invocationLookbackHours limits the FilterLogEvents scan window.
 const invocationLookbackHours = 24
-
-// maxInvocationScanPages caps the number of FilterLogEvents calls. Empty
-// pages carrying a NextToken are the normal case here too (scanning across
-// log streams with no REPORT lines in a given slice), so maxInvocations alone
-// never fires while that happens; without this cap a function with few or no
-// invocations scans the full lookback window page by page forever.
-const maxInvocationScanPages = 100
 
 // reportRegex matches the standard REPORT line from Lambda runtime.
 var reportRegex = regexp.MustCompile(
@@ -48,98 +39,33 @@ var xrayTraceRegex = regexp.MustCompile(`XRAY TraceId:\s*(\S+)`)
 // timeoutRegex matches timeout status in the REPORT line.
 var timeoutRegex = regexp.MustCompile(`Status:\s*timeout`)
 
-// FetchLambdaInvocations calls the CloudWatchLogs FilterLogEvents API with a
-// "REPORT RequestId" filter pattern, parses each REPORT line, and returns a
-// FetchResult with pagination support. Each call returns up to maxInvocations
-// (50) items. When the cap is reached and more pages exist,
-// FetchResult.Pagination.IsTruncated is set to true with a NextToken for
-// continuation.
+// FetchLambdaInvocations reads the newest maxInvocations (50) REPORT lines of
+// the function's log group in the last invocationLookbackHours, newest first,
+// and parses each into an invocation row. Load More continues with the next
+// older ones in the same window.
 func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, functionName, logGroup string, continuationToken string) (resource.FetchResult, error) {
+	cur, err := parseLogCursor(continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+	start := time.Now().Add(-invocationLookbackHours * time.Hour).UnixMilli()
+	source := logSource{api: api, group: logGroup, pattern: "REPORT RequestId"}
+	events, next, err := newestLogEvents(ctx, []logSource{source}, start, cur, maxInvocations)
+	if err != nil {
+		// ResourceNotFoundException means the log group doesn't exist → 0
+		if ErrCodeIs(err, "ResourceNotFoundException") {
+			return resource.FetchResult{}, nil
+		}
+		return resource.FetchResult{}, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
+	}
+
 	var resources []resource.Resource
-	var nextToken *string
-	if continuationToken != "" {
-		nextToken = &continuationToken
+	for _, event := range events {
+		if r, ok := convertReportEvent(event.FilteredLogEvent, logGroup); ok {
+			resources = append(resources, r)
+		}
 	}
-
-	startTime := time.Now().Add(-invocationLookbackHours * time.Hour).UnixMilli()
-	limit := int32(maxInvocations)
-
-	pages := 0
-	for {
-		input := &cloudwatchlogs.FilterLogEventsInput{
-			LogGroupName:  &logGroup,
-			FilterPattern: aws.String("REPORT RequestId"),
-			StartTime:     &startTime,
-			Limit:         &limit,
-			NextToken:     nextToken,
-		}
-
-		output, err := api.FilterLogEvents(ctx, input)
-		if err != nil {
-			// ResourceNotFoundException means the log group doesn't exist → 0
-			if ErrCodeIs(err, "ResourceNotFoundException") {
-				return resource.FetchResult{}, nil
-			}
-			return resource.FetchResult{}, fmt.Errorf("fetching invocations for %s: %w", functionName, err)
-		}
-		pages++
-
-		for _, event := range output.Events {
-			if r, ok := convertReportEvent(event, logGroup); ok {
-				resources = append(resources, r)
-			}
-		}
-
-		if len(resources) >= maxInvocations || pages >= maxInvocationScanPages {
-			apiNextToken := ""
-			if output.NextToken != nil {
-				apiNextToken = *output.NextToken
-			}
-			// IsTruncated must only ever claim what apiNextToken can actually
-			// resume: hitting either cap exactly on AWS's terminal page (no
-			// NextToken) means this result IS complete, not truncated — a dead
-			// cursor (IsTruncated=true, NextToken="") would make load-more
-			// restart from page 1 forever instead of recognizing there is
-			// nothing left to fetch.
-			isTruncated := apiNextToken != ""
-			totalHint := len(resources)
-			if isTruncated {
-				totalHint = -1
-			}
-			// Reverse so newest invocations are first
-			for i, j := 0, len(resources)-1; i < j; i, j = i+1, j-1 {
-				resources[i], resources[j] = resources[j], resources[i]
-			}
-			return resource.FetchResult{
-				Resources: resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: isTruncated,
-					NextToken:   apiNextToken,
-					TotalHint:   totalHint,
-					PageSize:    len(resources),
-				},
-			}, nil
-		}
-
-		if output.NextToken == nil {
-			break
-		}
-		nextToken = output.NextToken
-	}
-
-	// Reverse so newest invocations are first
-	for i, j := 0, len(resources)-1; i < j; i, j = i+1, j-1 {
-		resources[i], resources[j] = resources[j], resources[i]
-	}
-
-	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: false,
-			TotalHint:   len(resources),
-			PageSize:    len(resources),
-		},
-	}, nil
+	return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), next)}, nil
 }
 
 // convertReportEvent parses a single FilteredLogEvent for a REPORT line and returns

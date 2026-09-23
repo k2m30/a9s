@@ -3,10 +3,12 @@
 package fakes
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -61,7 +63,13 @@ func (f *CWLogsFake) GetLogEvents(_ context.Context, input *cloudwatchlogs.GetLo
 	if input != nil && input.LogGroupName != nil {
 		logGroupName = *input.LogGroupName
 	}
-	return &cloudwatchlogs.GetLogEventsOutput{Events: f.fix.LogEvents[logGroupName]}, nil
+	// GetLogEvents answers in timestamp order; the fixtures list some groups
+	// newest first.
+	events := slices.Clone(f.fix.LogEvents[logGroupName])
+	slices.SortStableFunc(events, func(a, b cwlogstypes.OutputLogEvent) int {
+		return cmp.Compare(aws.ToInt64(a.Timestamp), aws.ToInt64(b.Timestamp))
+	})
+	return &cloudwatchlogs.GetLogEventsOutput{Events: events}, nil
 }
 
 func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.FilterLogEventsInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
@@ -72,6 +80,14 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 	events := f.fix.LogEvents[logGroupName]
 	filtered := make([]cwlogstypes.FilteredLogEvent, 0, len(events))
 	for i, e := range events {
+		ts := aws.ToInt64(e.Timestamp)
+		if input != nil && (input.StartTime != nil && ts < *input.StartTime || input.EndTime != nil && ts > *input.EndTime) {
+			continue
+		}
+		stream := f.filteredStreamName(logGroupName, i)
+		if input != nil && !strings.HasPrefix(stream, aws.ToString(input.LogStreamNamePrefix)) {
+			continue
+		}
 		// EventId and LogStreamName are what FilterLogEvents adds over
 		// GetLogEvents, and consumers key their rows by them: without an id
 		// every event of a group collapses onto one row. The fixture stores
@@ -81,7 +97,7 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 			Message:       e.Message,
 			IngestionTime: e.IngestionTime,
 			EventId:       aws.String(fmt.Sprintf("%d%011d", aws.ToInt64(e.Timestamp), i)),
-			LogStreamName: aws.String(f.filteredStreamName(logGroupName, i)),
+			LogStreamName: aws.String(stream),
 		})
 	}
 	return &cloudwatchlogs.FilterLogEventsOutput{Events: filtered}, nil

@@ -159,7 +159,7 @@ Note: Same structure as other log views. `width: 0` fills remaining width.
 
 - The build's `Logs.GroupName` and `Logs.StreamName` fields (from BatchGetBuilds response) point to the CloudWatch log stream
 - `logs:GetLogEvents` with the extracted `logGroupName` and `logStreamName`
-- Paginated via `nextForwardToken`/`nextBackwardToken`
+- Opens on the stream's newest page (up to 1 MB or 10,000 events), lines in chronological order within the page, marked truncated while older pages exist; Load More reads the page before through `nextBackwardToken` until AWS hands back the token it was sent (the stream's start). Whether a page before exists is checked with a one-event read, so a stream that fits in one page is shown whole with no Load More. The count is not claimed exact while more remain. The log-stream event view and the CodeBuild build log view share this reader. `GetLogEvents` gives events no id, so a row is keyed by its instant, a digest of its line and its count among identical lines in the page; the events at the newest millisecond of a page read through Load More also carry a digest of that page's token, so identical lines on either side of a page boundary stay two rows.
 - **Latency warning:** Build logs can be large (thousands of lines). Initial fetch returns ~1MB. Show spinner.
 - **Edge case:** If `Logs.GroupName` is empty (custom log config or logs disabled), show: "Build logs not available in CloudWatch."
 

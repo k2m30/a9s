@@ -16,6 +16,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogs "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -150,19 +151,27 @@ func TestFetchEcsSvcTasks_TaskIDColumnKeyCarriesTheShortID(t *testing.T) {
 	}
 }
 
+// cwlogsReportFake is a log group holding one REPORT line written at at; like
+// FilterLogEvents it returns the line only to a read whose [StartTime,
+// EndTime] window contains it.
 type cwlogsReportFake struct {
 	awsclient.CWLogsFilterLogEventsAPI
+	at time.Time
 }
 
 func (f *cwlogsReportFake) FilterLogEvents(
-	_ context.Context, _ *cwlogs.FilterLogEventsInput, _ ...func(*cwlogs.Options),
+	_ context.Context, in *cwlogs.FilterLogEventsInput, _ ...func(*cwlogs.Options),
 ) (*cwlogs.FilterLogEventsOutput, error) {
+	ts := f.at.UnixMilli()
+	if (in.StartTime != nil && ts < *in.StartTime) || (in.EndTime != nil && ts > *in.EndTime) {
+		return &cwlogs.FilterLogEventsOutput{}, nil
+	}
 	msg := "REPORT RequestId: 8e1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8\t" +
 		"Duration: 512.34 ms\tBilled Duration: 513 ms\tMemory Size: 512 MB\tMax Memory Used: 137 MB\t"
 	return &cwlogs.FilterLogEventsOutput{Events: []cwlogstypes.FilteredLogEvent{{
 		Message:       aws.String(msg),
-		Timestamp:     aws.Int64(1767225600000),
-		LogStreamName: aws.String("2026/01/01/[$LATEST]abcdef"),
+		Timestamp:     aws.Int64(ts),
+		LogStreamName: aws.String(f.at.UTC().Format("2006/01/02") + "/[$LATEST]abcdef"),
 	}}}, nil
 }
 
@@ -171,7 +180,7 @@ func (f *cwlogsReportFake) FilterLogEvents(
 // SortKey pointing at whichever copy survives the next edit, and a SortKey
 // naming a key no row carries sorts every row equal.
 func TestFetchLambdaInvocations_MemoryUsedIsOneField(t *testing.T) {
-	res, err := awsclient.FetchLambdaInvocations(context.Background(), &cwlogsReportFake{},
+	res, err := awsclient.FetchLambdaInvocations(context.Background(), &cwlogsReportFake{at: time.Now().Add(-10 * time.Minute)},
 		"example-fn", "/aws/lambda/example-fn", "")
 	if err != nil {
 		t.Fatalf("FetchLambdaInvocations: %v", err)

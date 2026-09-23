@@ -1408,7 +1408,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eks | kms | KMS Key | no |
 | eks | subnet | Subnets | no |
 | eks | ami | AMI | no |
-| eks | asg | Auto Scaling Groups | yes |
+| eks | asg | Auto Scaling Groups | no |
 | eks | ec2 | EC2 Instances | no |
 | eks | ct-events | CloudTrail Events | no |
 | ng | eks | EKS Clusters | yes |

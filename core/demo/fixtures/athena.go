@@ -17,9 +17,13 @@ import (
 // both explicitly to the healthy value.
 const AthenaGovernanceMisconfigured = "acme-ungoverned-queries"
 
-// AthenaSparkWorkgroup is the Spark workgroup that publishes CloudWatch
-// metrics, and so writes to /aws/athena/<workgroup>.
-const AthenaSparkWorkgroup = "acme-spark-analytics"
+// AthenaSparkWorkgroup is the Spark workgroup whose
+// MonitoringConfiguration.CloudWatchLoggingConfiguration writes its session
+// logs to AthenaSparkLogGroup — the one demo workgroup with a logs pivot.
+const (
+	AthenaSparkWorkgroup = "acme-spark-analytics"
+	AthenaSparkLogGroup  = "/aws/athena/" + AthenaSparkWorkgroup
+)
 
 // AthenaFixtures holds typed fixture data for Athena.
 type AthenaFixtures struct {
@@ -234,6 +238,14 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 						},
 						ExecutionRole:                   aws.String("arn:aws:iam::123456789012:role/acme-glue-role"),
 						PublishCloudWatchMetricsEnabled: aws.Bool(true),
+						MonitoringConfiguration: &athenatypes.MonitoringConfiguration{
+							CloudWatchLoggingConfiguration: &athenatypes.CloudWatchLoggingConfiguration{
+								Enabled:             aws.Bool(true),
+								LogGroup:            aws.String(AthenaSparkLogGroup),
+								LogStreamNamePrefix: aws.String(AthenaSparkWorkgroup),
+								LogTypes:            map[string][]string{"SPARK_DRIVER": {"STDOUT", "STDERR"}},
+							},
+						},
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/spark-results/"),
 							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{

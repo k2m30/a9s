@@ -3,9 +3,12 @@
 package fixtures
 
 import (
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
@@ -46,6 +49,10 @@ const (
 	BuildLogRepeatedLine   = "[Container] 2026/03/22 03:17:12 Retrying artifact upload (attempt 2 of 3)"
 	BuildLogRepeatedLineAt = int64(1774149432000)
 )
+
+// ECSAPIGatewayHistoryLines is how many older access lines the api-gateway
+// service's log group holds behind its four newest events.
+const ECSAPIGatewayHistoryLines = 236
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
 var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
@@ -505,10 +512,11 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		"/aws/lambda/orders-projector":     minimalLogStreams("lambda-orders-projector"),
 		// ecs-svc→ecs_svc_logs renders "container/task-id" from the stream
 		// name, which only reads on the "<prefix>/<container>/<task>" shape
-		// the awslogs driver writes (core/aws/ecs_svc_logs.go).
+		// the awslogs driver writes (core/aws/ecs_svc_logs.go). The
+		// api-gateway:12 definition's container is api.
 		"/ecs/api-gateway": {
 			{
-				LogStreamName:       aws.String("ecs/api-gateway/4f7c1a9e2b6d4f08b1c35a7e9d240c6f"),
+				LogStreamName:       aws.String("ecs/api/4f7c1a9e2b6d4f08b1c35a7e9d240c6f"),
 				CreationTime:        aws.Int64(1774253700000),
 				FirstEventTimestamp: aws.Int64(1774253700000),
 				LastEventTimestamp:  aws.Int64(1774253730000),
@@ -729,6 +737,18 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		},
 	}
 
+	// Four weeks of access lines before the four above: more than the 200 the
+	// service log view shows, so it visibly opens on the newest and Load More
+	// reaches back.
+	for i := range ECSAPIGatewayHistoryLines {
+		at := int64(1774253700000) - int64(ECSAPIGatewayHistoryLines-i)*3*3600*1000
+		logEvents["/ecs/api-gateway"] = append(logEvents["/ecs/api-gateway"], cwlogstypes.OutputLogEvent{
+			Timestamp:     aws.Int64(at),
+			Message:       aws.String(fmt.Sprintf("INFO  [http] GET /v1/orders/%d 200 in %dms", 7000+i, 12+i%40)),
+			IngestionTime: aws.Int64(at + 100),
+		})
+	}
+
 	logEvents["/ecs/web-frontend"] = []cwlogstypes.OutputLogEvent{
 		{
 			Timestamp:     aws.Int64(1774253600000),
@@ -768,6 +788,27 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logEvents["/aws/lambda/a9s-demo-s3-notifier"] = lambdaInvocationReport("a9s-demo-s3-notifier")
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
+
+	// The invocation list reads the last 24 hours, so every Lambda group's
+	// events are moved to end five minutes before the demo starts, keeping
+	// their spacing.
+	var lambdaNewest int64
+	for group, events := range logEvents {
+		if strings.HasPrefix(group, "/aws/lambda/") {
+			for _, e := range events {
+				lambdaNewest = max(lambdaNewest, aws.ToInt64(e.Timestamp))
+			}
+		}
+	}
+	shift := time.Now().Add(-5*time.Minute).UnixMilli() - lambdaNewest
+	for group, events := range logEvents {
+		if strings.HasPrefix(group, "/aws/lambda/") {
+			for i := range events {
+				events[i].Timestamp = aws.Int64(aws.ToInt64(events[i].Timestamp) + shift)
+				events[i].IngestionTime = aws.Int64(aws.ToInt64(events[i].IngestionTime) + shift)
+			}
+		}
+	}
 
 	// SubscriptionFilters — required for the logs:kinesis and logs:s3
 	// related-panel pivots (checkLogsKinesis / checkLogsS3 via
@@ -867,7 +908,7 @@ func derivedLogGroups(have []cwlogstypes.LogGroup) []cwlogstypes.LogGroup {
 		}
 	}
 	add(MSKBrokerLogGroup)
-	add("/aws/athena/" + AthenaSparkWorkgroup)
+	add(AthenaSparkLogGroup)
 	add(WAFProdAPILogGroup)
 	for _, fn := range []string{"rotate-api-key", "rotate-rds-credentials", "rotate-docdb-credentials"} {
 		add("/aws/lambda/" + fn)

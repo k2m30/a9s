@@ -75,20 +75,6 @@ func newFakeAthenaWithKMSKey(kmsKeyARN string) *fakeAthenaCR {
 	}
 }
 
-// newFakeAthenaWithCWLogsEnabled returns a fakeAthenaCR whose GetWorkGroup response
-// has PublishCloudWatchMetricsEnabled=true.
-func newFakeAthenaWithCWLogsEnabled() *fakeAthenaCR {
-	return &fakeAthenaCR{
-		workGroupOutput: &athena.GetWorkGroupOutput{
-			WorkGroup: &athenatypes.WorkGroup{
-				Configuration: &athenatypes.WorkGroupConfiguration{
-					PublishCloudWatchMetricsEnabled: aws.Bool(true),
-				},
-			},
-		},
-	}
-}
-
 // newFakeAthenaWithExecutionRole returns a fakeAthenaCR whose GetWorkGroup response
 // carries an ExecutionRole ARN.
 func newFakeAthenaWithExecutionRole(roleARN string) *fakeAthenaCR {

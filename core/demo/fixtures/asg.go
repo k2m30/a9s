@@ -211,6 +211,26 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
+		// The self-managed node group of EKSSelfManagedClusterName (eks.go),
+		// reached through eks→asg by its nodes' aws:autoscaling:groupName tag.
+		{
+			AutoScalingGroupName:   aws.String(EKSSelfManagedASGName),
+			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:77777777-7777-7777-7777-777777777777:autoScalingGroupName/" + EKSSelfManagedASGName),
+			MinSize:                aws.Int32(2),
+			MaxSize:                aws.Int32(4),
+			DesiredCapacity:        aws.Int32(2),
+			HealthCheckType:        aws.String("EC2"),
+			HealthCheckGracePeriod: aws.Int32(300),
+			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
+			CreatedTime:            aws.Time(mustTime("2026-03-21T09:30:00Z")),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String(EKSSelfManagedNodeID1), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String(EKSSelfManagedNodeID2), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
+			Tags: []asgtypes.TagDescription{
+				{Key: aws.String("kubernetes.io/cluster/" + EKSSelfManagedClusterName), Value: aws.String("owned"), PropagateAtLaunch: aws.Bool(true)},
+			},
+		},
 		{
 			AutoScalingGroupName: aws.String("awseb-e-acmeprodapi-asg"),
 			AutoScalingGroupARN:  aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:44444444-4444-4444-4444-444444444444:autoScalingGroupName/awseb-e-acmeprodapi-asg"),
@@ -483,5 +503,5 @@ func buildActivitiesFor(asgName string) []asgtypes.Activity {
 }
 
 func init() {
-	Register(Pin{ShortName: "asg", Rows: 9, Issues: 7, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "asg", Rows: 10, Issues: 7, CoverageGaps: []string{"dim"}})
 }

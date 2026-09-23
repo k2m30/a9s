@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
 // eventRowID is the ID of an event row read from an API that hands out no
@@ -39,6 +42,30 @@ func eventRowIDFromMillis(ms int64, content ...string) string {
 // arrives above it later.
 type eventRowIDs struct {
 	seen map[string]int
+	// page marks the events at newestMs of a page read through a Load More
+	// token; see streamPageRowIDs.
+	page     string
+	newestMs int64
+}
+
+// streamPageRowIDs keys the events of one GetLogEvents page. A twin of a line
+// can sit on the other side of a page boundary, where this page's count of
+// identical events cannot see it; the only events a boundary can split from
+// their twins are those at the newest millisecond of a page read through a
+// Load More token, so those carry a digest of the token as well. The newest
+// page and every other row keep the key their instant and content make.
+func streamPageRowIDs(token string, events []cwlogstypes.OutputLogEvent) eventRowIDs {
+	k := eventRowIDs{}
+	if token == "" {
+		return k
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(token))
+	k.page = fmt.Sprintf("%08x", h.Sum32())
+	for _, e := range events {
+		k.newestMs = max(k.newestMs, aws.ToInt64(e.Timestamp))
+	}
+	return k
 }
 
 // at keys the next event of the response: two events of one instant carrying
@@ -51,8 +78,11 @@ func (k *eventRowIDs) at(ms int64, content ...string) string {
 	}
 	n := k.seen[id]
 	k.seen[id] = n + 1
-	if n == 0 {
-		return id
+	if n > 0 {
+		id = fmt.Sprintf("%s-%d", id, n)
 	}
-	return fmt.Sprintf("%s-%d", id, n)
+	if k.page != "" && ms == k.newestMs {
+		id += "~" + k.page
+	}
+	return id
 }

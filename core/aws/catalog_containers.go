@@ -78,7 +78,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEKSSubnet, Mirror: true},
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkEKSAMI, Truncated: true},
-			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, Truncated: true},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eks")},
 		},
@@ -335,13 +335,17 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Name:      "Service Logs",
 		ShortName: "ecs_svc_logs",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			// A line read in its awslogs-region opens that Region's console.
+			if lr := r.Fields["log_region"]; lr != "" {
+				region = lr
+			}
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
 		},
 		Columns:   resource.EcsSvcLogColumns(),
 		Color:     colorAnyFindingOrHealthy,
-		FieldKeys: []string{"timestamp", "ingestion_time", "stream_short", "message", "log_group", "log_stream", "status"},
+		FieldKeys: []string{"timestamp", "ingestion_time", "stream_short", "message", "log_group", "log_region", "log_stream", "status"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
+			return FetchEcsSvcLogs(ctx, c.ECS, sessionLogs{c}, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
