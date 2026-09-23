@@ -116,8 +116,14 @@ func TestForEachParallel_ContextCancellation(t *testing.T) {
 			c := callCount
 			mu.Unlock()
 
+			// Every other call holds its slot until the cancel, so a freed slot
+			// and the cancelled context are ready at once when the loop next
+			// waits: only a check of the context after winning a slot keeps the
+			// loop from starting another call.
 			if c == 3 {
 				cancel()
+			} else {
+				<-ctx.Done()
 			}
 
 			mu.Lock()
@@ -140,8 +146,26 @@ func TestForEachParallel_ContextCancellation(t *testing.T) {
 	mu.Lock()
 	finalRan := ranCount
 	mu.Unlock()
-	if finalRan >= n {
-		t.Errorf("ranCount = %d, want < %d (cancellation should have stopped new fn calls from starting)", finalRan, n)
+	if finalRan > limit {
+		t.Errorf("ranCount = %d, want at most %d: only the calls started before the cancel may run", finalRan, limit)
+	}
+}
+
+// A context already cancelled when a slot is free leaves both select cases
+// ready at once; Go picks between ready cases at random, so without its own
+// check of the context the loop would start calls after the cancel.
+func TestForEachParallel_CancelledContextStartsNothing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var calls atomic.Int32
+	err := awsclient.ForEachParallel(ctx, 200, 4, func(_ int) { calls.Add(1) })
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
+	}
+	if got := calls.Load(); got != 0 {
+		t.Errorf("%d calls started on a cancelled context, want 0", got)
 	}
 }
 

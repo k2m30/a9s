@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Checks that read AWS in parallel start no further reads once they are
+  cancelled. A read could still start after the cancel when a worker slot
+  came free at the same moment.
 - An EC2 instance whose subnet sends its default route to a VPC endpoint (a
   Gateway Load Balancer or Network Firewall endpoint) reads not inspected: the
   appliance behind it decides what reaches the instance, and its rules are not

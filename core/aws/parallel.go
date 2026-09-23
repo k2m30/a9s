@@ -39,6 +39,12 @@ func ForEachParallel(ctx context.Context, n, limit int, fn func(i int)) error {
 			return ctx.Err()
 		case sem <- struct{}{}:
 		}
+		// select picks at random when the context is done and a slot is free.
+		if ctx.Err() != nil {
+			<-sem
+			wg.Wait()
+			return ctx.Err()
+		}
 
 		wg.Add(1)
 		go func(i int) {
