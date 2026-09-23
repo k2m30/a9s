@@ -110,6 +110,15 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		publicIP = *inst.PublicIpAddress
 	}
 
+	// EC2 sets Ipv6Address only for an address flagged primary; an instance
+	// can hold IPv6 addresses on its interfaces without one.
+	ipv6 := aws.ToString(inst.Ipv6Address)
+	for _, eni := range inst.NetworkInterfaces {
+		if ipv6 == "" && len(eni.Ipv6Addresses) > 0 {
+			ipv6 = aws.ToString(eni.Ipv6Addresses[0].Ipv6Address)
+		}
+	}
+
 	launchTime := ""
 	if inst.LaunchTime != nil {
 		launchTime = inst.LaunchTime.Format("2006-01-02 15:04")
@@ -145,6 +154,7 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 			"type":              instanceType,
 			"private_ip":        privateIP,
 			"public_ip":         publicIP,
+			"ipv6_address":      ipv6,
 			"launch_time":       launchTime,
 			"lifecycle":         lifecycle,
 			"image_id":          imageID,

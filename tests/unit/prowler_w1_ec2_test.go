@@ -153,11 +153,19 @@ func (f *pw1EC2EnrichFake) DescribeInstanceAttribute(_ context.Context, in *ec2.
 	}, nil
 }
 
-// pw1Instance builds a realistic DescribeInstances entry.
+const (
+	pw1VPC          = "vpc-0pw1aaaa1111bbbb2"
+	pw1PublicSubnet = "subnet-0pw1aaaa1111bbb2"
+)
+
+// pw1Instance builds a realistic DescribeInstances entry in a public subnet:
+// pw1PublicRTB routes its 0.0.0.0/0 to an internet gateway.
 func pw1Instance(id, state, publicIP string, tokens ec2types.HttpTokensState, sgIDs ...string) ec2types.Instance {
 	inst := ec2types.Instance{
 		InstanceId:   aws.String(id),
 		InstanceType: ec2types.InstanceTypeT3Micro,
+		VpcId:        aws.String(pw1VPC),
+		SubnetId:     aws.String(pw1PublicSubnet),
 		State:        &ec2types.InstanceState{Name: ec2types.InstanceStateName(state)},
 		MetadataOptions: &ec2types.InstanceMetadataOptionsResponse{
 			HttpTokens:   tokens,
@@ -338,8 +346,13 @@ func pw1ClosedSG(id string) ec2types.SecurityGroup {
 
 // pw1EnrichEC2 runs the ec2 Wave-2 enricher over resources built by the
 // wave-1 fetcher, so RawStruct and Fields carry exactly what production holds.
+// A public address reaches the internet only through its subnet's route
+// table, so a cache that names no rtb list gets pw1PublicRTB.
 func pw1EnrichEC2(t *testing.T, fake *pw1EC2EnrichFake, cache resource.ResourceCache, instances ...ec2types.Instance) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
+	if _, ok := cache["rtb"]; !ok {
+		cache["rtb"] = pw1PublicRTB()
+	}
 	rs := pw1FetchEC2(t, instances...)
 	return awsclient.EnrichEC2InstanceStatus(context.Background(), &awsclient.ServiceClients{EC2: fake}, rs, cache)
 }
@@ -697,22 +710,49 @@ func TestEC2_DemoBench_WitnessRowsCarryExactlyTheirFinding(t *testing.T) {
 	for code, witness := range wave2 {
 		var carriers []string
 		for id, fs := range enriched.Findings {
-			if _, ok := pw1FindFinding(fs, code); ok {
+			if _, ok := pw1FindFinding(fs, code); ok && (code != pw1EC2CodeInternetExposed || id != fixtures.EC2InstanceIPv6Exposed) {
 				carriers = append(carriers, pw1DemoNameFor(out.Resources, id))
 			}
 		}
 		pw1RequireOnlyWitness(t, code, witness, carriers)
 	}
+	// The IPv6-only witness carries the port-list exposure over its IPv6
+	// address, beside the bastion's over IPv4.
+	if _, ok := pw1FindFinding(enriched.Findings[fixtures.EC2InstanceIPv6Exposed], pw1EC2CodeInternetExposed); !ok {
+		t.Errorf("%s: the IPv6 witness %s does not carry it", pw1EC2CodeInternetExposed, fixtures.EC2InstanceIPv6Exposed)
+	}
 }
 
-// pw1DemoSGCache builds the demo sg cache the ec2 exposure rule cross-refs.
+// pw1PublicRTB is a complete rtb list holding pw1PublicSubnet's table, whose
+// 0.0.0.0/0 route goes to an internet gateway.
+func pw1PublicRTB() resource.ResourceCacheEntry {
+	const id = "rtb-0pw1aaaa1111bbbb2"
+	return resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: id, RawStruct: ec2types.RouteTable{
+		RouteTableId: aws.String(id),
+		VpcId:        aws.String(pw1VPC),
+		Associations: []ec2types.RouteTableAssociation{{RouteTableId: aws.String(id), SubnetId: aws.String(pw1PublicSubnet), Main: aws.Bool(false)}},
+		Routes: []ec2types.Route{
+			{DestinationCidrBlock: aws.String("0.0.0.0/0"), GatewayId: aws.String("igw-0pw1aaaa1111bbbb2"), State: ec2types.RouteStateActive},
+		},
+	}}}}
+}
+
+// pw1DemoSGCache builds the demo sg and rtb lists the ec2 exposure rule
+// cross-refs.
 func pw1DemoSGCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
 	out, err := awsclient.FetchSecurityGroupsPage(context.Background(), fakes.NewEC2(), "")
 	if err != nil {
 		t.Fatalf("FetchSecurityGroupsPage(demo): %v", err)
 	}
-	return resource.ResourceCache{"sg": resource.ResourceCacheEntry{Resources: out.Resources}}
+	rtb, err := awsclient.FetchRouteTablesPage(context.Background(), fakes.NewEC2(), "")
+	if err != nil {
+		t.Fatalf("FetchRouteTablesPage(demo): %v", err)
+	}
+	return resource.ResourceCache{
+		"sg":  resource.ResourceCacheEntry{Resources: out.Resources},
+		"rtb": resource.ResourceCacheEntry{Resources: rtb.Resources},
+	}
 }
 
 func pw1DemoNameFor(rs []resource.Resource, id string) string {

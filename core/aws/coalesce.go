@@ -63,6 +63,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -116,6 +117,12 @@ func coalesceKey(ctx context.Context, key string) string {
 // abandoned operation's entries age out under normal LRU eviction pressure
 // from newer operations rather than via any explicit per-operation cleanup.
 const maxCompletedResultMemoEntries = 128
+
+// coalescedFlightTimeout bounds one coalesced call, which runs detached from
+// every caller's own deadline. It outlasts any one caller's bound (a related
+// checker gets 10s), so a joiner is never cut short by the flight before its
+// own deadline.
+const coalescedFlightTimeout = 30 * time.Second
 
 // completedResultMemo is a small, thread-safe, bounded LRU that retains one
 // AWS call's result (value AND error — see coalescedResult) per coalesceKey
@@ -249,8 +256,8 @@ func NewCoalescingSFNWithLedger(api SFNAPI, ledger *CallLedger) SFNAPI {
 
 func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.DescribeStateMachineInput, optFns ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
 	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "sfn.DescribeStateMachine", aws.ToString(params.StateMachineArn),
-		func() (*sfn.DescribeStateMachineOutput, error) {
-			return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
+		func(flightCtx context.Context) (*sfn.DescribeStateMachineOutput, error) {
+			return c.SFNAPI.DescribeStateMachine(flightCtx, params, optFns...)
 		},
 		alwaysMemoizeSuccess[*sfn.DescribeStateMachineOutput],
 	)
@@ -306,23 +313,19 @@ func NewCoalescingSNSWithLedger(api SNSFullAPI, ledger *CallLedger) SNSFullAPI {
 
 func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
 	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "sns.GetTopicAttributes", aws.ToString(params.TopicArn),
-		func() (*sns.GetTopicAttributesOutput, error) {
-			return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
+		func(flightCtx context.Context) (*sns.GetTopicAttributesOutput, error) {
+			return c.SNSFullAPI.GetTopicAttributes(flightCtx, params, optFns...)
 		},
 		alwaysMemoizeSuccess[*sns.GetTopicAttributesOutput],
 	)
 }
 
-// S3FullAPI widens S3API with the six S3 operations used only via a narrow
-// type-assertion elsewhere in core/aws: S3GetBucketPolicyAPI (s3_related.go
-// and s3_detail_enrichment.go), S3GetBucketCorsAPI and S3GetBucketLifecycleAPI
-// (s3_detail_enrichment.go), and S3GetBucketTaggingAPI,
-// S3GetBucketEncryptionAPI, S3GetBucketLoggingAPI (s3_related.go). S3API
-// itself embeds none of them. Without this widening, coalescingS3 embedding
-// only S3API would satisfy S3API but FAIL every one of those six assertions,
-// breaking the s3 related panel and s3 detail enrichment entirely. Exported
-// alongside NewCoalescingS3 because it appears in that constructor's
-// exported signature.
+// S3FullAPI widens S3API with the S3 operations used only via a narrow
+// type-assertion elsewhere in core/aws, which S3API itself does not embed.
+// Without this widening, coalescingS3 embedding only S3API would satisfy
+// S3API but fail those assertions on the live client, and the check behind
+// each one would silently never run. Exported alongside NewCoalescingS3
+// because it appears in that constructor's exported signature.
 type S3FullAPI interface {
 	S3API
 	S3GetBucketPolicyAPI
@@ -332,6 +335,7 @@ type S3FullAPI interface {
 	S3GetBucketEncryptionAPI
 	S3GetBucketLoggingAPI
 	S3GetBucketLocationAPI
+	S3HeadBucketAPI
 }
 
 // coalescingS3 wraps S3FullAPI, coalescing concurrent identical
@@ -368,8 +372,8 @@ func NewCoalescingS3WithLedger(api S3FullAPI, ledger *CallLedger) S3FullAPI {
 
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
 	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "s3.GetBucketPolicy", aws.ToString(params.Bucket),
-		func() (*s3.GetBucketPolicyOutput, error) {
-			return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
+		func(flightCtx context.Context) (*s3.GetBucketPolicyOutput, error) {
+			return c.S3FullAPI.GetBucketPolicy(flightCtx, params, optFns...)
 		},
 		// A benign NoSuchBucketPolicy (most buckets have no policy) is a
 		// definitive, memoizable answer for the rest of the operation, not a
@@ -420,31 +424,36 @@ func NewCoalescingECS(api ECSAPI) ECSAPI {
 
 func (c *coalescingECS) DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	return coalesceCall(ctx, &c.g, c.memo, nil, "ecs.DescribeTaskDefinition", aws.ToString(params.TaskDefinition),
-		func() (*ecs.DescribeTaskDefinitionOutput, error) {
-			return c.ECSAPI.DescribeTaskDefinition(ctx, params, optFns...)
+		func(flightCtx context.Context) (*ecs.DescribeTaskDefinitionOutput, error) {
+			return c.ECSAPI.DescribeTaskDefinition(flightCtx, params, optFns...)
 		},
-		// A task definition revision is immutable, so whatever one open
-		// learns about it — the definition itself, or a refusal to hand it
-		// over — is that open's answer, and asking again inside the open buys
-		// nothing. The refusal is memoized for a second reason the other
-		// decorators do not have: three rows of one screen read this one
-		// definition, and a refusal the second row re-ran could leave two
-		// rows of a screen disagreeing about what the workload runs. A
-		// refresh mints a new operation id, so it always reads afresh.
-		func(_ *ecs.DescribeTaskDefinitionOutput, _ error) bool { return true },
+		// A task definition revision is immutable, so the definition, or
+		// AWS refusing to hand it over, is that open's answer, and asking
+		// again inside the open buys nothing; three rows of one screen read
+		// this one definition, and a refusal the second row re-ran could leave
+		// two rows disagreeing about what the workload runs. A throttle, a
+		// server fault or a lapsed deadline is no answer about the definition,
+		// so the next row asks again. A refresh mints a new operation id, so
+		// it always reads afresh.
+		func(_ *ecs.DescribeTaskDefinitionOutput, err error) bool { return err == nil || isAWSRefusal(err) },
 	)
 }
 
-// coalescingLambda wraps LambdaAPI, coalescing concurrent identical
+// LambdaFullAPI widens LambdaAPI with the posture reads EnrichLambdaPosture
+// asserts on the client (LambdaPostureAPI), which LambdaAPI does not embed.
+// Exported alongside NewCoalescingLambda because it appears in that
+// constructor's exported signature.
+type LambdaFullAPI interface {
+	LambdaAPI
+	LambdaPostureAPI
+}
+
+// coalescingLambda wraps LambdaFullAPI, coalescing concurrent identical
 // GetFunction calls (same operation, same FunctionName) into one underlying
 // call — checkLambdaECR (lambda_related.go) and enrichLambda
 // (lambda_detail_enrichment.go) each call it independently on every Image-
-// package-type Lambda detail open. LambdaAPI is already the complete
-// aggregate of every Lambda operation asserted anywhere in core/aws
-// (LambdaGetFunctionAPI, LambdaListEventSourceMappingsAPI — apigw_related.go,
-// related_common.go, secrets_related_extra.go), so embedding it alone is
-// sufficient — no narrower interface elsewhere needs a separate pass-through,
-// unlike SNSFullAPI/S3FullAPI's widening.
+// package-type Lambda detail open. It embeds LambdaFullAPI, not LambdaAPI,
+// so the posture reads asserted off the live client pass through.
 //
 // Callers must treat the shared *lambda.GetFunctionOutput as read-only:
 // every current consumer only reads from it.
@@ -456,7 +465,7 @@ func (c *coalescingECS) DescribeTaskDefinition(ctx context.Context, params *ecs.
 // anomaly, not a common, expected state the way an S3 bucket having no
 // policy is (contrast coalescingS3).
 type coalescingLambda struct {
-	LambdaAPI
+	LambdaFullAPI
 	g      singleflight.Group
 	memo   *completedResultMemo
 	ledger *CallLedger
@@ -465,7 +474,7 @@ type coalescingLambda struct {
 // NewCoalescingLambda wraps api with in-flight GetFunction call coalescing.
 // Exported for construction at the live client bootstrap (client.go) and
 // from external tests; the concrete decorator type stays unexported.
-func NewCoalescingLambda(api LambdaAPI) LambdaAPI {
+func NewCoalescingLambda(api LambdaFullAPI) LambdaFullAPI {
 	return NewCoalescingLambdaWithLedger(api, nil)
 }
 
@@ -473,14 +482,14 @@ func NewCoalescingLambda(api LambdaAPI) LambdaAPI {
 // *CallLedger (nil behaves identically to NewCoalescingLambda) — the test
 // harness's opt-in to per-call recording, additive over the production
 // constructor above.
-func NewCoalescingLambdaWithLedger(api LambdaAPI, ledger *CallLedger) LambdaAPI {
-	return &coalescingLambda{LambdaAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
+func NewCoalescingLambdaWithLedger(api LambdaFullAPI, ledger *CallLedger) LambdaFullAPI {
+	return &coalescingLambda{LambdaFullAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
 func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
 	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "lambda.GetFunction", aws.ToString(params.FunctionName),
-		func() (*lambda.GetFunctionOutput, error) {
-			return c.LambdaAPI.GetFunction(ctx, params, optFns...)
+		func(flightCtx context.Context) (*lambda.GetFunctionOutput, error) {
+			return c.LambdaFullAPI.GetFunction(flightCtx, params, optFns...)
 		},
 		alwaysMemoizeSuccess[*lambda.GetFunctionOutput],
 	)
@@ -555,7 +564,7 @@ func coalesceCall[T any](
 	ledger *CallLedger,
 	api string,
 	argKey string,
-	call func() (T, error),
+	call func(context.Context) (T, error),
 	shouldMemoize func(T, error) bool,
 ) (T, error) {
 	opID := DetailOpFromContext(ctx)
@@ -578,7 +587,7 @@ func coalesceCall[T any](
 	}
 
 	var executed bool
-	v, _, shared := g.Do(key, func() (any, error) {
+	flight := g.DoChan(key, func() (any, error) {
 		// See coalesceCall's doc comment: this recheck, not the one above,
 		// is what closes the race — it runs only once Do has granted this
 		// goroutine sole leadership for key.
@@ -587,7 +596,11 @@ func coalesceCall[T any](
 			return r, r.err
 		}
 		executed = true
-		out, callErr := call()
+		// The flight answers every caller that joins it, so it runs on a
+		// context none of them can cancel, bounded on its own.
+		flightCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), coalescedFlightTimeout)
+		defer cancel()
+		out, callErr := call(flightCtx)
 		recordCoalesceCall(ledger, opID, api, argKey, true)
 		r := coalescedResult[T]{out: out, err: callErr}
 		if opID != 0 && shouldMemoize(out, callErr) {
@@ -595,13 +608,20 @@ func coalesceCall[T any](
 		}
 		return r, callErr
 	})
-	if shared && !executed {
+	var res singleflight.Result
+	select {
+	case res = <-flight:
+	case <-ctx.Done():
+		var zero T
+		return zero, ctx.Err()
+	}
+	if res.Shared && !executed {
 		// Joined another goroutine's already-in-flight identical call: no
 		// second AWS request, so this caller's ask is recorded too, as
 		// served — the ledger must be able to see BOTH askers to prove
 		// dedup happened, not just infer it from a single executed entry.
 		recordCoalesceCall(ledger, opID, api, argKey, false)
 	}
-	r := v.(coalescedResult[T])
+	r := res.Val.(coalescedResult[T])
 	return r.out, r.err
 }

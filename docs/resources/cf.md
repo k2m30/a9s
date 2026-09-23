@@ -99,7 +99,7 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
 
-- **Signal**: viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`). An S3 static-website endpoint is excluded from the origin half: that endpoint serves HTTP only, so `http-only` is the only setting that works and telling the operator to change it would be wrong.
+- **Signal**: the default or any ordered cache behaviour allows plain HTTP (`allow-all`), named by its path pattern, / origin `http-only` (`cf.insecure-protocol`). An S3 static-website endpoint is excluded from the origin half: that endpoint serves HTTP only, so `http-only` is the only setting that works and telling the operator to change it would be wrong.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -148,7 +148,7 @@ One row per signal from §3:
 | `Status == InProgress` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deploying: config propagating` |
 | `Enabled == false` | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
 | Weak TLS policy on aliased distribution | 2 | Warning | `~` | S2, S3, S4, S5 | `minimum TLS below 1.2` |
-| viewer allows plain HTTP / origin `http-only`, S3 website endpoints excluded (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
+| a cache behaviour (default or ordered) allows plain HTTP / origin `http-only`, S3 website endpoints excluded (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
 | `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `access logging off` |
 | an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `S3 origin bucket does not exist` |
 | `DefaultRootObject` empty | 2 | Warning | `~` | S2, S3, S4, S5 | `no default root object` |

@@ -230,8 +230,8 @@ func parseSGIngress(ipv4, ipv6 []string) ec2types.IpPermission {
 func TestSGInternetFacing_AnyZeroLengthPrefixIsTheInternet(t *testing.T) {
 	const code = domain.FindingCode("sg.ingress.dangerous-ports")
 	// The declaration agrees its noun with the list it names, and this
-	// fixture opens one port.
-	const phrase = "port 22 open to 0.0.0.0/0"
+	// fixture opens one port; the range it names is the family's own.
+	const phraseV4, phraseV6 = "port 22 open to 0.0.0.0/0", "port 22 open to ::/0"
 
 	tests := []struct {
 		name        string
@@ -264,6 +264,10 @@ func TestSGInternetFacing_AnyZeroLengthPrefixIsTheInternet(t *testing.T) {
 					t.Errorf("Fields[dangerous_open_count] = %q, want %q", rows[0].Fields["dangerous_open_count"], "0")
 				}
 				return
+			}
+			phrase := phraseV4
+			if len(tc.ipv6) > 0 {
+				phrase = phraseV6
 			}
 			w4AssertFinding(t, rows[0].Findings, code, phrase, domain.SevBroken, "wave1")
 			if rows[0].Fields["dangerous_open_count"] != "1" {

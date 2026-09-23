@@ -202,9 +202,9 @@ One bullet per distinct signal.
 
 - **Signal**: public address behind a security group open on a sensitive port (`sg` cache cross-ref).
   - **State bucket**: Broken.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type. Each network interface is judged on its own, against its own security groups and its own subnet: its public IPv4 addresses (the association of each of its private addresses, so an Elastic IP on a secondary interface counts) and its IPv6 addresses. Each address family is judged on its own: a rule open to `0.0.0.0/0` reaches a public IPv4 address, a rule open to `::/0` reaches an IPv6 address, and either counts only when the interface's subnet route table (`rtb` cache cross-ref) sends that family's default route to an internet gateway — a NAT gateway or an egress-only gateway admits nothing inbound. An attached group missing from the loaded `sg` list (truncated or stale), or a route table the loaded `rtb` list cannot place, marks the row not inspected: in place of a verdict when nothing was found, and beside the finding when one was, since the unread part could widen it.
 
-- **Signal**: public address behind a security group admitting every protocol from `0.0.0.0/0` (`sg` cache cross-ref, `wide_open`).
+- **Signal**: public address behind a security group admitting every protocol from everyone on that address's family (`sg`, `rtb` cache cross-ref), with the same per-family and route rule as above.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type. A group that opens every port says everything a port list would, so it is reported instead of the list, not beside it.
 
@@ -241,8 +241,8 @@ One row per signal from §3:
 | `SystemStatus.Status == initializing` | 2 | Warning | `~` | S2, S3, S4, S5 | `initializing: checks in progress` |
 | `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S2, S3, S4, S5 | `status unknown: checks not reporting` |
 | `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `~` | S2, S3, S4, S5 | `scheduled event` |
-| public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> reachable from the internet` |
-| public address behind a security group admitting every protocol from `0.0.0.0/0` (`sg` cache cross-ref, `wide_open`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `every port reachable from the internet` |
+| public address behind its interface's security group open on a sensitive port to that address's family, in a subnet routing that family to an internet gateway (`sg`, `rtb` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> reachable from the internet` |
+| public address behind a security group admitting every protocol from `0.0.0.0/0` or `::/0` on that address's family (`sg`, `rtb` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `every port reachable from the internet` |
 | credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in user data` |
 
 Notes on list-text construction:

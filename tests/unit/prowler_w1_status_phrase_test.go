@@ -113,8 +113,8 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 	ec2Fake, ecsFake, lambdaFake, asgFake := fakes.NewEC2(), fakes.NewECS(), fakes.NewLambda(), fakes.NewASG()
 	clients := &awsclient.ServiceClients{EC2: ec2Fake, ECS: ecsFake, Lambda: lambdaFake, AutoScaling: asgFake}
 
-	// The sg and ebs lists are cross-referenced by the ec2 and ebs-snap
-	// enrichers; the ami list by lt's. Each is drained, because a sibling that
+	// The sg and rtb lists are cross-referenced by the ec2 enricher, the ebs
+	// list by ebs-snap's, the ami list by lt's. Each is drained, because a sibling that
 	// sorts onto page two is a cross-reference that silently resolves to
 	// nothing.
 	cache := resource.ResourceCache{}
@@ -124,6 +124,9 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 	}{
 		{"sg", func(token string) (resource.FetchResult, error) {
 			return awsclient.FetchSecurityGroupsPage(context.Background(), ec2Fake, token)
+		}},
+		{"rtb", func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchRouteTablesPage(context.Background(), ec2Fake, token)
 		}},
 		{"ebs", func(token string) (resource.FetchResult, error) {
 			return awsclient.FetchEBSVolumesPage(context.Background(), ec2Fake, token)

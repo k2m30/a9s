@@ -102,7 +102,7 @@ One bullet per distinct signal.
   - **API call**: `GetTrailStatus(Name=<trailARN>)` — one per trail (same call — combine `IsLogging` and `LatestDeliveryTime` from the single response).
   - **Cost shape**: per-resource.
 
-- **Signal**: the S3 bucket this trail delivers to carries the `s3.public` finding.
+- **Signal**: the S3 bucket this trail delivers to is public by the same verdict as the bucket's `s3.public` finding: a public policy status with the bucket's `RestrictPublicBuckets` off, or an ACL grant to a public group with the bucket's `IgnorePublicAcls` off.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -132,7 +132,7 @@ One row per signal from §3:
 | `IsLogging==false` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not logging` |
 | `LatestDeliveryError` non-empty | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `delivery error: <error>` |
 | `LatestDeliveryTime` >1h stale (on `IsLogging==true`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `delivery stale since <time>` |
-| the S3 bucket this trail delivers to carries the `s3.public` finding | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `log bucket is publicly accessible` |
+| the S3 bucket this trail delivers to is public by the `s3.public` verdict (policy or ACL) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `log bucket is publicly accessible` |
 | the S3 bucket this trail delivers to carries the `s3.access-logging-off` finding | 2 | Warning | `~` | S2, S3, S4, S5 | `log bucket has no access logging` |
 
 Rules for filling list and detail text:

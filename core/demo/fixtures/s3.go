@@ -301,6 +301,16 @@ func buildS3PublicAccessBlockConfigs() map[string]*s3.GetPublicAccessBlockOutput
 		},
 		// no-pab: return nil → fake returns NoSuchPublicAccessBlockConfiguration.
 		S3BucketPublicByACL: nil,
+		// public by policy: RestrictPublicBuckets off, or S3 would serve the
+		// public policy to no one outside the account.
+		S3BucketPublic: {
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       aws.Bool(true),
+				IgnorePublicAcls:      aws.Bool(true),
+				BlockPublicPolicy:     aws.Bool(false),
+				RestrictPublicBuckets: aws.Bool(false),
+			},
+		},
 		// partial-pab: BlockPublicAcls=false, others true → Warning (one flag off).
 		"a9s-demo-partial-pab": {
 			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{

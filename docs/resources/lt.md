@@ -110,7 +110,7 @@ Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber !
 
 All three signals ride the same single call: `DescribeLaunchTemplateVersions(Versions=["$Default"])`, one per template.
 
-- **Signal**: `ImageId` present in the already-loaded `ami` cache AND that AMI's `DeprecationTime` is past — new launches use a deprecated image. NOT-in-cache ≠ deregistered (public/marketplace AMIs are legitimately absent from the owner-scoped cache) — no signal then. `resolve:ssm:` references are skipped.
+- **Signal**: `ImageId` present in the already-loaded `ami` cache AND that AMI's `DeprecationTime` is past — new launches use a deprecated image. NOT-in-cache ≠ deregistered (public/marketplace AMIs are legitimately absent from the owner-scoped cache) — no signal then on a complete list; on an unloaded or truncated list an absent AMI may sit on an unread page, so the row reads not inspected. `resolve:ssm:` references are skipped.
   - **State bucket**: Warning.
   - **API call**: none beyond the same call (cross-ref of the loaded `ami` list).
   - **Cost shape**: per-resource.

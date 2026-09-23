@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -206,7 +207,7 @@ func cachedBucketNames(cache resource.ResourceCache) map[string]bool {
 // and returns a Finding for any distribution with insecure viewer or origin protocol settings.
 //
 // Findings (severity "~" — informational):
-//   - DefaultCacheBehavior.ViewerProtocolPolicy == "allow-all" → "no HTTPS redirect (insecure)"
+//   - the default or any ordered cache behaviour with ViewerProtocolPolicy "allow-all"
 //   - Any Origin with CustomOriginConfig.OriginProtocolPolicy == "http-only" → "origin without TLS"
 //
 // Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
@@ -256,12 +257,24 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		cfg := out.DistributionConfig
 		var rows []domain.DetailRow
 
-		// Check viewer protocol policy on default cache behavior.
+		// A request matching an ordered behaviour's path is served by that
+		// behaviour's policy alone, whatever the default says.
+		var plainHTTP []string
 		if cfg.DefaultCacheBehavior != nil &&
 			cfg.DefaultCacheBehavior.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
+			plainHTTP = append(plainHTTP, "Default (*)")
+		}
+		if cfg.CacheBehaviors != nil {
+			for _, b := range cfg.CacheBehaviors.Items {
+				if b.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
+					plainHTTP = append(plainHTTP, aws.ToString(b.PathPattern))
+				}
+			}
+		}
+		if len(plainHTTP) > 0 {
 			rows = append(rows, domain.DetailRow{
 				Label: "Viewer protocol policy",
-				Value: "allow-all",
+				Value: "allow-all on " + strings.Join(plainHTTP, ", "),
 				Tier:  "~",
 			})
 		}

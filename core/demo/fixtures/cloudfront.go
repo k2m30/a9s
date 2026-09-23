@@ -354,6 +354,11 @@ const (
 	// below TLS 1.2.
 	CFDeprecatedTLS = "E2B3C4D5E6F7G8"
 
+	// CFOrderedBehaviourHTTP is the distribution whose default behaviour
+	// redirects to HTTPS while its /api/* behaviour allows plain HTTP; it is
+	// also the deprecated-TLS distribution.
+	CFOrderedBehaviourHTTP = CFDeprecatedTLS
+
 	// CFLoggingOff is the distribution with access logging switched off.
 	CFLoggingOff = "E5E6F7G8H9I0J1"
 
@@ -461,6 +466,15 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	}
 
 	cfgs[CFDeprecatedTLS].ViewerCertificate.MinimumProtocolVersion = cftypes.MinimumProtocolVersionTLSv12016
+	// The legacy API redirects to HTTPS by default but still serves /api/*
+	// over plain HTTP: the ordered behaviour decides for its path.
+	cfgs[CFOrderedBehaviourHTTP].CacheBehaviors = &cftypes.CacheBehaviors{
+		Quantity: aws.Int32(2),
+		Items: []cftypes.CacheBehavior{
+			{PathPattern: aws.String("/static/*"), TargetOriginId: aws.String("alb-legacy-api"), ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyHttpsOnly},
+			{PathPattern: aws.String("/api/*"), TargetOriginId: aws.String("alb-legacy-api"), ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyAllowAll},
+		},
+	}
 	cfgs[CFNoRootObject].DefaultRootObject = aws.String("")
 	cfgs[CFLoggingOff].Logging = nil
 	// The distribution keeps its insecure viewer policy from the summary.

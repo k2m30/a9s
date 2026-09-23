@@ -88,37 +88,31 @@ func coversSensitivePort(p ec2types.IpPermission) bool {
 }
 
 // isInternetFacing reports whether the IpPermission is open to the public
-// internet. Both address families are one question, answered by
-// CIDROpenToEveryone: a rule reaching every IPv6 client is internet-facing
-// whether or not it also names an IPv4 range.
-func isInternetFacing(p ec2types.IpPermission) bool {
-	cidrs := make([]string, 0, len(p.IpRanges)+len(p.Ipv6Ranges))
-	for _, r := range p.IpRanges {
-		cidrs = append(cidrs, aws.ToString(r.CidrIp))
+// internet over the address families asked about: IpRanges answers for IPv4,
+// Ipv6Ranges for IPv6. A rule open to ::/0 alone reaches no IPv4 client.
+func isInternetFacing(p ec2types.IpPermission, ipv4, ipv6 bool) bool {
+	var cidrs []string
+	if ipv4 {
+		for _, r := range p.IpRanges {
+			cidrs = append(cidrs, aws.ToString(r.CidrIp))
+		}
 	}
-	for _, r := range p.Ipv6Ranges {
-		cidrs = append(cidrs, aws.ToString(r.CidrIpv6))
+	if ipv6 {
+		for _, r := range p.Ipv6Ranges {
+			cidrs = append(cidrs, aws.ToString(r.CidrIpv6))
+		}
 	}
 	return CIDROpenToEveryone(cidrs)
 }
 
-// computeSGRiskFields inspects the ingress rules of a security group and
-// returns (dangerous_open_count, wide_open, open_ports). All three are machine
-// fields: the ec2 internet-exposure signal reads wide_open and open_ports
-// through the sg cache.
-//
-// open_ports is the sorted, comma-separated list of sensitive ports the group
-// leaves open to the internet, empty when it leaves none. A wide-open group
-// reports no list: every port is open, which wide_open already says.
-// dangerous_open_count counts matching rules, not ports, so it is non-zero
-// beside an empty list for a wide-open group and can exceed the list's length
-// when several rules open one port.
-func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
-	dangerousCount := 0
-	wideOpen := false
+// sgExposure is the exposure rule of a group's ingress rules over the address
+// families asked about: whether an all-protocols rule is open to everyone,
+// the sorted, comma-separated sensitive ports left open (empty when wide
+// open, since every port is), and how many rules open a sensitive port.
+func sgExposure(perms []ec2types.IpPermission, ipv4, ipv6 bool) (wideOpen bool, ports string, dangerousCount int) {
 	portSet := make(map[int32]struct{})
 	for _, p := range perms {
-		if !isInternetFacing(p) {
+		if !isInternetFacing(p, ipv4, ipv6) {
 			continue
 		}
 		if aws.ToString(p.IpProtocol) == "-1" {
@@ -129,10 +123,8 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 			dangerousCount++
 			if p.FromPort != nil && p.ToPort != nil {
 				from, to := *p.FromPort, *p.ToPort
-				// Always enumerate the dangerous ports that fall inside [from, to].
-				// We iterate the sensitive-port set (small, constant) rather than the
-				// range itself, so a 1-65535 rule stays O(|sensitivePorts|) and
-				// correctly surfaces every dangerous port the rule actually exposes.
+				// Iterating the sensitive-port set rather than the range keeps
+				// a 1-65535 rule O(|sensitivePorts|).
 				for sp := range sensitivePorts {
 					if sp >= from && sp <= to {
 						portSet[sp] = struct{}{}
@@ -141,24 +133,43 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 			}
 		}
 	}
-	wideOpenStr := "false"
-	if wideOpen {
-		wideOpenStr = "true"
+	if wideOpen || len(portSet) == 0 {
+		return wideOpen, "", dangerousCount
 	}
-	openPorts := ""
-	if !wideOpen && len(portSet) > 0 {
-		ports := make([]int, 0, len(portSet))
-		for p := range portSet {
-			ports = append(ports, int(p))
-		}
-		sort.Ints(ports)
-		parts := make([]string, len(ports))
-		for i, p := range ports {
-			parts[i] = strconv.Itoa(p)
-		}
-		openPorts = strings.Join(parts, ", ")
+	sorted := make([]int, 0, len(portSet))
+	for p := range portSet {
+		sorted = append(sorted, int(p))
 	}
-	return strconv.Itoa(dangerousCount), wideOpenStr, openPorts
+	sort.Ints(sorted)
+	parts := make([]string, len(sorted))
+	for i, p := range sorted {
+		parts[i] = strconv.Itoa(p)
+	}
+	return false, strings.Join(parts, ", "), dangerousCount
+}
+
+// sgFamilyExposure is sg's exposure to clients of one address family: IPv6
+// when ipv6 is set, IPv4 otherwise. A resource is reachable only over the
+// families it holds a public address in, so the ec2 internet-exposure signal
+// judges each family on its own.
+func sgFamilyExposure(sg ec2types.SecurityGroup, ipv6 bool) (wideOpen bool, ports string) {
+	wideOpen, ports, _ = sgExposure(sg.IpPermissions, !ipv6, ipv6)
+	return wideOpen, ports
+}
+
+// computeSGRiskFields inspects the ingress rules of a security group over
+// both address families and returns (dangerous_open_count, wide_open,
+// open_ports), the group row's own verdict.
+//
+// open_ports is the sorted, comma-separated list of sensitive ports the group
+// leaves open to the internet, empty when it leaves none. A wide-open group
+// reports no list: every port is open, which wide_open already says.
+// dangerous_open_count counts matching rules, not ports, so it is non-zero
+// beside an empty list for a wide-open group and can exceed the list's length
+// when several rules open one port.
+func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
+	wideOpen, openPorts, dangerousCount := sgExposure(perms, true, true)
+	return strconv.Itoa(dangerousCount), strconv.FormatBool(wideOpen), openPorts
 }
 
 // sgRiskFindings ranks wide-open ahead of dangerous ports: a rule opening every
@@ -170,14 +181,34 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 // The ports arrive as the list, never as a sentence to take apart: an empty one
 // beside a non-zero count reaches the slot filler, which refuses it, rather than
 // quietly rendering a group with an open port as clean.
-func sgRiskFindings(wideOpen, dangerousOpenCount, openPorts string) []domain.Finding {
+//
+// openRange names the ranges the verdict's rules are open to, so a group open
+// only to ::/0 does not read as open to 0.0.0.0/0.
+func sgRiskFindings(wideOpen, dangerousOpenCount, openPorts, openRange string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
-		return []domain.Finding{wave1Finding(sgCodeWideOpen)}
+		return []domain.Finding{wave1Finding(sgCodeWideOpen, openRange)}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
-		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, openPorts)}
+		return []domain.Finding{wave1Finding(sgCodeDangerousPorts, openPorts, openRange)}
 	}
 	return nil
+}
+
+// sgOpenRange names the everyone-ranges behind the group's risk verdict:
+// the families with an all-protocols rule open to everyone when wideOpen, else
+// the families with a sensitive port open to everyone.
+func sgOpenRange(perms []ec2types.IpPermission, wideOpen bool) string {
+	var ranges []string
+	for _, fam := range []struct {
+		ipv6 bool
+		cidr string
+	}{{false, "0.0.0.0/0"}, {true, "::/0"}} {
+		wide, _, count := sgExposure(perms, !fam.ipv6, fam.ipv6)
+		if (wideOpen && wide) || (!wideOpen && count > 0) {
+			ranges = append(ranges, fam.cidr)
+		}
+	}
+	return strings.Join(ranges, " and ")
 }
 
 // sgDefaultAllowsTraffic reports whether sg is a VPC's default security
@@ -246,7 +277,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 
 		dangerousCount, wideOpen, openPorts := computeSGRiskFields(sg.IpPermissions)
 
-		findings := sgRiskFindings(wideOpen, dangerousCount, openPorts)
+		findings := sgRiskFindings(wideOpen, dangerousCount, openPorts, sgOpenRange(sg.IpPermissions, wideOpen == "true"))
 		// The Status cell is the risk verdict's own phrase, read back off the
 		// finding rather than assembled a second time. Taken before the
 		// default-group finding is appended, which is a separate fact and does

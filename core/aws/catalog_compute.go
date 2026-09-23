@@ -281,9 +281,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchEC2InstancesByIDs(ctx, c.EC2, ids)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100, Reads: []string{"sg"}},
+		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100, Reads: []string{"sg", "rtb"}},
 		FieldKeys: []string{
-			"instance_id", "name", "state", "type", "private_ip", "public_ip",
+			"instance_id", "name", "state", "type", "private_ip", "public_ip", "ipv6_address",
 			"launch_time", "lifecycle", "image_id", "vpc_id",
 			"system_status", "instance_status", "state_reason_code",
 		},

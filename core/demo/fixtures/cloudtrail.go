@@ -88,11 +88,12 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 func buildCTTrails() []cloudtrailtypes.Trail {
 	return []cloudtrailtypes.Trail{
 		{
-			// TrailLogBucketPublic: delivers to the bucket the s3 enricher
-			// reports as public, which is what trail.log-bucket-public joins on.
+			// TrailLogBucketPublic: delivers to the bucket public by an ACL
+			// grant alone, so the trail's verdict is visibly the bucket's own
+			// and not a policy-status read.
 			Name:                       aws.String(TrailLogBucketPublic),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/" + TrailLogBucketPublic),
-			S3BucketName:               aws.String(S3BucketPublic),
+			S3BucketName:               aws.String(S3BucketPublicByACL),
 			HomeRegion:                 aws.String("us-east-1"),
 			IsMultiRegionTrail:         aws.Bool(true),
 			IsOrganizationTrail:        aws.Bool(false),
@@ -227,21 +228,8 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// Audit trails for PAB-issue buckets — give the operator a
-		// "who's watching this?" pivot from the public-access findings.
-		{
-			Name:                       aws.String("a9s-demo-s3-nopab-audit"),
-			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-nopab-audit"),
-			S3BucketName:               aws.String("a9s-demo-nopab"),
-			HomeRegion:                 aws.String("us-east-1"),
-			IsMultiRegionTrail:         aws.Bool(false),
-			IsOrganizationTrail:        aws.Bool(false),
-			LogFileValidationEnabled:   aws.Bool(true),
-			IncludeGlobalServiceEvents: aws.Bool(false),
-			HasCustomEventSelectors:    aws.Bool(false),
-			HasInsightSelectors:        aws.Bool(false),
-			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
-			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
-		},
+		// "who's watching this?" pivot from the public-access findings. The
+		// no-block bucket's trail is TrailLogBucketPublic.
 		{
 			Name:                       aws.String("a9s-demo-s3-partial-audit"),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-partial-audit"),
@@ -1094,8 +1082,9 @@ const (
 	// TrailNoKMS is the trail whose log files carry no KMS key.
 	TrailNoKMS = "acme-unencrypted-trail"
 
-	// TrailLogBucketPublic is the trail delivering to fixtures.S3BucketPublic,
-	// the bucket the s3 enricher reports as public.
+	// TrailLogBucketPublic is the trail delivering to
+	// fixtures.S3BucketPublicByACL, the bucket the s3 enricher reports as
+	// public by an ACL grant.
 	TrailLogBucketPublic = "acme-public-bucket-trail"
 
 	// TrailLogBucketNoLogging is the trail delivering to the bucket the s3

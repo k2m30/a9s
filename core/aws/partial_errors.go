@@ -377,9 +377,10 @@ func deniedAction(message string) (string, bool) {
 const classUnknown = "Unknown"
 
 // ClassifyAWSError inspects an error for a smithy.APIError and returns the
-// error code, message, and whether the operation is retryable. This is the one
-// read of the SDK's error type in a9s: every other site asks ErrClass for the
-// class, ErrCodeIs for a code it names itself, or MessageOf for the message.
+// error code, message, and whether the operation is retryable. It and
+// isAWSRefusal are the reads of the SDK's error type in a9s: every other site
+// asks ErrClass for the class, ErrCodeIs for a code it names itself, or
+// MessageOf for the message.
 func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 	if err == nil {
 		return "", "", false
@@ -397,6 +398,15 @@ func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 	// table already says, read here so a code cannot be worth retrying and
 	// classify as a generic error at the same time.
 	return code, message, awsCodeClass[code] == ClassThrottled
+}
+
+// isAWSRefusal reports whether err is AWS answering the request with a
+// client-side refusal (denied, not found, invalid): asked again, the same
+// request gets the same answer. A throttle, a server fault, a transport
+// failure, or a cancelled or lapsed context is not one.
+func isAWSRefusal(err error) bool {
+	apiErr, ok := errors.AsType[smithy.APIError](err)
+	return ok && apiErr.ErrorFault() == smithy.FaultClient && awsCodeClass[apiErr.ErrorCode()] != ClassThrottled
 }
 
 // awsCodeClass is the one AWS-error-code table in a9s: which class each code

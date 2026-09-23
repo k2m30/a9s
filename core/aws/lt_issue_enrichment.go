@@ -69,19 +69,14 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 
 	}
 
+	// An AMI absent from an unloaded or truncated ami list may be a deprecated
+	// one on a page nobody read, so the template reads not inspected.
 	amiEntry, amiLoaded := cache["ami"]
-	if !amiLoaded {
-		for _, res := range resources {
-			if raw, ok := assertStruct[LTRaw](res.RawStruct); ok && raw.DefaultVersion.LaunchTemplateData != nil &&
-				strings.HasPrefix(aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId), "ami-") {
-				markUninspected(&result, res.ID, checkListIncomplete("ami"))
-			}
-		}
-		return result, nil
-	}
-
+	complete := amiLoaded && !amiEntry.IsTruncated
+	listed := make(map[string]bool, len(amiEntry.Resources))
 	deprecatedByID := make(map[string]bool, len(amiEntry.Resources))
 	for _, amiRes := range amiEntry.Resources {
+		listed[amiRes.ID] = true
 		img, ok := assertStruct[ec2types.Image](amiRes.RawStruct)
 		if !ok || img.DeprecationTime == nil || *img.DeprecationTime == "" {
 			continue
@@ -94,9 +89,6 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 			deprecatedByID[amiRes.ID] = true
 		}
 	}
-	if len(deprecatedByID) == 0 {
-		return result, nil
-	}
 
 	for _, res := range resources {
 		raw, ok := assertStruct[LTRaw](res.RawStruct)
@@ -104,11 +96,13 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 			continue
 		}
 		imageID := aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId)
-		if !strings.HasPrefix(imageID, "ami-") || !deprecatedByID[imageID] {
-			continue
+		switch {
+		case !strings.HasPrefix(imageID, "ami-"):
+		case deprecatedByID[imageID]:
+			setWave2Finding(&result, res.ID, ltCodeDeprecatedAMI, []domain.DetailRow{{Label: "AMI", Value: imageID, Tier: tierOf(ltCodeDeprecatedAMI)}})
+		case !listed[imageID] && !complete:
+			markUninspected(&result, res.ID, checkListIncomplete("ami"))
 		}
-		setWave2Finding(&result, res.ID, ltCodeDeprecatedAMI, []domain.DetailRow{{Label: "AMI", Value: imageID, Tier: tierOf(ltCodeDeprecatedAMI)}})
-
 	}
 
 	return result, nil

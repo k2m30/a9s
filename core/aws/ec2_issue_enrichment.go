@@ -204,89 +204,239 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 	return result, walkErr
 }
 
-// ec2InternetExposure is the ec2 ↔ sg cross-reference: an instance holding a
-// public IP whose security groups already carry sg.go's risk verdict is
-// API call; the sensitive-port set and the exposure rules are owned by sg.go,
-// and this pass only joins them to the instance.
-// An unloaded "sg" cache is not a clean bill of health: every instance the
-// join would judge is marked not inspected instead.
+// ec2InternetExposure is the ec2 ↔ sg ↔ rtb cross-reference: a public
+// address whose interface's security groups open a sensitive port, or every
+// port, to everyone on that address's family, in a subnet whose route table
+// sends that family's default route to an internet gateway, is reachable from
+// the internet. No API call; the exposure rule per address family is owned by
+// sg.go (sgFamilyExposure), and this pass only joins it to each interface.
+//
+// A NAT gateway or an egress-only gateway admits nothing inbound, so an
+// address behind one is not exposed. A group or a route table the loaded
+// lists cannot answer for marks the row not inspected — beside the finding
+// when one was found, since the unread part could widen it.
 func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) {
 	sgEntry, sgLoaded := cache["sg"]
-	type sgRisk struct {
-		wideOpen bool
-		ports    string
-	}
-	risk := make(map[string]sgRisk, len(sgEntry.Resources))
+	rtbEntry, rtbLoaded := cache["rtb"]
+	groups := make(map[string]ec2types.SecurityGroup, len(sgEntry.Resources))
 	for _, sg := range sgEntry.Resources {
-		risk[sg.ID] = sgRisk{
-			wideOpen: sg.Fields["wide_open"] == "true",
-			ports:    sg.Fields["open_ports"],
+		if raw, ok := assertStruct[ec2types.SecurityGroup](sg.RawStruct); ok {
+			groups[sg.ID] = raw
 		}
 	}
 
 	for _, r := range resources {
-		publicIP := r.Fields["public_ip"]
-		if publicIP == "" || r.Fields["state"] != "running" {
-			continue
-		}
-		if !sgLoaded {
-			markUninspected(result, r.ID, checkListIncomplete("sg"))
+		if r.Fields["state"] != "running" {
 			continue
 		}
 		inst, ok := assertStruct[ec2types.Instance](r.RawStruct)
 		if !ok {
 			continue
 		}
-		var groupIDs []string
-		wideOpen := false
-		portSet := map[string]bool{}
-		for _, g := range inst.SecurityGroups {
-			id := aws.ToString(g.GroupId)
-			ri, known := risk[id]
-			if !known {
-				continue
-			}
-			groupIDs = append(groupIDs, id)
-			if ri.wideOpen {
-				wideOpen = true
-			}
-			for p := range strings.SplitSeq(ri.ports, ", ") {
-				if p != "" {
-					portSet[p] = true
+		ifaces := ec2Interfaces(inst)
+		if !slices.ContainsFunc(ifaces, ec2Interface.public) {
+			continue
+		}
+		if !sgLoaded {
+			markUninspected(result, r.ID, checkListIncomplete("sg"))
+			continue
+		}
+		var all ec2Exposure
+		var addresses, groupIDs []string
+		groupUnread, routeUnread := false, false
+		for _, ifc := range ifaces {
+			for _, fam := range []struct {
+				ipv6  bool
+				addrs []string
+				dest  string
+			}{{false, ifc.ipv4, "0.0.0.0/0"}, {true, ifc.ipv6, "::/0"}} {
+				if len(fam.addrs) == 0 {
+					continue
 				}
+				var e ec2Exposure
+				for _, g := range ifc.groups {
+					id := aws.ToString(g.GroupId)
+					sg, known := groups[id]
+					// A live instance's group cannot be absent from the
+					// account's groups; missing from any list, the list is
+					// short or stale, and says nothing about its rules.
+					if !known {
+						groupUnread = true
+						continue
+					}
+					if !slices.Contains(groupIDs, id) {
+						groupIDs = append(groupIDs, id)
+					}
+					e.add(sgFamilyExposure(sg, fam.ipv6))
+				}
+				if !e.exposed() {
+					continue
+				}
+				routed, decided := ec2RoutedToInternet(aws.ToString(inst.VpcId), ifc.subnet, fam.dest, rtbEntry, rtbLoaded)
+				routeUnread = routeUnread || !decided
+				if !routed {
+					continue
+				}
+				all.add(e.wideOpen, strings.Join(e.ports, ", "))
+				addresses = append(addresses, fam.addrs...)
 			}
 		}
+		switch {
+		case groupUnread:
+			markUninspected(result, r.ID, checkListIncomplete("sg"))
+		case routeUnread:
+			markUninspected(result, r.ID, checkListIncomplete("rtb"))
+		}
+		if !all.exposed() {
+			continue
+		}
 		portList := "all"
-		if !wideOpen {
-			if len(portSet) == 0 {
-				continue
-			}
-			ports := make([]string, 0, len(portSet))
-			for p := range portSet {
-				ports = append(ports, p)
-			}
-			sort.Slice(ports, func(i, j int) bool {
-				a, _ := strconv.Atoi(ports[i])
-				b, _ := strconv.Atoi(ports[j])
+		if !all.wideOpen {
+			sort.Slice(all.ports, func(i, j int) bool {
+				a, _ := strconv.Atoi(all.ports[i])
+				b, _ := strconv.Atoi(all.ports[j])
 				return a < b
 			})
-			portList = strings.Join(ports, ", ")
+			portList = strings.Join(all.ports, ", ")
 		}
 		sort.Strings(groupIDs)
 		rows := []domain.DetailRow{
-			{Label: "Public address", Value: publicIP, Tier: "!"},
+			{Label: "Public address", Value: strings.Join(addresses, ", "), Tier: "!"},
 			{Label: "Security groups", Value: strings.Join(groupIDs, ", "), Tier: "!"},
 			{Label: "Ports", Value: portList, Tier: "!"},
 		}
 		// A group admitting every protocol is a different statement from a
 		// list of ports, so it carries its own code and its own sentence
 		// rather than a list whose only member is the word "all".
-		if wideOpen {
+		if all.wideOpen {
 			setWave2Finding(result, r.ID, ec2CodeInternetExposedAll, rows)
 			continue
 		}
 		setWave2Finding(result, r.ID, ec2CodeInternetExposed, rows, portList)
 	}
+}
+
+// ec2Exposure accumulates sgFamilyExposure verdicts across groups and
+// interfaces: wide open when any is, else the union of their ports.
+type ec2Exposure struct {
+	wideOpen bool
+	ports    []string
+}
+
+func (e *ec2Exposure) add(wideOpen bool, ports string) {
+	e.wideOpen = e.wideOpen || wideOpen
+	for p := range strings.SplitSeq(ports, ", ") {
+		if p != "" && !slices.Contains(e.ports, p) {
+			e.ports = append(e.ports, p)
+		}
+	}
+}
+
+func (e ec2Exposure) exposed() bool { return e.wideOpen || len(e.ports) > 0 }
+
+// ec2Interface is one network interface's public addresses, security groups
+// and subnet: AWS applies groups and routes per interface, not per instance.
+type ec2Interface struct {
+	subnet string
+	groups []ec2types.GroupIdentifier
+	ipv4   []string
+	ipv6   []string
+}
+
+func (i ec2Interface) public() bool { return len(i.ipv4)+len(i.ipv6) > 0 }
+
+// ec2Interfaces reads the instance's interfaces: each one's public IPv4
+// addresses (the association of each of its private addresses, which is
+// where an Elastic IP on a secondary interface lands) and its IPv6 addresses.
+// The instance-level public address, IPv6 address, subnet and groups are the
+// primary interface's (device index 0); they fill in whatever the reported
+// interfaces leave out, and stand alone for an instance reported without any.
+func ec2Interfaces(inst ec2types.Instance) []ec2Interface {
+	out := make([]ec2Interface, 0, len(inst.NetworkInterfaces)+1)
+	primary := 0
+	for _, eni := range inst.NetworkInterfaces {
+		i := ec2Interface{subnet: aws.ToString(eni.SubnetId), groups: eni.Groups}
+		if eni.Association != nil {
+			i.ipv4 = appendNew(i.ipv4, aws.ToString(eni.Association.PublicIp))
+		}
+		for _, p := range eni.PrivateIpAddresses {
+			if p.Association != nil {
+				i.ipv4 = appendNew(i.ipv4, aws.ToString(p.Association.PublicIp))
+			}
+		}
+		for _, a := range eni.Ipv6Addresses {
+			i.ipv6 = appendNew(i.ipv6, aws.ToString(a.Ipv6Address))
+		}
+		if eni.Attachment != nil && aws.ToInt32(eni.Attachment.DeviceIndex) == 0 {
+			primary = len(out)
+		}
+		out = append(out, i)
+	}
+	if len(out) == 0 {
+		out = append(out, ec2Interface{})
+	}
+	carried := func(addr string, v6 bool) bool {
+		return slices.ContainsFunc(out, func(i ec2Interface) bool {
+			if v6 {
+				return slices.Contains(i.ipv6, addr)
+			}
+			return slices.Contains(i.ipv4, addr)
+		})
+	}
+	p := &out[primary]
+	if v4 := aws.ToString(inst.PublicIpAddress); !carried(v4, false) {
+		p.ipv4 = appendNew(p.ipv4, v4)
+	}
+	if v6 := aws.ToString(inst.Ipv6Address); !carried(v6, true) {
+		p.ipv6 = appendNew(p.ipv6, v6)
+	}
+	if p.subnet == "" {
+		p.subnet = aws.ToString(inst.SubnetId)
+	}
+	if len(p.groups) == 0 {
+		p.groups = inst.SecurityGroups
+	}
+	return out
+}
+
+// appendNew appends s to list unless it is empty or already there.
+func appendNew(list []string, s string) []string {
+	if s == "" || slices.Contains(list, s) {
+		return list
+	}
+	return append(list, s)
+}
+
+// ec2RoutedToInternet reports whether subnet's route table sends dest (an
+// address family's default route, "0.0.0.0/0" or "::/0") to an internet
+// gateway, and whether the loaded rtb list can tell. subnetRouteTableIDs owns
+// which table serves the subnet, falling back to the VPC's main table only on
+// a complete list.
+func ec2RoutedToInternet(vpc, subnet, dest string, rtb resource.ResourceCacheEntry, loaded bool) (routed, decided bool) {
+	if !loaded {
+		return false, false
+	}
+	ids := subnetRouteTableIDs(subnet, vpc, rtb.Resources, !rtb.IsTruncated)
+	for _, row := range rtb.Resources {
+		if !slices.Contains(ids, row.ID) {
+			continue
+		}
+		table, ok := assertStruct[ec2types.RouteTable](row.RawStruct)
+		if !ok {
+			continue
+		}
+		decided = true
+		for _, route := range table.Routes {
+			to := aws.ToString(route.DestinationCidrBlock)
+			if dest == "::/0" {
+				to = aws.ToString(route.DestinationIpv6CidrBlock)
+			}
+			if to == dest && routeGatewayTarget(route, "igw") != "" {
+				return true, true
+			}
+		}
+	}
+	return false, decided
 }
 
 // ec2UserDataSecrets reads each instance's user-data script via

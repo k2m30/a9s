@@ -109,13 +109,20 @@ const (
 	// Elastic IP with, so the address is the one it would really have.
 	EC2InstancePublicIPOnly = "i-0a1b2c3d4e5f60001"
 	// EC2InstanceInternetExposed holds a public address AND carries
-	// public-ssh-bad (sg-0public0ssh000001, port 22 open to 0.0.0.0/0).
+	// public-ssh-bad (sg-0public0ssh000001, port 22 open to 0.0.0.0/0 and ::/0).
 	EC2InstanceInternetExposed = "i-0a1b2c3d4e5f60005"
 	// EC2InstanceInternetExposedAll is the only instance behind a group that
 	// admits every protocol from 0.0.0.0/0 (public-all-open,
 	// sg-0public0all000003); every other public instance is behind a group
 	// that names its ports.
 	EC2InstanceInternetExposedAll = "i-0a1b2c3d4e5f60050"
+	// EC2InstanceIPv6Exposed has no public IPv4 address but an IPv6 address
+	// in prod-public, whose ::/0 route goes to the internet gateway, behind
+	// public-ssh-bad, whose port 22 is also open to ::/0.
+	EC2InstanceIPv6Exposed = "i-0aaa111111111111a"
+	// EC2InstanceIPv6EgressOnly is the same shape in prod-private, whose ::/0
+	// route goes to an egress-only gateway: nothing reaches it inbound.
+	EC2InstanceIPv6EgressOnly = "i-0a1b2c3d4e5f60040"
 	// EC2InstanceHostileTag is the only demo instance whose Name tag was
 	// written by someone who wanted the terminal, not the operator, to read
 	// it: the value opens an SGR sequence that recolours the rest of the
@@ -676,9 +683,13 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("aws:ec2launchtemplate:id"), Value: aws.String(ProdWebLTID)},
 		)
 	}
-	// The bastion is the only internet-exposed instance: a public address in
-	// front of public-ssh-bad, whose port 22 is open to 0.0.0.0/0.
-	if instanceID == EC2InstanceInternetExposed {
+	if ipv6, ok := instanceIPv6[instanceID]; ok {
+		inst.Ipv6Address = aws.String(ipv6)
+	}
+	// The bastion is the only instance exposed over IPv4: a public address in
+	// front of public-ssh-bad, whose port 22 is open to 0.0.0.0/0. The
+	// dual-stack pair sits behind it too, so its ::/0 rule is judged by route.
+	if instanceID == EC2InstanceInternetExposed || instanceIPv6[instanceID] != "" {
 		inst.SecurityGroups = append(inst.SecurityGroups, ec2types.GroupIdentifier{
 			GroupId:   aws.String("sg-0public0ssh000001"),
 			GroupName: aws.String("public-ssh-bad"),
@@ -688,6 +699,12 @@ func makeInstance(
 		inst.PublicIpAddress = aws.String(publicIP)
 	}
 	return inst
+}
+
+// instanceIPv6 is the primary IPv6 address of each dual-stack instance.
+var instanceIPv6 = map[string]string{
+	EC2InstanceIPv6Exposed:    "2001:db8:a9:1a00::10",
+	EC2InstanceIPv6EgressOnly: "2001:db8:a9:3a00::10",
 }
 
 // httpTokensFor keeps EC2InstanceIMDSv1 the single demo instance that still
@@ -1155,7 +1172,8 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
-		// SSH open to 0.0.0.0/0 → Risk column shows PORTS:22
+		// SSH open to both families: the Status cell reads
+		// "port 22 open to 0.0.0.0/0 and ::/0".
 		{
 			GroupId:          aws.String("sg-0public0ssh000001"),
 			GroupName:        aws.String("public-ssh-bad"),
@@ -1169,6 +1187,7 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 					FromPort:   aws.Int32(22),
 					ToPort:     aws.Int32(22),
 					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+					Ipv6Ranges: []ec2types.Ipv6Range{{CidrIpv6: aws.String("::/0")}},
 				},
 			},
 			IpPermissionsEgress: []ec2types.IpPermission{
@@ -2075,6 +2094,7 @@ func buildRouteTables() []ec2types.RouteTable {
 			Routes: []ec2types.Route{
 				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), GatewayId: aws.String("igw-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				{DestinationIpv6CidrBlock: aws.String("::/0"), GatewayId: aws.String("igw-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				{DestinationCidrBlock: aws.String("10.1.0.0/16"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				// required for rtb→eni related-panel pivot (checkRTBENI):
 				// route via a real ENI in this VPC (eni-0eee555555555555e, ec2.go).
@@ -2099,6 +2119,7 @@ func buildRouteTables() []ec2types.RouteTable {
 			Routes: []ec2types.Route{
 				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				{DestinationIpv6CidrBlock: aws.String("::/0"), EgressOnlyInternetGatewayId: aws.String("eigw-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				// required for rtb→vpc-peer related-panel pivot (second of
 				// the two rtb fixtures routing into ProdPeerSharedID,
 				// vpcpeer.go).

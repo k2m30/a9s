@@ -63,12 +63,14 @@ func (f *w2S3Posture) GetPublicAccessBlock(_ context.Context, in *s3.GetPublicAc
 	if err := f.fail(b); err != nil {
 		return nil, err
 	}
+	// A public policy reaches the internet only with RestrictPublicBuckets
+	// off; with it on, S3 serves the policy to the owner's account alone.
 	return &s3.GetPublicAccessBlockOutput{
 		PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
 			BlockPublicAcls:       aws.Bool(true),
 			IgnorePublicAcls:      aws.Bool(true),
-			BlockPublicPolicy:     aws.Bool(true),
-			RestrictPublicBuckets: aws.Bool(true),
+			BlockPublicPolicy:     aws.Bool(!f.policyPublic[b]),
+			RestrictPublicBuckets: aws.Bool(!f.policyPublic[b]),
 		},
 	}, nil
 }

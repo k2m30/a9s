@@ -15,6 +15,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request and response payload, a source repository URL without its credentials and a webhook
   subscription by its origin. A `snapshot.json` written by an earlier version still holds the
   old values: delete it or collect again.
+- An EC2 instance is reported reachable from the internet only over an address
+  family it holds a public address in. A security group rule open to `::/0` no
+  longer flags an IPv4-only instance, and an instance with only an IPv6 address
+  is now flagged when its subnet routes `::/0` to an internet gateway. Behind an
+  egress-only gateway it is not flagged.
+- An EC2 instance attached to a security group that is not on the loaded group
+  list, whether the list is partial or stale, now reads as not inspected. It
+  used to read as clean. The same applies when its subnet's route table is not
+  on the loaded list.
+- A CloudFront distribution that serves any path over plain HTTP is now
+  reported, and the detail names that path. Only the default cache behaviour
+  was checked before.
+- A trail whose log bucket is public through an ACL grant is now reported. The
+  trail and the bucket list now use the same check to decide whether a bucket
+  is public.
+- Lambda function posture findings and CloudFront missing-origin-bucket
+  findings now appear on live sessions. The live clients did not expose the
+  calls those checks make, so the checks never ran.
+- EC2 internet exposure is now judged per network interface, against that
+  interface's own security groups and subnet, so an Elastic IP or an IPv6
+  address on a secondary interface is checked. A public IPv4 address counts
+  only when its subnet routes `0.0.0.0/0` to an internet gateway; an instance
+  behind a NAT gateway is no longer reported exposed. An exposure found while a
+  group or route table went unread also reads as not inspected.
+- A bucket whose policy is public but whose own `RestrictPublicBuckets` setting
+  is on no longer reads as publicly accessible, and neither does the trail
+  writing to it. A bucket whose public access block could not be read reads as
+  not inspected instead of public.
+- A security group's status names the range its rule is actually open to:
+  `::/0`, `0.0.0.0/0`, or both. An IPv6-only rule used to read `0.0.0.0/0`.
+- A launch template whose AMI is not on a partially loaded AMI list now reads
+  as not inspected instead of clean.
+- A throttled or timed-out read of an ECS task definition is asked again by the
+  next row of the same detail screen instead of repeating the first error.
+  A detail row no longer fails with a timeout that belonged to another row
+  reading the same resource.
 
 ## [3.58.0] - 2026-09-21
 

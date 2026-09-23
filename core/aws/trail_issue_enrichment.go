@@ -15,24 +15,25 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// trailLogBucketAPI is the pair of read-only S3 calls the log-bucket rows
-// need. Asserted off the bucket's own S3 client rather than folded into the
-// aggregate, so a client without these two calls still satisfies the
-// aggregate.
+// trailLogBucketAPI is the read-only S3 calls the log-bucket rows need: the
+// public verdict's reads and the access-logging read. Asserted off the
+// bucket's own S3 client rather than folded into the aggregate, so a client
+// without these calls still satisfies the aggregate.
 type trailLogBucketAPI interface {
-	S3GetBucketPolicyStatusAPI
+	s3PublicAPI
 	S3GetBucketLoggingAPI
 }
 
 // EnrichTrailLogBucket reports on the bucket each trail delivers to: one that
-// AWS evaluates as public, and one that records no access logging.
+// is public by s3PublicVerdict, the verdict the bucket's own row carries, and
+// one that records no access logging.
 //
 // It asks S3 directly for the trail's own bucket rather than joining the s3
 // resource cache. A join only answers once the operator has opened the bucket
 // list, so in production it is silent exactly when nobody has looked — which
 // is when the audit trail sitting in a public bucket matters most.
 //
-// One or two calls per trail, capped by EnrichmentCap. A bucket that cannot be
+// Up to four calls per trail, capped by EnrichmentCap. A bucket that cannot be
 // read marks its trail truncated rather than reporting it clean.
 func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -60,9 +61,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 			return
 		}
 
-		status, statusErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyStatusOutput, error) {
-			return api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
-		})
+		pub := s3PublicVerdict(ctx, api, bucket)
 		logging, loggingErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
 			return api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 		})
@@ -70,16 +69,13 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		defer mu.Unlock()
 
-		// A bucket with no policy cannot be public by policy; anything else
-		// that fails leaves the trail's posture unknown, not clean.
-		public := statusErr == nil && status.PolicyStatus != nil && aws.ToBool(status.PolicyStatus.IsPublic)
-		switch {
-		case statusErr == nil || isS3APIErrCode(statusErr, "NoSuchBucketPolicy"):
-			// No policy at all is an answer, not a gap.
-		default:
-			MarkSkipped(&result, r.ID, &failures, statusErr)
+		// A read that failed leaves the trail's posture unknown, not clean.
+		for _, err := range append(pub.failures, pub.unreachable) {
+			if err != nil {
+				MarkSkipped(&result, r.ID, &failures, err)
+			}
 		}
-		if public {
+		if pub.rows != nil {
 			setWave2Finding(&result, r.ID, CodeTrailLogBucketPublic, []domain.DetailRow{{Label: "Bucket", Value: bucket, Tier: tierOf(CodeTrailLogBucketPublic)}})
 		}
 

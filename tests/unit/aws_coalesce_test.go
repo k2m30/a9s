@@ -213,6 +213,10 @@ func (f *coalesceS3Fake) GetBucketLocation(_ context.Context, _ *s3.GetBucketLoc
 	return &s3.GetBucketLocationOutput{}, nil
 }
 
+func (f *coalesceS3Fake) HeadBucket(_ context.Context, _ *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	return &s3.HeadBucketOutput{}, nil
+}
+
 var _ awsclient.S3FullAPI = (*coalesceS3Fake)(nil)
 
 // A non-zero op memoizes a completed result across sequential
@@ -946,10 +950,8 @@ func TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace(t *testing.T
 
 // ---------------------------------------------------------------------------
 // Lambda: NewCoalescingLambda —
-// coalesceLambdaFake implements awsclient.LambdaAPI. LambdaAPI is already
-// the complete aggregate of every Lambda operation asserted anywhere in
-// core/aws (coalesce.go's own doc comment), so no wider FullAPI type exists
-// for Lambda, unlike SNS/S3.
+// coalesceLambdaFake implements awsclient.LambdaFullAPI (LambdaAPI plus the
+// posture reads LambdaFullAPI widens for).
 // ---------------------------------------------------------------------------
 
 type coalesceLambdaFake struct {
@@ -990,7 +992,14 @@ func (f *coalesceLambdaFake) ListTags(_ context.Context, _ *lambda.ListTagsInput
 	return &lambda.ListTagsOutput{}, nil
 }
 
-var _ awsclient.LambdaAPI = (*coalesceLambdaFake)(nil)
+func (f *coalesceLambdaFake) GetPolicy(_ context.Context, _ *lambda.GetPolicyInput, _ ...func(*lambda.Options)) (*lambda.GetPolicyOutput, error) {
+	return &lambda.GetPolicyOutput{}, nil
+}
+func (f *coalesceLambdaFake) ListFunctionUrlConfigs(_ context.Context, _ *lambda.ListFunctionUrlConfigsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionUrlConfigsOutput, error) {
+	return &lambda.ListFunctionUrlConfigsOutput{}, nil
+}
+
+var _ awsclient.LambdaFullAPI = (*coalesceLambdaFake)(nil)
 
 func TestNewCoalescingLambda_ConcurrentIdenticalCalls_ShareOneUnderlyingCallAndResult(t *testing.T) {
 	const fnName = "process-payment"

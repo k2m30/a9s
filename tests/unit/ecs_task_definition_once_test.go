@@ -206,14 +206,13 @@ func TestECSDetailOpenReadsOneTaskDefinitionOnce(t *testing.T) {
 }
 
 // TestECSDetailOpenCostsOneRefusedReadWhateverTheRowCount pins what a
-// definition the account refuses costs. A throttled read is retried by the
-// retry policy, which is what a throttle is for; what the open must not do is
-// pay that whole sequence once per row, turning one refused question into as
-// many refusal storms as there are rows that ask it — the state a throttled
-// account is least able to absorb, and the one where two rows of a screen can
-// still end up disagreeing about what the workload runs.
+// definition the account refuses costs. A refusal is AWS's answer about that
+// definition, the same however often it is asked, so one open asks once and
+// every row reads the same answer; two rows of a screen cannot disagree about
+// what the workload runs. A throttle is no answer about the definition and is
+// asked again by the next row.
 func TestECSDetailOpenCostsOneRefusedReadWhateverTheRowCount(t *testing.T) {
-	refusal := &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded"}
+	refusal := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized to perform: ecs:DescribeTaskDefinition", Fault: smithy.FaultClient}
 	cache := onceECSCache("ecs-svc", "ecs-task")
 
 	for _, tc := range []struct {

@@ -144,7 +144,7 @@ func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 	}
 }
 
-// w6aTrailS3Fake answers the two read-only bucket calls the trail enricher
+// w6aTrailS3Fake answers the read-only bucket calls the trail enricher
 // makes. Buckets default to private with access logging on, so each test
 // switches off only the setting it is about.
 type w6aTrailS3Fake struct {
@@ -164,6 +164,17 @@ func (f *w6aTrailS3Fake) GetBucketPolicyStatus(_ context.Context, in *s3.GetBuck
 	return &s3.GetBucketPolicyStatusOutput{
 		PolicyStatus: &s3types.PolicyStatus{IsPublic: aws.Bool(f.public[b])},
 	}, nil
+}
+
+// The public verdict also reads the public access block and the ACL; no
+// bucket here has a block or grants anything publicly, so only the policy
+// status decides it.
+func (f *w6aTrailS3Fake) GetPublicAccessBlock(_ context.Context, _ *s3.GetPublicAccessBlockInput, _ ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
+	return &s3.GetPublicAccessBlockOutput{}, nil
+}
+
+func (f *w6aTrailS3Fake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return &s3.GetBucketAclOutput{}, nil
 }
 
 func (f *w6aTrailS3Fake) GetBucketLogging(_ context.Context, in *s3.GetBucketLoggingInput, _ ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error) {
