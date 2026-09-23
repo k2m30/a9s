@@ -76,7 +76,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			ContextKeys:    map[string]string{"role_name": "ID"},
 			DisplayNameKey: "role_name",
 		}},
-		Color: colorRole,
+		Color:          colorRole,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMRolesPage(ctx, c.IAM, continuationToken)
 		}),
@@ -138,7 +139,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "path", Title: "Path", Width: 20},
 			{Key: "create_date", Title: "Created", Width: 22},
 		},
-		Color: colorPolicy,
+		Color:          colorPolicy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 			if err != nil {
@@ -238,7 +240,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
 			{Key: "password_last_used", Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22},
 		},
-		Color: colorIAMUser,
+		Color:          colorIAMUser,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMUsersPage(ctx, c.IAM, continuationToken)
 		}),
@@ -289,7 +292,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			ContextKeys:    map[string]string{"group_name": "ID"},
 			DisplayNameKey: "group_name",
 		}},
-		Color: colorIAMGroup,
+		Color:          colorIAMGroup,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMGroupsPage(ctx, c.IAM, continuationToken)
 		}),
@@ -333,7 +337,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "rules_summary", Title: "Rules", Width: 18},
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
-		Color: colorWAF,
+		Color:          colorWAF,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.WAFv2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.wafIn(wafScopeCloudFront), continuationToken)
 		}),

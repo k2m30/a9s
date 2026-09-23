@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
@@ -55,14 +57,14 @@ func GoView(region, arn string) string {
 	return Global(region, "go/view?arn="+url.QueryEscape(arn))
 }
 
-// AccountFromARN extracts the account ID (the 5th colon-delimited field)
-// from arn, or "" if arn is too short to be a well-formed ARN.
-func AccountFromARN(arn string) string {
-	parts := strings.SplitN(arn, ":", 6)
-	if len(parts) < 5 {
+// AccountFromARN returns the account ID ref names, or "" when ref is not a
+// well-formed ARN.
+func AccountFromARN(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
 		return ""
 	}
-	return parts[4]
+	return a.AccountID
 }
 
 // Valid reports whether u is a well-formed https console URL whose host is

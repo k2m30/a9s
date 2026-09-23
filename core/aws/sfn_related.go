@@ -125,7 +125,7 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	var refs []string
 	sfnCollectLambdaRefs([]byte(*out.Definition), &refs)
-	return relatedRefs("lambda", refs, refContext(clients, cache, "lambda"))
+	return listedRelated(ctx, clients, cache, "lambda", refs, false)
 }
 
 // sfnCollectLambdaRefs walks an ASL definition JSON and appends to refs the

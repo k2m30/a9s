@@ -139,7 +139,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cac
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("sqs")
 	}
-	return lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", ":sqs:", refContext(clients, cache, "sqs"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", "sqs", refContext(clients, cache, "sqs"))
 }
 
 // lambdaEventSourceRefs is the result of an event-source pivot of a function:

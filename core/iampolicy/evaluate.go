@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // Exposure is the verdict of Evaluate on a resource policy.
@@ -60,8 +62,8 @@ func AllowedPrincipals(doc Document, _ string) []Principal {
 // ARN or its account field is not an account ID (an S3 bucket ARN has none;
 // an AWS-managed policy's reads "aws").
 func AccountFromARN(s string) string {
-	if f, ok := arnFields(s); ok && isAccountID(f[4]) {
-		return f[4]
+	if a, err := arn.Parse(s); err == nil && isAccountID(a.AccountID) {
+		return a.AccountID
 	}
 	return ""
 }
@@ -451,7 +453,7 @@ func isWildcardValue(v string) bool {
 	if len(fields) < 2 || fields[0] != "arn" {
 		return false
 	}
-	if f, ok := arnFields(v); ok && f[4] == "*" {
+	if a, err := arn.Parse(v); err == nil && a.AccountID == "*" {
 		return true
 	}
 	return !slices.ContainsFunc(fields[2:], func(f string) bool { return f != "" && f != "*" })

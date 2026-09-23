@@ -135,7 +135,7 @@ func dbiSnapParentIsLocal(snap rdstypes.DBSnapshot) bool {
 // dbiSnapParentRow is the dbi row the snapshot was taken from, the one the
 // DB Instances related row counts. With no dbi list loaded, a local
 // snapshot's DBInstanceIdentifier is the only name there is.
-func dbiSnapParentRow(src resource.Resource, dbis []resource.Resource) string {
+func dbiSnapParentRow(src resource.Resource, _ string, dbis []resource.Resource) string {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](src.RawStruct)
 	if !ok || !dbiSnapParentIsLocal(snap) {
 		return ""

@@ -152,11 +152,11 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	return result, errors.Join(tagErr, AggregateFailures("DescribePendingMaintenanceActions", failures, pages))
 }
 
-// isClusterARN returns true when the ARN's resource-type segment is "cluster".
-// Format: arn:aws:rds:region:account:cluster:id  (DocDB clusters use the RDS service prefix in ARNs)
-func isClusterARN(arn string) bool {
-	parts := strings.Split(arn, ":")
-	return len(parts) >= 7 && parts[5] == "cluster"
+// isClusterARN reports whether ref is an RDS cluster ARN ("cluster:<id>");
+// DocumentDB clusters carry the rds service in theirs.
+func isClusterARN(ref string) bool {
+	a, ok := ARNForService(ref, "rds")
+	return ok && strings.HasPrefix(a.Resource, "cluster:")
 }
 
 // docdbTagsForARN reads one cluster's tags. DocumentDB and Aurora clusters

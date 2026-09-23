@@ -219,7 +219,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "delay_seconds", Title: "Delay", Width: 8},
 			{Key: "queue_url", Title: "Queue URL", Width: 50},
 		},
-		Color: colorSQS,
+		Color:          colorSQS,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SQS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			listAPI, ok := c.SQS.(SQSListQueuesAPI)
 			if !ok {
@@ -271,7 +272,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			ContextKeys:    map[string]string{"topic_arn": "ID"},
 			DisplayNameKey: "display_name",
 		}},
-		Color: colorSNS,
+		Color:          colorSNS,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SNS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			topicsAPI, ok := c.SNS.(SNSListTopicsAPI)
 			if !ok {
@@ -302,7 +304,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		ShortName:     "sns-sub",
 		Aliases:       []string{"sns-sub", "sns-subscriptions", "subscriptions"},
 		Category:      "MESSAGING",
-		CloudTrailKey: "ResourceName:ID",
+		CloudTrailKey: "ResourceName:Fields.subscription_arn",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/subscription/"+r.ID)
 		},
@@ -314,7 +316,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "confirmed", Title: "Confirmed", Width: 12},
 			{Key: "subscription_arn", Title: "Subscription ARN", Width: 60},
 		},
-		Color: colorSNSSub,
+		Color:          colorSNSSub,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SNS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			subsAPI, ok := c.SNS.(SNSListSubscriptionsAPI)
 			if !ok {
@@ -343,13 +346,14 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		// main menu's category grouping stays contiguous.
 		Name:          "Elastic Beanstalk",
 		ShortName:     "eb",
+		RefToID:       ebRefToID,
 		Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			// environment_arn shape: arn:aws:elasticbeanstalk:region:account:environment/{app}/{env}
-			_, rest, ok := strings.Cut(r.Fields["environment_arn"], ":environment/")
+			res, _, _ := localARN(r.Fields["environment_arn"], domain.RefContext{}, "elasticbeanstalk")
+			rest, ok := afterPrefix(res, "environment/")
 			if !ok {
 				return ""
 			}
@@ -368,7 +372,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "health", Title: "Health", Path: "Health", Width: 10},
 			{Key: "version_label", Title: "Version", Path: "VersionLabel", Width: 16},
 		},
-		Color: colorEB,
+		Color:          colorEB,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ElasticBeanstalk} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBEnvironmentsPage(ctx, c.ElasticBeanstalk, continuationToken)
 		}),
@@ -433,7 +438,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			ContextKeys:    map[string]string{"rule_name": "name", "event_bus": "event_bus"},
 			DisplayNameKey: "rule_name",
 		}},
-		Color: colorEBRule,
+		Color:          colorEBRule,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EventBridge} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEventBridgeRulesPage(ctx, c.EventBridge, continuationToken)
 		}),
@@ -477,7 +483,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "stream_mode", Title: "Mode", Path: "StreamModeDetails.StreamMode", Width: 14},
 			{Key: "creation_time", Title: "Created", Path: "StreamCreationTimestamp", Width: 22},
 		},
-		Color: colorKinesis,
+		Color:          colorKinesis,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Kinesis} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
 		}),
@@ -520,7 +527,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "state", Title: "Status", Path: "State", Width: 14},
 			{Key: "version", Title: "Version", Path: "CurrentVersion", Width: 14},
 		},
-		Color: colorMSK,
+		Color:          colorMSK,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.MSK} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
 		}),
@@ -592,7 +600,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			},
 			DrillBlockMessage: "Execution history is not available for Express state machines",
 		}},
-		Color: colorSFN,
+		Color:          colorSFN,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SFN} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
 		}),
@@ -639,7 +648,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "identity_type", Title: "Type", Width: 16},
 			{Key: "status", Title: "Status", Width: 36},
 		},
-		Color: colorSES,
+		Color:          colorSES,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SESv2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSESIdentitiesPage(ctx, c.SESv2, continuationToken)
 		}),

@@ -7,13 +7,13 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -111,7 +111,7 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 		if task.ClusterArn == nil {
 			continue
 		}
-		if *task.ClusterArn == clusterName || strings.HasSuffix(*task.ClusterArn, "/"+clusterName) {
+		if name, _ := ecsRefToID(*task.ClusterArn, domain.RefContext{}); clusterName != "" && name == clusterName {
 			ids = append(ids, tRes.ID)
 		}
 	}

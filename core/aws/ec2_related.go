@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"sort"
 
@@ -317,22 +318,10 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 	if profileName == "" {
 		return resource.ProvenZero("role", "profileName")
 	}
-
-	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-	for _, roleRes := range roleList {
-		if roleRes.Name == profileName || roleRes.Fields["role_name"] == profileName {
-			return relatedResultTrunc("role", []string{profileName}, false)
-		}
-	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.IAM == nil {
-		if truncated {
-			return relatedResultTrunc("role", nil, true)
-		}
-		return resource.KnownRelated("role", nil, false)
+	c, err := svcClients(clients)
+	// no finding: without the IAM client nothing was read.
+	if err != nil || c.IAM == nil {
+		return resource.UnknownRelated("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
 		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
@@ -342,14 +331,12 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
-	if out == nil || out.InstanceProfile == nil || len(out.InstanceProfile.Roles) == 0 {
-		return resource.ProvenZero("role", "out.InstanceProfile.Roles")
-	}
-	var ids []string
-	for _, r := range out.InstanceProfile.Roles {
-		if r.RoleName != nil && *r.RoleName != "" {
-			ids = append(ids, *r.RoleName)
+	var refs []string
+	if out.InstanceProfile != nil {
+		for _, r := range out.InstanceProfile.Roles {
+			refs = append(refs, cmp.Or(aws.ToString(r.Arn), aws.ToString(r.RoleName)))
 		}
 	}
-	return relatedResultTrunc("role", ids, false)
+	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
+	return relatedResultTrunc("role", ids, dropped)
 }

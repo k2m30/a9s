@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -58,6 +57,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -396,13 +396,17 @@ func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
 	o.ruleSets = s
 }
 
+// errClientMissing is domain.ErrClientMissing, the one signal that a read's
+// client is absent; resource.ErrorRelated reads it as unknown.
+var errClientMissing = domain.ErrClientMissing
+
 // svcClients asserts clients holds an initialized *ServiceClients, the
 // prelude every catalog fetcher/reveal closure needs before it can dereference
-// a specific service client. Centralizes the assertion and its error text.
+// a specific service client. A value that is none is errClientMissing.
 func svcClients(clients any) (*ServiceClients, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return nil, fmt.Errorf("AWS clients not initialized")
+		return nil, errClientMissing
 	}
 	return c, nil
 }
@@ -418,6 +422,19 @@ func fetcherWithClients(fn func(ctx context.Context, c *ServiceClients, continua
 			return resource.FetchResult{}, err
 		}
 		return fn(ctx, c, continuationToken)
+	}
+}
+
+// clientsOf adapts a *ServiceClients-typed client selector into the shape
+// of a catalog ResourceTypeDef's FetcherClients field. A value that is no
+// client set holds none of the clients.
+func clientsOf(fn func(c *ServiceClients) []any) func(clients any) []any {
+	return func(clients any) []any {
+		c, err := svcClients(clients)
+		if err != nil {
+			return []any{nil}
+		}
+		return fn(c)
 	}
 }
 

@@ -77,12 +77,15 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if asgList == nil {
 		return resource.UnknownRelated("asg")
 	}
-	ec2List, ec2Truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
-	if err != nil {
-		return resource.ErrorRelated("asg", err)
+	// The ec2 list is read only for the groups' instances: with no group
+	// there is nothing to look up.
+	var ec2List []resource.Resource
+	var ec2Truncated bool
+	if len(asgList) > 0 {
+		if ec2List, ec2Truncated, err = relatedResourcesFor(ctx, clients, cache, "ec2"); err != nil {
+			return resource.ErrorRelated("asg", err)
+		}
 	}
-	// ec2List may be nil when no ec2 cache entry is present (secondary lookup).
-	// Continue with an empty map — results will be based on asg cache alone.
 
 	ec2Image := make(map[string]string, len(ec2List))
 	for _, ec2Res := range ec2List {

@@ -225,21 +225,23 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 					// L3: NavID (or Value) must exist in demo fixture set for TargetType.
 					// Skip this check for child types (e.g. s3_objects) and ct-events self-pivots
 					// because their IDs encode composite keys or are filter-only.
-					navID := row.NavID
+					// The row carries a reference — its NavID, else its value —
+					// and the detail resolves it through the target type's own
+					// resolver against the loaded list, which is what reads the
+					// account in an ARN and the suffix on a secret's. Resolve
+					// it the same way here.
+					ref := row.NavID
+					if ref == "" {
+						ref = row.Value
+					}
+					navID := resource.NavIDFromValue(row.TargetType, ref,
+						domain.RefContext{AccountID: "123456789012", Targets: cache[row.TargetType].Resources})
 					if navID == "" {
-						// The row carries the reference; the detail resolves it
-						// through the target type's own resolver, which is what
-						// reads the account in an ARN. Resolve it the same way
-						// here, or an ARN would be looked up as if it were an id.
-						navID = resource.NavIDFromValue(row.TargetType, row.Value,
-							domain.RefContext{AccountID: "123456789012", Targets: cache[row.TargetType].Resources})
-						if navID == "" {
-							// The reference names nothing this account holds —
-							// another account's principal, a deleted resource.
-							// The detail drops navigability for those, so there
-							// is no row here to reach a fixture.
-							continue
-						}
+						// The reference names nothing this account holds —
+						// another account's principal, a deleted resource.
+						// The detail drops navigability for those, so there
+						// is no row here to reach a fixture.
+						continue
 					}
 					if navID == "" {
 						t.Errorf("L3 FAIL: navigable row has empty NavID and Value — %s", rowLabel)

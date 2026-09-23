@@ -58,6 +58,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CloudFormation Stacks",
 		ShortName:      "cfn",
+		RefToID:        cfnRefToID,
 		HumanizeFields: []string{"status", "StackStatus"},
 		Aliases:        []string{"cfn", "cloudformation", "stacks"},
 		Category:       "CI/CD",
@@ -83,7 +84,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID", "stack_arn": "arn"}, DisplayNameKey: "Name"},
 		},
-		Color: colorCFN,
+		Color:          colorCFN,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudFormation} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
 		}),
@@ -117,6 +119,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodePipelines",
 		ShortName:      "pipeline",
+		RefToID:        pipelineRefToID,
 		LifecycleKey:   "last_status",
 		HumanizeFields: []string{"pipeline_type", "ExecutionMode"},
 		Aliases:        []string{"pipeline", "codepipeline", "pipelines"},
@@ -140,6 +143,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			DisplayNameKey: "Name",
 		}},
 		Color:                  colorPipeline,
+		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.CodePipeline} }),
 		Fetcher:                fetcherWithClients(FetchCodePipelinesPageWithClients),
 		Wave2:                  IssueEnricher{Fn: EnrichCodePipelineStatus, Priority: 10},
 		FieldKeys:              []string{"name", "pipeline_type", "version", "created", "updated", "arn"},
@@ -164,6 +168,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodeBuild Projects",
 		ShortName:      "cb",
+		RefToID:        cbRefToID,
 		LifecycleKey:   "last_build",
 		HumanizeFields: []string{"source_type"},
 		Aliases:        []string{"cb", "codebuild"},
@@ -192,7 +197,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			ContextKeys:    map[string]string{"project_name": "ID"},
 			DisplayNameKey: "project_name",
 		}},
-		Color: colorCB,
+		Color:          colorCB,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CodeBuild} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 		}),
@@ -257,7 +263,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			ContextKeys:    map[string]string{"repository_name": "ID", "repository_uri": "uri"},
 			DisplayNameKey: "repository_name",
 		}},
-		Color: colorECR,
+		Color:          colorECR,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECR} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
 		}),
@@ -292,6 +299,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:          "CodeArtifact Repos",
 		ShortName:     "codeartifact",
+		RefToID:       codeartifactRefToID,
 		Aliases:       []string{"codeartifact", "artifact", "ca"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:Fields.repo_name",
@@ -322,7 +330,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 			{Key: "domain_owner", Title: "Owner", Path: "DomainOwner", Width: 14},
 		},
-		Color: colorCodeArtifact,
+		Color:          colorCodeArtifact,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CodeArtifact} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
 		}),

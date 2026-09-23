@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -33,87 +34,9 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 		return resource.FetchResult{}, fmt.Errorf("fetching network interfaces: %w", err)
 	}
 
-	var resources []resource.Resource
-
+	resources := make([]resource.Resource, 0, len(output.NetworkInterfaces))
 	for _, eni := range output.NetworkInterfaces {
-		eniID := ""
-		if eni.NetworkInterfaceId != nil {
-			eniID = *eni.NetworkInterfaceId
-		}
-
-		// Extract Name from TagSet (NetworkInterface uses TagSet, not Tags)
-		name := ""
-		for _, tag := range eni.TagSet {
-			if tag.Key != nil && *tag.Key == "Name" {
-				if tag.Value != nil {
-					name = *tag.Value
-				}
-				break
-			}
-		}
-
-		status := string(eni.Status)
-		interfaceType := string(eni.InterfaceType)
-
-		vpcID := ""
-		if eni.VpcId != nil {
-			vpcID = *eni.VpcId
-		}
-
-		privateIP := ""
-		if eni.PrivateIpAddress != nil {
-			privateIP = *eni.PrivateIpAddress
-		}
-
-		requesterManaged := "false"
-		if eni.RequesterManaged != nil && aws.ToBool(eni.RequesterManaged) {
-			requesterManaged = "true"
-		}
-
-		description := ""
-		if eni.Description != nil {
-			description = *eni.Description
-		}
-
-		requesterID := ""
-		if eni.RequesterId != nil {
-			requesterID = *eni.RequesterId
-		}
-
-		securityGroupIDs := make([]string, 0, len(eni.Groups))
-		for _, g := range eni.Groups {
-			if g.GroupId != nil && *g.GroupId != "" {
-				securityGroupIDs = append(securityGroupIDs, *g.GroupId)
-			}
-		}
-
-		r := resource.Resource{
-			ID:   eniID,
-			Name: name,
-			Fields: map[string]string{
-				"eni_id":            eniID,
-				"name":              name,
-				"status":            status,
-				"type":              interfaceType,
-				"vpc_id":            vpcID,
-				"private_ip":        privateIP,
-				"requester_managed": requesterManaged,
-				// description/requester_id — required for the lambda:eni
-				// related-panel pivot (checkLambdaENI matches Description
-				// prefix "AWS Lambda VPC ENI-<FunctionName>-" and
-				// RequesterId=="AWS Lambda VPC ENI" per docs/resources/lambda.md).
-				"description":  description,
-				"requester_id": requesterID,
-				// security_groups — required for the ecs-task:sg related-panel
-				// pivot (checkECSTaskSG chains Task -> ENI -> SG via this field).
-				"security_groups": strings.Join(securityGroupIDs, ","),
-			},
-			RawStruct: eni,
-		}
-
-		r.Findings = eniFindings(status, requesterManaged)
-
-		resources = append(resources, r)
+		resources = append(resources, eniToResource(eni))
 	}
 
 	nextToken := ""
@@ -137,6 +60,104 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// FetchNetworkInterfacesByIDs fetches specific network interfaces by ID, for
+// an exact-ID drill to an interface past the list's first page. Missing IDs
+// are handled by fetchEC2ByIDs.
+func FetchNetworkInterfacesByIDs(ctx context.Context, api EC2DescribeNetworkInterfacesAPI, ids []string) ([]resource.Resource, error) {
+	return fetchEC2ByIDs(ctx, "eni FetchByIDs", "InvalidNetworkInterfaceID.NotFound", "eni-", ids, func(ids []string) ([]resource.Resource, error) {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeNetworkInterfacesOutput, error) {
+			return api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: ids, IncludeManagedResources: aws.Bool(true)})
+		})
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]resource.Resource, 0, len(out.NetworkInterfaces))
+		for _, eni := range out.NetworkInterfaces {
+			resources = append(resources, eniToResource(eni))
+		}
+		return resources, nil
+	})
+}
+
+// eniToResource builds the row of one network interface.
+func eniToResource(eni ec2types.NetworkInterface) resource.Resource {
+	eniID := ""
+	if eni.NetworkInterfaceId != nil {
+		eniID = *eni.NetworkInterfaceId
+	}
+
+	// Extract Name from TagSet (NetworkInterface uses TagSet, not Tags)
+	name := ""
+	for _, tag := range eni.TagSet {
+		if tag.Key != nil && *tag.Key == "Name" {
+			if tag.Value != nil {
+				name = *tag.Value
+			}
+			break
+		}
+	}
+
+	status := string(eni.Status)
+	interfaceType := string(eni.InterfaceType)
+
+	vpcID := ""
+	if eni.VpcId != nil {
+		vpcID = *eni.VpcId
+	}
+
+	privateIP := ""
+	if eni.PrivateIpAddress != nil {
+		privateIP = *eni.PrivateIpAddress
+	}
+
+	requesterManaged := "false"
+	if eni.RequesterManaged != nil && aws.ToBool(eni.RequesterManaged) {
+		requesterManaged = "true"
+	}
+
+	description := ""
+	if eni.Description != nil {
+		description = *eni.Description
+	}
+
+	requesterID := ""
+	if eni.RequesterId != nil {
+		requesterID = *eni.RequesterId
+	}
+
+	securityGroupIDs := make([]string, 0, len(eni.Groups))
+	for _, g := range eni.Groups {
+		if g.GroupId != nil && *g.GroupId != "" {
+			securityGroupIDs = append(securityGroupIDs, *g.GroupId)
+		}
+	}
+
+	return resource.Resource{
+		ID:   eniID,
+		Name: name,
+		Fields: map[string]string{
+			"eni_id":            eniID,
+			"name":              name,
+			"status":            status,
+			"type":              interfaceType,
+			"vpc_id":            vpcID,
+			"private_ip":        privateIP,
+			"requester_managed": requesterManaged,
+			// description/requester_id — required for the lambda:eni
+			// related-panel pivot (checkLambdaENI matches Description
+			// prefix "AWS Lambda VPC ENI-<FunctionName>-" and
+			// RequesterId=="AWS Lambda VPC ENI" per docs/resources/lambda.md).
+			"description":  description,
+			"requester_id": requesterID,
+			// security_groups — required for the ecs-task:sg related-panel
+			// pivot (checkECSTaskSG chains Task -> ENI -> SG via this field).
+			"security_groups": strings.Join(securityGroupIDs, ","),
+		},
+		RawStruct: eni,
+		Findings:  eniFindings(status, requesterManaged),
+	}
 }
 
 // eniFindings is the one predicate for a network interface. An unattached

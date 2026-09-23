@@ -203,7 +203,9 @@ func TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible(t *tes
 	}
 
 	ecrChecker := coalesceLambdaECRDefByTarget(t)
-	ecrResult := ecrChecker(ctx, sc, res, nil)
+	// The ecr list is loaded: only it confirms the repository the image names.
+	ecrList := resource.ResourceCache{"ecr": {Resources: []resource.Resource{{ID: "my-app", Name: "my-app", Type: "ecr"}}}}
+	ecrResult := ecrChecker(ctx, sc, res, ecrList)
 	if ecrResult.State() == domain.RelatedUnknown {
 		t.Fatalf("ecr related check returned Unknown, want a resolved result driving a real GetFunction call: %+v", ecrResult)
 	}

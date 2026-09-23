@@ -393,7 +393,10 @@ func TestRelated_Glue_Secrets_MatchSecretARN(t *testing.T) {
 	}
 
 	checker := glueCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	if unlisted := checker(context.Background(), nil, source, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("glue → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), nil, source, secretsListCache(secretARN))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

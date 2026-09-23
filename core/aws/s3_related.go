@@ -160,9 +160,10 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 	if !ok || c == nil || c.S3 == nil {
 		return resource.UnknownRelated("kms")
 	}
-	// The key encrypting a bucket lives in the bucket's region, so the key's
-	// ARN is read against that region and not the session's.
-	inBucketRegion := c.InRegion(c.bucketRegion(ctx, bucket))
+	// The key encrypting a bucket lives in the bucket's region, and is read
+	// there.
+	bucketRegion := c.bucketRegion(ctx, bucket)
+	inBucketRegion := c.InRegion(bucketRegion)
 	encAPI, ok := inBucketRegion.S3.(S3GetBucketEncryptionAPI)
 	if !ok {
 		return resource.UnknownRelated("kms")
@@ -202,7 +203,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 		// AWS-managed aliases like "alias/aws/s3"), or a bare ID/alias.
 		ids = append(ids, kmsRefFromField(keyID, res.Type))
 	}
-	return kmsRelated(ctx, inBucketRegion, cache, ids)
+	return kmsRelatedIn(ctx, c, cache, bucketRegion, ids)
 }
 
 // checkS3Logs calls s3:GetBucketLogging and returns the destination S3 bucket

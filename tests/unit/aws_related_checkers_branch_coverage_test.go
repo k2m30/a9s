@@ -51,10 +51,10 @@ func TestRelated_DBC_Subnet_NilClientsW5(t *testing.T) {
 	}
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Nothing was read, so the answer is the error rather than a "?" that
-	// would stand for three different states.
-	if result.State() != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (nil clients)", result.State())
+	// With no client set no call was made, so nothing failed: the pivot
+	// reads unknown, never an AWS error.
+	if result.State() != domain.RelatedUnknown || result.Err() != nil {
+		t.Errorf("State = %v Err = %v, want unknown with no error (nil clients)", result.State(), result.Err())
 	}
 }
 

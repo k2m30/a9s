@@ -68,7 +68,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		})
 		if descErr != nil {
 			if IsAccessDenied(descErr) {
-				resources = append(resources, kmsAccessDeniedResource(*key.KeyId))
+				resources = append(resources, kmsAccessDeniedResource(*key.KeyId, aws.ToString(key.KeyArn)))
 				continue
 			}
 			failures = append(failures, FailedCall(*key.KeyId, descErr))
@@ -101,6 +101,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			Findings: kmsStateFindings(meta.KeyState, status),
 			Fields: map[string]string{
 				"key_id":      keyID,
+				"arn":         aws.ToString(meta.Arn),
 				"alias":       alias,
 				"aliases":     aliases,
 				"status":      status,
@@ -206,7 +207,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		})
 		if err != nil {
 			if IsAccessDenied(err) {
-				resources = append(resources, kmsAccessDeniedResource(id))
+				resources = append(resources, kmsAccessDeniedResource(id, ""))
 				continue
 			}
 			if _, isAlias := kmsAliasName(id); isAlias && IsNotFoundErr(err) {
@@ -243,6 +244,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			Findings: kmsStateFindings(meta.KeyState, status),
 			Fields: map[string]string{
 				"key_id":      keyID,
+				"arn":         aws.ToString(meta.Arn),
 				"alias":       alias,
 				"aliases":     aliases,
 				"status":      status,
@@ -284,7 +286,7 @@ func kmsAliasName(keyID string) (string, bool) {
 // was denied: the real key state is unknowable, but the key's existence
 // (from ListKeys) is not in question, so it stays visible with a finding
 // distinguishing it from the generic "unavailable" bucket in kmsStateFindings.
-func kmsAccessDeniedResource(keyID string) resource.Resource {
+func kmsAccessDeniedResource(keyID, keyARN string) resource.Resource {
 	return resource.Resource{
 		ID: keyID,
 		Findings: []domain.Finding{
@@ -292,6 +294,7 @@ func kmsAccessDeniedResource(keyID string) resource.Resource {
 		},
 		Fields: map[string]string{
 			"key_id": keyID,
+			"arn":    keyARN,
 			"status": "AccessDenied",
 		},
 	}

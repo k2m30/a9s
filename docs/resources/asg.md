@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ami`
 
 - **Why related**: AMI the group's instances boot from — rollback target and vulnerability-scan pivot.
-- **How discovered**: Read `LaunchConfiguration.ImageId` (legacy) or resolve `LaunchTemplate.LaunchTemplateData.ImageId` for the version the ASG references, then cross-reference the already-loaded `ami` list by ImageId. — a9s-devops: possible=yes (`AutoScalingGroup.LaunchConfigurationName` / `AutoScalingGroup.LaunchTemplate`), worth=yes (AMI drift and deprecation are common ASG failure causes).
+- **How discovered**: Read `LaunchConfiguration.ImageId` (legacy) or resolve `LaunchTemplate.LaunchTemplateData.ImageId` for the version the ASG references, then cross-reference the already-loaded `ami` list by ImageId. An `ImageId` of `resolve:ssm:<parameter>` names a parameter, not an image, and makes the count a lower bound. — a9s-devops: possible=yes (`AutoScalingGroup.LaunchConfigurationName` / `AutoScalingGroup.LaunchTemplate`), worth=yes (AMI drift and deprecation are common ASG failure causes).
 - **Count shown**: yes.
 
 ### `ec2`

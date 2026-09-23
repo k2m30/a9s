@@ -110,12 +110,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 			returned := make(map[string]bool, len(out.Tasks))
 			for _, task := range out.Tasks {
-				// Identify the resource by task ID (last segment of ARN).
-				taskID := ""
-				if task.TaskArn != nil {
-					parts := strings.Split(*task.TaskArn, "/")
-					taskID = parts[len(parts)-1]
-				}
+				taskID, _ := ecsTaskRefToID(aws.ToString(task.TaskArn), domain.RefContext{})
 				if taskID == "" {
 					continue
 				}

@@ -14,13 +14,7 @@ import (
 // relatedResourcesFor returns the resource list for target from cache or by
 // fetching the first page via the registered paginated fetcher.
 func relatedResourcesFor(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
+	return FetchRelatedTarget(ctx, clients, cache, target)
 }
 
 // relatedListIn is relatedResourcesFor for a target that lives in region

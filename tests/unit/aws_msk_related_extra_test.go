@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -417,6 +418,9 @@ func TestRelated_MSK_S3_WrongRawStruct(t *testing.T) {
 	}
 }
 
+// The SCRAM secrets ListScramSecrets names are counted as the secrets list
+// holds them, by name; with the secrets list not loaded, only the list could
+// tell a name from its ARN's six-character suffix, so the count is unknown.
 func TestRelated_MSK_Secrets_Found(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
 	source := resource.Resource{
@@ -426,26 +430,20 @@ func TestRelated_MSK_Secrets_Found(t *testing.T) {
 			ClusterArn:  aws.String(clusterARN),
 		},
 	}
-	clients := &awsclient.ServiceClients{
-		MSK: &fakeMSKScram{
-			secretArns: []string{
-				"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-scram-secret-abc123",
-				"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-user2-xyz456",
-			},
-		},
+	arns := []string{
+		"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-scram-secret-abc123",
+		"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-user2-xyz456",
 	}
+	clients := &awsclient.ServiceClients{MSK: &fakeMSKScram{secretArns: arns}}
 	checker := mskCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count() != 2 {
-		t.Errorf("Count = %d, want 2", result.Count())
+	result := checker(context.Background(), clients, source, secretsListCache(arns...))
+	if ids := sortedIDs(result); !slices.Equal(ids, []string{"AmazonMSK_kafka-scram-secret", "AmazonMSK_kafka-user2"}) || result.Truncated() {
+		t.Errorf("msk → secrets = %v (truncated %v), want exactly the two listed secrets by name", ids, result.Truncated())
 	}
-	// The IDs are secret names, without the ARN's "-XXXXXX".
-	if result.ResourceIDs()[0] != "AmazonMSK_kafka-scram-secret" {
-		t.Errorf("ResourceIDs[0] = %q, want AmazonMSK_kafka-scram-secret", result.ResourceIDs()[0])
-	}
-	if result.ResourceIDs()[1] != "AmazonMSK_kafka-user2" {
-		t.Errorf("ResourceIDs[1] = %q, want AmazonMSK_kafka-user2", result.ResourceIDs()[1])
+
+	if unlisted := checker(context.Background(), clients, source, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("msk → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
 	}
 }
 

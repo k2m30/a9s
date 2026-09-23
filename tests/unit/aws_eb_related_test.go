@@ -66,40 +66,43 @@ func TestRelated_EB_Registered(t *testing.T) {
 	}
 }
 
+// DescribeEnvironmentResources names the environment's load balancer; the
+// elb list (ELBv2) is what it is counted against. A load balancer the list
+// holds is counted by its row; with no elb list to read, the count is unknown.
 func TestRelated_Eb_ELB_MatchByEnvironmentResources(t *testing.T) {
-	elbName := "awseb-e-abc12345-AWSEBLoad-ABCDEF123456"
-	envName := "my-eb-env"
+	const envName = "my-eb-env"
+	const lbName = "awseb-AWSEBLB-ABCDEF123456"
+	const lbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/awseb-AWSEBLB-ABCDEF123456/0123456789abcdef"
 
 	fakeEB := newFakeEBWithEnvironmentResources(ebtypes.EnvironmentResourceDescription{
 		EnvironmentName: aws.String(envName),
-		LoadBalancers: []ebtypes.LoadBalancer{
-			{Name: aws.String(elbName)},
-		},
+		LoadBalancers:   []ebtypes.LoadBalancer{{Name: aws.String(lbName)}},
 	})
-	clients := &awsclient.ServiceClients{
-		ElasticBeanstalk: fakeEB,
-	}
-
 	res := resource.Resource{
-		ID:     envName,
-		Name:   envName,
-		Fields: map[string]string{},
-		RawStruct: ebtypes.EnvironmentDescription{
-			EnvironmentName: aws.String(envName),
-		},
+		ID:        envName,
+		Name:      envName,
+		Fields:    map[string]string{},
+		RawStruct: ebtypes.EnvironmentDescription{EnvironmentName: aws.String(envName)},
 	}
-
 	checker := ebCheckerByTarget(t, "elb")
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	lbs, err := awsclient.FetchLoadBalancersPage(context.Background(), newFakeELBv2WithLBsAndListeners(
+		[]elbv2types.LoadBalancer{{LoadBalancerName: aws.String(lbName), LoadBalancerArn: aws.String(lbARN), Type: elbv2types.LoadBalancerTypeEnumApplication}}, nil), "")
+	if err != nil {
+		t.Fatalf("elb list: %v", err)
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != elbName {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), elbName)
+	cache := resource.ResourceCache{"elb": resource.ResourceCacheEntry{Resources: lbs.Resources}}
+	result := checker(context.Background(), &awsclient.ServiceClients{ElasticBeanstalk: fakeEB}, res, cache)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != lbName || result.Count() != 1 {
+		t.Errorf("with the elb list loaded: ResourceIDs = %v Count = %d, want [%s] 1", result.ResourceIDs(), result.Count(), lbName)
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
+	}
+
+	unloaded := checker(context.Background(), &awsclient.ServiceClients{ElasticBeanstalk: fakeEB}, res, resource.ResourceCache{})
+	if unloaded.EffectiveState() != domain.RelatedUnknown && unloaded.EffectiveState() != domain.RelatedError {
+		t.Errorf("with no elb list: state = %v ids %v, want unknown", unloaded.EffectiveState(), unloaded.ResourceIDs())
 	}
 }
 

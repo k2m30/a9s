@@ -45,6 +45,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 	{
 		Name:           "EKS Clusters",
 		ShortName:      "eks",
+		RefToID:        eksRefToID,
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"eks", "kubernetes", "k8s"},
 		Category:       "CONTAINERS",
@@ -60,8 +61,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 			{Key: "platform_version", Title: "Platform Version", Path: "PlatformVersion", Width: 18},
 		},
-		Color:   colorEKSCluster,
-		Fetcher: fetcherWithClients(FetchEKSClustersPage),
+		Color:          colorEKSCluster,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EKS} }),
+		Fetcher:        fetcherWithClients(FetchEKSClustersPage),
 		FieldKeys: []string{
 			"cluster_name", "version", "status", "endpoint", "platform_version",
 			"arn", "health_issues_count", "health_issues", "subnet_ids",
@@ -108,6 +110,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 	{
 		Name:           "EKS Node Groups",
 		ShortName:      "ng",
+		RefToID:        ngRefToID,
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"ng", "nodegroups", "node-groups"},
 		Category:       "CONTAINERS",
@@ -133,8 +136,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "instance_types", Title: "Instance Types", Path: "InstanceTypes", Width: 20},
 			{Key: "desired_size", Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
 		},
-		Color:   colorEKSNodeGroup,
-		Fetcher: fetchNodeGroupsPage,
+		Color:          colorEKSNodeGroup,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EKS} }),
+		Fetcher:        fetchNodeGroupsPage,
 		FieldKeys: []string{
 			"nodegroup_name", "cluster_name", "status", "instance_types",
 			"desired_size", "health_issues_count", "health_issues", "image_id",

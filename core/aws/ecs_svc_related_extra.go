@@ -308,7 +308,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 
-	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
+	return listedRelated(ctx, clients, cache, "secrets", refs, false)
 }
 
 // checkECSSvcSFN is a reverse-scan checker for the ecs-svc→sfn relationship.

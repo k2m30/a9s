@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -54,7 +55,7 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 	// its "loading" state immediately on push, before checker results arrive.
 	related := buildDetailRelatedBlocks(ds)
 	if len(related) == 0 && len(ds.RelatedRows) == 0 {
-		related = buildDetailRelatedLoadingBlocks(ds.ResourceType)
+		related = buildDetailRelatedLoadingBlocks(ds)
 	}
 
 	fc := selectableRowAtOrAbove(items, ds.FieldCursor)
@@ -133,13 +134,16 @@ func selectableRowAtOrAbove(items []fieldpath.FieldItem, i int) int {
 // buildDetailRelatedLoadingBlocks constructs loading-state RelatedBlocks from
 // registered related defs when the DetailState has no RelatedRows yet. Mirrors
 // newRightColumn(defs, res, sourceType) which sets count=-1, loading=true.
-func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
-	defs := resource.GetRelated(resourceType)
+func buildDetailRelatedLoadingBlocks(ds *DetailState) []RelatedBlock {
+	defs := resource.GetRelated(ds.ResourceType)
 	if len(defs) == 0 {
 		return nil
 	}
 	blocks := make([]RelatedBlock, 0, len(defs))
 	for _, def := range defs {
+		if isHiddenDetailRow(DetailRelatedRow{TargetType: def.TargetType, Loading: true}, ds) {
+			continue
+		}
 		blocks = append(blocks, RelatedBlock{
 			Name:       def.DisplayName,
 			State:      domain.RelatedLoading,
@@ -237,12 +241,13 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 	return built
 }
 
-// resolveNavIDs reads every navigable row's value through the target type's
-// resolver, as the related panel reads the same reference, and against the
-// rows loaded now — so a key list that lands after the detail opened is used
-// on the next build. A field whose NavigableField has Resolve is read through
-// it from src instead. A value that names no row of the target stops being
-// navigable. Rows a projector already gave a NavID keep it.
+// resolveNavIDs reads every navigable row's reference through the target
+// type's resolver (resource.NavIDFromValue), as the related panel reads the
+// same reference, and against the rows loaded now — so a key list that lands
+// after the detail opened is used on the next build. The reference is the
+// row's value, or the NavID a projector read out of the source; a field
+// whose NavigableField has Resolve picks it from src instead. A reference
+// that names no row of the target stops being navigable.
 //
 // A reference is read against the Region its own ARN names, not the
 // session's: an ARN of another Region names a real row there, and holding
@@ -254,27 +259,31 @@ func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items 
 	}
 	navDefs := resource.GetNavigableFields(srcType)
 	for i, it := range items {
-		if !it.IsNavigable || it.NavID != "" {
+		if !it.IsNavigable {
 			continue
 		}
+		value := strings.TrimPrefix(strings.TrimSpace(it.Value), "- ")
+		ref := cmp.Or(it.NavID, value)
 		region := c.core.Region()
-		if named := resource.RefRegion(strings.TrimPrefix(strings.TrimSpace(it.Value), "- ")); named != "" {
+		if named := cmp.Or(resource.RefRegion(ref), resource.RefRegion(value)); named != "" {
 			region = named
 		}
 		rc := domain.RefContext{AccountID: accountID, Region: region, Targets: c.core.AnyLaneResources(it.TargetType)}
-		var id string
 		if d := slices.IndexFunc(navDefs, func(nf resource.NavigableField) bool {
 			return nf.Resolve != nil && nf.FieldPath == it.Path && nf.TargetType == it.TargetType
 		}); d >= 0 {
-			id = navDefs[d].Resolve(src, rc.Targets)
-		} else {
-			id = resource.NavIDFromValue(it.TargetType, strings.TrimPrefix(strings.TrimSpace(it.Value), "- "), rc)
+			ref = navDefs[d].Resolve(src, value, rc.Targets)
+		}
+		id := ""
+		if ref != "" {
+			id = resource.NavIDFromValue(it.TargetType, ref, rc)
 		}
 		switch {
 		case id == "":
 			items[i].IsNavigable = false
 			items[i].TargetType = ""
-		case id != it.Value:
+			items[i].NavID = ""
+		case id != it.Value || it.NavID != "":
 			items[i].NavID = id
 		}
 	}
@@ -746,7 +755,7 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
 	var blocks []RelatedBlock
 	for _, row := range ds.RelatedRows {
-		if isSelfPivotZeroDetailRow(row, ds.ResourceType) {
+		if isHiddenDetailRow(row, ds) {
 			continue
 		}
 		if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {

@@ -53,9 +53,6 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 
 	subList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return resource.UnknownRelated("sns-sub")
-		}
 		return resource.ErrorRelated("sns-sub", err)
 	}
 	if subList == nil {

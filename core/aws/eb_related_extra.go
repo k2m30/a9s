@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -14,9 +15,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkEbELB resolves classic load balancer names for this EB environment.
-// elasticbeanstalk:DescribeEnvironmentResources.EnvironmentResources.LoadBalancers[].Name.
-func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEbELB resolves the load balancers of this EB environment,
+// elasticbeanstalk:DescribeEnvironmentResources.EnvironmentResources.LoadBalancers[].Name,
+// against the elb list. That list holds ELBv2 load balancers only, so an
+// environment on a Classic Load Balancer counts none of its rows.
+func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("elb")
@@ -48,13 +51,11 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 	if out.EnvironmentResources == nil {
 		return resource.ProvenZero("elb", "out.EnvironmentResources")
 	}
-	var ids []string
+	var refs []string
 	for _, lb := range out.EnvironmentResources.LoadBalancers {
-		if lb.Name != nil && *lb.Name != "" {
-			ids = append(ids, *lb.Name)
-		}
+		refs = append(refs, aws.ToString(lb.Name))
 	}
-	return relatedResultTrunc("elb", ids, false)
+	return listedRelated(ctx, clients, cache, "elb", refs, false)
 }
 
 // checkEbTG resolves target groups for this EB environment.
@@ -101,7 +102,10 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		if lb.Name == nil || *lb.Name == "" {
 			continue
 		}
-		lbName := *lb.Name
+		lbName, isV2 := resource.ResolveRef("elb", *lb.Name, refContext(clients, cache, "elb"))
+		if !isV2 {
+			continue
+		}
 
 		lbs, _, lbErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.LoadBalancer, *string, error) {
 			out, err := c.ELBv2.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
@@ -113,6 +117,11 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 			}
 			return out.LoadBalancers, out.NextMarker, nil
 		})
+		// A Classic Load Balancer is no ELBv2 load balancer: the call answers
+		// LoadBalancerNotFound, and a Classic one has no target groups.
+		if ErrCodeIs(lbErr, "LoadBalancerNotFound") {
+			continue
+		}
 		if lbErr != nil {
 			failures = append(failures, FailedCall(lbName, lbErr))
 			continue

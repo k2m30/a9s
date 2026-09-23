@@ -279,7 +279,10 @@ func TestRelated_CbSecrets_ARNWithSecretSegment_ExtractsName(t *testing.T) {
 		},
 	}
 	checker := cbCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if unlisted := checker(context.Background(), nil, res, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("cb → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), nil, res, secretsListCache("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password-AbCdEf"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -306,7 +309,10 @@ func TestRelated_CbSecrets_ARNWithJSONKeySuffix_StripsSuffix(t *testing.T) {
 		},
 	}
 	checker := cbCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if unlisted := checker(context.Background(), nil, res, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("cb → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), nil, res, secretsListCache("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/creds-XyZ123"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

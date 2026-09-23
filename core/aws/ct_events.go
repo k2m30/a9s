@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
@@ -466,12 +467,12 @@ func computeCTActorInner(parsed map[string]any, topLevelUser string) string {
 		if sc, ok := ui["sessionContext"].(map[string]any); ok {
 			if si, ok := sc["sessionIssuer"].(map[string]any); ok {
 				if roleName, _ := si["userName"].(string); roleName != "" {
-					if arn, _ := ui["arn"].(string); arn != "" {
-						// Extract session name from arn: arn:aws:sts::…:assumed-role/<role>/<session>
-						parts := strings.Split(arn, "/")
-						if len(parts) >= 3 {
-							sessionName := parts[len(parts)-1]
-							return roleName + "/" + sessionName
+					principal, _ := ui["arn"].(string)
+					if a, err := arn.Parse(principal); err == nil {
+						if rest, ok := afterPrefix(a.Resource, "assumed-role/"); ok {
+							if _, session, ok := strings.Cut(rest, "/"); ok && session != "" {
+								return roleName + "/" + session
+							}
 						}
 					}
 					return roleName

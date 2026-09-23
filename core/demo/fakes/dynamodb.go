@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -94,15 +93,11 @@ func (f *DynamoDBFake) DescribeKinesisStreamingDestination(_ context.Context, in
 // The enricher passes the table ARN, so the lookup matches on the ARN's table
 // name segment.
 func (f *DynamoDBFake) GetResourcePolicy(_ context.Context, input *dynamodb.GetResourcePolicyInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetResourcePolicyOutput, error) {
-	arn := aws.ToString(input.ResourceArn)
-	name := arn
-	if i := strings.LastIndex(arn, "/"); i >= 0 {
-		name = arn[i+1:]
-	}
+	name := arnResourceName(aws.ToString(input.ResourceArn))
 	policy, ok := f.fix.ResourcePolicies[name]
 	if !ok {
 		return nil, &ddbtypes.PolicyNotFoundException{
-			Message: aws.String("No resource policy found for " + arn),
+			Message: aws.String("No resource policy found for " + aws.ToString(input.ResourceArn)),
 		}
 	}
 	return &dynamodb.GetResourcePolicyOutput{Policy: aws.String(policy)}, nil

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
@@ -146,7 +147,8 @@ const (
 )
 
 func IsCustomerManagedPolicyARN(policyARN string) bool {
-	return policyARN != "" && !strings.Contains(policyARN, ":aws:policy/")
+	a, err := arn.Parse(policyARN)
+	return policyARN != "" && (err != nil || a.AccountID != "aws")
 }
 
 // NewIAMFixtures builds and returns a fully-populated IAMFixtures struct.

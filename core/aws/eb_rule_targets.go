@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
@@ -123,19 +124,14 @@ var arnServiceMap = map[string]string{
 
 // ArnToResourceName parses an ARN and returns a "Service: name" string.
 // For empty ARNs, returns "". For unparseable strings, returns the input as-is.
-func ArnToResourceName(arn string) string {
-	if arn == "" {
-		return ""
+func ArnToResourceName(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
+		return ref
 	}
 
-	// ARN format: arn:partition:service:region:account:resource
-	parts := strings.SplitN(arn, ":", 6)
-	if len(parts) < 6 || parts[0] != "arn" {
-		return arn
-	}
-
-	service := parts[2]
-	resourcePart := parts[5]
+	service := a.Service
+	resourcePart := a.Resource
 
 	// Extract the resource name: prefer splitting on ":" first, then "/" only
 	// if no ":" was found. This preserves path-like names (e.g. /aws/lambda/my-func).

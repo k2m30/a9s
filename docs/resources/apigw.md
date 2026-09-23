@@ -60,7 +60,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `lambda`
 
 - **Why related**: Lambda integrations — the most common APIGW backend.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API, parse `IntegrationUri` for Lambda function ARNs (`arn:aws:apigateway:...functions/arn:aws:lambda:...:function:<name>/invocations`) and match against the already-loaded `lambda` list — a9s-devops: `IntegrationType==AWS_PROXY` with a Lambda ARN in `IntegrationUri` is the canonical pattern.
+- **How discovered**: `apigatewayv2:GetIntegrations` per API, parse `IntegrationUri` for Lambda function ARNs (`arn:aws:apigateway:...functions/arn:aws:lambda:...:function:<name>/invocations`) and match against the already-loaded `lambda` list — a9s-devops: `IntegrationType==AWS_PROXY` with a Lambda ARN in `IntegrationUri` is the canonical pattern. A stage-variable placeholder (`function:${stageVariables.fn}`) names no function, a function the list does not hold is not counted, and with the `lambda` list unreadable the row is unknown.
 - **Count shown**: yes.
 
 ### `logs`

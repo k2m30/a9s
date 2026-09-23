@@ -409,11 +409,11 @@ func lambdaEventSourceMappingsNaming(ctx context.Context, clients any, cache res
 }
 
 // eventSourceARNs returns the EventSourceArn of every mapping whose source is
-// the service marked by service (":sqs:", ":kinesis:", ":kafka:").
+// an ARN of service ("sqs", "kinesis", "kafka").
 func eventSourceARNs(mappings []lambdatypes.EventSourceMappingConfiguration, service string) []string {
 	var arns []string
 	for _, m := range mappings {
-		if m.EventSourceArn != nil && strings.Contains(*m.EventSourceArn, service) {
+		if _, ok := ARNForService(aws.ToString(m.EventSourceArn), service); ok {
 			arns = append(arns, *m.EventSourceArn)
 		}
 	}

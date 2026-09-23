@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -66,8 +67,7 @@ func fetchECSTasksPageWithJoin(
 				taskArn := ""
 				if task.TaskArn != nil {
 					taskArn = *task.TaskArn
-					parts := strings.Split(taskArn, "/")
-					taskID = parts[len(parts)-1]
+					taskID, _ = ecsTaskRefToID(taskArn, domain.RefContext{})
 				}
 
 				clusterName := ""
@@ -170,9 +170,9 @@ type taskDefJoinFields struct {
 	// ContainerDefinitions[].RepositoryCredentials.CredentialsParameter —
 	// required for the ecs-task:secrets related-panel pivot.
 	secretARNs string
-	// ssmParamNames is a sorted, comma-joined list of SSM parameter names
-	// resolved from ContainerDefinitions[].Secrets[].ValueFrom — required for
-	// the ecs-task:ssm related-panel pivot.
+	// ssmParamNames is a sorted, comma-joined list of the names of the SSM
+	// parameters ContainerDefinitions[].Secrets[].ValueFrom names — required
+	// for the ecs-task:ssm related-panel pivot.
 	ssmParamNames string
 }
 
@@ -258,30 +258,23 @@ func ecsJoinTaskDefinition(
 
 	secretsSeen := make(map[string]struct{})
 	ssmSeen := make(map[string]struct{})
-	const ssmParamPrefix = "parameter/"
 	for _, c := range td.ContainerDefinitions {
 		for _, s := range c.Secrets {
 			if s.ValueFrom == nil || *s.ValueFrom == "" {
 				continue
 			}
+			// A Secrets Manager secret is named by ARN; an SSM parameter by
+			// ARN, or by name when it is in the task's Region
+			// (docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-ssm-paramstore.html).
 			v := *s.ValueFrom
-			ssmARN, isSSM := ARNForService(v, "ssm")
+			_, isSSM := ARNForService(v, "ssm")
 			switch {
 			case isSecret(v):
 				secretsSeen[v] = struct{}{}
-			case isSSM:
-				// The parameter's real Name (as returned by
-				// DescribeParameters) keeps its own leading "/", which the
-				// "parameter/" resource prefix absorbs; re-add it so the
-				// extracted name matches the ssm cache's canonical
-				// Resource.ID.
-				if after, found := strings.CutPrefix(ssmARN.Resource, ssmParamPrefix); found && after != "" {
-					ssmSeen["/"+after] = struct{}{}
+			case isSSM || !strings.HasPrefix(v, "arn:"):
+				if name, ok := ssmRefToID(v, domain.RefContext{}); ok {
+					ssmSeen[name] = struct{}{}
 				}
-			case strings.HasPrefix(v, "/"):
-				// Bare SSM parameter name (no ARN) resolved to the
-				// account/region namespace by the SSM client at read time.
-				ssmSeen[v] = struct{}{}
 			}
 		}
 		if c.RepositoryCredentials != nil && c.RepositoryCredentials.CredentialsParameter != nil &&

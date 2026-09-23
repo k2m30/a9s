@@ -40,7 +40,8 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		// Wave 2 enricher surfaces plans whose recent backup jobs have
 		// failed — Wave 1 list is declarative config.
-		Color: colorBackup,
+		Color:          colorBackup,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Backup} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchBackupPlansPage(ctx, c.Backup, continuationToken)
 		}),

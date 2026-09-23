@@ -217,8 +217,7 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
-	ids, dropped := resolveRefs("secrets", arns, refContext(clients, cache, "secrets"))
-	return relatedResultTrunc("secrets", ids, dropped || !complete)
+	return listedRelated(ctx, clients, cache, "secrets", arns, !complete)
 }
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's

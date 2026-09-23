@@ -765,10 +765,11 @@ func TestS3BucketPolicyRoles_RolePrincipalsInEveryPartitionAreCounted(t *testing
 }
 
 // TestGlueSecrets_SecretARNsInEveryPartitionAreCounted: a Glue job names its
-// secrets in the job arguments AWS returned. The ID is the secret's name
-// without the "-XXXXXX" Secrets Manager appends in the ARN, and each
-// partition's secret is read from a session in its own region, since a
-// secret in another region is no row of the local list.
+// secrets in the job arguments AWS returned. The ID is the secret's name as
+// the loaded secrets list holds it, without the "-XXXXXX" Secrets Manager
+// appends in the ARN, and each partition's secret is read from a session in
+// its own region, since a secret in another region is no row of the local
+// list.
 func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 	checker := parseCheckerFor(t, "glue", "secrets")
 	const secretName = "acme/db"
@@ -792,7 +793,11 @@ func TestGlueSecrets_SecretARNsInEveryPartitionAreCounted(t *testing.T) {
 				Name:             aws.String("acme-etl-job"),
 				DefaultArguments: map[string]string{"--db-secret": tc.value},
 			}}
-			got := checker(context.Background(), parseClients(tc.region), res, resource.ResourceCache{})
+			var listed []resource.Resource
+			if len(tc.wantIDs) > 0 {
+				listed = []resource.Resource{{ID: secretName, Name: secretName, Type: "secrets", Fields: map[string]string{"arn": tc.value}}}
+			}
+			got := checker(context.Background(), parseClients(tc.region), res, resource.ResourceCache{"secrets": {Resources: listed}})
 			if got.Count() != len(tc.wantIDs) {
 				t.Fatalf("Count = %d, want %d (ids %v)", got.Count(), len(tc.wantIDs), got.ResourceIDs())
 			}

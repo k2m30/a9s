@@ -53,16 +53,18 @@ func ctAccountOf(arn string) string {
 	return parts[4]
 }
 
-func ctPrincipalRowOf(t *testing.T, event cloudtrailtypes.Event, roles []resource.Resource) app.FieldRow {
+// ctPrincipalRowOf opens event's detail with roles loaded and returns its
+// Principal row. identity is the session's STS answer, nil before it lands.
+func ctPrincipalRowOf(t *testing.T, event cloudtrailtypes.Event, roles []resource.Resource, identity *domain.CallerIdentity) app.FieldRow {
 	t.Helper()
 	page, err := awsclient.FetchCloudTrailEventsPage(t.Context(), &ctOneEventAPI{event: event}, "")
 	if err != nil || len(page.Resources) != 1 {
 		t.Fatalf("building the event: %v (%d rows)", err, len(page.Resources))
 	}
 	c := newTestController(t)
-	c.ApplyIntents([]runtime.UIIntent{runtime.SetIdentityIntent{
-		Identity: &domain.CallerIdentity{AccountID: ctLocalAccount, Arn: "arn:aws:iam::" + ctLocalAccount + ":user/demo"},
-	}})
+	if identity != nil {
+		c.ApplyIntents([]runtime.UIIntent{runtime.SetIdentityIntent{Identity: identity}})
+	}
 	c.ApplyResourcesLoaded("role", roles, nil, false)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenDetail,
@@ -80,16 +82,18 @@ func ctPrincipalRowOf(t *testing.T, event cloudtrailtypes.Event, roles []resourc
 	return body.Fields[idx]
 }
 
-func TestCTDetail_ForeignAccountPrincipalDoesNotOpenTheLocalRole(t *testing.T) {
-	roles := []resource.Resource{{
-		ID:     "Admin",
-		Name:   "Admin",
-		Type:   "role",
-		Fields: map[string]string{"role_name": "Admin", "arn": "arn:aws:iam::" + ctLocalAccount + ":role/Admin"},
-	}}
+var ctLocalIdentity = &domain.CallerIdentity{AccountID: ctLocalAccount, Arn: "arn:aws:iam::" + ctLocalAccount + ":user/demo"} //nolint:gochecknoglobals // read-only fixture
 
+var ctAdminRoles = []resource.Resource{{ //nolint:gochecknoglobals // read-only fixture
+	ID:     "Admin",
+	Name:   "Admin",
+	Type:   "role",
+	Fields: map[string]string{"role_name": "Admin", "arn": "arn:aws:iam::" + ctLocalAccount + ":role/Admin"},
+}}
+
+func TestCTDetail_ForeignAccountPrincipalDoesNotOpenTheLocalRole(t *testing.T) {
 	local := ctPrincipalRowOf(t, ctPrincipalEvent("evt-local-principal",
-		"arn:aws:sts::"+ctLocalAccount+":assumed-role/Admin/session-1"), roles)
+		"arn:aws:sts::"+ctLocalAccount+":assumed-role/Admin/session-1"), ctAdminRoles, ctLocalIdentity)
 	if !local.IsNavigable {
 		t.Errorf("the account's own Admin role is not navigable from the event that names it (value %q)", local.Value)
 	}
@@ -98,11 +102,29 @@ func TestCTDetail_ForeignAccountPrincipalDoesNotOpenTheLocalRole(t *testing.T) {
 	}
 
 	foreign := ctPrincipalRowOf(t, ctPrincipalEvent("evt-foreign-principal",
-		"arn:aws:sts::999988887777:assumed-role/Admin/session-1"), roles)
+		"arn:aws:sts::999988887777:assumed-role/Admin/session-1"), ctAdminRoles, ctLocalIdentity)
 	if foreign.IsNavigable {
 		t.Errorf("account 999988887777's Admin is navigable and would open this account's Admin (NavID %q)", foreign.NavID)
 	}
 	if foreign.Value != "arn:aws:sts::999988887777:assumed-role/Admin/session-1" {
 		t.Errorf("Principal Value = %q, want the whole ARN so the operator can see whose it is", foreign.Value)
+	}
+}
+
+// Every CloudTrail event names the account it was recorded in
+// (recipientAccountId), so the Principal row reads its principal against that
+// account whether or not the session's own STS call has answered: another
+// account's Admin stays another account's before identity lands too, and the
+// recorded account's own Admin still opens.
+func TestCTDetail_PrincipalReadsTheEventsAccountBeforeIdentityLoads(t *testing.T) {
+	foreign := ctPrincipalRowOf(t, ctPrincipalEvent("evt-foreign-no-identity",
+		"arn:aws:sts::999988887777:assumed-role/Admin/session-1"), ctAdminRoles, nil)
+	if foreign.IsNavigable {
+		t.Errorf("with the session identity not loaded, account 999988887777's Admin is navigable and would open this account's Admin (NavID %q)", foreign.NavID)
+	}
+	local := ctPrincipalRowOf(t, ctPrincipalEvent("evt-local-no-identity",
+		"arn:aws:sts::"+ctLocalAccount+":assumed-role/Admin/session-1"), ctAdminRoles, nil)
+	if !local.IsNavigable || local.NavID != "Admin" {
+		t.Errorf("with the session identity not loaded, the recorded account's own Admin: navigable=%v NavID=%q, want navigable to %q", local.IsNavigable, local.NavID, "Admin")
 	}
 }

@@ -174,9 +174,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
-		// S3 healthy-bucket SSE-KMS key (checkS3KMS pivot).
-		// The checker strips everything up to the last "/" from the KMS key ARN,
-		// leaving the bare key ID. This must match S3BucketKMSKeyID in s3.go.
+		// S3 healthy-bucket SSE-KMS key (checkS3KMS and athena → kms pivots).
 		{
 			KeyId:        aws.String(S3BucketKMSKeyID),
 			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + S3BucketKMSKeyID),

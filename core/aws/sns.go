@@ -5,7 +5,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
@@ -32,11 +31,7 @@ func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationT
 			topicArn = *topic.TopicArn
 		}
 
-		// Extract display name from ARN (last segment after :)
-		displayName := topicArn
-		if parts := strings.Split(topicArn, ":"); len(parts) > 0 {
-			displayName = parts[len(parts)-1]
-		}
+		displayName := snsTopicName(topicArn)
 
 		r := resource.Resource{
 			ID:   topicArn,
@@ -77,4 +72,13 @@ func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationT
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// snsTopicName reads a topic ARN ("arn:…:sns:<region>:<account>:<name>") as
+// the topic's name, or returns ref unchanged when it is no topic ARN.
+func snsTopicName(ref string) string {
+	if a, ok := ARNForService(ref, "sns"); ok {
+		return a.Resource
+	}
+	return ref
 }

@@ -187,7 +187,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 // checkCbSecrets extracts Secrets Manager secret references from project environment
 // variables (Type=SECRETS_MANAGER). The Value is either the secret name or an ARN
 // with an optional ":json-key" suffix.
-func checkCbSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkCbSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("secrets")
@@ -201,12 +201,12 @@ func checkCbSecrets(_ context.Context, clients any, res resource.Resource, cache
 			refs = append(refs, aws.ToString(env.Value))
 		}
 	}
-	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
+	return listedRelated(ctx, clients, cache, "secrets", refs, false)
 }
 
 // checkCbSSM extracts SSM parameter references from project environment variables
 // (Type=PARAMETER_STORE).
-func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkCbSSM(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ssm")
@@ -223,5 +223,5 @@ func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 			ids = append(ids, *env.Value)
 		}
 	}
-	return relatedResultTrunc("ssm", ids, false)
+	return relatedRefs("ssm", ids, refContext(clients, cache, "ssm"))
 }

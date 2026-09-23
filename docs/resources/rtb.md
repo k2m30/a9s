@@ -40,13 +40,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `igw`
 
 - **Why related**: Internet Gateway route targets — the default-route target for public subnets; operator pivots to confirm IGW attachment.
-- **How discovered**: read `Routes[].GatewayId` on live routes, filter to values with the `igw-` prefix; cross-reference the already-loaded `igw` list by gateway ID. A blackhole route keeps the stale target id after the gateway is detached and is not counted.
+- **How discovered**: read `Routes[].GatewayId` on live routes, filter to values with the `igw-` prefix; cross-reference the already-loaded `igw` list by gateway ID. A blackhole route keeps the stale target id after the gateway is detached and is not counted, and its target field in the detail is not a link.
 - **Count shown**: unknown.
 
 ### `nat`
 
 - **Why related**: NAT Gateway route targets — default-route target for private subnets; operator pivots to confirm the NAT is `available` and to inspect its EIP.
-- **How discovered**: read `Routes[].NatGatewayId` on live routes; cross-reference the already-loaded `nat` list by NAT gateway ID. A blackhole route keeps the stale target id after the NAT gateway is deleted and is not counted.
+- **How discovered**: read `Routes[].NatGatewayId` on live routes; cross-reference the already-loaded `nat` list by NAT gateway ID. A blackhole route keeps the stale target id after the NAT gateway is deleted and is not counted, and its target field in the detail is not a link.
 - **Count shown**: unknown.
 
 ### `subnet`
@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `tgw`
 
 - **Why related**: Transit Gateway route targets — inter-VPC/on-prem hops; operator pivots to confirm TGW attachment and routes.
-- **How discovered**: read `Routes[].TransitGatewayId` on live routes; cross-reference the already-loaded `tgw` list by transit gateway ID. A blackhole route keeps the stale target id after the attachment is deleted and is not counted.
+- **How discovered**: read `Routes[].TransitGatewayId` on live routes; cross-reference the already-loaded `tgw` list by transit gateway ID. A blackhole route keeps the stale target id after the attachment is deleted and is not counted, and its target field in the detail is not a link.
 - **Count shown**: unknown.
 
 ### `vpc`

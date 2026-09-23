@@ -100,7 +100,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `role`
 
 - **Why related**: Permissions the instance operates with.
-- **How discovered**: read field `Instance.IamInstanceProfile.Arn` (or `.Id`), strip the profile, resolve to role name; cross-reference the already-loaded `role` list by `Role.RoleName` — a9s-devops: instance-profile ARNs embed the profile name, not the role; when profile name and role name differ, a `GetInstanceProfile` call is needed. In practice the two match 99% of the time so the cache-scan is sufficient; fall back to the API only on miss.
+- **How discovered**: read field `Instance.IamInstanceProfile.Arn`, and `iam:GetInstanceProfile` for that profile names the roles it holds; each role ARN reads through the role resolver. A profile's name is never taken for a role's.
 - **Count shown**: yes.
 
 ### `sg`

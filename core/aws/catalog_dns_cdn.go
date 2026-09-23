@@ -59,7 +59,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			ContextKeys:    map[string]string{"zone_id": "ID", "zone_name": "Name"},
 			DisplayNameKey: "zone_name",
 		}},
-		Color: r53Color,
+		Color:          r53Color,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Route53} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
 		}),
@@ -85,6 +86,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:             "CloudFront Distributions",
 		ShortName:        "cf",
+		RefToID:          cfRefToID,
 		HumanizeFields:   []string{"status"},
 		Aliases:          []string{"cf", "cloudfront", "cdn"},
 		Category:         "DNS & CDN",
@@ -104,7 +106,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "aliases", Title: "Aliases", Path: "Aliases.Items", Width: 30},
 			{Key: "price_class", Title: "Price Class", Path: "PriceClass", Width: 16},
 		},
-		Color: colorCF,
+		Color:          colorCF,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudFront} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
 		}),
@@ -160,7 +163,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "not_after", Title: "Expires", Path: "NotAfter", Width: 22},
 			{Key: "in_use", Title: "In Use", Path: "InUse", Width: 8},
 		},
-		Color: acmColor,
+		Color:          acmColor,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ACM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
 		}),
@@ -207,6 +211,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Color:                  colorAPIGW,
+		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.APIGatewayV2} }),
 		Fetcher:                fetcherWithClients(FetchAPIGatewaysPageMerged),
 		Wave2:                  IssueEnricher{Fn: EnrichAPIGatewayStage, Priority: 100},
 		FieldKeys:              []string{"api_id", "name", "protocol", "endpoint", "description"},

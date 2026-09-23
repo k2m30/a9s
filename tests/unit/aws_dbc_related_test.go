@@ -539,10 +539,10 @@ func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	// A client that cannot be called read nothing, so the answer is the error,
-	// not a "?" that would stand for three different states.
-	if result.State() != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (nil DocDB client)", result.State())
+	// With no DocDB client no call was made, so nothing failed: the pivot
+	// reads unknown, never an AWS error.
+	if result.State() != domain.RelatedUnknown || result.Err() != nil {
+		t.Errorf("State = %v Err = %v, want unknown with no error (nil DocDB client)", result.State(), result.Err())
 	}
 }
 
@@ -558,10 +558,10 @@ func TestRelated_DBC_VPC_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	// A client that cannot be called read nothing, so the answer is the error,
-	// not a "?" that would stand for three different states.
-	if result.State() != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (nil DocDB client)", result.State())
+	// With no DocDB client no call was made, so nothing failed: the pivot
+	// reads unknown, never an AWS error.
+	if result.State() != domain.RelatedUnknown || result.Err() != nil {
+		t.Errorf("State = %v Err = %v, want unknown with no error (nil DocDB client)", result.State(), result.Err())
 	}
 }
 

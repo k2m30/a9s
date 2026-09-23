@@ -83,10 +83,11 @@ type NavigableField struct {
 	FieldPath  string // matches a path in ViewDef.Detail (e.g., "VpcId")
 	TargetType string // resource short name (e.g., "vpc")
 	// Resolve, when set, names the target row the field opens for src, given
-	// the loaded target rows (nil when that list is not loaded); "" leaves the
-	// field not navigable. It is for a field whose value alone does not
-	// identify the row, such as a name another row may have taken since.
-	Resolve func(src Resource, targets []Resource) string
+	// the field's value and the loaded target rows (nil when that list is not
+	// loaded); "" leaves the field not navigable. It is for a field whose value
+	// alone does not identify the row, such as a name another row may have
+	// taken since, or a route target a blackholed route still names.
+	Resolve func(src Resource, value string, targets []Resource) string
 }
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus

@@ -7,9 +7,9 @@ package fakes
 import (
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go"
@@ -53,11 +53,11 @@ func (f *LambdaFake) ListEventSourceMappings(_ context.Context, input *lambda.Li
 	source, fn := aws.ToString(input.EventSourceArn), aws.ToString(input.FunctionName)
 	var filtered []lambdatypes.EventSourceMappingConfiguration
 	for _, m := range f.fix.EventSourceMappings {
-		arn := aws.ToString(m.FunctionArn)
+		fnARN := aws.ToString(m.FunctionArn)
 		if source != "" && aws.ToString(m.EventSourceArn) != source {
 			continue
 		}
-		if fn != "" && arn != fn && !strings.HasSuffix(arn, ":function:"+fn) {
+		if a, _ := arn.Parse(fnARN); fn != "" && fnARN != fn && a.Resource != "function:"+fn {
 			continue
 		}
 		filtered = append(filtered, m)

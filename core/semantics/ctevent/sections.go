@@ -5,6 +5,8 @@ package ctevent
 import (
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // BuildSections builds the ordered list of detail sections for the given parsed event.
@@ -37,7 +39,7 @@ func BuildSections(event *Event) []Section {
 	var targetRows []Row
 	var cleanedParams map[string]any
 	if len(event.Resources) > 0 || event.RequestParameters != nil {
-		targetRows, cleanedParams = ExtractTarget(event.EventName, event.EventSource, event.RecipientAccountID, event.Resources, event.RequestParameters)
+		targetRows, cleanedParams = ExtractTargetInRegion(event.EventName, event.EventSource, event.RecipientAccountID, event.AWSRegion, event.Resources, event.RequestParameters)
 	} else {
 		cleanedParams = map[string]any{}
 	}
@@ -105,17 +107,15 @@ func buildActorRows(event *Event) []Row {
 	var rows []Row
 
 	// Principal row — always present for non-service events with an ARN.
-	// Only navigable when arnTargetType resolves to a known type (e.g. role, iam-user).
-	// Root ARNs (arn:*:root) return "" from arnTargetType and must stay display-only.
-	// The row carries the whole ARN and no NavID, so the detail resolves it
-	// through the target type's own reference resolver, which reads the
-	// account in it and refuses a principal of another one.
-	principalTargetType := arnTargetType(ui.ARN)
-	principalRow := Row{
-		Key:         "Principal",
-		Value:       ui.ARN,
-		IsNavigable: principalTargetType != "" && arnNamesAPrincipal(ui.ARN),
-		TargetType:  principalTargetType,
+	// Only navigable when arnTargetType resolves to a known type (e.g. role,
+	// iam-user) and the type's resolver reads it in the account the event was
+	// recorded in. Root ARNs (arn:*:root) return "" from arnTargetType and
+	// stay display-only.
+	principalRow := Row{Key: "Principal", Value: ui.ARN}
+	if target := arnTargetType(ui.ARN); target != "" {
+		if _, ok := navLink(target, ui.ARN, event.RecipientAccountID); ok {
+			principalRow.IsNavigable, principalRow.TargetType = true, target
+		}
 	}
 	rows = append(rows, principalRow)
 
@@ -150,20 +150,23 @@ func buildActorRows(event *Event) []Row {
 	return rows
 }
 
-// arnNamesAPrincipal reports whether an ARN carries a principal after its type
-// marker. An ARN that ends at the marker ("…:role/") names a type and nobody,
-// and a row that opens nothing must not offer to open.
-func arnNamesAPrincipal(arn string) bool {
-	return !strings.HasSuffix(arn, "/")
-}
-
-// arnTargetType derives the navigable resource type from an ARN.
-// Returns "role" for assumed-role and role ARNs, "iam-user" for :user/ ARNs, "" otherwise.
-func arnTargetType(arn string) string {
-	if strings.Contains(arn, ":assumed-role/") || strings.Contains(arn, ":role/") {
-		return "role"
+// arnTargetType derives the navigable resource type from a principal ARN:
+// "role" for a role or assumed-role ARN, "iam-user" for a user ARN, "" for
+// anything else. An ARN that ends at its type marker ("…:role/") names a
+// type and nobody, and a row that opens nothing must not offer to open.
+func arnTargetType(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
+		return ""
 	}
-	if strings.Contains(arn, ":user/") {
+	typ, name, _ := strings.Cut(a.Resource, "/")
+	if name == "" || strings.HasSuffix(name, "/") {
+		return ""
+	}
+	switch typ {
+	case "role", "assumed-role":
+		return "role"
+	case "user":
 		return "iam-user"
 	}
 	return ""

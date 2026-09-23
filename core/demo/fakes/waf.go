@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
@@ -44,15 +45,15 @@ func (f *WAFFake) ListResourcesForWebACL(_ context.Context, input *wafv2.ListRes
 	}
 	// Each call answers one resource type, APPLICATION_LOAD_BALANCER when
 	// none is named; the fixtures associate no type outside this map.
-	marker := map[wafv2types.ResourceType]string{
-		"": ":loadbalancer/app/",
-		wafv2types.ResourceTypeApplicationLoadBalancer: ":loadbalancer/app/",
-		wafv2types.ResourceTypeApiGateway:              ":apigateway:",
+	want := map[wafv2types.ResourceType]struct{ service, prefix string }{
+		"": {"elasticloadbalancing", "loadbalancer/app/"},
+		wafv2types.ResourceTypeApplicationLoadBalancer: {"elasticloadbalancing", "loadbalancer/app/"},
+		wafv2types.ResourceTypeApiGateway:              {"apigateway", ""},
 	}[input.ResourceType]
 	var arns []string
-	for _, arn := range f.fix.ResourcesByWebACL[*input.WebACLArn] {
-		if marker != "" && strings.Contains(arn, marker) {
-			arns = append(arns, arn)
+	for _, ref := range f.fix.ResourcesByWebACL[*input.WebACLArn] {
+		if a, err := arn.Parse(ref); err == nil && want.service != "" && a.Service == want.service && strings.HasPrefix(a.Resource, want.prefix) {
+			arns = append(arns, ref)
 		}
 	}
 	return &wafv2.ListResourcesForWebACLOutput{ResourceArns: arns}, nil
@@ -140,7 +141,7 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 		}
 	}
 	dest := "arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-acme"
-	if strings.Contains(*input.ResourceArn, "/webacl/acme-prod-api-waf/") {
+	if a, _ := arn.Parse(aws.ToString(input.ResourceArn)); strings.Contains(a.Resource, "/webacl/acme-prod-api-waf/") {
 		dest = "arn:aws:logs:us-east-1:123456789012:log-group:" + fixtures.WAFProdAPILogGroup
 	}
 	return &wafv2.GetLoggingConfigurationOutput{

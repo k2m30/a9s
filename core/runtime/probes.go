@@ -803,7 +803,7 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 	if clients == nil {
 		return ProbeAvailabilityResult{
 			ResourceType: shortName,
-			Err:          fmt.Errorf("AWS clients not initialized"),
+			Err:          domain.ErrClientMissing,
 		}
 	}
 	// A registered AvailabilityFetcher (core/resource.GetAvailabilityFetcher)
@@ -1021,7 +1021,7 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	if clients == nil {
 		return ProbeEnrichmentResult{
 			ResourceType: shortName,
-			Err:          fmt.Errorf("AWS clients not initialized"),
+			Err:          domain.ErrClientMissing,
 		}
 	}
 	e, ok := awsclient.Wave2EnricherFor(shortName)
@@ -1076,22 +1076,16 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 
 // prefetchDeclaredRead reads the first page of a list an enricher declares
 // but the session has not observed. ok is false when the list could not be
-// read in full: a fetcher error, a partial answer, or a panic, which a fetcher
-// raises on a session without that service's client — recovered here as
-// RunRelatedDef does, since this runs on a task goroutine.
-func prefetchDeclaredRead(ctx context.Context, clients *awsclient.ServiceClients, name string) (entry resource.ResourceCacheEntry, ok bool) {
+// read in full: a fetcher error (a session without a service client the
+// list's fetcher calls among them) or a partial answer.
+func prefetchDeclaredRead(ctx context.Context, clients *awsclient.ServiceClients, name string) (resource.ResourceCacheEntry, bool) {
 	pf := resource.GetPaginatedFetcher(name)
 	if pf == nil {
-		return entry, false
+		return resource.ResourceCacheEntry{}, false
 	}
-	defer func() {
-		if recover() != nil {
-			entry, ok = resource.ResourceCacheEntry{}, false
-		}
-	}()
 	fr, err := pf(ctx, clients, "")
 	if err != nil {
-		return entry, false
+		return resource.ResourceCacheEntry{}, false
 	}
 	return resource.ResourceCacheEntry{
 		Resources:   fr.Resources,

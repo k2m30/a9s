@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
@@ -58,18 +59,11 @@ func FetchCallerIdentity(ctx context.Context, stsClient STSGetCallerIdentityAPI,
 //   - arn:aws:iam::ACCOUNT:user/PATH/USERNAME
 //   - arn:aws:sts::ACCOUNT:federated-user/NAME
 func parseARN(id *CallerIdentity) {
-	arnStr := id.Arn
-	if arnStr == "" {
+	a, err := arn.Parse(id.Arn)
+	if err != nil {
 		return
 	}
-
-	// ARN format: arn:partition:service:region:account:resource
-	parts := strings.SplitN(arnStr, ":", 6)
-	if len(parts) < 6 {
-		return
-	}
-
-	resourcePart := parts[5] // e.g., "assumed-role/ROLE/SESSION" or "user/USERNAME"
+	resourcePart := a.Resource
 
 	switch {
 	case strings.HasPrefix(resourcePart, "assumed-role/"):

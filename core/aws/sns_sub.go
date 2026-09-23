@@ -61,10 +61,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 			endpoint = *sub.Endpoint
 		}
 
-		topicName := topicArn
-		if parts := strings.Split(topicArn, ":"); len(parts) > 0 {
-			topicName = parts[len(parts)-1]
-		}
+		topicName := snsTopicName(topicArn)
 
 		findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 

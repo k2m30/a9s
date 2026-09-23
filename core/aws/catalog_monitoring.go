@@ -79,7 +79,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"alarm_name": "alarm_name"},
 			DisplayNameKey: "alarm_name",
 		}},
-		Color: colorAlarm,
+		Color:          colorAlarm,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudWatch} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchAlarmsPage(ctx, c.CloudWatch, continuationToken)
 		}),
@@ -134,7 +135,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"log_group_name": "Name"},
 			DisplayNameKey: "log_group_name",
 		}},
-		Color: colorLogs,
+		Color:          colorLogs,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudWatchLogs} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		}),
@@ -164,6 +166,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:             "CloudTrail Trails",
 		ShortName:        "trail",
+		RefToID:          trailRefToID,
 		Aliases:          []string{"trail", "cloudtrail", "trails"},
 		Category:         "MONITORING",
 		CloudTrailKey:    "ResourceName:ID",
@@ -182,7 +185,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "home_region", Title: "Home Region", Path: "HomeRegion", Width: 16},
 			{Key: "multi_region", Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},
 		},
-		Color: colorTrail,
+		Color:          colorTrail,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudTrail} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)
 			if err != nil {
@@ -250,6 +254,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		ExcludeFromIssueBadge: true,
 		Color:                 colorCTEvents,
 		Project:               ctevent.Project,
+		FetcherClients:        clientsOf(func(c *ServiceClients) []any { return []any{c.CloudTrail} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return ctLocalPrincipals(c)(FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken))
 		}),

@@ -346,12 +346,21 @@ func relatedParseCall(call *ast.CallExpr) string {
 }
 
 // A checker that splits an ARN itself is a second reading of a fact the
-// target type's resolver owns. Only a RefToID function may parse.
+// target type's resolver owns. Only a RefToID function may parse. The
+// CloudTrail pivots read their candidates out of ct_events_*.go, which is
+// checker code under another file name.
 func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
 	files, err := filepath.Glob("../../core/aws/*_related*.go")
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no related checker files found: %v", err)
 	}
+	ctFiles, err := filepath.Glob("../../core/aws/ct_events_*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = append(files, ctFiles...)
+	slices.Sort(files)
+	files = slices.Compact(files)
 	var hits []string
 	fset := token.NewFileSet()
 	for _, path := range files {

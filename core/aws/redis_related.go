@@ -20,7 +20,7 @@ import (
 )
 
 // errRedisNoGroupDetail is the answer when the row holds something that is not
-// a replication group, or the ElastiCache client is unusable. Distinct from
+// a replication group. Distinct from
 // errRawStructMissing: there the row was never read, here what we have cannot
 // be used.
 var errRedisNoGroupDetail = errors.New("the replication group could not be read")
@@ -384,18 +384,19 @@ func redisMemberCluster(ctx context.Context, clients any, res resource.Resource)
 	if len(rg.MemberClusters) == 0 {
 		return nil, nil
 	}
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil || c.ElastiCache == nil {
-		return nil, errRedisNoGroupDetail
+	c, err := svcClients(clients)
+	// no finding: without the ElastiCache client nothing was read.
+	if err != nil || c.ElastiCache == nil {
+		return nil, errClientMissing
 	}
 	memberID := rg.MemberClusters[0]
 	clusters, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elasticachetypes.CacheCluster, *string, error) {
-		out, err := c.ElastiCache.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
+		out, callErr := c.ElastiCache.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
 			CacheClusterId: &memberID,
 			Marker:         marker,
 		})
-		if err != nil {
-			return nil, nil, err
+		if callErr != nil {
+			return nil, nil, callErr
 		}
 		return out.CacheClusters, out.Marker, nil
 	})
@@ -425,9 +426,9 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 	// A member cluster came back, so redisMemberCluster already proved the
 	// ElastiCache client is usable; the checked assertion only recovers the
 	// typed pointer.
-	c, cok := clients.(*ServiceClients)
-	if !cok {
-		return nil, errRedisNoGroupDetail
+	c, err := svcClients(clients)
+	if err != nil {
+		return nil, err
 	}
 	name := *cc.CacheSubnetGroupName
 	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elasticachetypes.CacheSubnetGroup, *string, error) {

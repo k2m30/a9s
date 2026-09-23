@@ -88,23 +88,19 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		return resource.ProvenZero("sns", "trail.SnsTopicARN")
 	}
+	// A multi-region trail publishes to a topic in its home region, which the
+	// topic's ARN names.
 	topicARN := *trail.SnsTopicARN
-
-	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
+	region := arnRegionOf(topicARN, "sns")
+	snsList, rc, truncated, err := relatedListIn(ctx, clients, cache, "sns", region)
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
 	if snsList == nil {
 		return resource.UnknownRelated("sns")
 	}
-
-	var ids []string
-	for _, snsRes := range snsList {
-		if snsRes.ID == topicARN {
-			ids = append(ids, snsRes.ID)
-		}
-	}
-	return relatedResultTrunc("sns", ids, truncated)
+	ids, lowerBound := listedRefs("sns", []string{topicARN}, rc, snsList)
+	return inRegion(clients, region, relatedResultTrunc("sns", ids, truncated && lowerBound))
 }
 
 // checkTrailKMS returns the key in the trail's KmsKeyId (a key ARN or alias).

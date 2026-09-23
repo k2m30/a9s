@@ -2,13 +2,12 @@ package unit_test
 
 // A slash inside a resource id is part of the name, not a path to trim.
 //
-// A CloudTrail event names its resource in one of two shapes: an ARN, whose id
-// is the segment after the last slash ("...:key/1234abcd"), and a plain name,
-// which may itself contain slashes ("prod/api/stripe-key"). Trimming to the
-// last segment is right for the first and destroys the second, and nothing in
-// the event says which shape it carries. The pins below hold both forms
-// resolvable through the same matcher, and hold the count to the one resource
-// the event actually named when the account happens to hold both forms.
+// A CloudTrail event names its resource by ARN or by name. A Secrets Manager
+// name may itself contain slashes ("prod/api/stripe-key"); a bucket, function,
+// table, trail or EC2 id never does. Each value is read through the target
+// type's resolver and confirmed against the loaded list, so a path-shaped
+// secret name resolves whole, an ARN resolves to the id its list is keyed by,
+// and the count holds to the one resource the event named.
 
 import (
 	"context"
@@ -26,10 +25,8 @@ import (
 )
 
 // ctSlashPivots is the subset of ctPivots that reads its ids out of the
-// Resources envelope through the shared extractCTResourceIDs. vpce reads the
-// event JSON instead; dbi and cfn keep their own copies of the trim rule, and
-// neither an RDS instance identifier nor a CloudFormation stack name may
-// contain a slash, so no input distinguishes those copies here.
+// Resources envelope. vpce reads the event JSON instead; dbi and cfn have
+// their own tests below.
 func ctSlashPivots() []ctPivot {
 	shared := map[string]bool{"ec2": true, "s3": true, "lambda": true, "kms": true,
 		"secrets": true, "sg": true, "ddb": true, "trail": true}
@@ -63,12 +60,68 @@ func ctSlashEvent(p ctPivot, name string) resource.Resource {
 	}
 }
 
+// ctPivotARN is the ARN AWS gives p's resource, the shape a CloudTrail
+// Resources entry carries.
+func ctPivotARN(p ctPivot) string {
+	const acct = "123456789012"
+	switch p.target {
+	case "ec2":
+		return "arn:aws:ec2:us-east-1:" + acct + ":instance/" + p.id
+	case "s3":
+		return "arn:aws:s3:::" + p.id
+	case "lambda":
+		return "arn:aws:lambda:us-east-1:" + acct + ":function:" + p.id
+	case "kms":
+		return "arn:aws:kms:us-east-1:" + acct + ":key/" + p.id
+	case "secrets":
+		return "arn:aws:secretsmanager:us-east-1:" + acct + ":secret:" + p.id + "-AbCdEf"
+	case "sg":
+		return "arn:aws:ec2:us-east-1:" + acct + ":security-group/" + p.id
+	case "ddb":
+		return "arn:aws:dynamodb:us-east-1:" + acct + ":table/" + p.id
+	case "trail":
+		return "arn:aws:cloudtrail:us-east-1:" + acct + ":trail/" + p.id
+	}
+	panic("ctPivotARN: no ARN shape for " + p.target)
+}
+
+// ctPivotListed is p's resource as its list holds it.
+func ctPivotListed(p ctPivot) resource.Resource {
+	return resource.Resource{ID: p.id, Name: p.id, Fields: map[string]string{"arn": ctPivotARN(p)}}
+}
+
+// ctPivotSecondID is the id of another resource of p's type, in the shape
+// AWS issues it.
+func ctPivotSecondID(p ctPivot) string {
+	switch p.target {
+	case "ec2":
+		return "i-0fedcba9876543210"
+	case "sg":
+		return "sg-0fedcba9876543210"
+	case "kms":
+		return "9f8e7d6c-5b4a-4938-8271-605f4e3d2c1b"
+	}
+	return p.id + "-staging"
+}
+
+// ctPathNamePivots are the pivots whose target's names may hold a slash:
+// Secrets Manager's. The other targets' ids never carry one.
+func ctPathNamePivots() []ctPivot {
+	var out []ctPivot
+	for _, p := range ctSlashPivots() {
+		if p.target == "secrets" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // TestCtEventsPivots_PathNamedIDResolvesAsWritten: the event names
 // "prod/api/<id>" and the account holds a resource under
 // that whole name. The list confirms it, so the pivot resolves to it — the
 // trimmed tail names nothing and must not turn the answer into a zero.
 func TestCtEventsPivots_PathNamedIDResolvesAsWritten(t *testing.T) {
-	for _, p := range ctSlashPivots() {
+	for _, p := range ctPathNamePivots() {
 		t.Run(p.target, func(t *testing.T) {
 			pathName := "prod/api/" + p.id
 			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
@@ -87,18 +140,16 @@ func TestCtEventsPivots_PathNamedIDResolvesAsWritten(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_ARNShapedNameResolvesByLastSegment: an event that names
-// its resource
-// as a path ("instance/i-0abc") is resolved by the segment after the slash,
-// which is the id the list is keyed by.
-func TestCtEventsPivots_ARNShapedNameResolvesByLastSegment(t *testing.T) {
+// TestCtEventsPivots_ARNResolvesToTheListedID: an event that names its
+// resource by ARN resolves to the id the list is keyed by.
+func TestCtEventsPivots_ARNResolvesToTheListedID(t *testing.T) {
 	for _, p := range ctSlashPivots() {
 		t.Run(p.target, func(t *testing.T) {
 			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
-				Resources: []resource.Resource{{ID: p.id, Name: p.id}},
+				Resources: []resource.Resource{ctPivotListed(p)},
 			}}
 
-			result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil, ctSlashEvent(p, "resource/"+p.id), cache)
+			result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil, ctSlashEvent(p, ctPivotARN(p)), cache)
 
 			if got := result.EffectiveState(); got != domain.RelatedResolved {
 				t.Fatalf("state = %v, want RelatedResolved: the list is complete", got)
@@ -116,7 +167,7 @@ func TestCtEventsPivots_ARNShapedNameResolvesByLastSegment(t *testing.T) {
 // second invents a row the event never established, so the answer is one
 // resource, the one that was named.
 func TestCtEventsPivots_PathNamedIDDoesNotOfferTheTail(t *testing.T) {
-	for _, p := range ctSlashPivots() {
+	for _, p := range ctPathNamePivots() {
 		t.Run(p.target, func(t *testing.T) {
 			pathName := "prod/api/" + p.id
 			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
@@ -337,17 +388,14 @@ func ctSlashEventNaming(p ctPivot, names ...string) resource.Resource {
 func TestCtEventsPivots_OneRowPerResourceNamed(t *testing.T) {
 	for _, p := range ctSlashPivots() {
 		t.Run(p.target, func(t *testing.T) {
-			other := "second-" + p.id
+			other := ctPivotSecondID(p)
 			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
-				Resources: []resource.Resource{
-					{ID: p.id, Name: p.id},
-					{ID: other, Name: other},
-				},
+				Resources: []resource.Resource{ctPivotListed(p), {ID: other, Name: other}},
 			}}
 			checker := ctEventsCheckerByTarget(t, p.target)
 
 			t.Run("the same resource named twice is one row", func(t *testing.T) {
-				event := ctSlashEventNaming(p, "resource/"+p.id, p.id)
+				event := ctSlashEventNaming(p, ctPivotARN(p), p.id)
 				result := checker(context.Background(), nil, event, cache)
 				if result.Count() != 1 || result.ResourceIDs()[0] != p.id {
 					t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), p.id)
@@ -366,19 +414,19 @@ func TestCtEventsPivots_OneRowPerResourceNamed(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_TruncatedListConfirmsTheTail pins the group rule against a
-// partial list: the page that was read confirms the trimmed form and nothing
-// else, so that one id is real and the truncated flag rides along.
-func TestCtEventsPivots_TruncatedListConfirmsTheTail(t *testing.T) {
+// TestCtEventsPivots_TruncatedListConfirmsTheARN: against a partial list, the
+// page that was read confirms the resource the ARN names, so that one id is
+// real and the truncated flag rides along.
+func TestCtEventsPivots_TruncatedListConfirmsTheARN(t *testing.T) {
 	for _, p := range ctSlashPivots() {
 		t.Run(p.target, func(t *testing.T) {
 			cache := resource.ResourceCache{p.target: resource.ResourceCacheEntry{
-				Resources:   []resource.Resource{{ID: p.id, Name: p.id}},
+				Resources:   []resource.Resource{ctPivotListed(p)},
 				IsTruncated: true,
 			}}
 
 			result := ctEventsCheckerByTarget(t, p.target)(context.Background(), nil,
-				ctSlashEvent(p, "resource/"+p.id), cache)
+				ctSlashEvent(p, ctPivotARN(p)), cache)
 
 			if got := result.EffectiveState(); got != domain.RelatedResolved {
 				t.Fatalf("state = %v, want RelatedResolved: the page read confirmed %q", got, p.id)
@@ -422,8 +470,8 @@ func TestCtEventsPivots_ListIDOutranksAnotherResourceName(t *testing.T) {
 	}
 }
 
-// TestCtEventsDBI_ThroughTheSharedExtractor: the RDS envelope resolves in
-// both id shapes, the request-body fallback runs when the envelope names no
+// TestCtEventsDBI_ThroughTheSharedExtractor: the RDS envelope resolves by
+// identifier and by ARN ("…:db:<id>"), the request-body fallback runs when the envelope names no
 // instance, and a cluster entry is not an instance id.
 func TestCtEventsDBI_ThroughTheSharedExtractor(t *testing.T) {
 	const dbID = "acme-orders-prod"
@@ -462,8 +510,8 @@ func TestCtEventsDBI_ThroughTheSharedExtractor(t *testing.T) {
 			want:  1,
 		},
 		{
-			what:  "the envelope names it as a path",
-			event: dbiEvent(instanceRef("db/"+dbID), `{"requestParameters":{}}`),
+			what:  "the envelope names it by ARN",
+			event: dbiEvent(instanceRef("arn:aws:rds:us-east-1:123456789012:db:"+dbID), `{"requestParameters":{}}`),
 			want:  1,
 		},
 		{

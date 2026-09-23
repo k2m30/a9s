@@ -71,3 +71,8 @@ func FetchIsPartial(result resource.FetchResult, err error) bool {
 func anyDegraded(list []resource.Resource) bool {
 	return slices.ContainsFunc(list, func(r resource.Resource) bool { return r.Fields[DegradedFindingField] != "" })
 }
+
+// TargetClientMissing is resource.ClientMissing for the target type.
+func TargetClientMissing(clients any, target string) error {
+	return resource.ClientMissing(resource.TypeDef(target), clients)
+}

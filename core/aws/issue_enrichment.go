@@ -79,12 +79,11 @@ const EnrichmentParallelism = 8
 // "A cap marks whichever fact it made uncertain".
 const PerParentPageCap = 10
 
-// isInstanceARN returns true when the RDS ARN targets a DB instance
-// (resource-type segment = "db"), not a cluster, snapshot, or other resource.
-// ARN format: arn:aws:rds:region:account:resource-type:id
-func isInstanceARN(arn string) bool {
-	parts := strings.Split(arn, ":")
-	return len(parts) >= 7 && parts[5] == "db"
+// isInstanceARN reports whether ref is an RDS DB instance ARN ("db:<id>"),
+// not a cluster, snapshot, or other resource.
+func isInstanceARN(ref string) bool {
+	a, ok := ARNForService(ref, "rds")
+	return ok && strings.HasPrefix(a.Resource, "db:")
 }
 
 // formatDate formats a *time.Time as "2006-01-02" or returns "" for nil.

@@ -33,6 +33,10 @@ const CtEventSecondPathNamedRole = "evt-0a1b2c3d4e5f60012"
 // at zero rather than answering with a role that merely shares a name segment.
 const CtEventDeletedRole = "evt-0a1b2c3d4e5f60013"
 
+// CtEventPathedUserTarget acts on ci-service-account, which is filed under an
+// IAM path: its TARGET row carries the pathed user ARN and opens the user.
+const CtEventPathedUserTarget = "evt-0a1b2c3d4e5f60014"
+
 // CloudTrailFixtures holds all CloudTrail domain objects served by the fake.
 type CloudTrailFixtures struct {
 	Trails      []cloudtrailtypes.Trail
@@ -697,7 +701,19 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String("prod/database/primary")},
 			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"secretsmanager.amazonaws.com","awsRegion":"us-east-1","eventName":"GetSecretValue","requestParameters":{"secretId":"prod/database/primary"}}`),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"secretsmanager.amazonaws.com","awsRegion":"us-east-1","eventName":"GetSecretValue","requestParameters":{"secretId":"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"},"recipientAccountId":"123456789012"}`),
+		},
+		{
+			EventId:     aws.String(CtEventPathedUserTarget),
+			EventName:   aws.String("TagUser"),
+			EventSource: aws.String("iam.amazonaws.com"),
+			EventTime:   aws.Time(tR),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("ci-service-account")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"iam.amazonaws.com","awsRegion":"us-east-1","eventName":"TagUser","eventID":"` + CtEventPathedUserTarget + `","requestParameters":{"userName":"ci-service-account","tags":[{"key":"team","value":"platform"}]},"recipientAccountId":"123456789012","resources":[{"ARN":"arn:aws:iam::123456789012:user/service-accounts/ci-service-account","accountId":"123456789012","type":"AWS::IAM::User"}]}`),
 		},
 		{
 			EventId:     aws.String("evt-eks-describe-001"),
@@ -982,7 +998,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::Lambda::Function"), ResourceName: aws.String("data-pipeline-transform")},
 			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/deploy-887","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE777777777","arn":"arn:aws:iam::123456789012:role/acme-ci-deploy-role","accountId":"123456789012","userName":"acme-ci-deploy-role"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-03-22T03:00:00Z"}}},"eventSource":"lambda.amazonaws.com","awsRegion":"us-east-1","eventName":"UpdateFunctionConfiguration","requestParameters":{"functionName":"data-pipeline-transform"}}`),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/deploy-887","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE777777777","arn":"arn:aws:iam::123456789012:role/acme-ci-deploy-role","accountId":"123456789012","userName":"acme-ci-deploy-role"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-03-22T03:00:00Z"}}},"eventSource":"lambda.amazonaws.com","awsRegion":"us-east-1","eventName":"UpdateFunctionConfiguration","requestParameters":{"functionName":"data-pipeline-transform"},"recipientAccountId":"123456789012","resources":[{"ARN":"arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform","accountId":"123456789012","type":"AWS::Lambda::Function"}]}`),
 		},
 		// rds!db-prod-dbi-1-ABCDEF rotation event — required for
 		// ct-events:secrets related-panel pivot.
@@ -1010,7 +1026,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::EC2::SecurityGroup"), ResourceName: aws.String("sg-0aaa111111111111a")},
 			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"ec2.amazonaws.com","awsRegion":"us-east-1","eventName":"AuthorizeSecurityGroupIngress","requestParameters":{"groupId":"sg-0aaa111111111111a"}}`),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"ec2.amazonaws.com","awsRegion":"us-east-1","eventName":"AuthorizeSecurityGroupIngress","requestParameters":{"groupId":"sg-0aaa111111111111a"},"recipientAccountId":"123456789012","resources":[{"ARN":"arn:aws:ec2:us-east-1:123456789012:security-group/sg-0aaa111111111111a","accountId":"123456789012","type":"AWS::EC2::SecurityGroup"}]}`),
 		},
 		// acme-management-trail config-change event — required for
 		// ct-events:trail related-panel pivot (meta: trail auditing trail changes).
@@ -1097,5 +1113,5 @@ func init() {
 	// healthy: colorCTEvents (core/aws/catalog_monitoring.go) colors only
 	// ct-danger→Broken and ct-attention→Warning and defaults everything else
 	// to Dim, so Healthy is not a return value of this classifier.
-	Register(Pin{ShortName: "ct-events", Rows: 56, Issues: 0, CoverageGaps: []string{"healthy"}})
+	Register(Pin{ShortName: "ct-events", Rows: 57, Issues: 0, CoverageGaps: []string{"healthy"}})
 }

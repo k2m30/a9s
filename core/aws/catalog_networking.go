@@ -114,7 +114,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"load_balancer_arn": "load_balancer_arn", "lb_name": "Name"},
 			DisplayNameKey: "lb_name",
 		}},
-		Color: colorELB,
+		Color:          colorELB,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ELBv2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 		}),
@@ -181,7 +182,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"target_group_arn": "target_group_arn"},
 			DisplayNameKey: "Name",
 		}},
-		Color: colorTG,
+		Color:          colorTG,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ELBv2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetGroupsPage(ctx, c.ELBv2, continuationToken)
 		}),
@@ -214,6 +216,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Security Groups",
 		ShortName:     "sg",
+		RefToID:       sgRefToID,
 		LifecycleKey:  "risk_summary",
 		Aliases:       []string{"sg", "securitygroups", "security-groups"},
 		Category:      "NETWORKING",
@@ -228,7 +231,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
-		Color: colorAnyFindingOrHealthy,
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -257,6 +261,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "VPCs",
 		ShortName:     "vpc",
+		RefToID:       vpcRefToID,
 		Aliases:       []string{"vpc", "vpcs"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -271,7 +276,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9},
 			{Key: "flow_logs", Title: "Flow Logs", Width: 10},
 		},
-		Color: colorVPC,
+		Color:          colorVPC,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -317,7 +323,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
 			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 		},
-		Color: colorSubnet,
+		Color:          colorSubnet,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSubnetsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -365,7 +372,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "associations_count", Title: "Assoc.", Width: 8},
 			{Key: "blackhole_routes_count", Title: "Blackholes", Width: 10},
 		},
-		Color: colorRTB,
+		Color:          colorRTB,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRouteTablesPage(ctx, c.EC2, continuationToken)
 		}),
@@ -384,11 +392,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 			{FieldPath: "Associations.SubnetId", TargetType: "subnet"},
-			{FieldPath: "Routes.NatGatewayId", TargetType: "nat"},
-			{FieldPath: "Routes.GatewayId", TargetType: "igw"},
-			{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
-			{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
-			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc-peer"},
+			{FieldPath: "Routes.NatGatewayId", TargetType: "nat", Resolve: rtbLiveRouteTarget},
+			{FieldPath: "Routes.GatewayId", TargetType: "igw", Resolve: rtbLiveRouteTarget},
+			{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni", Resolve: rtbLiveRouteTarget},
+			{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw", Resolve: rtbLiveRouteTarget},
+			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc-peer", Resolve: rtbLiveRouteTarget},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "A route in this table points at a gateway or interface that no longer exists, so traffic matching it is dropped silently — from the instance's side it looks like a firewall problem. Repoint the route at a live target or remove it."},
@@ -414,7 +422,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Failure", Path: "FailureCode", Width: 22},
 			{Key: "public_ip", Title: "Public IP", Width: 16},
 		},
-		Color: colorNAT,
+		Color:          colorNAT,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
 		}),
@@ -456,7 +465,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 			{Key: "state", Title: "Status", Width: 12},
 		},
-		Color: colorIGW,
+		Color:          colorIGW,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchInternetGatewaysPage(ctx, c.EC2, continuationToken)
 		}),
@@ -495,7 +505,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "instance_id", Title: "Instance", Path: "InstanceId", Width: 20},
 			{Key: "domain", Title: "Domain", Path: "Domain", Width: 8},
 		},
-		Color: colorAnyFindingOrHealthy,
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, _ string) (resource.FetchResult, error) {
 			resources, err := FetchElasticIPs(ctx, c.EC2)
 			if err != nil {
@@ -545,7 +556,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Last Error", Path: "LastError.Message", Width: 32},
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 		},
-		Color: colorVPCE,
+		Color:          colorVPCE,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -583,6 +595,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Transit Gateways",
 		ShortName:     "tgw",
+		RefToID:       tgwRefToID,
 		Aliases:       []string{"tgw", "transit-gateways", "transitgateways"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -597,7 +610,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
-		Color: colorTGW,
+		Color:          colorTGW,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchTransitGatewaysPage(ctx, c.EC2, continuationToken)
 		}),
@@ -640,9 +654,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 		},
-		Color: colorENI,
+		Color:          colorENI,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
+		}),
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
+			return FetchNetworkInterfacesByIDs(ctx, c.EC2, ids)
 		}),
 		FieldKeys: []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed", "description", "requester_id", "security_groups"},
 		Related: []domain.RelatedDef{
@@ -695,8 +713,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"server_id": "ID"},
 			DisplayNameKey: "server_id",
 		}},
-		Color:   colorAnyFindingOrHealthy,
-		Fetcher: fetcherWithClients(FetchTransferServersPage),
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Transfer} }),
+		Fetcher:        fetcherWithClients(FetchTransferServersPage),
 		FieldKeys: []string{
 			"server_id", "status", "domain", "endpoint_type",
 			"identity_provider_type", "user_count", "arn",
@@ -752,7 +771,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "accepter_owner", Title: "Accepter Owner", Path: "AccepterVpcInfo.OwnerId", Width: 14},
 			{Key: "expires", Title: "Expires", Width: 17},
 		},
-		Color: colorAnyFindingOrHealthy,
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVpcPeeringConnectionsPage(ctx, c.EC2, continuationToken)
 		}),

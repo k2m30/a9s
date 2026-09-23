@@ -4,13 +4,13 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -44,20 +44,18 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 // checkCtEventsRole extracts role information from the CloudTrail event's
 // Resources slice (AWS::IAM::Role) and matches against the role cache.
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	candidates := ctEventsRoleCandidates(res, refContext(clients, cache, "role"))
-	if len(candidates) == 0 {
+	ref := ctEventsRoleRef(res)
+	if ref == "" {
 		return unreadZero(res, resource.ProvenZero("role", "candidates"))
 	}
-	return unreadZero(res, ctEventsMatchTarget(ctx, clients, cache, "role", [][]string{candidates}))
+	return unreadZero(res, ctEventsMatchTarget(ctx, clients, cache, "role", res, []string{ref}))
 }
 
-// ctEventsRoleCandidates returns the candidate ids for the role a CloudTrail
-// event names, in the order the four sources are trusted: the target roleArn in
-// requestParameters, an AWS::IAM::Role entry in Resources, a Username carrying a
-// service-role path, then the event JSON. Each source's raw value goes through
-// ctRoleAlternatives, so the candidates follow the shared id rule rather than
-// any role-specific trim.
-func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []string {
+// ctEventsRoleRef returns the reference to the role a CloudTrail event names,
+// from the first of four sources in the order they are trusted: the target
+// roleArn in requestParameters, an AWS::IAM::Role entry in Resources, a
+// Username carrying a service-role path, then the event JSON.
+func ctEventsRoleRef(res resource.Resource) string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
 	// TARGET role being assumed. Prefer it over Resources[]/sessionIssuer, which
@@ -66,52 +64,31 @@ func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []strin
 	if ok {
 		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
 			if req, _ := parsed["requestParameters"].(map[string]any); req != nil {
-				if arn, _ := req["roleArn"].(string); arn != "" {
-					return ctRoleAlternatives(arn, rc)
+				if roleARN, _ := req["roleArn"].(string); roleARN != "" {
+					return roleARN
 				}
 			}
 		}
-	}
-	if ok {
 		for _, r := range event.Resources {
-			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") {
-				if r.ResourceName != nil && *r.ResourceName != "" {
-					return ctRoleAlternatives(*r.ResourceName, rc)
-				}
+			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") && aws.ToString(r.ResourceName) != "" {
+				return *r.ResourceName
 			}
 		}
 	}
 
 	// Fallback: Username may encode a service role path ("AWSServiceRole/RoleName").
 	if username := res.Fields["_ct.username"]; strings.Contains(username, "/") {
-		return ctRoleAlternatives(username, rc)
+		return username
 	}
 
 	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON
 	// string. The issuer's ARN is read in preference to its name: only the ARN
 	// tells another account's role from the local one of that name.
 	if ok {
-		if name, roleARN := extractRoleNameFromCTEventJSON(event.CloudTrailEvent); roleARN != "" {
-			return ctRoleAlternatives(roleARN, rc)
-		} else if name != "" {
-			return ctRoleAlternatives(name, rc)
-		}
+		name, roleARN := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+		return cmp.Or(roleARN, name)
 	}
-
-	return nil
-}
-
-// ctRoleAlternatives reads a role ARN (or an STS assumed-role ARN) through
-// the role resolver, so another account's role is no candidate; anything else
-// is read by ctIDAlternatives.
-func ctRoleAlternatives(v string, rc domain.RefContext) []string {
-	if !arn.IsARN(v) {
-		return ctIDAlternatives(v)
-	}
-	if id, ok := resource.ResolveRef("role", v, rc); ok {
-		return []string{id}
-	}
-	return nil
+	return ""
 }
 
 // ctEventsRelatedResources reads the target list from the session cache ONLY —
@@ -134,83 +111,45 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 	return nil, false, nil
 }
 
-// ctEventsMatchTarget resolves an event-derived id list against target's
-// related-resource cache. An id in an event body is a claim about the past —
-// the resource existed when the call was recorded, which is not evidence it
-// exists now — so only the list can turn it into a count:
+// ctEventsMatchTarget reads the references an event names through target's
+// resolver, in the session's account (the one the event was recorded in
+// while the session's identity is unread) and Region, and keeps the ids target's cached list holds. A reference is a
+// claim about the past — the resource existed when the call was recorded,
+// which is not evidence it exists now — so only the list can turn it into a
+// count:
 //
 //   - nil list (nothing cached, nothing to call): Unknown. Trusting the ids
 //     here would offer a row that navigates to a resource that may be long gone.
-//   - proven list: the ids the list confirms, by ID or Name.
-//   - truncated list: still only the confirmed ids, because an unread page
-//     cannot confirm anything, and the truncation flag carries the rest — none
-//     confirmed among the pages read is a lower bound, rendered "(0+)".
-func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, groups [][]string) resource.RelatedCheckResult {
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
+//   - proven list: the ids the list holds.
+//   - truncated list: still only the ids the list holds, because an unread
+//     page cannot confirm anything, and the truncation flag carries the rest —
+//     none confirmed among the pages read is a lower bound, rendered "(0+)".
+func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, res resource.Resource, refs []string) resource.RelatedCheckResult {
+	list, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
 	if err != nil {
 		return resource.ErrorRelated(target, err)
 	}
-	if resourceList == nil {
+	if list == nil {
 		return resource.UnknownRelated(target)
 	}
-
-	byID := make(map[string]string, len(resourceList)*3)
-	for _, r := range resourceList {
-		byID[r.ID] = r.ID
-		if r.Name != "" {
-			if _, taken := byID[r.Name]; !taken {
-				byID[r.Name] = r.ID
-			}
-		}
-		// A secret's id is its name while its ARN carries the six random
-		// characters AWS appends, so an event that named the ARN can only be
-		// confirmed here. Exact equality against the row's own ARN, so no id
-		// is guessed and the suffix is never stripped.
-		if arn := r.Fields["arn"]; arn != "" {
-			if _, taken := byID[arn]; !taken {
-				byID[arn] = r.ID
-			}
-		}
-	}
-	var matched []string
-	seen := make(map[string]struct{}, len(groups))
-	for _, group := range groups {
-		for _, candidate := range group {
-			id, ok := byID[candidate]
-			if !ok {
-				continue
-			}
-			if _, dup := seen[id]; !dup {
-				seen[id] = struct{}{}
-				matched = append(matched, id)
-			}
-			break
-		}
-	}
-	return relatedResultTrunc(target, matched, truncated)
+	rc := refContext(clients, cache, target)
+	rc.AccountID = cmp.Or(rc.AccountID, res.Fields["_ct.recipient_account"])
+	ids, _ := listedRefs(target, refs, rc, list)
+	return relatedResultTrunc(target, ids, truncated)
 }
 
-// extractCTResourceIDs scans the event's Resources slice for entries matching
-// awsResourceType (e.g. "AWS::EC2::Instance") and returns one candidate group
-// per entry, built by ctIDAlternatives: at most two forms, the value as written
-// and, when it starts with a type word, everything after that word's separator.
-// Which form is the id varies per target type — a Secrets Manager name keeps its
-// slashes, an ARN's resource part does not — so both are offered and the target
-// list picks. They are ALTERNATIVES: one event resource is one resource, so
-// ctEventsMatchTarget takes at most one match per group, preferring the value as
-// written. No fragment of a name is ever a candidate.
-func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [][]string {
-	var groups [][]string
+// extractCTResourceIDs returns the name of every entry of the event's
+// Resources slice whose type is awsResourceType (e.g. "AWS::EC2::Instance"),
+// as the event wrote it: an id, a name or an ARN, for the target's resolver
+// to read.
+func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) []string {
+	var refs []string
 	for _, r := range event.Resources {
-		if r.ResourceType == nil || !strings.EqualFold(*r.ResourceType, awsResourceType) {
-			continue
+		if r.ResourceType != nil && strings.EqualFold(*r.ResourceType, awsResourceType) && aws.ToString(r.ResourceName) != "" {
+			refs = append(refs, *r.ResourceName)
 		}
-		if r.ResourceName == nil || *r.ResourceName == "" {
-			continue
-		}
-		groups = append(groups, ctIDAlternatives(*r.ResourceName))
 	}
-	return groups
+	return refs
 }
 
 // ctJSONString walks a parsed CT event JSON map along the given keys and
@@ -281,9 +220,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 			resp, _ := parsed["responseElements"].(map[string]any)
 			fromBody := append(ctJSONStringSlice(req, "instanceId", "instancesSet", "items"),
 				ctJSONStringSlice(resp, "instanceId", "instancesSet", "items")...)
-			for _, id := range fromBody {
-				ids = append(ids, ctIDAlternatives(id))
-			}
+			ids = append(ids, fromBody...)
 		}
 	}
 
@@ -291,7 +228,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("ec2", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "ec2", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "ec2", res, ids)
 }
 
 // checkCtEventsS3 extracts S3 bucket names from the CloudTrail event.
@@ -311,7 +248,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if b := ctJSONString(req, "bucketName"); b != "" {
-				ids = append(ids, ctIDAlternatives(b))
+				ids = append(ids, b)
 			}
 		}
 	}
@@ -320,7 +257,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ProvenZero("s3", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "s3", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "s3", res, ids)
 }
 
 // checkCtEventsLambda extracts Lambda function names from the CloudTrail event.
@@ -334,16 +271,13 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 	}
 
 	ids := extractCTResourceIDs(event, "AWS::Lambda::Function")
-	for i, group := range ids {
-		ids[i] = ctLambdaAlternatives(group)
-	}
 
 	if len(ids) == 0 {
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if fn := ctJSONString(req, "functionName"); fn != "" {
-				ids = append(ids, ctLambdaAlternatives(ctIDAlternatives(fn)))
+				ids = append(ids, fn)
 			}
 		}
 	}
@@ -352,7 +286,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		return resource.ProvenZero("lambda", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "lambda", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "lambda", res, ids)
 }
 
 // checkCtEventsRDS extracts RDS instance/cluster identifiers from the CloudTrail event.
@@ -379,7 +313,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "dBInstanceIdentifier"); id != "" {
-				ids = append(ids, ctIDAlternatives(id))
+				ids = append(ids, id)
 			}
 		}
 	}
@@ -388,7 +322,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("dbi", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "dbi", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "dbi", res, ids)
 }
 
 // checkCtEventsKMS extracts KMS key IDs from the CloudTrail event.
@@ -408,11 +342,11 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "keyId"); id != "" {
-				ids = append(ids, ctIDAlternatives(id))
+				ids = append(ids, id)
 			}
 			svcDetails, _ := parsed["serviceEventDetails"].(map[string]any)
 			if id := ctJSONString(svcDetails, "keyId"); id != "" {
-				ids = append(ids, ctIDAlternatives(id))
+				ids = append(ids, id)
 			}
 		}
 	}
@@ -421,7 +355,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("kms", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "kms", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "kms", res, ids)
 }
 
 // checkCtEventsSecrets extracts Secrets Manager secret IDs from the CloudTrail event.
@@ -441,7 +375,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "secretId"); id != "" {
-				ids = append(ids, ctIDAlternatives(id))
+				ids = append(ids, id)
 			}
 		}
 	}
@@ -450,7 +384,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		return resource.ProvenZero("secrets", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "secrets", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "secrets", res, ids)
 }
 
 // checkCtEventsVPCE extracts VPC Endpoint IDs from the CloudTrail event.
@@ -463,11 +397,11 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		return resource.KnownRelated("vpce", nil, false)
 	}
 
-	var ids [][]string
+	var ids []string
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 	if parsed != nil {
 		if id := ctJSONString(parsed, "vpcEndpointId"); id != "" {
-			ids = append(ids, ctIDAlternatives(id))
+			ids = append(ids, id)
 		}
 	}
 
@@ -475,7 +409,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		return resource.ProvenZero("vpce", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "vpce", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "vpce", res, ids)
 }
 
 // checkCtEventsSG extracts Security Group IDs from the CloudTrail event.
@@ -495,7 +429,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "groupId"); id != "" {
-				ids = append(ids, ctIDAlternatives(id))
+				ids = append(ids, id)
 			}
 		}
 	}
@@ -504,7 +438,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ProvenZero("sg", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "sg", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "sg", res, ids)
 }
 
 // checkCtEventsDDB extracts DynamoDB table names from the CloudTrail event.
@@ -524,7 +458,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "tableName"); name != "" {
-				ids = append(ids, ctIDAlternatives(name))
+				ids = append(ids, name)
 			}
 		}
 	}
@@ -533,7 +467,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("ddb", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "ddb", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "ddb", res, ids)
 }
 
 // ---------------------------------------------------------------------------
@@ -622,7 +556,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 			req, _ := parsed["requestParameters"].(map[string]any)
 			for _, key := range []string{"name", "trailName", "trailARN", "trailArn"} {
 				if v := ctJSONString(req, key); v != "" {
-					ids = append(ids, ctIDAlternatives(v))
+					ids = append(ids, v)
 				}
 			}
 		}
@@ -632,7 +566,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 		return resource.ProvenZero("trail", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "trail", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "trail", res, ids)
 }
 
 // checkCtEventsCFN extracts CloudFormation stack names from the CloudTrail event.
@@ -645,19 +579,14 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.KnownRelated("cfn", nil, false)
 	}
 
-	// cfn resources are keyed by stack NAME and a stack id is "<name>/<uuid>",
-	// so the uuid is dropped from whatever the extractor produced.
-	var ids [][]string
-	for _, group := range extractCTResourceIDs(event, "AWS::CloudFormation::Stack") {
-		ids = append(ids, cfnStackNameFromResourceName(group))
-	}
+	ids := extractCTResourceIDs(event, "AWS::CloudFormation::Stack")
 
 	if len(ids) == 0 {
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if name := ctJSONString(req, "stackName"); name != "" {
-				ids = append(ids, cfnStackNameFromResourceName(ctIDAlternatives(name)))
+				ids = append(ids, name)
 			}
 		}
 	}
@@ -666,5 +595,5 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ProvenZero("cfn", "ids")
 	}
 
-	return ctEventsMatchTarget(ctx, clients, cache, "cfn", ids)
+	return ctEventsMatchTarget(ctx, clients, cache, "cfn", res, ids)
 }

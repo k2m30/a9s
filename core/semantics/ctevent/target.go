@@ -3,9 +3,15 @@
 package ctevent
 
 import (
+	"cmp"
 	"maps"
 	"sort"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ExtractTarget derives the TARGET section rows for a CloudTrail event.
@@ -21,6 +27,18 @@ import (
 //   - Returns non-nil cleanedParams (never mutates the input params map).
 //   - When params is nil, cleanedParams is an empty non-nil map.
 func ExtractTarget(eventName string, eventSource string, recipientAccountID string, resources []ResourceRef, params map[string]any) (rows []Row, cleanedParams map[string]any) {
+	return ExtractTargetInRegion(eventName, eventSource, recipientAccountID, "", resources, params)
+}
+
+// recording is where an event was recorded: its recipient account and its
+// Region ("" when unknown).
+type recording struct{ account, region string }
+
+// ExtractTargetInRegion is ExtractTarget for an event recorded in eventRegion:
+// a TARGET row whose ARN names another Region shows the whole ARN, which is
+// what carries that Region to navigation.
+func ExtractTargetInRegion(eventName, eventSource, recipientAccountID, eventRegion string, resources []ResourceRef, params map[string]any) (rows []Row, cleanedParams map[string]any) {
+	rec := recording{account: recipientAccountID, region: eventRegion}
 	if params == nil {
 		cleanedParams = map[string]any{}
 	} else {
@@ -30,12 +48,12 @@ func ExtractTarget(eventName string, eventSource string, recipientAccountID stri
 	// resources[] envelope wins — one Row per ResourceRef.
 	if len(resources) > 0 {
 		for _, ref := range resources {
-			rows = append(rows, resourceRefToRow(ref, recipientAccountID))
+			rows = append(rows, resourceRefToRow(ref, rec))
 		}
 		return rows, cleanedParams
 	}
 
-	rows, cleanedParams = extractByEventName(eventName, recipientAccountID, params, cleanedParams)
+	rows, cleanedParams = extractByEventName(eventName, rec, params, cleanedParams)
 	if len(rows) > 0 {
 		return rows, cleanedParams
 	}
@@ -60,25 +78,32 @@ func removeKeys(m map[string]any, keys ...string) map[string]any {
 	return out
 }
 
-// namesRecordingAccount reports whether ref names a resource of the account
-// the event was recorded in. The comparison is between the ARN's own account
-// segment and the event's recipientAccountId — both carried by the event — so
-// it says nothing about which account the operator is browsing. A reference
-// that is not an ARN, or an ARN with no account segment (an S3 bucket), names
-// no account and is left to the resolver the detail runs afterwards.
-//
-// A row naming another account's resource must not navigate: the list there
-// holds this account's rows, and the row of that name is a different
-// resource.
-func namesRecordingAccount(ref, recipientAccountID string) bool {
-	if !strings.HasPrefix(ref, "arn:") || recipientAccountID == "" {
-		return true
+// navRow is the TARGET row for ref, labelled key. It opens a row only when
+// navLink reads ref as one; a ref naming another Region than the event's
+// shows whole, since its Region is part of what it names.
+func navRow(key, ref string, rec recording) Row {
+	val := cmp.Or(FormatCTTarget(ref, rec.account), ref)
+	if named := resource.RefRegion(ref); named != "" && rec.region != "" && named != rec.region {
+		val = ref
 	}
-	parts := strings.SplitN(ref, ":", 6)
-	if len(parts) < 6 || parts[4] == "" {
-		return true
+	row := Row{Key: key, Value: val}
+	_, target := navFromLabel(key)
+	if id, ok := navLink(target, ref, rec.account); ok {
+		row.IsNavigable, row.TargetType, row.NavID = true, target, id
 	}
-	return parts[4] == recipientAccountID
+	return row
+}
+
+// navLink reads ref through the target type's own resolver
+// (resource.ResolveRef, the reading the detail and the related panel use),
+// held to the account the event was recorded in, since another account's
+// resource is a different row from this account's row of that name, and in
+// the Region ref itself names.
+func navLink(target, ref, recipientAccountID string) (string, bool) {
+	if target == "" {
+		return "", false
+	}
+	return resource.ResolveRef(target, ref, domain.RefContext{AccountID: recipientAccountID, Region: resource.RefRegion(ref)})
 }
 
 // navFromLabel returns (IsNavigable, TargetType) for a TARGET row label.
@@ -110,45 +135,10 @@ func navFromLabel(label string) (bool, string) {
 	return false, ""
 }
 
-// resourceRefToRow converts a ResourceRef to a Row, deriving the label from the
-// resource type or ARN and stripping the ARN to its resource portion.
-//
-// Cross-account detection: recipientAccountID is the caller's (recipient) account.
-// When the ARN's account segment matches recipientAccountID, the account is stripped.
-// When it differs, the account is retained (FormatCTTarget prefix logic).
-// For S3 bucket ARNs (empty account segment), the resource portion is returned as-is.
-func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
-	key := labelFromType(ref.Type, ref.ARN)
-	val := FormatCTTarget(ref.ARN, recipientAccountID)
-	if val == "" {
-		val = ref.ARN
-	}
-	isNav, target := navFromLabel(key)
-	if !namesRecordingAccount(ref.ARN, recipientAccountID) {
-		return Row{Key: key, Value: val}
-	}
-	// NavID strips the type prefix, which is what precedes the FIRST
-	// separator: "instance/i-0abc" → "i-0abc", "secret:prod/api/stripe-key" →
-	// "prod/api/stripe-key". No prefix leaves it empty and navigation falls
-	// back to Value.
-	navID := ""
-	if idx := strings.IndexAny(val, "/:"); idx >= 0 {
-		navID = val[idx+1:]
-	}
-	if target == "role" {
-		navID = roleNavID(navID)
-	}
-	return Row{Key: key, Value: val, IsNavigable: isNav, TargetType: target, NavID: navID}
-}
-
-// roleNavID reduces a role reference to the name the role list answers by. An
-// IAM role name is unique account-wide and the path filed in front of it is not
-// part of it, so a path-filed role reaches the list only by its last segment.
-func roleNavID(val string) string {
-	if idx := strings.LastIndex(val, "/"); idx >= 0 {
-		return val[idx+1:]
-	}
-	return val
+// resourceRefToRow converts a ResourceRef to a Row, labelled by the
+// resource type or ARN.
+func resourceRefToRow(ref ResourceRef, rec recording) Row {
+	return navRow(labelFromType(ref.Type, ref.ARN), ref.ARN, rec)
 }
 
 // labelFromType derives the Row.Key label from an AWS resource type string.
@@ -169,41 +159,55 @@ func labelFromType(resType string, arn string) string {
 		return "Key"
 	case "AWS::SecretsManager::Secret":
 		return "Secret"
+	case "AWS::Lambda::Function":
+		return "Function"
+	case "AWS::EC2::VPC":
+		return "VPC"
+	case "AWS::EC2::SecurityGroup":
+		return "SG"
+	case "AWS::EC2::Subnet":
+		return "Subnet"
 	}
 	return labelFromARN(arn)
 }
 
-// labelFromARN derives a Row.Key label by inspecting the ARN's service and resource segments.
-func labelFromARN(arn string) string {
-	if !strings.HasPrefix(arn, "arn:") {
+// labelFromARN derives a Row.Key label from the ARN's service and the
+// resource type that leads its resource part.
+func labelFromARN(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
 		return "Resource"
 	}
-	parts := strings.SplitN(arn, ":", 6)
-	if len(parts) < 6 {
-		return "Resource"
-	}
-	service := parts[2]
-	resource := parts[5]
-	switch service {
+	switch a.Service {
 	case "s3":
-		if strings.Contains(resource, "/") {
+		if strings.Contains(a.Resource, "/") {
 			return "Object"
 		}
 		return "Bucket"
-	case "ec2":
-		return "Instance"
-	case "iam":
-		if strings.HasPrefix(resource, "role/") {
-			return "Role"
-		}
-		if strings.HasPrefix(resource, "user/") {
-			return "User"
-		}
-		return "Resource"
 	case "kms":
 		return "Key"
 	case "secretsmanager":
 		return "Secret"
+	}
+	typ, _, _ := strings.Cut(a.Resource, "/")
+	if a.Service == "lambda" {
+		typ, _, _ = strings.Cut(a.Resource, ":")
+	}
+	switch a.Service + ":" + typ {
+	case "ec2:instance":
+		return "Instance"
+	case "ec2:vpc":
+		return "VPC"
+	case "ec2:security-group":
+		return "SG"
+	case "ec2:subnet":
+		return "Subnet"
+	case "iam:role":
+		return "Role"
+	case "iam:user":
+		return "User"
+	case "lambda:function":
+		return "Function"
 	}
 	return "Resource"
 }
@@ -211,7 +215,7 @@ func labelFromARN(arn string) string {
 // extractByEventName implements the per-event-name fallback lookup table.
 // params is the requestParameters map (may be nil).
 // cleanedParams is a clone of the input params; this function removes lifted keys.
-func extractByEventName(eventName, recipientAccountID string, params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
+func extractByEventName(eventName string, rec recording, params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
 	switch eventName {
 	case "PutObject", "GetObject", "DeleteObject", "CopyObject":
 		return extractS3ObjectEvent(params, cleanedParams)
@@ -251,34 +255,19 @@ func extractByEventName(eventName, recipientAccountID string, params map[string]
 
 	case "GetSecretValue":
 		if id, _ := params["secretId"].(string); id != "" {
-			val := FormatCTTarget(id, recipientAccountID)
-			isNav, target := navFromLabel("Secret")
-			if !namesRecordingAccount(id, recipientAccountID) {
-				isNav, target = false, ""
-			}
-			return []Row{{Key: "Secret", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "secretId")
+			return []Row{navRow("Secret", id, rec)}, removeKeys(cleanedParams, "secretId")
 		}
 
 	case "Decrypt":
 		if id, _ := params["keyId"].(string); id != "" {
-			val := FormatCTTarget(id, recipientAccountID)
-			isNav, target := navFromLabel("Key")
-			if !namesRecordingAccount(id, recipientAccountID) {
-				isNav, target = false, ""
-			}
-			return []Row{{Key: "Key", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "keyId")
+			return []Row{navRow("Key", id, rec)}, removeKeys(cleanedParams, "keyId")
 		}
 		isNav, target := navFromLabel("Key")
 		return []Row{{Key: "Key", Value: "(by alias)", IsNavigable: isNav, TargetType: target}}, cleanedParams
 
 	case "AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
-		if arn, _ := params["roleArn"].(string); arn != "" {
-			val := FormatCTTarget(arn, recipientAccountID)
-			if !namesRecordingAccount(arn, recipientAccountID) {
-				return []Row{{Key: "Role", Value: val}}, removeKeys(cleanedParams, "roleArn")
-			}
-			isNav, target := navFromLabel("Role")
-			return []Row{{Key: "Role", Value: val, IsNavigable: isNav, TargetType: target, NavID: roleNavID(val)}}, removeKeys(cleanedParams, "roleArn")
+		if roleARN, _ := params["roleArn"].(string); roleARN != "" {
+			return []Row{navRow("Role", roleARN, rec)}, removeKeys(cleanedParams, "roleArn")
 		}
 
 	case "BatchGetImage":
@@ -302,13 +291,10 @@ func extractByEventName(eventName, recipientAccountID string, params map[string]
 
 	case "RotateKey":
 		if id, _ := params["keyId"].(string); id != "" {
-			val := FormatCTTarget(id, "")
-			if val == "" {
-				val = id
-			}
-			val = strings.TrimPrefix(val, "key/")
-			isNav, target := navFromLabel("Key")
-			return []Row{{Key: "Key", Value: val, IsNavigable: isNav, TargetType: target, FieldPath: "TARGET.Key"}}, removeKeys(cleanedParams, "keyId")
+			row := navRow("Key", id, rec)
+			row.Value = cmp.Or(row.NavID, row.Value)
+			row.FieldPath = "TARGET.Key"
+			return []Row{row}, removeKeys(cleanedParams, "keyId")
 		}
 
 	case "PutBucketPolicy", "GetBucketPolicy", "DeleteBucketPolicy", "PutBucketAcl",

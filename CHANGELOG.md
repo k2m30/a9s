@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A CloudTrail event's TARGET rows open the row they name: an IAM user filed
+  under a path opens the user, a secret named by ARN (with its random suffix)
+  or by name opens the secret, an S3 object opens its bucket, and a Lambda
+  function, VPC, security group or subnet opens its own row. An ARN's resource
+  type sets the label, so a security group or VPC is no longer labelled
+  Instance.
+- Related-panel counts no longer include values the target list can never
+  hold: a launch template's `resolve:ssm:` image, an API Gateway
+  stage-variable placeholder, an API Gateway custom domain ID, an Elastic
+  Beanstalk environment's Classic Load Balancer, and a Step Functions
+  `FunctionName` alias, partial ARN or JSONata expression. API Gateway and
+  Step Functions count only the Lambda functions the list holds, and read
+  unknown when that list cannot be read.
+- A KMS key field holding a customer alias (Secrets Manager, CloudTrail
+  trail, MSK, SSM parameter) opens the key the alias names even before the
+  KMS list has loaded, the same key the related panel counts. An AWS-managed
+  alias (`alias/aws/…`) is a link only once a loaded KMS list holds its key.
+- A detail field that names another resource by ARN opens that resource's row
+  for every resource type, and a value no row of its type can hold is no
+  longer shown as a link.
+- ECS task → SSM Parameters counts a parameter named without a leading slash
+  (`db_password`), by name or by ARN.
+- A KMS key's CloudTrail Events row finds the events that name the key by ARN.
+  An SNS subscription with no ARN yet shows no CloudTrail Events row.
+- A blackholed route's NAT gateway, network interface, transit gateway,
+  internet gateway or peering target is no longer a link in the route table's
+  detail.
+- Opening a network interface by ID reaches one past the list's first page,
+  and opening EBS snapshots by ID shows the ones that exist and reports the
+  missing one instead of failing all of them.
+- A CloudTrail event's related panel counts only this account's resources in
+  this Region, the ones its TARGET rows open, and finds a KMS key named by any
+  of its aliases. A TARGET row naming a resource in another Region shows the
+  whole ARN and opens it there. The Principal row of another account's caller
+  is not a link, even before the session's identity has loaded.
+- An S3 bucket's KMS key is read in the bucket's Region, and a multi-Region
+  trail's SNS topic and KMS key in the trail's home Region.
+- EC2 → IAM Role and IAM Role → EC2 read the roles an instance profile holds
+  from IAM instead of matching a profile's name to a role's.
+- An S3 access point, Batch Operations job or Storage Lens ARN, and an SSM
+  managed node (`mi-…`), are no longer links to a bucket or an instance. A
+  Secrets Manager ARN whose name may end in the random suffix is matched
+  against the secrets list instead of having the suffix guessed, and codebuild,
+  ECS service, Glue and MSK → Secrets read unknown when that list cannot be
+  read.
+- KMS → IAM Roles counts a role granted through an assumed-role session.
+- Before the session connects, or after a failed connect, every related row
+  reads unknown with no error flash naming a call that was never made.
+- A related check that fails unexpectedly shows as that row's error, not as a
+  failed by-ID fetch.
+
 ## [3.58.1] - 2026-09-23
 
 ### Fixed

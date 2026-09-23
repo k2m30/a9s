@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -175,8 +176,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 	taskIDShort := ""
 	if task.TaskArn != nil {
 		taskArn = *task.TaskArn
-		parts := strings.Split(taskArn, "/")
-		taskIDShort = parts[len(parts)-1]
+		taskIDShort, _ = ecsTaskRefToID(taskArn, domain.RefContext{})
 	}
 
 	status := ""
@@ -188,12 +188,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 
 	taskDefShort := ""
 	if task.TaskDefinitionArn != nil {
-		// Extract "family:revision" from ARN like
-		// "arn:aws:ecs:us-east-1:123456789012:task-definition/web-app:5"
-		parts := strings.Split(*task.TaskDefinitionArn, "/")
-		if len(parts) > 0 {
-			taskDefShort = parts[len(parts)-1]
-		}
+		taskDefShort = taskDefRevision(*task.TaskDefinitionArn)
 	}
 
 	startedAt := ""

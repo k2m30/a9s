@@ -174,7 +174,7 @@ func dbcSnapParentIsLocal(raw any) bool {
 // opens. A cluster that was deleted, or that lives in another Region or
 // account, has no row here, and the field stays unnavigable rather than
 // offering a link to nothing.
-func dbcSnapParentRow(src resource.Resource, clusters []resource.Resource) string {
+func dbcSnapParentRow(src resource.Resource, _ string, clusters []resource.Resource) string {
 	p, ok := dbcSnapParentOf(src.RawStruct)
 	if !ok || !p.local() {
 		return ""

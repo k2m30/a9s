@@ -7,11 +7,13 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -205,16 +207,9 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
 }
 
-// checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile
-// ARN last segment (the profile name) equals this role's name — the common
-// one-profile-per-role convention (docs/resources/role.md). This is an
-// exact-boundary match, not a substring match: "my-role" must not match a
-// profile named "my-role-2". Profiles whose name differs from the role name
-// (EKS/ASG-generated profiles) match nothing: resolving them needs a
-// per-profile iam:GetInstanceProfile fan-out across all distinct profile ARNs
-// in the ec2 cache, outside the zero/one-call budget this checker is
-// scoped to; checkEC2Role (ec2_related.go) resolves the reverse direction
-// per-instance with a bounded single call.
+// checkRoleEC2 lists the instance profiles that hold this role
+// (iam:ListInstanceProfilesForRole) and counts the instances in the ec2 list
+// running under one of them. A profile's name says nothing about its role.
 func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 	if roleName == "" {
@@ -233,19 +228,40 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 	if ec2List == nil {
 		return resource.UnknownRelated("ec2")
 	}
+	profileOf := make(map[string]string, len(ec2List))
+	for _, ec2Res := range ec2List {
+		if inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct); ok && inst.IamInstanceProfile != nil && aws.ToString(inst.IamInstanceProfile.Arn) != "" {
+			profileOf[ec2Res.ID] = *inst.IamInstanceProfile.Arn
+		}
+	}
+	if len(profileOf) == 0 {
+		return relatedResultTrunc("ec2", nil, truncated)
+	}
 
+	c, err := svcClients(clients)
+	// no finding: without the IAM client nothing was read.
+	if err != nil || c.IAM == nil {
+		return resource.UnknownRelated("ec2")
+	}
+	api, ok := c.IAM.(IAMListInstanceProfilesForRoleAPI)
+	if !ok {
+		return resource.UnknownRelated("ec2")
+	}
+	profiles, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.InstanceProfile, *string, error) {
+		out, callErr := api.ListInstanceProfilesForRole(ctx, &iam.ListInstanceProfilesForRoleInput{RoleName: aws.String(roleName), Marker: marker})
+		if callErr != nil {
+			return nil, nil, callErr
+		}
+		return out.InstanceProfiles, out.Marker, nil
+	})
+	if err != nil {
+		return resource.ErrorRelated("ec2", err)
+	}
 	var ids []string
 	for _, ec2Res := range ec2List {
-		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
-		if !ok {
-			continue
-		}
-		if inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil {
-			continue
-		}
-		if instanceProfileName(*inst.IamInstanceProfile.Arn) == roleName {
+		if slices.ContainsFunc(profiles, func(p iamtypes.InstanceProfile) bool { return aws.ToString(p.Arn) == profileOf[ec2Res.ID] }) {
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	return relatedResultTrunc("ec2", ids, truncated)
+	return relatedResultTrunc("ec2", ids, truncated || !complete)
 }

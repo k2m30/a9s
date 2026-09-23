@@ -142,14 +142,18 @@ func canonicalDNS(s string) string {
 // for an ELBv2 ARN: for a load balancer the resource after "loadbalancer/"
 // ("app/<name>/<id>"), for a target group the resource from "targetgroup/"
 // on ("targetgroup/<name>/<id>"). Any other value is returned as is.
-func elbv2Dimension(arn string) string {
-	if _, after, ok := strings.Cut(arn, ":loadbalancer/"); ok {
+func elbv2Dimension(ref string) string {
+	a, ok := ARNForService(ref, "elasticloadbalancing")
+	if !ok {
+		return ref
+	}
+	if after, ok := strings.CutPrefix(a.Resource, "loadbalancer/"); ok {
 		return after
 	}
-	if i := strings.Index(arn, "targetgroup/"); i >= 0 {
-		return arn[i:]
+	if strings.HasPrefix(a.Resource, "targetgroup/") {
+		return a.Resource
 	}
-	return arn
+	return ref
 }
 
 // elbNameFromENIDescription returns the load balancer name an ELB-owned ENI's

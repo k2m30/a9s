@@ -89,7 +89,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			ContextKeys:    map[string]string{"db_identifier": "ID"},
 			DisplayNameKey: "db_identifier",
 		}},
-		Color: colorDBI,
+		Color:          colorDBI,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
 		}),
@@ -176,7 +177,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			ContextKeys:    map[string]string{"bucket": "ID"},
 			DisplayNameKey: "bucket",
 		}},
-		Color: colorS3,
+		Color:          colorS3,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.S3} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			// Related-panel contract (docs/resources/s3.md): lambda/sns/sqs
 			// pivots must resolve non-zero when this bucket has a matching
@@ -243,7 +245,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "nodes", Title: "Nodes", Width: 8},
 			{Key: "endpoint", Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 		},
-		Color: colorRedis,
+		Color:          colorRedis,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ElastiCache} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedisPage(ctx, c.ElastiCache, continuationToken)
 		}),
@@ -280,6 +283,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "DB Clusters",
 		ShortName:     "dbc",
+		RefToID:       dbcRefToID,
 		Aliases:       []string{"dbc", "docdb", "clusters", "db-clusters"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
@@ -305,7 +309,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "instances", Title: "Instances", Path: "DBClusterMembers", Width: 10},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 		},
-		Color: colorDBC,
+		Color:          colorDBC,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS, c.DocDB} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			// errGlobalRolesUnread comes with a complete page whose rows stand;
 			// it is carried to the return as a partial-success error.
@@ -440,7 +445,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "size_bytes", Title: "Size", Width: 14, SortKey: "size_bytes_raw"},
 			{Key: "billing_mode", Title: "Billing", Width: 16},
 		},
-		Color: colorDDB,
+		Color:          colorDDB,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.DynamoDB} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 		}),
@@ -494,7 +500,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "instance_count", Title: "Instances", Path: "ClusterConfig.InstanceCount", Width: 10},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 		},
-		Color: colorOpenSearch,
+		Color:          colorOpenSearch,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.OpenSearch} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			// Partial success: degraded name-only rows may arrive alongside
 			// a composite error — return both, never drop the rows.
@@ -564,8 +571,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "db_name", Title: "Database", Path: "DBName", Width: 16},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint.Address", Width: 44},
 		},
-		Color: colorRedshift,
-		Wave2: IssueEnricher{Fn: EnrichRedshiftPosture, Priority: 100},
+		Color:          colorRedshift,
+		Wave2:          IssueEnricher{Fn: EnrichRedshiftPosture, Priority: 100},
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Redshift} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
 		}),
@@ -635,7 +643,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
 			{Key: "mount_targets", Title: "Mounts", Path: "NumberOfMountTargets", Width: 8},
 		},
-		Color: colorEFS,
+		Color:          colorEFS,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EFS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
 		}),
@@ -672,6 +681,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "DB Instance Snapshots",
 		ShortName:     "dbi-snap",
+		RefToID:       dbiSnapRefToID,
 		Aliases:       []string{"dbi-snap", "rds-snapshots", "db-snapshots"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
@@ -687,7 +697,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "snapshot_type", Title: "Type", Path: "SnapshotType", Width: 12},
 			{Key: "created", Title: "Created", Path: "SnapshotCreateTime", Width: 22},
 		},
-		Color: colorDBISnap,
+		Color:          colorDBISnap,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
 		}),
@@ -717,6 +728,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "DB Cluster Snapshots",
 		ShortName:     "dbc-snap",
+		RefToID:       dbcSnapRefToID,
 		Aliases:       []string{"dbc-snap", "docdb-snapshots", "cluster-snapshots"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
@@ -733,7 +745,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "snapshot_create_time", Title: "Created", Path: "SnapshotCreateTime", Width: 22},
 			{Key: "storage_type", Title: "Storage", Path: "StorageType", Width: 10},
 		},
-		Color: colorDBCSnap,
+		Color:          colorDBCSnap,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS, c.DocDB} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
 				result, err := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, rdsTok)

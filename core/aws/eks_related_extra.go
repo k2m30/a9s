@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -162,7 +163,8 @@ func nodeSourcesResult(target string, ids map[string]struct{}, partial bool, err
 	if len(ids) == 0 && err != nil {
 		return resource.ErrorRelated(target, err)
 	}
-	return relatedResultTrunc(target, slices.Collect(maps.Keys(ids)), partial || err != nil)
+	resolved, dropped := resolveRefs(target, slices.Collect(maps.Keys(ids)), domain.RefContext{})
+	return relatedResultTrunc(target, resolved, partial || dropped || err != nil)
 }
 
 // listClusterNodegroups walks the ListNodegroups pages of one cluster.

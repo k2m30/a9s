@@ -126,6 +126,13 @@ type IAMGetInstanceProfileAPI interface {
 	GetInstanceProfile(ctx context.Context, params *iam.GetInstanceProfileInput, optFns ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error)
 }
 
+// IAMListInstanceProfilesForRoleAPI for role→ec2: the profiles that hold a
+// role. *iam.Client has it; it is asserted, not part of IAMAPI, so the IAM
+// fakes that implement IAMAPI whole need not grow it.
+type IAMListInstanceProfilesForRoleAPI interface {
+	ListInstanceProfilesForRole(ctx context.Context, params *iam.ListInstanceProfilesForRoleInput, optFns ...func(*iam.Options)) (*iam.ListInstanceProfilesForRoleOutput, error)
+}
+
 // IAMAPI is the aggregate interface covering all IAM operations used by a9s fetchers.
 // *iam.Client structurally satisfies this interface.
 type IAMAPI interface {
@@ -148,5 +155,5 @@ type IAMAPI interface {
 	IAMGetLoginProfileAPI
 	IAMListMFADevicesAPI
 	IAMListAccessKeysAPI
-	IAMGetInstanceProfileAPI // asg→role, eb→role via IamInstanceProfile
+	IAMGetInstanceProfileAPI // asg→role, eb→role, ec2→role via IamInstanceProfile
 }

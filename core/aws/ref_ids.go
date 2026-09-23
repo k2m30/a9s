@@ -5,6 +5,8 @@ package aws
 import (
 	"cmp"
 	"context"
+	"errors"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -117,6 +119,24 @@ func listedRefs(target string, refs []string, rc domain.RefContext, list []resou
 	return ids, dropped || len(ids) < len(names)
 }
 
+// listedRelated is the result of a checker whose refs only the target list
+// can confirm: the refs that resolve to a listed row, a lower bound when one
+// did not or truncated is set, and unknown when the list cannot be read.
+func listedRelated(ctx context.Context, clients any, cache resource.ResourceCache, target string, refs []string, truncated bool) resource.RelatedCheckResult {
+	if !slices.ContainsFunc(refs, func(r string) bool { return r != "" }) {
+		return relatedResultTrunc(target, nil, truncated)
+	}
+	list, _, err := FetchRelatedTarget(ctx, clients, cache, target)
+	if list == nil {
+		if err != nil && !errors.Is(err, errClientMissing) {
+			return resource.ErrorRelated(target, err)
+		}
+		return resource.UnknownRelated(target)
+	}
+	ids, lowerBound := listedRefs(target, refs, refContext(clients, cache, target), list)
+	return relatedResultTrunc(target, ids, truncated || lowerBound)
+}
+
 // localARN reads ref as an ARN of service. isARN is false for anything that
 // is not an ARN, which the caller reads as a bare ID. ok is false for another
 // service's ARN, or one that names another account or region than rc's; an
@@ -192,7 +212,6 @@ func lastSegment(s, sep string) string {
 }
 
 var (
-	lambdaRefToID  = arnNameRef("lambda", "function:", ":")
 	iamUserRefToID = func(ref string, rc domain.RefContext) (string, bool) { return iamNameRef(ref, rc, "user/") }
 	ecsRefToID     = arnNameRef("ecs", "cluster/", "")
 	kinesisRefToID = arnNameRef("kinesis", "stream/", "/")
@@ -204,6 +223,57 @@ var (
 	snsRefToID     = arnWholeRef("sns")
 )
 
+// ssmRefToID reads a parameter ARN ("parameter/<name>") or name as the
+// parameter's name. A name in a hierarchy keeps its leading "/", which the
+// ARN folds into "parameter/" ("/app/db" is "parameter/app/db"); a flat name
+// has none ("db_password" is "parameter/db_password")
+// (docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-su-create.html).
+// A single-level "/db" and "db" share an ARN, and the loaded list tells
+// which it is.
+func ssmRefToID(ref string, rc domain.RefContext) (string, bool) {
+	res, isARN, ok := localARN(ref, rc, "ssm")
+	if !ok || !isARN {
+		return res, ok
+	}
+	name, ok := afterPrefix(res, "parameter/")
+	if !ok {
+		return "", false
+	}
+	if rc.Targets != nil && !listHolds(rc, name) && listHolds(rc, "/"+name) || strings.Contains(name, "/") {
+		return "/" + name, true
+	}
+	return name, true
+}
+
+// lambdaFunctionName is the shape of a function name: letters, digits,
+// hyphens and underscores, at most 64
+// (docs.aws.amazon.com/lambda/latest/api/API_CreateFunction.html#lambda-CreateFunction-request-FunctionName).
+// A stage-variable placeholder or a JSONata expression is none.
+var lambdaFunctionName = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+// lambdaRefToID reads every form a function is named by — its name, the name
+// with a version or alias ("my-fn:prod"), the partial ARN
+// "<account>:function:my-fn" and the full ARN — as the function's name
+// (docs.aws.amazon.com/lambda/latest/api/API_Invoke.html#lambda-Invoke-request-FunctionName).
+func lambdaRefToID(ref string, rc domain.RefContext) (string, bool) {
+	res, isARN, ok := localARN(ref, rc, "lambda")
+	if !ok {
+		return "", false
+	}
+	if isARN {
+		if res, ok = afterPrefix(res, "function:"); !ok {
+			return "", false
+		}
+	} else if owner, rest, partial := strings.Cut(res, ":function:"); partial {
+		if account := lastSegment(owner, ":"); rc.AccountID != "" && account != rc.AccountID {
+			return "", false
+		}
+		res = rest
+	}
+	name, _, _ := strings.Cut(res, ":")
+	return name, lambdaFunctionName.MatchString(name)
+}
+
 // s3RefToID reads a bucket ARN, an s3://bucket/key URI or a bare
 // bucket/key location as the bucket's name; a bucket name holds no "/".
 func s3RefToID(ref string, rc domain.RefContext) (string, bool) {
@@ -214,7 +284,15 @@ func s3RefToID(ref string, rc domain.RefContext) (string, bool) {
 	return s3ARNRefToID(ref, rc)
 }
 
-var s3ARNRefToID = arnNameRef("s3", "", "/")
+// s3ARNRefToID reads a bucket ARN ("arn:aws:s3:::<bucket>[/<key>]"), the one
+// s3 ARN with no Region and no account; an access point, Multi-Region access
+// point, Batch Operations job or Storage Lens ARN names no bucket.
+func s3ARNRefToID(ref string, rc domain.RefContext) (string, bool) {
+	if a, err := arn.Parse(ref); err != nil || a.Region != "" || a.AccountID != "" {
+		return "", false
+	}
+	return arnNameRef("s3", "", "/")(ref, rc)
+}
 
 // ecsSvcRefToID reads a service ARN ("service/<cluster>/<name>", or the
 // older "service/<name>"), the cluster-qualified ID itself, or a task's
@@ -247,7 +325,8 @@ func ecsSvcRefFromTask(res resource.Resource, task ecstypes.Task) (ref string, o
 	if !ofService || name == "" {
 		return "", false
 	}
-	return ecsSvcID(lastSegment(cmp.Or(aws.ToString(task.ClusterArn), res.Fields["cluster"]), "/"), name), true
+	cluster, _ := ecsRefToID(cmp.Or(aws.ToString(task.ClusterArn), res.Fields["cluster"]), domain.RefContext{})
+	return ecsSvcID(cluster, name), true
 }
 
 // policyRefToID reads an IAM policy reference as the policy row's ID, which
@@ -299,8 +378,9 @@ func iamNameRef(ref string, rc domain.RefContext, kind string) (string, bool) {
 }
 
 // kmsRefToID reads a key ARN or bare key ID as the key ID, and an alias (bare
-// or ARN) as the key among rc.Targets that carries it. An alias no target
-// carries names no row; kmsRefContext adds the key a local alias names.
+// or ARN) as the key among rc.Targets that carries it. With the list loaded,
+// an alias no target carries names no row; kmsRefContext adds the key a local
+// alias names.
 func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 	res, isARN, ok := localARN(ref, rc, "kms")
 	if !ok {
@@ -312,49 +392,66 @@ func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 		}
 	}
 	if !strings.HasPrefix(res, "alias/") {
-		return res, !isARN && isKMSKeyID(res)
+		return res, !isARN && (isKMSKeyID(res) || rc.Targets != nil && listHolds(rc, res))
 	}
 	for _, t := range rc.Targets {
-		if t.Fields["alias"] == res || slices.Contains(strings.Split(t.Fields["aliases"], ","), res) {
+		if t.Fields["alias"] == res || t.Name == res || slices.Contains(strings.Split(t.Fields["aliases"], ","), res) {
 			return t.ID, true
 		}
+	}
+	// With no key list to read it against, a customer alias names its key by
+	// itself: the kms by-ID read (DescribeKey) accepts an alias and returns
+	// the key's own row. An AWS-managed alias names a key no kms row lists.
+	if rc.Targets == nil && !strings.HasPrefix(res, "alias/aws/") {
+		return ref, true
 	}
 	return "", false
 }
 
-// kmsRefContext is refContext for the kms target, with the key behind every
-// local alias no loaded row carries added to Targets. The kms list holds
+// kmsRefContext is refContext for the kms target in region, with the key
+// behind every local alias no loaded row carries added to Targets. The
+// session's cache holds its own Region's keys and none of another's, so a
+// read elsewhere goes through that Region's clients with no list. The kms list holds
 // customer keys only, so an AWS-managed alias (alias/aws/*) is never on it,
 // and an alias may be newer than the list. The keys come from the kms type's
 // own by-ID lookup: DescribeKey accepts an alias name or alias ARN. Another
 // account's alias is never looked up. The error is the lookup's; the rows it
 // did return are in Targets either way.
-func kmsRefContext(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) (domain.RefContext, error) {
-	rc := refContext(clients, cache, "kms")
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.KMS == nil {
-		return rc, nil
+func kmsRefContext(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) (domain.RefContext, error) {
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
+		if elsewhere := c.InRegion(region); elsewhere != c {
+			clients, cache = elsewhere, nil
+		}
 	}
+	rc := refContext(clients, cache, "kms")
 	var missing []string
 	for _, ref := range refs {
 		res, _, local := localARN(ref, rc, "kms")
-		if _, known := resource.ResolveRef("kms", ref, rc); local && !known && strings.HasPrefix(res, "alias/") {
+		if id, known := resource.ResolveRef("kms", ref, rc); local && strings.HasPrefix(res, "alias/") && (!known || id == ref) {
 			missing = append(missing, ref)
 		}
 	}
 	if len(missing) == 0 {
 		return rc, nil
 	}
-	rows, err := FetchKMSKeysByIDs(ctx, c, missing)
-	rc.Targets = append(slices.Clone(rc.Targets), rows...)
+	// A non-nil target list makes the panel count an alias only through the
+	// key that carries it, never the alias itself.
+	targets := append(make([]resource.Resource, 0, len(rc.Targets)), rc.Targets...)
+	var err error
+	if c, ok := clients.(*ServiceClients); ok && c != nil && c.KMS != nil {
+		var rows []resource.Resource
+		rows, err = FetchKMSKeysByIDs(ctx, c, missing)
+		targets = append(targets, rows...)
+	}
+	rc.Targets = targets
 	return rc, err
 }
 
-// kmsResolve resolves refs to kms row IDs through kmsRefContext. A lookup
-// that failed leaves what did resolve as a lower bound; its error is the
-// answer only when nothing resolved.
-func kmsResolve(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) (ids []string, lowerBound bool, err error) {
-	rc, err := kmsRefContext(ctx, clients, cache, refs)
+// kmsResolve resolves refs to kms row IDs through kmsRefContext, in region.
+// A lookup that failed leaves what did resolve as a lower bound; its error is
+// the answer only when nothing resolved.
+func kmsResolve(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) (ids []string, lowerBound bool, err error) {
+	rc, err := kmsRefContext(ctx, clients, cache, region, refs)
 	ids, dropped := resolveRefs("kms", refs, rc)
 	if len(ids) == 0 && err != nil {
 		return nil, false, err
@@ -362,13 +459,30 @@ func kmsResolve(ctx context.Context, clients any, cache resource.ResourceCache, 
 	return ids, dropped || err != nil, nil
 }
 
-// kmsRelated is relatedRefs for the kms target, through kmsResolve.
+// kmsRelated is kmsRelatedIn in the Region the keys' ARNs name.
 func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) resource.RelatedCheckResult {
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
+	return kmsRelatedIn(ctx, clients, cache, kmsRegion(refs), refs)
+}
+
+// kmsRelatedIn is relatedRefs for the kms target through kmsResolve, for keys
+// that live in region; the result is read there.
+func kmsRelatedIn(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) resource.RelatedCheckResult {
+	ids, lowerBound, err := kmsResolve(ctx, clients, cache, region, refs)
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
-	return relatedResultTrunc("kms", ids, lowerBound)
+	return inRegion(clients, region, relatedResultTrunc("kms", ids, lowerBound))
+}
+
+// kmsRegion is the Region the first key or alias ARN among refs names; a
+// bare ID or alias names none, which reads as the session's.
+func kmsRegion(refs []string) string {
+	for _, ref := range refs {
+		if region := arnRegionOf(ref, "kms"); region != "" {
+			return region
+		}
+	}
+	return ""
 }
 
 // isKMSKeyID reports whether s has the shape of a key ID: a UUID, or
@@ -377,11 +491,15 @@ func isKMSKeyID(s string) bool {
 	return strings.HasPrefix(s, "mrk-") || len(s) == 36 && s[8] == '-' && s[13] == '-' && s[18] == '-' && s[23] == '-'
 }
 
-// secretsRefToID reads a secret ARN as the secret's name. Secrets Manager
-// appends "-" and six random characters to the name in the ARN, and a
-// container's ValueFrom may carry ":json-key:version-stage:version-id" after
-// it. A row whose ID or ARN is the reference as written wins over stripping
-// the suffix, since a name may itself end in "-XXXXXX".
+// secretsRefToID reads a secret ARN as the name of the loaded secret it
+// names. Secrets Manager appends "-" and six random characters to the name
+// in a full ARN, a partial ARN omits them, and a name may itself end in
+// "-XXXXXX", so only the list tells the two apart: a partial ARN names the
+// row of that name, a full one the row whose ARN it is. With no list loaded
+// an ARN whose name cannot end in that suffix is a partial one and names the
+// secret of that name; any other ARN, less the ":json-key:version-stage:
+// version-id" a container's ValueFrom may carry after it, names its secret by
+// itself: DescribeSecret takes a full or a partial ARN.
 func secretsRefToID(ref string, rc domain.RefContext) (string, bool) {
 	res, isARN, ok := localARN(ref, rc, "secretsmanager")
 	if !ok {
@@ -399,16 +517,29 @@ func secretsRefToID(ref string, rc domain.RefContext) (string, bool) {
 	}
 	name, _, _ = strings.Cut(name, ":")
 	full := ref[:len(ref)-len(res)] + "secret:" + name
+	if rc.Targets == nil {
+		if !secretSuffix.MatchString(name) {
+			return name, true
+		}
+		return full, true
+	}
+	// A row named as written answers before a row whose ARN it is: the list
+	// holds a secret of exactly that name.
+	if listHolds(rc, name) {
+		return name, true
+	}
 	for _, t := range rc.Targets {
-		if t.ID == name || t.Fields["arn"] == full {
+		if t.Fields["arn"] == full {
 			return t.ID, true
 		}
 	}
-	if i := strings.LastIndex(name, "-"); i > 0 && len(name)-i == 7 {
-		name = name[:i]
-	}
-	return name, true
+	return "", false
 }
+
+// secretSuffix is the shape of the "-" and six characters Secrets Manager
+// appends to a secret's name in its full ARN. A name that does not end in it
+// can only be a partial ARN's.
+var secretSuffix = regexp.MustCompile(`-[A-Za-z0-9]{6}$`)
 
 // elbRefToID reads a load balancer ARN (application, network, gateway —
 // "loadbalancer/<kind>/<name>/<id>" — or classic — "loadbalancer/<name>")
@@ -504,6 +635,9 @@ func apigwRefToID(ref string, rc domain.RefContext) (string, bool) {
 		return "", false
 	}
 	if !isARN {
+		if rc.Targets == nil && !apigwID.MatchString(ref) {
+			return "", false
+		}
 		return idOrLoadedName(ref, rc)
 	}
 	for _, prefix := range []string{"/restapis/", "/apis/"} {
@@ -514,6 +648,11 @@ func apigwRefToID(ref string, rc domain.RefContext) (string, bool) {
 	}
 	return "", false
 }
+
+// apigwID is the shape of an API ID: lower-case letters and digits. A custom
+// domain's ID ("d-…") has a hyphen, and a name is read only against the
+// loaded list.
+var apigwID = regexp.MustCompile(`^[a-z0-9]+$`)
 
 // instanceProfileName reads an instance profile ARN
 // ("instance-profile/<path>/<name>") or a bare name as the profile's name.
@@ -535,25 +674,96 @@ func instanceProfileName(ref string) string {
 // family. A family is no a9s row; checkers match log groups and state
 // machines against it.
 func taskDefFamily(ref string) string {
-	if _, rest, ok := strings.Cut(ref, ":task-definition/"); ok {
-		ref = rest
-	}
-	family, _, _ := strings.Cut(ref, ":")
+	family, _, _ := strings.Cut(taskDefRevision(ref), ":")
 	return family
 }
 
-// extractEventBusName extracts the bus name from an EventBridge event bus ARN.
-// ARN format: arn:aws:events:REGION:ACCOUNT:event-bus/NAME
-// If the input contains no "/", it is returned as-is (handles already-extracted names).
-// An event bus is no a9s row: eb-rule rows are matched by the bus they sit on.
-func extractEventBusName(arn string) string {
-	return lastSegment(arn, "/")
+// taskDefRevision reads a task definition ARN or "<family>:<revision>" as
+// "<family>:<revision>".
+func taskDefRevision(ref string) string {
+	rev, _ := arnNameRef("ecs", "task-definition/", "")(ref, domain.RefContext{})
+	return rev
+}
+
+// extractEventBusName reads an event bus ARN ("event-bus/<name>") or a bare
+// name as the bus name. An event bus is no a9s row: eb-rule rows are matched
+// by the bus they sit on.
+func extractEventBusName(ref string) string {
+	name, _ := arnNameRef("events", "event-bus/", "")(ref, domain.RefContext{})
+	return name
 }
 
 var (
-	iamGroupRefToID = func(ref string, rc domain.RefContext) (string, bool) { return iamNameRef(ref, rc, "group/") }
-	sfnRefToID      = arnNameRef("states", "stateMachine:", ":")
+	iamGroupRefToID     = func(ref string, rc domain.RefContext) (string, bool) { return iamNameRef(ref, rc, "group/") }
+	sfnRefToID          = arnNameRef("states", "stateMachine:", ":")
+	cbRefToID           = arnNameRef("codebuild", "project/", "")
+	cfRefToID           = arnNameRef("cloudfront", "distribution/", "")
+	cfnRefToID          = arnNameRef("cloudformation", "stack/", "/")
+	codeartifactRefToID = arnNameRef("codeartifact", "repository/", "")
+	dbcRefToID          = arnNameRef("rds", "cluster:", "")
+	dbiSnapRefToID      = arnNameRef("rds", "snapshot:", "")
+	eksRefToID          = arnNameRef("eks", "cluster/", "")
+	pipelineRefToID     = arnNameRef("codepipeline", "", "")
+	trailRefToID        = arnNameRef("cloudtrail", "trail/", "")
+	dbcSnapRefToID      = arnNameRef("rds", "cluster-snapshot:", "")
+	tgwRefToID          = ec2ARNRef("transit-gateway/", "tgw-")
 )
+
+// asgRefToID reads an Auto Scaling group ARN
+// ("autoScalingGroup:<uuid>:autoScalingGroupName/<name>") as the group's name.
+func asgRefToID(ref string, rc domain.RefContext) (string, bool) {
+	res, isARN, ok := localARN(ref, rc, "autoscaling")
+	if !ok || !isARN {
+		return res, ok
+	}
+	_, name, found := strings.Cut(res, ":autoScalingGroupName/")
+	return name, found && strings.HasPrefix(res, "autoScalingGroup:") && name != ""
+}
+
+// ngRefToID reads a node group ARN ("nodegroup/<cluster>/<name>/<uuid>") as
+// the "<cluster>/<name>" the node group rows are keyed by.
+func ngRefToID(ref string, rc domain.RefContext) (string, bool) {
+	res, isARN, ok := localARN(ref, rc, "eks")
+	if !ok || !isARN {
+		return res, ok
+	}
+	rest, ok := afterPrefix(res, "nodegroup/")
+	parts := strings.Split(rest, "/")
+	if !ok || len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", false
+	}
+	return ngRowID(parts[0], parts[1]), true
+}
+
+// ecsTaskRefToID reads a task ARN ("task/<cluster>/<id>", or the older
+// "task/<id>") as the task ID the task rows are keyed by.
+func ecsTaskRefToID(ref string, rc domain.RefContext) (string, bool) {
+	id, ok := arnNameRef("ecs", "task/", "")(ref, rc)
+	return lastSegment(id, "/"), ok && id != ""
+}
+
+// ebRefToID reads an environment ARN ("environment/<app>/<env>") as the ID of
+// the loaded environment it names, and a bare value as an environment ID or
+// name. The ID ("e-…") is not in the ARN, so an ARN reads only against the
+// loaded list.
+func ebRefToID(ref string, rc domain.RefContext) (string, bool) {
+	res, isARN, ok := localARN(ref, rc, "elasticbeanstalk")
+	if !ok {
+		return "", false
+	}
+	if !isARN {
+		return idOrLoadedName(ref, rc)
+	}
+	if _, ok := afterPrefix(res, "environment/"); !ok {
+		return "", false
+	}
+	for _, t := range rc.Targets {
+		if t.Fields["environment_arn"] == ref {
+			return t.ID, true
+		}
+	}
+	return "", false
+}
 
 // listHolds reports whether the loaded target list holds id; with no list
 // loaded nothing is known against it.
@@ -576,11 +786,20 @@ func dbiRefToID(ref string, rc domain.RefContext) (string, bool) {
 // outlives the volume it was taken from, so an ID the loaded list does not
 // hold names no row.
 func ebsRefToID(ref string, rc domain.RefContext) (string, bool) {
-	id, isARN, ok := localARN(ref, rc, "ec2")
-	if ok && isARN {
-		id, ok = afterPrefix(id, "volume/")
-	}
-	return id, ok && listHolds(rc, id)
+	id, ok := ec2ARNRef("volume/", "vol-")(ref, rc)
+	return id, ok && id != copiedSnapshotVolumeID && listHolds(rc, id)
+}
+
+// copiedSnapshotVolumeID is the volume ID a snapshot made by CopySnapshot
+// carries: it names no volume
+// (docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html, volumeId).
+const copiedSnapshotVolumeID = "vol-ffffffff"
+
+// amiRefToID reads an image ARN ("image/ami-…") or an AMI ID. A launch
+// template's ImageId may instead be "resolve:ssm:<parameter>", which names a
+// parameter holding an AMI ID, not an image.
+func amiRefToID(ref string, rc domain.RefContext) (string, bool) {
+	return ec2ARNRef("image/", "ami-")(ref, rc)
 }
 
 // wafRefToID reads a web ACL ARN ("<scope>/webacl/<name>/<id>") as its ID,
@@ -633,12 +852,31 @@ func ecrRefToID(ref string, rc domain.RefContext) (string, bool) {
 	return repo, repo != ""
 }
 
+// ec2ARNRef is the resolver of an EC2 type keyed by its ID: an ARN of kind
+// ("vpc/", "security-group/", "instance/") reads as the ID after it, and a
+// bare value is the ID already. Either way the ID carries the prefix EC2
+// gives every ID of the type ("vpc-", "sg-", "i-"); a value without it (an
+// SSM managed node's "mi-…", a "resolve:ssm:" image) is no row of the type.
+func ec2ARNRef(kind, idPrefix string) func(string, domain.RefContext) (string, bool) {
+	return func(ref string, rc domain.RefContext) (string, bool) {
+		id, isARN, ok := localARN(ref, rc, "ec2")
+		if ok && isARN {
+			id, ok = afterPrefix(id, kind)
+		}
+		return id, ok && strings.HasPrefix(id, idPrefix)
+	}
+}
+
+var (
+	ec2RefToID    = ec2ARNRef("instance/", "i-")
+	vpcRefToID    = ec2ARNRef("vpc/", "vpc-")
+	sgRefToID     = ec2ARNRef("security-group/", "sg-")
+	subnetARNToID = ec2ARNRef("subnet/", "subnet-")
+)
+
 // subnetRefToID reads a subnet ARN ("subnet/<id>") or subnet ID. An ASG's
 // VPCZoneIdentifier joins several IDs with commas; that names no one row.
 func subnetRefToID(ref string, rc domain.RefContext) (string, bool) {
-	id, isARN, ok := localARN(ref, rc, "ec2")
-	if ok && isARN {
-		id, ok = afterPrefix(id, "subnet/")
-	}
+	id, ok := subnetARNToID(ref, rc)
 	return id, ok && !strings.Contains(id, ",")
 }

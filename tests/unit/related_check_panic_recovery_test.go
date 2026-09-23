@@ -1,13 +1,10 @@
 // Pins relatedCheckCmd's
 // panic-recovery closure (internal/tui/runtime_adapter_related.go).
 //
-// When a related checker panics, the recover() branch must surface the panic
-// as an error on LazyAddError, the message's only error-carrying field
-// (core/runtime/messages/event.go), which Core.HandleRelatedCheckResult
-// converts into a FlashIntent{IsError:true}
-// (core/runtime/handlers_resources.go) — a checker crash is never silent to
-// the operator. Result itself stays resource.UnknownRelated so the blank,
-// navigable-row rendering fallback (core/resource/related.go) is unaffected.
+// A related checker that panics is a defect in that pivot. The recover()
+// branch reports it as that pivot's error — Result is the pivot's
+// ErrorRelated, which Core.HandleRelatedCheckResult announces as
+// "related <type>: …" — and no by-ID fetch ran, so LazyAddError stays nil.
 package unit
 
 import (
@@ -17,18 +14,18 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown
-// registers a related checker that panics, drives it through the real
-// relatedCheckCmd fan-out (by opening the resource's detail view, which
-// begins a DetailOperation and dispatches the related-check task directly),
-// and asserts the recovered result carries a non-nil, descriptive
-// LazyAddError while Result is preserved as resource.UnknownRelated.
-func TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown(t *testing.T) {
+// TestRelatedCheckCmd_CheckerPanic_IsThatPivotsError registers a related
+// checker that panics, drives it through the real relatedCheckCmd fan-out (by
+// opening the resource's detail view, which begins a DetailOperation and
+// dispatches the related-check task directly), and asserts the recovered
+// result is the pivot's error naming the panic.
+func TestRelatedCheckCmd_CheckerPanic_IsThatPivotsError(t *testing.T) {
 	const (
 		srcType    = "test-related-panic-source"
 		targetType = "test-related-panic-target"
@@ -61,27 +58,17 @@ func TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown(t *test
 		t.Fatal("no RelatedCheckResult received — a checker panic must still be recovered and reported, not left unhandled")
 	}
 
-	if resultMsg.LazyAddError == nil {
-		t.Fatal("RelatedCheckResult.LazyAddError is nil after a checker panic — the panic must be surfaced as an error, not silently discarded")
+	if resultMsg.LazyAddError != nil {
+		t.Errorf("LazyAddError = %v: no by-ID fetch ran, the checker panicked", resultMsg.LazyAddError)
 	}
-	if !strings.Contains(resultMsg.LazyAddError.Error(), "boom") {
-		t.Errorf("LazyAddError = %q, want it to mention the panic value %q", resultMsg.LazyAddError.Error(), "boom")
-	}
-	if !strings.Contains(resultMsg.LazyAddError.Error(), targetType) {
-		t.Errorf("LazyAddError = %q, want it to mention the target type %q", resultMsg.LazyAddError.Error(), targetType)
-	}
-
-	// Field-by-field, not reflect.DeepEqual (govet deepequalerrors flags
-	// DeepEqual on a struct carrying an error field): UnknownRelated leaves
-	// every field but TargetType/State at its zero value.
-	wantResult := resource.UnknownRelated(targetType)
 	got := resultMsg.Result
-	if got.TargetType() != wantResult.TargetType() ||
-		got.State() != wantResult.State() ||
-		got.Count() != wantResult.Count() ||
-		got.Truncated() != wantResult.Truncated() ||
-		len(got.ResourceIDs()) != 0 ||
-		len(got.FetchFilter()) != 0 {
-		t.Errorf("Result = %+v, want %+v — the UnknownRelated rendering fallback must be preserved on a checker panic", got, wantResult)
+	if got.TargetType() != targetType || got.EffectiveState() != domain.RelatedError || got.Err() == nil {
+		t.Fatalf("Result = state %v target %q err %v, want the %s pivot's error", got.EffectiveState(), got.TargetType(), got.Err(), targetType)
+	}
+	if !strings.Contains(got.Err().Error(), "boom") {
+		t.Errorf("Result error = %q, want it to name the panic value %q", got.Err().Error(), "boom")
+	}
+	if len(got.ResourceIDs()) != 0 {
+		t.Errorf("Result IDs = %v, want none: a panicked checker counted nothing", got.ResourceIDs())
 	}
 }

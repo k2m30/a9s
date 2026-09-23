@@ -54,7 +54,7 @@ KMS is a **reverse-index pivot**: `KeyMetadata` carries no references to consume
 ### `ct-events`
 
 - **Why related**: audit trail for key usage — Encrypt / Decrypt / GenerateDataKey / ScheduleKeyDeletion calls against this key show who touched it and when.
-- **How discovered**: universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy. Filtered by `resources[].ARN` matching this key's `Arn`.
+- **How discovered**: universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy. `LookupEvents` by the key ID, and by the key's `Arn` beside it, since KMS records most calls against a key under its ARN.
 - **Count shown**: unknown (event stream, not a bounded collection).
 
 ## 3. Attention / Issues Algorithm

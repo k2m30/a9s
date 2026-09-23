@@ -891,9 +891,8 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 				ResourceType:     op.ResourceType,
 				SourceResourceID: op.Resource.ID,
 				DefDisplayName:   def.DisplayName,
-				Result:           resource.UnknownRelated(def.TargetType),
+				Result:           resource.ErrorRelated(def.TargetType, fmt.Errorf("checker panicked: %v", r)),
 				OperationID:      op.ID,
-				LazyAddError:     fmt.Errorf("related checker for %s panicked: %v", def.TargetType, r),
 			}
 		}
 	}()
@@ -978,7 +977,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs())
 			if len(missing) > 0 {
 				extra, fetchErr := ff(checkCtx, op.Clients, missing)
-				if fetchErr != nil {
+				if fetchErr != nil && !errors.Is(fetchErr, domain.ErrClientMissing) {
 					lazyAddError = fetchErr
 				}
 				if len(extra) > 0 {

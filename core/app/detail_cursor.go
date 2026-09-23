@@ -245,7 +245,7 @@ func visibleRelatedRowCount(ds *DetailState) int {
 	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
 	count := 0
 	for _, row := range ds.RelatedRows {
-		if isSelfPivotZeroDetailRow(row, ds.ResourceType) {
+		if isHiddenDetailRow(row, ds) {
 			continue
 		}
 		if query == "" || strings.Contains(strings.ToLower(row.DisplayName), query) {
@@ -255,17 +255,23 @@ func visibleRelatedRowCount(ds *DetailState) int {
 	return count
 }
 
-// isSelfPivotZeroDetailRow reports a self-targeted related row that resolved
-// to nothing; the panel hides those. A row that carries a lookup of its own
-// has not resolved to nothing — it has not been counted yet, and taking it
-// runs that lookup — so actionability decides before the count does.
-func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
+// isHiddenDetailRow reports a related row the panel does not show: a
+// self-targeted row that resolved to nothing, and a CloudTrail Events row of a
+// resource CloudTrail has no lookup for (BuildCloudTrailFilter, the lookup the
+// `t` key sends), such as a subscription with no ARN yet. A self-targeted row
+// that carries a lookup of its own has not resolved to nothing — it has not
+// been counted yet, and taking it runs that lookup — so actionability decides
+// before the count does.
+func isHiddenDetailRow(row DetailRelatedRow, ds *DetailState) bool {
+	if row.TargetType == "ct-events" && ds.ResourceType != "ct-events" {
+		return resource.BuildCloudTrailFilter(ds.Resource, ds.ResourceType) == nil
+	}
 	return !row.Loading &&
 		row.Err == "" &&
 		row.Count == 0 &&
 		!isActionableDetailRow(row) &&
-		sourceType != "" &&
-		row.TargetType == sourceType
+		ds.ResourceType != "" &&
+		row.TargetType == ds.ResourceType
 }
 
 // isActionableDetailRow delegates to the single shared predicate
@@ -292,7 +298,7 @@ func visibleRelatedRowAt(ds *DetailState, idx int) *DetailRelatedRow {
 	vis := 0
 	for i := range ds.RelatedRows {
 		row := &ds.RelatedRows[i]
-		if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
+		if isHiddenDetailRow(*row, ds) {
 			continue
 		}
 		if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {

@@ -67,7 +67,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 			refs = append(refs, *out.Configuration.KMSKeyArn)
 		}
 	}
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
+	ids, lowerBound, err := kmsResolve(ctx, clients, cache, kmsRegion(refs), refs)
 	if len(ids) == 0 {
 		// Every function refused its read: nothing was established about any
 		// of them, which is a fetch failure rather than a lower bound over
@@ -161,8 +161,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 	for _, item := range items {
 		arns = append(arns, lambdaIntegrationARN(aws.ToString(item.IntegrationUri)))
 	}
-	ids, dropped := resolveRefs("lambda", arns, refContext(clients, cache, "lambda"))
-	return relatedResultTrunc("lambda", ids, dropped || !complete)
+	return listedRelated(ctx, clients, cache, "lambda", arns, !complete)
 }
 
 // checkApigwACM reports ACM certificates attached to this API's custom domain names.

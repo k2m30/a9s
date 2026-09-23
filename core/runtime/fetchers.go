@@ -15,6 +15,7 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -63,7 +64,7 @@ func (c *Core) FetchResourcesFiltered(ctx context.Context, clients *awsclient.Se
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	if clients == nil {
-		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+		return resource.FetchResult{}, domain.ErrClientMissing
 	}
 	pf := resource.GetFilteredPaginatedFetcher(resourceType)
 	if pf == nil {
@@ -78,7 +79,7 @@ func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.Servi
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	if clients == nil {
-		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+		return resource.FetchResult{}, domain.ErrClientMissing
 	}
 	pc := resource.ParentContext(parentCtx)
 	pf := resource.GetPaginatedChildFetcher(childType)
@@ -96,7 +97,7 @@ func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.Servic
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	if clients == nil {
-		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+		return resource.FetchResult{}, domain.ErrClientMissing
 	}
 
 	if len(p.FetchFilter) > 0 {
@@ -127,7 +128,7 @@ func (c *Core) FetchIdentity(ctx context.Context, clients *awsclient.ServiceClie
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	if clients == nil || clients.STS == nil {
-		return nil, fmt.Errorf("AWS clients not initialized")
+		return nil, domain.ErrClientMissing
 	}
 	return awsclient.FetchCallerIdentity(ctx, clients.STS, clients.IAM)
 }
@@ -155,7 +156,7 @@ func (c *Core) FetchRevealValue(ctx context.Context, clients *awsclient.ServiceC
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	if clients == nil {
-		return "", fmt.Errorf("AWS clients not initialized")
+		return "", domain.ErrClientMissing
 	}
 	fetcher := resource.GetRevealFetcher(resourceType)
 	if fetcher == nil {

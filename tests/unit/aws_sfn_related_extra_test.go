@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	lambdasvc "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	sfnsvc "github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
@@ -42,6 +44,31 @@ func sfnExtSrc(arn string) resource.Resource {
 
 func sfnClientsWithFake(f *fakeSFNExtra) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{SFN: f}
+}
+
+type sfnLambdaList struct{ names []string }
+
+func (l sfnLambdaList) ListFunctions(context.Context, *lambdasvc.ListFunctionsInput, ...func(*lambdasvc.Options)) (*lambdasvc.ListFunctionsOutput, error) {
+	out := &lambdasvc.ListFunctionsOutput{}
+	for _, n := range l.names {
+		out.Functions = append(out.Functions, lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(n),
+			FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + n),
+			Runtime:      lambdatypes.RuntimePython312,
+		})
+	}
+	return out, nil
+}
+
+// sfnLambdaCache is the loaded lambda list holding names, as the lambda
+// fetcher emits it.
+func sfnLambdaCache(t *testing.T, names ...string) resource.ResourceCache {
+	t.Helper()
+	page, err := awsclient.FetchLambdaFunctionsPage(context.Background(), sfnLambdaList{names: names}, "")
+	if err != nil {
+		t.Fatalf("lambda list: %v", err)
+	}
+	return resource.ResourceCache{"lambda": resource.ResourceCacheEntry{Resources: page.Resources}}
 }
 
 func TestRelated_SFN_Role_Found(t *testing.T) {
@@ -185,13 +212,29 @@ func TestRelated_SFN_Lambda_FoundFromResourceARN(t *testing.T) {
 	}
 
 	checker := sfnCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), sfnLambdaCache(t, "process-order"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "process-order" {
 		t.Errorf("ResourceIDs = %v, want [process-order]", result.ResourceIDs())
+	}
+}
+
+// A function named in the definition is counted against the loaded lambda
+// list; with no list to read, the count is unknown rather than the names as
+// written.
+func TestRelated_SFN_Lambda_UnknownWithoutALambdaList(t *testing.T) {
+	const sfnARN = "arn:aws:states:us-east-1:123456789012:stateMachine:lambda-workflow"
+	fake := &fakeSFNExtra{output: &sfnsvc.DescribeStateMachineOutput{Definition: aws.String(`{
+		"StartAt": "InvokeFunction",
+		"States": {"InvokeFunction": {"Type": "Task", "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-order", "End": true}}
+	}`)}}
+
+	result := sfnCheckerByTarget(t, "lambda")(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	if result.EffectiveState() != domain.RelatedUnknown && result.EffectiveState() != domain.RelatedError {
+		t.Errorf("state = %v ids %v, want unknown with no lambda list", result.EffectiveState(), result.ResourceIDs())
 	}
 }
 
@@ -219,7 +262,7 @@ func TestRelated_SFN_Lambda_FoundFromParametersFunctionName(t *testing.T) {
 	}
 
 	checker := sfnCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), sfnLambdaCache(t, "validate-input"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -254,7 +297,7 @@ func TestRelated_SFN_Lambda_DeduplicatesMultipleReferences(t *testing.T) {
 	}
 
 	checker := sfnCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), sfnLambdaCache(t, "shared-fn"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())
@@ -286,7 +329,7 @@ func TestRelated_SFN_Lambda_MultipleDifferentFunctions(t *testing.T) {
 	}
 
 	checker := sfnCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), sfnLambdaCache(t, "fn-alpha", "fn-beta"))
 
 	if result.Count() != 2 {
 		t.Errorf("Count = %d, want 2", result.Count())
@@ -412,7 +455,7 @@ func TestRelated_SFN_Lambda_StatesIntegrationResourceIgnored(t *testing.T) {
 	}
 
 	checker := sfnCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), resource.ResourceCache{})
+	result := checker(context.Background(), sfnClientsWithFake(fake), sfnExtSrc(sfnARN), sfnLambdaCache(t, "real-function"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (states::: ARN ignored, FunctionName extracted)", result.Count())

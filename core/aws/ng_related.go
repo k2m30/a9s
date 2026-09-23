@@ -204,7 +204,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	for _, v := range versions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedResultTrunc("ami", []string{*v.LaunchTemplateData.ImageId}, false)
+			return relatedRefs("ami", []string{*v.LaunchTemplateData.ImageId}, refContext(clients, nil, "ami"))
 		}
 	}
 	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")

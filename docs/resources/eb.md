@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `elb`
 
 - **Why related**: The load balancer fronting the environment; target-group health, 5xx rates, and TLS config live here.
-- **How discovered**: Call `DescribeEnvironmentResources` and read `EnvironmentResources.LoadBalancers[].Name`.
+- **How discovered**: Call `DescribeEnvironmentResources` and read `EnvironmentResources.LoadBalancers[].Name` (a name or an ARN), and count the ones the loaded `elb` list holds. The `elb` list holds Application and Network Load Balancers only, so an environment on a Classic Load Balancer counts none; the target-group pivot skips a Classic one, which has none. With the `elb` list unreadable the row is unknown.
 - **Count shown**: unknown.
 
 ### `logs`

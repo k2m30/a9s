@@ -20,11 +20,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// errClientMissing is a sentinel returned by related-resource checkers when
-// the service client required for the check is not initialized. Callers
-// should treat it as "unknown" (RelatedUnknown) rather than a real API error.
-var errClientMissing = errors.New("AWS service client not initialized")
-
 // r53ListRecordsFirstPage makes a single ListResourceRecordSets call for the
 // given hosted zone via RetryOnThrottle. Zone ID may be in the raw form
 // ("Z1ABCD") or canonical "/hostedzone/Z1ABCD"; the API accepts both. AWS
@@ -175,18 +170,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if len(apiIDs) == 0 {
 		return relatedResultTrunc("apigw", nil, recordsTruncated)
 	}
-	apigwList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
-	if apigwList == nil {
-		if fetchErr != nil {
-			return resource.ErrorRelated("apigw", fetchErr)
-		}
-		// Nothing cached and no fetcher: the aliases name something we cannot
-		// look up. The alias DNS name is not a apigw ID, so reporting it would
-		// offer the operator a row that navigates to nothing.
-		return resource.UnknownRelated("apigw")
-	}
-	ids, lowerBound := listedRefs("apigw", apiIDs, refContext(clients, cache, "apigw"), apigwList)
-	return relatedResultTrunc("apigw", ids, recordsTruncated || lowerBound)
+	return listedRelated(ctx, clients, cache, "apigw", apiIDs, recordsTruncated)
 }
 
 // checkR53S3 reports the S3 buckets this zone's S3-website alias records

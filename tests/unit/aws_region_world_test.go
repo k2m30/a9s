@@ -61,6 +61,14 @@ const (
 	rwTrailBucket  = "acme-org-cloudtrail"
 	rwAssetsQueue  = "arn:aws:sqs:eu-west-1:123456789012:acme-ingest"
 	rwAssetsKMSKey = "arn:aws:kms:eu-west-1:123456789012:key/0f1e2d3c-4b5a-4978-8a9b-0c1d2e3f4a5b"
+
+	rwReportsBucket    = "acme-reports-eu"
+	rwAssetsAlias      = "alias/acme-assets"
+	rwUSAssetsKeyID    = "5c4d3e2f-1a0b-4c9d-8e7f-6a5b4c3d2e1f"
+	rwEUAssetsKeyID    = "0f1e2d3c-4b5a-4978-8a9b-0c1d2e3f4a5b"
+	rwOrgTrailKMSKeyID = "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d"
+	rwOrgTrailTopic    = "arn:aws:sns:us-west-2:123456789012:acme-org-trail-alerts"
+	rwEUTrailKMSKeyID  = "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e"
 )
 
 // rwCall is one request the world answered: the service and region from its
@@ -182,6 +190,10 @@ func (w *rwWorld) RoundTrip(req *http.Request) (*http.Response, error) {
 		return rwRoute53(op, req), nil
 	case "cloudfront":
 		return rwCloudFront(req), nil
+	case "kms":
+		return rwKMS(region, op, body), nil
+	case "sns":
+		return rwSNS(region, body), nil
 	}
 	return rwJSONError(400, "UnknownOperationException", service+" "+op+" is not modelled by the region test world"), nil
 }
@@ -490,7 +502,9 @@ func rwTrails(region, op string) *http.Response {
 			"IncludeGlobalServiceEvents": true,
 			"LogFileValidationEnabled":   true,
 			"S3BucketName":               rwTrailBucket,
-			"KmsKeyId":                   "arn:aws:kms:us-west-2:123456789012:key/7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d",
+			"KmsKeyId":                   "arn:aws:kms:us-west-2:123456789012:key/" + rwOrgTrailKMSKeyID,
+			"SnsTopicName":               "acme-org-trail-alerts",
+			"SnsTopicARN":                rwOrgTrailTopic,
 			"CloudWatchLogsLogGroupArn":  "arn:aws:logs:us-west-2:123456789012:log-group:" + rwOrgTrailLogGroup + ":*",
 			"CloudWatchLogsRoleArn":      "arn:aws:iam::123456789012:role/acme-cloudtrail-to-logs",
 		}}
@@ -502,7 +516,7 @@ func rwTrails(region, op string) *http.Response {
 				"IsMultiRegionTrail":        false,
 				"LogFileValidationEnabled":  true,
 				"S3BucketName":              rwTrailBucket,
-				"KmsKeyId":                  "arn:aws:kms:eu-west-1:123456789012:key/1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+				"KmsKeyId":                  "arn:aws:kms:eu-west-1:123456789012:key/" + rwEUTrailKMSKeyID,
 				"CloudWatchLogsLogGroupArn": "arn:aws:logs:eu-west-1:123456789012:log-group:" + rwEUTrailLogGroup + ":*",
 				"CloudWatchLogsRoleArn":     "arn:aws:iam::123456789012:role/acme-cloudtrail-to-logs",
 			})
@@ -512,6 +526,70 @@ func rwTrails(region, op string) *http.Response {
 		return rwJSON(map[string]any{"IsLogging": true, "LatestDeliveryTime": time.Now().Add(-5 * time.Minute).Unix()})
 	}
 	return rwJSONError(400, "UnsupportedOperationException", "cloudtrail "+op+" is not modelled by the region test world")
+}
+
+// ─── KMS ───────────────────────────────────────────────────────────────────
+
+// The same infrastructure code deployed per Region gives each Region its own
+// key under the same alias name: an alias names a key only inside its Region.
+var rwKMSKeys = map[string][]struct{ id, alias string }{ //nolint:gochecknoglobals // read-only fixture world
+	"us-east-1": {{rwUSAssetsKeyID, rwAssetsAlias}},
+	"eu-west-1": {{rwEUAssetsKeyID, rwAssetsAlias}, {rwEUTrailKMSKeyID, "alias/acme-eu-trail"}},
+	"us-west-2": {{rwOrgTrailKMSKeyID, "alias/acme-org-trail"}},
+}
+
+func rwKMS(region, op string, body []byte) *http.Response {
+	var in struct{ KeyId string }
+	_ = json.Unmarshal(body, &in) //nolint:errcheck // an empty body names no key
+	prefix := "arn:aws:kms:" + region + ":123456789012:"
+	switch op {
+	case "ListKeys":
+		keys := []map[string]any{}
+		for _, k := range rwKMSKeys[region] {
+			keys = append(keys, map[string]any{"KeyId": k.id, "KeyArn": prefix + "key/" + k.id})
+		}
+		return rwJSON(map[string]any{"Keys": keys, "Truncated": false})
+	case "ListAliases":
+		aliases := []map[string]any{}
+		for _, k := range rwKMSKeys[region] {
+			if in.KeyId == "" || in.KeyId == k.id {
+				aliases = append(aliases, map[string]any{"AliasName": k.alias, "AliasArn": prefix + k.alias, "TargetKeyId": k.id})
+			}
+		}
+		return rwJSON(map[string]any{"Aliases": aliases, "Truncated": false})
+	case "DescribeKey":
+		for _, k := range rwKMSKeys[region] {
+			if in.KeyId == k.id || in.KeyId == prefix+"key/"+k.id || in.KeyId == k.alias || in.KeyId == prefix+k.alias {
+				return rwJSON(map[string]any{"KeyMetadata": map[string]any{
+					"AWSAccountId": "123456789012", "KeyId": k.id, "Arn": prefix + "key/" + k.id,
+					"CreationDate": 1767225600, "Enabled": true, "KeyState": "Enabled", "KeyManager": "CUSTOMER",
+					"KeyUsage": "ENCRYPT_DECRYPT", "KeySpec": "SYMMETRIC_DEFAULT", "Origin": "AWS_KMS", "MultiRegion": false,
+				}})
+			}
+		}
+		return rwJSONError(400, "NotFoundException", "Key '"+in.KeyId+"' does not exist")
+	}
+	return rwJSONError(400, "UnsupportedOperationException", "kms "+op+" is not modelled by the region test world")
+}
+
+// ─── SNS (awsquery) ────────────────────────────────────────────────────────
+
+var rwTopics = map[string][]string{ //nolint:gochecknoglobals // read-only fixture world
+	"us-west-2": {rwOrgTrailTopic},
+	"eu-west-1": {"arn:aws:sns:eu-west-1:123456789012:acme-eu-alerts"},
+}
+
+func rwSNS(region string, body []byte) *http.Response {
+	form, _ := url.ParseQuery(string(body)) //nolint:errcheck // a malformed body names no action
+	if action := form.Get("Action"); action != "ListTopics" {
+		return rwResponse(400, "text/xml", []byte(`<ErrorResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/"><Error><Type>Sender</Type><Code>InvalidAction</Code><Message>sns `+action+` is not modelled by the region test world</Message></Error><RequestId>7a62c49f-347e-4fc4-9331-6e8eEXAMPLE</RequestId></ErrorResponse>`), nil)
+	}
+	var b strings.Builder
+	for _, arn := range rwTopics[region] {
+		b.WriteString(`<member><TopicArn>` + arn + `</TopicArn></member>`)
+	}
+	return rwResponse(200, "text/xml", []byte(`<ListTopicsResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/"><ListTopicsResult><Topics>`+b.String()+
+		`</Topics></ListTopicsResult><ResponseMetadata><RequestId>3f1478c7-33a9-11df-9540-99d0768312d3</RequestId></ResponseMetadata></ListTopicsResponse>`), nil)
 }
 
 // ─── Route 53 and CloudFront (global, signed for us-east-1) ─────────────────
@@ -574,6 +652,10 @@ var rwBuckets = map[string]rwBucket{ //nolint:gochecknoglobals // read-only fixt
 	rwTrailBucket: {
 		region: "us-west-2",
 	},
+	rwReportsBucket: {
+		region: "eu-west-1",
+		kmsKey: "arn:aws:kms:eu-west-1:123456789012:" + rwAssetsAlias,
+	},
 }
 
 func rwS3Bucket(req *http.Request) string {
@@ -621,7 +703,7 @@ func rwS3Error(status int, code, message, bucket string) *http.Response {
 func rwS3(region, op, name string, req *http.Request) *http.Response {
 	if op == "ListBuckets" {
 		var b strings.Builder
-		for _, n := range []string{rwAssetsBucket, rwTrailBucket, rwWebBucket} {
+		for _, n := range []string{rwAssetsBucket, rwReportsBucket, rwTrailBucket, rwWebBucket} {
 			fmt.Fprintf(&b, `<Bucket><Name>%s</Name><CreationDate>2025-03-01T09:30:00.000Z</CreationDate><BucketRegion>%s</BucketRegion></Bucket>`, n, rwBuckets[n].region)
 		}
 		return rwS3XML(`<ListAllMyBucketsResult ` + rwS3NS + `><Owner><ID>79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be</ID></Owner><Buckets>` + b.String() + `</Buckets></ListAllMyBucketsResult>`)

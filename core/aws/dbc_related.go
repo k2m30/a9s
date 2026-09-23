@@ -18,7 +18,7 @@ import (
 )
 
 // errDbcNoClusterDetail is the answer when the row holds something that is not
-// a DB cluster, or the engine's client is unusable. Distinct from
+// a DB cluster. Distinct from
 // errRawStructMissing: there the row was never read, here what we have cannot
 // be used.
 var errDbcNoClusterDetail = errors.New("the cluster could not be read")
@@ -293,17 +293,18 @@ func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) 
 	if name == "" {
 		return nil, nil
 	}
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil || c.RDS == nil {
-		return nil, errDbcNoClusterDetail
+	c, err := svcClients(clients)
+	// no finding: without the RDS client nothing was read.
+	if err != nil || c.RDS == nil {
+		return nil, errClientMissing
 	}
 	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]rdstypes.DBSubnetGroup, *string, error) {
-		out, err := c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
+		out, callErr := c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
 			Marker:            marker,
 		})
-		if err != nil {
-			return nil, nil, err
+		if callErr != nil {
+			return nil, nil, callErr
 		}
 		return out.DBSubnetGroups, out.Marker, nil
 	})
@@ -328,17 +329,18 @@ func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource
 	if name == "" {
 		return nil, nil
 	}
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil || c.DocDB == nil {
-		return nil, errDbcNoClusterDetail
+	c, err := svcClients(clients)
+	// no finding: without the DocDB client nothing was read.
+	if err != nil || c.DocDB == nil {
+		return nil, errClientMissing
 	}
 	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]docdb_types.DBSubnetGroup, *string, error) {
-		out, err := c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
+		out, callErr := c.DocDB.DescribeDBSubnetGroups(ctx, &docdb.DescribeDBSubnetGroupsInput{
 			DBSubnetGroupName: &name,
 			Marker:            marker,
 		})
-		if err != nil {
-			return nil, nil, err
+		if callErr != nil {
+			return nil, nil, callErr
 		}
 		return out.DBSubnetGroups, out.Marker, nil
 	})

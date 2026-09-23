@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `ec2`
 
 - **Why related**: EC2 instances assuming this role via instance profile — operator is asking "who runs as this role?".
-- **How discovered**: cross-reference the already-loaded `ec2` list by `Instance.IamInstanceProfile.Arn` matched against the instance profiles this role is a member of (the role-name segment of the profile ARN equals the role's name in the common one-profile-per-role convention) — a9s-devops: the list-level `ec2` response carries `IamInstanceProfile`, so no extra API call is needed when the `ec2` list is already loaded; a strict resolution (`ListInstanceProfilesForRole`) is Wave-2-grade and can be added if the filename-match heuristic is rejected.
+- **How discovered**: `iam:ListInstanceProfilesForRole` names the instance profiles that hold this role; the `ec2` list is cross-referenced by `Instance.IamInstanceProfile.Arn` against those profiles' ARNs. A profile's name says nothing about the role it holds.
 - **Count shown**: yes.
 
 ### `eks`

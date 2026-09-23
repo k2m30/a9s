@@ -242,7 +242,7 @@ type Session struct {
 	// instant — the disk-cache load races ahead of the AWS connect on
 	// startup (Init fires both concurrently via tea.Batch for instant-paint),
 	// so dispatching probes here would run them against a nil
-	// transport and fail every one with "AWS clients not initialized"
+	// transport and fail every one with domain.ErrClientMissing
 	// instead of actually probing. Consumed by the next successful
 	// HandleClientsReady, which drains AvailQueue's first batch now that a
 	// real transport exists. Not cleared by Rotate for the same reason

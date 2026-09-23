@@ -5,7 +5,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -148,14 +147,13 @@ func elbListenerFindings(listener elbtypes.Listener) []domain.Finding {
 	return nil
 }
 
-// extractTGName extracts the target group name from an ARN like:
-// arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123
-func extractTGName(arn string) string {
-	parts := strings.Split(arn, "/")
-	if len(parts) >= 2 {
-		return parts[len(parts)-2]
+// extractTGName reads a target group ARN as the group's name, and anything
+// else as written.
+func extractTGName(ref string) string {
+	if name, ok := tgRefToID(ref, domain.RefContext{}); ok {
+		return name
 	}
-	return arn
+	return ref
 }
 
 // buildRedirectURL builds a human-readable redirect URL from RedirectConfig.
@@ -183,12 +181,12 @@ func buildRedirectURL(cfg *elbtypes.RedirectActionConfig) string {
 	return fmt.Sprintf("%s://%s:%s%s?%s", proto, host, port, path, query)
 }
 
-// extractCertID extracts the certificate ID from the ARN.
-// "arn:aws:acm:us-east-1:123456789012:certificate/abc-def-123" -> "abc-def-123"
-func extractCertID(arn string) string {
-	parts := strings.Split(arn, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
+// extractCertID reads a certificate ARN ("certificate/<id>") as the
+// certificate ID, and anything else as written.
+func extractCertID(ref string) string {
+	res, _, _ := localARN(ref, domain.RefContext{}, "acm")
+	if id, ok := afterPrefix(res, "certificate/"); ok {
+		return id
 	}
-	return arn
+	return ref
 }

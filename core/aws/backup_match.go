@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -179,16 +180,16 @@ func backupNeedsOptIn(t backupTarget) bool {
 // ARN up to its resource type ("arn:aws:ec2:*:*:volume/*"). "*" and a service
 // name ("arn:aws:ec2:*") do not. An S3 bucket ARN has no resource-type
 // segment, so a pattern over the bucket name names the type.
-func backupPatternNamesType(pattern, arn string) bool {
+func backupPatternNamesType(pattern, ref string) bool {
 	if !strings.Contains(pattern, "*") {
 		return true
 	}
-	p := strings.SplitN(pattern, ":", 6)
-	a := strings.SplitN(arn, ":", 6)
-	if len(p) < 6 || len(a) < 6 {
+	p, perr := arn.Parse(pattern)
+	a, aerr := arn.Parse(ref)
+	if perr != nil || aerr != nil {
 		return false
 	}
-	return !strings.ContainsAny(a[5], "/:") || !strings.HasPrefix(p[5], "*")
+	return !strings.ContainsAny(a.Resource, "/:") || !strings.HasPrefix(p.Resource, "*")
 }
 
 // backupOptInTypes maps a resource ARN's service and resource type to its
@@ -232,12 +233,12 @@ func backupOptedIn(optIn map[string]bool, t backupTarget) (bool, string) {
 	var types []string
 	switch {
 	case !isClusterARN(t.arn):
-		if a := strings.SplitN(t.arn, ":", 6); len(a) == 6 {
+		if a, err := arn.Parse(t.arn); err == nil {
 			typ := ""
-			if i := strings.IndexAny(a[5], "/:"); i >= 0 {
-				typ = a[5][:i]
+			if i := strings.IndexAny(a.Resource, "/:"); i >= 0 {
+				typ = a.Resource[:i]
 			}
-			if key, ok := backupOptInTypes[a[2]+":"+typ]; ok {
+			if key, ok := backupOptInTypes[a.Service+":"+typ]; ok {
 				types = []string{key}
 			}
 		}

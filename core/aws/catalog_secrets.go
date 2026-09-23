@@ -64,7 +64,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "last_changed", Title: "Last Changed", Path: "LastChangedDate", Width: 18},
 			{Key: "rotation_enabled", Title: "Rotation", Path: "RotationEnabled", Width: 10},
 		},
-		Color: colorSecrets,
+		Color:          colorSecrets,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SecretsManager} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
 		}),
@@ -104,6 +105,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "SSM Parameters",
 		ShortName:      "ssm",
+		RefToID:        ssmRefToID,
 		LifecycleKey:   "risk",
 		HumanizeFields: []string{"type"},
 		Aliases:        []string{"ssm", "parameters", "parameter-store"},
@@ -121,7 +123,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedDate", Width: 22},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
-		Color: colorSSM,
+		Color:          colorSSM,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SSM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
 		}),
@@ -161,10 +164,11 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
 		Color:                  colorKMS,
+		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.KMS} }),
 		Fetcher:                fetcherWithClients(FetchKMSKeysPage),
 		Wave2:                  IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
 		FetchByIDs:             fetchByIDsWithClients(FetchKMSKeysByIDs),
-		FieldKeys:              []string{"alias", "key_id", "status", "description", "aliases"},
+		FieldKeys:              []string{"alias", "key_id", "arn", "status", "description", "aliases"},
 		IssueEnricherFieldKeys: []string{"rotation_enabled"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true, Truncated: true, Mirror: true},

@@ -43,9 +43,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	if !ok {
 		return result, nil
 	}
-	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
-	// always succeeds for valid clients. However, test fakes that embed the interface
-	// as a nil zero value will panic at call time — safeDescribeLogStreams recovers.
 	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
 	var failures []Failure
@@ -60,7 +57,12 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			if name == "" {
 				return
 			}
-			out, err := safeDescribeLogStreams(ctx, logStreamsAPI, name)
+			out, err := logStreamsAPI.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
+				LogGroupName: aws.String(name),
+				OrderBy:      "LastEventTime",
+				Descending:   aws.Bool(true),
+				Limit:        aws.Int32(1),
+			})
 			// no finding: last_event_at is a column, left empty when the read fails or the group has no stream.
 			if err != nil || len(out.LogStreams) == 0 || out.LogStreams[0].LastEventTimestamp == nil {
 				return
@@ -124,23 +126,4 @@ func logGroupNameOf(r resource.Resource) string {
 		return name
 	}
 	return r.ID
-}
-
-// safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic
-// that would arise if the api value is a nil-embedded interface (e.g. in test fakes
-// that embed CWLogsAPI without overriding DescribeLogStreams). On panic it returns
-// an empty output and a sentinel error so the caller can skip the log-stream step.
-func safeDescribeLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string) (out *cwlogssvc.DescribeLogStreamsOutput, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			out = &cwlogssvc.DescribeLogStreamsOutput{}
-			err = fmt.Errorf("DescribeLogStreams panicked: %v", r)
-		}
-	}()
-	return api.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
-		LogGroupName: aws.String(logGroupName),
-		OrderBy:      "LastEventTime",
-		Descending:   aws.Bool(true),
-		Limit:        aws.Int32(1),
-	})
 }

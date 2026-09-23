@@ -7,6 +7,7 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -327,6 +328,20 @@ func (f *IAMFake) GetAccessKeyLastUsed(_ context.Context, input *iam.GetAccessKe
 		last.Region = aws.String("us-east-1")
 	}
 	return &iam.GetAccessKeyLastUsedOutput{AccessKeyLastUsed: last}, nil
+}
+
+// ListInstanceProfilesForRole returns the fixture profiles that hold the role,
+// in one page. Backs the role:ec2 related-panel pivot.
+func (f *IAMFake) ListInstanceProfilesForRole(_ context.Context, input *iam.ListInstanceProfilesForRoleInput, _ ...func(*iam.Options)) (*iam.ListInstanceProfilesForRoleOutput, error) {
+	role := aws.ToString(input.RoleName)
+	out := &iam.ListInstanceProfilesForRoleOutput{}
+	for _, name := range slices.Sorted(maps.Keys(f.fix.InstanceProfiles)) {
+		p := f.fix.InstanceProfiles[name]
+		if slices.ContainsFunc(p.Roles, func(r iamtypes.Role) bool { return aws.ToString(r.RoleName) == role }) {
+			out.InstanceProfiles = append(out.InstanceProfiles, p)
+		}
+	}
+	return out, nil
 }
 
 // GetInstanceProfile resolves an instance-profile name from fixture data.

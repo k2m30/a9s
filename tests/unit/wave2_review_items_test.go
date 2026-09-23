@@ -158,6 +158,21 @@ func (rvThrottledEC2) DescribeVolumeStatus(context.Context, *ec2sdk.DescribeVolu
 	return nil, rvThrottled("EC2", "DescribeVolumeStatus")
 }
 
+// The lists the ec2 and ebs enrichers read beside their own walk — snapshots,
+// security groups, route tables — answer empty: the call under test is the
+// throttled status walk, not these lists.
+func (rvThrottledEC2) DescribeSnapshots(context.Context, *ec2sdk.DescribeSnapshotsInput, ...func(*ec2sdk.Options)) (*ec2sdk.DescribeSnapshotsOutput, error) {
+	return &ec2sdk.DescribeSnapshotsOutput{}, nil
+}
+
+func (rvThrottledEC2) DescribeSecurityGroups(context.Context, *ec2sdk.DescribeSecurityGroupsInput, ...func(*ec2sdk.Options)) (*ec2sdk.DescribeSecurityGroupsOutput, error) {
+	return &ec2sdk.DescribeSecurityGroupsOutput{}, nil
+}
+
+func (rvThrottledEC2) DescribeRouteTables(context.Context, *ec2sdk.DescribeRouteTablesInput, ...func(*ec2sdk.Options)) (*ec2sdk.DescribeRouteTablesOutput, error) {
+	return &ec2sdk.DescribeRouteTablesOutput{}, nil
+}
+
 type rvThrottledRDS struct {
 	awsclient.RDSAPI
 }

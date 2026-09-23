@@ -37,9 +37,10 @@ const (
 	S3EventsTopicName = "a9s-demo-s3-events"
 	// S3DLQueueName is the SQS dead-letter queue for the healthy bucket.
 	S3DLQueueName = "a9s-demo-s3-dlq"
-	// S3BucketKMSKeyID is the bare KMS key ID used to encrypt the healthy bucket.
-	// The checker strips everything up to the last "/" from the key ARN.
-	S3BucketKMSKeyID = "a9s-demo-s3-key"
+	// S3BucketKMSKeyID is the bare KMS key ID used to encrypt the healthy
+	// bucket; a key ID is a UUID, the shape the kms resolver accepts while
+	// the key list is not loaded.
+	S3BucketKMSKeyID = "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
 	// S3CFNStackName is the CloudFormation stack that owns the healthy bucket.
 	S3CFNStackName = "a9s-demo-stack"
 	// ManagedKeyBucketName is encrypted with the AWS-managed `aws/s3` default

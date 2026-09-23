@@ -2,7 +2,7 @@
 
 package ctevent
 
-import "strings"
+import "github.com/aws/aws-sdk-go-v2/aws/arn"
 
 // FormatCTTarget collapses an ARN to its resource portion. When the ARN's account segment differs
 // from localAccount, the account ID is retained inline as "<acct>:<resource>".
@@ -11,17 +11,11 @@ func FormatCTTarget(rawARN, localAccount string) string {
 	if rawARN == "" {
 		return ""
 	}
-	if !strings.HasPrefix(rawARN, "arn:") {
+	a, err := arn.Parse(rawARN)
+	if err != nil {
 		return rawARN
 	}
-	// arn:aws:<service>:<region>:<account>:<resource>
-	// Split on ":" with limit 6 so the resource can itself contain colons.
-	parts := strings.SplitN(rawARN, ":", 6)
-	if len(parts) < 6 {
-		return rawARN
-	}
-	account := parts[4]
-	resource := parts[5]
+	account, resource := a.AccountID, a.Resource
 	// When account is empty (e.g. S3 bucket ARNs like arn:aws:s3:::bucket),
 	// return the resource portion — there is no account segment to compare.
 	if account == "" {

@@ -673,7 +673,11 @@ func TestRelated_CB_Secrets_Match(t *testing.T) {
 	}
 
 	checker := cbCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	listed := secretsListCache("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password-Q7rT2x")
+	if unlisted := checker(context.Background(), nil, res, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("cb → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), nil, res, listed)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

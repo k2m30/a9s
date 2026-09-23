@@ -2,7 +2,10 @@
 
 package domain
 
-import "sort"
+import (
+	"errors"
+	"sort"
+)
 
 // KnownRelated returns a proven RelatedCheckResult: the checker's lookup
 // completed and ids is either the exhaustive match set (truncated == false)
@@ -95,9 +98,20 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // navigable, because drilling into data that never resolved is misleading.
 // The failure is surfaced separately through a Flash{IsError:true} + the "!"
 // error log; the user retries with Ctrl+R.
+//
+// A pivot whose service client is absent (ErrClientMissing) made no call and
+// is unknown, not an error.
 func ErrorRelated(targetType string, err error) RelatedCheckResult {
+	if errors.Is(err, ErrClientMissing) {
+		return UnknownRelated(targetType)
+	}
 	return RelatedCheckResult{targetType: targetType, state: RelatedError, err: err}
 }
+
+// ErrClientMissing is the one signal that the AWS client a read needs is
+// absent — no client set yet, or none for that service: the read was never
+// made.
+var ErrClientMissing = errors.New("AWS service client not initialized")
 
 // DeferredRelated returns a RelatedCheckResult representing "the count is not
 // resolved locally; Enter should drill in via a server-side FetchFilter fetch

@@ -206,14 +206,18 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
 		return resource.ErrorRelated("role", err)
 	}
+	ids, dropped := resolveRefs("role", refs, rc)
+	// A grant principal is an ARN (a role, an assumed-role session, a user)
+	// or an AWS service principal; the role resolver reads the ones that
+	// name this account's roles, and every other principal names no row.
+	var principals []string
 	for _, g := range grants {
-		for _, p := range []string{aws.ToString(g.GranteePrincipal), aws.ToString(g.RetiringPrincipal)} {
-			if strings.Contains(p, ":role/") {
-				refs = append(refs, p)
-			}
+		principals = append(principals, aws.ToString(g.GranteePrincipal), aws.ToString(g.RetiringPrincipal))
+	}
+	for _, p := range arnsOnly(principals) {
+		if id, ok := resource.ResolveRef("role", p, rc); ok && !slices.Contains(ids, id) {
+			ids = append(ids, id)
 		}
 	}
-
-	ids, dropped := resolveRefs("role", refs, rc)
 	return relatedResultTrunc("role", ids, dropped || !complete)
 }

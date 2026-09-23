@@ -3,15 +3,15 @@
 package aws
 
 import (
-	"strings"
-
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
 // IsCustomerManagedIAMPolicyARN reports whether an IAM policy ARN belongs to
 // the current account rather than the global AWS-managed policy namespace.
 func IsCustomerManagedIAMPolicyARN(policyARN string) bool {
-	return policyARN != "" && !strings.Contains(policyARN, ":aws:policy/")
+	a, err := arn.Parse(policyARN)
+	return policyARN != "" && (err != nil || a.AccountID != "aws")
 }
 
 // attachedPolicyIDs returns the ARN of every attachment in the slice, which

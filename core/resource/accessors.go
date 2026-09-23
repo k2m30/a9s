@@ -4,7 +4,9 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -315,7 +317,7 @@ func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	fn, ok := paginatedRegistry[shortName]
 	if !ok {
 		if ct := TypeDef(shortName); ct != nil && ct.Fetcher != nil {
-			fn = ct.Fetcher
+			fn = withClients(ct, ct.Fetcher)
 		}
 	}
 	if fn == nil {
@@ -323,6 +325,28 @@ func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	}
 	return func(ctx context.Context, clients any, continuationToken string) (FetchResult, error) {
 		return sanitizeFetchResult(fn(ctx, clients, continuationToken))
+	}
+}
+
+// ClientMissing returns domain.ErrClientMissing when a service client the
+// type's catalog fetchers call (its FetcherClients) is absent from clients:
+// the one check every catalog Fetcher, AvailabilityFetcher and FetchByIDs
+// passes before it runs, so none of them dereferences an absent client.
+func ClientMissing(ct *ResourceTypeDef, clients any) error {
+	if ct == nil || ct.FetcherClients == nil || !slices.Contains(ct.FetcherClients(clients), nil) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s", domain.ErrClientMissing, ct.ShortName)
+}
+
+// withClients is fn run only when ClientMissing finds every client ct's
+// fetchers call.
+func withClients(ct *ResourceTypeDef, fn PaginatedFetcher) PaginatedFetcher {
+	return func(ctx context.Context, clients any, continuationToken string) (FetchResult, error) {
+		if err := ClientMissing(ct, clients); err != nil {
+			return FetchResult{}, err
+		}
+		return fn(ctx, clients, continuationToken)
 	}
 }
 
@@ -365,7 +389,7 @@ func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
 	fn, ok := availabilityRegistry[shortName]
 	if !ok {
 		if ct := TypeDef(shortName); ct != nil && ct.AvailabilityFetcher != nil {
-			fn = ct.AvailabilityFetcher
+			fn = withClients(ct, ct.AvailabilityFetcher)
 		}
 	}
 	if fn == nil {

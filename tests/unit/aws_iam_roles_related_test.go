@@ -11,7 +11,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -360,11 +360,8 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 	}
 }
 
-// TestRelated_Role_EC2_Found verifies that an EC2 instance whose
-// IamInstanceProfile ARN contains "/"+roleName is counted.
-// Uses constructed test data — not demo fixture alignment — because the
-// demo EC2 fixture profile ARN ("acme-ec2-instance-profile") does not match
-// any IAM role name in the IAM fixtures.
+// TestRelated_Role_EC2_Found verifies that an EC2 instance running under an
+// instance profile that holds the role is counted.
 func TestRelated_Role_EC2_Found(t *testing.T) {
 	const roleName = "my-app-role"
 	source := resource.Resource{
@@ -391,7 +388,8 @@ func TestRelated_Role_EC2_Found(t *testing.T) {
 	}
 
 	checker := roleCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, cache)
+	iamFake := &t542ProfileIAM{profiles: map[string][]string{roleName: {roleName}}}
+	result := checker(context.Background(), &awsclient.ServiceClients{IAM: iamFake}, source, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -404,8 +402,8 @@ func TestRelated_Role_EC2_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_Role_EC2_NoMatch verifies that EC2 instances whose profile ARN
-// does not contain the role name produce count=0.
+// TestRelated_Role_EC2_NoMatch verifies that EC2 instances whose profile
+// holds another role produce count=0.
 func TestRelated_Role_EC2_NoMatch(t *testing.T) {
 	const roleName = "my-app-role"
 	source := resource.Resource{
@@ -431,10 +429,11 @@ func TestRelated_Role_EC2_NoMatch(t *testing.T) {
 	}
 
 	checker := roleCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, cache)
+	iamFake := &t542ProfileIAM{profiles: map[string][]string{"other-role": {"other-role"}}}
+	result := checker(context.Background(), &awsclient.ServiceClients{IAM: iamFake}, source, cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (no matching profile)", result.Count())
+	if result.Count() != 0 || result.EffectiveState() != domain.RelatedResolved {
+		t.Errorf("Count = %d state %v, want a resolved 0 (no profile holds the role)", result.Count(), result.EffectiveState())
 	}
 }
 

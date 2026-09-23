@@ -61,7 +61,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			ContextKeys:    map[string]string{"job_name": "ID"},
 			DisplayNameKey: "job_name",
 		}},
-		Color: colorGlue,
+		Color:          colorGlue,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Glue} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
 		}),
@@ -105,7 +106,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
 		},
-		Color: colorAthena,
+		Color:          colorAthena,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Athena} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
 		}),
@@ -145,8 +147,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "webserver_access_mode", Title: "Access", Path: "WebserverAccessMode", Width: 16},
 			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22},
 		},
-		Color:   colorAnyFindingOrHealthy,
-		Fetcher: fetcherWithClients(FetchMWAAEnvironmentsPage),
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.MWAA} }),
+		Fetcher:        fetcherWithClients(FetchMWAAEnvironmentsPage),
 		FieldKeys: []string{
 			"name", "status", "airflow_version", "environment_class",
 			"min_workers", "max_workers", "schedulers", "min_webservers", "max_webservers",

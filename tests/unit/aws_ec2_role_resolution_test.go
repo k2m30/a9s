@@ -1,6 +1,5 @@
 // EKS/ASG instance profiles often carry a name different from their role, so
-// checkEC2Role resolves Roles[].RoleName through iam:GetInstanceProfile unless
-// cache["role"] already holds the profile-derived name.
+// checkEC2Role resolves Roles[].RoleName through iam:GetInstanceProfile.
 package unit_test
 
 import (
@@ -82,13 +81,23 @@ func TestEC2Role_ResolvesRealRoleName_ViaGetInstanceProfile(t *testing.T) {
 	}
 }
 
-func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
+// An instance profile's name says nothing about the role it holds: a profile
+// "my-shared-name" may carry "my-shared-name-v2" while a role named like the
+// profile also exists. Only the profile's own role list answers.
+func TestEC2Role_ProfileNamedLikeAnotherRoleResolvesToTheRoleItHolds(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/my-shared-name")
 
 	fake := &recordingRoleIAM{}
-	fake.getInstanceProfileFn = func(_ *iam.GetInstanceProfileInput) (*iam.GetInstanceProfileOutput, error) {
-		t.Fatalf("GetInstanceProfile must not be called when cache[\"role\"] already has a matching entry")
-		return nil, nil
+	fake.getInstanceProfileFn = func(in *iam.GetInstanceProfileInput) (*iam.GetInstanceProfileOutput, error) {
+		if aws.ToString(in.InstanceProfileName) != "my-shared-name" {
+			return nil, errors.New("NoSuchEntity: Instance Profile " + aws.ToString(in.InstanceProfileName) + " cannot be found.")
+		}
+		return &iam.GetInstanceProfileOutput{
+			InstanceProfile: &iamtypes.InstanceProfile{
+				InstanceProfileName: aws.String("my-shared-name"),
+				Roles:               []iamtypes.Role{{RoleName: aws.String("my-shared-name-v2")}},
+			},
+		}, nil
 	}
 	clients := &awsclient.ServiceClients{IAM: fake}
 
@@ -96,21 +105,18 @@ func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{ID: "my-shared-name", Name: "my-shared-name"},
+				{ID: "my-shared-name-v2", Name: "my-shared-name-v2"},
 			},
 		},
 	}
 
-	checker := ec2RoleCheckerByTarget(t)
-	result := checker(context.Background(), clients, res, cache)
+	result := ec2RoleCheckerByTarget(t)(context.Background(), clients, res, cache)
 
-	if result.Count() != 1 {
-		t.Fatalf("Count = %d, want 1 (Err=%v)", result.Count(), result.Err())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "my-shared-name-v2" {
+		t.Fatalf("ResourceIDs = %v (Err=%v), want [my-shared-name-v2], the role the profile holds", ids, result.Err())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-shared-name" {
-		t.Fatalf("ResourceIDs = %v, want [my-shared-name]", result.ResourceIDs())
-	}
-	if fake.calls != 0 {
-		t.Fatalf("GetInstanceProfile calls = %d, want 0 (fast path via cache)", fake.calls)
+	if result.Truncated() {
+		t.Error("the profile's role list was read whole; the count is exact, not a lower bound")
 	}
 }
 

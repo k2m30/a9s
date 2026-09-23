@@ -114,7 +114,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 		query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
 		var visibleRows []DetailRelatedRow
 		for _, row := range ds.RelatedRows {
-			if isSelfPivotZeroDetailRow(row, ds.ResourceType) {
+			if isHiddenDetailRow(row, ds) {
 				continue
 			}
 			if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {

@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `ami`
 
 - **Why related**: node groups run a specific EKS-optimized AMI; operator checks it to confirm patch level, compare against latest approved image, or diagnose boot-time failures after an AMI drift.
-- **How discovered**: for node groups without a custom launch template, `Nodegroup.ReleaseVersion` identifies the AWS-managed AMI alias directly. For node groups with a custom launch template, `Nodegroup.LaunchTemplate.{Id,Version}` resolves to an `ImageId` via `ec2:DescribeLaunchTemplateVersions` — a9s-devops: the field is only populated when a launch template was supplied at create time.
+- **How discovered**: for node groups without a custom launch template, `Nodegroup.ReleaseVersion` identifies the AWS-managed AMI alias directly. For node groups with a custom launch template, `Nodegroup.LaunchTemplate.{Id,Version}` resolves to an `ImageId` via `ec2:DescribeLaunchTemplateVersions` — a9s-devops: the field is only populated when a launch template was supplied at create time. An `ImageId` of `resolve:ssm:<parameter>` names a parameter, not an image, and makes the count a lower bound.
 - **Count shown**: yes (0 or 1 — a node group pins exactly one AMI).
 
 ### `asg`

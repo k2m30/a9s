@@ -395,39 +395,16 @@ var _ awsclient.CWLogsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeLogStreamsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeMetricFiltersAPI = (*cwLogsFullFake)(nil)
 
-// cwLogsNoStreamsFake embeds CWLogsAPI as nil so the DescribeLogStreams
-// type assertion in EnrichLogsMetricFilters FAILS (hasStreams=false).
-type cwLogsNoStreamsFake struct {
-	awsclient.CWLogsAPI // nil embedded — causes panic on any non-overridden call
-
-	filtersByGroup map[string][]cwlogstypes.MetricFilter
-}
-
-func (f *cwLogsNoStreamsFake) DescribeMetricFilters(
-	_ context.Context,
-	in *cwlogssvc.DescribeMetricFiltersInput,
-	_ ...func(*cwlogssvc.Options),
-) (*cwlogssvc.DescribeMetricFiltersOutput, error) {
-	name := ""
-	if in != nil && in.LogGroupName != nil {
-		name = *in.LogGroupName
-	}
-	return &cwlogssvc.DescribeMetricFiltersOutput{MetricFilters: f.filtersByGroup[name]}, nil
-}
-
-var _ awsclient.CWLogsAPI = (*cwLogsNoStreamsFake)(nil)
-
 func TestEnrichLogsMetricFilters_MetricFiltersAPIAssertionFailsReturnsEmpty(t *testing.T) {
 	t.Skip("CWLogsAPI embeds CWLogsDescribeMetricFiltersAPI — assertion always succeeds for valid clients; nil guard already covered")
 }
 
-// TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt verifies that when
-// clients.CloudWatchLogs does NOT implement CWLogsDescribeLogStreamsAPI
-// (hasStreams=false in EnrichLogsMetricFilters), the last_event_at field is not
-// populated in FieldUpdates.
-func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
+// TestEnrichLogsMetricFilters_GroupWithoutStreamsHasNoLastEventAt: a log
+// group nothing has written to yet holds no log streams, so DescribeLogStreams
+// answers an empty list and the group has no last event time.
+func TestEnrichLogsMetricFilters_GroupWithoutStreamsHasNoLastEventAt(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/no-streams"
-	fake := &cwLogsNoStreamsFake{
+	fake := &cwLogsFullFake{
 		filtersByGroup: map[string][]cwlogstypes.MetricFilter{
 			auditGroup: {cwMetricFilter(auditGroup, "SomeFilter")},
 		},
@@ -444,7 +421,7 @@ func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
 	}
 	if fu := result.FieldUpdates[auditGroup]; fu != nil {
 		if _, ok := fu["last_event_at"]; ok {
-			t.Errorf("last_event_at must not be set when hasStreams=false, got %q", fu["last_event_at"])
+			t.Errorf("last_event_at = %q for a group with no log streams, want none", fu["last_event_at"])
 		}
 	}
 }

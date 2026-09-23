@@ -143,7 +143,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cac
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("ddb")
 	}
-	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "ddb", ":dynamodb:", refContext(clients, cache, "ddb"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "ddb", "dynamodb", refContext(clients, cache, "ddb"))
 }
 
 // checkLambdaKinesis scans this Lambda's event source mappings for Kinesis
@@ -157,7 +157,7 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("kinesis")
 	}
-	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "kinesis", ":kinesis:", refContext(clients, cache, "kinesis"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "kinesis", "kinesis", refContext(clients, cache, "kinesis"))
 }
 
 // checkLambdaMSK scans this Lambda's event source mappings for MSK cluster
@@ -171,7 +171,7 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.UnknownRelated("msk")
 	}
-	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "msk", ":kafka:", refContext(clients, cache, "msk"))
+	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "msk", "kafka", refContext(clients, cache, "msk"))
 }
 
 // The following checkers reverse-look the target cache for references back to

@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `sns`, `
 ### `ct-events`
 
 - **Why related**: audit trail for subscription changes — who created/confirmed/deleted this sub, and recent errors. (`docs/related-resources.md` § `sns-sub` — "Audit trail for subscription changes.")
-- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Resolved by `LookupEvents` filtered on `SubscriptionArn`.
+- **How discovered**: universal pivot — applies to every registered type; see docs/related-resources.md §Policy. Resolved by `LookupEvents` filtered on `SubscriptionArn`. A subscription with no ARN yet (pending confirmation, or deleted) has no name CloudTrail records it under: the detail shows no CloudTrail Events row.
 - **Count shown**: yes — reflects recent matching events, so volume is informative at a glance (a9s-devops 2026-04-20).
 
 ## 3. Attention / Issues Algorithm

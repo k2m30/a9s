@@ -91,7 +91,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 			refs = append(refs, *vol.KmsKeyId)
 		}
 	}
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, refs)
+	ids, lowerBound, err := kmsResolve(ctx, clients, cache, kmsRegion(refs), refs)
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}

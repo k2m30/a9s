@@ -7,6 +7,7 @@ package aws
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -39,7 +40,7 @@ func imageRefersToRepo(imageURI, repoURI string) bool {
 }
 
 // routeGatewayTarget returns the id of the target of the given family
-// ("igw", "nat", "tgw", "pcx") that the route sends traffic to, and "" when
+// ("igw", "nat", "tgw", "pcx", "eni") that the route sends traffic to, and "" when
 // it names none. A blackhole route carries no traffic: AWS leaves the target
 // id on the route after the gateway or connection is detached or deleted, so
 // it names no live target. GatewayId also carries "local" and virtual
@@ -55,6 +56,8 @@ func routeGatewayTarget(route ec2types.Route, family string) string {
 		return aws.ToString(route.TransitGatewayId)
 	case "pcx":
 		return aws.ToString(route.VpcPeeringConnectionId)
+	case "eni":
+		return aws.ToString(route.NetworkInterfaceId)
 	case "igw":
 		if id := aws.ToString(route.GatewayId); strings.HasPrefix(id, "igw-") {
 			return id
@@ -68,6 +71,19 @@ func routeGatewayTarget(route ec2types.Route, family string) string {
 func routeTargetsGateway(route ec2types.Route, targetID string) bool {
 	family, _, _ := strings.Cut(targetID, "-")
 	return targetID != "" && routeGatewayTarget(route, family) == targetID
+}
+
+// rtbLiveRouteTarget is the Resolve of a route table's route-target fields:
+// the target value names when a route of the table that is not blackholed
+// sends traffic to it, as the related checkers read the routes, and "" for a
+// target only a blackholed route still names, or for "local" and a virtual
+// private gateway in GatewayId.
+func rtbLiveRouteTarget(src resource.Resource, value string, _ []resource.Resource) string {
+	table, ok := assertStruct[ec2types.RouteTable](src.RawStruct)
+	if !ok || !slices.ContainsFunc(table.Routes, func(r ec2types.Route) bool { return routeTargetsGateway(r, value) }) {
+		return ""
+	}
+	return value
 }
 
 // endpointIsQueue reports whether an SNS subscription's Endpoint delivers to

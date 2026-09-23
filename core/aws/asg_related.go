@@ -98,7 +98,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			return resource.ErrorRelated("ami", err)
 		}
 		if len(lcs) > 0 && aws.ToString(lcs[0].ImageId) != "" {
-			return relatedResultTrunc("ami", []string{*lcs[0].ImageId}, false)
+			return relatedRefs("ami", []string{*lcs[0].ImageId}, refContext(clients, nil, "ami"))
 		}
 		return resource.ProvenZero("ami", "LaunchConfiguration.ImageId")
 	}
@@ -117,7 +117,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	for _, v := range versions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedResultTrunc("ami", []string{*v.LaunchTemplateData.ImageId}, false)
+			return relatedRefs("ami", []string{*v.LaunchTemplateData.ImageId}, refContext(clients, nil, "ami"))
 		}
 	}
 	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")

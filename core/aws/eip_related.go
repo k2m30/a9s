@@ -114,9 +114,6 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ec2List, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ec2")
 	if err != nil {
-		if _, sok := clients.(*ServiceClients); !sok {
-			return resource.UnknownRelated("asg")
-		}
 		return resource.ErrorRelated("asg", err)
 	}
 	if ec2List == nil {

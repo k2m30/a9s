@@ -275,6 +275,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:      "EC2 Instances",
 		ShortName: "ec2",
+		RefToID:   ec2RefToID,
 		// UserData is base64 on DescribeInstanceAttribute and is decoded onto
 		// InstanceEnriched when the detail opens.
 		ComputedDetailPaths:     []string{"UserData"},
@@ -312,8 +313,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				return v
 			},
 		},
-		Color:   colorEC2,
-		Augment: augmentEC2StatusChecks,
+		Color:          colorEC2,
+		Augment:        augmentEC2StatusChecks,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
 		}),
@@ -438,7 +440,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				DisplayNameKey: "service_name",
 			},
 		},
-		Color: colorECSSvc,
+		Color:          colorECSSvc,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSServicesPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
 		}),
@@ -500,7 +503,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "pending_tasks", Title: "Pending", Path: "PendingTasksCount", Width: 9},
 			{Key: "services_count", Title: "Services", Path: "ActiveServicesCount", Width: 10},
 		},
-		Color: colorECSCluster,
+		Color:          colorECSCluster,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
 		}),
@@ -531,6 +535,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "ECS Tasks",
 		ShortName:      "ecs-task",
+		RefToID:        ecsTaskRefToID,
 		HumanizeFields: []string{"stop_code", "launch_type", "status", "LastStatus", "DesiredStatus", "Connectivity"},
 		Aliases:        []string{"ecs-task", "ecs-tasks", "tasks"},
 		Category:       "COMPUTE",
@@ -554,7 +559,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "cpu", Title: "CPU", Path: "Cpu", Width: 6},
 			{Key: "memory", Title: "Memory", Path: "Memory", Width: 8},
 		},
-		Color: colorECSTask,
+		Color:          colorECSTask,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
 		}),
@@ -631,7 +637,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				DisplayNameKey: "function_name",
 			},
 		},
-		Color: colorLambda,
+		Color:          colorLambda,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Lambda} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
 		}),
@@ -692,6 +699,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "Auto Scaling Groups",
 		ShortName:      "asg",
+		RefToID:        asgRefToID,
 		HumanizeFields: []string{"HealthCheckType"},
 		Aliases:        []string{"asg", "autoscaling", "auto-scaling"},
 		Category:       "COMPUTE",
@@ -711,7 +719,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Children: []domain.ChildViewDef{
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 		},
-		Color: colorASG,
+		Color:          colorASG,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.AutoScaling} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
 		}),
@@ -777,7 +786,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "az", Title: "AZ", Path: "AvailabilityZone", Width: 16},
 			{Key: "created", Title: "Created", Path: "CreateTime", Width: 18},
 		},
-		Color: colorEBS,
+		Color:          colorEBS,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
 		}),
@@ -827,7 +837,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "started", Title: "Started", Path: "StartTime", Width: 18},
 			{Key: "progress", Title: "Progress", Path: "Progress", Width: 10},
 		},
-		Color: colorEBSSnap,
+		Color:          colorEBSSnap,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -864,6 +875,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"ami", "amis", "images"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		RefToID:       amiRefToID,
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Regional(region, "ec2/home?region="+region+"#ImageDetails:imageId="+r.ID)
 		},
@@ -888,7 +900,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				},
 			}
 		},
-		Color: colorAMI,
+		Color:          colorAMI,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAMIsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -937,7 +950,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "created_by", Title: "Created By", Width: 24},
 			{Key: "created", Title: "Created", Width: 18},
 		},
-		Color: colorAnyFindingOrHealthy,
+		Color:          colorAnyFindingOrHealthy,
+		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
 		}),

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/smithy-go"
@@ -120,7 +121,7 @@ func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...f
 		// full ARN; a ecs-svc row carries the name, so matching the ARN alone
 		// returns nothing for every demo service.
 		clusterArn := aws.ToString(t.ClusterArn)
-		if clusterFilter != "" && clusterArn != clusterFilter && shortNameOf(clusterArn) != clusterFilter {
+		if clusterFilter != "" && clusterArn != clusterFilter && arnResourceName(clusterArn) != clusterFilter {
 			continue
 		}
 		if serviceFilter != "" && aws.ToString(t.Group) != "service:"+serviceFilter {
@@ -134,12 +135,14 @@ func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...f
 	return &ecs.ListTasksOutput{TaskArns: arns}, nil
 }
 
-// shortNameOf returns the segment after the last "/" of an ARN.
-func shortNameOf(arn string) string {
-	if idx := strings.LastIndex(arn, "/"); idx != -1 {
-		return arn[idx+1:]
+// arnResourceName returns what follows the last "/" of an ARN's resource
+// part, or ref itself when ref is not an ARN.
+func arnResourceName(ref string) string {
+	a, err := arn.Parse(ref)
+	if err != nil {
+		return ref
 	}
-	return arn
+	return a.Resource[strings.LastIndex(a.Resource, "/")+1:]
 }
 
 func (f *ECSFake) DescribeTasks(_ context.Context, input *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
@@ -149,12 +152,8 @@ func (f *ECSFake) DescribeTasks(_ context.Context, input *ecs.DescribeTasksInput
 	wanted := toSet(input.Tasks)
 	var result []ecstypes.Task
 	for _, t := range f.fix.Tasks {
-		arn := aws.ToString(t.TaskArn)
-		id := arn
-		if idx := strings.LastIndex(arn, "/"); idx != -1 {
-			id = arn[idx+1:]
-		}
-		if wanted[arn] || wanted[id] {
+		taskARN := aws.ToString(t.TaskArn)
+		if wanted[taskARN] || wanted[arnResourceName(taskARN)] {
 			result = append(result, t)
 		}
 	}

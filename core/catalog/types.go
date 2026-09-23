@@ -102,6 +102,10 @@ type ResourceTypeDef struct {
 
 	// Fetcher is the Wave 1 paginated fetcher for this resource type.
 	Fetcher domain.PaginatedFetcher
+	// FetcherClients returns, from the session's clients, every service
+	// client Fetcher calls; a nil among them means the list cannot be read
+	// and Fetcher must not run.
+	FetcherClients func(clients any) []any
 	// AvailabilityFetcher is an optional, cheaper alternative to Fetcher used
 	// ONLY by the availability/count probe (core/runtime/probes.go's
 	// Core.ProbeResourceAvailability). nil means the probe falls back to

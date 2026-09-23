@@ -98,7 +98,7 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	var refs []string
 	for _, arn := range arns {
-		if strings.Contains(arn, ":loadbalancer/") {
+		if a, ok := ARNForService(arn, "elasticloadbalancing"); ok && strings.HasPrefix(a.Resource, "loadbalancer/") {
 			refs = append(refs, arn)
 		}
 	}
@@ -120,7 +120,7 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var refs []string
 	for _, arn := range arns {
-		if strings.Contains(arn, ":apigateway:") {
+		if _, ok := ARNForService(arn, "apigateway"); ok {
 			refs = append(refs, arn)
 		}
 	}

@@ -716,7 +716,10 @@ func TestRelated_ECSSvc_Secrets_Match(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECS: fakeECS}
 
 	checker := ecsSvcCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{})
+	if unlisted := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("ecs-svc → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), secretsListCache(secretARN))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -749,7 +752,10 @@ func TestRelated_ECSSvc_Secrets_RepositoryCredentials(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECS: fakeECS}
 
 	checker := ecsSvcCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{})
+	if unlisted := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("ecs-svc → secrets with no secrets list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	result := checker(context.Background(), clients, ecsSvcWithTaskDef("api-service", taskDefARN), secretsListCache(credARN))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

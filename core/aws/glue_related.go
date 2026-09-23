@@ -175,7 +175,7 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 // checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
 // values that look like Secrets Manager references (arn:aws:secretsmanager:
 // prefix).
-func checkGlueSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkGlueSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("secrets")
@@ -189,5 +189,5 @@ func checkGlueSecrets(_ context.Context, clients any, res resource.Resource, cac
 			refs = append(refs, v)
 		}
 	}
-	return relatedRefs("secrets", refs, refContext(clients, cache, "secrets"))
+	return listedRelated(ctx, clients, cache, "secrets", refs, false)
 }

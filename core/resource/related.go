@@ -516,7 +516,12 @@ func GetFetchByIDs(shortName string) FetchByIDsFunc {
 		return fn
 	}
 	if ct := TypeDef(shortName); ct != nil && ct.FetchByIDs != nil {
-		return ct.FetchByIDs
+		return func(ctx context.Context, clients any, ids []string) ([]Resource, error) {
+			if err := ClientMissing(ct, clients); err != nil {
+				return nil, err
+			}
+			return ct.FetchByIDs(ctx, clients, ids)
+		}
 	}
 	return nil
 }

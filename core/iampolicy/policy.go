@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // PrincipalBlock is a parsed Principal or NotPrincipal block of a statement.
@@ -152,20 +154,9 @@ func isAnyoneARN(s string) bool {
 	if s == "*" {
 		return true
 	}
-	f, ok := arnFields(s)
-	return ok && (f[1] == "aws" || strings.HasPrefix(f[1], "aws-")) &&
-		f[2] == "iam" && f[4] == "*" && f[5] == "root"
-}
-
-// arnFields splits an ARN into its six fields — arn, partition, service,
-// region, account, resource — reporting false for a value not shaped like
-// one. The resource field keeps any colons of its own.
-func arnFields(v string) ([]string, bool) {
-	f := strings.SplitN(v, ":", 6)
-	if len(f) != 6 || f[0] != "arn" {
-		return nil, false
-	}
-	return f, true
+	a, err := arn.Parse(s)
+	return err == nil && (a.Partition == "aws" || strings.HasPrefix(a.Partition, "aws-")) &&
+		a.Service == "iam" && a.AccountID == "*" && a.Resource == "root"
 }
 
 func parseCondition(v any) map[string]map[string][]string {

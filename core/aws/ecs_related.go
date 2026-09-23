@@ -5,11 +5,11 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -39,7 +39,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 		rawSvc, svcOk := assertStruct[ecstypes.Service](svcRes.RawStruct)
 		if svcOk && rawSvc.ClusterArn != nil {
 			arnVal := *rawSvc.ClusterArn
-			if (clusterArn != "" && arnVal == clusterArn) || strings.HasSuffix(arnVal, "/"+clusterName) {
+			if name, _ := ecsRefToID(arnVal, domain.RefContext{}); (clusterArn != "" && arnVal == clusterArn) || clusterName != "" && name == clusterName {
 				ids = append(ids, svcRes.ID)
 				continue
 			}

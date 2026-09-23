@@ -13,9 +13,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// cwLogsMetricFilterFake implements CWLogsAPI for logs enrichment testing.
-// It embeds the interface and overrides only DescribeMetricFilters.
-// The results map is keyed by LogGroupName.
+// cwLogsMetricFilterFake implements CWLogsAPI for logs enrichment testing:
+// DescribeMetricFilters answers from filtersByGroup, keyed by LogGroupName,
+// and DescribeLogStreams answers as for groups that hold no streams yet.
 type cwLogsMetricFilterFake struct {
 	awsclient.CWLogsAPI
 
@@ -34,6 +34,14 @@ func (f *cwLogsMetricFilterFake) DescribeMetricFilters(
 	}
 	filters := f.filtersByGroup[name]
 	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
+}
+
+func (f *cwLogsMetricFilterFake) DescribeLogStreams(
+	_ context.Context,
+	_ *cloudwatchlogs.DescribeLogStreamsInput,
+	_ ...func(*cloudwatchlogs.Options),
+) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+	return &cloudwatchlogs.DescribeLogStreamsOutput{}, nil
 }
 
 var _ awsclient.CWLogsAPI = (*cwLogsMetricFilterFake)(nil)
