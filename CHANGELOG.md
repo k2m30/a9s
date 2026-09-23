@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.58.1] - 2026-09-23
+
 ### Fixed
 
 - An EC2 instance whose subnet sends its default route to a VPC endpoint (a
@@ -75,8 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   member AWS does not list as the writer, no longer reads `no writer: reads
   only`: it is read-only by design. A global primary without a writer still
   does. When the global database member list cannot be read, such a cluster
-  gets no verdict and DB Clusters reports the list as partial. A Neptune DB instance's DB Clusters pivot now shows 0 instead of a
-  cluster DB Clusters does not list.
+  gets no verdict and DB Clusters reports the list as partial. A Neptune DB
+  instance's DB Clusters pivot now shows 0 instead of a cluster DB Clusters
+  does not list.
 - VPC endpoints in a pending-acceptance, pending, deleting, deleted, rejected,
   failed, expired or partial state now show that state and its colour. AWS
   sends the state in lower case and the check compared it with capitalised
