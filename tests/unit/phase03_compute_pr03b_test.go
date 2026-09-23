@@ -14,7 +14,8 @@ package unit_test
 // types_containers.go / types_networking.go):
 //
 //   lambda: Active→healthy, Pending→SevWarn, Failed→SevBroken, Inactive→SevDim
-//           (fetcher writes Fields["state"] + emits Finding for non-Active)
+//           (ListFunctions carries no State; the wave-2 GetFunction read
+//           writes Fields["state"] and emits the Finding for non-Active)
 //   eks:    ACTIVE→healthy, CREATING/UPDATING→SevWarn, FAILED→SevBroken,
 //           DELETING→no Finding (lifecycle terminal)
 //   asg:    ""→healthy, "Delete in progress"→SevWarn (only Status source);
@@ -35,6 +36,9 @@ package unit_test
 
 import (
 	"context"
+	"maps"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -52,6 +56,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // =============================================================================
@@ -66,27 +71,14 @@ import (
 // structural check (see TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding for
 // that branch on its own).
 func TestPR03b_LambdaFetcher_ActiveEmitsNoFinding(t *testing.T) {
-	mock := &pr03bLambdaMock{
-		fns: []lambdatypes.FunctionConfiguration{
-			{
-				FunctionName: aws.String("my-api-handler"),
-				Runtime:      lambdatypes.RuntimeNodejs20x,
-				State:        lambdatypes.StateActive,
-				DeadLetterConfig: &lambdatypes.DeadLetterConfig{
-					TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:my-api-handler-dlq"),
-				},
-			},
+	r := pr03bLambdaRow(t, lambdatypes.FunctionConfiguration{
+		FunctionName: aws.String("my-api-handler"),
+		Runtime:      lambdatypes.RuntimeNodejs24x,
+		State:        lambdatypes.StateActive,
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:my-api-handler-dlq"),
 		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
-	if err != nil {
-		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	r := result.Resources[0]
+	})
 
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for Active state", len(r.Findings))
@@ -105,7 +97,7 @@ func TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding(t *testing.T) {
 		fns: []lambdatypes.FunctionConfiguration{
 			{
 				FunctionName: aws.String("no-dlq-handler"),
-				Runtime:      lambdatypes.RuntimeNodejs20x,
+				Runtime:      lambdatypes.RuntimeNodejs24x,
 				State:        lambdatypes.StateActive,
 			},
 		},
@@ -133,27 +125,18 @@ func TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03b_LambdaFetcher_FailedEmitsBrokenFinding asserts that a Failed lambda
-// function emits one SevBroken Finding with CodeLambdaStateFailed.
+// function emits one SevBroken Finding with CodeLambdaStateFailed, from the
+// wave-2 GetFunction read.
 func TestPR03b_LambdaFetcher_FailedEmitsBrokenFinding(t *testing.T) {
-	mock := &pr03bLambdaMock{
-		fns: []lambdatypes.FunctionConfiguration{
-			{
-				FunctionName: aws.String("broken-processor"),
-				Runtime:      lambdatypes.RuntimePython312,
-				State:        lambdatypes.StateFailed,
-				StateReason:  aws.String("function failed to deploy"),
-			},
+	r := pr03bLambdaRow(t, lambdatypes.FunctionConfiguration{
+		FunctionName: aws.String("broken-processor"),
+		Runtime:      lambdatypes.RuntimePython312,
+		State:        lambdatypes.StateFailed,
+		StateReason:  aws.String("function failed to deploy"),
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:broken-processor-dlq"),
 		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
-	if err != nil {
-		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	r := result.Resources[0]
+	})
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for Failed state", len(r.Findings))
@@ -165,8 +148,8 @@ func TestPR03b_LambdaFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken", f.Severity)
 	}
-	if f.Source != "wave1" {
-		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+	if !strings.HasPrefix(f.Source, "wave2") {
+		t.Errorf("Findings[0].Source: got %q, want a wave2 source", f.Source)
 	}
 }
 
@@ -174,7 +157,10 @@ func TestPR03b_LambdaFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 // lambda mock
 // ---------------------------------------------------------------------------
 
+// pr03bLambdaMock answers as Lambda does: ListFunctions without State or
+// LastUpdateStatus, GetFunction with them, no resource policy, no URL.
 type pr03bLambdaMock struct {
+	awsclient.LambdaAPI
 	fns []lambdatypes.FunctionConfiguration
 }
 
@@ -183,7 +169,53 @@ func (m *pr03bLambdaMock) ListFunctions(
 	_ *lambdasvc.ListFunctionsInput,
 	_ ...func(*lambdasvc.Options),
 ) (*lambdasvc.ListFunctionsOutput, error) {
-	return &lambdasvc.ListFunctionsOutput{Functions: m.fns}, nil
+	out := make([]lambdatypes.FunctionConfiguration, len(m.fns))
+	for i, fn := range m.fns {
+		fn.State, fn.StateReason, fn.LastUpdateStatus = "", nil, ""
+		out[i] = fn
+	}
+	return &lambdasvc.ListFunctionsOutput{Functions: out}, nil
+}
+
+func (m *pr03bLambdaMock) GetFunction(_ context.Context, in *lambdasvc.GetFunctionInput, _ ...func(*lambdasvc.Options)) (*lambdasvc.GetFunctionOutput, error) {
+	for _, fn := range m.fns {
+		if aws.ToString(fn.FunctionName) == aws.ToString(in.FunctionName) {
+			return &lambdasvc.GetFunctionOutput{Configuration: &fn}, nil
+		}
+	}
+	return nil, lambdaNotFound()
+}
+
+func (m *pr03bLambdaMock) GetPolicy(_ context.Context, _ *lambdasvc.GetPolicyInput, _ ...func(*lambdasvc.Options)) (*lambdasvc.GetPolicyOutput, error) {
+	return nil, lambdaNotFound()
+}
+
+func (m *pr03bLambdaMock) ListFunctionUrlConfigs(_ context.Context, _ *lambdasvc.ListFunctionUrlConfigsInput, _ ...func(*lambdasvc.Options)) (*lambdasvc.ListFunctionUrlConfigsOutput, error) {
+	return &lambdasvc.ListFunctionUrlConfigsOutput{}, nil
+}
+
+// pr03bLambdaRow fetches fn through the list call and folds the type's wave-2
+// pass onto the row, the way the app does.
+func pr03bLambdaRow(t *testing.T, fn lambdatypes.FunctionConfiguration) resource.Resource {
+	t.Helper()
+	mock := &pr03bLambdaMock{fns: []lambdatypes.FunctionConfiguration{fn}}
+	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	wave2, err := awsclient.EnrichLambdaPosture(context.Background(), &awsclient.ServiceClients{Lambda: mock}, result.Resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichLambdaPosture: unexpected error: %v", err)
+	}
+	r := result.Resources[0]
+	r.Fields = maps.Clone(r.Fields)
+	maps.Copy(r.Fields, wave2.FieldUpdates[r.ID])
+	td := resource.FindResourceType("lambda")
+	a9sruntime.ApplyWave2ToRow(&r, *td, wave2.Findings, wave2.AttentionDetails)
+	return r
 }
 
 // =============================================================================
@@ -1141,30 +1173,20 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 // =============================================================================
 
 // TestPR03b_LambdaFetcher_InactiveEmitsDimFinding pins that Lambda Inactive
-// state is treated as lifecycle-class: it is surfaced as a SevDim wave1
+// state is treated as lifecycle-class: it is surfaced as a SevDim wave2
 // Finding (CodeLambdaInactive), not SevWarn/SevBroken. SevDim keeps it out
 // of the issue badge / ctrl+z filter (those only count SevBroken) while
 // still making the state visible on the list/Attention surfaces.
 func TestPR03b_LambdaFetcher_InactiveEmitsDimFinding(t *testing.T) {
-	mock := &pr03bLambdaMock{
-		fns: []lambdatypes.FunctionConfiguration{
-			{
-				FunctionName: aws.String("evicted-worker"),
-				Runtime:      lambdatypes.RuntimeNodejs20x,
-				State:        lambdatypes.StateInactive,
-				StateReason:  aws.String("The function was not invoked for 14 days"),
-			},
+	r := pr03bLambdaRow(t, lambdatypes.FunctionConfiguration{
+		FunctionName: aws.String("evicted-worker"),
+		Runtime:      lambdatypes.RuntimeNodejs24x,
+		State:        lambdatypes.StateInactive,
+		StateReason:  aws.String("The function was not invoked for 14 days"),
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:evicted-worker-dlq"),
 		},
-	}
-
-	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
-	if err != nil {
-		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	r := result.Resources[0]
+	})
 
 	if len(r.Findings) != 1 {
 		t.Errorf("Inactive function: Findings = %d, want 1 (CodeLambdaInactive, SevDim)", len(r.Findings))
@@ -1197,16 +1219,13 @@ func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
 // Lambda state registered in GetFieldKeys
 // =============================================================================
 
-// TestPR03b_LambdaFields_StateRegistered asserts that "state" is declared in the
-// Lambda SetFieldKeysForTest call. The Lambda fetcher writes Fields["state"] for
-// every function (used by Color's lifecycle-class branch); the key must be
-// registered to flow through column projections correctly.
+// ListFunctions returns no State, so the wave-2 GetFunction read is its only
+// writer, and a wave-1 rows write must carry it rather than blank it.
 func TestPR03b_LambdaFields_StateRegistered(t *testing.T) {
-	keys := resource.GetFieldKeys("lambda")
-	for _, k := range keys {
-		if k == "state" {
-			return
-		}
+	if keys := resource.GetIssueEnricherFieldKeys("lambda"); !slices.Contains(keys, "state") {
+		t.Errorf("lambda IssueEnricherFieldKeys must include \"state\"; registered keys: %v", keys)
 	}
-	t.Errorf("lambda SetFieldKeysForTest must include \"state\" (written by FetchLambdaFunctions per PR-03b); registered keys: %v", keys)
+	if keys := resource.GetFieldKeys("lambda"); slices.Contains(keys, "state") {
+		t.Errorf("lambda FieldKeys must not include \"state\", which no wave-1 fetch writes; registered keys: %v", keys)
+	}
 }

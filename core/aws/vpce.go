@@ -170,27 +170,29 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 // exposure, so the posture finding is suppressed there. colorVPCE runs this
 // over Fields for rows built outside the fetcher, which is why it takes the
 // exposure verdict as the word the fetcher writes rather than the document.
+// DescribeVpcEndpoints sends the state lower-camel ("pendingAcceptance"),
+// not in the SDK enum constants' spelling ("PendingAcceptance").
 func vpceFindings(state, policyExposure string) []domain.Finding {
 	var findings []domain.Finding
 	switch state {
-	case "PendingAcceptance":
+	case "pendingAcceptance":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStatePendingAcceptance)}
-	case "Pending":
+	case "pending":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStatePending)}
-	case "Deleting":
+	case "deleting":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleting)}
-	case "Failed":
+	case "failed":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStateFailed)}
-	case "Rejected":
+	case "rejected":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStateRejected)}
-	case "Expired":
+	case "expired":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStateExpired)}
-	case "Partial":
+	case "partial":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStatePartial)}
-	case "Deleted":
+	case "deleted":
 		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleted)}
 	}
-	if policyExposure == "open" && state != "Deleting" && state != "Deleted" {
+	if policyExposure == "open" && state != "deleting" && state != "deleted" {
 		findings = append(findings, wave1Finding(CodeVPCEPolicyOpen))
 	}
 	return findings

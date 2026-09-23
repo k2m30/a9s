@@ -577,7 +577,8 @@ func (m *pr03dNATMock) DescribeNatGateways(
 // =============================================================================
 
 // TestPR03d_VPCEFetcher_PendingEmitsWarnFinding asserts that a VPC endpoint
-// in "Pending" state emits one SevWarn Finding with CodeVPCEStatePending.
+// in the "pending" state, spelled as DescribeVpcEndpoints sends it, emits one
+// SevWarn Finding with CodeVPCEStatePending.
 func TestPR03d_VPCEFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	mock := &pr03dVPCEMock{
 		endpoints: []ec2types.VpcEndpoint{
@@ -585,7 +586,7 @@ func TestPR03d_VPCEFetcher_PendingEmitsWarnFinding(t *testing.T) {
 				VpcEndpointId:   aws.String("vpce-0abc1234pending56"),
 				ServiceName:     aws.String("com.amazonaws.us-east-1.s3"),
 				VpcEndpointType: ec2types.VpcEndpointTypeInterface,
-				State:           ec2types.StatePending,
+				State:           ec2types.State("pending"),
 				VpcId:           aws.String("vpc-01234abcd"),
 			},
 		},
@@ -616,7 +617,8 @@ func TestPR03d_VPCEFetcher_PendingEmitsWarnFinding(t *testing.T) {
 }
 
 // TestPR03d_VPCEFetcher_FailedEmitsBrokenFinding asserts that a VPC endpoint
-// in "Failed" state emits one SevBroken Finding with CodeVPCEStateFailed.
+// in the "failed" state, spelled as DescribeVpcEndpoints sends it, emits one
+// SevBroken Finding with CodeVPCEStateFailed.
 func TestPR03d_VPCEFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	mock := &pr03dVPCEMock{
 		endpoints: []ec2types.VpcEndpoint{
@@ -624,7 +626,7 @@ func TestPR03d_VPCEFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 				VpcEndpointId:   aws.String("vpce-0def5678failed90"),
 				ServiceName:     aws.String("com.amazonaws.us-east-1.ec2"),
 				VpcEndpointType: ec2types.VpcEndpointTypeInterface,
-				State:           ec2types.StateFailed,
+				State:           ec2types.State("failed"),
 				VpcId:           aws.String("vpc-01234abcd"),
 			},
 		},

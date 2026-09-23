@@ -270,10 +270,11 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This image was never scanned, so nothing is known about the vulnerabilities it carries, and an unscanned image is not a clean one. Read the failure and the scanning mode in use: a basic scan can be started again for the image once the cause is fixed, while an enhanced scan is a registry and Inspector configuration problem rather than an image one."},
+			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The last scan of this image failed, so nothing is known about the vulnerabilities it carries, and an image whose scan failed is not a clean one. Read the scan status description for the cause: a basic scan can be started again for the image once it is fixed, while an enhanced scan is a registry and Inspector configuration problem rather than an image one."},
 			{Code: CodeECRImageCritical, Phrase: "<N> critical vulnerabilities", Severity: domain.SevBroken, Source: "wave1", Detail: "The scan found vulnerabilities at critical severity in this image, and any container running it is exposed to them right now. Rebuild on a patched base image and redeploy the workloads using this tag or digest."},
 			{Code: CodeECRImageHigh, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave1", Detail: "The scan found high-severity vulnerabilities in this image's layers. Fold a rebuild on an updated base image into the next deployment rather than shipping this one forward again."},
 			{Code: CodeECRImageUntagged, Phrase: "untagged", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeECRImageScanUnread, Phrase: "scan results not read", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{

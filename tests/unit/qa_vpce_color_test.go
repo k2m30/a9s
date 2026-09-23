@@ -12,20 +12,22 @@ func TestVpceColor(t *testing.T) {
 		t.Fatal("vpce not registered")
 	}
 
+	// DescribeVpcEndpoints sends the state lower-camel; the SDK constants'
+	// capitalised spelling never arrives on the wire.
 	cases := []struct {
 		name  string
 		state string
 		want  resource.Color
 	}{
-		{name: "Available", state: "Available", want: resource.ColorHealthy},
-		{name: "PendingAcceptance", state: "PendingAcceptance", want: resource.ColorWarning},
-		{name: "Pending", state: "Pending", want: resource.ColorWarning},
-		{name: "Deleting", state: "Deleting", want: resource.ColorWarning},
-		{name: "Failed", state: "Failed", want: resource.ColorBroken},
-		{name: "Rejected", state: "Rejected", want: resource.ColorBroken},
-		{name: "Expired", state: "Expired", want: resource.ColorBroken},
-		{name: "Partial", state: "Partial", want: resource.ColorBroken},
-		{name: "Deleted", state: "Deleted", want: resource.ColorDim},
+		{name: "available", state: "available", want: resource.ColorHealthy},
+		{name: "pendingAcceptance", state: "pendingAcceptance", want: resource.ColorWarning},
+		{name: "pending", state: "pending", want: resource.ColorWarning},
+		{name: "deleting", state: "deleting", want: resource.ColorWarning},
+		{name: "failed", state: "failed", want: resource.ColorBroken},
+		{name: "rejected", state: "rejected", want: resource.ColorBroken},
+		{name: "expired", state: "expired", want: resource.ColorBroken},
+		{name: "partial", state: "partial", want: resource.ColorBroken},
+		{name: "deleted", state: "deleted", want: resource.ColorDim},
 		{name: "empty", state: "", want: resource.ColorHealthy},
 	}
 

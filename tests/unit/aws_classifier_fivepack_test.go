@@ -216,16 +216,42 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	}
 }
 
+// fakeLambdaFivepack answers as Lambda does: ListFunctions without State or
+// LastUpdateStatus, GetFunction with them, no resource policy, no URL.
 type fakeLambdaFivepack struct {
+	awsclient.LambdaAPI
 	functions []lambdatypes.FunctionConfiguration
 }
 
 func (f *fakeLambdaFivepack) ListFunctions(_ context.Context, _ *lambda.ListFunctionsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error) {
-	return &lambda.ListFunctionsOutput{Functions: f.functions}, nil
+	out := make([]lambdatypes.FunctionConfiguration, len(f.functions))
+	for i, fn := range f.functions {
+		fn.State, fn.LastUpdateStatus = "", ""
+		out[i] = fn
+	}
+	return &lambda.ListFunctionsOutput{Functions: out}, nil
+}
+
+func (f *fakeLambdaFivepack) GetFunction(_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	for _, fn := range f.functions {
+		if aws.ToString(fn.FunctionName) == aws.ToString(in.FunctionName) {
+			return &lambda.GetFunctionOutput{Configuration: &fn}, nil
+		}
+	}
+	return nil, lambdaNotFound()
+}
+
+func (f *fakeLambdaFivepack) GetPolicy(_ context.Context, _ *lambda.GetPolicyInput, _ ...func(*lambda.Options)) (*lambda.GetPolicyOutput, error) {
+	return nil, lambdaNotFound()
+}
+
+func (f *fakeLambdaFivepack) ListFunctionUrlConfigs(_ context.Context, _ *lambda.ListFunctionUrlConfigsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionUrlConfigsOutput, error) {
+	return &lambda.ListFunctionUrlConfigsOutput{}, nil
 }
 
 // TestColorLambda_RealFetcherReachesDimAndHealthy drives the real
-// FetchLambdaFunctionsPage against an Active function that has a
+// FetchLambdaFunctionsPage and the type's wave-2 pass (which reads State
+// through GetFunction) against an Active function that has a
 // DeadLetterConfig set (should classify Healthy) and an Inactive function
 // (should classify Dim per docs/resources/lambda.md
 // "State in Inactive -> Dim"), and asserts the real td.ResolveColor("lambda")
@@ -243,7 +269,7 @@ func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 		{
 			FunctionName:     aws.String("healthy-with-dlq"),
 			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:healthy-with-dlq"),
-			Runtime:          lambdatypes.RuntimeNodejs20x,
+			Runtime:          lambdatypes.RuntimeNodejs24x,
 			State:            lambdatypes.StateActive,
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
@@ -253,7 +279,7 @@ func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 		{
 			FunctionName:     aws.String("idle-inactive"),
 			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:idle-inactive"),
-			Runtime:          lambdatypes.RuntimeNodejs20x,
+			Runtime:          lambdatypes.RuntimeNodejs24x,
 			State:            lambdatypes.StateInactive,
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
@@ -262,16 +288,24 @@ func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 		},
 	}
 
-	fetchResult, err := awsclient.FetchLambdaFunctionsPage(context.Background(), &fakeLambdaFivepack{functions: functions}, "")
+	fake := &fakeLambdaFivepack{functions: functions}
+	fetchResult, err := awsclient.FetchLambdaFunctionsPage(context.Background(), fake, "")
 	if err != nil {
 		t.Fatalf("FetchLambdaFunctionsPage returned error: %v", err)
 	}
 	if len(fetchResult.Resources) != 2 {
 		t.Fatalf("expected 2 fetched Lambda functions, got %d", len(fetchResult.Resources))
 	}
+	wave2, err := awsclient.EnrichLambdaPosture(context.Background(), &awsclient.ServiceClients{Lambda: fake}, fetchResult.Resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichLambdaPosture returned error: %v", err)
+	}
 
 	byID := make(map[string]resource.Resource, len(fetchResult.Resources))
 	for _, r := range fetchResult.Resources {
+		r.Fields = maps.Clone(r.Fields)
+		maps.Copy(r.Fields, wave2.FieldUpdates[r.ID])
+		a9sruntime.ApplyWave2ToRow(&r, *td, wave2.Findings, wave2.AttentionDetails)
 		byID[r.ID] = r
 	}
 

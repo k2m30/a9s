@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +11,7 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -80,10 +82,13 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	if r0.Name != "my-go-function" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-go-function", r0.Name)
 	}
-	// go1.x is a deprecated Lambda runtime, so the structural classifier emits a
-	// wave1 Finding for it (see core/aws/lambda.go isDeprecatedLambdaRuntime).
-	if len(r0.Findings) != 1 {
-		t.Errorf("resource[0].Findings: expected 1 (deprecated go1.x runtime) for Active function, got %d", len(r0.Findings))
+	// go1.x is a deprecated Lambda runtime and the function has no
+	// DeadLetterConfig; the two checks are independent, so both are reported.
+	has := func(code domain.FindingCode) bool {
+		return slices.ContainsFunc(r0.Findings, func(f domain.Finding) bool { return f.Code == code })
+	}
+	if len(r0.Findings) != 2 || !has(awsclient.CodeLambdaDeprecatedRuntime) || !has(awsclient.CodeLambdaNoDLQ) {
+		t.Errorf("resource[0].Findings: expected the deprecated-runtime and no-DLQ findings, got %v", r0.Findings)
 	}
 	if r0.Fields["function_name"] != "my-go-function" {
 		t.Errorf("resource[0].Fields[\"function_name\"]: expected %q, got %q", "my-go-function", r0.Fields["function_name"])

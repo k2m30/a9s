@@ -18,8 +18,8 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `lambda`
 - **Display name**: Lambda Functions
 - **AWS API reference**: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
-- **List API**: `ListFunctions` (returns `FunctionConfiguration` entries — same shape as `GetFunctionConfiguration`; includes `State`, `LastUpdateStatus`, `Runtime`, `DeadLetterConfig`, `VpcConfig`, `Role`, `KMSKeyArn`, `FileSystemConfigs`).
-- **Describe API (if any)**: not used. All Wave 1 fields are already on the `ListFunctions` response — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
+- **List API**: `ListFunctions` (returns `FunctionConfiguration` entries — `Runtime`, `DeadLetterConfig`, `VpcConfig`, `Role`, `KMSKeyArn`, `FileSystemConfigs`; it returns none of `State`, `StateReasonCode` or `LastUpdateStatus`, which the SDK documents as `GetFunction`-only).
+- **Describe API (if any)**: `GetFunction`, once per function in Wave 2, for `State` and `LastUpdateStatus` (§3.2).
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -188,21 +188,9 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 A function that is `Active` with nothing else wrong raises no signal and
 renders green and blank.
 
-- **Signal**: `State` in `Pending`.
-  - **State bucket**: Warning.
-  - **How obtained**: `ListFunctions` response field `State`.
-- **Signal**: `State` in `Inactive`.
-  - **State bucket**: Dim.
-  - **How obtained**: `ListFunctions` response field `State`. (Inactive means the function has been idle and will re-initialize on next invoke.)
-- **Signal**: `State` in `Failed`.
+- **Signal**: `Runtime` whose AWS deprecation date — from the ["Deprecated runtimes" table, or the date the "Supported runtimes" table schedules](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) — is on or before today.
   - **State bucket**: Broken.
-  - **How obtained**: `ListFunctions` response field `State`; reason carried on `StateReason` + `StateReasonCode`.
-- **Signal**: `LastUpdateStatus==Failed`.
-  - **State bucket**: Broken.
-  - **How obtained**: `ListFunctions` response fields `LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
-- **Signal**: `Runtime` in the [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html).
-  - **State bucket**: Broken.
-  - **How obtained**: `ListFunctions` response field `Runtime` compared against the AWS-published deprecated-runtimes list baked into the build.
+  - **How obtained**: `ListFunctions` response field `Runtime`, looked up in the table's identifiers and deprecation dates baked into the build, and the date compared with the current date.
 - **Signal**: `DeadLetterConfig==nil`.
   - **State bucket**: Warning.
   - **How obtained**: `ListFunctions` response field `DeadLetterConfig` (nil means async-invocation failures are silently dropped after retries).
@@ -212,6 +200,26 @@ renders green and blank.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
+`State` and `LastUpdateStatus` come from one `GetFunction` call per function,
+capped at the enrichment cap. A function past the cap, or whose `GetFunction`
+read failed, is not inspected: its Status cell stays empty, never `Active`.
+
+- **Signal**: `State` in `Pending`.
+  - **State bucket**: Warning.
+  - **API call**: `GetFunction` response field `Configuration.State`.
+  - **Cost shape**: per-resource.
+- **Signal**: `State` in `Inactive`.
+  - **State bucket**: Dim.
+  - **API call**: `GetFunction` response field `Configuration.State`. (Inactive means the function has been idle and will re-initialize on next invoke.)
+  - **Cost shape**: per-resource.
+- **Signal**: `State` in `Failed`.
+  - **State bucket**: Broken.
+  - **API call**: `GetFunction` response field `Configuration.State`; reason carried on `StateReason` + `StateReasonCode`.
+  - **Cost shape**: per-resource.
+- **Signal**: `LastUpdateStatus==Failed`.
+  - **State bucket**: Broken.
+  - **API call**: `GetFunction` response fields `Configuration.LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
+  - **Cost shape**: per-resource.
 - **Signal**: the function's resource policy allows a wildcard principal, so any AWS caller can invoke it.
   - A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
@@ -241,10 +249,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State==Pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
-| `State==Inactive` | 1 | Dim | n/a | S2, S4 | `inactive, evicted after extended idle time` |
-| `State==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
-| `LastUpdateStatus==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `last update failed to apply` |
+| `State==Pending` (`GetFunction`) | 2 | Warning | `~` | S2, S3, S4, S5 | `pending` |
+| `State==Inactive` (`GetFunction`) | 2 | Dim | n/a | S2, S4 | `inactive, evicted after extended idle time` |
+| `State==Failed` (`GetFunction`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `LastUpdateStatus==Failed` (`GetFunction`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `last update failed to apply` |
 | `Runtime` deprecated | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `runtime is end-of-life` |
 | `DeadLetterConfig==nil` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no dead-letter queue configured` |
 | credential in `Environment.Variables` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
@@ -332,9 +340,9 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - `vpc` reasoning (VPC the function runs in) — `docs/related-resources.md` § `lambda` bullet `vpc`.
 - `vpc` discovery (`VpcConfig.VpcId`) — AWS SDK Go v2 — lambda/types.VpcConfigResponse § `VpcId`.
 - Wave 1 signals list — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
-- Wave 1 `State` values `Active`/`Pending`/`Inactive`/`Failed` — AWS SDK Go v2 — lambda/types.State § constants.
-- Wave 1 `LastUpdateStatus==Failed` — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `LastUpdateStatus` and lambda/types.LastUpdateStatus § constants.
-- Wave 1 deprecated-runtimes list — AWS docs `lambda/latest/dg/lambda-runtimes.html`; the finding it feeds is `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
+- Wave 2 `State` values `Active`/`Pending`/`Inactive`/`Failed` — AWS SDK Go v2 — lambda/types.State § constants; `ListFunctions` does not return `State` (lambda/types.FunctionConfiguration § `State`: "use GetFunction").
+- Wave 2 `LastUpdateStatus==Failed` — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `LastUpdateStatus` and lambda/types.LastUpdateStatus § constants.
+- Wave 1 runtime deprecation dates — AWS docs `lambda/latest/dg/lambda-runtimes.html` § Deprecated runtimes and § Supported runtimes (fetched 2026-09-23); the finding it feeds is `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 - Wave 1 `DeadLetterConfig==nil` — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `DeadLetterConfig` and lambda/types.DeadLetterConfig § `TargetArn`.
 - The wave-2 resource-policy and function-URL findings — `docs/attention-signals.md § Signals § COMPUTE` row `lambda`.
 - Wave 3 OUT OF SCOPE items — `docs/attention-signals.md § Not yet implemented`.
@@ -348,11 +356,11 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| lambda.last-update.failed | last update failed to apply | broken | wave1 | The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again. |
+| lambda.last-update.failed | last update failed to apply | broken | wave2 | The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again. |
 | lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 | This function runs on a runtime AWS no longer patches, so language and base-image security fixes will never reach it. Existing functions keep being invoked, but AWS first stops you creating new functions on it and then stops you updating this one, which turns an urgent fix into a migration under pressure. Move to a supported runtime version and redeploy while the update path is still open. |
-| lambda.state.pending | pending | warn | wave1 | The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it. |
-| lambda.state.failed | failed | broken | wave1 | The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry. |
-| lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 | — |
+| lambda.state.pending | pending | warn | wave2 | The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it. |
+| lambda.state.failed | failed | broken | wave2 | The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry. |
+| lambda.state.inactive | inactive, evicted after extended idle time | dim | wave2 | — |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed. |
 | lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
 | lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |

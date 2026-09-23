@@ -29,6 +29,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does. When the global database member list cannot be read, such a cluster
   gets no verdict and DB Clusters reports the list as partial. A Neptune DB instance's DB Clusters pivot now shows 0 instead of a
   cluster DB Clusters does not list.
+- VPC endpoints in a pending-acceptance, pending, deleting, deleted, rejected,
+  failed, expired or partial state now show that state and its colour. AWS
+  sends the state in lower case and the check compared it with capitalised
+  names, so every endpoint read as available.
+- A Lambda function's state and last update status now come from `GetFunction`,
+  since the list call does not return them. Failed, pending and inactive
+  functions and failed updates are reported again, and the Status column
+  shows the state. A function the check did not reach (past the inspection
+  cap, or whose read failed) shows no state instead of reading as active.
+- The end-of-life runtime check uses AWS's current runtime deprecation dates,
+  both past and scheduled, and reports a function once its runtime's date has
+  passed. Functions on runtimes such as `nodejs18.x`, `nodejs20.x`,
+  `python3.8`, `python3.9` and `dotnet6` are now reported, and `python3.10`
+  and `dotnet8` will be from their scheduled dates in October and November 2026.
+- ECR vulnerability counts are read through `DescribeImageScanFindings`, for
+  repositories and for the image list, since current Basic Scanning no longer
+  puts them on `DescribeImages`. Critical and high counts and the
+  vulnerability finding appear again. A repository whose scan results could
+  not be read shows no count instead of 0.
+- In the ECR image list, an image whose scan results could not be read shows
+  `?` in Scan Status and Findings and is greyed, instead of looking clean.
+- A Lambda function on an end-of-life runtime without a dead-letter queue now
+  shows both problems; one used to hide the other.
+- A Lambda function's state and last update status no longer go blank when
+  the list is refreshed or saved to the cache before the next state read.
+- The snapshot collector reads Lambda lifecycle fields through `GetFunction`,
+  and for ECR records each image the app inspects (the first ten), its
+  severity counts from `DescribeImageScanFindings` with any read error kept,
+  and the critical and high totals.
 - The snapshot collector no longer writes secret values to `snapshot.json`. Glue job arguments,
   CodeBuild environment variables and pipeline action configurations are recorded by name,
   Parameter Store and Secrets Manager variables by reference, CloudTrail events without their

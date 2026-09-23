@@ -37,12 +37,16 @@ type lambdaFunction struct {
 	LastUpdateStatus           string `json:"last_update_status,omitempty"`
 	LastUpdateStatusReason     string `json:"last_update_status_reason,omitempty"`
 	LastUpdateStatusReasonCode string `json:"last_update_status_reason_code,omitempty"`
-	Runtime                    string `json:"runtime,omitempty"`
-	HasDeadLetterConfig        bool   `json:"has_dead_letter_config"`
+	// GetFunctionErrorCode is set when the GetFunction read failed, so the
+	// lifecycle fields are unknown rather than empty.
+	GetFunctionErrorCode string `json:"get_function_error_code,omitempty"`
+	Runtime              string `json:"runtime,omitempty"`
+	HasDeadLetterConfig  bool   `json:"has_dead_letter_config"`
 }
 
-// captureLambda lists every function (ListFunctions, all pages) and captures
-// the Wave 1 fields already present on FunctionConfiguration.
+// captureLambda lists every function (ListFunctions, all pages) and reads the
+// lifecycle fields from one GetFunction per function: ListFunctions returns
+// none of them.
 func captureLambda(ctx context.Context, cfg aws.Config) (any, error) {
 	client := lambda.NewFromConfig(cfg)
 
@@ -54,18 +58,26 @@ func captureLambda(ctx context.Context, cfg aws.Config) (any, error) {
 			return nil, err
 		}
 		for _, f := range out.Functions {
-			functions = append(functions, lambdaFunction{
-				FunctionName:               aws.ToString(f.FunctionName),
-				FunctionArn:                aws.ToString(f.FunctionArn),
-				State:                      string(f.State),
-				StateReason:                aws.ToString(f.StateReason),
-				StateReasonCode:            string(f.StateReasonCode),
-				LastUpdateStatus:           string(f.LastUpdateStatus),
-				LastUpdateStatusReason:     aws.ToString(f.LastUpdateStatusReason),
-				LastUpdateStatusReasonCode: string(f.LastUpdateStatusReasonCode),
-				Runtime:                    string(f.Runtime),
-				HasDeadLetterConfig:        f.DeadLetterConfig != nil,
-			})
+			fn := lambdaFunction{
+				FunctionName:        aws.ToString(f.FunctionName),
+				FunctionArn:         aws.ToString(f.FunctionArn),
+				Runtime:             string(f.Runtime),
+				HasDeadLetterConfig: f.DeadLetterConfig != nil,
+			}
+			got, err := client.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: f.FunctionName})
+			switch {
+			case err != nil:
+				fn.GetFunctionErrorCode = apiErrorCode(err)
+			case got.Configuration != nil:
+				c := got.Configuration
+				fn.State = string(c.State)
+				fn.StateReason = aws.ToString(c.StateReason)
+				fn.StateReasonCode = string(c.StateReasonCode)
+				fn.LastUpdateStatus = string(c.LastUpdateStatus)
+				fn.LastUpdateStatusReason = aws.ToString(c.LastUpdateStatusReason)
+				fn.LastUpdateStatusReasonCode = string(c.LastUpdateStatusReasonCode)
+			}
+			functions = append(functions, fn)
 		}
 	}
 
@@ -381,24 +393,35 @@ type ecrData struct {
 }
 
 type ecrRepository struct {
-	RepositoryName string         `json:"repository_name"`
-	RepositoryArn  string         `json:"repository_arn"`
-	ScanOnPush     bool           `json:"scan_on_push"`
-	LatestImage    ecrLatestImage `json:"latest_image"`
+	RepositoryName string `json:"repository_name"`
+	RepositoryArn  string `json:"repository_arn"`
+	ScanOnPush     bool   `json:"scan_on_push"`
+	// ImagesErrorCode is set when DescribeImages itself failed.
+	ImagesErrorCode string     `json:"images_error_code,omitempty"`
+	Images          []ecrImage `json:"images"`
+	// The totals are absent when any image's scan results could not be read:
+	// a sum over the readable images is neither the total nor a proven zero.
+	CriticalTotal *int32 `json:"critical_total,omitempty"`
+	HighTotal     *int32 `json:"high_total,omitempty"`
 }
 
-// ecrLatestImage captures the DescribeImages outcome for the most recently
-// pushed image. Outcome "none" means the repo has no images.
-type ecrLatestImage struct {
-	Outcome               string           `json:"outcome"`
-	ErrorCode             string           `json:"error_code,omitempty"`
+// ecrImage is one image the app inspects and its scan counts. ScanErrorCode
+// is set when its scan results could not be read, so its counts are unknown
+// rather than zero.
+type ecrImage struct {
+	ImageDigest           string           `json:"image_digest"`
 	ImagePushedAt         string           `json:"image_pushed_at,omitempty"`
 	FindingSeverityCounts map[string]int32 `json:"finding_severity_counts,omitempty"`
+	ScanErrorCode         string           `json:"scan_error_code,omitempty"`
 }
 
+// ecrImagesPerRepo is the app's ECRImagesPerRepo: the repository pass reads
+// one DescribeImages page of this many images and no further.
+const ecrImagesPerRepo = 10
+
 // captureECR lists every repository (DescribeRepositories, all pages) and
-// captures the Wave 1 scanOnPush flag plus the Wave 2 latest-image scan
-// summary per docs/resources/ecr.md.
+// captures the Wave 1 scanOnPush flag plus the scan evidence the Wave 2
+// repository pass reads, per docs/resources/ecr.md.
 func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecr.NewFromConfig(cfg)
 
@@ -414,56 +437,60 @@ func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 
 	var repositories []ecrRepository
 	for _, r := range repos {
-		scanOnPush := false
-		if r.ImageScanningConfiguration != nil {
-			scanOnPush = r.ImageScanningConfiguration.ScanOnPush
-		}
-		repositories = append(repositories, ecrRepository{
+		repo := ecrRepository{
 			RepositoryName: aws.ToString(r.RepositoryName),
 			RepositoryArn:  aws.ToString(r.RepositoryArn),
-			ScanOnPush:     scanOnPush,
-			LatestImage:    captureLatestECRImage(ctx, client, aws.ToString(r.RepositoryName)),
-		})
+			ScanOnPush:     r.ImageScanningConfiguration != nil && r.ImageScanningConfiguration.ScanOnPush,
+		}
+		captureECRImages(ctx, client, &repo)
+		repositories = append(repositories, repo)
 	}
 
 	return ecrData{Repositories: repositories}, nil
 }
 
-func captureLatestECRImage(ctx context.Context, client *ecr.Client, repoName string) ecrLatestImage {
-	var images []ecrtypes.ImageDetail
-	paginator := ecr.NewDescribeImagesPaginator(client, &ecr.DescribeImagesInput{
-		RepositoryName: aws.String(repoName),
+func captureECRImages(ctx context.Context, client *ecr.Client, repo *ecrRepository) {
+	out, err := client.DescribeImages(ctx, &ecr.DescribeImagesInput{
+		RepositoryName: aws.String(repo.RepositoryName),
+		MaxResults:     aws.Int32(ecrImagesPerRepo),
 	})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-				return ecrLatestImage{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
+	if err != nil {
+		repo.ImagesErrorCode = apiErrorCode(err)
+		return
+	}
+	var critical, high int32
+	complete := true
+	for _, detail := range out.ImageDetails {
+		img := ecrImage{
+			ImageDigest:   aws.ToString(detail.ImageDigest),
+			ImagePushedAt: snapFormatTime(detail.ImagePushedAt),
+		}
+		if detail.ImageScanFindingsSummary != nil {
+			img.FindingSeverityCounts = detail.ImageScanFindingsSummary.FindingSeverityCounts
+		} else {
+			// Basic Scanning leaves DescribeImages without a scan summary;
+			// the counts are only in DescribeImageScanFindings.
+			scan, err := client.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
+				RepositoryName: aws.String(repo.RepositoryName),
+				ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: detail.ImageDigest},
+			})
+			var notScanned *ecrtypes.ScanNotFoundException
+			switch {
+			case errors.As(err, &notScanned):
+			case err != nil:
+				img.ScanErrorCode = apiErrorCode(err)
+				complete = false
+			case scan.ImageScanFindings != nil:
+				img.FindingSeverityCounts = scan.ImageScanFindings.FindingSeverityCounts
 			}
-			return ecrLatestImage{Outcome: "error", ErrorCode: err.Error()}
 		}
-		images = append(images, out.ImageDetails...)
+		critical += img.FindingSeverityCounts[string(ecrtypes.FindingSeverityCritical)]
+		high += img.FindingSeverityCounts[string(ecrtypes.FindingSeverityHigh)]
+		repo.Images = append(repo.Images, img)
 	}
-
-	if len(images) == 0 {
-		return ecrLatestImage{Outcome: "none"}
+	if complete {
+		repo.CriticalTotal, repo.HighTotal = &critical, &high
 	}
-
-	latest := images[0]
-	for _, img := range images[1:] {
-		if img.ImagePushedAt != nil && (latest.ImagePushedAt == nil || img.ImagePushedAt.After(*latest.ImagePushedAt)) {
-			latest = img
-		}
-	}
-
-	result := ecrLatestImage{
-		Outcome:       "found",
-		ImagePushedAt: snapFormatTime(latest.ImagePushedAt),
-	}
-	if latest.ImageScanFindingsSummary != nil {
-		result.FindingSeverityCounts = latest.ImageScanFindingsSummary.FindingSeverityCounts
-	}
-	return result
 }
 
 // ---------------------------------------------------------------------------

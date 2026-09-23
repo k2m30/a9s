@@ -4,11 +4,13 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
@@ -16,11 +18,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchECRImages calls the ECR DescribeImages API and converts the response into
-// a FetchResult with pagination support. A single API call is made per invocation;
-// images are sorted by push time (newest first) before being returned. IsTruncated
-// and NextToken are forwarded as pagination metadata for the caller to request the
-// next page.
+// FetchECRImages calls the ECR DescribeImages API once per invocation, reads
+// each image's scan results through DescribeImageScanFindings, and converts the
+// response into a FetchResult with pagination support. Images are sorted by
+// push time (newest first) before being returned. IsTruncated and NextToken
+// are forwarded as pagination metadata for the caller to request the next page.
 func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map[string]string, continuationToken string) (resource.FetchResult, error) {
 	repositoryName := parentCtx["repository_name"]
 	repositoryURI := parentCtx["repository_uri"]
@@ -60,9 +62,25 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 		return pageImages[i].ImagePushedAt.After(*pageImages[j].ImagePushedAt)
 	})
 
+	scanAPI, _ := api.(ECRDescribeImageScanFindingsAPI)
+	unread := make([]bool, len(pageImages))
+	if err := ForEachParallel(ctx, len(pageImages), EnrichmentParallelism, func(i int) {
+		unread[i] = ecrReadScanResults(ctx, scanAPI, repositoryName, &pageImages[i]) != nil
+	}); err != nil {
+		return resource.FetchResult{}, fmt.Errorf("reading scan results for %s: %w", repositoryName, err)
+	}
+
 	resources := make([]resource.Resource, 0, len(pageImages))
-	for _, img := range pageImages {
-		resources = append(resources, convertECRImage(img, repositoryURI, repositoryName))
+	for i, img := range pageImages {
+		r := convertECRImage(img, repositoryURI, repositoryName)
+		if unread[i] {
+			// Not inspected, not clean: the scan results exist but could not
+			// be read, so the counts are unknown rather than empty.
+			r.Fields["scan_status"] = "?"
+			r.Fields["finding_counts"] = "?"
+			r.Findings = append(r.Findings, wave1Finding(CodeECRImageScanUnread))
+		}
+		resources = append(resources, r)
 	}
 
 	nextToken := ""
@@ -86,6 +104,38 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// ecrReadScanResults fills img's scan status and severity summary from
+// DescribeImageScanFindings: under Basic Scanning DescribeImages leaves both
+// empty. An image that already carries a summary is left as it is, and so is
+// one never scanned (ScanNotFoundException). A nil api is a client that
+// predates the call and reads nothing.
+func ecrReadScanResults(ctx context.Context, api ECRDescribeImageScanFindingsAPI, repo string, img *ecrtypes.ImageDetail) error {
+	if img.ImageScanFindingsSummary != nil || api == nil {
+		return nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImageScanFindingsOutput, error) {
+		return api.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
+			RepositoryName: aws.String(repo),
+			ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
+		})
+	})
+	if _, notScanned := errors.AsType[*ecrtypes.ScanNotFoundException](err); notScanned {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	img.ImageScanStatus = out.ImageScanStatus
+	if f := out.ImageScanFindings; f != nil {
+		img.ImageScanFindingsSummary = &ecrtypes.ImageScanFindingsSummary{
+			FindingSeverityCounts:        f.FindingSeverityCounts,
+			ImageScanCompletedAt:         f.ImageScanCompletedAt,
+			VulnerabilitySourceUpdatedAt: f.VulnerabilitySourceUpdatedAt,
+		}
+	}
+	return nil
 }
 
 // convertECRImage converts a single ecrtypes.ImageDetail into a generic Resource.

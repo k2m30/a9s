@@ -34,29 +34,25 @@ const (
 	ecrCodeNoLifecyclePolicy domain.FindingCode = "ecr.no-lifecycle-policy"
 )
 
-// ECRImagesPerRepo caps how many recent images are inspected per repository.
-// DescribeImages returns ImageScanFindingsSummary inline, so the enricher pays
-// exactly one AWS call per repo regardless of how many images it samples —
-// keeping the wave-2 N+1 budget. This value caps how many images are
-// included in the single DescribeImages response; AWS returns the most
-// recent images by default.
+// ECRImagesPerRepo caps how many images are inspected per repository: one
+// DescribeImages call returns at most this many, and each is then read through
+// DescribeImageScanFindings.
 const ECRImagesPerRepo = 10
 
-// EnrichECRRepository issues ONE DescribeImages call per repository with
-// maxResults=ECRImagesPerRepo and aggregates CRITICAL / HIGH counts from
-// ImageDetails[].ImageScanFindingsSummary.FindingSeverityCounts — which AWS
-// populates inline when scan-on-push is enabled on the repo.
-//
-// Wave-2 budget: 1 call per repo (N), 0 ancillary per-image calls.
+// EnrichECRRepository issues one DescribeImages call per repository with
+// maxResults=ECRImagesPerRepo, reads each image's scan results through
+// DescribeImageScanFindings (ecrReadScanResults) and aggregates the CRITICAL
+// and HIGH counts.
 //
 // Findings:
 //   - Any CRITICAL across scanned images → "!" severity.
 //   - Any HIGH (no CRITICAL) → "~" severity.
 //
 // fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
-// Per-repo errors aggregate into a composite returned error.
-// Repositories without scan data (unscanned images) contribute zero counts
-// silently — AWS returns a nil ImageScanFindingsSummary for those.
+// Per-repo errors aggregate into a composite returned error. An image never
+// scanned contributes nothing; a repository with an image whose scan results
+// could not be read gets no count at all and is marked not inspected, since
+// the counts it would show are neither the total nor a proven zero.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -70,6 +66,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	if !ok {
 		return result, nil
 	}
+	scanAPI, _ := clients.ECR.(ECRDescribeImageScanFindingsAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	truncated := false
@@ -90,8 +87,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		total++
 		mu.Unlock()
 
-		// ONE call per repo. Returns up to ECRImagesPerRepo most-recent images
-		// with ImageScanFindingsSummary populated inline.
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImagesOutput, error) {
 			return describeAPI.DescribeImages(ctx, &ecr.DescribeImagesInput{
 				RepositoryName: aws.String(repoName),
@@ -104,6 +99,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			mu.Unlock()
 			return
+		}
+		var scanErr error
+		for j := range out.ImageDetails {
+			if scanErr = ecrReadScanResults(ctx, scanAPI, repoName, &out.ImageDetails[j]); scanErr != nil {
+				break
+			}
 		}
 
 		// The two policy reads are issued before the lock is taken: holding it
@@ -130,6 +131,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, lifecycleErr)
 		case noLifecyclePolicy:
 			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, nil)
+		}
+
+		if scanErr != nil {
+			truncated = true
+			MarkSkipped(&result, r.ID, &failures, scanErr)
+			return
 		}
 
 		scannedCount := 0

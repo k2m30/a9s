@@ -40,17 +40,14 @@ type ECRDescribeImagesAPI interface {
 	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
 }
 
-// ECRDescribeImageScanFindingsAPI defines the interface for the ECR DescribeImageScanFindings operation.
-// Used by the Wave 2 EnrichECRRepository enricher.
+// ECRDescribeImageScanFindingsAPI defines the interface for the ECR
+// DescribeImageScanFindings operation, read by EnrichECRRepository and the
+// ecr_images child view for each image's scan results. Standalone rather than
+// part of the aggregate for the same reason as ECRGetLifecyclePolicyAPI: both
+// callers type-assert for it, and a partial client that lacks it reads no
+// scan results instead of panicking on an inherited nil method.
 type ECRDescribeImageScanFindingsAPI interface {
 	DescribeImageScanFindings(ctx context.Context, params *ecr.DescribeImageScanFindingsInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error)
-}
-
-// ECRListImagesAPI defines the interface for the ECR ListImages operation.
-// Used by the Wave 2 EnrichECRRepository enricher to enumerate image IDs per repository
-// before calling DescribeImageScanFindings on each image.
-type ECRListImagesAPI interface {
-	ListImages(ctx context.Context, params *ecr.ListImagesInput, optFns ...func(*ecr.Options)) (*ecr.ListImagesOutput, error)
 }
 
 // ECRGetLifecyclePolicyAPI defines the interface for the ECR
@@ -72,6 +69,5 @@ type ECRGetLifecyclePolicyAPI interface {
 type ECRAPI interface {
 	ECRDescribeRepositoriesAPI
 	ECRDescribeImagesAPI
-	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
-	ECRListTagsForResourceAPI       // related-panel: ecr→cfn
+	ECRListTagsForResourceAPI // related-panel: ecr→cfn
 }

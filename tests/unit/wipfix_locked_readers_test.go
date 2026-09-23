@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // Every method that reads the cost store's shared state, driven against a
-// writer, plus the map one of them hands out. And the Lambda verification is
-// asked for once per row that needs one, and not at all for a row whose read
-// failed outright.
+// writer, plus the map one of them hands out. And the Lambda GetFunction read
+// is made exactly once per row, whatever the policy read answered.
 package unit_test
 
 import (
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -88,8 +88,8 @@ func TestAttrs_HandsOutACopy(t *testing.T) {
 	}
 }
 
-// A row whose policy read failed outright has nothing for the verifier to
-// settle, and must not pay for a call.
+// GetFunction is the lifecycle read and runs once for every function; a
+// denied policy read still leaves the row uninspected.
 type lambdaRealErrFake struct {
 	awsclient.LambdaAPI
 	verified *int
@@ -105,25 +105,24 @@ func (f *lambdaRealErrFake) ListFunctionUrlConfigs(context.Context, *lambda.List
 
 func (f *lambdaRealErrFake) GetFunction(context.Context, *lambda.GetFunctionInput, ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
 	*f.verified++
-	return &lambda.GetFunctionOutput{}, nil
+	return &lambda.GetFunctionOutput{Configuration: &lambdatypes.FunctionConfiguration{State: lambdatypes.StateActive}}, nil
 }
 
-func TestEnrichLambdaPosture_RealErrorNeverReachesTheVerifier(t *testing.T) {
+func TestEnrichLambdaPosture_RealErrorStillMarksTheRowUninspected(t *testing.T) {
 	verified := 0
 	res, _ := awsclient.EnrichLambdaPosture(context.Background(),
 		&awsclient.ServiceClients{Lambda: &lambdaRealErrFake{verified: &verified}},
 		[]resource.Resource{{ID: "example-fn", Name: "example-fn",
 			Fields: map[string]string{"function_name": "example-fn"}}}, nil)
-	if verified != 0 {
-		t.Errorf("GetFunction was called %d time(s) for a row whose policy read failed outright — "+
-			"there is nothing for it to settle", verified)
+	if verified != 1 {
+		t.Errorf("GetFunction was called %d time(s), want exactly 1", verified)
 	}
 	if _, marked := res.TruncatedIDs["example-fn"]; !marked {
 		t.Error("a row whose policy read was denied is not marked uninspected")
 	}
 }
 
-// Every row that needs a verification gets exactly one.
+// Every row gets exactly one GetFunction read.
 type lambdaCountingVerifier struct {
 	awsclient.LambdaAPI
 	mu    sync.Mutex
@@ -142,7 +141,7 @@ func (f *lambdaCountingVerifier) GetFunction(_ context.Context, in *lambda.GetFu
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls[*in.FunctionName]++
-	return &lambda.GetFunctionOutput{}, nil
+	return &lambda.GetFunctionOutput{Configuration: &lambdatypes.FunctionConfiguration{State: lambdatypes.StateActive}}, nil
 }
 
 func TestEnrichLambdaPosture_OneVerificationPerRowThatNeedsIt(t *testing.T) {

@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: ECR Repositories
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html>
 - **List API**: `DescribeRepositories` (returns `Repository` objects with `RepositoryName`, `RepositoryArn`, `RepositoryUri`, `RegistryId`, `CreatedAt`, `ImageTagMutability`, `ImageScanningConfiguration`, `EncryptionConfiguration` — no runtime state field; a repo is always "available" once created).
-- **Describe API (if any)**: `DescribeImages` (per repository, used in Wave 2 to fetch the latest image and read its `imageScanFindingsSummary`).
+- **Describe API (if any)**: `DescribeImages` (per repository, used in Wave 2 to list up to ten images) and `DescribeImageScanFindings` (per image, for its severity counts — Basic Scanning leaves `imageScanFindingsSummary` and `imageScanStatus` empty on `DescribeImages`).
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -101,16 +101,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: latest image by `imagePushedAt` has `imageScanFindingsSummary.findingSeverityCounts.CRITICAL>0` → CRITICAL vulnerabilities present in the most recently pushed image.
+- **Signal**: the repository's images carry `imageScanFindings.findingSeverityCounts.CRITICAL>0` → CRITICAL vulnerabilities present.
   - **State bucket**: Broken.
-  - **API call**: `DescribeImages` — one call per repository (N+1). Client-side sort by `imagePushedAt` descending to pick the latest image; the API itself does not order by time.
+  - **API call**: `DescribeImages` (`maxResults=10`) — one call per repository — then `DescribeImageScanFindings` once per returned image; the counts are summed across those images.
   - **Cost shape**: per-resource.
 
-- **Signal**: latest image `imageScanFindingsSummary.findingSeverityCounts.HIGH>0` (and `CRITICAL==0`) → HIGH-severity vulnerabilities present.
+- **Signal**: the same counts show `HIGH>0` (and `CRITICAL==0`) → HIGH-severity vulnerabilities present.
   - **State bucket**: Warning.
-  - **API call**: same `DescribeImages` response as above — no extra call.
+  - **API call**: the same `DescribeImageScanFindings` answers as above — no extra call.
   - **Cost shape**: per-resource.
-  - Note: `imageScanFindingsSummary` is present only when a scan has run; if absent, no finding is surfaced for this signal.
+  - Note: an image never scanned answers `ScanNotFoundException` and contributes nothing. A repository with an image whose scan results could not be read shows no count and is not inspected — never a proven 0.
 
 - **Signal**: the repository policy grants a wildcard principal.
   - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
@@ -123,7 +123,7 @@ One bullet per distinct signal.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
 
-- OUT OF SCOPE: `DescribeImageScanFindings` per image (full finding detail beyond the summary counts).
+- OUT OF SCOPE: the per-finding list `DescribeImageScanFindings` returns (`imageScanFindings.findings`), beyond its severity counts.
 - OUT OF SCOPE: `GetLifecyclePolicy` per repo (lifecycle policy inspection for cost/retention audit).
 
 ## 4. Issue Visualization
@@ -194,9 +194,9 @@ One bullet per claim in §§2–4.1.
 - Wave 1 signal `scanOnPush==false` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 - `ScanOnPush` field location — `AWS SDK Go v2 — ecr/types.ImageScanningConfiguration § ScanOnPush`.
 - Wave 2 signals `CRITICAL>0` / `HIGH>0` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
-- `imageScanFindingsSummary.findingSeverityCounts` shape — `AWS SDK Go v2 — ecr/types.ImageScanFindingsSummary § FindingSeverityCounts`; `AWS SDK Go v2 — ecr/types.ImageDetail § ImageScanFindingsSummary, ImagePushedAt`.
+- `imageScanFindings.findingSeverityCounts` shape — `AWS SDK Go v2 — ecr/types.ImageScanFindings § FindingSeverityCounts`; `DescribeImages` leaves `ImageScanFindingsSummary` and `ImageScanStatus` empty under the current Basic Scanning — `AWS SDK Go v2 — ecr.DescribeImages` operation doc.
 - Severity mapping (`!` for Broken, `~` for Warning on Healthy-baseline row) — `.claude/skills/a9s-resource-spec/SKILL.md` §"Mapping rules for §4".
-- Wave 3 exclusions (per-image findings, lifecycle policy) — `docs/attention-signals.md § Not yet implemented`.
+- Wave 3 exclusions (the per-finding list, lifecycle policy rule content) — `docs/attention-signals.md § Not yet implemented`.
 - Non-matches (`ecr → ecs`, `ecr → eks`) — `docs/related-resources.md` § Explicitly excluded.
 - Read-only invariant — `docs/architecture.md` §"What is a9s?".
 - Removed stale `ecs` bullet from detailed `ecr` section — `a9s-resource-spec amendment (2026-04-20): contradicted per-type contract and Non-matches section; reason in HTML comment inline.`

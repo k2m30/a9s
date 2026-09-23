@@ -9,4 +9,5 @@ const (
 	CodeECRImageCritical   domain.FindingCode = "ecr_images.broken.critical"
 	CodeECRImageHigh       domain.FindingCode = "ecr_images.warn.high"
 	CodeECRImageUntagged   domain.FindingCode = "ecr_images.dim.untagged"
+	CodeECRImageScanUnread domain.FindingCode = "ecr_images.dim.scan_unread"
 )

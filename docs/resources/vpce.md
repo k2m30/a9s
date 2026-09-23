@@ -18,7 +18,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **shortName**: `vpce`
 - **Display name**: VPC Endpoints
 - **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html>
-- **List API**: `DescribeVpcEndpoints` (returns the full `VpcEndpoint` shape per endpoint, including `VpcEndpointId`, `VpcEndpointType` (`Interface` | `Gateway` | `GatewayLoadBalancer` | `Resource` | `ServiceNetwork`), `State`, `VpcId`, `ServiceName`, `RouteTableIds[]`, `SubnetIds[]`, `Groups[].GroupId`, `NetworkInterfaceIds[]`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags[]`).
+- **List API**: `DescribeVpcEndpoints` (returns the full `VpcEndpoint` shape per endpoint, including `VpcEndpointId`, `VpcEndpointType` (`Interface` | `Gateway` | `GatewayLoadBalancer` | `Resource` | `ServiceNetwork`), `State` (sent lower-camel — `available`, `pendingAcceptance`, `failed` — not in the SDK enum constants' spelling), `VpcId`, `ServiceName`, `RouteTableIds[]`, `SubnetIds[]`, `Groups[].GroupId`, `NetworkInterfaceIds[]`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags[]`).
 - **Describe API (if any)**: not used. Wave 1 signals are sufficient; there is no per-endpoint Describe call in the Wave 2 budget (endpoint-policy semantic analysis and DNS-resolution probes are Wave 3 — see §3.3).
 
 ## 2. Related Resources Panel (detail view, right column)
@@ -89,31 +89,31 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `vpce`
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `State == PendingAcceptance` → Warning.
+- **Signal**: `State == pendingAcceptance` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `State` field on the list-response endpoint (producer hasn't accepted the consumer's PrivateLink request yet).
 
-- **Signal**: `State == Pending` → Warning.
+- **Signal**: `State == pending` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `State` field on the list-response endpoint (endpoint is provisioning).
 
-- **Signal**: `State == Deleting` → Warning.
+- **Signal**: `State == deleting` → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `State` field on the list-response endpoint.
 
-- **Signal**: `State == Failed` → Broken.
+- **Signal**: `State == failed` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `State` field on the list-response endpoint; surface `LastError.Code` + `LastError.Message` as the cause.
 
-- **Signal**: `State == Rejected` → Broken.
+- **Signal**: `State == rejected` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `State` field on the list-response endpoint (producer rejected the consumer's PrivateLink request).
 
-- **Signal**: `State == Expired` → Broken.
+- **Signal**: `State == expired` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `State` field on the list-response endpoint.
 
-- **Signal**: `State == Partial` → Broken.
+- **Signal**: `State == partial` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `State` field on the list-response endpoint (interface endpoint with some AZ ENIs failed to provision — subset of expected ENIs came up).
 
@@ -122,7 +122,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `State == Deleted` → Dim.
+- **Signal**: `State == deleted` → Dim.
   - **State bucket**: Dim.
   - **How obtained**: `State` field on the list-response endpoint.
 
@@ -149,15 +149,15 @@ sentence would restate it. Their S5 cell reads `—`.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == PendingAcceptance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending acceptance` |
-| `State == Pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
-| `State == Deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
-| `State == Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
-| `State == Rejected` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `rejected` |
-| `State == Expired` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expired` |
-| `State == Partial` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `partial` |
+| `State == pendingAcceptance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending acceptance` |
+| `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
+| `State == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `State == rejected` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `rejected` |
+| `State == expired` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `expired` |
+| `State == partial` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `partial` |
 | One `PolicyDocument` statement grants a wildcard action — `*` or a service-wide `s3:*` — on `Resource: "*"` to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint policy open to anyone` |
-| `State == Deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).
 
@@ -183,7 +183,7 @@ At 3am, glancing at the list, a red vpce row reading `failed`, `rejected`, `expi
 - AWS API reference URL, related targets list — `docs/related-resources.md` § Per-type contract row for `vpce` and § `vpce` narrative block.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `VpcEndpoint.VpcEndpointId`, `VpcEndpointType`, `State`, `VpcId`, `ServiceName`, `RouteTableIds`, `SubnetIds`, `Groups[].GroupId`, `NetworkInterfaceIds`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags` field names — `AWS SDK Go v2 — service/ec2/types.VpcEndpoint`.
-- `State` enum values (`PendingAcceptance`, `Pending`, `Available`, `Deleting`, `Deleted`, `Rejected`, `Failed`, `Expired`, `Partial`) — `AWS SDK Go v2 — service/ec2/types.State` (`StatePendingAcceptance`, `StatePending`, `StateAvailable`, `StateDeleting`, `StateDeleted`, `StateRejected`, `StateFailed`, `StateExpired`, `StatePartial`).
+- `State` values as `DescribeVpcEndpoints` sends them (`pendingAcceptance`, `pending`, `available`, `deleting`, `deleted`, `rejected`, `failed`, `expired`, `partial`) — live read-only accounts (2026-09-23); the SDK enum `AWS SDK Go v2 — service/ec2/types.State` (`StatePendingAcceptance`, `StatePending`, …) spells them capitalised (`PendingAcceptance`, `Pending`, …), a spelling the wire never carries.
 - `VpcEndpointType` enum values (`Interface`, `Gateway`, `GatewayLoadBalancer`, `Resource`, `ServiceNetwork`) — `AWS SDK Go v2 — service/ec2/types.VpcEndpointType`.
 - `LastError.{Code, Message}` shape — `AWS SDK Go v2 — service/ec2/types.LastError § Code, Message`.
 - `SecurityGroupIdentifier.GroupId` for the `sg` cross-reference — `AWS SDK Go v2 — service/ec2/types.SecurityGroupIdentifier § GroupId`.

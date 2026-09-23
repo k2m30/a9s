@@ -51,17 +51,18 @@ ecr_images:
 Note on computed fields:
 - `image_tags`: comma-separated tags from `ImageTags[]` (e.g., "v2.3.1, latest"). Untagged images show "<untagged>"
 - `digest_short`: first 12 chars of `ImageDigest` after the `sha256:` prefix (e.g., `a1b2c3d4e5f6`)
-- `finding_counts`: summarized from `ImageScanFindingsSummary.FindingSeverityCounts` (e.g., "0C 2H 5M" for 0 critical, 2 high, 5 medium). Empty if not scanned.
+- `finding_counts`: summarized from the image's `DescribeImageScanFindings` severity counts (e.g., "2H 5M" for 2 high, 5 medium). Empty if never scanned; `?` when the scan results could not be read, with `scan_status` also `?` and the row grey (`scan results not read`).
 
 Source struct: `ecrtypes.ImageDetail`
 
 ## AWS API
 
 - `ecr:DescribeImages` with `repositoryName`
+- `ecr:DescribeImageScanFindings` per image on the page: current Basic Scanning leaves `imageScanFindingsSummary` and `imageScanStatus` off `DescribeImages`
 - Paginated via `nextToken`
 - **Sorting:** Results can be sorted by `imagePushedAt` descending (newest first) using `filter` parameter
 - **Latency:** Fast (<1 second) for repositories with fewer than 500 images. Larger repositories may take 2-3 seconds.
-- **Note:** Finding severity counts come from `ImageScanFindingsSummary` which is populated only if ECR image scanning is enabled for the repository. If not, the Scan Status and Findings columns show "— ".
+- **Note:** Finding severity counts come from `DescribeImageScanFindings`, which answers `ScanNotFoundException` for an image never scanned; the Scan Status and Findings columns are then empty.
 
 ## ASCII Wireframe
 

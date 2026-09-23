@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -18,35 +19,73 @@ import (
 // routes, so the definition they share is one literal.
 var ecsTaskStopCodeFailedDef = catalog.FindingDef{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones."}
 
-// deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
-// has end-of-lifed per docs/attention-signals.md.
-var deprecatedLambdaRuntimes = map[string]struct{}{ //nolint:gochecknoglobals // static catalog: intentional package-level var
-	"nodejs":        {},
-	"nodejs4.3":     {},
-	"nodejs6.10":    {},
-	"nodejs8.10":    {},
-	"nodejs10.x":    {},
-	"nodejs12.x":    {},
-	"nodejs14.x":    {},
-	"python2.7":     {},
-	"python3.6":     {},
-	"python3.7":     {},
-	"ruby2.5":       {},
-	"ruby2.7":       {},
-	"dotnetcore1.0": {},
-	"dotnetcore2.0": {},
-	"dotnetcore2.1": {},
-	"dotnetcore3.1": {},
-	"java8":         {},
-	"go1.x":         {},
+// lambdaRuntimeDeprecation maps a Lambda runtime identifier to its AWS
+// deprecation date: the "Deprecated runtimes" table and the dates the
+// "Supported runtimes" table announces, from
+// https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html as
+// fetched on 2026-09-23. Runtimes AWS lists as "Not scheduled" are absent.
+var lambdaRuntimeDeprecation = map[string]time.Time{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	"provided.al2":   lambdaRuntimeDate(2026, 7, 31),
+	"nodejs20.x":     lambdaRuntimeDate(2026, 4, 30),
+	"ruby3.2":        lambdaRuntimeDate(2026, 3, 31),
+	"python3.9":      lambdaRuntimeDate(2025, 12, 15),
+	"nodejs18.x":     lambdaRuntimeDate(2025, 9, 1),
+	"dotnet6":        lambdaRuntimeDate(2024, 12, 20),
+	"python3.8":      lambdaRuntimeDate(2024, 10, 14),
+	"nodejs16.x":     lambdaRuntimeDate(2024, 6, 12),
+	"dotnet7":        lambdaRuntimeDate(2024, 5, 14),
+	"java8":          lambdaRuntimeDate(2024, 1, 8),
+	"go1.x":          lambdaRuntimeDate(2024, 1, 8),
+	"provided":       lambdaRuntimeDate(2024, 1, 8),
+	"ruby2.7":        lambdaRuntimeDate(2023, 12, 7),
+	"nodejs14.x":     lambdaRuntimeDate(2023, 12, 4),
+	"python3.7":      lambdaRuntimeDate(2023, 12, 4),
+	"dotnetcore3.1":  lambdaRuntimeDate(2023, 4, 3),
+	"nodejs12.x":     lambdaRuntimeDate(2023, 3, 31),
+	"python3.6":      lambdaRuntimeDate(2022, 7, 18),
+	"dotnet5.0":      lambdaRuntimeDate(2022, 5, 10),
+	"dotnetcore2.1":  lambdaRuntimeDate(2022, 1, 5),
+	"nodejs10.x":     lambdaRuntimeDate(2021, 7, 30),
+	"ruby2.5":        lambdaRuntimeDate(2021, 7, 30),
+	"python2.7":      lambdaRuntimeDate(2021, 7, 15),
+	"nodejs8.10":     lambdaRuntimeDate(2020, 3, 6),
+	"nodejs4.3":      lambdaRuntimeDate(2020, 3, 5),
+	"nodejs4.3-edge": lambdaRuntimeDate(2020, 3, 5),
+	"nodejs6.10":     lambdaRuntimeDate(2019, 8, 12),
+	"dotnetcore1.0":  lambdaRuntimeDate(2019, 6, 27),
+	"dotnetcore2.0":  lambdaRuntimeDate(2019, 5, 30),
+	"nodejs":         lambdaRuntimeDate(2016, 8, 30),
+	// Supported runtimes, deprecation scheduled.
+	"nodejs24.x":      lambdaRuntimeDate(2028, 4, 30),
+	"nodejs22.x":      lambdaRuntimeDate(2027, 4, 30),
+	"python3.14":      lambdaRuntimeDate(2029, 6, 30),
+	"python3.13":      lambdaRuntimeDate(2029, 6, 30),
+	"python3.12":      lambdaRuntimeDate(2028, 10, 31),
+	"python3.11":      lambdaRuntimeDate(2027, 6, 30),
+	"python3.10":      lambdaRuntimeDate(2026, 10, 31),
+	"java25":          lambdaRuntimeDate(2029, 6, 30),
+	"java21":          lambdaRuntimeDate(2029, 6, 30),
+	"java17":          lambdaRuntimeDate(2027, 6, 30),
+	"java11":          lambdaRuntimeDate(2027, 6, 30),
+	"java8.al2":       lambdaRuntimeDate(2027, 6, 30),
+	"dotnet10":        lambdaRuntimeDate(2028, 11, 14),
+	"dotnet9":         lambdaRuntimeDate(2026, 11, 10),
+	"dotnet8":         lambdaRuntimeDate(2026, 11, 10),
+	"ruby4.0":         lambdaRuntimeDate(2029, 3, 31),
+	"ruby3.4":         lambdaRuntimeDate(2028, 3, 31),
+	"ruby3.3":         lambdaRuntimeDate(2027, 3, 31),
+	"provided.al2023": lambdaRuntimeDate(2029, 6, 30),
 }
 
-// isDeprecatedLambdaRuntime reports whether runtime is in the AWS
-// end-of-life set. Shared by colorLambda and the lambda fetcher's Wave-1
-// Finding emission so both read the same catalog.
-func isDeprecatedLambdaRuntime(runtime string) bool {
-	_, ok := deprecatedLambdaRuntimes[runtime]
-	return ok
+func lambdaRuntimeDate(year, month, day int) time.Time {
+	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+}
+
+// isDeprecatedLambdaRuntime reports whether AWS's deprecation date for
+// runtime is on or before now.
+func isDeprecatedLambdaRuntime(runtime string, now time.Time) bool {
+	date, ok := lambdaRuntimeDeprecation[runtime]
+	return ok && !now.Before(date)
 }
 
 func colorEC2(r domain.Resource) domain.Color {
@@ -597,10 +636,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
 		}),
 		FieldKeys: []string{
-			"function_name", "runtime", "state", "last_update_status", "memory",
+			"function_name", "runtime", "memory",
 			"timeout", "handler", "last_modified", "code_size", "log_group",
 			"package_type", "event_source_arn", "dlq_target_arn", "arn",
 		},
+		IssueEnricherFieldKeys: []string{"state", "last_update_status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true, Truncated: true},
@@ -638,11 +678,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply", Severity: domain.SevBroken, Source: "wave1", Detail: "The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again."},
+			{Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply", Severity: domain.SevBroken, Source: "wave2", Detail: "The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again."},
 			{Code: CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life", Severity: domain.SevBroken, Source: "wave1", Detail: "This function runs on a runtime AWS no longer patches, so language and base-image security fixes will never reach it. Existing functions keep being invoked, but AWS first stops you creating new functions on it and then stops you updating this one, which turns an urgent fix into a migration under pressure. Move to a supported runtime version and redeploy while the update path is still open."},
-			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it."},
-			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry."},
-			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave2", Detail: "The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it."},
+			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry."},
+			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave2"},
 			{Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1", Detail: "Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed."},
 			{Code: CodeLambdaEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1", Detail: "A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one."},
 			{Code: lambdaCodePublicPolicy, Phrase: "invokable by anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it."},

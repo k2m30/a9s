@@ -27,22 +27,49 @@ func (f *ECRFake) DescribeRepositories(_ context.Context, _ *ecr.DescribeReposit
 	return &ecr.DescribeRepositoriesOutput{Repositories: f.fix.Repositories}, nil
 }
 
+// DescribeImages answers the way Basic Scanning does: without the scan
+// summary and scan status, which DescribeImageScanFindings serves.
 func (f *ECRFake) DescribeImages(_ context.Context, input *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
 	var repoName string
 	if input != nil && input.RepositoryName != nil {
 		repoName = *input.RepositoryName
 	}
-	return &ecr.DescribeImagesOutput{ImageDetails: f.fix.Images[repoName]}, nil
+	images := slices.Clone(f.fix.Images[repoName])
+	for i := range images {
+		images[i].ImageScanFindingsSummary = nil
+		images[i].ImageScanStatus = nil
+	}
+	return &ecr.DescribeImagesOutput{ImageDetails: images}, nil
 }
 
-// DescribeImageScanFindings is a stub for Wave 2 enrichment in demo mode.
-// Returns an empty response (no scan findings) for all repositories.
-func (f *ECRFake) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
-	return &ecr.DescribeImageScanFindingsOutput{}, nil
+// DescribeImageScanFindings serves the fixture image's scan summary. An image
+// the fixtures give no summary was never scanned and answers
+// ScanNotFoundException, as ECR does.
+func (f *ECRFake) DescribeImageScanFindings(_ context.Context, input *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
+	repoName := aws.ToString(input.RepositoryName)
+	var digest string
+	if input.ImageId != nil {
+		digest = aws.ToString(input.ImageId.ImageDigest)
+	}
+	for _, img := range f.fix.Images[repoName] {
+		if aws.ToString(img.ImageDigest) != digest || img.ImageScanFindingsSummary == nil {
+			continue
+		}
+		return &ecr.DescribeImageScanFindingsOutput{
+			RepositoryName:  input.RepositoryName,
+			ImageId:         input.ImageId,
+			ImageScanStatus: &ecrtypes.ImageScanStatus{Status: ecrtypes.ScanStatusComplete},
+			ImageScanFindings: &ecrtypes.ImageScanFindings{
+				FindingSeverityCounts:        img.ImageScanFindingsSummary.FindingSeverityCounts,
+				ImageScanCompletedAt:         img.ImageScanFindingsSummary.ImageScanCompletedAt,
+				VulnerabilitySourceUpdatedAt: img.ImageScanFindingsSummary.VulnerabilitySourceUpdatedAt,
+			},
+		}, nil
+	}
+	return nil, &ecrtypes.ScanNotFoundException{Message: aws.String("Image scan does not exist for the image with digest " + digest)}
 }
 
 // ListImages returns image identifiers for the requested repository from fixture data.
-// Satisfies ECRListImagesAPI for Wave 2 enrichment in demo mode.
 func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ...func(*ecr.Options)) (*ecr.ListImagesOutput, error) {
 	var repoName string
 	if input != nil && input.RepositoryName != nil {

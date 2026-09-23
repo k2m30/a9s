@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/costs"
@@ -59,8 +60,9 @@ func TestAnomalyOverlay_ReadsUnderTheSameLockItsWritersHold(t *testing.T) {
 }
 
 // lambdaSlowVerifierFake answers the policy read with a public policy for
-// every function but one, which gets the absent-resource code and so goes on
-// to the verification. That verification blocks until the test releases it.
+// every function but one, which gets the absent-resource code. That one
+// function's GetFunction read blocks until the test releases it; every other
+// function's answers at once.
 type lambdaSlowVerifierFake struct {
 	awsclient.LambdaAPI
 	slowID    string
@@ -89,11 +91,13 @@ func (f *lambdaSlowVerifierFake) ListFunctionUrlConfigs(
 }
 
 func (f *lambdaSlowVerifierFake) GetFunction(
-	_ context.Context, _ *lambda.GetFunctionInput, _ ...func(*lambda.Options),
+	_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options),
 ) (*lambda.GetFunctionOutput, error) {
-	close(f.verifying)
-	<-f.release
-	return &lambda.GetFunctionOutput{}, nil
+	if aws.ToString(in.FunctionName) == f.slowID {
+		close(f.verifying)
+		<-f.release
+	}
+	return &lambda.GetFunctionOutput{Configuration: &lambdatypes.FunctionConfiguration{State: lambdatypes.StateActive}}, nil
 }
 
 // TestEnrichLambdaPosture_OneSlowVerificationDoesNotStallTheBatch:

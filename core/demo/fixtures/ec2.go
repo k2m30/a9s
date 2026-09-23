@@ -2718,6 +2718,8 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 	}
 }
 
+// buildVpcEndpoints writes State as DescribeVpcEndpoints sends it
+// ("pendingAcceptance"), never in the SDK constants' spelling.
 func buildVpcEndpoints() []ec2types.VpcEndpoint {
 	t1 := aws.Time(time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC))
 	t2 := aws.Time(time.Date(2025, 6, 15, 12, 5, 0, 0, time.UTC))
@@ -2728,7 +2730,7 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			VpcEndpointId:       aws.String("vpce-0aaa111111111111a"),
 			ServiceName:         aws.String("com.amazonaws.us-east-1.s3"),
 			VpcEndpointType:     ec2types.VpcEndpointTypeGateway,
-			State:               ec2types.StateAvailable,
+			State:               ec2types.State("available"),
 			VpcId:               aws.String(fixtProdVPCID),
 			RouteTableIds:       []string{"rtb-0aaa111111111111a", "rtb-0ccc333333333333c"},
 			SubnetIds:           []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
@@ -2748,7 +2750,7 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			VpcEndpointId:     aws.String("vpce-0bbb222222222222b"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.dynamodb"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeGateway,
-			State:             ec2types.StateAvailable,
+			State:             ec2types.State("available"),
 			VpcId:             aws.String(fixtProdVPCID),
 			RouteTableIds:     []string{"rtb-0aaa111111111111a", "rtb-0ccc333333333333c"},
 			OwnerId:           aws.String("123456789012"),
@@ -2761,7 +2763,7 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			VpcEndpointId:       aws.String("vpce-0ccc333333333333c"),
 			ServiceName:         aws.String("com.amazonaws.us-east-1.secretsmanager"),
 			VpcEndpointType:     ec2types.VpcEndpointTypeInterface,
-			State:               ec2types.StateAvailable,
+			State:               ec2types.State("available"),
 			VpcId:               aws.String(fixtProdVPCID),
 			SubnetIds:           []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 			NetworkInterfaceIds: []string{"eni-0ccc333333333333c", "eni-0ddd444444444444d"},
@@ -2776,22 +2778,25 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			VpcEndpointId:     aws.String("vpce-0ddd444444444444d"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.ecr.dkr"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StatePending,
+			State:             ec2types.State("pending"),
 			VpcId:             aws.String(fixtProdVPCID),
 			SubnetIds:         []string{fixtProdPrivateSubnetA},
 			PrivateDnsEnabled: aws.Bool(true),
+			// The default full-access policy on a pending endpoint: the row
+			// carries the lifecycle finding and the open-policy finding.
+			PolicyDocument:    aws.String(`{"Version":"2008-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"*","Resource":"*"}]}`),
 			OwnerId:           aws.String("123456789012"),
 			CreationTimestamp: t4,
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-ecr-endpoint")},
 			},
 		},
-		// State=Failed → wave1 finding (CodeVPCEStateFailed, SevBroken) → Broken.
+		// State=failed → wave1 finding (CodeVPCEStateFailed, SevBroken) → Broken.
 		{
 			VpcEndpointId:     aws.String("vpce-0failed111111111e"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.sts"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateFailed,
+			State:             ec2types.State("failed"),
 			VpcId:             aws.String(fixtStagingVPCID),
 			SubnetIds:         []string{fixtStagingSubnetA},
 			PrivateDnsEnabled: aws.Bool(true),
@@ -2801,13 +2806,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("staging-sts-endpoint-failed")},
 			},
 		},
-		// State=Deleted: fetcher emits no wave1 finding for "Deleted" → falls
-		// through to colorVPCE's structural switch, which maps it to Dim.
+		// State=deleted → wave1 finding (CodeVPCEStateDeleted, SevDim) → Dim.
 		{
 			VpcEndpointId:     aws.String("vpce-0deleted111111111f"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.sns"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateDeleted,
+			State:             ec2types.State("deleted"),
 			VpcId:             aws.String(fixtStagingVPCID),
 			OwnerId:           aws.String("123456789012"),
 			CreationTimestamp: aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
@@ -2815,12 +2819,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("staging-sns-endpoint-deleted")},
 			},
 		},
-		// State=PendingAcceptance → wave1 finding (CodeVPCEStatePendingAcceptance, SevWarn) → Warning.
+		// State=pendingAcceptance → wave1 finding (CodeVPCEStatePendingAcceptance, SevWarn) → Warning.
 		{
 			VpcEndpointId:     aws.String("vpce-0pendingaccept001g"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.execute-api"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StatePendingAcceptance,
+			State:             ec2types.State("pendingAcceptance"),
 			VpcId:             aws.String(fixtProdVPCID),
 			SubnetIds:         []string{fixtProdPrivateSubnetA},
 			PrivateDnsEnabled: aws.Bool(false),
@@ -2830,12 +2834,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("prod-execute-api-endpoint-pending-accept")},
 			},
 		},
-		// State=Deleting → wave1 finding (CodeVPCEStateDeleting, SevWarn) → Warning.
+		// State=deleting → wave1 finding (CodeVPCEStateDeleting, SevWarn) → Warning.
 		{
 			VpcEndpointId:     aws.String("vpce-0deleting0000001h"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.ecr.api"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateDeleting,
+			State:             ec2types.State("deleting"),
 			VpcId:             aws.String(fixtStagingVPCID),
 			SubnetIds:         []string{fixtStagingSubnetA},
 			PrivateDnsEnabled: aws.Bool(true),
@@ -2845,12 +2849,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("staging-ecr-api-endpoint-deleting")},
 			},
 		},
-		// State=Rejected → wave1 finding (CodeVPCEStateRejected, SevBroken) → Broken.
+		// State=rejected → wave1 finding (CodeVPCEStateRejected, SevBroken) → Broken.
 		{
 			VpcEndpointId:     aws.String("vpce-0rejected0000001i"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.kinesis-streams"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateRejected,
+			State:             ec2types.State("rejected"),
 			VpcId:             aws.String(fixtProdVPCID),
 			SubnetIds:         []string{fixtProdPrivateSubnetB},
 			PrivateDnsEnabled: aws.Bool(false),
@@ -2860,12 +2864,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("prod-kinesis-endpoint-rejected")},
 			},
 		},
-		// State=Expired → wave1 finding (CodeVPCEStateExpired, SevBroken) → Broken.
+		// State=expired → wave1 finding (CodeVPCEStateExpired, SevBroken) → Broken.
 		{
 			VpcEndpointId:     aws.String("vpce-0expired0000001j"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.sqs"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StateExpired,
+			State:             ec2types.State("expired"),
 			VpcId:             aws.String(fixtStagingVPCID),
 			SubnetIds:         []string{fixtStagingSubnetB},
 			PrivateDnsEnabled: aws.Bool(false),
@@ -2875,12 +2879,12 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("staging-sqs-endpoint-expired")},
 			},
 		},
-		// State=Partial → wave1 finding (CodeVPCEStatePartial, SevBroken) → Broken.
+		// State=partial → wave1 finding (CodeVPCEStatePartial, SevBroken) → Broken.
 		{
 			VpcEndpointId:     aws.String("vpce-0partial00000001k"),
 			ServiceName:       aws.String("com.amazonaws.us-east-1.logs"),
 			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
-			State:             ec2types.StatePartial,
+			State:             ec2types.State("partial"),
 			VpcId:             aws.String(fixtProdVPCID),
 			SubnetIds:         []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
 			PrivateDnsEnabled: aws.Bool(true),
@@ -2897,7 +2901,7 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			VpcEndpointId:       aws.String(ProdAS2GatewayVpcEndpointID),
 			ServiceName:         aws.String("com.amazonaws.us-east-1.transfer.server"),
 			VpcEndpointType:     ec2types.VpcEndpointTypeInterface,
-			State:               ec2types.StateAvailable,
+			State:               ec2types.State("available"),
 			VpcId:               aws.String(fixtProdVPCID),
 			SubnetIds:           []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
 			NetworkInterfaceIds: []string{"eni-0a1b2c3d4e5f60a2a", "eni-0a1b2c3d4e5f60a2b", "eni-0a1b2c3d4e5f60a2c"},

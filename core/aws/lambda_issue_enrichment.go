@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // lambda_issue_enrichment.go — Wave 2 issue enrichment for the lambda
-// resource type: who is allowed to invoke a function, and whether it answers
-// unauthenticated HTTP.
+// resource type: the function's lifecycle state, who is allowed to invoke
+// it, and whether it answers unauthenticated HTTP.
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -27,18 +28,20 @@ const (
 	lambdaCodeFunctionURLPublic domain.FindingCode = "lambda.function-url-public"
 )
 
-// EnrichLambdaPosture asks, per function (capped at EnrichmentCap), who may
-// invoke it: GetPolicy for the resource policy and ListFunctionUrlConfigs for
-// unauthenticated function URLs. Both are read-only.
+// EnrichLambdaPosture asks, per function (capped at EnrichmentCap), GetPolicy
+// for the resource policy, ListFunctionUrlConfigs for unauthenticated function
+// URLs, and GetFunction for its lifecycle state — ListFunctions returns none
+// of State, StateReasonCode or LastUpdateStatus. All three are read-only.
 //
 // A function with no resource policy answers GetPolicy with
 // ResourceNotFoundException — that is the healthy answer, not a failure and
 // not a coverage gap, so it is neither recorded in TruncatedIDs nor folded
-// into the composite error.
+// into the composite error. GetFunction answering the same code means the
+// function is gone.
 //
-// The two reads answer two independent questions. Losing one says nothing
-// about the other, so each check's finding stands on its own and only the
-// check that failed leaves the row uninspected.
+// The policy and URL reads answer two independent questions. Losing one says
+// nothing about the other, so each check's finding stands on its own and only
+// the check that failed leaves the row uninspected.
 func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
@@ -57,59 +60,83 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 	targets := capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool { return r.ID != "" }, resourceIDsOf)
 
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
-	const op = "function policy and URL posture"
+	const op = "function state, policy and URL posture"
 	var mu sync.Mutex
 	var failures []Failure
 	loopErr := ForEachRow(ctx, &result, resourceIDs(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
+		// Every read runs here, on this row's own goroutine; the mutex below
+		// only records results, so no row waits on another's round trip.
 		policyRows, policyPublic, policyErr := lambdaPolicyExposure(ctx, api, r.ID, ownAccount)
 		urlRows, urlPublic, urlErr := lambdaFunctionURLExposure(ctx, api, r.ID)
-
-		// One of the two may have answered the absent-resource code, which
-		// means either "no policy / no URL config" (healthy) or "the function
-		// is gone" (a race). Only GetFunction can tell them apart, and it is a
-		// network round trip: it runs HERE, on this row's own goroutine, not
-		// under the mutex below. That mutex exists to record results into one
-		// map; holding it across a call makes every other function in the
-		// batch wait on this one's round trip, and the parallel workers fill
-		// with goroutines blocked on it, so rows further down are never asked
-		// about at all.
-		realErr := lambdaRealErr(policyErr, urlErr)
-		var absent bool
-		var verifyErr error
-		if realErr == nil && (policyErr != nil || urlErr != nil) {
-			absent, verifyErr = lambdaFunctionAbsent(ctx, api, r.ID)
-		}
+		cfg, getErr := lambdaGetConfiguration(ctx, api, r.ID)
 
 		mu.Lock()
 		defer mu.Unlock()
+		if isLambdaNoPolicy(getErr) {
+			// Gone between the list call and this one: a race, not a failure
+			// to log, and nothing was inspected either.
+			markUninspected(&result, r.ID, "GetFunction")
+			return
+		}
+		if cfg != nil {
+			result.FieldUpdates[r.ID] = map[string]string{
+				"state":              string(cfg.State),
+				"last_update_status": string(cfg.LastUpdateStatus),
+			}
+			if code := lambdaLifecycleCode(cfg); code != "" {
+				setWave2Finding(&result, r.ID, code, nil)
+			}
+		}
 		if policyPublic {
 			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, policyRows)
-
 		}
 		if urlPublic {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
-
 		}
-		switch {
-		case realErr != nil:
-			MarkSkipped(&result, r.ID, &failures, realErr)
-		case verifyErr != nil:
-			// The question was not settled. Nothing about this function's
-			// posture was established, so the row is uninspected — reading a
-			// failed verification as "still there" reports it clean on the
-			// strength of a call that never succeeded.
-			MarkSkipped(&result, r.ID, &failures, verifyErr)
-		case absent:
-			// Gone between the list call and this one: a race, not a failure
-			// to log, and nothing was inspected either. GetFunction is the
-			// call that settled it, so it is the check the row names.
-			markUninspected(&result, r.ID, "GetFunction")
+		var unusable UnusableAnswerErr
+		switch err := cmp.Or(getErr, lambdaRealErr(policyErr, urlErr)); {
+		case errors.As(err, &unusable):
+			MarkUnusable(&result, r.ID, &failures, unusable.Error())
+		case err != nil:
+			MarkSkipped(&result, r.ID, &failures, err)
 		}
 	})
 
 	err := errors.Join(loopErr, Finish(&result, failures, len(targets), op))
 	return result, err
+}
+
+// lambdaLifecycleCode is the one lifecycle finding GetFunction's answer
+// earns: a failed last update first, since the function then runs a version
+// other than the one configured, then the function's own state.
+func lambdaLifecycleCode(cfg *lambdatypes.FunctionConfiguration) domain.FindingCode {
+	switch {
+	case cfg.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
+		return CodeLambdaLastUpdateFailed
+	case cfg.State == lambdatypes.StatePending:
+		return CodeLambdaStatePending
+	case cfg.State == lambdatypes.StateFailed:
+		return CodeLambdaStateFailed
+	case cfg.State == lambdatypes.StateInactive:
+		return CodeLambdaInactive
+	}
+	return ""
+}
+
+// lambdaGetConfiguration reads the function's configuration through
+// GetFunction. An answer without one is an error, never an empty state.
+func lambdaGetConfiguration(ctx context.Context, api LambdaGetFunctionAPI, name string) (*lambdatypes.FunctionConfiguration, error) {
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
+		return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out == nil || out.Configuration == nil {
+		return nil, UnusableAnswerErr{Call: "GetFunction", Field: "configuration"}
+	}
+	return out.Configuration, nil
 }
 
 // lambdaPolicyExposure evaluates the function's resource policy through the
@@ -163,11 +190,9 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 }
 
 // isLambdaNoPolicy reports the wire code Lambda answers when the thing asked
-// for is absent. It is deliberately NOT a verdict: the same code means "this
-// function has no resource policy / no URL config" (healthy) and "this
-// function no longer exists" (a race). Which one it is takes a second
-// question — see lambdaFunctionGone — asked once by the enricher rather than
-// guessed at each call site.
+// for is absent: "no resource policy / no URL config" (healthy) from GetPolicy
+// and ListFunctionUrlConfigs, "the function no longer exists" from
+// GetFunction.
 func isLambdaNoPolicy(err error) bool {
 	return ErrCodeIs(err, "ResourceNotFoundException")
 }
@@ -183,28 +208,4 @@ func lambdaRealErr(errs ...error) error {
 		}
 	}
 	return nil
-}
-
-// lambdaFunctionAbsent reports whether the function is absent, the one
-// question GetPolicy's and ListFunctionUrlConfigs' shared error code cannot
-// answer. Asked only after one of them reported absence, so a healthy
-// function costs no extra call.
-//
-// Three answers, not two. A successful GetFunction says the function is there
-// (false, nil); the absent-resource code says it is gone (true, nil); any
-// other failure — denied, throttled, a reset connection — settles nothing and
-// is returned, because a verification that did not happen is not the same
-// answer as one that came back "present".
-func lambdaFunctionAbsent(ctx context.Context, api LambdaGetFunctionAPI, name string) (bool, error) {
-	_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-		return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
-	})
-	switch {
-	case err == nil:
-		return false, nil
-	case isLambdaNoPolicy(err):
-		return true, nil
-	default:
-		return false, err
-	}
 }

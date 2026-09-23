@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -26,8 +27,19 @@ func NewLambda() *LambdaFake {
 	return &LambdaFake{fix: fixtures.NewLambdaFixtures()}
 }
 
+// ListFunctions answers without the lifecycle fields, as Lambda does;
+// GetFunction serves them.
 func (f *LambdaFake) ListFunctions(_ context.Context, _ *lambda.ListFunctionsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error) {
-	return &lambda.ListFunctionsOutput{Functions: f.fix.Functions}, nil
+	fns := slices.Clone(f.fix.Functions)
+	for i := range fns {
+		fns[i].State = ""
+		fns[i].StateReason = nil
+		fns[i].StateReasonCode = ""
+		fns[i].LastUpdateStatus = ""
+		fns[i].LastUpdateStatusReason = nil
+		fns[i].LastUpdateStatusReasonCode = ""
+	}
+	return &lambda.ListFunctionsOutput{Functions: fns}, nil
 }
 
 func (f *LambdaFake) ListEventSourceMappings(_ context.Context, input *lambda.ListEventSourceMappingsInput, _ ...func(*lambda.Options)) (*lambda.ListEventSourceMappingsOutput, error) {

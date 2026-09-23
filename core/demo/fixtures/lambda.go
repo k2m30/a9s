@@ -127,12 +127,12 @@ var lambdaNamePool = []string{
 }
 
 var lambdaRuntimePool = []lambdatypes.Runtime{
-	lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimePython312, lambdatypes.RuntimeGo1x,
-	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimePython312,
-	lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimeGo1x, lambdatypes.RuntimePython312,
-	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimePython312,
-	lambdatypes.RuntimeGo1x, lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimePython312,
-	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs20x, lambdatypes.RuntimePython312,
+	lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimePython312, lambdatypes.RuntimeGo1x,
+	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimePython312,
+	lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimeGo1x, lambdatypes.RuntimePython312,
+	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimePython312,
+	lambdatypes.RuntimeGo1x, lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimePython312,
+	lambdatypes.RuntimeJava21, lambdatypes.RuntimeNodejs24x, lambdatypes.RuntimePython312,
 }
 
 var lambdaHandlerPool = []string{
@@ -156,7 +156,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			FunctionName:     aws.String("api-gateway-authorizer"),
 			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"),
 			Role:             aws.String(lambdaProdRoleARN),
-			Runtime:          lambdatypes.RuntimeNodejs20x,
+			Runtime:          lambdatypes.RuntimeNodejs24x,
 			MemorySize:       aws.Int32(256),
 			Timeout:          aws.Int32(10),
 			Handler:          aws.String("index.handler"),
@@ -302,7 +302,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			FunctionName:     aws.String("cloudwatch-slack-notifier"),
 			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier"),
 			Role:             aws.String(lambdaProdRoleARN),
-			Runtime:          lambdatypes.RuntimeNodejs20x,
+			Runtime:          lambdatypes.RuntimeNodejs24x,
 			MemorySize:       aws.Int32(128),
 			Timeout:          aws.Int32(10),
 			Handler:          aws.String("notify.handler"),
@@ -396,6 +396,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				LogGroup:  aws.String("/aws/lambda/legacy-data-sync"),
 				LogFormat: lambdatypes.LogFormatText,
 			},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+			},
 			LastUpdateStatus:       lambdatypes.LastUpdateStatusFailed,
 			LastUpdateStatusReason: aws.String("Layer attachment limit exceeded"),
 		},
@@ -406,7 +409,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		FunctionName:     aws.String("lambda-pending-deploy"),
 		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:lambda-pending-deploy"),
 		Role:             aws.String(lambdaProdRoleARN),
-		Runtime:          lambdatypes.RuntimeNodejs20x,
+		Runtime:          lambdatypes.RuntimeNodejs24x,
 		MemorySize:       aws.Int32(256),
 		Timeout:          aws.Int32(30),
 		Handler:          aws.String("index.handler"),
@@ -419,6 +422,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		PackageType:      lambdatypes.PackageTypeZip,
 		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
 		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+		},
 		LoggingConfig: &lambdatypes.LoggingConfig{
 			LogGroup:  aws.String("/aws/lambda/lambda-pending-deploy"),
 			LogFormat: lambdatypes.LogFormatText,
@@ -444,6 +450,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		PackageType:      lambdatypes.PackageTypeZip,
 		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
 		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+		},
 		LoggingConfig: &lambdatypes.LoggingConfig{
 			LogGroup:  aws.String("/aws/lambda/lambda-inactive-runtime"),
 			LogFormat: lambdatypes.LogFormatText,
@@ -473,6 +482,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		PackageType:      lambdatypes.PackageTypeZip,
 		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
 		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+			TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+		},
 		LoggingConfig: &lambdatypes.LoggingConfig{
 			LogGroup:  aws.String("/aws/lambda/lambda-runtime-crash"),
 			LogFormat: lambdatypes.LogFormatText,

@@ -5,12 +5,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -81,50 +80,38 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 			dlqTargetARN = aws.ToString(fn.DeadLetterConfig.TargetArn)
 		}
 
+		// ListFunctions returns no State, StateReasonCode or LastUpdateStatus,
+		// so "state" and "last_update_status" are written by the wave-2
+		// GetFunction read (EnrichLambdaPosture), never here.
 		r := resource.Resource{
 			ID:   functionName,
 			Name: functionName,
-			// Lifecycle state goes into Findings.
 			Fields: map[string]string{
-				"function_name":      functionName,
-				"runtime":            runtime,
-				"state":              string(fn.State),
-				"last_update_status": string(fn.LastUpdateStatus),
-				"memory":             memory,
-				"timeout":            timeout,
-				"handler":            handler,
-				"last_modified":      lastModified,
-				"code_size":          codeSize,
-				"log_group":          logGroup,
-				"package_type":       packageType,
-				"event_source_arn":   eventSourceARN,
-				"dlq_target_arn":     dlqTargetARN,
-				"arn":                aws.ToString(fn.FunctionArn),
+				"function_name":    functionName,
+				"runtime":          runtime,
+				"memory":           memory,
+				"timeout":          timeout,
+				"handler":          handler,
+				"last_modified":    lastModified,
+				"code_size":        codeSize,
+				"log_group":        logGroup,
+				"package_type":     packageType,
+				"event_source_arn": eventSourceARN,
+				"dlq_target_arn":   dlqTargetARN,
+				"arn":              aws.ToString(fn.FunctionArn),
 			},
 			RawStruct: fn,
 		}
 
-		// emit canonical Findings for every non-healthy branch colorLambda
-		// reads, mirroring its own precedence: last-update failure, then
-		// deprecated runtime, then lifecycle state, then no-DLQ fallback.
-		switch {
-		case fn.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaLastUpdateFailed)}
-		case isDeprecatedLambdaRuntime(runtime):
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaDeprecatedRuntime)}
-		case fn.State == lambdatypes.StatePending:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStatePending)}
-		case fn.State == lambdatypes.StateFailed:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaStateFailed)}
-		case fn.State == lambdatypes.StateInactive:
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaInactive)}
-		case dlqTargetARN == "":
-			r.Findings = []domain.Finding{wave1Finding(CodeLambdaNoDLQ)}
+		if isDeprecatedLambdaRuntime(runtime, time.Now()) {
+			r.Findings = append(r.Findings, wave1Finding(CodeLambdaDeprecatedRuntime))
+		}
+		if dlqTargetARN == "" {
+			r.Findings = append(r.Findings, wave1Finding(CodeLambdaNoDLQ))
 		}
 
-		// Independent of the lifecycle switch above: ListFunctions already
-		// carries the environment, so a pasted credential is readable in
-		// Wave 1 and colours the row on its own.
+		// ListFunctions already carries the environment, so a pasted
+		// credential is readable in Wave 1 and colours the row on its own.
 		if fn.Environment != nil {
 			addSecretScanFinding(&r, CodeLambdaEnvSecret, fn.Environment.Variables)
 		}

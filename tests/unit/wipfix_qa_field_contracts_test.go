@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -236,8 +237,8 @@ func (f *lambdaDeletedFunctionFake) GetFunction(
 	return nil, lambdaNotFound()
 }
 
-// lambdaLivePolicylessFake is the healthy counterpart: the function exists,
-// it simply has no resource policy and no function URL.
+// lambdaLivePolicylessFake is the healthy counterpart: the function exists
+// and is Active, it simply has no resource policy and no function URL.
 type lambdaLivePolicylessFake struct {
 	awsclient.LambdaAPI
 }
@@ -257,7 +258,7 @@ func (f *lambdaLivePolicylessFake) ListFunctionUrlConfigs(
 func (f *lambdaLivePolicylessFake) GetFunction(
 	_ context.Context, _ *lambda.GetFunctionInput, _ ...func(*lambda.Options),
 ) (*lambda.GetFunctionOutput, error) {
-	return &lambda.GetFunctionOutput{}, nil
+	return &lambda.GetFunctionOutput{Configuration: &lambdatypes.FunctionConfiguration{State: lambdatypes.StateActive}}, nil
 }
 
 func wipfixLambdaRow() []resource.Resource {

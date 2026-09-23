@@ -104,7 +104,7 @@ func w3VPCE(id, state, policy string) ec2types.VpcEndpoint {
 }
 
 func TestW3VPCEPolicyOpen_DefaultFullAccessFlagged(t *testing.T) {
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", w3VPCEDefaultPolicy))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "available", w3VPCEDefaultPolicy))
 
 	f, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen)
 	if !ok {
@@ -133,7 +133,7 @@ func TestW3VPCEPolicyOpen_DefaultFullAccessFlagged(t *testing.T) {
 // endpoint written that way is exactly as open.
 func TestW3VPCEPolicyOpen_StatementAsObject(t *testing.T) {
 	const doc = `{"Version":"2008-10-17","Statement":{"Effect":"Allow","Principal":"*","Action":"*","Resource":"*"}}`
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", doc))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "available", doc))
 	if _, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen); !ok {
 		t.Errorf("single-object Statement produced no %s; findings=%+v", w3CodeVPCEPolicyOpen, rows[0].Findings)
 	}
@@ -150,7 +150,7 @@ func TestW3VPCEPolicyOpen_HealthyPolicies(t *testing.T) {
 		{"unparseable document", `{"Statement": [`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", tc.policy))
+			rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "available", tc.policy))
 			if f, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen); ok {
 				t.Errorf("got %s (%q), want no finding", f.Code, f.Phrase)
 			}
@@ -163,7 +163,7 @@ func TestW3VPCEPolicyOpen_HealthyPolicies(t *testing.T) {
 // actions is the pattern operators use deliberately.
 func TestW3VPCEPolicyOpen_PublicButNarrowActions(t *testing.T) {
 	const doc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::acme-public/*"}]}`
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", doc))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "available", doc))
 	if f, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen); ok {
 		t.Errorf("got %s (%q) for a narrow-action public statement, want no finding", f.Code, f.Phrase)
 	}
@@ -172,7 +172,7 @@ func TestW3VPCEPolicyOpen_PublicButNarrowActions(t *testing.T) {
 // TestW3VPCEPolicyOpen_IndependentOfState pins that a transitional endpoint
 // still reports its policy — two conditions, two findings.
 func TestW3VPCEPolicyOpen_IndependentOfState(t *testing.T) {
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Pending", w3VPCEDefaultPolicy))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "pending", w3VPCEDefaultPolicy))
 
 	if _, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPending); !ok {
 		t.Errorf("missing %s; findings=%+v", w3CodeVPCEPending, rows[0].Findings)
@@ -188,7 +188,7 @@ func TestW3VPCEPolicyOpen_IndependentOfState(t *testing.T) {
 // TestW3VPCEPolicyOpen_DeletedEmitsNoPostureFinding pins the disposal rule: a
 // deleted endpoint routes nothing, so its policy is not actionable.
 func TestW3VPCEPolicyOpen_DeletedEmitsNoPostureFinding(t *testing.T) {
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Deleted", w3VPCEDefaultPolicy))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "deleted", w3VPCEDefaultPolicy))
 
 	if _, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen); ok {
 		t.Errorf("deleted endpoint carries %s; findings=%+v", w3CodeVPCEPolicyOpen, rows[0].Findings)
@@ -202,9 +202,9 @@ func TestW3VPCEPolicyOpen_DeletedEmitsNoPostureFinding(t *testing.T) {
 // does not colour its neighbours.
 func TestW3VPCEPolicyOpen_PerRowIsolation(t *testing.T) {
 	rows := w3FetchVPCEs(t,
-		w3VPCE("vpce-0scoped000000000", "Available", w3VPCEScopedPolicy),
-		w3VPCE("vpce-0open0000000000", "Available", w3VPCEDefaultPolicy),
-		w3VPCE("vpce-0nopolicy000000", "Available", ""),
+		w3VPCE("vpce-0scoped000000000", "available", w3VPCEScopedPolicy),
+		w3VPCE("vpce-0open0000000000", "available", w3VPCEDefaultPolicy),
+		w3VPCE("vpce-0nopolicy000000", "available", ""),
 	)
 	for _, r := range rows {
 		_, got := w3FindingByCode(r.Findings, w3CodeVPCEPolicyOpen)
@@ -232,7 +232,7 @@ func TestW3VPCEPolicyOpen_ConditionValuesAsArray(t *testing.T) {
     }
   ]
 }`
-	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "Available", doc))
+	rows := w3FetchVPCEs(t, w3VPCE("vpce-0aa11bb22cc33dd44", "available", doc))
 	if f, ok := w3FindingByCode(rows[0].Findings, w3CodeVPCEPolicyOpen); ok {
 		t.Errorf("got %s (%q) for an org-fenced policy written with array condition values, want no finding", f.Code, f.Phrase)
 	}
