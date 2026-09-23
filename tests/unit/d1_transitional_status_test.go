@@ -293,20 +293,17 @@ func TestD1_DbiDeletingSuppressesPosture(t *testing.T) {
 	}
 }
 
-// A status a9s does not recognise stays silent on the lifecycle for dbi, which
-// is the opposite of the snapshot rule above. The two differ because a DB
-// instance reports a settled state a9s can read posture from, while a snapshot
-// in an unnamed state cannot be restored from at all.
-func TestD1_DbiUnknownStatusEmitsNoLifecycleFinding(t *testing.T) {
+// A status in neither AWS DB instance status table reads as the status word
+// itself at Warn, never as a transition in progress and never as silence.
+func TestD1_DbiUnknownStatusReadsAsItself(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
 	inst.DBInstanceStatus = aws.String("some-future-aws-status")
 
 	r := fetchSingleResource(t, inst)
-	for _, f := range r.Findings {
-		if f.Code == awsclient.CodeDBITransitional {
-			t.Errorf("unknown status produced a transitional finding; findings = %+v", r.Findings)
-		}
+	if len(r.Findings) == 0 || r.Findings[0].Code != awsclient.CodeDBIUnrecognisedStatus {
+		t.Fatalf("findings = %+v, want %s first", r.Findings, awsclient.CodeDBIUnrecognisedStatus)
 	}
+	d1AssertFinding(t, r.Findings[0], "some-future-aws-status", domain.SevWarn)
 }
 
 // Each finding code needs a demo fixture that reaches it and reaches it

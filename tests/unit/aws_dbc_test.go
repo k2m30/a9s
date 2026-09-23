@@ -887,10 +887,10 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("cross-region-copying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			// An unrecognised status is still the transitional code, and that
-			// code declares one wording with the status in its slot.
-			wantPhrase:   "cross-region-copying: in progress",
-			wantFindings: []string{"cross-region-copying: in progress"},
+			// A status in neither AWS status table reads as the status word
+			// itself: a9s cannot claim the cluster is mid-transition.
+			wantPhrase:   "cross-region-copying",
+			wantFindings: []string{"cross-region-copying"},
 		},
 	}
 

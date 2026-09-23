@@ -18,7 +18,7 @@ import (
 
 // computeRDSDBClusterFindings reads an RDS-side (Aurora / Multi-AZ) DB
 // cluster's findings.
-func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+func computeRDSDBClusterFindings(cluster rdstypes.DBCluster, expectsWriter *bool) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	writers := 0
 	for _, m := range cluster.DBClusterMembers {
 		if aws.ToBool(m.IsClusterWriter) {
@@ -28,6 +28,7 @@ func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) ([]domain.Finding, 
 	return computeDBClusterFindings(dbClusterState{
 		Status:                aws.ToString(cluster.Status),
 		Writers:               writers,
+		ExpectsWriter:         expectsWriter,
 		DeletionProtection:    cluster.DeletionProtection,
 		StorageEncrypted:      cluster.StorageEncrypted,
 		BackupRetentionPeriod: cluster.BackupRetentionPeriod,
@@ -41,15 +42,21 @@ func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) ([]domain.Finding, 
 	})
 }
 
+// isDBCListedEngine reports whether DB Clusters lists clusters of engine.
+// Neptune shares the RDS endpoint but is not a DB Clusters row. A deny-list
+// keeps a new Aurora engine variant listed.
+func isDBCListedEngine(engine string) bool {
+	return strings.ToLower(engine) != "neptune"
+}
+
+// isRDSSideDBCEngine reports whether a cluster or cluster snapshot of engine
+// is listed from the RDS call; DocumentDB rows come from the DocumentDB call.
+func isRDSSideDBCEngine(engine string) bool {
+	return strings.ToLower(engine) != "docdb" && isDBCListedEngine(engine)
+}
+
 // FetchRDSDBClustersPage fetches a single page of Aurora + Multi-AZ DB clusters
 // via the RDS SDK.
-//
-// Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28), this
-// operation returns Aurora + Multi-AZ explicitly and may also return Neptune /
-// DocumentDB rows. The docdb-side DescribeDBClusters docstring
-// (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
-// filterName=engine,Values=docdb for DocDB-only results — unfiltered behavior is
-// documented as ambiguous, not engine-agnostic.
 func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &rds.DescribeDBClustersInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
@@ -65,16 +72,13 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 		return resource.FetchResult{}, fmt.Errorf("fetching RDS clusters: %w", err)
 	}
 
+	roles := readRDSGlobalRoles(ctx, api)
+	withheld := 0
 	var resources []resource.Resource
 
 	for _, cluster := range output.DBClusters {
-		// Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28),
-		// DescribeDBClusters may return Neptune and DocDB rows alongside Aurora/Multi-AZ.
-		// Skip engines that are handled by their own SDK paths (docdb SDK) or are
-		// not supported as dbc resource types (neptune). Use deny-list so future
-		// Aurora variants (e.g. "aurora-limitless") are not accidentally dropped.
 		engine := strings.ToLower(aws.ToString(cluster.Engine))
-		if engine == "neptune" || engine == "docdb" {
+		if !isRDSSideDBCEngine(engine) {
 			continue
 		}
 
@@ -119,7 +123,12 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		findings, attentionDetails := computeRDSDBClusterFindings(cluster)
+		expectsWriter := roles.expectsWriter(aws.ToString(cluster.DBClusterArn),
+			aws.ToString(cluster.ReplicationSourceIdentifier) != "", aws.ToString(cluster.GlobalClusterIdentifier) != "")
+		if expectsWriter == nil && writerCount == 0 {
+			withheld++
+		}
+		findings, attentionDetails := computeRDSDBClusterFindings(cluster, expectsWriter)
 		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
@@ -168,5 +177,5 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, roles.unreadErr(withheld)
 }

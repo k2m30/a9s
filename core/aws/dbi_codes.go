@@ -18,8 +18,13 @@ const (
 	CodeDBIRestoreError             domain.FindingCode = "dbi.broken.restore_error"
 	CodeDBIEncryptionKeyUnavailable domain.FindingCode = "dbi.broken.encryption_key_unavailable"
 	CodeDBIStopped                  domain.FindingCode = "dbi.broken.stopped"
+	CodeDBIEncryptionKeyRecoverable domain.FindingCode = "dbi.broken.encryption_key_recoverable"
+	CodeDBIIncompatibleCreate       domain.FindingCode = "dbi.broken.incompatible_create"
+	CodeDBIInsufficientCapacity     domain.FindingCode = "dbi.broken.insufficient_capacity"
+	CodeDBIUpgradeFailed            domain.FindingCode = "dbi.broken.upgrade_failed"
 
 	CodeDBITransitional          domain.FindingCode = "dbi.warn.transitional"
+	CodeDBIUnrecognisedStatus    domain.FindingCode = "dbi.warn.unrecognised_status"
 	CodeDBINoAutomatedBackups    domain.FindingCode = "dbi.warn.no_automated_backups"
 	CodeDBIPubliclyAccessible    domain.FindingCode = "dbi.warn.publicly_accessible"
 	CodeDBIUnencryptedStorage    domain.FindingCode = "dbi.warn.unencrypted_storage"

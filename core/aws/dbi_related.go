@@ -183,9 +183,9 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("vpc", []string{*inst.DBSubnetGroup.VpcId}, false)
 }
 
-// checkDbiDBC returns the Aurora/RDS cluster this DB instance belongs to, if
-// any. DBInstance.DBClusterIdentifier is non-nil only for Aurora/RDS cluster
-// members. We match that identifier against the dbc cache by ID/Name.
+// checkDbiDBC returns the DB cluster this DB instance belongs to, if any.
+// DBInstance.DBClusterIdentifier is set only for cluster members; a member of
+// a cluster whose engine DB Clusters does not list has no row to open.
 func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
@@ -196,6 +196,9 @@ func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
 		return resource.ProvenZero("dbc", "db.DBClusterIdentifier")
+	}
+	if !isDBCListedEngine(aws.ToString(db.Engine)) {
+		return resource.ProvenZero("dbc", "db.Engine")
 	}
 	// In-body: DBClusterIdentifier IS the cluster's resource id (dbc keyed by identifier).
 	return relatedResultTrunc("dbc", []string{*db.DBClusterIdentifier}, false)

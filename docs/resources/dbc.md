@@ -23,23 +23,15 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Coverage**: this resource type covers BOTH DocumentDB clusters AND Aurora + Multi-AZ DB clusters.
   Both SDKs must be called to get complete coverage; the a9s fetcher calls both and merges
   results using the `docdb:` / `rds:` continuation-token prefix scheme.
-  **The DocDB and RDS SDKs are NOT interchangeable, and they overlap.** The docdb-side SDK
-  (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
-  `filterName=engine,Values=docdb` for DocDB-only results; unfiltered behavior is
-  documented as ambiguous, not engine-agnostic. The rds-side SDK
-  (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28) returns Aurora + Multi-AZ clusters
-  and may also return Neptune / DocumentDB rows per the official RDS docstring.
-  **Empirically (AS-145, verified live on dev-readonly account `000000000000` eu-west-2),
-  both endpoints return rows for both engine families** — e.g. an `aurora-postgresql`
-  cluster surfaces from the DocDB endpoint as well as the RDS endpoint. Naïve concat would
-  therefore double-count every cluster that both endpoints return.
-  **Dedup contract**: results are concatenated DocDB-side first, then deduped by
-  `Resource.ID` with first-occurrence-wins. The DocDB-side row is therefore preserved on
-  collisions, which is the engine-correct one for detail enrichment and the
-  `dbc → dbc-snap` related-panel pivot (those branches type-assert on
-  `RawStruct` being a `docdbtypes.DBCluster`). See `core/aws/dbc.go` (concat region)
-  and `dedupResourcesByID` for the implementation; this dedup behavior is part of the
-  fetcher contract — do not remove it.
+  **The DocDB and RDS SDKs share one regional endpoint** with Neptune, and each
+  answers every engine's clusters unless told otherwise. The DocumentDB call carries
+  `filterName=engine,Values=docdb`, as the docdb SDK's `DescribeDBClusters` doc comment
+  directs, so it returns DocumentDB clusters only. The RDS call skips `docdb` and
+  `neptune` rows, so Aurora and Multi-AZ DB clusters are listed in their RDS shape and
+  carry the RDS-only posture checks (auto minor version upgrade, IAM database
+  authentication) and the RDS subnet-group pivot. Neptune clusters are not listed.
+  Results are concatenated DocDB-side first and deduped by `Resource.ID`,
+  first-occurrence-wins.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -115,25 +107,51 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `Status` is transitional (e.g. `creating`, `modifying`, `backing-up`, `maintenance`, `upgrading`, `starting`, `stopping`, `resetting-master-credentials`, `renaming`) → Warning.
+The lifecycle rows map every status in the DB cluster status table of the Amazon Aurora User Guide ("Viewing DB cluster status"); the DocumentDB cluster status table is a subset of it. `dbi` reads its status through the same rule, so `stopped` and a status in neither table render alike on both.
+
+- **Signal**: `Status` is transitional (`backing-up`, `backtracking`, `creating`, `deleting`, `failing-over`, `maintenance`, `migrating`, `modifying`, `promoting`, `preparing-data-migration`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-optimization`, `update-iam-db-auth`, `upgrading`) → Warning.
   - **State bucket**: Warning.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status == failed` → Broken.
+  - **State bucket**: Broken.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
 - **Signal**: `Status == inaccessible-encryption-credentials` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
-- **Signal**: `Status == inaccessible-encryption-credentials`.
+- **Signal**: `Status == inaccessible-encryption-credentials-recoverable` → Broken.
   - **State bucket**: Broken.
-  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
 - **Signal**: `Status == incompatible-parameters`.
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: No `DBClusterMembers[]` entry with `IsClusterWriter == true` → Broken.
+- **Signal**: `Status == cloning-failed` → Broken.
   - **State bucket**: Broken.
-  - **How obtained**: scan `DBClusterMembers[]` on the list response; no entry flagged as writer means the cluster has no primary accepting writes.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status == migration-failed` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status == upgrade-failed` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status == stopped` → Broken: AWS starts a stopped cluster again after seven days, and storage is billed while it is stopped.
+  - **State bucket**: Broken.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: `Status` is in neither AWS table → Warning, the status word itself, with a detail saying a9s does not recognise it.
+  - **State bucket**: Warning.
+  - **How obtained**: `Status` field on the `DescribeDBClusters` response.
+
+- **Signal**: No `DBClusterMembers[]` entry with `IsClusterWriter == true` on an `available` cluster that is not a secondary → Broken. A replica of another cluster (`ReplicationSourceIdentifier` set), or a global database member that `DescribeGlobalClusters` lists with `IsWriter == false`, is read-only by design and is not flagged; a global primary without a writer is. The global member list is read once per list fetch, in the RDS and the DocumentDB lane. When that read fails, a cluster that may be a global member (on the RDS side `GlobalClusterIdentifier` set; on the DocumentDB side any cluster, whose record carries no global identifier) gets no verdict, and the list comes back partial.
+  - **State bucket**: Broken.
+  - **How obtained**: scan `DBClusterMembers[]` on the list response; no entry flagged as writer means the cluster has no primary accepting writes. The cluster's role comes from `ReplicationSourceIdentifier` and the `DescribeGlobalClusters` member list (`GlobalClusterMembers[].DBClusterArn`, `IsWriter`).
 
 - **Signal**: `DeletionProtection == false` → Warning.
   - **State bucket**: Warning.
@@ -196,6 +214,12 @@ One row per signal from §3:
 | `Status == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed: cluster operation` |
 | `Status == inaccessible-encryption-credentials` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unreachable` |
 | `Status == incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `parameter group incompatible` |
+| `Status == inaccessible-encryption-credentials-recoverable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unreachable (recoverable)` |
+| `Status == cloning-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `clone failed` |
+| `Status == migration-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `migration failed` |
+| `Status == upgrade-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `engine upgrade failed` |
+| `Status == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped (storage still billed)` |
+| `Status` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
 | No writer in `DBClusterMembers[]` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no writer: reads only` |
 | `DeletionProtection == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete-protection off` |
 | `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted at rest` |
@@ -258,6 +282,12 @@ dbc — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 | The KMS key protecting this cluster's volume cannot be used, so no node can read the data and the cluster will not start. Check whether the key is disabled, pending deletion, or whether its policy still allows the database service to use it. |
 | dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 | The cluster parameter group holds a setting the engine rejects, so the cluster will not come up with it applied. Correct the parameter the events list names. A dynamic parameter takes effect at once; a static one needs the affected instances rebooted individually, which is the only reboot DocumentDB offers. |
 | dbc.broken.no\_writer | no writer: reads only | broken | wave1 | The cluster has no writer instance, so every write fails while reads may still succeed and hide the outage from a shallow health check. Check whether a failover is stuck or the writer was deleted, then promote a reader or add an instance. |
+| dbc.broken.encryption\_key\_recoverable | encryption key unreachable (recoverable) | broken | wave1 | The KMS key protecting this cluster's volume cannot be used, so no node can read the data, but AWS can still recover the cluster. Re-enable the key or restore the database service's access to it, then restart the cluster; its storage is billed while it waits. |
+| dbc.broken.cloning\_failed | clone failed | broken | wave1 | Creating this cluster as a clone of another failed, so it holds no usable database. Read the cluster events for the cause, delete it, and create the clone again. |
+| dbc.broken.migration\_failed | migration failed | broken | wave1 | Restoring a snapshot or migrating data into this cluster failed, so it holds no usable database. Read the cluster events for the cause, delete it, and run the restore or migration again. |
+| dbc.broken.upgrade\_failed | engine upgrade failed | broken | wave1 | AWS could not upgrade this cluster to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new cluster on a supported version. |
+| dbc.broken.stopped | stopped (storage still billed) | broken | wave1 | The cluster accepts no connections, and a stopped cluster is started again automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage is billed while it sits here. |
+| dbc.warn.unrecognised\_status | <status> | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
 | dbc.warn.transitional | <status>: in progress | warn | wave1 | The cluster is mid-operation, so it may fail over or drop connections before it settles. Wait for it to return to available rather than starting another change on top of this one. |
 | dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 | Nothing stands between this cluster and a delete call. Aurora and DocumentDB still make you remove the member instances before the cluster volume goes, so it is not one click, but it is also nothing anybody has to think twice about. Turn deletion protection on so removing it takes a deliberate second step. |
 | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | The cluster's volume, its snapshots and its backups are stored unencrypted, and that cannot be changed in place. Snapshot it, copy the snapshot with a KMS key, and restore into a new encrypted cluster at the next opportunity for a cutover. |

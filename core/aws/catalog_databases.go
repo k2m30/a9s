@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -128,6 +129,11 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBIRestoreError, Phrase: "restore-error", Severity: domain.SevBroken, Source: "wave1", Detail: "The instance failed while restoring from backup, so the recovery you were counting on did not land. Read its events for the failing step and restore again, choosing a different snapshot or point in time if one snapshot is the problem."},
 			{Code: CodeDBIEncryptionKeyUnavailable, Phrase: "encryption key unavailable", Severity: domain.SevBroken, Source: "wave1", Detail: "The KMS key that encrypts this instance's storage cannot be used, so the database is inaccessible and stays that way until the key is usable again. Check whether the key was disabled, scheduled for deletion, or has a policy that no longer grants the database service access."},
 			{Code: CodeDBIStopped, Phrase: "stopped (storage still billed)", Severity: domain.SevBroken, Source: "wave1", Detail: "The database accepts no connections, and a stopped instance is restarted automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage and any provisioned IOPS are billed while it sits here."},
+			{Code: CodeDBIEncryptionKeyRecoverable, Phrase: "encryption key unavailable (recoverable)", Severity: domain.SevBroken, Source: "wave1", Detail: "The KMS key that encrypts this instance's storage cannot be used, so the database is inaccessible, but AWS can still recover it. Re-enable the key or restore the database service's access to it, then reboot the instance; its storage is billed while it waits."},
+			{Code: CodeDBIIncompatibleCreate, Phrase: "incompatible-create", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS cannot finish creating this instance because something it depends on is incompatible with it, for example an instance profile without the permissions the instance needs. Read the instance's recent events for the resource AWS names and correct it."},
+			{Code: CodeDBIInsufficientCapacity, Phrase: "insufficient capacity", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS has no capacity for this instance class in this Availability Zone right now, so the instance was never created. Delete it and create it again in a few hours, or create it with a different instance class or Availability Zone."},
+			{Code: CodeDBIUpgradeFailed, Phrase: "engine upgrade failed", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS could not upgrade this instance to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new instance on a supported version."},
+			{Code: CodeDBIUnrecognisedStatus, Phrase: "<status>", Severity: domain.SevWarn, Source: "wave1", Detail: rdsUnrecognisedStatusDetail},
 			{Code: CodeDBITransitional, Phrase: "<transitional status>", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is mid-change, so it may fail over, drop connections, or run with reduced performance until it settles. Wait for it to return to available before starting another modification or judging its performance."},
 			{Code: CodeDBINoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1", Detail: "Backup retention is zero, so there are no automated backups and no point-in-time recovery: a bad deployment or a dropped table can only be undone from a manual snapshot. Set a retention period of at least one day, and longer for anything that matters."},
 			{Code: CodeDBIPubliclyAccessible, Phrase: "public endpoint", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance resolves to a routable address from outside the VPC, so only its security groups stand between the database and the internet. Turn public accessibility off and reach it over a private link or a bastion host unless an external system genuinely requires it."},
@@ -301,26 +307,38 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color: colorDBC,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+			// errGlobalRolesUnread comes with a complete page whose rows stand;
+			// it is carried to the return as a partial-success error.
+			var partial error
 			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
 				result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
+				if errors.Is(err, errGlobalRolesUnread) {
+					partial, err = err, nil
+				}
 				if err != nil {
 					return resource.FetchResult{}, err
 				}
 				if result.Pagination != nil && result.Pagination.IsTruncated {
 					result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
 				}
-				return result, nil
+				return result, partial
 			}
 			docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
 			docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, docdbTok)
+			if errors.Is(err, errGlobalRolesUnread) {
+				partial, err = err, nil
+			}
 			if err != nil {
 				return resource.FetchResult{}, err
 			}
 			if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
 				docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
-				return docResult, nil
+				return docResult, partial
 			}
 			rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, "")
+			if errors.Is(rdsErr, errGlobalRolesUnread) {
+				partial, rdsErr = errors.Join(partial, rdsErr), nil
+			}
 			if rdsErr != nil {
 				return resource.FetchResult{
 					Resources: docResult.Resources,
@@ -330,7 +348,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 						PageSize:    len(docResult.Resources),
 						TotalHint:   -1,
 					},
-				}, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr)
+				}, errors.Join(partial, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr))
 			}
 			docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
 			if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
@@ -342,7 +360,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 						PageSize:    len(docResult.Resources),
 						TotalHint:   -1,
 					},
-				}, nil
+				}, partial
 			}
 			return resource.FetchResult{
 				Resources: docResult.Resources,
@@ -351,7 +369,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 					PageSize:    len(docResult.Resources),
 					TotalHint:   len(docResult.Resources),
 				},
-			}, nil
+			}, partial
 		}),
 		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
 		FieldKeys: []string{
@@ -380,6 +398,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCEncryptionKeyUnreachable, Phrase: "encryption key unreachable", Severity: domain.SevBroken, Source: "wave1", Detail: "The KMS key protecting this cluster's volume cannot be used, so no node can read the data and the cluster will not start. Check whether the key is disabled, pending deletion, or whether its policy still allows the database service to use it."},
 			{Code: CodeDBCIncompatibleParameters, Phrase: "parameter group incompatible", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster parameter group holds a setting the engine rejects, so the cluster will not come up with it applied. Correct the parameter the events list names. A dynamic parameter takes effect at once; a static one needs the affected instances rebooted individually, which is the only reboot DocumentDB offers."},
 			{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster has no writer instance, so every write fails while reads may still succeed and hide the outage from a shallow health check. Check whether a failover is stuck or the writer was deleted, then promote a reader or add an instance."},
+			{Code: CodeDBCEncryptionKeyRecoverable, Phrase: "encryption key unreachable (recoverable)", Severity: domain.SevBroken, Source: "wave1", Detail: "The KMS key protecting this cluster's volume cannot be used, so no node can read the data, but AWS can still recover the cluster. Re-enable the key or restore the database service's access to it, then restart the cluster; its storage is billed while it waits."},
+			{Code: CodeDBCCloningFailed, Phrase: "clone failed", Severity: domain.SevBroken, Source: "wave1", Detail: "Creating this cluster as a clone of another failed, so it holds no usable database. Read the cluster events for the cause, delete it, and create the clone again."},
+			{Code: CodeDBCMigrationFailed, Phrase: "migration failed", Severity: domain.SevBroken, Source: "wave1", Detail: "Restoring a snapshot or migrating data into this cluster failed, so it holds no usable database. Read the cluster events for the cause, delete it, and run the restore or migration again."},
+			{Code: CodeDBCUpgradeFailed, Phrase: "engine upgrade failed", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS could not upgrade this cluster to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new cluster on a supported version."},
+			{Code: CodeDBCStopped, Phrase: "stopped (storage still billed)", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster accepts no connections, and a stopped cluster is started again automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage is billed while it sits here."},
+			{Code: CodeDBCUnrecognisedStatus, Phrase: "<status>", Severity: domain.SevWarn, Source: "wave1", Detail: rdsUnrecognisedStatusDetail},
 			{Code: CodeDBCTransitional, Phrase: "<status>: in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is mid-operation, so it may fail over or drop connections before it settles. Wait for it to return to available rather than starting another change on top of this one."},
 			{Code: CodeDBCDeletionProtectionOff, Phrase: "delete-protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing stands between this cluster and a delete call. Aurora and DocumentDB still make you remove the member instances before the cluster volume goes, so it is not one click, but it is also nothing anybody has to think twice about. Turn deletion protection on so removing it takes a deliberate second step."},
 			{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster's volume, its snapshots and its backups are stored unencrypted, and that cannot be changed in place. Snapshot it, copy the snapshot with a KMS key, and restore into a new encrypted cluster at the next opportunity for a cutover."},

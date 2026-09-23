@@ -15,10 +15,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchDocDBClustersPage fetches a single page of DocumentDB clusters.
+// FetchDocDBClustersPage fetches a single page of DocumentDB clusters. The
+// DocumentDB endpoint is shared with RDS and Neptune and answers every
+// engine's clusters unless asked for engine=docdb, as the SDK's
+// DescribeDBClusters doc comment directs.
 func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &docdb.DescribeDBClustersInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
+		Filters:    []docdbtypes.Filter{{Name: aws.String("engine"), Values: []string{"docdb"}}},
 	}
 	if continuationToken != "" {
 		input.Marker = &continuationToken
@@ -31,6 +35,10 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 		return resource.FetchResult{}, fmt.Errorf("fetching DocumentDB clusters: %w", err)
 	}
 
+	// The DocumentDB cluster record carries no global cluster identifier, so
+	// only the member list can rule a global membership in or out.
+	roles := readDocDBGlobalRoles(ctx, api)
+	withheld := 0
 	var resources []resource.Resource
 
 	for _, cluster := range output.DBClusters {
@@ -82,7 +90,11 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		findings, attentionDetails := computeDBCFindings(cluster)
+		expectsWriter := roles.expectsWriter(aws.ToString(cluster.DBClusterArn), aws.ToString(cluster.ReplicationSourceIdentifier) != "", true)
+		if expectsWriter == nil && writerCount == 0 {
+			withheld++
+		}
+		findings, attentionDetails := computeDBCFindings(cluster, expectsWriter)
 		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
@@ -131,15 +143,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
-}
-
-// transitionalDBCStatusSet contains the DB cluster statuses that indicate a
-// transitional (Warning) state. These show a ": in progress" suffix.
-var transitionalDBCStatusSet = map[string]struct{}{
-	"creating": {}, "modifying": {}, "backing-up": {}, "maintenance": {},
-	"upgrading": {}, "starting": {}, "stopping": {}, "resetting-master-credentials": {},
-	"renaming": {},
+	}, roles.unreadErr(withheld)
 }
 
 // dbClusterState is what a DB cluster's findings are read from. DocumentDB
@@ -148,8 +152,11 @@ var transitionalDBCStatusSet = map[string]struct{}{
 // AutoMinorVersionUpgrade or IAMDatabaseAuthenticationEnabled, and those two
 // predicates stay silent when the posture is handed nil for them.
 type dbClusterState struct {
-	Status                string
-	Writers               int
+	Status  string
+	Writers int
+	// ExpectsWriter says whether a missing writer is broken; nil when the
+	// cluster's role could not be read (dbcGlobalRoles.expectsWriter).
+	ExpectsWriter         *bool
 	DeletionProtection    *bool
 	StorageEncrypted      *bool
 	BackupRetentionPeriod *int32
@@ -162,64 +169,39 @@ type dbClusterState struct {
 // lifecycle status and stacks on top of it.
 func computeDBClusterFindings(c dbClusterState) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	postureFindings, postureDetails := rdsPostureFindings(c.Posture, dbcPostureCodes)
-
-	// Broken statuses — first match wins; no warning stacking.
-	brokenCode := map[string]domain.FindingCode{
-		"failed":                              CodeDBCFailed,
-		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
-		"incompatible-parameters":             CodeDBCIncompatibleParameters,
-	}
-	if code, ok := brokenCode[c.Status]; ok {
-		lead := []domain.Finding{wave1Finding(code)}
-		return append(lead, postureFindings...), postureDetails
-	}
-
-	// No writer on an available cluster — reads only (Broken; beats warnings).
-	if c.Status == "available" && c.Writers == 0 {
-		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
-		return append(lead, postureFindings...), postureDetails
-	}
-
 	// A cluster on its way out has no posture worth reporting.
 	if isTeardownStatus(c.Status) {
 		postureFindings, postureDetails = nil, nil
 	}
 
-	// Transitional statuses.
-	if _, ok := transitionalDBCStatusSet[c.Status]; ok {
-		lead := []domain.Finding{wave1Finding(CodeDBCTransitional, c.Status)}
-		return append(lead, postureFindings...), postureDetails
+	if lead, ok := dbcLifecycle.finding(c.Status, c.Status); ok {
+		return append([]domain.Finding{lead}, postureFindings...), postureDetails
 	}
-
-	// Healthy available — collect Wave-1 warnings.
-	if c.Status == "available" {
-		var findings []domain.Finding
-		if c.DeletionProtection != nil && !*c.DeletionProtection {
-			findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
-		}
-		if c.StorageEncrypted != nil && !*c.StorageEncrypted {
-			findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest))
-		}
-		if c.BackupRetentionPeriod != nil && *c.BackupRetentionPeriod == 0 {
-			findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
-		}
-		return append(findings, postureFindings...), postureDetails
-	}
-
-	// A cluster AWS reported no status for has no keyword to pass through.
-	// The transitional wording puts that keyword in front of "in progress",
-	// and an empty one claims a transition nobody reported.
-	if c.Status == "" {
+	if c.Status != "available" {
 		return postureFindings, postureDetails
 	}
 
-	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	lead := []domain.Finding{wave1Finding(CodeDBCTransitional, c.Status)}
-	return append(lead, postureFindings...), postureDetails
+	// No writer on an available cluster — reads only (Broken; beats warnings).
+	if c.Writers == 0 && aws.ToBool(c.ExpectsWriter) {
+		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
+		return append(lead, postureFindings...), postureDetails
+	}
+
+	var findings []domain.Finding
+	if c.DeletionProtection != nil && !*c.DeletionProtection {
+		findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
+	}
+	if c.StorageEncrypted != nil && !*c.StorageEncrypted {
+		findings = append(findings, wave1Finding(CodeDBCNotEncryptedAtRest))
+	}
+	if c.BackupRetentionPeriod != nil && *c.BackupRetentionPeriod == 0 {
+		findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
+	}
+	return append(findings, postureFindings...), postureDetails
 }
 
 // computeDBCFindings reads a DocumentDB cluster's findings.
-func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+func computeDBCFindings(cluster docdbtypes.DBCluster, expectsWriter *bool) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	writers := 0
 	for _, m := range cluster.DBClusterMembers {
 		if aws.ToBool(m.IsClusterWriter) {
@@ -229,6 +211,7 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 	return computeDBClusterFindings(dbClusterState{
 		Status:                aws.ToString(cluster.Status),
 		Writers:               writers,
+		ExpectsWriter:         expectsWriter,
 		DeletionProtection:    cluster.DeletionProtection,
 		StorageEncrypted:      cluster.StorageEncrypted,
 		BackupRetentionPeriod: cluster.BackupRetentionPeriod,
@@ -241,16 +224,9 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) ([]domain.Finding, map[dom
 }
 
 // dedupResourcesByID returns rs with duplicate Resource.ID entries removed,
-// keeping the first occurrence. Used by the dbc and dbc-snap fetchers where
-// the DocDB and RDS SDKs both return overlapping rows for the same cluster /
-// snapshot (verified live: the DocDB DescribeDBClusters endpoint
-// returns aurora-postgresql clusters too). DocDB-side rows are appended first
-// at the call sites, so first-occurrence wins keeps the docdb-side row.
-//
-// Dedup-by-ID rather than an engine filter at source: an engine filter goes
-// silently stale the moment AWS adds a new docdb engine variant or new aurora
-// flavor, whereas dedup-by-ID is symmetric across both fetchers and robust to
-// SDK drift.
+// keeping the first occurrence. The dbc and dbc-snap fetchers append the
+// DocumentDB-side rows first, so a row both lanes return keeps its
+// DocumentDB shape.
 func dedupResourcesByID(rs []resource.Resource) []resource.Resource {
 	if len(rs) < 2 {
 		return rs

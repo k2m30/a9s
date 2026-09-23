@@ -92,15 +92,6 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 
 		findings, attentionDetails := computeDBIFindings(db, now)
 		statusPhrase := domain.StatusPhrase(findings)
-		if statusPhrase == "" {
-			// Unknown / undocumented RDS status: keep the raw value visible in
-			// the table; colorDBI inspects Fields["status"] and the
-			// public/encrypted/deletion-protection overlays. "available" with zero
-			// warnings returns "".
-			if raw := aws.ToString(db.DBInstanceStatus); raw != "" && raw != "available" {
-				statusPhrase = raw
-			}
-		}
 
 		r := resource.Resource{
 			ID:       dbIdentifier,
@@ -151,79 +142,44 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 	}, nil
 }
 
-// transitionalStatusSet contains RDS instance statuses that indicate a
-// transitional (Warning) state. These show a pending modification key suffix when applicable.
-var transitionalStatusSet = map[string]struct{}{
-	"creating": {}, "modifying": {}, "backing-up": {}, "rebooting": {},
-	"renaming": {}, "resetting-master-credentials": {}, "starting": {},
-	"stopping": {}, "upgrading": {}, "maintenance": {},
-	"configuring-enhanced-monitoring": {}, "configuring-iam-database-auth": {},
-	"configuring-log-exports": {}, "converting-to-vpc": {}, "moving-to-vpc": {},
-	"storage-optimization": {}, "deleting": {},
-}
-
 // computeDBIFindings returns the findings for an RDS DB instance plus the
 // supporting AttentionDetail rows keyed by the finding that owns them.
-// Broken statuses take priority in the status column; transitional statuses
-// are Warn; the security-posture pack (rds_posture.go) is evaluated
-// independently and stacks on top of whatever the lifecycle status says,
-// except on an instance that is being torn down.
+// The lifecycle status leads; the security-posture pack (rds_posture.go) is
+// evaluated independently and stacks on top of whatever the lifecycle status
+// says, except on an instance that is being torn down.
 func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	status := aws.ToString(db.DBInstanceStatus)
-
-	// Broken statuses. `stopped` belongs here: an instance you must restart
-	// before it can serve traffic is operationally broken, not transitional.
-	brokenMap := map[string]domain.FindingCode{
-		"failed":                              CodeDBIFailed,
-		"storage-full":                        CodeDBIStorageFull,
-		"incompatible-network":                CodeDBIIncompatibleNetwork,
-		"incompatible-option-group":           CodeDBIIncompatibleOptionGroup,
-		"incompatible-parameters":             CodeDBIIncompatibleParameters,
-		"incompatible-restore":                CodeDBIIncompatibleRestore,
-		"restore-error":                       CodeDBIRestoreError,
-		"inaccessible-encryption-credentials": CodeDBIEncryptionKeyUnavailable,
-		"stopped":                             CodeDBIStopped,
-	}
 	postureFindings, postureDetails := dbiPostureFindings(db, now)
 	// An instance on its way out has no posture worth reporting.
 	if isTeardownStatus(status) {
 		postureFindings, postureDetails = nil, nil
 	}
 
-	if code, ok := brokenMap[status]; ok {
-		lead := []domain.Finding{wave1Finding(code)}
-		return append(lead, postureFindings...), postureDetails
+	transitionalPhrase := status
+	if key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues); key != "" {
+		transitionalPhrase = status + ": " + key
 	}
-	if _, ok := transitionalStatusSet[status]; ok {
-		key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues)
-		phrase := status
-		if key != "" {
-			phrase = status + ": " + key
-		}
-		lead := []domain.Finding{wave1Finding(CodeDBITransitional, phrase)}
-		return append(lead, postureFindings...), postureDetails
+	if lead, ok := dbiLifecycle.finding(status, transitionalPhrase); ok {
+		return append([]domain.Finding{lead}, postureFindings...), postureDetails
 	}
-	if status == "available" {
-		var findings []domain.Finding
-		if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
-			findings = append(findings, wave1Finding(CodeDBINoAutomatedBackups))
-		}
-		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
-			findings = append(findings, wave1Finding(CodeDBIPubliclyAccessible))
-		}
-		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
-			findings = append(findings, wave1Finding(CodeDBIUnencryptedStorage))
-		}
-		if db.DeletionProtection != nil && !*db.DeletionProtection {
-			findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff))
-		}
-		return append(findings, postureFindings...), postureDetails
+	if status != "available" {
+		return postureFindings, postureDetails
 	}
-	// Unknown status: no lifecycle finding, so the row reads healthy on its
-	// lifecycle and the posture pack still decides its colour. Emitting a
-	// warning for a status a9s does not recognise would flag every future RDS
-	// state AWS adds, most of which are benign.
-	return postureFindings, postureDetails
+
+	var findings []domain.Finding
+	if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
+		findings = append(findings, wave1Finding(CodeDBINoAutomatedBackups))
+	}
+	if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
+		findings = append(findings, wave1Finding(CodeDBIPubliclyAccessible))
+	}
+	if db.StorageEncrypted != nil && !*db.StorageEncrypted {
+		findings = append(findings, wave1Finding(CodeDBIUnencryptedStorage))
+	}
+	if db.DeletionProtection != nil && !*db.DeletionProtection {
+		findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff))
+	}
+	return append(findings, postureFindings...), postureDetails
 }
 
 // dbiPostureFindings evaluates the shared RDS posture predicates plus the

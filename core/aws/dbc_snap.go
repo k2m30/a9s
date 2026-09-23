@@ -51,7 +51,10 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 	return findings
 }
 
-// FetchDocDBClusterSnapshotsPage fetches a single page of DocumentDB cluster snapshots.
+// FetchDocDBClusterSnapshotsPage fetches a single page of DocumentDB cluster
+// snapshots. The DocumentDB endpoint is shared with RDS and Neptune and
+// answers every engine's snapshots; its Filters parameter is documented as
+// not supported, so a snapshot that names another engine is skipped here.
 func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &docdb.DescribeDBClusterSnapshotsInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
@@ -70,6 +73,9 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 	var resources []resource.Resource
 
 	for _, snapshot := range output.DBClusterSnapshots {
+		if e := aws.ToString(snapshot.Engine); e != "" && e != "docdb" {
+			continue
+		}
 		snapshotID := ""
 		if snapshot.DBClusterSnapshotIdentifier != nil {
 			snapshotID = *snapshot.DBClusterSnapshotIdentifier

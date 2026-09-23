@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -195,7 +196,9 @@ func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
 
 func listDocDBClusters(ctx context.Context, client *docdb.Client) ([]dbcCluster, error) {
 	var clusters []dbcCluster
-	paginator := docdb.NewDescribeDBClustersPaginator(client, &docdb.DescribeDBClustersInput{})
+	paginator := docdb.NewDescribeDBClustersPaginator(client, &docdb.DescribeDBClustersInput{
+		Filters: []docdbtypes.Filter{{Name: aws.String("engine"), Values: []string{"docdb"}}},
+	})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -217,10 +220,21 @@ func listRDSClusters(ctx context.Context, client *rds.Client) ([]dbcCluster, err
 			return nil, err
 		}
 		for _, c := range out.DBClusters {
+			if !rdsSideDBCEngine(aws.ToString(c.Engine)) {
+				continue
+			}
 			clusters = append(clusters, dbcClusterFromRDS(c))
 		}
 	}
 	return clusters, nil
+}
+
+// rdsSideDBCEngine reports whether a cluster or cluster snapshot the RDS call
+// returns belongs to DB Clusters: DocumentDB rows come from the DocumentDB
+// call, and Neptune is not listed.
+func rdsSideDBCEngine(engine string) bool {
+	engine = strings.ToLower(engine)
+	return engine != "docdb" && engine != "neptune"
 }
 
 // combineDBCClusters merges the two DescribeDBClusters sources with docdb-first
@@ -406,6 +420,9 @@ func listDocDBClusterSnapshots(ctx context.Context, client *docdb.Client) ([]dbc
 			return nil, err
 		}
 		for _, s := range out.DBClusterSnapshots {
+			if e := aws.ToString(s.Engine); e != "" && e != "docdb" {
+				continue
+			}
 			snaps = append(snaps, dbcSnapshot{
 				Source:                      "docdb",
 				DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),
@@ -433,6 +450,9 @@ func listRDSClusterSnapshots(ctx context.Context, client *rds.Client) ([]dbcSnap
 			return nil, err
 		}
 		for _, s := range out.DBClusterSnapshots {
+			if !rdsSideDBCEngine(aws.ToString(s.Engine)) {
+				continue
+			}
 			snaps = append(snaps, dbcSnapshot{
 				Source:                      "rds",
 				DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),

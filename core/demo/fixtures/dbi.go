@@ -387,6 +387,35 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	}
 }
 
+// One witness per DB instance lifecycle status that has a finding of its
+// own. They carry Wave-1 findings only, so they sit after the bulk pool and
+// leave the Wave-2 witnesses inside EnrichmentCap.
+const (
+	DBIEncryptionRecoverable = "broken-dbi-encryption-recoverable"
+	DBIIncompatibleCreate    = "broken-dbi-incompatible-create"
+	DBIInsufficientCapacity  = "broken-dbi-insufficient-capacity"
+	DBIUpgradeFailed         = "broken-dbi-upgrade-failed"
+	// DBIUnrecognisedStatus reports a status in neither AWS DB instance
+	// status table.
+	DBIUnrecognisedStatus = "warn-dbi-unrecognised-status"
+)
+
+func dbiLifecycleWitnesses() []rdstypes.DBInstance {
+	var out []rdstypes.DBInstance
+	for _, w := range []struct{ id, status string }{
+		{DBIEncryptionRecoverable, "inaccessible-encryption-credentials-recoverable"},
+		{DBIIncompatibleCreate, "incompatible-create"},
+		{DBIInsufficientCapacity, "insufficient-capacity"},
+		{DBIUpgradeFailed, "upgrade-failed"},
+		{DBIUnrecognisedStatus, "storage-rebalancing"},
+	} {
+		db := dbiBaselineHealthy(w.id, "arn:aws:rds:us-east-1:123456789012:db:"+w.id)
+		db.DBInstanceStatus = aws.String(w.status)
+		out = append(out, db)
+	}
+	return out
+}
+
 func dbiDocDBClusterMember() rdstypes.DBInstance {
 	db := dbiBaselineHealthy(DBIDocDBMember, DBIDocDBMemberARN)
 	db.Engine = aws.String("docdb")

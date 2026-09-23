@@ -68,6 +68,11 @@ func (f *RDSFake) DescribeDBClusters(_ context.Context, _ *rds.DescribeDBCluster
 	return &rds.DescribeDBClustersOutput{DBClusters: f.fix.DBClusters}, nil
 }
 
+// DescribeGlobalClusters answers that the demo Region holds no global database.
+func (f *RDSFake) DescribeGlobalClusters(_ context.Context, _ *rds.DescribeGlobalClustersInput, _ ...func(*rds.Options)) (*rds.DescribeGlobalClustersOutput, error) {
+	return &rds.DescribeGlobalClustersOutput{}, nil
+}
+
 // DescribeDBClusterSnapshots returns the Aurora + Multi-AZ DB cluster snapshots from fixture data.
 func (f *RDSFake) DescribeDBClusterSnapshots(_ context.Context, _ *rds.DescribeDBClusterSnapshotsInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error) {
 	return &rds.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: f.fix.DBClusterSnapshots}, nil

@@ -27,21 +27,14 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
   `CreateDBSnapshot` on Aurora cluster members; Aurora cluster-level snapshots
   only exist as `DBClusterSnapshot`s on the RDS side, which is why they live
   here and not in `dbi-snap`.
-  **The DocDB and RDS SDKs are NOT interchangeable, and they overlap.** The AWS
-  SDK Go v2 docstrings imply each scopes its `DescribeDBClusterSnapshots` response
-  to its own engine family, but **empirically (AS-145, verified live on dev-readonly
-  account `000000000000` eu-west-2), both endpoints return snapshot rows for both
-  engine families** — every snapshot for clusters that exist in both engines'
-  result sets is returned by both endpoints. Naïve concat would therefore double
-  every snapshot row.
-  **Dedup contract**: results are concatenated DocDB-side first, then deduped by
-  `Resource.ID` with first-occurrence-wins. The DocDB-side row is therefore preserved
-  on collisions, which is the engine-correct one for detail enrichment and the
-  `dbc-snap → dbc` related-panel pivot (`DBClusterSnapshot.DBClusterIdentifier` read
-  via the docdb-typed `RawStruct`). See `core/aws/dbc_snap.go` (concat region)
-  and the package-private `dedupResourcesByID` helper in `core/aws/dbc.go` for
-  the implementation; this dedup behavior is part of the fetcher contract — do not
-  remove it.
+  **The DocDB and RDS SDKs share one regional endpoint** with Neptune, and each
+  answers every engine's snapshots. The docdb SDK documents the `Filters` parameter of
+  `DescribeDBClusterSnapshots` as not supported, so the DocumentDB lane skips a
+  snapshot whose `Engine` names another engine, and the RDS lane skips `docdb` and
+  `neptune` snapshots: DocumentDB snapshots are listed in their DocumentDB shape, Aurora
+  and Multi-AZ snapshots in their RDS shape, and Neptune snapshots are not listed.
+  Results are concatenated DocDB-side first and deduped by `Resource.ID`,
+  first-occurrence-wins.
 
 ## 2. Related Resources Panel (detail view, right column)
 

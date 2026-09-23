@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -24,8 +25,43 @@ func NewDocDB() *DocDBFake {
 	return &DocDBFake{fix: fixtures.NewDBCFixtures()}
 }
 
-func (f *DocDBFake) DescribeDBClusters(_ context.Context, _ *docdb.DescribeDBClustersInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClustersOutput, error) {
-	return &docdb.DescribeDBClustersOutput{DBClusters: f.fix.DBClusters}, nil
+// DescribeDBClusters answers as the regional endpoint DocumentDB shares with
+// RDS and Neptune does: the RDS fixture's clusters, Neptune among them, sit
+// beside the DocumentDB ones unless an engine filter names the engines wanted.
+func (f *DocDBFake) DescribeDBClusters(_ context.Context, in *docdb.DescribeDBClustersInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClustersOutput, error) {
+	all := slices.Clone(f.fix.DBClusters)
+	for _, c := range fixtures.NewRDSFixtures().DBClusters {
+		all = append(all, docdbtypes.DBCluster{
+			DBClusterIdentifier: c.DBClusterIdentifier,
+			DBClusterArn:        c.DBClusterArn,
+			Engine:              c.Engine,
+			EngineVersion:       c.EngineVersion,
+			Status:              c.Status,
+		})
+	}
+	var engines []string
+	if in != nil {
+		for _, flt := range in.Filters {
+			if aws.ToString(flt.Name) == "engine" {
+				engines = flt.Values
+			}
+		}
+	}
+	if engines == nil {
+		return &docdb.DescribeDBClustersOutput{DBClusters: all}, nil
+	}
+	var out []docdbtypes.DBCluster
+	for _, c := range all {
+		if slices.Contains(engines, aws.ToString(c.Engine)) {
+			out = append(out, c)
+		}
+	}
+	return &docdb.DescribeDBClustersOutput{DBClusters: out}, nil
+}
+
+// DescribeGlobalClusters answers that the demo Region holds no global cluster.
+func (f *DocDBFake) DescribeGlobalClusters(_ context.Context, _ *docdb.DescribeGlobalClustersInput, _ ...func(*docdb.Options)) (*docdb.DescribeGlobalClustersOutput, error) {
+	return &docdb.DescribeGlobalClustersOutput{}, nil
 }
 
 func (f *DocDBFake) DescribeDBClusterSnapshots(_ context.Context, _ *docdb.DescribeDBClusterSnapshotsInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error) {

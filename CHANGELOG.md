@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DB clusters and DB instances in a failed state AWS documents now read broken
+  with their own phrase: an encryption key that is recoverable, a failed clone,
+  migration or engine upgrade, and on instances `incompatible-create` and
+  `insufficient capacity`. They used to read as in progress or as healthy. A
+  stopped cluster reads `stopped (storage still billed)`, as a stopped instance
+  does, and `delete-precheck`, `storage-config-upgrade` and
+  `storage-initialization` instances read as transitional. A status in neither
+  AWS table shows as the status word itself, at warning, on clusters and
+  instances alike.
+- DB Clusters no longer lists Neptune clusters, and an Aurora or Multi-AZ DB
+  cluster is listed from the RDS call, so its auto minor version upgrade and
+  IAM database authentication checks run and its subnets are read from RDS.
+  DB Cluster Snapshots follows the same split. The snapshot collector records
+  the same set.
+- A secondary DB cluster, a replica of another cluster or a global database
+  member AWS does not list as the writer, no longer reads `no writer: reads
+  only`: it is read-only by design. A global primary without a writer still
+  does. When the global database member list cannot be read, such a cluster
+  gets no verdict and DB Clusters reports the list as partial. A Neptune DB instance's DB Clusters pivot now shows 0 instead of a
+  cluster DB Clusters does not list.
 - The snapshot collector no longer writes secret values to `snapshot.json`. Glue job arguments,
   CodeBuild environment variables and pipeline action configurations are recorded by name,
   Parameter Store and Secrets Manager variables by reference, CloudTrail events without their

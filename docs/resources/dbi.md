@@ -34,8 +34,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `dbc`
 
 - **Why related**: Aurora instance → cluster. The cluster owns endpoints, failover policy, and backup configuration the operator needs to reason about.
-- **How discovered**: read `DBClusterIdentifier` on the `DBInstance`; look up the already-loaded `dbc` list by that ID (non-Aurora engines leave the field empty and the row is simply absent).
-- **Count shown**: yes — 0 for RDS engines, 1 for Aurora members.
+- **How discovered**: read `DBClusterIdentifier` on the `DBInstance`; look up the already-loaded `dbc` list by that ID (engines outside a cluster leave the field empty and the row is simply absent). A Neptune instance names its cluster, but DB Clusters does not list Neptune, so the count is a proven 0.
+- **Count shown**: yes — 0 for stand-alone instances and Neptune members, 1 for Aurora and DocumentDB members.
 
 ### `eni`
 
@@ -107,7 +107,29 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `DBInstanceStatus` in transitional set (`creating`, `modifying`, `backing-up`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `upgrading`, `maintenance`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `moving-to-vpc`, `storage-optimization`, `deleting`) → Warning.
+The lifecycle rows map every status in the DB instance status tables of the Amazon RDS User Guide ("Viewing Amazon RDS DB instance status") and the Amazon Aurora User Guide ("Viewing DB instance status in an Aurora cluster"). `dbc` reads its status through the same rule, so `stopped` and a status in neither table render alike on both.
+
+- **Signal**: `DBInstanceStatus` in transitional set (`backing-up`, `backtracking`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `creating`, `delete-precheck`, `deleting`, `maintenance`, `modifying`, `moving-to-vpc`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-config-upgrade`, `storage-initialization`, `storage-optimization`, `upgrading`) → Warning.
+  - **State bucket**: Warning.
+  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `DBInstanceStatus == inaccessible-encryption-credentials-recoverable` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `DBInstanceStatus == incompatible-create` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `DBInstanceStatus == insufficient-capacity` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `DBInstanceStatus == upgrade-failed` → Broken.
+  - **State bucket**: Broken.
+  - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
+
+- **Signal**: `DBInstanceStatus` is in neither AWS table → Warning, the status word itself, with a detail saying a9s does not recognise it.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
@@ -232,6 +254,11 @@ One row per signal from §3:
 | `incompatible-restore` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-restore` |
 | `restore-error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `restore-error` |
 | `inaccessible-encryption-credentials` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unavailable` |
+| `inaccessible-encryption-credentials-recoverable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unavailable (recoverable)` |
+| `incompatible-create` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-create` |
+| `insufficient-capacity` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `insufficient capacity` |
+| `upgrade-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `engine upgrade failed` |
+| `DBInstanceStatus` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no automated backups` |
 | `PubliclyAccessible == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public endpoint` |
 | `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted storage` |
@@ -314,6 +341,11 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbi.broken.restore\_error | restore-error | broken | wave1 | The instance failed while restoring from backup, so the recovery you were counting on did not land. Read its events for the failing step and restore again, choosing a different snapshot or point in time if one snapshot is the problem. |
 | dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 | The KMS key that encrypts this instance's storage cannot be used, so the database is inaccessible and stays that way until the key is usable again. Check whether the key was disabled, scheduled for deletion, or has a policy that no longer grants the database service access. |
 | dbi.broken.stopped | stopped (storage still billed) | broken | wave1 | The database accepts no connections, and a stopped instance is restarted automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage and any provisioned IOPS are billed while it sits here. |
+| dbi.broken.encryption\_key\_recoverable | encryption key unavailable (recoverable) | broken | wave1 | The KMS key that encrypts this instance's storage cannot be used, so the database is inaccessible, but AWS can still recover it. Re-enable the key or restore the database service's access to it, then reboot the instance; its storage is billed while it waits. |
+| dbi.broken.incompatible\_create | incompatible-create | broken | wave1 | AWS cannot finish creating this instance because something it depends on is incompatible with it, for example an instance profile without the permissions the instance needs. Read the instance's recent events for the resource AWS names and correct it. |
+| dbi.broken.insufficient\_capacity | insufficient capacity | broken | wave1 | AWS has no capacity for this instance class in this Availability Zone right now, so the instance was never created. Delete it and create it again in a few hours, or create it with a different instance class or Availability Zone. |
+| dbi.broken.upgrade\_failed | engine upgrade failed | broken | wave1 | AWS could not upgrade this instance to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new instance on a supported version. |
+| dbi.warn.unrecognised\_status | <status> | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
 | dbi.warn.transitional | <transitional status> | warn | wave1 | The instance is mid-change, so it may fail over, drop connections, or run with reduced performance until it settles. Wait for it to return to available before starting another modification or judging its performance. |
 | dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | Backup retention is zero, so there are no automated backups and no point-in-time recovery: a bad deployment or a dropped table can only be undone from a manual snapshot. Set a retention period of at least one day, and longer for anything that matters. |
 | dbi.warn.publicly\_accessible | public endpoint | warn | wave1 | The instance resolves to a routable address from outside the VPC, so only its security groups stand between the database and the internet. Turn public accessibility off and reach it over a private link or a bastion host unless an external system genuinely requires it. |

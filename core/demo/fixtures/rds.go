@@ -4,6 +4,7 @@
 package fixtures
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -44,7 +45,7 @@ var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        append(append(dbi.Instances, dbiDocDBClusterMember()), normalizeRDSInstancePosture(legacy)...),
+		DBInstances:        slices.Concat(dbi.Instances, []rdstypes.DBInstance{dbiDocDBClusterMember()}, normalizeRDSInstancePosture(legacy), dbiLifecycleWitnesses()),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
 		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
@@ -69,6 +70,22 @@ const (
 	DBCIAMAuthOff = "warn-dbc-iam-auth-off"
 	// DBCDefaultMasterUser keeps the vendor default administrative username.
 	DBCDefaultMasterUser = "warn-dbc-default-master-user"
+	// DBCEncryptionRecoverable is the Aurora cluster whose KMS key AWS
+	// reports as inaccessible but recoverable.
+	DBCEncryptionRecoverable = "broken-dbc-encryption-recoverable"
+	// DBCStopped is the stopped Aurora cluster.
+	DBCStopped = "broken-dbc-stopped"
+	// DBCCloningFailed, DBCMigrationFailed and DBCUpgradeFailed are Aurora
+	// clusters in those failed states.
+	DBCCloningFailed   = "broken-dbc-cloning-failed"
+	DBCMigrationFailed = "broken-dbc-migration-failed"
+	DBCUpgradeFailed   = "broken-dbc-upgrade-failed"
+	// DBCUnrecognisedStatus reports a status in neither AWS DB cluster
+	// status table.
+	DBCUnrecognisedStatus = "warn-dbc-unrecognised-status"
+	// DBCNeptune is the Neptune cluster the shared endpoint answers beside
+	// the Aurora and DocumentDB ones; DB Clusters does not list it.
+	DBCNeptune = "acme-graph-neptune"
 	// DBCSnapPublic is the cluster snapshot shared with every AWS account.
 	DBCSnapPublic = "shared-with-all-aurora-snap"
 	// DBISnapPublic is the DB instance snapshot shared with every AWS account.
@@ -567,6 +584,20 @@ func buildRDSDBClusters() []rdstypes.DBCluster {
 		rdsPostureWitnessCluster(DBCMinorUpgradeOff, func(c *rdstypes.DBCluster) { c.AutoMinorVersionUpgrade = aws.Bool(false) }),
 		rdsPostureWitnessCluster(DBCIAMAuthOff, func(c *rdstypes.DBCluster) { c.IAMDatabaseAuthenticationEnabled = aws.Bool(false) }),
 		rdsPostureWitnessCluster(DBCDefaultMasterUser, func(c *rdstypes.DBCluster) { c.MasterUsername = aws.String("admin") }),
+		rdsPostureWitnessCluster(DBCEncryptionRecoverable, func(c *rdstypes.DBCluster) {
+			c.Status = aws.String("inaccessible-encryption-credentials-recoverable")
+		}),
+		rdsPostureWitnessCluster(DBCStopped, func(c *rdstypes.DBCluster) { c.Status = aws.String("stopped") }),
+		rdsPostureWitnessCluster(DBCCloningFailed, func(c *rdstypes.DBCluster) { c.Status = aws.String("cloning-failed") }),
+		rdsPostureWitnessCluster(DBCMigrationFailed, func(c *rdstypes.DBCluster) { c.Status = aws.String("migration-failed") }),
+		rdsPostureWitnessCluster(DBCUpgradeFailed, func(c *rdstypes.DBCluster) { c.Status = aws.String("upgrade-failed") }),
+		rdsPostureWitnessCluster(DBCUnrecognisedStatus, func(c *rdstypes.DBCluster) { c.Status = aws.String("storage-rebalancing") }),
+		rdsPostureWitnessCluster(DBCNeptune, func(c *rdstypes.DBCluster) {
+			c.Engine = aws.String("neptune")
+			c.EngineVersion = aws.String("1.3.2.1")
+			c.Port = aws.Int32(8182)
+			c.Endpoint = aws.String(DBCNeptune + ".cluster-c9xyz123.us-east-1.neptune.amazonaws.com")
+		}),
 	}
 }
 
@@ -724,10 +755,10 @@ func buildRDSEvents() []rdstypes.Event {
 func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
-	Register(Pin{ShortName: "dbi", Rows: 52, Issues: 29, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 57, Issues: 34, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 13, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.
-	Register(Pin{ShortName: "dbc", Rows: 17, Issues: 14, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbc", Rows: 23, Issues: 20, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbc-snap", Rows: 14, Issues: 6, CoverageGaps: []string{"dim"}})
 }

@@ -53,11 +53,6 @@ func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []doma
 
 // FetchRDSDBClusterSnapshotsPage fetches a single page of Aurora + Multi-AZ DB
 // cluster snapshots via the RDS SDK.
-//
-// Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusterSnapshots.go:19-25),
-// this operation returns Aurora and Multi-AZ cluster snapshots. The docdb-side
-// DescribeDBClusterSnapshots is scoped to DocumentDB only
-// (docdb@v1.48.12/api_op_DescribeDBClusterSnapshots.go:14).
 func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBClusterSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &rds.DescribeDBClusterSnapshotsInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
@@ -76,6 +71,9 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 	var resources []resource.Resource
 
 	for _, snapshot := range output.DBClusterSnapshots {
+		if !isRDSSideDBCEngine(aws.ToString(snapshot.Engine)) {
+			continue
+		}
 		snapshotID := ""
 		if snapshot.DBClusterSnapshotIdentifier != nil {
 			snapshotID = *snapshot.DBClusterSnapshotIdentifier
