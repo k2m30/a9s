@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The snapshot collector no longer writes secret values to `snapshot.json`. Glue job arguments,
+  CodeBuild environment variables and pipeline action configurations are recorded by name,
+  Parameter Store and Secrets Manager variables by reference, CloudTrail events without their
+  request and response payload, a source repository URL without its credentials and a webhook
+  subscription by its origin. A `snapshot.json` written by an earlier version still holds the
+  old values: delete it or collect again.
+
 ## [3.58.0] - 2026-09-21
 
 ### Fixed

@@ -73,3 +73,7 @@ Guidelines:
 - Capture everything; let the checklist generator apply caps and paging.
 - Keep the JSON shape readable and stable — the checklist generator and human diffs depend
   on it.
+- Never record a value that can carry a secret. Environment variables, job and action
+  arguments, call payloads, and URLs that can hold userinfo or a token in their path or query
+  are recorded as keys, a reference to where the secret lives, or an origin — never the value.
+  The file sits on disk and gets copied around.

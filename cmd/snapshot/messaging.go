@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
@@ -98,6 +99,21 @@ type snsSubscription struct {
 	Owner           string `json:"owner"`
 }
 
+// An HTTP(S) endpoint's path and query are routinely the webhook's shared
+// secret and its userinfo is SNS's basic-auth form, so only scheme and host
+// are kept; an unparseable URL keeps nothing. The other protocols' endpoints
+// are ARNs, email addresses and phone numbers.
+func snsSubEndpointOf(protocol, endpoint string) string {
+	if protocol != "http" && protocol != "https" {
+		return endpoint
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func captureSNSSub(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sns.NewFromConfig(cfg)
 
@@ -113,7 +129,7 @@ func captureSNSSub(ctx context.Context, cfg aws.Config) (any, error) {
 				SubscriptionArn: aws.ToString(s.SubscriptionArn),
 				TopicArn:        aws.ToString(s.TopicArn),
 				Protocol:        aws.ToString(s.Protocol),
-				Endpoint:        aws.ToString(s.Endpoint),
+				Endpoint:        snsSubEndpointOf(aws.ToString(s.Protocol), aws.ToString(s.Endpoint)),
 				Owner:           aws.ToString(s.Owner),
 			})
 		}

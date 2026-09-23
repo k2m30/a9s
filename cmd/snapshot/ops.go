@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"maps"
+	"net/url"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,9 +20,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
+	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	smithy "github.com/aws/smithy-go"
@@ -52,8 +58,31 @@ type cbProject struct {
 
 type cbEnvVar struct {
 	Name  string `json:"name"`
-	Value string `json:"value"`
+	Value string `json:"value,omitempty"`
 	Type  string `json:"type"`
+}
+
+// A PLAINTEXT value (the type CodeBuild assumes when none is set) is the secret
+// itself; the reference types hold only the Parameter Store name or Secrets
+// Manager id where the secret lives.
+func cbEnvVarOf(ev cbtypes.EnvironmentVariable) cbEnvVar {
+	v := cbEnvVar{Name: aws.ToString(ev.Name), Type: string(ev.Type)}
+	switch ev.Type {
+	case cbtypes.EnvironmentVariableTypeParameterStore, cbtypes.EnvironmentVariableTypeSecretsManager:
+		v.Value = aws.ToString(ev.Value)
+	}
+	return v
+}
+
+// A Git source URL may embed the repository credential as userinfo. CodeCommit
+// ARNs and S3 paths are not URLs and pass through unchanged.
+func cbSourceLocationOf(loc string) string {
+	u, err := url.Parse(loc)
+	if err != nil || u.Scheme == "" || u.User == nil {
+		return loc
+	}
+	u.User = nil
+	return u.String()
 }
 
 type cbBuildInfo struct {
@@ -91,7 +120,7 @@ func captureCB(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			if p.Source != nil {
 				proj.SourceType = string(p.Source.Type)
-				proj.SourceLocation = aws.ToString(p.Source.Location)
+				proj.SourceLocation = cbSourceLocationOf(aws.ToString(p.Source.Location))
 			}
 			if p.Artifacts != nil {
 				proj.ArtifactsType = string(p.Artifacts.Type)
@@ -100,11 +129,7 @@ func captureCB(ctx context.Context, cfg aws.Config) (any, error) {
 			if p.Environment != nil {
 				proj.EnvImage = aws.ToString(p.Environment.Image)
 				for _, ev := range p.Environment.EnvironmentVariables {
-					proj.EnvVars = append(proj.EnvVars, cbEnvVar{
-						Name:  aws.ToString(ev.Name),
-						Value: aws.ToString(ev.Value),
-						Type:  string(ev.Type),
-					})
+					proj.EnvVars = append(proj.EnvVars, cbEnvVarOf(ev))
 				}
 			}
 			if p.LogsConfig != nil && p.LogsConfig.CloudWatchLogs != nil {
@@ -202,13 +227,31 @@ type pipelineArtStore struct {
 }
 
 type pipelineAction struct {
-	StageName     string            `json:"stage_name"`
-	ActionName    string            `json:"action_name"`
-	Category      string            `json:"category"`
-	Owner         string            `json:"owner"`
-	Provider      string            `json:"provider"`
-	Configuration map[string]string `json:"configuration,omitempty"`
-	RoleArn       string            `json:"role_arn,omitempty"`
+	StageName         string   `json:"stage_name"`
+	ActionName        string   `json:"action_name"`
+	Category          string   `json:"category"`
+	Owner             string   `json:"owner"`
+	Provider          string   `json:"provider"`
+	ConfigurationKeys []string `json:"configuration_keys,omitempty"`
+	RoleArn           string   `json:"role_arn,omitempty"`
+}
+
+// Action configuration is provider-defined and free-form (a CodeBuild action's
+// EnvironmentVariables carries PLAINTEXT values, a Lambda action's
+// UserParameters is arbitrary), so the record keeps which keys exist only.
+func pipelineActionOf(stageName string, action cptypes.ActionDeclaration) pipelineAction {
+	pa := pipelineAction{
+		StageName:         stageName,
+		ActionName:        aws.ToString(action.Name),
+		ConfigurationKeys: slices.Sorted(maps.Keys(action.Configuration)),
+		RoleArn:           aws.ToString(action.RoleArn),
+	}
+	if action.ActionTypeId != nil {
+		pa.Category = string(action.ActionTypeId.Category)
+		pa.Owner = string(action.ActionTypeId.Owner)
+		pa.Provider = aws.ToString(action.ActionTypeId.Provider)
+	}
+	return pa
 }
 
 func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
@@ -271,23 +314,10 @@ func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
 
 			for _, stage := range declOut.Pipeline.Stages {
 				for _, action := range stage.Actions {
-					pa := pipelineAction{
-						StageName:  aws.ToString(stage.Name),
-						ActionName: aws.ToString(action.Name),
-					}
-					if action.ActionTypeId != nil {
-						pa.Category = string(action.ActionTypeId.Category)
-						pa.Owner = string(action.ActionTypeId.Owner)
-						pa.Provider = aws.ToString(action.ActionTypeId.Provider)
-					}
-					if len(action.Configuration) > 0 {
-						pa.Configuration = action.Configuration
-					}
 					if action.RoleArn != nil {
-						pa.RoleArn = *action.RoleArn
 						decl.ActionRoleArns = append(decl.ActionRoleArns, *action.RoleArn)
 					}
-					decl.Actions = append(decl.Actions, pa)
+					decl.Actions = append(decl.Actions, pipelineActionOf(aws.ToString(stage.Name), action))
 				}
 			}
 			info.Declaration = decl
@@ -721,6 +751,23 @@ type ctEventInfo struct {
 
 const ctEventsCap = 200
 
+// requestParameters and responseElements echo the API call's own payload,
+// which carries whatever the caller sent (environment variables, job
+// arguments); the rest of the event is CloudTrail's envelope.
+func ctEventEnvelopeOf(raw string) string {
+	var event map[string]json.RawMessage
+	if json.Unmarshal([]byte(raw), &event) != nil {
+		return ""
+	}
+	delete(event, "requestParameters")
+	delete(event, "responseElements")
+	out, err := json.Marshal(event)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
 func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudtrail.NewFromConfig(cfg)
 
@@ -741,7 +788,7 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 				EventSource:     aws.ToString(e.EventSource),
 				ReadOnly:        aws.ToString(e.ReadOnly),
 				AccessKeyId:     aws.ToString(e.AccessKeyId),
-				CloudTrailEvent: aws.ToString(e.CloudTrailEvent),
+				CloudTrailEvent: ctEventEnvelopeOf(aws.ToString(e.CloudTrailEvent)),
 			}
 			for _, r := range e.Resources {
 				info.ResourceTypes = append(info.ResourceTypes, aws.ToString(r.ResourceType))
@@ -962,20 +1009,41 @@ type glueData struct {
 }
 
 type glueJobInfo struct {
-	Name                  string            `json:"name"`
-	Role                  string            `json:"role,omitempty"`
-	ScriptLocation        string            `json:"script_location,omitempty"`
-	SecurityConfiguration string            `json:"security_configuration,omitempty"`
-	LogUri                string            `json:"log_uri,omitempty"`
-	CreatedOn             string            `json:"created_on,omitempty"`
-	LastModifiedOn        string            `json:"last_modified_on,omitempty"`
-	DefaultArguments      map[string]string `json:"default_arguments,omitempty"`
-	Connections           []string          `json:"connections,omitempty"`
-	RunsOutcome           string            `json:"runs_outcome"`
-	RunsErrorCode         string            `json:"runs_error_code,omitempty"`
-	LatestRunState        string            `json:"latest_run_state,omitempty"`
-	LatestRunErrorMessage string            `json:"latest_run_error_message,omitempty"`
-	LatestRunStartedOn    string            `json:"latest_run_started_on,omitempty"`
+	Name                  string   `json:"name"`
+	Role                  string   `json:"role,omitempty"`
+	ScriptLocation        string   `json:"script_location,omitempty"`
+	SecurityConfiguration string   `json:"security_configuration,omitempty"`
+	LogUri                string   `json:"log_uri,omitempty"`
+	CreatedOn             string   `json:"created_on,omitempty"`
+	LastModifiedOn        string   `json:"last_modified_on,omitempty"`
+	DefaultArgumentKeys   []string `json:"default_argument_keys,omitempty"`
+	Connections           []string `json:"connections,omitempty"`
+	RunsOutcome           string   `json:"runs_outcome"`
+	RunsErrorCode         string   `json:"runs_error_code,omitempty"`
+	LatestRunState        string   `json:"latest_run_state,omitempty"`
+	LatestRunErrorMessage string   `json:"latest_run_error_message,omitempty"`
+	LatestRunStartedOn    string   `json:"latest_run_started_on,omitempty"`
+}
+
+// Default arguments are free-form and routinely carry credentials, so the
+// record keeps which arguments exist, never their values.
+func glueJobInfoOf(j gluetypes.Job) glueJobInfo {
+	info := glueJobInfo{
+		Name:                  aws.ToString(j.Name),
+		Role:                  aws.ToString(j.Role),
+		SecurityConfiguration: aws.ToString(j.SecurityConfiguration),
+		LogUri:                aws.ToString(j.LogUri),
+		CreatedOn:             snapFormatTime(j.CreatedOn),
+		LastModifiedOn:        snapFormatTime(j.LastModifiedOn),
+		DefaultArgumentKeys:   slices.Sorted(maps.Keys(j.DefaultArguments)),
+	}
+	if j.Command != nil {
+		info.ScriptLocation = aws.ToString(j.Command.ScriptLocation)
+	}
+	if j.Connections != nil {
+		info.Connections = j.Connections.Connections
+	}
+	return info
 }
 
 func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
@@ -989,22 +1057,7 @@ func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
 			return nil, err
 		}
 		for _, j := range out.Jobs {
-			info := glueJobInfo{
-				Name:                  aws.ToString(j.Name),
-				Role:                  aws.ToString(j.Role),
-				SecurityConfiguration: aws.ToString(j.SecurityConfiguration),
-				LogUri:                aws.ToString(j.LogUri),
-				CreatedOn:             snapFormatTime(j.CreatedOn),
-				LastModifiedOn:        snapFormatTime(j.LastModifiedOn),
-				DefaultArguments:      j.DefaultArguments,
-			}
-			if j.Command != nil {
-				info.ScriptLocation = aws.ToString(j.Command.ScriptLocation)
-			}
-			if j.Connections != nil {
-				info.Connections = j.Connections.Connections
-			}
-
+			info := glueJobInfoOf(j)
 			runsOut, err := client.GetJobRuns(ctx, &glue.GetJobRunsInput{
 				JobName:    j.Name,
 				MaxResults: aws.Int32(1),
