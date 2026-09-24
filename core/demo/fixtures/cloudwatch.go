@@ -4,7 +4,6 @@ package fixtures
 
 import (
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -24,7 +23,7 @@ type CloudWatchFixtures struct {
 const relatedAlarmSNSARN = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
 
 // NewCloudWatchFixtures constructs CloudWatchFixtures from the canonical demo data.
-var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
+var sharedCloudWatchFixtures = shared(func() *CloudWatchFixtures {
 	return &CloudWatchFixtures{
 		Alarms: []cwtypes.MetricAlarm{
 			{

@@ -5,7 +5,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -32,7 +31,7 @@ type ECSFixtures struct {
 }
 
 // NewECSFixtures builds and returns a fully-populated ECSFixtures struct.
-var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
+var sharedECSFixtures = shared(func() *ECSFixtures {
 	clusters := buildECSClusters()
 	services := buildECSServices()
 	tasks := buildECSTasks()

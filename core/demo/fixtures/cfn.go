@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -86,7 +85,7 @@ func minimalCreateEventSequence(stackName, startTime, primaryResLogicalID, prima
 }
 
 // NewCFNFixtures constructs CFNFixtures from the canonical demo data.
-var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
+var sharedCFNFixtures = shared(func() *CFNFixtures {
 	const prodCIDeployRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 
 	stacks := []cfntypes.Stack{

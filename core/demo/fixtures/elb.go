@@ -5,7 +5,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -83,7 +82,7 @@ const (
 )
 
 // NewELBFixtures builds and returns a fully-populated ELBFixtures struct.
-var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
+var sharedELBFixtures = shared(func() *ELBFixtures {
 	f := &ELBFixtures{
 		Listeners: make(map[string][]elbv2types.Listener),
 		ListenerSNICerts: map[string][]string{

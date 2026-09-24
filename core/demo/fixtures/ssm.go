@@ -4,7 +4,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -42,7 +41,7 @@ func mustParseSSMTime(s string) time.Time {
 }
 
 // NewSSMFixtures constructs SSMFixtures from the canonical demo data.
-var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
+var sharedSSMFixtures = shared(func() *SSMFixtures {
 	ssmTypeMap := map[string]ssmtypes.ParameterType{
 		"String":       ssmtypes.ParameterTypeString,
 		"SecureString": ssmtypes.ParameterTypeSecureString,

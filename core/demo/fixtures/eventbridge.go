@@ -3,8 +3,6 @@
 package fixtures
 
 import (
-	"sync"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 )
@@ -39,7 +37,7 @@ const (
 )
 
 // NewEventBridgeFixtures constructs EventBridgeFixtures from the canonical demo data.
-var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
+var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 	rules := []eventbridgetypes.Rule{
 		{
 			Name:               aws.String("nightly-db-backup"),

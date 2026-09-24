@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -115,7 +114,7 @@ const (
 )
 
 // NewDBCFixtures builds and returns a fully-populated DBCFixtures struct.
-var sharedDBCFixtures = sync.OnceValue(func() *DBCFixtures {
+var sharedDBCFixtures = shared(func() *DBCFixtures {
 	return &DBCFixtures{
 		DBClusters:                normalizeDocDBClusterPosture(buildDBCClusters()),
 		DBClusterSnapshots:        buildDBCSnapshots(),

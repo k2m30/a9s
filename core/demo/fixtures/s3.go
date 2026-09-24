@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -141,7 +140,7 @@ func mustTime(s string) time.Time {
 
 // NewS3Fixtures builds and returns a fully-populated S3Fixtures struct
 // with deterministic demo data.
-var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
+var sharedS3Fixtures = shared(func() *S3Fixtures {
 	f := &S3Fixtures{
 		NotificationConfigs:      buildS3NotificationConfigs(),
 		PublicAccessBlockConfigs: buildS3PublicAccessBlockConfigs(),

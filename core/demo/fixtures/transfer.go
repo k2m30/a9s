@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -192,7 +191,7 @@ func withSecurityPolicy(s transfertypes.DescribedServer, policy string) transfer
 }
 
 // sharedTransferFixtures constructs the canonical demo data once per process.
-var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
+var sharedTransferFixtures = shared(func() *TransferFixtures {
 	now := time.Now().UTC()
 
 	servers := make(map[string]transfertypes.DescribedServer, 11)

@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -65,7 +64,7 @@ const (
 )
 
 // NewAPIGWFixtures constructs APIGWFixtures from the canonical demo data.
-var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
+var sharedAPIGWFixtures = shared(func() *APIGWFixtures {
 	return &APIGWFixtures{
 		APIs: []apigwtypes.Api{
 			{
@@ -320,7 +319,7 @@ func apigwV1HealthyStage(name string) apigwv1types.Stage {
 
 // NewAPIGWV1Fixtures constructs the REST-lane fixtures. Each API is the only
 // carrier of its finding; every other API is healthy for that finding.
-var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:gochecknoglobals // fixture singleton, matching this package's shape
+var sharedAPIGWV1Fixtures = shared(func() *APIGWV1Fixtures { //nolint:gochecknoglobals // fixture singleton, matching this package's shape
 	noLogs := apigwV1HealthyStage(APIGWRESTStageSecretStage)
 	noLogs.AccessLogSettings = nil
 

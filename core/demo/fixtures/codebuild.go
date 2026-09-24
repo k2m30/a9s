@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,7 +34,7 @@ func mustParseCBTime(s string) time.Time {
 }
 
 // NewCodeBuildFixtures constructs CodeBuildFixtures from the canonical demo data.
-var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
+var sharedCodeBuildFixtures = shared(func() *CodeBuildFixtures {
 	projects := []cbtypes.Project{
 		{
 			Name:                 aws.String("acme-api-build"),

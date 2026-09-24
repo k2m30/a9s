@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,7 +39,7 @@ func mustParseMSKTime(s string) time.Time {
 }
 
 // NewMSKFixtures constructs MSKFixtures from the canonical demo data.
-var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
+var sharedMSKFixtures = shared(func() *MSKFixtures {
 	return &MSKFixtures{
 		Clusters: []kafkatypes.Cluster{
 			{

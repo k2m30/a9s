@@ -7,7 +7,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -69,7 +68,7 @@ const LambdaJSONTimeoutRequestID = "d7a1c3e5-0b2d-4f6a-8c9e-1a3b5c7d9e02"
 const ECSAPIGatewayHistoryLines = 236
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
-var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
+var sharedCWLogsFixtures = shared(func() *CWLogsFixtures {
 	logGroups := []cwlogstypes.LogGroup{
 		{
 			LogGroupName:              aws.String("/aws/lambda/api-gateway-authorizer"),

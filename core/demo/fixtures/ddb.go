@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -116,7 +115,7 @@ const (
 )
 
 // NewDDBFixtures returns a fully-populated DDBFixtures for demo and tests.
-var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
+var sharedDDBFixtures = shared(func() *DDBFixtures {
 	return &DDBFixtures{
 		Tables:              normalizeDDBDeletionProtection(buildDDBTables()),
 		ContinuousBackups:   buildDDBContinuousBackups(),

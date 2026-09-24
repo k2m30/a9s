@@ -3,8 +3,6 @@
 package fixtures
 
 import (
-	"sync"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
@@ -32,7 +30,7 @@ const PublicZoneQueryLogGroupARN = "arn:aws:logs:us-east-1:123456789012:log-grou
 const PublicZoneID = "/hostedzone/Z0123456789ABCDEFGHIJ"
 
 // NewR53Fixtures constructs R53Fixtures from the canonical demo data.
-var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
+var sharedR53Fixtures = shared(func() *R53Fixtures {
 	return &R53Fixtures{
 		HostedZones: []r53types.HostedZone{
 			{

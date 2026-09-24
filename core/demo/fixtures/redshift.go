@@ -4,7 +4,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -116,7 +115,7 @@ const (
 )
 
 // NewRedshiftFixtures constructs RedshiftFixtures from the canonical demo data.
-var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {
+var sharedRedshiftFixtures = shared(func() *RedshiftFixtures {
 	return &RedshiftFixtures{
 		Clusters: normalizeRedshiftParameterGroups(buildRedshiftClusters()),
 	}

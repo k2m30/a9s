@@ -5,7 +5,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,7 +46,7 @@ type CloudTrailFixtures struct {
 }
 
 // NewCloudTrailFixtures builds and returns a fully-populated CloudTrailFixtures struct.
-var sharedCloudTrailFixtures = sync.OnceValue(func() *CloudTrailFixtures {
+var sharedCloudTrailFixtures = shared(func() *CloudTrailFixtures {
 	return &CloudTrailFixtures{
 		Trails:      buildCTTrails(),
 		TrailStatus: buildCTTrailStatus(),

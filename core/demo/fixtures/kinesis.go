@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,7 +46,7 @@ func mustParseKinesisTime(s string) time.Time {
 }
 
 // NewKinesisFixtures constructs KinesisFixtures from the canonical demo data.
-var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
+var sharedKinesisFixtures = shared(func() *KinesisFixtures {
 	return &KinesisFixtures{
 		Streams: []kinesistypes.StreamSummary{
 			{

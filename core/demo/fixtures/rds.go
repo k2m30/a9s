@@ -5,7 +5,6 @@ package fixtures
 
 import (
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -41,7 +40,7 @@ type RDSFixtures struct {
 // EnrichmentCap rows, and a row past it carries its verdict only in its own
 // detail view. Every instance that witnesses a Wave-2 finding is ahead of the
 // bulk pool's tail for that reason.
-var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
+var sharedRDSFixtures = shared(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{

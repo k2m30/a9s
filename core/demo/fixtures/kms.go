@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -55,7 +54,7 @@ const SSMDefaultKeyID = "e7f8a9b0-c1d2-4e3f-8a9b-0c1d2e3f4a5b"
 const AWSManagedS3KeyID = "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0"
 
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
-var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
+var sharedKMSFixtures = shared(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
 		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
 		// which EnrichKMSRotation raises no kms.rotation-disabled finding,

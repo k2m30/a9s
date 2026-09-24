@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -64,7 +63,7 @@ func mustParseECRTime(s string) time.Time {
 }
 
 // NewECRFixtures constructs ECRFixtures from the canonical demo data.
-var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
+var sharedECRFixtures = shared(func() *ECRFixtures {
 	repos := []ecrtypes.Repository{
 		{
 			RepositoryName:             aws.String("acme/api-service"),

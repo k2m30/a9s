@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -182,7 +181,7 @@ func withLastUpdateFailed(env mwaatypes.Environment, errorCode, errorMessage str
 }
 
 // NewMWAAFixtures constructs MWAAFixtures from the canonical demo data.
-var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
+var sharedMWAAFixtures = shared(func() *MWAAFixtures {
 	envs := make(map[string]mwaatypes.Environment, 16)
 
 	// GRAPH ROOT — rich pivots: kms 1, logs 5, role 1, s3 1, sg 2, subnet 2,

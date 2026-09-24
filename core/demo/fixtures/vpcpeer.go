@@ -7,7 +7,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -70,7 +69,7 @@ const (
 	vpcPeerRemoteVpcID   = "vpc-0remoteacct1111a"
 )
 
-var sharedVpcPeerFixtures = sync.OnceValue(func() *VpcPeerFixtures {
+var sharedVpcPeerFixtures = shared(func() *VpcPeerFixtures {
 	return &VpcPeerFixtures{Connections: buildVpcPeerConnections()}
 })
 

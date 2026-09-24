@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -165,7 +164,7 @@ const (
 
 // NewDBIFixtures builds and returns a fully-populated DBIFixtures struct.
 // PendingMaintenanceActions contains the Wave 2 enrichment data for maint-dbi-scheduled.
-var sharedDBIFixtures = sync.OnceValue(func() *DBIFixtures {
+var sharedDBIFixtures = shared(func() *DBIFixtures {
 	return &DBIFixtures{
 		Instances:                 buildDBIInstances(),
 		PendingMaintenanceActions: buildDBIPendingMaintenance(),

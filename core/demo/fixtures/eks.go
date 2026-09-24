@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,7 +39,7 @@ const (
 )
 
 // NewEKSFixtures builds and returns a fully-populated EKSFixtures struct.
-var sharedEKSFixtures = sync.OnceValue(func() *EKSFixtures {
+var sharedEKSFixtures = shared(func() *EKSFixtures {
 	clusters := buildEKSClusters()
 	ngs := buildEKSNodegroups()
 	return &EKSFixtures{

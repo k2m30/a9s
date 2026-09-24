@@ -4,7 +4,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -89,7 +88,7 @@ const (
 )
 
 // NewDBISnapFixtures constructs DBISnapFixtures from the canonical demo data.
-var sharedDBISnapFixtures = sync.OnceValue(func() *DBISnapFixtures {
+var sharedDBISnapFixtures = shared(func() *DBISnapFixtures {
 	return &DBISnapFixtures{
 		Instances: buildDBISnapInstances(),
 	}

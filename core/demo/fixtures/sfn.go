@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -78,7 +77,7 @@ type SFNFixtures struct {
 }
 
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
-var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
+var sharedSFNFixtures = shared(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
 	const smARNPaymentValidation = "arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"
 	const smARNUserOnboarding = "arn:aws:states:us-east-1:123456789012:stateMachine:user-onboarding-flow"

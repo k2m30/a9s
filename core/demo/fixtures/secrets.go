@@ -4,7 +4,6 @@ package fixtures
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -57,7 +56,7 @@ var secretDescPool = []string{
 }
 
 // NewSecretsFixtures constructs SecretsFixtures from the canonical demo data.
-var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
+var sharedSecretsFixtures = shared(func() *SecretsFixtures {
 	// The fetcher judges LastAccessedDate, LastChangedDate and
 	// NextRotationDate against the wall clock (dormant after 180 days, stale
 	// after 365, overdue once past). A date meant to sit on the fresh side of

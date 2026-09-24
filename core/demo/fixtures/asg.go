@@ -6,7 +6,6 @@ package fixtures
 import (
 	"encoding/base64"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -29,7 +28,7 @@ type ASGFixtures struct {
 }
 
 // NewASGFixtures builds and returns a fully-populated ASGFixtures struct.
-var sharedASGFixtures = sync.OnceValue(func() *ASGFixtures {
+var sharedASGFixtures = shared(func() *ASGFixtures {
 	groups := buildASGGroups()
 	activities := buildASGActivities()
 	lcs := buildLaunchConfigurations()

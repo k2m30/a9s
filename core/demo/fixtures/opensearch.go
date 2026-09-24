@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -111,7 +110,7 @@ const (
 )
 
 // NewOpenSearchFixtures constructs OpenSearchFixtures from the canonical demo data.
-var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
+var sharedOpenSearchFixtures = shared(func() *OpenSearchFixtures {
 	return &OpenSearchFixtures{
 		Domains: []ostypes.DomainStatus{
 			osHealthyBaseline(),

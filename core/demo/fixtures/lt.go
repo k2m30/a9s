@@ -8,7 +8,6 @@ package fixtures
 
 import (
 	"encoding/base64"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -87,7 +86,7 @@ export SERVICE_API_KEY=svc-7a2e91c4dd6b3f08
 const ltCreatedBy = "arn:aws:iam::123456789012:user/acme-platform-admin"
 
 // NewLTFixtures builds and returns a fully-populated LTFixtures struct.
-var sharedLTFixtures = sync.OnceValue(func() *LTFixtures {
+var sharedLTFixtures = shared(func() *LTFixtures {
 	return &LTFixtures{
 		LaunchTemplates: buildLaunchTemplates(),
 		DefaultVersions: buildLTDefaultVersions(),

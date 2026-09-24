@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -41,7 +40,7 @@ func mustParseACMTime(s string) time.Time {
 }
 
 // NewACMFixtures constructs ACMFixtures from the canonical demo data.
-var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
+var sharedACMFixtures = shared(func() *ACMFixtures {
 	return &ACMFixtures{
 		Certificates: []acmtypes.CertificateSummary{
 			{

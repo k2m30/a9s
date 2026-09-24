@@ -3,8 +3,6 @@
 package fixtures
 
 import (
-	"sync"
-
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
@@ -37,7 +35,7 @@ type SQSFixtures struct {
 }
 
 // NewSQSFixtures constructs SQSFixtures from the canonical demo data.
-var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
+var sharedSQSFixtures = shared(func() *SQSFixtures {
 	return &SQSFixtures{
 		Queues: []awsclient.SQSQueueAttributesRow{
 			{

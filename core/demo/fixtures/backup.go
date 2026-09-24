@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -537,7 +536,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 }
 
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
-var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
+var sharedBackupFixtures = shared(func() *BackupFixtures {
 	return &BackupFixtures{
 		RecoveryPoints:      buildBackupRecoveryPoints(),
 		Selections:          buildBackupSelections(),

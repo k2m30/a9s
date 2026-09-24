@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -152,7 +151,7 @@ func IsCustomerManagedPolicyARN(policyARN string) bool {
 }
 
 // NewIAMFixtures builds and returns a fully-populated IAMFixtures struct.
-var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
+var sharedIAMFixtures = shared(func() *IAMFixtures {
 	f := &IAMFixtures{
 		AttachedRolePolicies:  make(map[string][]iamtypes.AttachedPolicy),
 		InlineRolePolicies:    make(map[string][]string),

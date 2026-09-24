@@ -6,7 +6,6 @@ package fixtures
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -204,7 +203,7 @@ const (
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
 // with deterministic demo data.
 // This is the single source of truth for all EC2 fake responses.
-var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
+var sharedEC2Fixtures = shared(func() *EC2Fixtures {
 	f := &EC2Fixtures{}
 	f.Reservations = buildReservations()
 	f.InstanceStatuses = buildInstanceStatuses(f.Reservations)

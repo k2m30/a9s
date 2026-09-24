@@ -3,7 +3,6 @@
 package fixtures
 
 import (
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -32,7 +31,7 @@ func mustParseCATime(s string) time.Time {
 }
 
 // NewCodeArtifactFixtures constructs CodeArtifactFixtures from the canonical demo data.
-var sharedCodeArtifactFixtures = sync.OnceValue(func() *CodeArtifactFixtures {
+var sharedCodeArtifactFixtures = shared(func() *CodeArtifactFixtures {
 	return &CodeArtifactFixtures{
 		Repositories: []codeartifacttypes.RepositorySummary{
 			{

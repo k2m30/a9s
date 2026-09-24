@@ -1,11 +1,13 @@
 package unit
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -64,7 +66,15 @@ func TestMain(m *testing.M) {
 		awsclient.Install()
 		resource.WireProjection()
 	}
+	fixturesChanged := fixtures.MutationCheckForTest()
 	code := m.Run()
+	// Every demo fixture consumer gets its own copy; a shared set or exported
+	// fixture variable that differs after the run was written through a path
+	// that bypasses the copy, and every test after the writer read it.
+	if changed := fixturesChanged(); len(changed) > 0 {
+		fmt.Fprintf(os.Stderr, "demo fixtures changed during the run: %v\n", changed)
+		code = 1
+	}
 	// newRootSizedModel (tui_root_test.go) closes the PREVIOUS call's
 	// controller on every new call, but the very LAST model it ever built in
 	// this run has no later call to trigger that drain — flush it here,
