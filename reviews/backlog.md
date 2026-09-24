@@ -78,6 +78,13 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     `~/.a9s/views/<type>.yaml` but not new `detail:` entries, so a field a later build adds to a
     detail view (for example `error_type` and `restore_duration_ms` on Lambda invocations) never
     reaches that operator's detail until the file is regenerated. Applies to every type.
+15. **ECR severity counts from a paged scan may be one page's.** When `DescribeImages` carries no
+    `imageScanFindingsSummary`, `ecrReadScanResults` (`core/aws/ecr_images.go:114`) takes
+    `findingSeverityCounts` from the first `DescribeImageScanFindings` page (up to 100 results).
+    API_ImageScanFindings does not say whether those counts cover the scan or the page. Count the
+    severities from `findings[]` and `enhancedFindings[]` across every page instead, capped, with
+    rows past the cap a lower bound.
+
 ## Structure
 
 14. **Three copies of the ECS client-assertion and retry plumbing** remain around the one
