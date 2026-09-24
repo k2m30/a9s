@@ -187,7 +187,11 @@ func (f *ECSFake) ListContainerInstances(_ context.Context, input *ecs.ListConta
 	out := &ecs.ListContainerInstancesOutput{ContainerInstanceArns: []string{}}
 	for _, ci := range f.fix.ContainerInstances {
 		a, err := arn.Parse(aws.ToString(ci.ContainerInstanceArn))
-		if err == nil && strings.Split(a.Resource, "/")[1] == cluster {
+		if err != nil {
+			continue
+		}
+		// The legacy form "container-instance/<id>" names no cluster.
+		if parts := strings.Split(a.Resource, "/"); len(parts) == 3 && parts[1] == cluster {
 			out.ContainerInstanceArns = append(out.ContainerInstanceArns, aws.ToString(ci.ContainerInstanceArn))
 		}
 	}

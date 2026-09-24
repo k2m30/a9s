@@ -260,6 +260,8 @@ func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items 
 		accountID = c.identityResult.AccountID
 	}
 	navDefs := resource.GetNavigableFields(srcType)
+	// Each AnyLaneResources call copies the type's rows.
+	targets := map[string][]resource.Resource{}
 	for i, it := range items {
 		if !it.IsNavigable {
 			continue
@@ -268,7 +270,10 @@ func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items 
 		ref := cmp.Or(it.NavID, value)
 		rc := domain.RefContext{AccountID: accountID, Region: cmp.Or(resource.RefRegion(ref), resource.RefRegion(value), region, c.core.Region())}
 		if rc.Region == c.core.Region() {
-			rc.Targets = c.core.AnyLaneResources(it.TargetType)
+			if _, ok := targets[it.TargetType]; !ok {
+				targets[it.TargetType] = c.core.AnyLaneResources(it.TargetType)
+			}
+			rc.Targets = targets[it.TargetType]
 		}
 		if d := slices.IndexFunc(navDefs, func(nf resource.NavigableField) bool {
 			return nf.Resolve != nil && nf.FieldPath == it.Path && nf.TargetType == it.TargetType
