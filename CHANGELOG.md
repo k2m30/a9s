@@ -14,11 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checker panicked. This covers the Auto Scaling group, Elastic Beanstalk,
   IAM group, user, role and policy panels and a secret's Elastic Beanstalk
   row. A read that was never sent is `?` on every path, never an error.
-- Reverse lookups that make one call per row of another type read at most
-  50 rows and show the count as a lower bound past that. Opening one Lambda
+- Reverse lookups that make one call per row of another type make at most
+  50 calls and show the count as a lower bound past that. Opening one Lambda
   function no longer makes a call for every API Gateway API in the account.
   The same bound applies to the ECR, CodeBuild, Kinesis, CloudWatch Logs,
-  Secrets Manager and ECS service lookups that read that way.
+  Secrets Manager and ECS service lookups that read that way. Only rows that
+  need a call count: a secret's or log group's ECS tasks are read from the
+  task list, with no call per task, and an ECR repository reads only the
+  container-image Lambda functions.
 - An AMI's Auto Scaling groups row is a lower bound when the instance list
   could not be read, instead of counting only the groups whose launch
   sources name the image.

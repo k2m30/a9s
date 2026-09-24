@@ -65,13 +65,50 @@
    sub-objects are inside the budget, fan-outs over the TARGET type's whole
    population are not — except where AWS offers no reverse read of the
    relation, and then at most `EnrichmentCap` (50) calls, one per target row,
-   with the rows past the cap making the count a lower bound `(N+)`. Three
-   pivots read that way: `ami` → `asg` (each group's launch sources: no API
-   lists the groups that launch an image), `sqs` → `eb-rule` (`ListTargetsByRule`
-   per rule: [`ListRuleNamesByTarget`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListRuleNamesByTarget.html)
-   matches a target's ARN, not its `DeadLetterConfig`) and `ec2`/`lambda` →
-   `tg` ([`DescribeTargetHealth`](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)
-   requires one `TargetGroupArn`). A paginated API is walked page by page through
+   with the rows past the cap making the count a lower bound `(N+)`. Only a
+   row that needs its own call counts toward the cap: a row answered from a
+   field the list already read costs nothing. These pivots read that way, and
+   no other checker makes a call per target row (the `fanOut` guard holds the
+   code to this list):
+
+   - `ami` → `asg`: each group's launch sources; no API lists the groups that
+     launch an image.
+   - `sqs` → `eb-rule`: `ListTargetsByRule` per rule;
+     [`ListRuleNamesByTarget`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListRuleNamesByTarget.html)
+     matches a target's ARN, not its `DeadLetterConfig`.
+   - `ec2` → `tg` and `lambda` → `tg`:
+     [`DescribeTargetHealth`](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)
+     requires one `TargetGroupArn`.
+   - `lambda` → `eb-rule`: `ListTargetsByRule` per rule;
+     [`ListRuleNamesByTarget`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListRuleNamesByTarget.html)
+     takes one `TargetArn`, and a rule can target the function through an
+     alias ARN ([configuration-aliases](https://docs.aws.amazon.com/lambda/latest/dg/configuration-aliases.html)).
+   - `lambda` → `apigw`: the integrations of each API;
+     [`GetIntegrations`](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)
+     and [`GetResources`](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)
+     each read one API.
+   - `cb` → `pipeline` and `ecr` → `pipeline`: `GetPipeline` per pipeline;
+     [`PipelineSummary`](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineSummary.html)
+     carries no stages or actions.
+   - `ecr` → `lambda`: `GetFunction` per container-image function;
+     [`FunctionConfiguration`](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html)
+     carries no image URI.
+   - `ecs-svc` → `sfn`: `DescribeStateMachine` per state machine;
+     [`StateMachineListItem`](https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html)
+     carries no definition.
+   - `kinesis` → `ddb`: `DescribeKinesisStreamingDestination` per table;
+     [the call](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeKinesisStreamingDestination.html)
+     reads one `TableName`.
+   - `secrets` → `eb`: `DescribeConfigurationSettings` per environment;
+     [`EnvironmentDescription`](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)
+     carries no option settings.
+   - `logs` → `ecs-task` and `secrets` → `ecs-task`: a task the list joined to
+     its definition answers from its fields; one without the join costs a
+     `DescribeTaskDefinition`, since
+     [`ListTaskDefinitions`](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTaskDefinitions.html)
+     filters by family and status only.
+
+   A paginated API is walked page by page through
    `aws.PageAll`, up to `PerParentPageCap` pages; a walk the cap stopped is a
    lower bound `(N+)`, never an exact count. A mechanism that cannot resolve within that budget on
    ANY cache state is NOT REGISTERED — it is documented under

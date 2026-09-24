@@ -172,24 +172,36 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		return NotRead("ecs-task")
 	}
 
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil {
-		return NotRead("ecs-task")
-	}
-
-	ecsAPI, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
+	ecsAPI, ok := serviceClient(clients, func(c *ServiceClients) ECSDescribeTaskDefinitionAPI {
+		api, _ := c.ECS.(ECSDescribeTaskDefinitionAPI)
+		return api
+	})
 	if !ok {
 		return NotRead("ecs-task")
 	}
 
 	var ids []string
 	var reads rowReads
-	ecsTaskList, capped := fanOut(ecsTaskList)
+	// A row the list joined carries its definition's secret references; only
+	// the rest cost a DescribeTaskDefinition each.
+	joined, unjoined := splitECSTaskJoin(ecsTaskList, "secret_arns")
+	rc := refContext(clients, nil, "")
+	for _, taskRes := range joined {
+		if !taskDefJoined(taskRes) {
+			reads.missed()
+			continue
+		}
+		reads.read++
+		if slices.ContainsFunc(splitCSV(taskRes.Fields["secret_arns"]), func(ref string) bool { return secretRefNames(ref, res, rc) }) {
+			ids = append(ids, taskRes.ID)
+		}
+	}
+	unjoined, capped := fanOut(unjoined)
 	truncated = truncated || capped
-	for _, taskRes := range ecsTaskList {
+	for _, taskRes := range unjoined {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
-		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
-		if !ok {
+		task, isTask := assertStruct[ecstypes.Task](taskRes.RawStruct)
+		if !isTask {
 			reads.missed()
 			continue
 		}
@@ -224,7 +236,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		if tdOut == nil || tdOut.TaskDefinition == nil {
 			continue
 		}
-		if secretsECSTaskRefsSecret(*tdOut.TaskDefinition, res, refContext(clients, nil, "")) {
+		if secretsECSTaskRefsSecret(*tdOut.TaskDefinition, res, rc) {
 			ids = append(ids, taskRes.ID)
 		}
 	}

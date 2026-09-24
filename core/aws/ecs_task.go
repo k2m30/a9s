@@ -326,6 +326,20 @@ func taskDefJoined(res resource.Resource) bool {
 	return res.Fields["task_def_join_error"] != "true"
 }
 
+// splitECSTaskJoin parts ecs-task rows into the ones whose definition join
+// answers field without a call — the join wrote it, or failed and left the
+// row unread — and the ones that need their definition read.
+func splitECSTaskJoin(rows []resource.Resource, field string) (joined, unjoined []resource.Resource) {
+	for _, r := range rows {
+		if _, ok := r.Fields[field]; ok || !taskDefJoined(r) {
+			joined = append(joined, r)
+		} else {
+			unjoined = append(unjoined, r)
+		}
+	}
+	return joined, unjoined
+}
+
 // ecsTaskLogGroups is the log groups in the task's own Region that the task's
 // containers write to, and whether every container's destination was read:
 // the list fetcher's join when the row carries it, else one read of the

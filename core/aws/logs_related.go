@@ -199,9 +199,12 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 	}
 	var ids []string
 	var reads rowReads
-	taskList, capped := fanOut(taskList)
+	// A row the list joined answers from its fields; only the rest cost a
+	// call each.
+	joined, unjoined := splitECSTaskJoin(taskList, "log_groups")
+	unjoined, capped := fanOut(unjoined)
 	truncated = truncated || capped
-	for _, taskRes := range taskList {
+	for _, taskRes := range slices.Concat(joined, unjoined) {
 		groups, read, err := ecsTaskLogGroups(ctx, clients, taskRes)
 		switch {
 		case err != nil:

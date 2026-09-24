@@ -67,12 +67,9 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	var ids []string
 	var reads rowReads
-	lambdaList, capped := fanOut(lambdaList)
+	images, capped := fanOut(slices.DeleteFunc(slices.Clone(lambdaList), func(r resource.Resource) bool { return !lambdaRunsImage(r) }))
 	truncated = truncated || capped
-	for _, r := range lambdaList {
-		if !lambdaRunsImage(r) {
-			continue
-		}
+	for _, r := range images {
 		image, err := lambdaImageURI(ctx, clients, r.ID)
 		if err != nil {
 			reads.fail(r.ID, err)

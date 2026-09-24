@@ -5,9 +5,14 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -335,5 +340,100 @@ func TestPerRowReverseScansAreCapped(t *testing.T) {
 	sort.Strings(found)
 	for _, f := range found {
 		t.Errorf("%s with a call per row and no fanOut cap", f)
+	}
+}
+
+// rule7Pairs reads the pivots docs/related-resources.md rule 7 allows a call
+// per target row: the "source → target" pairs its bullets name before the
+// colon.
+func rule7Pairs(t *testing.T) map[string]bool {
+	t.Helper()
+	raw, err := os.ReadFile("../../docs/related-resources.md")
+	if err != nil {
+		t.Fatalf("reading the related-resources contract: %v", err)
+	}
+	doc := string(raw)
+	start := strings.Index(doc, "7. **Call budget**")
+	if start < 0 {
+		t.Fatal("rule 7 not found in docs/related-resources.md")
+	}
+	end := strings.Index(doc[start:], "\n## ")
+	if end < 0 {
+		t.Fatal("rule 7 has no section after it in docs/related-resources.md")
+	}
+	pairs := map[string]bool{}
+	pair := regexp.MustCompile("`([a-z0-9-]+)` → `([a-z0-9-]+)`")
+	for line := range strings.SplitSeq(doc[start:start+end], "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "- `") {
+			continue
+		}
+		head, _, _ := strings.Cut(trimmed, ":")
+		for _, m := range pair.FindAllStringSubmatch(head, -1) {
+			pairs[m[1]+" → "+m[2]] = true
+		}
+	}
+	return pairs
+}
+
+// A checker that makes a call per row of its target type is one rule 7
+// names, and every pivot rule 7 names is one whose checker does: fanOut, the
+// cap every such scan goes through, is reached from exactly those checkers.
+func TestRule7NamesEveryPerRowFanOut(t *testing.T) {
+	direct := map[string]bool{}
+	callers := map[string][]string{}
+	t570EachFunc(t, func(_ *packages.Package, _ string, fn *ast.FuncDecl) {
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if id, isID := call.Fun.(*ast.Ident); isID {
+				if id.Name == "fanOut" {
+					direct[fn.Name.Name] = true
+				}
+				callers[id.Name] = append(callers[id.Name], fn.Name.Name)
+			}
+			return true
+		})
+	})
+	reaches := map[string]bool{}
+	var mark func(string)
+	mark = func(fn string) {
+		if reaches[fn] {
+			return
+		}
+		reaches[fn] = true
+		for _, c := range callers[fn] {
+			mark(c)
+		}
+	}
+	for fn := range direct {
+		mark(fn)
+	}
+
+	allowed := rule7Pairs(t)
+	fanning := map[string]bool{}
+	for _, td := range resource.AllResourceTypes() {
+		for _, def := range td.Related {
+			if def.Checker == nil {
+				continue
+			}
+			name := runtime.FuncForPC(reflect.ValueOf(def.Checker).Pointer()).Name()
+			name = name[strings.LastIndex(name, ".")+1:]
+			if reaches[name] {
+				fanning[td.ShortName+" → "+def.TargetType] = true
+			}
+		}
+	}
+	for pair := range fanning {
+		if !allowed[pair] {
+			t.Errorf("%s makes a call per target row, which docs/related-resources.md rule 7 does not name", pair)
+		}
+	}
+	for pair := range allowed {
+		if !fanning[pair] {
+			t.Errorf("docs/related-resources.md rule 7 names %s, whose checker makes no call per target row", pair)
+		}
 	}
 }
