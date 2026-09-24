@@ -41,7 +41,7 @@ Applies to every defect — one you found, one a review reported, one a test cau
 **Nothing merges to `main` without an external pass resolved.** Local gates prove the code runs; they do not prove it is right. Three independent reviewers are available and they find different classes of defect. The area review dispatches a `general-purpose` agent on model `opus` per concern the task changed, reviewing all code in that area across every resource type, with the prompt in [`docs/review-prompt.md`](docs/review-prompt.md) — not a diff review; CodeRabbit runs from the shell:
 
 ```bash
-coderabbit review --plain --type committed --base-commit <base>
+coderabbit review --committed --base-commit <base>
 ```
 
 Plus `/ponytail-review` for over-engineering (delete/simplify only — it does not hunt correctness).

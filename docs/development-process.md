@@ -118,7 +118,7 @@ Lenses, used as tools:
 External passes, batched — one per phase boundary or pre-tag, never per fix: the area review — a `general-purpose` agent on model `opus` per concern the change touches, reviewing all code in that area, with the prompt in [`review-prompt.md`](review-prompt.md) — and CodeRabbit:
 
 ```bash
-coderabbit review --plain --type committed --base-commit <base>
+coderabbit review --committed --base-commit <base>
 ```
 
 A reviewer's suggested patch is a proposal, not verified code: read every snippet against the actual file before applying it. Flag only gaps that affect correctness or the stated requirements; a finding you cannot tie to either is disproved with `file:line` evidence, not filed and not waved off.
