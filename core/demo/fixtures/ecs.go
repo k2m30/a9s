@@ -56,6 +56,15 @@ var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
 				AutoScalingGroupArn:          aws.String(ECSBatchASGARN),
 				ManagedTerminationProtection: ecstypes.ManagedTerminationProtectionDisabled,
 			},
+		}, {
+			// AWS-managed: every account's DescribeCapacityProviders answers these two.
+			Name:   aws.String("FARGATE"),
+			Status: ecstypes.CapacityProviderStatusActive,
+			Type:   ecstypes.CapacityProviderTypeFargate,
+		}, {
+			Name:   aws.String("FARGATE_SPOT"),
+			Status: ecstypes.CapacityProviderStatusActive,
+			Type:   ecstypes.CapacityProviderTypeFargateSpot,
 		}},
 	}
 })

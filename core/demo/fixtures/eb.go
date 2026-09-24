@@ -72,10 +72,10 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 			// acme-api/acme-prod-api references prod/database/primary (a
 			// real secrets.go fixture) via the Elastic Beanstalk secret
 			// resolution syntax in an environment variable.
-			"acme-api/acme-prod-api": {
+			"acme-api/" + ebEnvUnmanaged: {
 				{
 					ApplicationName: aws.String("acme-api"),
-					EnvironmentName: aws.String("acme-prod-api"),
+					EnvironmentName: aws.String(ebEnvUnmanaged),
 					OptionSettings: []ebtypes.ConfigurationOptionSetting{
 						{
 							Namespace:  aws.String("aws:elasticbeanstalk:application:environment"),
@@ -115,8 +115,8 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 		// elb.go load balancer fixture with a listener forwarding to a
 		// target group.
 		EnvironmentResources: map[string]*ebtypes.EnvironmentResourceDescription{
-			"acme-prod-api": {
-				EnvironmentName: aws.String("acme-prod-api"),
+			ebEnvUnmanaged: {
+				EnvironmentName: aws.String(ebEnvUnmanaged),
 				LoadBalancers: []ebtypes.LoadBalancer{
 					{Name: aws.String("acme-prod-web")},
 				},
@@ -193,15 +193,15 @@ func ebStreamLogsOption(v string) ebtypes.ConfigurationOptionSetting {
 func buildEBEnvironments() []ebtypes.EnvironmentDescription {
 	return []ebtypes.EnvironmentDescription{
 		{
-			EnvironmentName:   aws.String("acme-prod-api"),
+			EnvironmentName:   aws.String(ebEnvUnmanaged),
 			EnvironmentId:     aws.String("e-acmeprodapi"),
 			ApplicationName:   aws.String("acme-api"),
-			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-api/acme-prod-api"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-api/" + ebEnvUnmanaged),
 			VersionLabel:      aws.String("v2.4.1"),
 			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
 			Health:            ebtypes.EnvironmentHealthGreen,
 			Status:            ebtypes.EnvironmentStatusReady,
-			CNAME:             aws.String("acme-prod-api.us-east-1.elasticbeanstalk.com"),
+			CNAME:             aws.String(ebEnvUnmanaged + ".us-east-1.elasticbeanstalk.com"),
 			EndpointURL:       aws.String("awseb-acme-prod-api-elb-123456789.us-east-1.elb.amazonaws.com"),
 			DateCreated:       aws.Time(mustTime("2025-01-10T09:00:00Z")),
 			DateUpdated:       aws.Time(mustTime("2026-03-15T14:30:00Z")),
