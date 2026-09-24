@@ -310,8 +310,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color:          colorDBC,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS, c.DocDB} }),
-		Fetcher:        fetcherWithClients(FetchDBClustersPageMerged),
-		Wave2:          IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+			return FetchDBClustersPageMerged(ctx, c.RDS, c.DocDB, continuationToken)
+		}),
+		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
 		FieldKeys: []string{
 			"cluster_id", "engine", "engine_version", "status", "status_raw", "instances", "endpoint", "arn",
 			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",

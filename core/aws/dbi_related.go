@@ -129,11 +129,6 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return NotRead("secrets")
-		}
-		// A parent that is not a DBInstance carries no MasterUserSecret, so
-		// there is no link to find.
 		return NotRead("secrets")
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {

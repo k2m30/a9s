@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: VPC flow logs in this VPC (or subnet-scoped flow logs for endpoint subnets) carry REJECT / ACCEPT records for traffic to the endpoint ENI's IPs — operator pivots here to answer "is traffic even reaching the endpoint, or is an NACL/SG dropping it before it gets there?". — a9s-devops (2026-04-20): possible=yes, worth=yes. Flow logs land in CloudWatch Logs groups (or S3), and an operator chasing "connection refused" wants a one-hop pivot from the endpoint to the log group.
-- **How discovered**: Flow logs on the endpoint's VPC or subnets, from `DescribeFlowLogs` by `resource-id`, that deliver to CloudWatch Logs ([API_CreateFlowLogs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html)).
+- **How discovered**: Flow logs on the endpoint's VPC, subnets or network interfaces (`NetworkInterfaceIds`), from `DescribeFlowLogs` by `resource-id`, that deliver to CloudWatch Logs ([API_CreateFlowLogs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html)).
 - **Count shown**: yes (0 or more log groups covering this endpoint's traffic).
 
 ### `r53`

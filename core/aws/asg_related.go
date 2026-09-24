@@ -92,12 +92,12 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(asg.TargetGroupARNs) == 0 {
 		return foundNone("elb", "asg.TargetGroupARNs")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	tgAPI, ok := serviceClient(clients, func(c *ServiceClients) ELBv2API { return c.ELBv2 })
+	if !ok {
 		return NotRead("elb")
 	}
 	tgs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.TargetGroup, *string, error) {
-		out, err := c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
+		out, err := tgAPI.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
 			TargetGroupArns: asg.TargetGroupARNs,
 			Marker:          marker,
 		})
@@ -124,15 +124,13 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	refs := []string{aws.ToString(asg.ServiceLinkedRoleARN)}
 	launch, read := readASGLaunch(ctx, clients, asg)
-	if c, ok := clients.(*ServiceClients); ok && c != nil {
-		for _, profile := range slices.Compact(slices.Sorted(slices.Values(launch.profiles))) {
-			if profile == "" {
-				continue
-			}
-			roles, resolved := asgInstanceProfileToRoles(ctx, c, profile)
-			refs = append(refs, roles...)
-			read.partial = read.partial || !resolved
+	for _, profile := range slices.Compact(slices.Sorted(slices.Values(launch.profiles))) {
+		if profile == "" {
+			continue
 		}
+		roles, resolved := asgInstanceProfileToRoles(ctx, clients, profile)
+		refs = append(refs, roles...)
+		read.partial = read.partial || !resolved
 	}
 	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
 	return relatedAnswer("role", joinReads(read, relatedRead{ids: ids, partial: dropped}))
@@ -141,10 +139,14 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 // asgInstanceProfileToRoles resolves a profile name or ARN to role ARNs via
 // iam:GetInstanceProfile. resolved is false when the call did not answer, so
 // the caller can say its role count is a lower bound rather than exact.
-func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNameOrARN string) (roles []string, resolved bool) {
+func asgInstanceProfileToRoles(ctx context.Context, clients any, profileNameOrARN string) (roles []string, resolved bool) {
+	api, ok := serviceClient(clients, func(c *ServiceClients) IAMGetInstanceProfileAPI { return c.IAM })
+	if !ok {
+		return nil, false
+	}
 	profileName := instanceProfileName(profileNameOrARN)
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
-		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
+		return api.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 		})
 	})

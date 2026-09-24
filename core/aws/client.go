@@ -446,6 +446,19 @@ func svcClients(clients any) (*ServiceClients, error) {
 	return c, nil
 }
 
+// serviceClient is the one read of a service client off a client set: ok is
+// false when clients is no client set or holds none for pick's service, so a
+// caller never calls through a nil client.
+func serviceClient[T any](clients any, pick func(*ServiceClients) T) (T, bool) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		var none T
+		return none, false
+	}
+	v := pick(c)
+	return v, any(v) != nil
+}
+
 // fetcherWithClients adapts a *ServiceClients-typed page fetcher into the
 // domain.PaginatedFetcher shape a catalog ResourceTypeDef's Fetcher/
 // AvailabilityFetcher field expects, running the svcClients assertion once

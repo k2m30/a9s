@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 
@@ -222,9 +221,6 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cach
 		return NotRead("lambda")
 	}
 	cfg, err := cfDistributionConfig(ctx, clients, res.ID)
-	if errors.Is(err, errClientMissing) {
-		return NotRead("lambda")
-	}
 	if err != nil {
 		return ReadFailed("lambda", err)
 	}

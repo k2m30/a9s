@@ -34,11 +34,11 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(cluster.CapacityProviders) == 0 {
 		return foundNone("asg", "cluster.CapacityProviders")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ecsAPI, ok := serviceClient(clients, func(c *ServiceClients) ECSAPI { return c.ECS })
+	if !ok {
 		return NotRead("asg")
 	}
-	api, ok := c.ECS.(ECSDescribeCapacityProvidersAPI)
+	api, ok := ecsAPI.(ECSDescribeCapacityProvidersAPI)
 	if !ok {
 		return NotRead("asg")
 	}
@@ -76,15 +76,15 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 	if clusterRef == "" {
 		return keyMissing("ec2", "clusterName")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return NotRead("ec2")
-	}
-	lister, ok := c.ECS.(ECSListContainerInstancesAPI)
+	ecsAPI, ok := serviceClient(clients, func(c *ServiceClients) ECSAPI { return c.ECS })
 	if !ok {
 		return NotRead("ec2")
 	}
-	describer, ok := c.ECS.(ECSDescribeContainerInstancesAPI)
+	lister, ok := ecsAPI.(ECSListContainerInstancesAPI)
+	if !ok {
+		return NotRead("ec2")
+	}
+	describer, ok := ecsAPI.(ECSDescribeContainerInstancesAPI)
 	if !ok {
 		return NotRead("ec2")
 	}

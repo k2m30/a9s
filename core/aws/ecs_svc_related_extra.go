@@ -144,14 +144,12 @@ func checkECSSvcEbRule(ctx context.Context, clients any, res resource.Resource, 
 		})
 	})
 	if err != nil {
-		runs = relatedRead{unread: true, failure: err}
+		// A session without an EventBridge client leaves the target lookup
+		// unread, not the relation: the rules the pattern scan matched stand.
+		runs = unreadBy(err)
+		runs.noClient = false
 	}
-	return relatedAnswer("eb-rule", relatedRead{
-		ids:     append(read.ids, runs.ids...),
-		partial: read.partial || runs.partial,
-		unread:  runs.unread,
-		failure: runs.failure,
-	})
+	return relatedAnswer("eb-rule", joinReads(read, runs))
 }
 
 // checkECSSvcECR resolves ECR repositories used by this ECS service.
@@ -244,9 +242,6 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 // matches the task definition family of this service.
 // NeedsTargetCache: true.
 func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	if res.RawStruct == nil {
-		return NotRead("sfn")
-	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
 		return NotRead("sfn")
@@ -270,6 +265,8 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 
 	var ids []string
 	var reads rowReads
+	sfnList, capped := fanOut(sfnList)
+	truncated = truncated || capped
 	for _, sfnRes := range sfnList {
 		sfnARN := sfnRes.Fields["arn"]
 		if sfnARN == "" {

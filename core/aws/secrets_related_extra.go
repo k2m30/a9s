@@ -87,14 +87,16 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 		return NotRead("eb")
 	}
 
-	c, cok := clients.(*ServiceClients)
-	if !cok || c == nil {
+	ebAPI, ok := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	if !ok {
 		return NotRead("eb")
 	}
 
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
 	var reads rowReads
+	ebList, capped := fanOut(ebList)
+	truncated = truncated || capped
 	for _, ebRes := range ebList {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)
 		if !ok {
@@ -114,7 +116,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			continue
 		}
 		cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-			return c.ElasticBeanstalk.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+			return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
 				ApplicationName: &appName,
 				EnvironmentName: &envName,
 			})
@@ -182,6 +184,8 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	var ids []string
 	var reads rowReads
+	ecsTaskList, capped := fanOut(ecsTaskList)
+	truncated = truncated || capped
 	for _, taskRes := range ecsTaskList {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)

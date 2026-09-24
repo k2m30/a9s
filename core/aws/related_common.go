@@ -29,16 +29,6 @@ import (
 // a "?".
 var errRawStructMissing = errors.New("resource details have not been read yet")
 
-// relatedFromErr turns the error a two-hop helper returned into the result the
-// panel owes. It is the single place that knows "we have not read this row yet"
-// is Unknown while every other error is Error.
-func relatedFromErr(target string, err error) resource.RelatedCheckResult {
-	if errors.Is(err, errRawStructMissing) {
-		return NotRead(target)
-	}
-	return ReadFailed(target, err)
-}
-
 // assertStruct extracts a value of type T from an interface that may hold
 // either T or *T. Used for RawStruct type assertions across related checkers.
 // Falls back to searching v's exported anonymous (embedded) struct fields

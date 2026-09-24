@@ -214,10 +214,13 @@ func readOf(r resource.RelatedCheckResult) relatedRead {
 }
 
 // unreadBy is the read of a place a failed read left unread: err reaches the
-// flash, except a missing client, which made no call.
+// flash, except a read never made (noCallMade).
 func unreadBy(err error) relatedRead {
-	if errors.Is(err, errClientMissing) {
+	switch {
+	case errors.Is(err, errClientMissing):
 		return relatedRead{unread: true, noClient: true}
+	case noCallMade(err):
+		return relatedRead{unread: true}
 	}
 	return relatedRead{unread: true, failure: err, failed: err != nil}
 }
@@ -316,7 +319,7 @@ func (s *rowReads) missed() { s.unread++ }
 // call, so it is not a failure to report.
 func (s *rowReads) fail(id string, err error) {
 	s.unread++
-	if !errors.Is(err, errClientMissing) {
+	if !noCallMade(err) {
 		s.failed = append(s.failed, failedRead{id, err})
 	}
 }
@@ -366,9 +369,21 @@ func NotRead(target string) resource.RelatedCheckResult {
 
 // ReadFailed is the answer of a checker whose read failed before it found
 // anything: the row carries err. A read that fails after rows were found
-// reports them partial through relatedAnswer instead.
+// reports them partial through relatedAnswer instead. A read never made — no
+// client for it, or a row whose details are not read yet — is unknown, not
+// failed.
 func ReadFailed(target string, err error) resource.RelatedCheckResult {
+	if noCallMade(err) {
+		return NotRead(target)
+	}
 	return resource.ErrorRelated(target, err)
+}
+
+// noCallMade reports whether err says a read was never sent: the session has
+// no client for it, or the row it would read from carries no details yet. It
+// is the one test of that; every mapping of a read's error goes through it.
+func noCallMade(err error) bool {
+	return errors.Is(err, errClientMissing) || errors.Is(err, errRawStructMissing)
 }
 
 // alsoPartial is r once a second place the checker read turned out to be read

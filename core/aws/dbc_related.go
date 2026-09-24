@@ -225,7 +225,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if sng == nil {
 		return foundNone("subnet", "sng")
@@ -245,7 +245,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	if sng == nil {
 		return foundNone("vpc", "sng")

@@ -326,10 +326,12 @@ func taskDefJoined(res resource.Resource) bool {
 	return res.Fields["task_def_join_error"] != "true"
 }
 
-// ecsTaskLogGroups is the log groups the task's containers write to, and
-// whether every container's destination was read: the list fetcher's join
-// when the row carries it, else one read of the definition. A task whose join
-// failed was not read; the fetcher already met the failure.
+// ecsTaskLogGroups is the log groups in the task's own Region that the task's
+// containers write to, and whether every container's destination was read:
+// the list fetcher's join when the row carries it, else one read of the
+// definition. A task whose join failed was not read; the fetcher already met
+// the failure. A group in another Region is left out: its one reader,
+// logs → ecs-task, asks about a group listed in the Region the tasks are.
 func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (groups []string, read bool, err error) {
 	if !taskDefJoined(row) {
 		return nil, false, nil

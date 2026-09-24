@@ -228,7 +228,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc, err := redisMemberCluster(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if cc == nil {
 		return foundNone("sg", "cc")
@@ -279,7 +279,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc, err := redisMemberCluster(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if cc == nil {
 		return foundNone("sns", "cc")
@@ -307,7 +307,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := redisSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if sng == nil {
 		return foundNone("subnet", "sng")
@@ -355,7 +355,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := redisSubnetGroup(ctx, clients, res)
 	if err != nil {
-		return relatedFromErr("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	if sng == nil {
 		return foundNone("vpc", "sng")
@@ -421,16 +421,13 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 	if cc == nil || cc.CacheSubnetGroupName == nil || *cc.CacheSubnetGroupName == "" {
 		return nil, nil
 	}
-	// A member cluster came back, so redisMemberCluster already proved the
-	// ElastiCache client is usable; the checked assertion only recovers the
-	// typed pointer.
-	c, err := svcClients(clients)
-	if err != nil {
-		return nil, err
+	api, ok := serviceClient(clients, func(c *ServiceClients) ElastiCacheAPI { return c.ElastiCache })
+	if !ok {
+		return nil, errClientMissing
 	}
 	name := *cc.CacheSubnetGroupName
 	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elasticachetypes.CacheSubnetGroup, *string, error) {
-		out, callErr := c.ElastiCache.DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{
+		out, callErr := api.DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{
 			CacheSubnetGroupName: &name,
 			Marker:               marker,
 		})

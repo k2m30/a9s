@@ -915,7 +915,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false, Mirror: true},
-			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true, Truncated: true, Distinct: "groups running an instance whose Instance.ImageId is this image"},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true, Truncated: true, Distinct: "groups whose launch configuration or template version names this image, and groups running an instance whose Instance.ImageId is this image"},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS, Truncated: true},
 			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkAMING, NeedsTargetCache: true, Truncated: true, Mirror: true},

@@ -36,13 +36,13 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return keyMissing("elb", "envName")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ebAPI, ok := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	if !ok {
 		return NotRead("elb")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
-		return c.ElasticBeanstalk.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
+		return ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
 			EnvironmentName: &envName,
 		})
 	})
@@ -80,13 +80,14 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		return keyMissing("tg", "envName")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ebAPI, ebOK := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	elbAPI, elbOK := serviceClient(clients, func(c *ServiceClients) ELBv2API { return c.ELBv2 })
+	if !ebOK || !elbOK {
 		return NotRead("tg")
 	}
 
 	resOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
-		return c.ElasticBeanstalk.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
+		return ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
 			EnvironmentName: &envName,
 		})
 	})
@@ -110,7 +111,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 
 		lbs, _, lbErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.LoadBalancer, *string, error) {
-			out, callErr := c.ELBv2.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
+			out, callErr := elbAPI.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
 				Names:  []string{lbName},
 				Marker: marker,
 			})
@@ -182,13 +183,13 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		return keyMissing("sg", "envName")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ebAPI, ok := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	if !ok {
 		return NotRead("sg")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-		return c.ElasticBeanstalk.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+		return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
 			ApplicationName: &appName,
 			EnvironmentName: &envName,
 		})
@@ -258,13 +259,13 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		return keyMissing("role", "envName")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ebAPI, ok := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	if !ok {
 		return NotRead("role")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-		return c.ElasticBeanstalk.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+		return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
 			ApplicationName: &appName,
 			EnvironmentName: &envName,
 		})
@@ -296,7 +297,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 			switch {
 			case ns == "aws:autoscaling:launchconfiguration" && name == "IamInstanceProfile":
-				roleARNs, answered := asgInstanceProfileToRoles(ctx, c, val)
+				roleARNs, answered := asgInstanceProfileToRoles(ctx, clients, val)
 				refs = append(refs, roleARNs...)
 				resolved = resolved && answered
 			case ns == "aws:elasticbeanstalk:environment" && name == "ServiceRole":
@@ -331,13 +332,13 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		return foundNone("s3", "VersionLabel")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ebAPI, ok := serviceClient(clients, func(c *ServiceClients) ElasticBeanstalkAPI { return c.ElasticBeanstalk })
+	if !ok {
 		return NotRead("s3")
 	}
 
 	versions, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ebtypes.ApplicationVersionDescription, *string, error) {
-		out, err := c.ElasticBeanstalk.DescribeApplicationVersions(ctx, &elasticbeanstalk.DescribeApplicationVersionsInput{
+		out, err := ebAPI.DescribeApplicationVersions(ctx, &elasticbeanstalk.DescribeApplicationVersionsInput{
 			ApplicationName: &appName,
 			VersionLabels:   []string{label},
 			NextToken:       token,

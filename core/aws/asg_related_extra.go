@@ -106,13 +106,13 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		return keyMissing("sns", "asgName")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	asgAPI, ok := serviceClient(clients, func(c *ServiceClients) ASGAPI { return c.AutoScaling })
+	if !ok {
 		return NotRead("sns")
 	}
 
 	notifs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.NotificationConfiguration, *string, error) {
-		out, err := c.AutoScaling.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
+		out, err := asgAPI.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
 			AutoScalingGroupNames: []string{asgName},
 			NextToken:             token,
 		})
@@ -129,7 +129,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	hookOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLifecycleHooksOutput, error) {
-		return c.AutoScaling.DescribeLifecycleHooks(ctx, &autoscaling.DescribeLifecycleHooksInput{
+		return asgAPI.DescribeLifecycleHooks(ctx, &autoscaling.DescribeLifecycleHooksInput{
 			AutoScalingGroupName: aws.String(asgName),
 		})
 	})
@@ -170,13 +170,13 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return foundNone("vpc", "subnetIDs")
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ec2API, ok := serviceClient(clients, func(c *ServiceClients) EC2API { return c.EC2 })
+	if !ok {
 		return NotRead("vpc")
 	}
 
 	subnets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
-		out, err := c.EC2.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{SubnetIds: subnetIDs, NextToken: token})
+		out, err := ec2API.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{SubnetIds: subnetIDs, NextToken: token})
 		if err != nil {
 			return nil, nil, err
 		}

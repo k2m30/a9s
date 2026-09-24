@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 
@@ -166,9 +165,6 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
 	if csErr != nil {
-		if errors.Is(csErr, errClientMissing) {
-			return NotRead("eb-rule")
-		}
 		return ReadFailed("eb-rule", csErr)
 	}
 	if configSetName == "" {
@@ -365,9 +361,6 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
 	if csErr != nil {
-		if errors.Is(csErr, errClientMissing) {
-			return NotRead("sns")
-		}
 		return ReadFailed("sns", csErr)
 	}
 	if configSetName == "" {

@@ -6,7 +6,6 @@ package aws
 import (
 	"cmp"
 	"context"
-	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -275,9 +274,6 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cac
 	fnName := cmp.Or(res.ID, res.Name)
 	image, err := lambdaImageURI(ctx, clients, fnName)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("ecr")
-		}
 		return ReadFailed("ecr", err)
 	}
 	if image == "" {
@@ -315,6 +311,8 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	}
 	idSet := make(map[string]struct{})
 	var reads rowReads
+	ruleList, capped := fanOut(ruleList)
+	truncated = truncated || capped
 	for _, ruleRes := range ruleList {
 		parentCtx := map[string]string{
 			"rule_name": ruleRes.Fields["name"],

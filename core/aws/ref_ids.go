@@ -5,7 +5,6 @@ package aws
 import (
 	"cmp"
 	"context"
-	"errors"
 	"regexp"
 	"slices"
 	"strings"
@@ -126,7 +125,7 @@ func listedRelated(ctx context.Context, clients any, cache resource.ResourceCach
 	}
 	list, _, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if list == nil {
-		if err != nil && !errors.Is(err, errClientMissing) {
+		if err != nil {
 			return ReadFailed(target, err)
 		}
 		return NotRead(target)

@@ -30,11 +30,11 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 	if task.ContainerInstanceArn == nil || *task.ContainerInstanceArn == "" {
 		return foundNone("ec2", "task.ContainerInstanceArn")
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	ecsAPI, ok := serviceClient(clients, func(c *ServiceClients) ECSAPI { return c.ECS })
+	if !ok {
 		return NotRead("ec2")
 	}
-	api, ok := c.ECS.(ECSDescribeContainerInstancesAPI)
+	api, ok := ecsAPI.(ECSDescribeContainerInstancesAPI)
 	if !ok {
 		return NotRead("ec2")
 	}

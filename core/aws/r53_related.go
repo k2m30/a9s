@@ -8,7 +8,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 
@@ -63,9 +62,6 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("elb")
-		}
 		return ReadFailed("elb", err)
 	}
 	aliases := r53AliasDNSNames(sets)
@@ -106,9 +102,6 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("cf")
-		}
 		return ReadFailed("cf", err)
 	}
 	aliases := r53AliasDNSNames(sets)
@@ -149,9 +142,6 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("apigw")
-		}
 		return ReadFailed("apigw", err)
 	}
 	var apiIDs []string
@@ -176,9 +166,6 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("s3")
-		}
 		return ReadFailed("s3", err)
 	}
 	wantedBuckets := make(map[string]struct{})
@@ -221,9 +208,6 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("acm")
-		}
 		return ReadFailed("acm", err)
 	}
 	validated := map[string]bool{}

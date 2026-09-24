@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A related panel opened in a session missing a service's client answers
+  `?` for the rows that client would read, instead of an error saying the
+  checker panicked. This covers the Auto Scaling group, Elastic Beanstalk,
+  IAM group, user, role and policy panels and a secret's Elastic Beanstalk
+  row. A read that was never sent is `?` on every path, never an error.
+- Reverse lookups that make one call per row of another type read at most
+  50 rows and show the count as a lower bound past that. Opening one Lambda
+  function no longer makes a call for every API Gateway API in the account.
+  The same bound applies to the ECR, CodeBuild, Kinesis, CloudWatch Logs,
+  Secrets Manager and ECS service lookups that read that way.
+- An AMI's Auto Scaling groups row is a lower bound when the instance list
+  could not be read, instead of counting only the groups whose launch
+  sources name the image.
+- A VPC endpoint's log groups include the flow logs on the endpoint's own
+  network interfaces.
+- An ECS service's EventBridge rules keep what the rule scan found when the
+  target lookup could not be read.
+
 - Paged AWS reads follow every page. The policy list reaches every IAM group
   and every inline policy past the first `ListGroups`/`ListGroupPolicies`
   page, and says it is a lower bound when the walk stops at its cap. Kinesis

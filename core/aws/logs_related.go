@@ -199,6 +199,8 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 	}
 	var ids []string
 	var reads rowReads
+	taskList, capped := fanOut(taskList)
+	truncated = truncated || capped
 	for _, taskRes := range taskList {
 		groups, read, err := ecsTaskLogGroups(ctx, clients, taskRes)
 		switch {

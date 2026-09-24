@@ -119,7 +119,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 	ids, complete, err := wafDistributionIDs(ctx, c, webACLArn)
 	var noList UnusableAnswerErr
 	switch {
-	case errors.Is(err, errClientMissing), errors.As(err, &noList):
+	case errors.As(err, &noList):
 		return NotRead("cf")
 	case err != nil:
 		return ReadFailed("cf", err)

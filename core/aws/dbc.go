@@ -44,10 +44,10 @@ func (c dbcRetryCursor) encode() string {
 // fails keeps the rows the other returned, as a lower bound with the error.
 // errGlobalRolesUnread comes with a complete page whose rows stand; it is
 // carried to the return as a partial-success error.
-func FetchDBClustersPageMerged(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+func FetchDBClustersPageMerged(ctx context.Context, rdsAPI RDSDescribeDBClustersAPI, docAPI DocDBDescribeDBClustersAPI, continuationToken string) (resource.FetchResult, error) {
 	var partial error
 	if rdsTok, ok := strings.CutPrefix(continuationToken, "rds:"); ok {
-		result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
+		result, err := FetchRDSDBClustersPage(ctx, rdsAPI, rdsTok)
 		if errors.Is(err, errGlobalRolesUnread) {
 			partial, err = err, nil
 		}
@@ -70,7 +70,7 @@ func FetchDBClustersPageMerged(ctx context.Context, c *ServiceClients, continuat
 		cur.DocDBToken, _ = strings.CutPrefix(continuationToken, "docdb:")
 	}
 
-	docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, cur.DocDBToken)
+	docResult, err := FetchDocDBClustersPage(ctx, docAPI, cur.DocDBToken)
 	if errors.Is(err, errGlobalRolesUnread) {
 		partial, err = err, nil
 	}
@@ -80,7 +80,7 @@ func FetchDBClustersPageMerged(ctx context.Context, c *ServiceClients, continuat
 		if cur.RDSDone {
 			return resource.FetchResult{}, errors.Join(partial, docErr)
 		}
-		rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, cur.RDSToken)
+		rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, rdsAPI, cur.RDSToken)
 		if errors.Is(rdsErr, errGlobalRolesUnread) {
 			partial, rdsErr = errors.Join(partial, rdsErr), nil
 		}
@@ -121,7 +121,7 @@ func FetchDBClustersPageMerged(ctx context.Context, c *ServiceClients, continuat
 			},
 		}, partial
 	}
-	rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, cur.RDSToken)
+	rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, rdsAPI, cur.RDSToken)
 	if errors.Is(rdsErr, errGlobalRolesUnread) {
 		partial, rdsErr = errors.Join(partial, rdsErr), nil
 	}

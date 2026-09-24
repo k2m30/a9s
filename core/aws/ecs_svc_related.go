@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -226,8 +225,6 @@ func checkECSSvcRole(ctx context.Context, clients any, res resource.Resource, ca
 	var def relatedRead
 	if td := aws.ToString(raw.TaskDefinition); td != "" {
 		switch taskDef, err := ecsTaskDefinition(ctx, clients, td); {
-		case errors.Is(err, errClientMissing):
-			return NotRead("role")
 		case err != nil || taskDef == nil:
 			def = unreadBy(err)
 		default:

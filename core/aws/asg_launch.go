@@ -56,14 +56,18 @@ func readASGLaunch(ctx context.Context, clients any, asg asgtypes.AutoScalingGro
 	if configuration != "" {
 		sources++
 	}
-	c, ok := clients.(*ServiceClients)
-	if sources == 0 || !ok || c == nil {
+	if sources == 0 {
 		return asgLaunch{images: images}, relatedRead{unread: true}
 	}
+	lcAPI, lcOK := serviceClient(clients, func(c *ServiceClients) ASGDescribeLaunchConfigurationsAPI { return c.AutoScaling })
+	ltAPI, ltOK := serviceClient(clients, func(c *ServiceClients) EC2DescribeLaunchTemplateVersionsAPI { return c.EC2 })
 	out := asgLaunch{images: images}
 	var failures []Failure
-	if configuration != "" {
-		lcs, err := launchConfigurations(ctx, c.AutoScaling, configuration)
+	missed := 0
+	if configuration != "" && !lcOK {
+		missed++
+	} else if configuration != "" {
+		lcs, err := launchConfigurations(ctx, lcAPI, configuration)
 		if err != nil {
 			failures = append(failures, FailedCall(configuration, err))
 		}
@@ -74,7 +78,11 @@ func readASGLaunch(ctx context.Context, clients any, asg asgtypes.AutoScalingGro
 		}
 	}
 	for _, spec := range templates {
-		data, err := launchTemplateData(ctx, c.EC2, spec)
+		if !ltOK {
+			missed++
+			continue
+		}
+		data, err := launchTemplateData(ctx, ltAPI, spec)
 		if err != nil {
 			failures = append(failures, FailedCall(cmp.Or(aws.ToString(spec.LaunchTemplateId), aws.ToString(spec.LaunchTemplateName)), err))
 			continue
@@ -91,11 +99,19 @@ func readASGLaunch(ctx context.Context, clients any, asg asgtypes.AutoScalingGro
 			out.profiles = append(out.profiles, cmp.Or(aws.ToString(p.Arn), aws.ToString(p.Name)))
 		}
 	}
+	// A source whose client the session lacks was never asked: it leaves the
+	// read partial, or unread when no source was asked at all, and it is no
+	// failure.
 	failure := AggregateFailures("asg-related: launch source", failures, sources)
-	if len(failures) == sources {
+	switch {
+	case len(failures) == sources:
 		return out, relatedRead{unread: true, failed: true, failure: failure}
+	case missed == sources:
+		return out, unreadBy(errClientMissing)
+	case missed+len(failures) == sources:
+		return out, relatedRead{unread: true, failure: failure}
 	}
-	return out, relatedRead{partial: len(failures) > 0, failure: failure}
+	return out, relatedRead{partial: len(failures)+missed > 0, failure: failure}
 }
 
 // launchTemplateData reads the version of the template spec names, by id or

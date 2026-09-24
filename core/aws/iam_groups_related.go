@@ -15,15 +15,15 @@ import (
 
 // checkGroupUser uses the IAM GetGroup API to return the users in this IAM group.
 func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	iamAPI, ok := serviceClient(clients, func(c *ServiceClients) IAMAPI { return c.IAM })
+	if !ok {
 		return NotRead("iam-user")
 	}
 	groupName := res.ID
 	if groupName == "" {
 		return keyMissing("iam-user", "groupName")
 	}
-	users, complete, err := iamGroupUsers(ctx, c.IAM, groupName)
+	users, complete, err := iamGroupUsers(ctx, iamAPI, groupName)
 	read := pagedRead(complete, err)
 	for _, u := range users {
 		read.ids = append(read.ids, aws.ToString(u.UserName))
@@ -33,16 +33,16 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 
 // checkGroupPolicy returns the combined count of managed and inline policies for this IAM group.
 func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	iamAPI, ok := serviceClient(clients, func(c *ServiceClients) IAMAPI { return c.IAM })
+	if !ok {
 		return NotRead("policy")
 	}
 	groupName := res.ID
 	if groupName == "" {
 		return keyMissing("policy", "groupName")
 	}
-	attached, attachedComplete, err := iamGroupAttachedPolicies(ctx, c.IAM, groupName)
-	inline, inlineComplete, err2 := iamGroupInlinePolicies(ctx, c.IAM, groupName)
+	attached, attachedComplete, err := iamGroupAttachedPolicies(ctx, iamAPI, groupName)
+	inline, inlineComplete, err2 := iamGroupInlinePolicies(ctx, iamAPI, groupName)
 	if err != nil && err2 != nil && len(attached) == 0 && len(inline) == 0 {
 		return ReadFailed("policy", err)
 	}

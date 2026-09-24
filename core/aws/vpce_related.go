@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -91,9 +92,12 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkVPCELogs reports the CloudWatch Logs groups the flow logs of the
-// endpoint's VPC and subnets deliver to: an endpoint owns no flow log, and a
-// flow log monitors a VPC, a subnet, a network interface or a transit gateway
-// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html).
+// endpoint's VPC, subnets and network interfaces deliver to: an endpoint owns
+// no flow log, and a flow log monitors a VPC, a subnet, a network interface or
+// a transit gateway
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html);
+// an interface endpoint's own interfaces are VpcEndpoint.NetworkInterfaceIds
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html).
 // One ec2:DescribeFlowLogs filtered by those resource ids; each flow log's
 // LogGroupName, or its LogDestination when that is a log group ARN.
 func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -101,7 +105,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok {
 		return NotRead("logs")
 	}
-	scope := nonEmpty(append([]string{aws.ToString(vpce.VpcId)}, vpce.SubnetIds...)...)
+	scope := nonEmpty(slices.Concat([]string{aws.ToString(vpce.VpcId)}, vpce.SubnetIds, vpce.NetworkInterfaceIds)...)
 	if len(scope) == 0 {
 		return foundNone("logs", "VpcId")
 	}

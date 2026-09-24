@@ -108,6 +108,9 @@ func (c *ServiceClients) bucketRegion(ctx context.Context, bucket string) string
 type s3PerBucket struct{ c *ServiceClients }
 
 func (p s3PerBucket) ListBuckets(ctx context.Context, in *s3.ListBucketsInput, opts ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
+	if p.c.S3 == nil {
+		return nil, errClientMissing
+	}
 	out, err := p.c.S3.ListBuckets(ctx, in, opts...)
 	if out != nil {
 		p.c.learnBucketRegions(out.Buckets)

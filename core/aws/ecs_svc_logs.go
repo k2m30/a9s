@@ -31,6 +31,9 @@ type regionalLogsAPI interface {
 type sessionLogs struct{ c *ServiceClients }
 
 func (s sessionLogs) FilterLogEvents(ctx context.Context, in *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error) {
+	if s.c.CloudWatchLogs == nil {
+		return nil, errClientMissing
+	}
 	return s.c.CloudWatchLogs.FilterLogEvents(ctx, in, optFns...)
 }
 

@@ -184,6 +184,8 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	var reads rowReads
+	ddbList, capped := fanOut(ddbList)
+	truncated = truncated || capped
 	for _, ddbRes := range ddbList {
 		tableName := ddbRes.ID
 		if tableName == "" {

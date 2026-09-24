@@ -158,6 +158,9 @@ func redshiftRequireSSL(
 // requireSSL reads one parameter group's require_ssl, once per run however
 // many clusters ask for it.
 func (g *redshiftParamGroupCache) requireSSL(ctx context.Context, clients *ServiceClients, name string) (string, error) {
+	if clients.Redshift == nil {
+		return "", errClientMissing
+	}
 	if cached, ok := g.values.Load(name); ok {
 		return cached.(string), nil
 	}

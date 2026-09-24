@@ -53,6 +53,8 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	var reads rowReads
+	pipelineList, capped := fanOut(pipelineList)
+	truncated = truncated || capped
 	for _, pipelineRes := range pipelineList {
 		pipelineName := pipelineRes.ID
 		if pipelineName == "" {

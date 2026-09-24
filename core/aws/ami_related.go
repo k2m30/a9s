@@ -100,13 +100,13 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if asgList == nil {
 		return NotRead("asg")
 	}
+	// The instance list is the second place the relation lives: one not read
+	// leaves the launch-source matches a lower bound, not the answer.
 	ec2Image := map[string]string{}
+	var instances relatedRead
 	if len(asgList) > 0 {
 		ec2List, ec2Truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
-		if err != nil {
-			return ReadFailed("asg", err)
-		}
-		truncated = truncated || ec2Truncated
+		instances = pagedRead(!ec2Truncated, err)
 		for _, ec2Res := range ec2List {
 			ec2Image[ec2Res.ID] = ec2Res.Fields["image_id"]
 		}
@@ -140,5 +140,5 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		truncated = truncated || read.partial
 	}
-	return reads.answer("asg", "ami-related: launch source", ids, truncated)
+	return alsoRead(reads.answer("asg", "ami-related: launch source", ids, truncated), instances)
 }

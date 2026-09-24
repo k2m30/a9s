@@ -16,8 +16,8 @@ import (
 // checkUserGroup uses the IAM ListGroupsForUser API to return the groups
 // this IAM user belongs to.
 func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	iamAPI, ok := serviceClient(clients, func(c *ServiceClients) IAMAPI { return c.IAM })
+	if !ok {
 		return NotRead("iam-group")
 	}
 	userName := res.ID
@@ -25,7 +25,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 		return keyMissing("iam-group", "userName")
 	}
 	groups, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Group, *string, error) {
-		out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
+		out, err := iamAPI.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
 			UserName: &userName,
 			Marker:   marker,
 		})
@@ -44,15 +44,15 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 // checkUserPolicy uses the IAM ListAttachedUserPolicies API to return the
 // managed policies attached to this IAM user.
 func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	iamAPI, ok := serviceClient(clients, func(c *ServiceClients) IAMAPI { return c.IAM })
+	if !ok {
 		return NotRead("policy")
 	}
 	userName := res.ID
 	if userName == "" {
 		return keyMissing("policy", "userName")
 	}
-	attached, complete, err := listAttachedUserPolicies(ctx, c.IAM, userName)
+	attached, complete, err := listAttachedUserPolicies(ctx, iamAPI, userName)
 	read := pagedRead(complete, err)
 	read.ids = attachedPolicyIDs(attached)
 	return relatedAnswer("policy", read)

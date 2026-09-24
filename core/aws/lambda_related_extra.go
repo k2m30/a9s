@@ -71,6 +71,8 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	rc := refContext(clients, cache, "lambda")
 	var ids []string
 	var reads rowReads
+	apiList, capped := fanOut(apiList)
+	truncated = truncated || capped
 	for _, apiRes := range apiList {
 		items, complete, err := apigwIntegrations(ctx, clients, apiRes)
 		if slices.ContainsFunc(items, func(item apigwIntegration) bool {

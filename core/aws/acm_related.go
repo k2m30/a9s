@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -95,9 +94,6 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("elb")
-		}
 		return ReadFailed("elb", err)
 	}
 	var refs []string
@@ -118,9 +114,6 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("apigw")
-		}
 		return ReadFailed("apigw", err)
 	}
 	var refs []string

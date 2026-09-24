@@ -268,12 +268,17 @@ func nodegroupASGNames(ngs []ekstypes.Nodegroup) []string {
 func nodegroupLaunchTemplateAMIs(ctx context.Context, c *ServiceClients, ngs []ekstypes.Nodegroup, amiSet map[string]struct{}) (partial bool, err error) {
 	var failures []Failure
 	read := 0
+	ec2API, ec2OK := serviceClient(c, func(c *ServiceClients) EC2API { return c.EC2 })
 	for _, ng := range ngs {
 		if ng.LaunchTemplate == nil || aws.ToString(ng.LaunchTemplate.Id) == "" {
 			continue
 		}
+		if !ec2OK {
+			partial = true
+			continue
+		}
 		read++
-		versions, ltErr := launchTemplateVersions(ctx, c.EC2, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
+		versions, ltErr := launchTemplateVersions(ctx, ec2API, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
 		if ltErr != nil {
 			// Soft-skip when the launch template has been deleted upstream:
 			// AWS returns InvalidLaunchTemplateId.NotFound, which is a true
@@ -291,9 +296,9 @@ func nodegroupLaunchTemplateAMIs(ctx context.Context, c *ServiceClients, ngs []e
 	}
 	aggErr := AggregateFailures("eks-related: DescribeLaunchTemplateVersions", failures, read)
 	if aggErr != nil && len(failures) == read {
-		return false, aggErr
+		return partial, aggErr
 	}
-	return aggErr != nil, nil
+	return partial || aggErr != nil, nil
 }
 
 // asgNamesPerDescribe is the maximum number of names DescribeAutoScalingGroups

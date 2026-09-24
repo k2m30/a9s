@@ -159,7 +159,10 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 	if dctx.Clients == nil {
 		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
-	c := dctx.Clients
+	transferAPI, ok := serviceClient(dctx.Clients, func(c *ServiceClients) TransferAPI { return c.Transfer })
+	if !ok {
+		return res, errClientMissing
+	}
 
 	agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct)
 	if !ok {
@@ -168,8 +171,8 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 
 	localProfileID := aws.ToString(agreement.LocalProfileId)
 	partnerProfileID := aws.ToString(agreement.PartnerProfileId)
-	localAs2ID, localCertFindings, localErr := resolveTransferProfile(ctx, c.Transfer, localProfileID)
-	partnerAs2ID, partnerCertFindings, partnerErr := resolveTransferProfile(ctx, c.Transfer, partnerProfileID)
+	localAs2ID, localCertFindings, localErr := resolveTransferProfile(ctx, transferAPI, localProfileID)
+	partnerAs2ID, partnerCertFindings, partnerErr := resolveTransferProfile(ctx, transferAPI, partnerProfileID)
 
 	enriched := res
 	enriched.Fields = make(map[string]string, len(res.Fields))
