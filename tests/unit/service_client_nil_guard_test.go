@@ -65,7 +65,7 @@ func TestServiceClientFieldsAreCheckedBeforeUse(t *testing.T) {
 		info := pkg.TypesInfo
 		name := fn.Name.Name
 		if fn.Recv != nil {
-			name = "method " + name
+			name = "method " + types.ExprString(fn.Recv.List[0].Type) + "." + name
 		}
 		if t571ReturnsFetchResult(fn, info) {
 			fetchers[name] = true

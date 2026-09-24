@@ -8,6 +8,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -23,8 +24,8 @@ func nilClientPanic(fn func()) (msg string) {
 }
 
 // A session can hold a client set with any service's client absent. Every
-// related checker, Wave 2 enricher and detail enricher runs on every demo row
-// with a client set holding none, and answers without panicking: a missing
+// related checker, Wave 2 enricher and detail enricher (child views' included)
+// runs on every demo row with a client set holding none, and answers without panicking: a missing
 // client is a read not made.
 func TestNilServiceClient_NoReadPanics(t *testing.T) {
 	demoClients := demo.NewServiceClients()
@@ -55,19 +56,53 @@ func TestNilServiceClient_NoReadPanics(t *testing.T) {
 				panics = append(panics, fmt.Sprintf("%s wave 2: %s", td.ShortName, msg))
 			}
 		}
-		if de := resource.GetDetailEnricher(td.ShortName); de != nil {
+		detailRows(t, td, rows, nil, demoClients, 0, func(shortName string, rows []resource.Resource) {
+			de := resource.GetDetailEnricher(shortName)
+			if de == nil {
+				return
+			}
+			// The context BeginDetailOperation hands a detail enricher, with
+			// the session's caches and no client.
+			dctx := &awsclient.DetailEnrichmentCtx{
+				Clients:    &awsclient.ServiceClients{},
+				PolicyDocs: &awsclient.PolicyDocumentCache{},
+				DetailDocs: &awsclient.DetailDocCache{},
+			}
 			for _, row := range rows {
 				if msg := nilClientPanic(func() {
-					de(ctx, &awsclient.ServiceClients{}, row) //nolint:errcheck // only a panic is under test
+					de(ctx, dctx, row) //nolint:errcheck // only a panic is under test
 				}); msg != "" {
-					panics = append(panics, fmt.Sprintf("%s detail on %s: %s", td.ShortName, row.ID, msg))
+					panics = append(panics, fmt.Sprintf("%s detail on %s: %s", shortName, row.ID, msg))
 					break
 				}
 			}
-		}
+		})
 	}
 	sort.Strings(panics)
 	for _, p := range panics {
 		t.Errorf("%s", p)
+	}
+}
+
+// detailRows hands visit the demo rows of td and, two levels down, of every
+// child view drilled from each of its rows.
+func detailRows(t *testing.T, td resource.ResourceTypeDef, rows []resource.Resource, parentCtx map[string]string, clients *awsclient.ServiceClients, depth int, visit func(string, []resource.Resource)) {
+	t.Helper()
+	visit(td.ShortName, rows)
+	if depth == 2 {
+		return
+	}
+	for _, child := range td.Children {
+		ctd := resource.GetChildType(child.ChildType)
+		if ctd == nil || ctd.ChildFetcher == nil {
+			continue
+		}
+		for i := range rows {
+			dr := domain.Resource(rows[i])
+			pctx := resource.ResolveChildContext(child, &dr, parentCtx)
+			if res, err := ctd.ChildFetcher(context.Background(), clients, pctx, ""); err == nil && len(res.Resources) > 0 {
+				detailRows(t, *ctd, res.Resources, pctx, clients, depth+1, visit)
+			}
+		}
 	}
 }
