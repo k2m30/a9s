@@ -68,7 +68,7 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 			// A refresh begins a brand-new operation, superseding staleOp —
 			// exactly what Ctrl+R does (core/app/actions_list.go's
 			// handleActionRefresh).
-			currentOp, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, true)
+			currentOp, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, "", true)
 
 			staleMsg := messages.RelatedCheckResult{
 				ResourceType:     "ec2",
@@ -202,7 +202,7 @@ func TestDetailOperation_OneFlightPerOperation_ConcurrentCallsUnderSameOpCoalesc
 	decorated := awsclient.NewCoalescingSFN(fake)
 
 	_, core := newTestControllerAndCore(t)
-	op, _ := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, false)
+	op, _ := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, "", false)
 	ctx := awsclient.WithDetailOp(context.Background(), op.ID)
 
 	const n = 6
@@ -241,8 +241,8 @@ func TestDetailOperation_OneFlightPerOperation_DifferentOperationsNeverCoalesce(
 
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: arn}
-	op1, _ := core.BeginDetailOperation("sfn", res, false)
-	op2, _ := core.BeginDetailOperation("sfn", res, true)
+	op1, _ := core.BeginDetailOperation("sfn", res, "", false)
+	op2, _ := core.BeginDetailOperation("sfn", res, "", true)
 
 	if op2.ID == op1.ID {
 		t.Fatal("BeginDetailOperation must return a fresh ID for the refresh — got the same ID as the initial open")
@@ -314,7 +314,7 @@ func TestDetailOperationTasks_GatingTable(t *testing.T) {
 
 			_, core := newTestControllerAndCore(t)
 			res := resource.Resource{ID: "gate-" + tc.name}
-			op, tasks := core.BeginDetailOperation(shortName, res, tc.refresh)
+			op, tasks := core.BeginDetailOperation(shortName, res, "", tc.refresh)
 			enrichTask := detailOpFindTaskKind(tasks, runtime.KindEnrichDetail)
 			relatedTask := detailOpFindTaskKind(tasks, runtime.KindRelatedCheck)
 
@@ -371,9 +371,9 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: "i-mono0001"}
 
-	op1, _ := core.BeginDetailOperation("ec2", res, false)
-	op2, _ := core.BeginDetailOperation("ec2", res, false)
-	op3, _ := core.BeginDetailOperation("ec2", res, true)
+	op1, _ := core.BeginDetailOperation("ec2", res, "", false)
+	op2, _ := core.BeginDetailOperation("ec2", res, "", false)
+	op3, _ := core.BeginDetailOperation("ec2", res, "", true)
 
 	if op2.ID <= op1.ID {
 		t.Errorf("op2.ID (%d) must be strictly greater than op1.ID (%d)", op2.ID, op1.ID)
@@ -407,7 +407,7 @@ func TestBeginDetailOperation_BackfillsEmptyResourceType(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: "backfill-0001"} // Type intentionally empty
 
-	op, tasks := core.BeginDetailOperation(shortName, res, false)
+	op, tasks := core.BeginDetailOperation(shortName, res, "", false)
 
 	if op.Resource.Type != shortName {
 		t.Fatalf("op.Resource.Type = %q, want backfilled %q", op.Resource.Type, shortName)
@@ -461,7 +461,7 @@ func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.
 	_, core := newTestControllerAndCore(t)
 	// Type intentionally empty, as a live CloudTrail-events fetcher leaves it.
 	res := resource.Resource{ID: "evt-000001"}
-	op, _ := core.BeginDetailOperation("ct-events", res, false)
+	op, _ := core.BeginDetailOperation("ct-events", res, "", false)
 
 	if op.Resource.Type != "ct-events" {
 		t.Fatalf("op.Resource.Type = %q, want backfilled %q", op.Resource.Type, "ct-events")
@@ -506,7 +506,7 @@ func TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceTy
 
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: "evt-guard-001", Type: "some-other-type"}
-	op, _ := core.BeginDetailOperation("ct-events", res, false)
+	op, _ := core.BeginDetailOperation("ct-events", res, "", false)
 
 	if op.Resource.Type != "some-other-type" {
 		t.Fatalf("test setup invalid: op.Resource.Type = %q, want the mismatched %q unchanged (a non-empty Type is never backfilled)", op.Resource.Type, "some-other-type")
@@ -544,7 +544,7 @@ func TestRunRelatedDef_TotalPrefetchFailure_IsTheFailedReadWithoutRunningChecker
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
 	_, core := newTestControllerAndCore(t)
-	op, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-prefetch0001"}, false)
+	op, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-prefetch0001"}, "", false)
 
 	checkerCalls := 0
 	def := resource.RelatedDef{
@@ -617,8 +617,8 @@ func TestHandleEnrichDetailResult_PendingRefreshClear(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, core := newTestControllerAndCore(t)
-			refreshOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, true)
-			laterOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, false)
+			refreshOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, "", true)
+			laterOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, "", false)
 			core.PendingDetailRefreshSet(key, refreshOp.ID)
 
 			core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{

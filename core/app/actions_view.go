@@ -155,6 +155,7 @@ func (c *Controller) handleActionOpenYAML(_ Action) (ViewState, []runtime.TaskRe
 		Target:       runtime.NavigateTargetYAML,
 		ResourceType: typeName,
 		Resource:     &r,
+		Region:       c.topRegionLocked(),
 	})
 	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
@@ -169,6 +170,7 @@ func (c *Controller) handleActionOpenJSON(_ Action) (ViewState, []runtime.TaskRe
 		Target:       runtime.NavigateTargetJSON,
 		ResourceType: typeName,
 		Resource:     &r,
+		Region:       c.topRegionLocked(),
 	})
 	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
@@ -198,6 +200,7 @@ func (c *Controller) handleActionReveal(_ Action) (ViewState, []runtime.TaskRequ
 		Target:       runtime.NavigateTargetReveal,
 		ResourceType: revealType,
 		Resource:     revealRes,
+		Region:       c.topRegionLocked(),
 	})
 	// KindFetchReveal: the push happens when Handle receives
 	// messages.ValueRevealed and calls HandleValueRevealed.
@@ -263,6 +266,7 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 		ChildType:     matchedChild.ChildType,
 		ParentContext: ctx,
 		DisplayName:   displayName,
+		Region:        c.topRegionLocked(),
 	}
 	intents, tasks := c.core.HandleEnterChildView(ev)
 	c.applyIntents(intents)
@@ -276,7 +280,7 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 					Loading:       true,
 					ParentContext: ctx,
 				}
-				c.initListState(top.State.List, top.Ctx.ResourceType)
+				c.initListState(top.State.List, top.Ctx)
 			}
 		}
 	}
@@ -285,14 +289,14 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 
 func (c *Controller) handleActionCloudTrail(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Navigate to the CloudTrail Events ("ct-events") list filtered to the
-	// active resource. Mirrors the TUI's 't' key: BuildCloudTrailFilter →
+	// active resource. Mirrors the TUI's 't' key: CloudTrailFilterIn →
 	// RelatedNavigate to "ct-events" with a FetchFilter (server-side filtered
 	// fetch). No-ops when the resource type has no CloudTrailKey.
 	r, typeName, ok := c.selectedResourceForAction()
 	if !ok {
 		return c.snapshot(), nil
 	}
-	ff := resource.BuildCloudTrailFilter(r, typeName)
+	ff := resource.CloudTrailFilterIn(r, typeName, c.topRegionLocked())
 	if ff == nil {
 		return c.snapshot(), nil
 	}
@@ -301,6 +305,7 @@ func (c *Controller) handleActionCloudTrail(_ Action) (ViewState, []runtime.Task
 		SourceResource: r,
 		SourceType:     typeName,
 		FetchFilter:    ff,
+		Region:         c.topRegionLocked(),
 	}
 	tasks := c.dispatchRelatedNavigate(ev)
 	return c.snapshot(), tasks

@@ -188,8 +188,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 	// The key encrypting a bucket lives in the bucket's region, and is read
 	// there.
 	bucketRegion := c.bucketRegion(ctx, bucket)
-	inBucketRegion := c.InRegion(bucketRegion)
-	encAPI, ok := inBucketRegion.S3.(S3GetBucketEncryptionAPI)
+	encAPI, ok := c.s3For(ctx, bucket).(S3GetBucketEncryptionAPI)
 	if !ok {
 		return NotRead("kms")
 	}

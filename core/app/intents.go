@@ -3,6 +3,8 @@
 package app
 
 import (
+	"cmp"
+
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -39,14 +41,13 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 		case runtime.PushScreen:
 			ctx := v.Context
 			// EnterChildView-emitted pushes (HandleEnterChildView) leave Context
-			// zero-valued and carry the child type in ChildListPayload instead —
-			// resolve it here so the pushed Screen.Ctx.ResourceType is non-empty
-			// (topListState/ensureListState key off it, and the renderer builder
-			// resolves the same field).
-			if ctx.ResourceType == "" {
-				if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
-					ctx.ResourceType = clp.ChildType
-				}
+			// zero-valued and carry the child type and the parent's Region in
+			// ChildListPayload instead — resolve them here so the pushed
+			// Screen.Ctx names the type (topListState/ensureListState and the
+			// renderer builder key off it) and the Region its rows are read in.
+			if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
+				ctx.ResourceType = cmp.Or(ctx.ResourceType, clp.ChildType)
+				ctx.Region = clp.Region
 			}
 			c.stack = append(c.stack, Screen{
 				ID:  v.ID,
@@ -302,7 +303,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// (controller.go) and openRelatedDetail (navigate.go) hit on a
 			// second open of the same detail.
 			if v.SourceID != "" {
-				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
+				key := runtime.RelatedCacheKeyIn(v.ResourceType, v.Region, v.SourceID)
 				existing, _ := c.core.RelatedCacheGet(key)
 				entry := runtime.RelatedCacheResult{DefDisplayName: v.DefDisplayName, Result: v.Result}
 				replaced := false
@@ -329,16 +330,16 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// must reach both screens, so popping back to detail-A shows the
 			// correct Attention section immediately. This is the single source of
 			// truth for both TUI and web/headless.
-			c.applyDetailFieldUpdates(v.ResourceType, v.FieldUpdates)
+			c.applyDetailFieldUpdates(v.ResourceType, v.Region, v.FieldUpdates)
 			switch {
 			case v.ResourceID != "":
 				if fs, answered := v.EnrichmentFindings[v.ResourceID]; answered {
-					c.applyDetailFindingsForResource(v.ResourceType, v.ResourceID, fs, v.EnrichmentAttentionDetails[v.ResourceID])
+					c.applyDetailFindingsForResource(v.ResourceType, v.Region, v.ResourceID, fs, v.EnrichmentAttentionDetails[v.ResourceID])
 				}
 			case len(v.EnrichmentFindings) == 0:
 				// Nil or empty Findings means all resources of this type have
 				// recovered: clear enrichment from every stacked detail screen.
-				c.clearDetailFindingsForType(v.ResourceType)
+				c.clearDetailFindingsForType(v.ResourceType, v.Region)
 			default:
 				// Clear stale findings from every stacked detail of this type first,
 				// so a resource that recovered (absent from the new map) loses its
@@ -349,9 +350,9 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// just a single worst-severity representative — so a
 				// multi-condition resource's Attention block shows every
 				// independently-evaluated finding on an already-open detail.
-				c.clearDetailFindingsForType(v.ResourceType)
+				c.clearDetailFindingsForType(v.ResourceType, v.Region)
 				for resourceID, fs := range v.EnrichmentFindings {
-					c.applyDetailFindingsForResource(v.ResourceType, resourceID, fs, v.EnrichmentAttentionDetails[resourceID])
+					c.applyDetailFindingsForResource(v.ResourceType, v.Region, resourceID, fs, v.EnrichmentAttentionDetails[resourceID])
 				}
 			}
 

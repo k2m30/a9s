@@ -83,7 +83,7 @@ func openDetailWithWorkload(t *testing.T, c *app.Controller, core *runtime.Core,
 		Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: row.ID},
 	}})
 	c.EnsureDetailState(row, "ec2")
-	_, tasks := core.BeginDetailOperation("ec2", row, false)
+	_, tasks := core.BeginDetailOperation("ec2", row, "", false)
 	ran := 0
 	for _, task := range tasks {
 		if task.Key.Kind != runtime.KindEnrichRow {
@@ -258,7 +258,7 @@ func TestCappedRow_AnswerFromBeforeARefreshIsDropped(t *testing.T) {
 				Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: rows[0].ID},
 			}})
 			c.EnsureDetailState(rows[0], "ec2")
-			_, tasks := core.BeginDetailOperation("ec2", rows[0], false)
+			_, tasks := core.BeginDetailOperation("ec2", rows[0], "", false)
 			var ev messages.Event
 			for _, task := range tasks {
 				if task.Key.Kind != runtime.KindEnrichRow {

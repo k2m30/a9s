@@ -519,6 +519,7 @@ func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest)
 		Target:       runtime.NavigateTargetDetail,
 		ResourceType: typeName,
 		Resource:     &r,
+		Region:       c.topRegionLocked(),
 	})
 	// applyNavResult's NavigateKindPushDetail case owns the related-cache
 	// replay (cache hit: rows merged directly into the stacked detail; cache

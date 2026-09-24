@@ -12,13 +12,13 @@ import (
 
 // ctEventsCheckerFor returns the RelatedChecker every type's CloudTrail
 // Events pivot is wired to in its own catalog literal. The returned closure
-// captures the owning type's short name, which is what BuildCloudTrailFilter
+// captures the owning type's short name, which is what CloudTrailFilterIn
 // reads the lookup key and Region from, so the row defers to the same lookup
 // the `t` hotkey sends.
 func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 	sn := shortName
-	return func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-		filter := resource.BuildCloudTrailFilter(res, sn)
+	return func(_ context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+		filter := resource.CloudTrailFilterIn(res, sn, readRegion(clients))
 		if filter == nil {
 			return foundNone("ct-events", "filter")
 		}

@@ -50,6 +50,8 @@ type NavigateEvent struct {
 	ResourceType   string             // alias allowed; runtime canonicalizes
 	Resource       *resource.Resource // for Detail/YAML/JSON/Reveal
 	ReplaceCurrent bool               // pop current view before pushing target
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
 }
 
 // NavigateKind enumerates the possible outcomes of HandleNavigate. The
@@ -87,6 +89,8 @@ type NavigateResult struct {
 	DispatchRelated bool                       // for PushDetail
 	FlashMessage    string
 	FlashIsError    bool
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
 }
 
 // TaskKind constants for fetch operations emitted by HandleNavigate.
@@ -109,6 +113,8 @@ const (
 type FetchRevealPayload struct {
 	ResourceType string
 	ResourceID   string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
 }
 
 // isTaskPayload satisfies the TaskPayload marker interface.
@@ -318,6 +324,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			ResolvedType:   resType,
 			ReplaceCurrent: ev.ReplaceCurrent,
 			Resource:       ev.Resource,
+			Region:         ev.Region,
 		}
 		if resType != "" && resource.HasDetailEnricher(resType) {
 			result.DispatchEnrich = true
@@ -358,10 +365,11 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 				Kind:         NavigateKindFetchReveal,
 				ResolvedType: ev.ResourceType,
 				Resource:     ev.Resource,
+				Region:       ev.Region,
 			}, []TaskRequest{{
 				Key:     TaskKey{Kind: KindFetchReveal, Scope: ev.ResourceType + "/" + ev.Resource.ID},
 				Cache:   CacheNone,
-				Payload: FetchRevealPayload{ResourceType: ev.ResourceType, ResourceID: ev.Resource.ID},
+				Payload: FetchRevealPayload{ResourceType: ev.ResourceType, ResourceID: ev.Resource.ID, Region: ev.Region},
 			}}
 
 	case NavigateTargetCosts:

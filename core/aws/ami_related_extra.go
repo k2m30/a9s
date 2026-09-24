@@ -66,7 +66,9 @@ func checkAMIKMS(ctx context.Context, clients any, res resource.Resource, cache 
 			read.partial = true
 		}
 	}
-	return relatedAnswer("kms", joinReads(read, readOf(kmsRelated(ctx, clients, cache, refs))))
+	reads := kmsReads(ctx, clients, cache, "", refs)
+	reads[""] = joinReads(reads[""], read)
+	return regionalAnswer(clients, "kms", reads)
 }
 
 // checkAMING scans the node-group list for node groups using this AMI:

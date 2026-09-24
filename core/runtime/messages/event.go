@@ -211,7 +211,9 @@ func (Flash) isEvent() {}
 type ByIDFetchFailed struct {
 	TargetType string
 	ID         string
-	Reason     string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
+	Reason string
 }
 
 func (ByIDFetchFailed) isEvent() {}
@@ -227,8 +229,10 @@ func (ClearFlash) isEvent() {}
 type ValueRevealed struct {
 	ResourceType string // e.g., "secrets", "ssm"
 	ResourceID   string // secret name or parameter name
-	Value        string
-	Err          error
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
+	Value  string
+	Err    error
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// ValueRevealed (secret from a prior profile) is silently discarded to
 	// prevent cross-account secret display. ConnectGen is seeded at 1 and
@@ -270,8 +274,10 @@ func (ClientsReady) AcceptZeroGen() bool { return true }
 type RelatedCheckResult struct {
 	ResourceType     string
 	SourceResourceID string // ID of the source resource (for cache keying)
-	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
-	Result           resource.RelatedCheckResult
+	// Region is the Region the resource was read in, "" for the session's.
+	Region         string
+	DefDisplayName string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
+	Result         resource.RelatedCheckResult
 	// OperationID is the core/runtime.DetailOperation.ID this result was
 	// dispatched under. Accepted only when it matches the session's current
 	// DetailOpGen (see messages.AspectDetailOp) — a fresh detail open or an
@@ -321,8 +327,10 @@ func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
 type RelatedCheckBatch struct {
 	ResourceType     string
 	SourceResourceID string
-	Results          []RelatedCheckResult
-	OperationID      domain.Gen
+	// Region is the Region the resource was read in, "" for the session's.
+	Region      string
+	Results     []RelatedCheckResult
+	OperationID domain.Gen
 }
 
 func (RelatedCheckBatch) isEvent()               {}
@@ -506,9 +514,11 @@ func (IdentityError) AcceptZeroGen() bool    { return true }
 type EnrichDetailResult struct {
 	ResourceType string
 	ResourceID   string
-	EnrichedRes  resource.Resource
-	Err          error
-	OperationID  domain.Gen
+	// Region is the Region the resource was read in, "" for the session's.
+	Region      string
+	EnrichedRes resource.Resource
+	Err         error
+	OperationID domain.Gen
 }
 
 // RowEnriched is one row's on-demand Wave-2 answer (runtime.KindEnrichRow):
@@ -518,8 +528,10 @@ type EnrichDetailResult struct {
 // that refused. Stamped with the detail operation that asked, like
 // EnrichDetailResult.
 type RowEnriched struct {
-	ResourceType     string
-	ResourceID       string
+	ResourceType string
+	ResourceID   string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region           string
 	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates     map[string]map[string]string

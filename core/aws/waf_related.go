@@ -60,7 +60,6 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok || c == nil || c.WAFv2 == nil {
 		return NotRead("logs")
 	}
-	region := wafRegionOf(res.Fields["scope"])
 	api := c.wafIn(res.Fields["scope"])
 	var groups []string
 	var failures []Failure
@@ -85,11 +84,13 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 			}
 		}
 	}
-	read := readOf(relatedRefs("logs", groups, refContext(c.InRegion(region), cache, "logs")))
-	read.partial = read.partial || len(failures) > 0
-	read.unread = len(failures) == len(scopes)
-	read.failure = AggregateFailures("waf-related: GetLoggingConfiguration", failures, len(scopes))
-	return inRegion(clients, region, relatedAnswer("logs", read))
+	reads := refReadsIn(clients, cache, "logs", refsByRegion(groups))
+	reads[""] = joinReads(reads[""], relatedRead{
+		partial: len(failures) > 0,
+		unread:  len(failures) == len(scopes),
+		failure: AggregateFailures("waf-related: GetLoggingConfiguration", failures, len(scopes)),
+	})
+	return regionalAnswer(clients, "logs", reads)
 }
 
 // checkWAFCF reports CloudFront distributions associated with this Web ACL.

@@ -310,7 +310,7 @@ func (c *Controller) activeListRefreshTasks(typeGen domain.Gen) []runtime.TaskRe
 		return []runtime.TaskRequest{{
 			Key:     runtime.TaskKey{Kind: runtime.KindFetchFiltered, Scope: typeName},
 			Cache:   runtime.CacheNone,
-			Payload: runtime.FetchFilteredPayload{Filter: ls.FetchFilter},
+			Payload: runtime.FetchFilteredPayload{Filter: ls.FetchFilter, Region: c.listRegionLocked(ls)},
 		}}
 	}
 	// A Ctrl+R issued while the top-of-stack list is a related-navigation
@@ -318,7 +318,7 @@ func (c *Controller) activeListRefreshTasks(typeGen domain.Gen) []runtime.TaskRe
 	// top-level list) must not let the resulting ResourcesLoaded default to
 	// FetchProvenanceCanonicalList — the symmetric gate in handle.go's
 	// handleResourcesLoadedEvent would then reject it on this exact screen.
-	payload := runtime.FetchResourcesPayload{TypeGen: typeGen, Provenance: listLane(c.topScreenID(), ls)}
+	payload := runtime.FetchResourcesPayload{TypeGen: typeGen, Provenance: listLane(c.topScreenID(), ls), Region: c.listRegionLocked(ls)}
 	return []runtime.TaskRequest{{
 		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: typeName},
 		Cache:   runtime.CacheNone,

@@ -102,7 +102,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			},
 		},
 	}
-	detail := PatchDetail{ResourceType: canon, ResourceID: msg.ResourceID, FieldUpdates: msg.FieldUpdates}
+	detail := PatchDetail{ResourceType: canon, ResourceID: msg.ResourceID, Region: msg.Region, FieldUpdates: msg.FieldUpdates}
 	if !msg.Uninspected {
 		detail.EnrichmentFindings = map[string][]domain.Finding{msg.ResourceID: msg.Findings[msg.ResourceID]}
 		detail.EnrichmentAttentionDetails = msg.AttentionDetails

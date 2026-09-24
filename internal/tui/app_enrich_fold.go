@@ -22,7 +22,7 @@ package tui
 // Core.HandleEnrichDetailResult directly (not Controller.Handle) so a flash
 // on enrichment error applies synchronously within one Update() call, then
 // calls primaryWave2Finding below before folding into detail state via
-// ctrl.ApplyDetailEnrichmentForResource.
+// ctrl.ApplyDetailEnrichmentIn.
 
 import (
 	"strings"

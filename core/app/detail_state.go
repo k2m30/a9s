@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"maps"
 	"strings"
 
@@ -34,6 +35,88 @@ func (c *Controller) topDetailState() *DetailState {
 		return nil
 	}
 	return c.stack[len(c.stack)-1].State.Detail
+}
+
+// topRegionLocked is the Region the top screen's rows or resource were read
+// in, "" for the session's: the one owner of a screen's Region. Callers must
+// hold c.mu.
+func (c *Controller) topRegionLocked() string {
+	if len(c.stack) == 0 {
+		return ""
+	}
+	top := c.stack[len(c.stack)-1]
+	if top.State.List != nil {
+		return c.listRegionLocked(top.State.List)
+	}
+	return c.localRegion(top.Ctx.Region)
+}
+
+// listRegionLocked is the Region ls's rows were read in, "" for the
+// session's: a CloudTrail lookup carries it in its filter, which names the
+// Region the lookup ran in even when the screen it was opened from was read
+// elsewhere; a drill into a count found elsewhere carries it on the screen.
+func (c *Controller) listRegionLocked(ls *ListState) string {
+	return c.localRegion(cmp.Or(ls.FetchFilter[resource.CTRegionFilterKey], ls.Region))
+}
+
+// localRegion is region, "" when it is the session's.
+func (c *Controller) localRegion(region string) string {
+	if region == c.core.Region() {
+		return ""
+	}
+	return region
+}
+
+// detailRegionLocked is the Region ds's screen was read in, "" for the
+// session's. A fold reaches details below the top, so it is read from the
+// screen that holds ds rather than from the top of the stack.
+func (c *Controller) detailRegionLocked(ds *DetailState) string {
+	for i := range c.stack {
+		if c.stack[i].State.Detail == ds {
+			return c.localRegion(c.stack[i].Ctx.Region)
+		}
+	}
+	return ""
+}
+
+// showsLocked reports whether s shows a resource of resourceType read in
+// region ("" for the session's) and, when id is not empty, the one with that
+// ID. A name-keyed type (a Lambda function, a DynamoDB table) can hold the
+// same ID in two Regions, so the Region is part of a resource's identity.
+func (c *Controller) showsLocked(s *Screen, resourceType, region, id string) bool {
+	if c.localRegion(s.Ctx.Region) != c.localRegion(region) {
+		return false
+	}
+	switch s.ID {
+	case runtime.ScreenDetail:
+		ds := s.State.Detail
+		return ds != nil && ds.ResourceType == resourceType && (id == "" || ds.Resource.ID == id)
+	case runtime.ScreenYAML, runtime.ScreenJSON:
+		return s.Ctx.ResourceType == resourceType && (id == "" || s.Ctx.ResourceID == id)
+	}
+	return false
+}
+
+// TopShows reports whether the top screen shows the resource resourceType/id
+// read in region ("" for the session's).
+func (c *Controller) TopShows(resourceType, region, id string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.stack) > 0 && c.showsLocked(&c.stack[len(c.stack)-1], resourceType, region, id)
+}
+
+// readRegionLocked names the Region the top screen reads: its own, or the
+// session's.
+func (c *Controller) readRegionLocked() string {
+	return cmp.Or(c.topRegionLocked(), c.core.Region())
+}
+
+// TopRegion is the locked form of topRegionLocked, for a renderer that pushes
+// a screen of one of the top screen's rows.
+func (c *Controller) TopRegion() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.topRegionLocked()
 }
 
 // ensureDetailState initialises the top detail screen's DetailState. It is a
@@ -132,41 +215,34 @@ func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID stri
 // applyDetailFindingForResource is the lock-free implementation of
 // ApplyDetailFindingForResource. Callers must hold c.mu (write).
 func (c *Controller) applyDetailFindingForResource(resourceType, resourceID string, f *domain.Finding, ad *domain.AttentionDetail) {
-	c.applyDetailFindingsForResource(resourceType, resourceID, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
+	c.applyDetailFindingsForResource(resourceType, "", resourceID, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
 }
 
 // applyDetailFindingsForResource applies EVERY finding in findings (each
 // looking up its own AttentionDetail in attentionDetails by its Code) to the
-// detail screen(s) in the stack matching (resourceType, resourceID) — the
+// detail screen(s) in the stack showing (resourceType, region, resourceID) — the
 // plural counterpart of applyDetailFindingForResource. Used by the PatchDetail
 // intent case so an already-open detail's Attention block shows every
 // independently-evaluated Wave-2 finding, not just a single worst-severity
 // representative. No-op when no stacked detail matches.
-func (c *Controller) applyDetailFindingsForResource(resourceType, resourceID string, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
+func (c *Controller) applyDetailFindingsForResource(resourceType, region, resourceID string, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
 	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
+		if c.stack[i].ID != runtime.ScreenDetail || !c.showsLocked(&c.stack[i], resourceType, region, resourceID) {
 			continue
 		}
-		ds := c.stack[i].State.Detail
-		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
-			continue
-		}
-		c.applyFindingToState(ds, findings, attentionDetails)
+		c.applyFindingToState(c.stack[i].State.Detail, findings, attentionDetails)
 	}
 }
 
 // applyDetailFieldUpdates rewrites, copy-on-write, the columns a Wave-2
 // answer changed on every stacked detail of the rows it names. Callers must
 // hold c.mu (write).
-func (c *Controller) applyDetailFieldUpdates(resourceType string, updates map[string]map[string]string) {
+func (c *Controller) applyDetailFieldUpdates(resourceType, region string, updates map[string]map[string]string) {
 	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
+		if c.stack[i].ID != runtime.ScreenDetail || !c.showsLocked(&c.stack[i], resourceType, region, "") {
 			continue
 		}
 		ds := c.stack[i].State.Detail
-		if ds == nil || ds.ResourceType != resourceType {
-			continue
-		}
 		fields := updates[ds.Resource.ID]
 		if len(fields) == 0 {
 			continue
@@ -184,21 +260,17 @@ func (c *Controller) applyDetailFieldUpdates(resourceType string, updates map[st
 func (c *Controller) ClearDetailFindingsForType(resourceType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.clearDetailFindingsForType(resourceType)
+	c.clearDetailFindingsForType(resourceType, "")
 }
 
 // clearDetailFindingsForType is the lock-free implementation of
 // ClearDetailFindingsForType. Callers must hold c.mu (write).
-func (c *Controller) clearDetailFindingsForType(resourceType string) {
+func (c *Controller) clearDetailFindingsForType(resourceType, region string) {
 	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
+		if c.stack[i].ID != runtime.ScreenDetail || !c.showsLocked(&c.stack[i], resourceType, region, "") {
 			continue
 		}
-		ds := c.stack[i].State.Detail
-		if ds == nil || ds.ResourceType != resourceType {
-			continue
-		}
-		c.applyFindingToState(ds, nil, nil)
+		c.applyFindingToState(c.stack[i].State.Detail, nil, nil)
 	}
 }
 
@@ -210,15 +282,21 @@ func (c *Controller) clearDetailFindingsForType(resourceType string) {
 // subsequent YAML/JSON opens keep showing the pre-enrichment resource — and then
 // applies the wave-2 finding. No-op when no stacked detail matches.
 func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
+	c.ApplyDetailEnrichmentIn(resourceType, "", resourceID, enriched, f, ad)
+}
+
+// ApplyDetailEnrichmentIn is ApplyDetailEnrichmentForResource for a resource
+// read in region ("" for the session's).
+func (c *Controller) ApplyDetailEnrichmentIn(resourceType, region, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.applyDetailEnrichmentForResourceLocked(resourceType, resourceID, enriched, f, ad)
+	c.applyDetailEnrichmentForResourceLocked(resourceType, region, resourceID, enriched, f, ad)
 }
 
 // applyDetailEnrichmentForResourceLocked is the lock-free implementation of
 // ApplyDetailEnrichmentForResource, shared with foldEnrichDetailResultLocked
 // (both already run under c.mu). Callers must hold c.mu (write).
-func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
+func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, region, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
 	// The detail enricher's own read of AWS: one resource, so the boundary is
 	// affordable here under the lock, unlike a page of rows.
 	enriched = enriched.Sanitized()
@@ -237,13 +315,10 @@ func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resour
 		attentionDetails = enriched.AttentionDetails
 	}
 	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
+		if c.stack[i].ID != runtime.ScreenDetail || !c.showsLocked(&c.stack[i], resourceType, region, resourceID) {
 			continue
 		}
 		ds := c.stack[i].State.Detail
-		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
-			continue
-		}
 		findings := fallbackFindings
 		if len(enriched.Findings) > 0 {
 			// Some DetailEnrichers (enrichPolicy/enrichRolePolicy) pass the
@@ -324,6 +399,7 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 	intents, tasks := c.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
 		ResourceType: msg.ResourceType,
 		ResourceID:   msg.ResourceID,
+		Region:       msg.Region,
 		OperationID:  msg.OperationID,
 		Err:          msg.Err,
 	})
@@ -331,14 +407,14 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 		return intents, tasks
 	}
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
-	c.applyDetailEnrichmentForResourceLocked(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
-	c.regenerateTextScreenLocked(msg.ResourceType, msg.ResourceID, msg.EnrichedRes)
+	c.applyDetailEnrichmentForResourceLocked(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, ef, ad)
+	c.regenerateTextScreenLocked(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes)
 	return intents, tasks
 }
 
 // regenerateTextScreenLocked replaces EVERY stacked text screen's (YAML/JSON)
 // Lines and Resource with content regenerated from the enriched resource,
-// for each screen whose ScreenContext matches (resourceType, resourceID) —
+// for each screen showing (resourceType, region, resourceID) —
 // not just the top one. Mirrors the stack-wide matching every sibling fold
 // in this file uses (applyDetailFindingsForResource,
 // clearDetailFindingsForType, applyDetailEnrichmentForResourceLocked): open
@@ -355,13 +431,13 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 // enrichment landing mid-search or mid-scroll does not reset either.
 //
 // Callers must hold c.mu (write).
-func (c *Controller) regenerateTextScreenLocked(resourceType, resourceID string, enriched resource.Resource) {
+func (c *Controller) regenerateTextScreenLocked(resourceType, region, resourceID string, enriched resource.Resource) {
 	for i := range c.stack {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenYAML && s.ID != runtime.ScreenJSON {
 			continue
 		}
-		if s.Ctx.ResourceType != resourceType || s.Ctx.ResourceID != resourceID {
+		if !c.showsLocked(s, resourceType, region, resourceID) {
 			continue
 		}
 		ts := s.State.Text
@@ -482,14 +558,24 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 // mergeDetailRelatedRow so ResourceIDs are preserved (the controller-owned Enter
 // navigation reads them). No-op when no stacked detail matches.
 func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string, region string) {
+	c.ApplyDetailRelatedResultIn(sourceType, "", sourceID, displayName, targetType, state, count, loading, errMsg, truncated, resourceIDs, fetchFilter, region)
+}
+
+// ApplyDetailRelatedResultIn is ApplyDetailRelatedResultForResource for a
+// source read in sourceRegion ("" for the session's); region is the Region
+// the row's count was read in.
+func (c *Controller) ApplyDetailRelatedResultIn(sourceType, sourceRegion, sourceID, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string, region string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.applyDetailRelatedResultLocked(sourceType, sourceRegion, sourceID, displayName, targetType, state, count, loading, errMsg, truncated, resourceIDs, fetchFilter, region)
+}
+
+// applyDetailRelatedResultLocked is the one stack-wide merge of a related
+// result into the details showing its source. Callers must hold c.mu (write).
+func (c *Controller) applyDetailRelatedResultLocked(sourceType, sourceRegion, sourceID, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string, region string) {
 	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
-			continue
-		}
-		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceID && ds.ResourceType == sourceType {
-			mergeDetailRelatedRow(ds, displayName, targetType, state, count, loading, errMsg, truncated, resourceIDs, fetchFilter, region)
+		if c.stack[i].ID == runtime.ScreenDetail && c.showsLocked(&c.stack[i], sourceType, sourceRegion, sourceID) {
+			mergeDetailRelatedRow(c.stack[i].State.Detail, displayName, targetType, state, count, loading, errMsg, truncated, resourceIDs, fetchFilter, region)
 		}
 	}
 }

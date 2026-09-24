@@ -12,6 +12,8 @@
 package tui
 
 import (
+	"cmp"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -503,6 +505,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 		}
 		res := m.ctrl.GetDetailResource()
 		rt := m.ctrl.GetDetailResourceType()
+		region := m.ctrl.TopRegion()
 		return m, func() tea.Msg {
 			return messages.RelatedNavigate{
 				TargetType:     field.TargetType,
@@ -511,8 +514,9 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				TargetID:       targetID,
 				// A field naming an ARN of another Region names a row the
 				// session's own Region does not hold; the reference, not the
-				// resolved ID, is what carries the Region.
-				Region:       resource.RefRegion(field.Value),
+				// resolved ID, is what carries the Region. A bare ID names a
+				// row of the Region the detail was read in.
+				Region:       cmp.Or(resource.RefRegion(field.Value), region),
 				DirectDetail: true,
 			}
 		}
@@ -520,35 +524,41 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 	case key.Matches(msg, m.keys.YAML):
 		res := m.ctrl.GetDetailResource()
 		rt := m.ctrl.GetDetailResourceType()
+		region := m.ctrl.TopRegion()
 		return m, func() tea.Msg {
 			return messages.Navigate{
 				Target:       messages.TargetYAML,
 				Resource:     &res,
 				ResourceType: rt,
+				Region:       region,
 			}
 		}
 
 	case key.Matches(msg, m.keys.JSON):
 		res := m.ctrl.GetDetailResource()
 		rt := m.ctrl.GetDetailResourceType()
+		region := m.ctrl.TopRegion()
 		return m, func() tea.Msg {
 			return messages.Navigate{
 				Target:       messages.TargetJSON,
 				Resource:     &res,
 				ResourceType: rt,
+				Region:       region,
 			}
 		}
 
 	case key.Matches(msg, m.keys.CloudTrail):
 		res := m.ctrl.GetDetailResource()
 		rt := m.ctrl.GetDetailResourceType()
-		if ff := resource.BuildCloudTrailFilter(res, rt); ff != nil {
+		region := m.ctrl.TopRegion()
+		if ff := resource.CloudTrailFilterIn(res, rt, region); ff != nil {
 			return m, func() tea.Msg {
 				return messages.RelatedNavigate{
 					TargetType:     "ct-events",
 					SourceResource: res,
 					SourceType:     rt,
 					FetchFilter:    ff,
+					Region:         region,
 				}
 			}
 		}
@@ -677,6 +687,7 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 					Target:         messages.TargetYAML,
 					Resource:       &res,
 					ResourceType:   ctx.ResourceType,
+					Region:         ctx.Region,
 					ReplaceCurrent: true,
 				}
 			}
@@ -692,6 +703,7 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 					Target:         messages.TargetJSON,
 					Resource:       &res,
 					ResourceType:   ctx.ResourceType,
+					Region:         ctx.Region,
 					ReplaceCurrent: true,
 				}
 			}
@@ -701,13 +713,15 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 	case key.Matches(msg, m.keys.CloudTrail):
 		res := m.ctrl.GetTextResource()
 		_, ctx := m.ctrl.GetTextScreenContext()
-		if ff := resource.BuildCloudTrailFilter(res, ctx.ResourceType); ff != nil {
+		region := m.ctrl.TopRegion()
+		if ff := resource.CloudTrailFilterIn(res, ctx.ResourceType, region); ff != nil {
 			return m, func() tea.Msg {
 				return messages.RelatedNavigate{
 					TargetType:     "ct-events",
 					SourceResource: res,
 					SourceType:     ctx.ResourceType,
 					FetchFilter:    ff,
+					Region:         region,
 				}
 			}
 		}
@@ -723,6 +737,7 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 					Target:         messages.TargetDetail,
 					Resource:       &res,
 					ResourceType:   ctx.ResourceType,
+					Region:         ctx.Region,
 					ReplaceCurrent: true,
 				}
 			}

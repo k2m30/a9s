@@ -71,7 +71,7 @@ func (m Model) ActiveListResources() []resource.Resource {
 // the given resourceType and gen. Test-only: lets tests execute the cmd
 // synchronously and assert that the Gen field was captured at dispatch time.
 func (m Model) FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd {
-	return m.fetchResources(resourceType, gen, messages.FetchProvenanceCanonicalList)
+	return m.fetchResources(resourceType, "", gen, messages.FetchProvenanceCanonicalList)
 }
 
 // FetchIdentityCmdForTest returns a tea.Cmd produced by fetchIdentity for
@@ -86,5 +86,5 @@ func (m Model) FetchIdentityCmdForTest(gen domain.Gen) tea.Cmd {
 // execute the cmd synchronously and assert that the Gen field was captured at
 // dispatch time.
 func (m Model) FetchRevealValueCmdForTest(resourceType, resourceID string, gen domain.Gen) tea.Cmd {
-	return m.fetchRevealValue(resourceType, resourceID, gen)
+	return m.fetchRevealValue(resourceType, resourceID, "", gen)
 }

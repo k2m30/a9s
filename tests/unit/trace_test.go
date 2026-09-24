@@ -66,7 +66,7 @@ func TestTrace_EnabledToBuffer_DetailOpenEmitsBeginEventWithRightOperationID(t *
 	trace.Enable(&buf)
 	t.Cleanup(trace.Disable)
 
-	op, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-traceopen0001"}, false)
+	op, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-traceopen0001"}, "", false)
 
 	line := strings.TrimSpace(buf.String())
 	if line == "" {
@@ -100,8 +100,8 @@ func TestTrace_EnabledToBuffer_DetailOpenEmitsBeginEventWithRightOperationID(t *
 func TestTrace_SupersededFold_EmitsRejectionNamingBothOperations(t *testing.T) {
 	ctrl, core := newTestControllerAndCore(t)
 
-	op1, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-stale0001"}, false)
-	op2, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-active0001"}, false)
+	op1, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-stale0001"}, "", false)
+	op2, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-active0001"}, "", false)
 
 	var buf bytes.Buffer
 	trace.Enable(&buf)
@@ -168,7 +168,7 @@ func TestTrace_ConcurrentRelatedFanout_ProducesWellFormedNonInterleavedJSONLines
 	op, tasks := core.BeginDetailOperation("sfn", resource.Resource{
 		ID:     "trace-fanout",
 		Fields: map[string]string{"arn": arn},
-	}, false)
+	}, "", false)
 	relatedTask := detailOpFindTaskKind(tasks, runtime.KindRelatedCheck)
 	if relatedTask == nil {
 		t.Fatal(`BeginDetailOperation("sfn", ...) returned no KindRelatedCheck task — "sfn" must have registered Related defs for this test to drive the real fan-out`)

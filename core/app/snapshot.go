@@ -3,6 +3,8 @@
 package app
 
 import (
+	"cmp"
+
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -132,7 +134,7 @@ func (c *Controller) snapshot() ViewState {
 // plus the same Valid guard the TUI's exec path uses before ever spawning a
 // browser. Callers must hold c.mu (consoleTarget is lock-free).
 func (c *Controller) consoleURL() (string, bool) {
-	td, res, ok := c.consoleTarget()
+	td, res, region, ok := c.consoleTarget()
 	if !ok {
 		return "", false
 	}
@@ -140,7 +142,7 @@ func (c *Controller) consoleURL() (string, bool) {
 	if c.identityResult != nil {
 		accountID = c.identityResult.AccountID
 	}
-	u, ok := consolelink.Resolve(*td, res, c.core.Region(), accountID)
+	u, ok := consolelink.Resolve(*td, res, region, accountID)
 	if !ok || !consolelink.Valid(u) {
 		return "", false
 	}
@@ -155,6 +157,13 @@ func (c *Controller) consoleURL() (string, bool) {
 // resource instead. An aggregate related row (0 or several targets) has no
 // single resource to link to and resolves to false.
 func (c *Controller) ConsoleTarget() (*resource.ResourceTypeDef, resource.Resource, bool) {
+	td, res, _, ok := c.ConsoleTargetIn()
+	return td, res, ok
+}
+
+// ConsoleTargetIn is ConsoleTarget with the Region the target was read in,
+// which is the Region its console page lives in.
+func (c *Controller) ConsoleTargetIn() (*resource.ResourceTypeDef, resource.Resource, string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.consoleTarget()
@@ -162,26 +171,26 @@ func (c *Controller) ConsoleTarget() (*resource.ResourceTypeDef, resource.Resour
 
 // consoleTarget is the lock-free core of ConsoleTarget. Callers must already
 // hold c.mu (read or write).
-func (c *Controller) consoleTarget() (*resource.ResourceTypeDef, resource.Resource, bool) {
+func (c *Controller) consoleTarget() (*resource.ResourceTypeDef, resource.Resource, string, bool) {
 	if len(c.stack) == 0 {
-		return nil, resource.Resource{}, false
+		return nil, resource.Resource{}, "", false
 	}
 	top := c.stack[len(c.stack)-1]
 	switch bodyKindForScreen(top) {
 	case BodyKindList:
 		r, ok := c.listSelected()
 		if !ok {
-			return nil, resource.Resource{}, false
+			return nil, resource.Resource{}, "", false
 		}
 		td := consoleTypeDefFor(top.Ctx.ResourceType)
 		if td == nil {
-			return nil, resource.Resource{}, false
+			return nil, resource.Resource{}, "", false
 		}
-		return td, r, true
+		return td, r, c.readRegionLocked(), true
 	case BodyKindDetail:
 		ds := c.topDetailState()
 		if ds == nil {
-			return nil, resource.Resource{}, false
+			return nil, resource.Resource{}, "", false
 		}
 		if ds.RelatedFocus {
 			if row := ds.focusedRelatedRow(); row != nil {
@@ -190,11 +199,11 @@ func (c *Controller) consoleTarget() (*resource.ResourceTypeDef, resource.Resour
 		}
 		td := consoleTypeDefFor(ds.ResourceType)
 		if td == nil {
-			return nil, resource.Resource{}, false
+			return nil, resource.Resource{}, "", false
 		}
-		return td, ds.Resource, true
+		return td, ds.Resource, c.readRegionLocked(), true
 	default:
-		return nil, resource.Resource{}, false
+		return nil, resource.Resource{}, "", false
 	}
 }
 
@@ -205,24 +214,26 @@ func (c *Controller) consoleTarget() (*resource.ResourceTypeDef, resource.Resour
 // ConsoleURL builder; (2) td.StubCreator, which synthesizes a resource
 // carrying the fields (e.g. an ARN) the builder needs; (3) a bare ID-only
 // resource — safe because every ConsoleURL builder returns "" rather than a
-// wrong URL on missing input.
-func (c *Controller) consoleTargetFromRelatedRow(row DetailRelatedRow) (*resource.ResourceTypeDef, resource.Resource, bool) {
+// wrong URL on missing input. The session's rows hold only its own Region, so
+// a row counted in another Region skips (1).
+func (c *Controller) consoleTargetFromRelatedRow(row DetailRelatedRow) (*resource.ResourceTypeDef, resource.Resource, string, bool) {
 	if len(row.ResourceIDs) != 1 {
-		return nil, resource.Resource{}, false
+		return nil, resource.Resource{}, "", false
 	}
 	td := consoleTypeDefFor(row.TargetType)
 	if td == nil {
-		return nil, resource.Resource{}, false
+		return nil, resource.Resource{}, "", false
 	}
+	region := cmp.Or(row.Region, c.core.Region())
 	id := row.ResourceIDs[0]
-	if cached, ok := c.core.AnyLaneResourceByID(row.TargetType, id); ok {
-		return td, cached, true
+	if cached, ok := c.core.AnyLaneResourceByID(row.TargetType, id); ok && c.localRegion(region) == "" {
+		return td, cached, region, true
 	}
 	if td.StubCreator != nil {
 		stub := td.StubCreator(id)
-		return td, stub, true
+		return td, stub, region, true
 	}
-	return td, resource.Resource{ID: id, Type: row.TargetType}, true
+	return td, resource.Resource{ID: id, Type: row.TargetType}, region, true
 }
 
 // consoleTypeDefFor resolves shortName against the top-level catalog first,

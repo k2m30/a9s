@@ -504,6 +504,8 @@ type EnterChildViewEvent struct {
 	ChildType     string
 	ParentContext map[string]string
 	DisplayName   string
+	// Region is the Region the parent was read in, "" for the session's.
+	Region string
 }
 
 // ThemeSelectedEvent carries the theme filename the user confirmed.
@@ -592,6 +594,7 @@ func (c *Core) HandleEnterChildView(ev EnterChildViewEvent) ([]UIIntent, []TaskR
 		Payload: FetchChildResourcesPayload{
 			ChildType:     ev.ChildType,
 			ParentContext: ev.ParentContext,
+			Region:        ev.Region,
 		},
 	}}
 	return intents, tasks

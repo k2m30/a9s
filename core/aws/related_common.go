@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -151,24 +152,23 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 	if err != nil || def == nil {
 		return logGroupsNaming(ctx, clients, cache, family)
 	}
-	groups, whole := ecsContainerLogGroups(def, sessionRegion(clients))
-	containers := relatedRead{unread: !whole}
-	if len(groups) == 0 {
-		return relatedAnswer("logs", containers)
+	byRegion, whole := ecsContainerLogGroups(def, sessionRegion(clients))
+	reads := map[string]relatedRead{"": {unread: !whole}}
+	for region, groups := range byRegion {
+		read := readListIn(ctx, clients, cache, "logs", region, func(logList []resource.Resource, rc domain.RefContext, _ bool) relatedRead {
+			ids, lowerBound := listedRefs("logs", groups, rc, logList)
+			return relatedRead{ids: ids, partial: lowerBound}
+		})
+		reads[region] = joinReads(reads[region], read)
 	}
-	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if logList == nil {
-		return relatedAnswer("logs", joinReads(containers, unreadBy(err)))
-	}
-	ids, lowerBound := listedRefs("logs", groups, refContext(clients, cache, "logs"), logList)
-	return relatedAnswer("logs", joinReads(containers, relatedRead{ids: ids, partial: lowerBound}))
+	return regionalAnswer(clients, "logs", reads)
 }
 
 // ecsContainerLogGroups is the one reader of the log groups the containers of
-// def write to, in region, and whether every container's destination could
-// be read from def:
-//   - the awslogs driver's awslogs-group, unless its awslogs-region names
-//     another Region (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html);
+// def write to, by the Region each is in ("" for region, where the task runs),
+// and whether every container's destination could be read from def:
+//   - the awslogs driver's awslogs-group, in its awslogs-region when that is
+//     set (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html);
 //   - FireLens (awsfirelens), whose options become the log router's output
 //     configuration (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/firelens-taskdef.html):
 //     Fluent Bit's cloudwatch_logs output sends to its log_group_name
@@ -176,8 +176,14 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 //     other outputs to no log group. A log_group_template names its group
 //     per record, and a container with no options routes through a
 //     configuration file def does not hold: neither is readable here.
-func ecsContainerLogGroups(def *ecstypes.TaskDefinition, region string) (groups []string, whole bool) {
-	whole = true
+func ecsContainerLogGroups(def *ecstypes.TaskDefinition, region string) (groups map[string][]string, whole bool) {
+	groups, whole = map[string][]string{}, true
+	add := func(in, group string) {
+		if in == region {
+			in = ""
+		}
+		groups[in] = append(groups[in], group)
+	}
 	for _, container := range def.ContainerDefinitions {
 		logs := container.LogConfiguration
 		if logs == nil {
@@ -185,11 +191,8 @@ func ecsContainerLogGroups(def *ecstypes.TaskDefinition, region string) (groups 
 		}
 		switch logs.LogDriver {
 		case ecstypes.LogDriverAwslogs:
-			if r := logs.Options["awslogs-region"]; r != "" && region != "" && r != region {
-				continue
-			}
 			if g := logs.Options["awslogs-group"]; g != "" {
-				groups = append(groups, g)
+				add(logs.Options["awslogs-region"], g)
 			}
 		case ecstypes.LogDriverAwsfirelens:
 			name := logs.Options["Name"]
@@ -199,9 +202,8 @@ func ecsContainerLogGroups(def *ecstypes.TaskDefinition, region string) (groups 
 			case name != "cloudwatch_logs" && name != "cloudwatch":
 			case logs.Options["log_group_template"] != "" || logs.Options["log_group_name"] == "":
 				whole = false
-			case logs.Options["region"] != "" && region != "" && logs.Options["region"] != region:
 			default:
-				groups = append(groups, logs.Options["log_group_name"])
+				add(logs.Options["region"], logs.Options["log_group_name"])
 			}
 		}
 	}
@@ -287,27 +289,24 @@ func alarmIDsByDimension(ctx context.Context, clients any, cache resource.Resour
 		return unreadZero(res, foundNone("alarm", "the row's identity"))
 	}
 
-	alarmList, _, truncated, err := relatedListIn(ctx, clients, cache, "alarm", spec.metricsRegionOf(res))
-	if err != nil {
-		return ReadFailed("alarm", err)
-	}
-	if alarmList == nil {
-		return NotRead("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
+	region := spec.metricsRegionOf(res)
+	scanned := 0
+	result := answerIn(clients, "alarm", region, readListIn(ctx, clients, cache, "alarm", region, func(alarmList []resource.Resource, _ domain.RefContext, truncated bool) relatedRead {
+		scanned = len(alarmList)
+		var ids []string
+		for _, alarmRes := range alarmList {
+			alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+			if !ok {
+				continue
+			}
+			if spec.names(alarm, res) || anyMatch(also, alarm) {
+				ids = append(ids, alarmRes.ID)
+			}
 		}
-		if spec.names(alarm, res) || anyMatch(also, alarm) {
-			ids = append(ids, alarmRes.ID)
-		}
-	}
-	result := relatedResultTrunc("alarm", ids, truncated)
+		return relatedRead{ids: ids, partial: truncated}
+	}))
 	if spec.ValuesFromRawStruct {
-		return unreadZeroScanned(res, len(alarmList), result)
+		return unreadZeroScanned(res, scanned, result)
 	}
 	return result
 }

@@ -88,8 +88,8 @@ func (m *Model) listFetchIdentity() (screen, seq domain.Gen) {
 //
 // Every lane draws a sequence: the guard is keyed by the screen instance, so a
 // drill's refresh orders the drill's own requests and reaches no other screen.
-func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane messages.FetchProvenance) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
+func (m *Model) fetchResources(resourceType, region string, gen domain.Gen, lane messages.FetchProvenance) tea.Cmd {
+	ctx, clients := m.appCtx, m.core.Clients().InRegion(region)
 	screen, seq := m.listFetchIdentity()
 	out := fetchOutcome{resourceType: resourceType, gen: gen, seq: seq, screen: screen, lane: lane}
 	return func() tea.Msg {
@@ -99,8 +99,8 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane message
 
 // fetchResourcesFiltered returns a tea.Cmd for a server-side filtered fetch.
 // gen is the AvailabilityGen captured at dispatch time.
-func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
+func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string, region string, gen domain.Gen) tea.Cmd {
+	ctx, clients := m.appCtx, m.core.Clients().InRegion(region)
 	screen, seq := m.listFetchIdentity()
 	out := fetchOutcome{resourceType: resourceType, gen: gen, seq: seq, screen: screen, lane: messages.FetchProvenanceFilteredList}
 	return func() tea.Msg {
@@ -129,27 +129,27 @@ func (m *Model) fetchByIDDetail(targetType, id, region string) tea.Cmd {
 	fn := resource.GetFetchByIDs(targetType)
 	if fn == nil {
 		return func() tea.Msg {
-			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: fmt.Sprintf("no by-id fetcher for %s", targetType)}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Region: region, Reason: fmt.Sprintf("no by-id fetcher for %s", targetType)}
 		}
 	}
 	return func() tea.Msg {
 		res, err := fn(ctx, clients, []string{id})
 		if err != nil {
-			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: err.Error()}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Region: region, Reason: err.Error()}
 		}
 		if len(res) == 0 {
-			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: fmt.Sprintf("%s %s not found", targetType, id)}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Region: region, Reason: fmt.Sprintf("%s %s not found", targetType, id)}
 		}
 		r := res[0]
-		return messages.Navigate{Target: messages.TargetDetail, ResourceType: targetType, Resource: &r}
+		return messages.Navigate{Target: messages.TargetDetail, ResourceType: targetType, Resource: &r, Region: region}
 	}
 }
 
 // fetchChildResources returns a tea.Cmd for paginated child resource loading.
 // Child resource fetches use AvailabilityGen so stale results from prior
 // profile/region are discarded along with top-level fetches.
-func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
+func (m *Model) fetchChildResources(childType string, parentCtx map[string]string, region string) tea.Cmd {
+	ctx, clients := m.appCtx, m.core.Clients().InRegion(region)
 	gen := m.core.AvailabilityGen()
 	screen, seq := m.listFetchIdentity()
 	out := fetchOutcome{resourceType: childType, gen: gen, seq: seq, screen: screen, lane: messages.FetchProvenanceChild}
@@ -219,14 +219,14 @@ func (m *Model) fetchProfiles() tea.Cmd {
 // fetchRevealValue returns a tea.Cmd that calls the registered reveal fetcher.
 // gen is the ConnectGen captured at dispatch time; it is stamped onto the
 // returned message so the handler can discard stale results after a switch.
-func (m *Model) fetchRevealValue(resourceType, resourceID string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
+func (m *Model) fetchRevealValue(resourceType, resourceID, region string, gen domain.Gen) tea.Cmd {
+	ctx, clients := m.appCtx, m.core.Clients().InRegion(region)
 	return func() tea.Msg {
 		value, err := m.core.FetchRevealValue(ctx, clients, resourceType, resourceID)
 		if err != nil {
-			return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Err: err, Gen: gen}
+			return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Region: region, Err: err, Gen: gen}
 		}
-		return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Value: value, Gen: gen}
+		return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Region: region, Value: value, Gen: gen}
 	}
 }
 

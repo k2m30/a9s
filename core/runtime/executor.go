@@ -351,6 +351,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		return messages.EnrichDetailResult{
 			ResourceType: p.Op.ResourceType,
 			ResourceID:   p.Op.Resource.ID,
+			Region:       p.Op.Region,
 			EnrichedRes:  enriched,
 			Err:          err,
 			OperationID:  p.Op.ID,
@@ -363,7 +364,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		id := p.Op.Resource.ID
 		canon := resource.CanonicalShortName(p.Op.ResourceType)
-		msg := messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, OperationID: p.Op.ID, Gen: p.Gen, TypeGen: p.TypeGen}
+		msg := messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, Region: p.Op.Region, OperationID: p.Op.ID, Gen: p.Gen, TypeGen: p.TypeGen}
 		row, live := c.liveRow(canon, id)
 		if !live {
 			msg.Uninspected, msg.Check = true, awsclient.CheckCap
@@ -449,7 +450,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ListSeq: req.ListSeq, ScreenID: req.ScreenID,
 			Lane: messages.FetchProvenanceFilteredList,
 		}
-		return out.Msg(c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)), nil
+		return out.Msg(c.FetchResourcesFiltered(ctx, snap.Clients.InRegion(p.Region), resourceType, p.Filter)), nil
 
 	case KindFetchMore:
 		p, ok := req.Payload.(FetchMorePayload)
@@ -468,6 +469,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Token:        p.ContinuationToken,
 			ParentCtx:    p.ParentContext,
 			FetchFilter:  p.FetchFilter,
+			Region:       p.Region,
 		})), nil
 
 	case TaskKindFetchChildResources:
@@ -481,7 +483,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			ListSeq: req.ListSeq, ScreenID: req.ScreenID,
 			Lane: messages.FetchProvenanceChild,
 		}
-		return out.Msg(c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)), nil
+		return out.Msg(c.FetchChildResources(ctx, snap.Clients.InRegion(p.Region), p.ChildType, p.ParentContext)), nil
 
 	case KindFetchReveal:
 		p, ok := req.Payload.(FetchRevealPayload)
@@ -489,10 +491,11 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, fmt.Errorf("ExecuteTask %s: missing FetchRevealPayload", req.Key.Kind)
 		}
 		gen := snap.ConnectGen
-		value, err := c.FetchRevealValue(ctx, snap.Clients, p.ResourceType, p.ResourceID)
+		value, err := c.FetchRevealValue(ctx, snap.Clients.InRegion(p.Region), p.ResourceType, p.ResourceID)
 		return messages.ValueRevealed{
 			ResourceType: p.ResourceType,
 			ResourceID:   p.ResourceID,
+			Region:       p.Region,
 			Value:        value,
 			Err:          err,
 			Gen:          gen,
@@ -508,14 +511,14 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		fn := resource.GetFetchByIDs(p.TargetType)
 		if fn == nil {
-			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("no by-id fetcher for %s", p.TargetType)}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Region: p.Region, Reason: fmt.Sprintf("no by-id fetcher for %s", p.TargetType)}, nil
 		}
 		res, err := fn(ctx, snap.Clients.InRegion(p.Region), []string{p.ID})
 		if err != nil {
-			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: err.Error()}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Region: p.Region, Reason: err.Error()}, nil
 		}
 		if len(res) == 0 {
-			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("%s %s not found", p.TargetType, p.ID)}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Region: p.Region, Reason: fmt.Sprintf("%s %s not found", p.TargetType, p.ID)}, nil
 		}
 		out := FetchOutcome{
 			ResourceType: p.TargetType, Gen: snap.AvailabilityGen,
@@ -866,6 +869,7 @@ func (c *Core) runRelatedCheckers(
 	return messages.RelatedCheckBatch{
 		ResourceType:     op.ResourceType,
 		SourceResourceID: op.Resource.ID,
+		Region:           op.Region,
 		Results:          results,
 		OperationID:      op.ID,
 	}
@@ -891,6 +895,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 			result = messages.RelatedCheckResult{
 				ResourceType:     op.ResourceType,
 				SourceResourceID: op.Resource.ID,
+				Region:           op.Region,
 				DefDisplayName:   def.DisplayName,
 				Result:           awsclient.ReadFailed(def.TargetType, fmt.Errorf("checker panicked: %v", r)),
 				OperationID:      op.ID,
@@ -903,6 +908,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 		return messages.RelatedCheckResult{
 			ResourceType:     op.ResourceType,
 			SourceResourceID: op.Resource.ID,
+			Region:           op.Region,
 			DefDisplayName:   def.DisplayName,
 			Result:           awsclient.NotRead(def.TargetType),
 			OperationID:      op.ID,
@@ -912,12 +918,17 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	checkCtx, cancel := context.WithTimeout(awsclient.WithDetailOp(ctx, op.ID), RelatedCheckerTimeout)
 	defer cancel()
 
+	// An operation in another Region reads that Region's lists: the
+	// session's are not its lists, and none of what it reads enters them.
 	localCache := cacheSnap
+	if op.Region != "" {
+		localCache, mainCacheKeys = resource.ResourceCache{}, nil
+	}
 	var cachedPages map[string]resource.ResourceCacheEntry
 	if def.NeedsTargetCache {
 		if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
-			if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-				fr, err := pf(checkCtx, op.Clients, "")
+			if resource.GetPaginatedFetcher(def.TargetType) != nil {
+				fr, err := awsclient.FirstPage(checkCtx, op.Clients, def.TargetType)
 				switch {
 				case err == nil || len(fr.Resources) > 0:
 					// Partial success: rows may arrive alongside a composite
@@ -934,7 +945,9 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					maps.Copy(enriched, localCache)
 					enriched[def.TargetType] = entry
 					localCache = enriched
-					cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+					if op.Region == "" {
+						cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+					}
 				default:
 					// Total prefetch failure (e.g. access denied), zero rows:
 					// def declared NeedsTargetCache because its own checker
@@ -948,6 +961,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					return messages.RelatedCheckResult{
 						ResourceType:     op.ResourceType,
 						SourceResourceID: op.Resource.ID,
+						Region:           op.Region,
 						DefDisplayName:   def.DisplayName,
 						Result:           awsclient.ReadFailed(def.TargetType, err),
 						OperationID:      op.ID,
@@ -963,6 +977,9 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	// is never empty for any registered RelatedDef. This is the containment
 	// that keeps an empty-TargetType result from ever reaching rendering.
 	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache).WithTargetType(def.TargetType)
+	if op.Region != "" && checkResult.Region() == "" {
+		checkResult = checkResult.WithRegion(op.Region)
+	}
 
 	var lazyAdded map[string][]resource.Resource
 	var lazyAddError error
@@ -971,7 +988,8 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	// the drill fetches on demand (KindFetchByIDDetail) — so a cross-account
 	// target (an AssumeRole role in another account) does not surface a
 	// "FetchByIDs failed" header error at detail open.
-	if op.ResourceType != "ct-events" && len(checkResult.ResourceIDs()) > 0 {
+	// Rows of another Region are no rows of the session's lists.
+	if op.ResourceType != "ct-events" && checkResult.Region() == "" && len(checkResult.ResourceIDs()) > 0 {
 		if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs())
 			if len(missing) > 0 {
@@ -989,6 +1007,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	return messages.RelatedCheckResult{
 		ResourceType:       op.ResourceType,
 		SourceResourceID:   op.Resource.ID,
+		Region:             op.Region,
 		DefDisplayName:     def.DisplayName,
 		Result:             checkResult,
 		OperationID:        op.ID,
@@ -1014,6 +1033,8 @@ func splitScope(scope string) (resourceType, id string) {
 // can invoke the filtered fetcher without reaching into renderer state.
 type FetchFilteredPayload struct {
 	Filter map[string]string
+	// Region is the Region the filtered list is read in, "" for the session's.
+	Region string
 }
 
 func (FetchFilteredPayload) isTaskPayload() {}

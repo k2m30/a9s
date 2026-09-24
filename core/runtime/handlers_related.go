@@ -196,6 +196,9 @@ func (FetchByIDDetailPayload) isTaskPayload() {}
 // View construction and Bubble Tea specifics live in the TUI adapter so this
 // handler is platform-agnostic and testable without standing up Bubble Tea.
 func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult, []TaskRequest) {
+	if ev.Region == c.session.Region {
+		ev.Region = ""
+	}
 	snap := relatedCacheSnapshot(c.session)
 	result := ResolveRelatedNavigate(ev, snap)
 
@@ -367,6 +370,7 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			Kind:       NavigationKindEnterChildView,
 			TargetType: ev.TargetType,
 			RelatedIDs: ev.RelatedIDs,
+			Region:     ev.Region,
 		}
 	}
 
@@ -386,12 +390,30 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 		}
 	}
 
+	// FetchFilter path — only when a filtered paginated fetcher is registered.
+	// The filter names what to look up and, for a lookup in another Region,
+	// where; the list is read in the Region the row was read in.
+	filtered := func() (NavigationResult, bool) {
+		if len(ev.FetchFilter) == 0 || resource.GetFilteredPaginatedFetcher(ev.TargetType) == nil {
+			return NavigationResult{}, false
+		}
+		return NavigationResult{
+			Kind:        NavigationKindFilteredList,
+			TargetType:  ev.TargetType,
+			FetchFilter: ev.FetchFilter,
+			Region:      ev.Region,
+		}, true
+	}
+
 	// A reference into another Region names rows of that Region. The session's
 	// cache holds its own Region's, where a row of the same ID is a different
 	// resource, so neither cache-hit fast path below may answer for one. The
 	// scope the reference carries travels with it, so the list Enter opens is
 	// still the one the operator asked for.
 	if ev.Region != "" {
+		if r, ok := filtered(); ok {
+			return r
+		}
 		return NavigationResult{
 			Kind:       NavigationKindFilteredList,
 			TargetType: ev.TargetType,
@@ -408,6 +430,7 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			Kind:       NavigationKindDetail,
 			TargetType: ev.TargetType,
 			TargetID:   ev.TargetID,
+			Region:     ev.Region,
 		}
 	}
 
@@ -417,16 +440,12 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			Kind:       NavigationKindDetail,
 			TargetType: ev.TargetType,
 			RelatedIDs: ev.RelatedIDs,
+			Region:     ev.Region,
 		}
 	}
 
-	// FetchFilter path — only when a filtered paginated fetcher is registered.
-	if len(ev.FetchFilter) > 0 && resource.GetFilteredPaginatedFetcher(ev.TargetType) != nil {
-		return NavigationResult{
-			Kind:        NavigationKindFilteredList,
-			TargetType:  ev.TargetType,
-			FetchFilter: ev.FetchFilter,
-		}
+	if r, ok := filtered(); ok {
+		return r
 	}
 
 	// TargetID cache miss → filtered list by the ID string.
@@ -436,6 +455,7 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 			TargetType: ev.TargetType,
 			TargetID:   ev.TargetID,
 			FilterText: ev.TargetID,
+			Region:     ev.Region,
 		}
 	}
 

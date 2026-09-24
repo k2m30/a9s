@@ -7,9 +7,9 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -65,22 +65,9 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 			continue
 		}
 		reads.read++
-		if cbPipelineHasProject(p.Stages, projectName) {
+		if slices.Contains(pipelineActionRefs(clients, p, "CodeBuild", "ProjectName")[""], projectName) {
 			ids = append(ids, pipelineName)
 		}
 	}
 	return reads.answer("pipeline", "cb-related: GetPipeline", ids, truncated)
-}
-
-// cbPipelineHasProject returns true if any action across the given stages has
-// Provider == "CodeBuild" and Configuration["ProjectName"] == projectName.
-func cbPipelineHasProject(stages []cptypes.StageDeclaration, projectName string) bool {
-	for _, stg := range stages {
-		for _, a := range stg.Actions {
-			if actionProvider(a) == "CodeBuild" && a.Configuration["ProjectName"] == projectName {
-				return true
-			}
-		}
-	}
-	return false
 }

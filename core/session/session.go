@@ -412,6 +412,10 @@ type Session struct {
 	// checkSESS3 see a session-scoped cache rather than a process-global map.
 	RuleSets *ruleSetStore
 
+	// RegionLists holds the first pages related reads fetched in Regions
+	// other than the session's, read once per session.
+	RegionLists *awsclient.RegionListStore
+
 	// ProbeStatus is the per-type most-recent-scan-outcome record,
 	// keyed by resource short name. Guarded by probeStatusMu — unlike
 	// AvailChecked/EnrichChecked and the rest of the Wave-1/Wave-2

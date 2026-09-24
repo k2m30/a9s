@@ -111,12 +111,14 @@ func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) 
 		ctx := m.buildChildContext(child, r)
 		displayName := ctx[child.DisplayNameKey]
 		childType := child.ChildType
+		region := m.ctrl.TopRegion()
 
 		return m, func() tea.Msg {
 			return messages.EnterChildView{
 				ChildType:     childType,
 				ParentContext: ctx,
 				DisplayName:   displayName,
+				Region:        region,
 			}
 		}
 	}

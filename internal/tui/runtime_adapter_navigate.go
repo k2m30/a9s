@@ -43,6 +43,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		ResourceType:   msg.ResourceType,
 		Resource:       msg.Resource,
 		ReplaceCurrent: msg.ReplaceCurrent,
+		Region:         msg.Region,
 	}
 	// Resolve empty ResourceType from the active rs for Detail/YAML/JSON.
 	// The runtime has no view stack to consult; canonicalization happens here.
@@ -206,7 +207,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		// Push ScreenDetail onto the controller stack and seed DetailState so
 		// Snapshot().Body.Detail is non-nil from the first render.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail, Context: runtime.ScreenContext{
+			ResourceType: result.ResolvedType, ResourceID: result.Resource.ID, Region: result.Region,
+		}}})
 		m.ctrl.EnsureDetailState(*result.Resource, result.ResolvedType)
 		// Initialise related rows from registered defs so the controller body
 		// shows loading state immediately (mirrors newRightColumn on SetSize).
@@ -377,6 +380,7 @@ func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.Sc
 		Context: runtime.ScreenContext{
 			ResourceType: result.ResolvedType,
 			ResourceID:   result.Resource.ID,
+			Region:       result.Region,
 		},
 	}})
 	m.ctrl.EnsureTextState(view.ContentLines())
@@ -613,7 +617,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		(&m).applyEnrichment(rt)
 	}
 
-	m.core.DeleteResourceCache(rt)
+	// A list read in another Region is not the session's list of the type.
+	if m.ctrl.TopRegion() == "" {
+		m.core.DeleteResourceCache(rt)
+	}
 	m.core.RefreshTypeStores(rt)
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -642,20 +649,20 @@ func (m Model) refreshActiveList() tea.Cmd {
 	if rs.kind != rsKindList {
 		return nil
 	}
-	rt := rs.resourceType
+	rt, region := rs.resourceType, m.ctrl.TopRegion()
 	gen := m.core.AvailabilityGen()
 
 	if ff := m.ctrl.GetListFetchFilter(); len(ff) > 0 {
-		return m.fetchResourcesFiltered(rt, ff, gen)
+		return m.fetchResourcesFiltered(rt, ff, region, gen)
 	}
 	if pc := m.ctrl.GetListParentContext(); pc != nil {
-		return m.fetchChildResources(rt, pc)
+		return m.fetchChildResources(rt, pc, region)
 	}
 	// The screen's own lane, from the one owner. A client-side related drill
 	// reaches here — it has neither a fetch filter nor a parent context — and
 	// a refresh stamped as the canonical list is refused by the delivery gate
 	// on the drill itself and can land on the list beneath it instead.
-	return m.fetchResources(rt, gen, m.ctrl.GetListLane())
+	return m.fetchResources(rt, region, gen, m.ctrl.GetListLane())
 }
 
 // refreshActiveListWithEnrichmentRerun wraps refreshActiveList with an
@@ -688,7 +695,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	cmd := m.fetchRevealValue(rt, r.ID, m.core.ConnectGen())
+	cmd := m.fetchRevealValue(rt, r.ID, m.ctrl.TopRegion(), m.core.ConnectGen())
 	return m, cmd
 }
 

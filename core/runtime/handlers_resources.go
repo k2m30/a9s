@@ -326,8 +326,10 @@ func stripWave2FindingsRows(rows []resource.Resource) []resource.Resource {
 type EnrichDetailResultEvent struct {
 	ResourceType string
 	ResourceID   string
-	OperationID  domain.Gen
-	Err          error
+	// Region is the Region the resource was read in, "" for the session's.
+	Region      string
+	OperationID domain.Gen
+	Err         error
 }
 
 // HandleEnrichDetailResult emits a single FlashIntent on enrichment
@@ -366,7 +368,7 @@ func (c *Core) HandleEnrichDetailResult(ev EnrichDetailResultEvent) ([]UIIntent,
 			IsError: true,
 		}}, nil
 	}
-	key := RelatedCacheKey(ev.ResourceType, ev.ResourceID)
+	key := RelatedCacheKeyIn(ev.ResourceType, ev.Region, ev.ResourceID)
 	if recorded, ok := c.PendingDetailRefreshGet(key); ok && ev.OperationID >= recorded {
 		c.PendingDetailRefreshClear(key)
 	}
@@ -380,8 +382,10 @@ func (c *Core) HandleEnrichDetailResult(ev EnrichDetailResultEvent) ([]UIIntent,
 // is adapter-side because the active view is renderer state; the Core
 // handler treats SourceResourceID as authoritative.
 type RelatedCheckResultEvent struct {
-	ResourceType       string
-	SourceResourceID   string
+	ResourceType     string
+	SourceResourceID string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region             string
 	DefDisplayName     string
 	Result             resource.RelatedCheckResult
 	CachedPages        map[string]resource.ResourceCacheEntry
@@ -411,6 +415,7 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		intents = append(intents, PatchRelatedCache{
 			ResourceType:   ev.ResourceType,
 			SourceID:       ev.SourceResourceID,
+			Region:         ev.Region,
 			DefDisplayName: ev.DefDisplayName,
 			Result:         ev.Result,
 		})

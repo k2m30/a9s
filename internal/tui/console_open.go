@@ -22,12 +22,11 @@ import (
 // reveal) are a silent no-op, matching handleCopy's precedent for the same
 // screen kinds.
 func (m Model) handleOpenConsole(copyOnly bool) (tea.Model, tea.Cmd) {
-	td, res, ok := m.ctrl.ConsoleTarget()
+	td, res, region, ok := m.ctrl.ConsoleTargetIn()
 	if !ok {
 		return m, nil
 	}
 
-	region := m.core.Region()
 	accountID := ""
 	if id := m.core.Identity(); id != nil {
 		accountID = id.AccountID

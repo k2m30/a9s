@@ -160,18 +160,20 @@ func (c *Controller) ensureListState() {
 	}
 	if top.State.List == nil {
 		top.State.List = &ListState{Loading: true}
-		c.initListState(top.State.List, top.Ctx.ResourceType)
+		c.initListState(top.State.List, top.Ctx)
 	}
 }
 
 // initListState prepares a freshly-created ListState: it takes the next
 // instance id and applies the type's defaults. Every path that creates a list
 // screen's state goes through it, so no screen can end up without an identity
-// for its own fetches to carry. Callers hold c.mu (write).
-func (c *Controller) initListState(ls *ListState, resourceType string) {
+// for its own fetches to carry, and its rows keep the Region the screen was
+// pushed for. Callers hold c.mu (write).
+func (c *Controller) initListState(ls *ListState, ctx runtime.ScreenContext) {
 	c.nextListInstance++
 	ls.instance = c.nextListInstance
-	applyListDefaults(ls, resourceType)
+	ls.Region = ctx.Region
+	applyListDefaults(ls, ctx.ResourceType)
 }
 
 // applyListDefaults seeds per-type defaults on a freshly-created ListState.

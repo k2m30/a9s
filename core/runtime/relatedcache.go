@@ -20,10 +20,19 @@ import (
 // import core/session to construct cache entries.
 type RelatedCacheResult = session.RelatedCacheResult
 
-// RelatedCacheKey builds the map key for RelatedCache lookups, using the
-// same `<resourceType>:<resourceID>` format as the session-side helper.
-// Lives here so renderer adapters can resolve cache keys without importing
-// core/session.
+// RelatedCacheKey builds the map key for RelatedCache lookups of a resource
+// read in the session's Region, `<resourceType>:<resourceID>`. Lives here so
+// renderer adapters can resolve cache keys without importing core/session.
 func RelatedCacheKey(resourceType, resourceID string) string {
+	return RelatedCacheKeyIn(resourceType, "", resourceID)
+}
+
+// RelatedCacheKeyIn is RelatedCacheKey for a resource read in region ("" for
+// the session's), `<resourceType>@<region>:<resourceID>`: a name-keyed type
+// can hold the same ID in two Regions.
+func RelatedCacheKeyIn(resourceType, region, resourceID string) string {
+	if region != "" {
+		resourceType += "@" + region
+	}
 	return resourceType + ":" + resourceID
 }

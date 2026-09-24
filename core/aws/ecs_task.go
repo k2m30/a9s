@@ -308,7 +308,8 @@ func ecsJoinTaskDefinition(
 		sort.Strings(ids)
 		out.ssmParamNames = strings.Join(ids, ",")
 	}
-	groups, whole := ecsContainerLogGroups(td, arnRegionOf(aws.ToString(task.TaskArn), "ecs"))
+	byRegion, whole := ecsContainerLogGroups(td, arnRegionOf(aws.ToString(task.TaskArn), "ecs"))
+	groups := byRegion[""]
 	sort.Strings(groups)
 	out.logGroups = strings.Join(slices.Compact(groups), ",")
 	out.logGroupsUnread = !whole
@@ -354,6 +355,6 @@ func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (
 	if err != nil {
 		return nil, false, err
 	}
-	groups, whole := ecsContainerLogGroups(def, cmp.Or(arnRegionOf(taskARN, "ecs"), sessionRegion(clients)))
-	return groups, whole, nil
+	byRegion, whole := ecsContainerLogGroups(def, cmp.Or(arnRegionOf(taskARN, "ecs"), sessionRegion(clients)))
+	return byRegion[""], whole, nil
 }

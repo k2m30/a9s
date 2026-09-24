@@ -40,13 +40,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `elb`
 
 - **Why related**: ALB configured as a CloudFront origin. When a CF distribution returns `5xxErrorRate` and the origin is an ALB, operator pivots straight to the load balancer to check target health and backend state.
-- **How discovered**: cross-reference the already-loaded `elb` list by matching `Distribution.Origins.Items[].DomainName` against the load balancer's `DNSName`, case-folded (an application or classic load balancer answers under `<name>-<id>.<region>.elb.amazonaws.com`, a network or gateway one under `<name>-<id>.elb.<region>.amazonaws.com`) — a9s-devops: there is no direct LB ARN field on the origin; name-match against the loaded ELB list is the standard cross-reference.
+- **How discovered**: cross-reference the `elb` list of the Region an origin's DNS name names by matching `Distribution.Origins.Items[].DomainName` against the load balancer's `DNSName`, case-folded (an application or classic load balancer answers under `<name>-<id>.<region>.elb.amazonaws.com`, a network or gateway one under `<name>-<id>.elb.<region>.amazonaws.com`); an origin in the session's Region matches the already-loaded list — a9s-devops: there is no direct LB ARN field on the origin; name-match against the loaded ELB list is the standard cross-reference.
 - **Count shown**: yes.
 
 ### `lambda`
 
 - **Why related**: Lambda@Edge / CloudFront Functions attached to cache behaviors. A misbehaving edge function is a common cause of distribution-wide 5xx spikes.
-- **How discovered**: read `Distribution.DefaultCacheBehavior.LambdaFunctionAssociations.Items[].LambdaFunctionARN` plus every `Distribution.CacheBehaviors.Items[].LambdaFunctionAssociations.Items[].LambdaFunctionARN`; deduplicate by function ARN — a9s-devops: ARNs include a function version; pivot targets the function, not the specific version.
+- **How discovered**: read `Distribution.DefaultCacheBehavior.LambdaFunctionAssociations.Items[].LambdaFunctionARN` plus every `Distribution.CacheBehaviors.Items[].LambdaFunctionAssociations.Items[].LambdaFunctionARN`; deduplicate by function ARN — a9s-devops: ARNs include a function version; pivot targets the function, not the specific version. A Lambda@Edge function is in US East (N. Virginia) ("The Lambda function must be in the US East (N. Virginia) Region", [Restrictions on Lambda@Edge](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-edge-function-restrictions.html#lambda-at-edge-restrictions-region)): each ARN resolves in the Region it names, so the row counts and drills in us-east-1 whatever Region the session reads.
 - **Count shown**: yes.
 
 ### `r53`

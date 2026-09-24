@@ -3,6 +3,7 @@
 package resource
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -739,10 +740,19 @@ const (
 	CTAlsoWhereFilterKey = "_alsowhere"
 )
 
-// BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
-// The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
-// Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
+// BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a
+// resource read in the session's Region.
 func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string {
+	return CloudTrailFilterIn(res, resourceType, "")
+}
+
+// CloudTrailFilterIn returns the CloudTrail LookupEvents filter for a resource
+// read in region ("" for the session's). The filter is determined by the
+// resource type's CloudTrailKey field, not by heuristics. CloudTrail records
+// an event in the Region the call was made in, so the lookup runs in the
+// type's CloudTrailRegion when it names one and in region otherwise. Returns
+// nil when the resource type has no CloudTrail support (empty CloudTrailKey).
+func CloudTrailFilterIn(res Resource, resourceType, region string) map[string]string {
 	rt := FindResourceType(resourceType)
 	if rt == nil || rt.CloudTrailKey == "" {
 		return nil
@@ -752,9 +762,10 @@ func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string 
 		return nil
 	}
 	if rt.CloudTrailRegion != nil {
-		if region := rt.CloudTrailRegion(res); region != "" {
-			filter[CTRegionFilterKey] = region
-		}
+		region = cmp.Or(rt.CloudTrailRegion(res), region)
+	}
+	if region != "" {
+		filter[CTRegionFilterKey] = region
 	}
 	if alt := ctAltName(res, filter); alt != "" {
 		filter[CTAltNameFilterKey] = alt

@@ -216,7 +216,7 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 		humanized = td.HumanizedFields()
 	}
 	content := sectionsToFieldItemsDetail(sections, humanized)
-	c.resolveNavIDs(ds.ResourceType, r, content)
+	c.resolveNavIDs(ds.ResourceType, r, content, c.detailRegionLocked(ds))
 	attention, keys := buildAttentionSectionDetail(ds, td, c.detailNotInspected(ds))
 	built := detailItems{
 		items:   append(attention, content...),
@@ -249,10 +249,12 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 // whose NavigableField has Resolve picks it from src instead. A reference
 // that names no row of the target stops being navigable.
 //
-// A reference is read against the Region its own ARN names, not the
-// session's: an ARN of another Region names a real row there, and holding
-// it to the session's Region would strike the field off as naming nothing.
-func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items []fieldpath.FieldItem) {
+// A reference is read against the Region its own ARN names, and a reference
+// naming none against the Region the detail was read in (region, "" for the
+// session's): an ARN of another Region names a real row there, and a bare ID
+// on a resource read elsewhere names that Region's row. Only a reference into
+// the session's Region is held to the session's loaded rows.
+func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items []fieldpath.FieldItem, region string) {
 	accountID := ""
 	if c.identityResult != nil {
 		accountID = c.identityResult.AccountID
@@ -264,11 +266,10 @@ func (c *Controller) resolveNavIDs(srcType string, src resource.Resource, items 
 		}
 		value := strings.TrimPrefix(strings.TrimSpace(it.Value), "- ")
 		ref := cmp.Or(it.NavID, value)
-		region := c.core.Region()
-		if named := cmp.Or(resource.RefRegion(ref), resource.RefRegion(value)); named != "" {
-			region = named
+		rc := domain.RefContext{AccountID: accountID, Region: cmp.Or(resource.RefRegion(ref), resource.RefRegion(value), region, c.core.Region())}
+		if rc.Region == c.core.Region() {
+			rc.Targets = c.core.AnyLaneResources(it.TargetType)
 		}
-		rc := domain.RefContext{AccountID: accountID, Region: region, Targets: c.core.AnyLaneResources(it.TargetType)}
 		if d := slices.IndexFunc(navDefs, func(nf resource.NavigableField) bool {
 			return nf.Resolve != nil && nf.FieldPath == it.Path && nf.TargetType == it.TargetType
 		}); d >= 0 {

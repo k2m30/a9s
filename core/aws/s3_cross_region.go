@@ -28,7 +28,6 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -85,9 +84,15 @@ func (c *ServiceClients) bucketRegion(ctx context.Context, bucket string) string
 		// rejects it, for as long as the session lasts.
 		return ""
 	}
-	// An empty location constraint is us-east-1, which predates the
-	// constraint and so carries none.
-	region = cmp.Or(string(out.LocationConstraint), "us-east-1")
+	// "Buckets in Region us-east-1 have a LocationConstraint of null. Buckets
+	// with a LocationConstraint of EU reside in eu-west-1."
+	// (https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLocation.html)
+	switch region = string(out.LocationConstraint); region {
+	case "":
+		region = "us-east-1"
+	case string(s3types.BucketLocationConstraintEu):
+		region = "eu-west-1"
+	}
 	c.bucketRegionMu.Lock()
 	defer c.bucketRegionMu.Unlock()
 	if c.bucketRegions == nil {

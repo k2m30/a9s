@@ -211,8 +211,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn", "latest_delivery_time", "org_trail"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true, Mirror: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, Truncated: true},
+			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTrailKMS, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkTrailRole},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("trail")},

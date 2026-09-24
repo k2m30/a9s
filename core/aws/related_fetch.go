@@ -45,7 +45,7 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 // ID or Name, which a row whose details could not be read still carries: it
 // is truncated only when the list is a subset of the list AWS holds.
 func relatedRowsByID(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	if entry, ok := CachedList(cache, target); ok {
+	if entry, ok := CachedList(cache, target); ok && !elsewhere(clients) {
 		// A present entry is a complete answer even when it holds nothing:
 		// the executor seeds it straight from a fetcher that found zero
 		// resources, and nil there would be indistinguishable from "no entry".
@@ -59,7 +59,7 @@ func relatedRowsByID(ctx context.Context, clients any, cache resource.ResourceCa
 	if pf == nil {
 		return nil, false, nil
 	}
-	result, err := pf(ctx, clients, "")
+	result, err := FirstPage(ctx, clients, target)
 	if err != nil && len(result.Resources) == 0 {
 		return nil, false, err
 	}
@@ -362,12 +362,13 @@ func alsoPartial(r resource.RelatedCheckResult, partial bool) resource.RelatedCh
 
 // alsoRead is r once a second place the checker read is folded in: a partial
 // place makes a count a lower bound, an unread one a lower bound or, with
-// nothing found, unknown or its error, and its failure reaches the flash.
+// nothing found, unknown or its error, and its failure reaches the flash. The
+// place is read where r was, so r's Region stays the answer's.
 func alsoRead(r resource.RelatedCheckResult, place relatedRead) resource.RelatedCheckResult {
 	if !place.partial && !place.unread && place.failure == nil {
 		return r
 	}
-	return relatedAnswer(r.TargetType(), joinReads(readOf(r), place))
+	return relatedAnswer(r.TargetType(), joinReads(readOf(r), place)).WithRegion(r.Region())
 }
 
 // relatedFanOutCap bounds the calls a checker makes one per target row, for
@@ -421,7 +422,7 @@ func unreadZero(res resource.Resource, r resource.RelatedCheckResult) resource.R
 	if res.RawStruct != nil || r.State() != domain.RelatedResolved || r.Count() != 0 || r.Truncated() {
 		return r
 	}
-	return NotRead(r.TargetType())
+	return NotRead(r.TargetType()).WithRegion(r.Region())
 }
 
 // unreadZeroScanned is unreadZero for a checker that did read the target list.

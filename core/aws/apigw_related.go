@@ -67,22 +67,16 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 			refs = append(refs, *out.Configuration.KMSKeyArn)
 		}
 	}
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, kmsRegion(refs), refs)
-	if len(ids) == 0 {
-		// Every function refused its read: nothing was established about any
-		// of them, which is a fetch failure rather than a lower bound over
-		// what was read.
-		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil && len(failures) == total {
-			return ReadFailed("kms", aggErr)
-		}
-		if err != nil {
-			return ReadFailed("kms", err)
-		}
+	// Every function refusing its read established nothing about any of
+	// them, which is a fetch failure; some refusing leave what was read a
+	// lower bound.
+	reads := kmsReads(ctx, clients, cache, "", refs)
+	functions := relatedRead{partial: len(failures) > 0 || !complete}
+	if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil && len(failures) == total {
+		functions = relatedRead{unread: true, failure: aggErr, failed: true}
 	}
-	// Some calls may have failed: ids is a proven subset, not necessarily
-	// exhaustive. Truncated (not Errored) keeps the row actionable rather
-	// than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("kms", ids, lowerBound || len(failures) > 0 || !complete)
+	reads[""] = joinReads(reads[""], functions)
+	return regionalAnswer(clients, "kms", reads)
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this

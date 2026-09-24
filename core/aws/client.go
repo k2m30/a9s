@@ -63,9 +63,9 @@ import (
 
 // ServiceClients holds AWS service clients for all supported services.
 //
-// Per-Session capability stores (IAMPolicies, IdentityStore, RuleSets) are
-// stored as unexported fields guarded by sync.RWMutex and accessed via
-// thread-safe getter/setter methods. Direct field access would race under
+// Per-Session capability stores (IAMPolicies, IdentityStore, RuleSets,
+// RegionLists) are stored as unexported fields guarded by sync.RWMutex and
+// accessed via thread-safe getter/setter methods. Direct field access would race under
 // `-race` because:
 //
 //   - Writes happen on the Bubble Tea Update goroutine (handleClientsReady,
@@ -82,6 +82,7 @@ type ServiceClients struct {
 	iamPolicies   iamPolicyStore
 	identityStore identityStore
 	ruleSets      ruleSetStore
+	regionLists   *RegionListStore
 
 	// cfg is the session config CreateServiceClients was called with, kept so
 	// a client for another Region can be built from it on demand. Zero value
@@ -258,10 +259,10 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 
 // InRegion returns the client set that reads region. The receiver answers for
 // its own Region, for an empty region, for a nil receiver, and for every
-// region when it cannot
-// reach another one; any other region is a set built from the session's own
-// config, once per region, reading the session's one set of capability
-// stores. Concurrency-safe.
+// region when it cannot reach another one; any other region is the session's
+// own set or one built from the session's config, once per region per
+// session, reading the session's one set of capability stores.
+// Concurrency-safe.
 func (c *ServiceClients) InRegion(region string) *ServiceClients {
 	if c == nil {
 		return nil
@@ -269,19 +270,26 @@ func (c *ServiceClients) InRegion(region string) *ServiceClients {
 	if region == "" || region == c.Region || c.oneRegion() {
 		return c
 	}
-	c.regionMu.Lock()
-	defer c.regionMu.Unlock()
-	if other, ok := c.byRegion[region]; ok {
+	// One map of the session's sets, on the session's own, which answers
+	// for its Region: a set read from another Region asked for the
+	// session's gets the session's.
+	o := c.storeOwner()
+	if region == o.Region {
+		return o
+	}
+	o.regionMu.Lock()
+	defer o.regionMu.Unlock()
+	if other, ok := o.byRegion[region]; ok {
 		return other
 	}
-	cfg := c.cfg.Copy()
+	cfg := o.cfg.Copy()
 	cfg.Region = region
 	other := CreateServiceClients(cfg)
-	other.parent = c.storeOwner()
-	if c.byRegion == nil {
-		c.byRegion = map[string]*ServiceClients{}
+	other.parent = o
+	if o.byRegion == nil {
+		o.byRegion = map[string]*ServiceClients{}
 	}
-	c.byRegion[region] = other
+	o.byRegion[region] = other
 	return other
 }
 
@@ -394,6 +402,33 @@ func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
 	o.storesMu.Lock()
 	defer o.storesMu.Unlock()
 	o.ruleSets = s
+}
+
+// RegionLists returns the session-scoped store of first pages read in other
+// Regions. A set no session has wired keeps one of its own. Concurrency-safe.
+func (c *ServiceClients) RegionLists() *RegionListStore {
+	if c == nil {
+		return nil
+	}
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	if o.regionLists == nil {
+		o.regionLists = NewRegionListStore()
+	}
+	return o.regionLists
+}
+
+// SetRegionLists replaces the session-scoped per-Region list store; a read in
+// flight keeps writing to the store it captured.
+func (c *ServiceClients) SetRegionLists(s *RegionListStore) {
+	if c == nil {
+		return
+	}
+	o := c.storeOwner()
+	o.storesMu.Lock()
+	defer o.storesMu.Unlock()
+	o.regionLists = s
 }
 
 // errClientMissing is domain.ErrClientMissing, the one signal that a read's

@@ -69,6 +69,9 @@ const (
 type ScreenContext struct {
 	ResourceType string
 	ResourceID   string
+	// Region is the Region a detail, YAML or JSON screen's resource was read
+	// in, "" for the session's.
+	Region string
 }
 
 // ScreenPayload is the marker interface for typed per-Screen payload
@@ -103,6 +106,8 @@ type ChildListPayload struct {
 	ChildType     string
 	ParentContext map[string]string
 	DisplayName   string
+	// Region is the Region the parent was read in, "" for the session's.
+	Region string
 }
 
 func (ChildListPayload) isScreenPayload() {}

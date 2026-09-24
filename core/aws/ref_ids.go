@@ -416,12 +416,8 @@ func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 // account's alias is never looked up. The error is the lookup's; the rows it
 // did return are in Targets either way.
 func kmsRefContext(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) (domain.RefContext, error) {
-	if c, ok := clients.(*ServiceClients); ok && c != nil {
-		if elsewhere := c.InRegion(region); elsewhere != c {
-			clients, cache = elsewhere, nil
-		}
-	}
-	rc := refContext(clients, cache, "kms")
+	rc := refContextIn(clients, cache, "kms", region)
+	clients = clientsIn(clients, region)
 	var missing []string
 	for _, ref := range refs {
 		res, _, local := localARN(ref, rc, "kms")
@@ -457,30 +453,31 @@ func kmsResolve(ctx context.Context, clients any, cache resource.ResourceCache, 
 	return ids, dropped || err != nil, nil
 }
 
-// kmsRelated is kmsRelatedIn in the Region the keys' ARNs name.
-func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) resource.RelatedCheckResult {
-	return kmsRelatedIn(ctx, clients, cache, kmsRegion(refs), refs)
-}
-
-// kmsRelatedIn is relatedRefs for the kms target through kmsResolve, for keys
-// that live in region; the result is read there.
-func kmsRelatedIn(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) resource.RelatedCheckResult {
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, region, refs)
-	if err != nil {
-		return ReadFailed("kms", err)
-	}
-	return inRegion(clients, region, relatedResultTrunc("kms", ids, lowerBound))
-}
-
-// kmsRegion is the Region the first key or alias ARN among refs names; a
-// bare ID or alias names none, which reads as the session's.
-func kmsRegion(refs []string) string {
+// kmsReads resolves refs to kms row IDs through kmsResolve, each in the
+// Region its ARN names, a bare key ID or alias in region.
+func kmsReads(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) map[string]relatedRead {
+	byRegion := map[string][]string{}
 	for _, ref := range refs {
-		if region := arnRegionOf(ref, "kms"); region != "" {
-			return region
-		}
+		r := cmp.Or(arnRegionOf(ref, "kms"), region)
+		byRegion[r] = append(byRegion[r], ref)
 	}
-	return ""
+	reads := make(map[string]relatedRead, len(byRegion))
+	for r, group := range byRegion {
+		ids, lowerBound, err := kmsResolve(ctx, clients, cache, r, group)
+		reads[r] = relatedRead{ids: ids, partial: lowerBound, unread: err != nil, failure: err, failed: err != nil}
+	}
+	return reads
+}
+
+// kmsRelated is kmsRelatedIn for keys named where the clients read.
+func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, refs []string) resource.RelatedCheckResult {
+	return kmsRelatedIn(ctx, clients, cache, "", refs)
+}
+
+// kmsRelatedIn is relatedRefs for the kms target through kmsReads, for keys
+// that a bare ID or alias names in region.
+func kmsRelatedIn(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) resource.RelatedCheckResult {
+	return regionalAnswer(clients, "kms", kmsReads(ctx, clients, cache, region, refs))
 }
 
 // isKMSKeyID reports whether s has the shape of a key ID: a UUID, or

@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -84,31 +85,29 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return foundNone("elb", "dist.Origins")
 	}
 
-	var origins []string
+	// A load balancer origin is listed in the Region its DNS name names.
+	byRegion := map[string][]string{}
 	for _, origin := range dist.Origins.Items {
 		if name := aws.ToString(origin.DomainName); maybeELBDNS(name) {
-			origins = append(origins, name)
+			byRegion[elbDNSRegion(name)] = append(byRegion[elbDNSRegion(name)], name)
 		}
 	}
-	if len(origins) == 0 {
+	if len(byRegion) == 0 {
 		return foundNone("elb", "the distribution's origins")
 	}
-
-	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
-	if err != nil {
-		return ReadFailed("elb", err)
+	reads := make(map[string]relatedRead, len(byRegion))
+	for region, origins := range byRegion {
+		reads[region] = readListIn(ctx, clients, cache, "elb", region, func(elbList []resource.Resource, _ domain.RefContext, truncated bool) relatedRead {
+			var ids []string
+			for _, elbRes := range elbList {
+				if slices.ContainsFunc(origins, func(o string) bool { return dnsAliasNames(o, elbRes.Fields["dns_name"]) }) {
+					ids = append(ids, elbRes.ID)
+				}
+			}
+			return relatedRead{ids: ids, partial: truncated}
+		})
 	}
-	if elbList == nil {
-		return NotRead("elb")
-	}
-
-	var ids []string
-	for _, elbRes := range elbList {
-		if slices.ContainsFunc(origins, func(o string) bool { return dnsAliasNames(o, elbRes.Fields["dns_name"]) }) {
-			ids = append(ids, elbRes.ID)
-		}
-	}
-	return relatedResultTrunc("elb", ids, truncated)
+	return regionalAnswer(clients, "elb", reads)
 }
 
 // checkCfWAF searches the WAF cache for the Web ACL associated with this
@@ -155,21 +154,15 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	// CloudFront serves a custom viewer certificate from us-east-1 alone, so
 	// the certificate is never on the session region's own list.
 	certRegion := arnRegionOf(certARN, "acm")
-	acmList, _, truncated, err := relatedListIn(ctx, clients, cache, "acm", certRegion)
-	if err != nil {
-		return ReadFailed("acm", err)
-	}
-	if acmList == nil {
-		return NotRead("acm")
-	}
-
-	var ids []string
-	for _, acmRes := range acmList {
-		if acmRes.Fields["certificate_arn"] == certARN || acmRes.ID == certARN {
-			ids = append(ids, acmRes.ID)
+	return answerIn(clients, "acm", certRegion, readListIn(ctx, clients, cache, "acm", certRegion, func(acmList []resource.Resource, _ domain.RefContext, truncated bool) relatedRead {
+		var ids []string
+		for _, acmRes := range acmList {
+			if acmRes.Fields["certificate_arn"] == certARN || acmRes.ID == certARN {
+				ids = append(ids, acmRes.ID)
+			}
 		}
-	}
-	return inRegion(clients, certRegion, relatedResultTrunc("acm", ids, truncated))
+		return relatedRead{ids: ids, partial: truncated}
+	}))
 }
 
 // checkCfR53 reports the Route 53 hosted zones with an alias record
@@ -255,5 +248,9 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cach
 			collect(cb.LambdaFunctionAssociations)
 		}
 	}
-	return relatedRefs("lambda", arns, refContext(clients, cache, "lambda"))
+	// A Lambda@Edge function is in US East (N. Virginia) whatever Region the
+	// session reads ("The Lambda function must be in the US East (N. Virginia)
+	// Region", https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-edge-function-restrictions.html#lambda-at-edge-restrictions-region),
+	// and its association names it by an ARN of that Region.
+	return relatedRefsByRegion(clients, cache, "lambda", arns)
 }

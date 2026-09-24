@@ -84,7 +84,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
 					if len(filtered) < len(result.RelatedIDs) {
-						fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen(), messages.FetchProvenanceFilteredList)
+						fetchCmd := m.fetchResources(msg.TargetType, result.Region, m.core.AvailabilityGen(), messages.FetchProvenanceFilteredList)
 						return m, fetchCmd
 					}
 				}
@@ -100,6 +100,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		// FetchFilter path: use server-side filtered fetcher.
 		if len(result.FetchFilter) > 0 {
 			m.ctrl.PushChildListScreen(rt.ShortName)
+			m.ctrl.SetListRegion(result.Region)
 			rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
 			rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 			rl.SetFetchFilter(result.FetchFilter)
@@ -113,7 +114,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// Replay: seed instantly from the session filtered-rows cache; the
 			// fetch below stays as the ⟳ verify-refresh.
 			m.ctrl.SeedFilteredListFromCache(msg.TargetType, result.FetchFilter)
-			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.AvailabilityGen()))
+			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, result.Region, m.core.AvailabilityGen()))
 		}
 
 		// TargetID-based filtered list (cache miss).
@@ -199,7 +200,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		if detailFound {
 			r := detailRes
 			// Push ScreenDetail onto the controller stack and seed DetailState.
-			m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+			// The row was read in the related row's Region, not the one of the
+			// detail it is opened from.
+			m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail,
+				Context: runtime.ScreenContext{ResourceType: msg.TargetType, ResourceID: r.ID, Region: result.Region}}})
 			m.ctrl.EnsureDetailState(r, msg.TargetType)
 			m.ctrl.InitDetailRelatedRows(msg.TargetType)
 			detail := views.NewDetailWithCtrl(r, msg.TargetType, m.viewConfig, m.keys, m.ctrl)
@@ -305,6 +309,7 @@ func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigate) (tea.Mod
 			ChildType:     msg.TargetType,
 			ParentContext: parentCtx,
 			DisplayName:   displayName,
+			Region:        msg.Region,
 		}
 	}
 }
@@ -326,7 +331,7 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 			// The filter lives in result.FetchFilter, not on the task, so
 			// ExecuteTask would fail with "missing fetchFilteredPayload"; this
 			// one case stays adapter-local.
-			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
+			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, result.Region, m.core.AvailabilityGen()))
 			continue
 		}
 		rest = append(rest, t)

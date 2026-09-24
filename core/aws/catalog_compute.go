@@ -455,7 +455,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkECSSvcTargetGroups, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSSvcAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, Truncated: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true, Truncated: true},
@@ -572,7 +572,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService, Mirror: true},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster, Mirror: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true, Truncated: true, Mirror: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, Truncated: true, Mirror: true},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ecs-task")},

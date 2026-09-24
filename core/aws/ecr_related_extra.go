@@ -6,10 +6,10 @@ package aws
 import (
 	"cmp"
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
@@ -92,24 +92,11 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 			continue
 		}
 		reads.read++
-		if ecrPipelineHasRepo(p.Stages, repoName) {
+		if slices.Contains(pipelineActionRefs(clients, p, "ECR", "RepositoryName")[""], repoName) {
 			ids = append(ids, pipelineName)
 		}
 	}
 	return reads.answer("pipeline", "ecr-related: GetPipeline", ids, truncated)
-}
-
-// ecrPipelineHasRepo returns true if any action in the given stages has
-// Provider == "ECR" AND Configuration["RepositoryName"] == repoName.
-func ecrPipelineHasRepo(stages []cptypes.StageDeclaration, repoName string) bool {
-	for _, stg := range stages {
-		for _, a := range stg.Actions {
-			if actionProvider(a) == "ECR" && a.Configuration["RepositoryName"] == repoName {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // checkECRRole resolves the IAM roles the ECR repository's resource-based

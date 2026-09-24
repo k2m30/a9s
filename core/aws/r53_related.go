@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -307,23 +308,15 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	// Route 53 is a global service and writes public-zone query logs to a
-	// us-east-1 log group; the config's ARN names the region holding it.
-	region := ""
-	if len(arns) > 0 {
-		region = arnRegionOf(arns[0], "logs")
+	// us-east-1 log group; each config's ARN names the Region holding it.
+	reads := map[string]relatedRead{"": {partial: !configsComplete}}
+	for region, group := range refsByRegion(arns) {
+		reads[region] = readListIn(ctx, clients, cache, "logs", region, func(logList []resource.Resource, rc domain.RefContext, _ bool) relatedRead {
+			ids, lowerBound := listedRefs("logs", group, rc, logList)
+			return relatedRead{ids: ids, partial: lowerBound || !configsComplete}
+		})
 	}
-	logList, rc, _, fetchErr := relatedListIn(ctx, clients, cache, "logs", region)
-	if logList == nil {
-		if fetchErr != nil {
-			return ReadFailed("logs", fetchErr)
-		}
-		// Nothing cached and no fetcher: the aliases name something we cannot
-		// look up. The alias DNS name is not a logs ID, so reporting it would
-		// offer the operator a row that navigates to nothing.
-		return NotRead("logs")
-	}
-	ids, lowerBound := listedRefs("logs", arns, rc, logList)
-	return inRegion(clients, region, relatedResultTrunc("logs", ids, lowerBound || !configsComplete))
+	return regionalAnswer(clients, "logs", reads)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.
@@ -347,14 +340,15 @@ func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	if err != nil {
 		return ReadFailed("vpc", err)
 	}
-	var ids []string
-	seen := make(map[string]bool)
+	// Each VPC is the one of its ID in VPCRegion, "the region that an Amazon
+	// VPC was created in" (https://docs.aws.amazon.com/Route53/latest/APIReference/API_VPC.html).
+	reads := map[string]relatedRead{}
 	for _, v := range out.VPCs {
-		if v.VPCId == nil || *v.VPCId == "" || seen[*v.VPCId] {
-			continue
+		if id := aws.ToString(v.VPCId); id != "" {
+			r := reads[string(v.VPCRegion)]
+			r.ids = append(r.ids, id)
+			reads[string(v.VPCRegion)] = r
 		}
-		seen[*v.VPCId] = true
-		ids = append(ids, *v.VPCId)
 	}
-	return relatedResultTrunc("vpc", ids, false)
+	return regionalAnswer(clients, "vpc", reads)
 }

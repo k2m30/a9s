@@ -91,11 +91,9 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 			refs = append(refs, *vol.KmsKeyId)
 		}
 	}
-	ids, lowerBound, err := kmsResolve(ctx, clients, cache, kmsRegion(refs), refs)
-	if err != nil {
-		return ReadFailed("kms", err)
-	}
-	return relatedResultTrunc("kms", ids, truncated || lowerBound)
+	reads := kmsReads(ctx, clients, cache, "", refs)
+	reads[""] = joinReads(reads[""], relatedRead{partial: truncated})
+	return regionalAnswer(clients, "kms", reads)
 }
 
 // checkEC2Logs offers the log groups whose name carries this instance's id,

@@ -286,6 +286,27 @@ func maybeELBDNS(name string) bool {
 	return strings.Contains(canonicalDNS(name), ".elb.")
 }
 
+// elbDNSRegion is the Region a load balancer's own DNS name names: the label
+// after "elb" in "{name}-{id}.elb.{region}.amazonaws.com"
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#dns-name),
+// the one before it in "{name}-{id}.{region}.elb.amazonaws.com"
+// (docs/resources/cf.md §elb). "" when the name names none.
+func elbDNSRegion(name string) string {
+	labels := strings.Split(canonicalDNS(name), ".")
+	for i, label := range labels {
+		if label != "elb" || i+1 >= len(labels) {
+			continue
+		}
+		if next := labels[i+1]; next != "amazonaws" {
+			return next
+		}
+		if i >= 2 {
+			return labels[i-1]
+		}
+	}
+	return ""
+}
+
 // lambdaRefNamesFunction reports whether ref — an EventBridge target ARN, an
 // SNS subscription endpoint, an S3 notification destination, a registered ALB
 // target or a Lambda@Edge association — names the Lambda function row fnID.

@@ -13,8 +13,10 @@ import (
 // WireStores and RefreshStores all walk this list.
 var clientStores = []struct {
 	refreshedBy []string
-	reset       func(*Session)
-	wire        func(*Session, *awsclient.ServiceClients)
+	// anyRefresh: every refresh reads again what the store remembers.
+	anyRefresh bool
+	reset      func(*Session)
+	wire       func(*Session, *awsclient.ServiceClients)
 }{
 	{
 		// A drill into a policy resolves through this store, and role, user
@@ -32,6 +34,12 @@ var clientStores = []struct {
 		refreshedBy: []string{"ses"},
 		reset:       func(s *Session) { s.RuleSets = NewRuleSetStore() },
 		wire:        func(s *Session, c *awsclient.ServiceClients) { c.SetRuleSets(s.RuleSets) },
+	},
+	{
+		// Another Region's lists, read by the related rows of any type.
+		anyRefresh: true,
+		reset:      func(s *Session) { s.RegionLists = awsclient.NewRegionListStore() },
+		wire:       func(s *Session, c *awsclient.ServiceClients) { c.SetRegionLists(s.RegionLists) },
 	},
 }
 
@@ -53,7 +61,7 @@ func (s *Session) WireStores(c *awsclient.ServiceClients) {
 // store is left to any in-flight read that captured it.
 func (s *Session) RefreshStores(rt string) {
 	for _, st := range clientStores {
-		if slices.Contains(st.refreshedBy, rt) {
+		if st.anyRefresh || slices.Contains(st.refreshedBy, rt) {
 			st.reset(s)
 			st.wire(s, s.Clients)
 		}

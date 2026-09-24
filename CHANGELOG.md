@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A detail opened on a row listed in another Region reads that Region: a
+  certificate opened through a CloudFront distribution's ACM row from a
+  session outside us-east-1 reads its details, related rows and CloudTrail
+  events in us-east-1, and a list read there is read once per session and
+  never joins the session's own list. A CodePipeline action names its
+  CodeBuild project, stack, repository, ECS service or Lambda function in the
+  action's Region, not a same-named one in the session's; a private hosted
+  zone's VPCs resolve in their own Regions; a CloudFront distribution's
+  Lambda@Edge functions resolve in us-east-1.
+
+- Everything opened from a resource read in another Region stays in that
+  Region: its YAML and JSON views, a revealed secret value, its child views,
+  a refresh of the list, a navigable field holding a bare ID, the console
+  link, and its CloudTrail events (`t` and the CloudTrail Events row) all
+  read where the resource lives. A Lambda function or DynamoDB table opened
+  in two Regions under the same name keeps its own related rows and findings.
+  CloudFront's load-balancer origins, an ECS task's `awslogs-region` log
+  groups, a pipeline's KMS keys and SNS approval topics, and CloudTrail's log
+  group and topic count in the Region AWS puts them in, and a row that could
+  not read one of those Regions is a lower bound or unknown rather than an
+  exact count. A bucket whose location constraint is the legacy `EU` is read
+  in eu-west-1.
+
 - Related rows count every place AWS records the link. A Lambda function's
   dead-letter queue or topic counts on both ends, and so does an EventBridge
   target's dead-letter queue; a log group counts the functions that log to it

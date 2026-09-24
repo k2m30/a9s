@@ -14,7 +14,7 @@
 //	                            the ViewState/Flash a synchronous single-Update
 //	                            render needs — then applies the enriched
 //	                            resource to detail state via the exported
-//	                            ctrl.ApplyDetailEnrichmentForResource (the same
+//	                            ctrl.ApplyDetailEnrichmentIn (the same
 //	                            merge the web/headless lane's
 //	                            foldEnrichDetailResultLocked calls), and
 //	                            regenerates syntax-colored YAML/JSON content
@@ -25,7 +25,7 @@
 //	                            dispatchDetailOpResultIntents + exported-merge
 //	                            pattern as handleEnrichDetailResult, calling
 //	                            Core.HandleRelatedCheckResult and
-//	                            ctrl.ApplyDetailRelatedResultForResource.
+//	                            ctrl.ApplyDetailRelatedResultIn.
 //	dispatchDetailOpResultIntents — the shared intent-applier for the two
 //	                            shims above: forwards the whole intents slice to
 //	                            ctrl.ApplyIntents (the Patch{Resource,Related,
@@ -111,7 +111,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 			if ok {
 				m.ctrl.ClearListAutoOpenSingle()
 				shortName := rs.resourceType
-				rCopy := r
+				rCopy, region := r, m.ctrl.TopRegion()
 				listType := shortName
 				return m, tea.Batch(coreCmd, func() tea.Msg {
 					return messages.Navigate{
@@ -119,6 +119,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 						ResourceType:   listType,
 						Resource:       &rCopy,
 						ReplaceCurrent: true,
+						Region:         region,
 					}
 				})
 			}
@@ -153,7 +154,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 			if td != nil && td.StubCreator != nil {
 				if targetID, ok := m.ctrl.GetListExactRelatedTargetID(); ok {
 					m.ctrl.ClearListAutoOpenSingle()
-					stub := td.StubCreator(targetID)
+					stub, region := td.StubCreator(targetID), m.ctrl.TopRegion()
 					listType := shortName
 					return m, tea.Batch(coreCmd, func() tea.Msg {
 						return messages.Navigate{
@@ -161,6 +162,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 							ResourceType:   listType,
 							Resource:       &stub,
 							ReplaceCurrent: true,
+							Region:         region,
 						}
 					})
 				}
@@ -181,7 +183,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // history, auto-clear tick), so its returned cmd must be batched in, not
 // dropped. On success,
 // applies the enriched resource to detail state via
-// ctrl.ApplyDetailEnrichmentForResource (the same merge
+// ctrl.ApplyDetailEnrichmentIn (the same merge
 // Controller.foldEnrichDetailResultLocked calls for the web/headless lane),
 // then regenerates syntax-colored YAML/JSON content when the active screen is
 // a text viewer for this resource: a TUI-only rendering concern with no
@@ -200,6 +202,7 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	intents, tasks := m.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
 		ResourceType: msg.ResourceType,
 		ResourceID:   msg.ResourceID,
+		Region:       msg.Region,
 		OperationID:  msg.OperationID,
 		Err:          msg.Err,
 	})
@@ -210,14 +213,14 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	}
 
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
-	m.ctrl.ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
+	m.ctrl.ApplyDetailEnrichmentIn(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, ef, ad)
 
 	// When the active screen is a YAML or JSON text viewer for this resource,
 	// regenerate the syntax-colored content lines from the enriched resource
 	// and push them into the controller's TextState.
 	if m.activeRS().kind == rsKindText {
-		screenID, ctx := m.ctrl.GetTextScreenContext()
-		if screenID != "" && ctx.ResourceType == msg.ResourceType && ctx.ResourceID == msg.ResourceID {
+		screenID, _ := m.ctrl.GetTextScreenContext()
+		if screenID != "" && m.ctrl.TopShows(msg.ResourceType, msg.Region, msg.ResourceID) {
 			w, h := m.innerSize()
 			var newLines []string
 			switch screenID {
@@ -261,11 +264,10 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 // that flash through the real Core.HandleFlash lifecycle and returns a cmd
 // that must be batched in. Then merges the row into every matching stacked
 // detail's RelatedRows via
-// ctrl.ApplyDetailRelatedResultForResource, the same exported method
-// Controller.foldRelatedCheckResultLocked calls for the web/headless lane and
-// the TUI's own related-navigation fetch-by-ID path
-// (runtime_adapter_related.go) already calls, so the merge itself has one
-// implementation regardless of which caller reaches it.
+// ctrl.ApplyDetailRelatedResultIn, which runs the same stack-wide merge
+// Controller.foldRelatedCheckResultLocked runs for the web/headless lane, so
+// the merge itself has one implementation regardless of which caller reaches
+// it.
 func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Model, tea.Cmd) {
 	if messages.IsStale(msg, m.core) {
 		return m, nil
@@ -273,6 +275,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 	intents, tasks := m.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
 		ResourceType:       msg.ResourceType,
 		SourceResourceID:   msg.SourceResourceID,
+		Region:             msg.Region,
 		DefDisplayName:     msg.DefDisplayName,
 		Result:             msg.Result,
 		CachedPages:        msg.CachedPages,
@@ -286,8 +289,9 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 	if err := msg.Result.Err(); err != nil {
 		errMsg = err.Error()
 	}
-	m.ctrl.ApplyDetailRelatedResultForResource(
+	m.ctrl.ApplyDetailRelatedResultIn(
 		msg.ResourceType,
+		msg.Region,
 		msg.SourceResourceID,
 		msg.DefDisplayName,
 		msg.Result.TargetType(),

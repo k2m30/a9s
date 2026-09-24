@@ -52,7 +52,7 @@ func stubEC2Enricher(t *testing.T, fn func(resources []resource.Resource) (awscl
 // dispatches, or fails.
 func enrichRowTask(t *testing.T, core *runtime.Core, row resource.Resource) runtime.TaskRequest {
 	t.Helper()
-	_, tasks := core.BeginDetailOperation("ec2", row, false)
+	_, tasks := core.BeginDetailOperation("ec2", row, "", false)
 	for _, task := range tasks {
 		if task.Key.Kind == runtime.KindEnrichRow {
 			return task

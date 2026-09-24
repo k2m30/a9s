@@ -1308,7 +1308,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs-svc | tg | Target Groups | no |
 | ecs-svc | alarm | CloudWatch Alarms | yes |
 | ecs-svc | elb | Load Balancers | yes |
-| ecs-svc | logs | Log Groups | yes |
+| ecs-svc | logs | Log Groups | no |
 | ecs-svc | sg | Security Groups | no |
 | ecs-svc | role | IAM Role | no |
 | ecs-svc | cfn | CloudFormation Stacks | yes |
@@ -1331,7 +1331,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs | logs | Log Groups | yes |
 | ecs-task | ecs-svc | ECS Services | no |
 | ecs-task | ecs | ECS Clusters | no |
-| ecs-task | logs | Log Groups | yes |
+| ecs-task | logs | Log Groups | no |
 | ecs-task | role | IAM Role | yes |
 | ecs-task | alarm | CloudWatch Alarms | yes |
 | ecs-task | ct-events | CloudTrail Events | no |
@@ -1664,8 +1664,8 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | logs | s3 | S3 (exports) | no |
 | logs | ct-events | CloudTrail Events | no |
 | trail | s3 | S3 Bucket | yes |
-| trail | logs | Log Groups | yes |
-| trail | sns | SNS Topic | yes |
+| trail | logs | Log Groups | no |
+| trail | sns | SNS Topic | no |
 | trail | kms | KMS Key | yes |
 | trail | role | IAM Role | no |
 | trail | ct-events | CloudTrail Events | no |
@@ -1780,11 +1780,11 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | r53 | vpc | VPCs | no |
 | r53 | ct-events | CloudTrail Events | no |
 | cf | s3 | S3 Buckets | yes |
-| cf | elb | Load Balancers (origin) | yes |
+| cf | elb | Load Balancers (origin) | no |
 | cf | waf | WAF Web ACLs | yes |
-| cf | acm | ACM Certificates | yes |
+| cf | acm | ACM Certificates | no |
 | cf | r53 | Route 53 Zones | no |
-| cf | alarm | CloudWatch Alarms | yes |
+| cf | alarm | CloudWatch Alarms | no |
 | cf | lambda | Lambda@Edge | no |
 | cf | ct-events | CloudTrail Events | no |
 | acm | cf | CloudFront Distros | yes |

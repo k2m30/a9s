@@ -36,7 +36,11 @@ type DetailOperation struct {
 	ResourceType string
 	Resource     resource.Resource
 	Clients      *awsclient.ServiceClients
-	Refresh      bool
+	// Region is the Region the row was listed in when that is not the
+	// session's: Clients read it, the session's cached lists are not its
+	// lists, and nothing the operation reads enters them.
+	Region  string
+	Refresh bool
 }
 
 // BeginDetailOperation starts a new DetailOperation for resourceType/res,
@@ -55,9 +59,12 @@ type DetailOperation struct {
 // which may itself trim the related entry out (cache-replay suppression) but
 // never receives it as a separately addressable value.
 //
+// region is the Region res was listed in ("" for the session's): the
+// operation's clients read it, whatever Region the session reads.
+//
 // Must be called while the caller's own serialization is already held:
 // core/app's beginDetailWorkloadLocked calls this under Controller.mu.
-func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, refresh bool) (op DetailOperation, tasks []TaskRequest) {
+func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, region string, refresh bool) (op DetailOperation, tasks []TaskRequest) {
 	id := c.session.DetailOpGen.Bump()
 	// Live fetchers (e.g. S3, CloudTrail events) may leave res.Type empty;
 	// the operation is the single identity downstream code (e.g. RunRelatedDef's
@@ -66,11 +73,16 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 	if res.Type == "" {
 		res.Type = resourceType
 	}
+	clients := c.session.Clients.InRegion(region)
+	if clients == c.session.Clients {
+		region = ""
+	}
 	op = DetailOperation{
 		ID:           id,
 		ResourceType: resourceType,
 		Resource:     res,
-		Clients:      c.session.Clients,
+		Region:       region,
+		Clients:      clients,
 		Refresh:      refresh,
 	}
 
@@ -106,9 +118,11 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 
 	// A row the sweep left at its cap is checked on demand — from the live
 	// row set only: a disk-seeded row carries no RawStruct, and a rule that
-	// needs one skips silently, which would read as a clean answer.
+	// needs one skips silently, which would read as a clean answer. The sweep
+	// and its rows are the session Region's, so a resource read elsewhere is
+	// never one of them, whatever its ID.
 	canon := resource.CanonicalShortName(op.ResourceType)
-	if check, ok := c.session.EnrichmentTruncatedIDs[canon][op.Resource.ID]; ok && check == awsclient.CheckCap && c.HasIssueEnricher(op.ResourceType) && c.session.RowStore.Snapshot(canon).Origin != session.OriginDisk {
+	if check, ok := c.session.EnrichmentTruncatedIDs[canon][op.Resource.ID]; ok && op.Region == "" && check == awsclient.CheckCap && c.HasIssueEnricher(op.ResourceType) && c.session.RowStore.Snapshot(canon).Origin != session.OriginDisk {
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindEnrichRow, Scope: scope},
 			Cache:   CacheNone,

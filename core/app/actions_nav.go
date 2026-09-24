@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"strconv"
 	"strings"
 
@@ -556,8 +557,9 @@ func (c *Controller) handleActionFieldSelect(a Action) (ViewState, []runtime.Tas
 		TargetID:       targetID,
 		// A field naming an ARN of another Region names a row the session's
 		// own Region does not hold; the reference, not the resolved ID, is
-		// what carries the Region.
-		Region: resource.RefRegion(field.Value),
+		// what carries the Region. A bare ID names a row of the Region the
+		// detail was read in.
+		Region: cmp.Or(resource.RefRegion(field.Value), c.topRegionLocked()),
 	}
 	tasks := c.dispatchRelatedNavigate(ev)
 	return c.snapshot(), tasks

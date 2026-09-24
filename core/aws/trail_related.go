@@ -8,6 +8,7 @@ import (
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -57,25 +58,19 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 	// session; the group's ARN names the region holding it.
 	groupARN := *trail.CloudWatchLogsLogGroupArn
 	region := arnRegionOf(groupARN, "logs")
-	logList, rc, truncated, err := relatedListIn(ctx, clients, cache, "logs", region)
-	if err != nil {
-		return ReadFailed("logs", err)
-	}
-	if logList == nil {
-		return NotRead("logs")
-	}
-	logGroupName, local := resource.ResolveRef("logs", groupARN, rc)
-	if !local {
-		return relatedResultTrunc("logs", nil, true)
-	}
-
-	var ids []string
-	for _, logRes := range logList {
-		if logRes.ID == logGroupName {
-			ids = append(ids, logRes.ID)
+	return answerIn(clients, "logs", region, readListIn(ctx, clients, cache, "logs", region, func(logList []resource.Resource, rc domain.RefContext, truncated bool) relatedRead {
+		logGroupName, local := resource.ResolveRef("logs", groupARN, rc)
+		if !local {
+			return relatedRead{partial: true}
 		}
-	}
-	return inRegion(clients, region, relatedResultTrunc("logs", ids, truncated))
+		var ids []string
+		for _, logRes := range logList {
+			if logRes.ID == logGroupName {
+				ids = append(ids, logRes.ID)
+			}
+		}
+		return relatedRead{ids: ids, partial: truncated}
+	}))
 }
 
 // checkTrailSNS searches the sns cache for the topic this trail publishes to.
@@ -92,15 +87,10 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 	// topic's ARN names.
 	topicARN := *trail.SnsTopicARN
 	region := arnRegionOf(topicARN, "sns")
-	snsList, rc, truncated, err := relatedListIn(ctx, clients, cache, "sns", region)
-	if err != nil {
-		return ReadFailed("sns", err)
-	}
-	if snsList == nil {
-		return NotRead("sns")
-	}
-	ids, lowerBound := listedRefs("sns", []string{topicARN}, rc, snsList)
-	return inRegion(clients, region, relatedResultTrunc("sns", ids, truncated && lowerBound))
+	return answerIn(clients, "sns", region, readListIn(ctx, clients, cache, "sns", region, func(snsList []resource.Resource, rc domain.RefContext, truncated bool) relatedRead {
+		ids, lowerBound := listedRefs("sns", []string{topicARN}, rc, snsList)
+		return relatedRead{ids: ids, partial: truncated && lowerBound}
+	}))
 }
 
 // checkTrailKMS returns the key in the trail's KmsKeyId (a key ARN or alias).

@@ -298,7 +298,7 @@ func TestHandle_RelatedCheckBatch_StaleOperation_Dropped(t *testing.T) {
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
 	staleOp := core.ActiveDetailOp()
-	core.BeginDetailOperation("ec2", resource.Resource{ID: "i-stale0001"}, true)
+	core.BeginDetailOperation("ec2", resource.Resource{ID: "i-stale0001"}, "", true)
 
 	c.Handle(messages.RelatedCheckBatch{
 		ResourceType:     "ec2",

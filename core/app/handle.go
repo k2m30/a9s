@@ -734,13 +734,13 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 		stub := td.StubCreator(targetID)
 		ls.AutoOpenSingle = false
 		c.applyIntentsLocked([]runtime.UIIntent{runtime.PopScreen{}})
-		return c.openRelatedDetail(stub, targetType)
+		return c.openRelatedDetail(stub, targetType, c.listRegionLocked(ls))
 	}
 	res := *matched
 	ls.AutoOpenSingle = false
 	// Replace the placeholder list with the resource's detail.
 	c.applyIntentsLocked([]runtime.UIIntent{runtime.PopScreen{}})
-	return c.openRelatedDetail(res, targetType)
+	return c.openRelatedDetail(res, targetType, c.listRegionLocked(ls))
 }
 
 // HandleResourcesLoadedEvent is the public adapter seam used by the TUI's
@@ -792,6 +792,7 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 	intents, _ := c.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
 		ResourceType:       result.ResourceType,
 		SourceResourceID:   result.SourceResourceID,
+		Region:             result.Region,
 		DefDisplayName:     result.DefDisplayName,
 		Result:             result.Result,
 		CachedPages:        result.CachedPages,
@@ -800,18 +801,8 @@ func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckRe
 	})
 	c.applyIntentsLocked(intents)
 
-	errMsg := relatedRowErrorText(result.Result)
-	for i := range c.stack {
-		if c.stack[i].ID != runtime.ScreenDetail {
-			continue
-		}
-		ds := c.stack[i].State.Detail
-		if ds == nil || ds.ResourceType != result.ResourceType || ds.Resource.ID != result.SourceResourceID {
-			continue
-		}
-		mergeDetailRelatedRow(ds, result.DefDisplayName, result.Result.TargetType(),
-			result.Result.EffectiveState(), result.Result.Count(), false, errMsg, result.Result.Truncated(), result.Result.ResourceIDs(), result.Result.FetchFilter(), result.Result.Region())
-	}
+	c.applyDetailRelatedResultLocked(result.ResourceType, result.Region, result.SourceResourceID, result.DefDisplayName, result.Result.TargetType(),
+		result.Result.EffectiveState(), result.Result.Count(), false, relatedRowErrorText(result.Result), result.Result.Truncated(), result.Result.ResourceIDs(), result.Result.FetchFilter(), result.Result.Region())
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by

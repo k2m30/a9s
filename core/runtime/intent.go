@@ -65,6 +65,8 @@ func (PatchResourceList) isIntent() {}
 type PatchDetail struct {
 	ResourceType string
 	ResourceID   string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
 	// FieldUpdates carries the columns a Wave-2 answer rewrote, keyed by
 	// Resource.ID: an open detail's own copy of the row shows them the way
 	// the list does. Applied to every detail the patch reaches, whether or
@@ -362,8 +364,10 @@ func (PatchResourceCache) isIntent() {}
 // resolving the source resource ID; the adapter applies by appending to
 // any existing slice under the runtime.RelatedCacheKey.
 type PatchRelatedCache struct {
-	ResourceType   string
-	SourceID       string
+	ResourceType string
+	SourceID     string
+	// Region is the Region the resource was read in, "" for the session's.
+	Region         string
 	DefDisplayName string
 	Result         resource.RelatedCheckResult
 }

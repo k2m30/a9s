@@ -15,6 +15,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
@@ -103,6 +104,44 @@ func actionProvider(a cptypes.ActionDeclaration) string {
 	return *a.ActionTypeId.Provider
 }
 
+// pipelineActionRefs returns what the actions of provider name under key,
+// by the Region each action runs in: ActionDeclaration.Region, "the action
+// declaration's AWS Region, such as us-east-1"
+// (https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_ActionDeclaration.html),
+// with "" for an action that names none and one in the clients' own Region.
+// A name identifies a project, stack, repository, service or function only
+// inside its Region.
+func pipelineActionRefs(clients any, p *cptypes.PipelineDeclaration, provider, key string) map[string][]string {
+	refs := map[string][]string{}
+	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
+		if actionProvider(a) == provider && a.Configuration[key] != "" {
+			region := actionRegion(clients, a)
+			refs[region] = append(refs[region], a.Configuration[key])
+		}
+	})
+	return refs
+}
+
+// actionRegion is the Region action a runs in, "" when that is the clients'
+// own (pipelineActionRefs).
+func actionRegion(clients any, a cptypes.ActionDeclaration) string {
+	region := aws.ToString(a.Region)
+	if c, ok := clients.(*ServiceClients); ok && c != nil && region == c.Region {
+		return ""
+	}
+	return region
+}
+
+// pipelineNamed is the answer of a pipeline pivot whose actions name their
+// targets by the IDs the targets' rows carry.
+func pipelineNamed(clients any, target string, refs map[string][]string) resource.RelatedCheckResult {
+	reads := make(map[string]relatedRead, len(refs))
+	for region, names := range refs {
+		reads[region] = relatedRead{ids: names}
+	}
+	return regionalAnswer(clients, target, reads)
+}
+
 // checkPipelineCB resolves CodeBuild projects referenced by this pipeline's actions.
 // Action Provider=CodeBuild → Configuration["ProjectName"] holds the project name.
 func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -110,16 +149,7 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return pipelineRelatedOnErr("cb", err)
 	}
-	seen := map[string]struct{}{}
-	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if actionProvider(a) != "CodeBuild" {
-			return
-		}
-		if name := a.Configuration["ProjectName"]; name != "" {
-			seen[name] = struct{}{}
-		}
-	})
-	return relatedResultTrunc("cb", mapKeys(seen), false)
+	return pipelineNamed(clients, "cb", pipelineActionRefs(clients, p, "CodeBuild", "ProjectName"))
 }
 
 // checkPipelineRole returns the pipeline's service role (Pipeline.RoleArn) and
@@ -148,16 +178,7 @@ func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _
 	if err != nil {
 		return pipelineRelatedOnErr("cfn", err)
 	}
-	seen := map[string]struct{}{}
-	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if actionProvider(a) != "CloudFormation" {
-			return
-		}
-		if name := a.Configuration["StackName"]; name != "" {
-			seen[name] = struct{}{}
-		}
-	})
-	return relatedResultTrunc("cfn", mapKeys(seen), false)
+	return pipelineNamed(clients, "cfn", pipelineActionRefs(clients, p, "CloudFormation", "StackName"))
 }
 
 // checkPipelineECR resolves ECR repositories referenced as Source action inputs.
@@ -167,16 +188,7 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 	if err != nil {
 		return pipelineRelatedOnErr("ecr", err)
 	}
-	seen := map[string]struct{}{}
-	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if actionProvider(a) != "ECR" {
-			return
-		}
-		if name := a.Configuration["RepositoryName"]; name != "" {
-			seen[name] = struct{}{}
-		}
-	})
-	return relatedResultTrunc("ecr", mapKeys(seen), false)
+	return pipelineNamed(clients, "ecr", pipelineActionRefs(clients, p, "ECR", "RepositoryName"))
 }
 
 // checkPipelineECSSvc resolves ECS services deployed by this pipeline.
@@ -191,20 +203,24 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 	if err != nil {
 		return pipelineRelatedOnErr("ecs-svc", err)
 	}
-	seen := map[string]struct{}{}
-	blueGreen := false
+	refs := map[string][]string{}
+	blueGreen := map[string]bool{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
+		region := actionRegion(clients, a)
 		switch actionProvider(a) {
 		case "CodeDeployToECS":
-			blueGreen = true
+			blueGreen[region] = true
 		case "ECS":
 			if name := a.Configuration["ServiceName"]; name != "" {
-				seen[ecsSvcID(a.Configuration["ClusterName"], name)] = struct{}{}
+				refs[region] = append(refs[region], ecsSvcID(a.Configuration["ClusterName"], name))
 			}
 		}
 	})
-	ids, dropped := resolveRefs("ecs-svc", mapKeys(seen), refContext(clients, cache, "ecs-svc"))
-	return relatedAnswer("ecs-svc", relatedRead{ids: ids, partial: dropped, unread: blueGreen})
+	reads := refReadsIn(clients, cache, "ecs-svc", refs)
+	for region := range blueGreen {
+		reads[region] = joinReads(reads[region], relatedRead{unread: true})
+	}
+	return regionalAnswer(clients, "ecs-svc", reads)
 }
 
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey
@@ -234,16 +250,7 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 	if err != nil {
 		return pipelineRelatedOnErr("lambda", err)
 	}
-	seen := map[string]struct{}{}
-	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		if actionProvider(a) != "Lambda" {
-			return
-		}
-		if name := a.Configuration["FunctionName"]; name != "" {
-			seen[name] = struct{}{}
-		}
-	})
-	return relatedResultTrunc("lambda", mapKeys(seen), false)
+	return pipelineNamed(clients, "lambda", pipelineActionRefs(clients, p, "Lambda", "FunctionName"))
 }
 
 // checkPipelineS3 resolves the S3 artifact bucket(s) for this pipeline.
@@ -282,18 +289,18 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 
 // checkPipelineSNS resolves SNS approval topics configured on Approval actions.
 // Provider=Manual (Category=Approval) → Configuration["NotificationArn"].
-func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
 		return pipelineRelatedOnErr("sns", err)
 	}
-	seen := map[string]struct{}{}
+	var arns []string
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
 		if arn := a.Configuration["NotificationArn"]; arn != "" {
-			seen[arn] = struct{}{}
+			arns = append(arns, arn)
 		}
 	})
-	return relatedResultTrunc("sns", mapKeys(seen), false)
+	return relatedRefsByRegion(clients, cache, "sns", arns)
 }
 
 // mapKeys returns the keys of a map[string]struct{} as a slice (order-independent —

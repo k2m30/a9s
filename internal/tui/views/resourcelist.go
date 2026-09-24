@@ -280,41 +280,45 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				if updated, cmd := m.handleChildKey("enter", &r); cmd != nil {
 					return updated, cmd
 				}
-				rCopy := r
+				rCopy, region := r, m.ctrl.TopRegion()
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetDetail,
 						Resource: &rCopy,
+						Region:   region,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.Describe):
 			if r, ok := m.ctrl.ListSelected(); ok {
-				rCopy := r
+				rCopy, region := r, m.ctrl.TopRegion()
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetDetail,
 						Resource: &rCopy,
+						Region:   region,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.YAML):
 			if r, ok := m.ctrl.ListSelected(); ok {
-				rCopy := r
+				rCopy, region := r, m.ctrl.TopRegion()
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetYAML,
 						Resource: &rCopy,
+						Region:   region,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.JSON):
 			if r, ok := m.ctrl.ListSelected(); ok {
-				rCopy := r
+				rCopy, region := r, m.ctrl.TopRegion()
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetJSON,
 						Resource: &rCopy,
+						Region:   region,
 					}
 				}
 			}
@@ -352,7 +356,8 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				break
 			}
 			if r, ok := m.ctrl.ListSelected(); ok {
-				filter := resource.BuildCloudTrailFilter(r, m.typeDef.ShortName)
+				region := m.ctrl.TopRegion()
+				filter := resource.CloudTrailFilterIn(r, m.typeDef.ShortName, region)
 				if filter != nil {
 					rCopy := r
 					return m, func() tea.Msg {
@@ -361,6 +366,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 							SourceResource: rCopy,
 							SourceType:     m.typeDef.ShortName,
 							FetchFilter:    filter,
+							Region:         region,
 						}
 					}
 				}

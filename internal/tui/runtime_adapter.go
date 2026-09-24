@@ -171,6 +171,7 @@ func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 		return messages.EnrichDetailResult{
 			ResourceType: op.ResourceType,
 			ResourceID:   op.Resource.ID,
+			Region:       op.Region,
 			EnrichedRes:  enriched,
 			Err:          err,
 			OperationID:  op.ID,

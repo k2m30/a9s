@@ -27,6 +27,8 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `cfn`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns`, `ct-events`. There is no `codeartifact` pivot: CodePipeline has no CodeArtifact action provider, so no action names a CodeArtifact repository (`docs/related-resources.md` § Explicitly excluded).
 
+An action runs in its `ActionDeclaration.Region` ("The action declaration's AWS Region, such as us-east-1", [API_ActionDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_ActionDeclaration.html)), the pipeline's own when unset, and the project, stack, repository, service or function it names is the one of that name in that Region. The `cb`, `cfn`, `ecr`, `ecs-svc` and `lambda` rows count there and drill there; a pipeline whose actions of one type run in several Regions counts those of its own Region as a lower bound. The reverse pivots (`cb`, `ecr` → `pipeline`) count only actions that run in the target's Region.
+
 ### `cb`
 
 - **Why related**: CodeBuild projects used as pipeline actions — `docs/related-resources.md` § Per-type contract `pipeline`.

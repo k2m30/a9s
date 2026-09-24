@@ -129,7 +129,27 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    that picks a client: `InRegion(region)` builds and caches one client set
    per region from the session's own config, and the bucket→region map
    feeding `s3For` is the routing table behind it. Both die with the client
-   set, which a reconnect replaces wholesale.
+   set, which a reconnect replaces wholesale. Which Region a read goes to is
+   decided in two places only. A detail operation is begun with the Region
+   its row was listed in (`Core.BeginDetailOperation`, from the Region the
+   screen was pushed with), and its clients, enricher and related checks read
+   there; the session's cached lists are not its lists and nothing it reads
+   enters them. A related read of a value that names a Region (an ARN, a
+   pipeline action's `Region`, a private zone's `VPCRegion`) goes through
+   `core/aws/related_shared.go` (`clientsIn`, `refContextIn`,
+   `regionalAnswer`); no checker calls `InRegion`. A list read in another
+   Region is read once per session through `RegionListStore`, a session
+   store every rotate and refresh replaces. A resource's identity is its
+   type, its Region and its ID: every navigate, fetch, reveal, child view,
+   refresh, console link, related-cache key and result fold carries the
+   Region its resource was read in (`""` for the session's), and a screen
+   reads its own through the controller (`topRegionLocked`, `TopRegion`),
+   never the session's. A CloudTrail lookup runs where the event was
+   recorded: `resource.CloudTrailFilterIn` writes that Region into the
+   filter, the type's `CloudTrailRegion` when it declares one and the Region
+   the resource was read in otherwise. `NeedsTargetCache` prefetches the
+   session's list, so a pivot that counts in a Region it computes does not
+   declare it.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local

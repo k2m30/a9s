@@ -37,7 +37,7 @@ func (m Model) handleValueRevealed(msg messages.ValueRevealed) (tea.Model, tea.C
 // (messages.LoadResources with a parent context, and refreshActiveList).
 func (m Model) handleEnterChildView(msg messages.EnterChildView) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEnterChildView(runtime.EnterChildViewEvent{
-		ChildType: msg.ChildType, ParentContext: msg.ParentContext, DisplayName: msg.DisplayName,
+		ChildType: msg.ChildType, ParentContext: msg.ParentContext, DisplayName: msg.DisplayName, Region: msg.Region,
 	})
 	cmd := m.dispatchCoreScreenResult(intents, tasks)
 	return m, cmd

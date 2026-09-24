@@ -799,7 +799,7 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 		return &runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.KindFetchByIDDetail, Scope: out.Locator.Type},
 			Cache:   runtime.CacheNone,
-			Payload: runtime.FetchByIDDetailPayload{TargetType: out.Locator.Type, ID: out.Locator.ID},
+			Payload: runtime.FetchByIDDetailPayload{TargetType: out.Locator.Type, ID: out.Locator.ID, Region: ""},
 		}
 	case screen.PushDrill:
 		pinned := cloneCostsFilter(cur.Filter)

@@ -172,6 +172,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			Context: runtime.ScreenContext{
 				ResourceType: res.ResolvedType,
 				ResourceID:   res.Resource.ID,
+				Region:       res.Region,
 			},
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
@@ -195,6 +196,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			Context: runtime.ScreenContext{
 				ResourceType: res.ResolvedType,
 				ResourceID:   res.Resource.ID,
+				Region:       res.Region,
 			},
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
@@ -218,6 +220,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			Context: runtime.ScreenContext{
 				ResourceType: res.ResolvedType,
 				ResourceID:   res.Resource.ID,
+				Region:       res.Region,
 			},
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
@@ -294,13 +297,13 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 	if c.topDetailState() == nil {
 		return false
 	}
-	cached, complete := c.relatedCacheCoverage(resourceType, res)
+	cached, complete := c.relatedCacheCoverage(resourceType, c.topRegionLocked(), res)
 	c.mergeRelatedCacheIntoDetail(resourceType, res, cached)
 	return complete
 }
 
 // relatedCacheCoverage fetches the cached related-check results for
-// (resourceType, res.ID) and reports whether they cover EVERY def
+// (resourceType, region, res.ID) and reports whether they cover EVERY def
 // resource.GetRelated(resourceType) registers — an explicit completeness
 // answer, not inferred from "did we merge anything" and not gated on any
 // detail screen being present (see replayRelatedCache's doc comment for why
@@ -313,12 +316,12 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 // ID.
 //
 // Callers must hold c.mu (read or write).
-func (c *Controller) relatedCacheCoverage(resourceType string, res resource.Resource) (cached []runtime.RelatedCacheResult, complete bool) {
+func (c *Controller) relatedCacheCoverage(resourceType, region string, res resource.Resource) (cached []runtime.RelatedCacheResult, complete bool) {
 	defs := resource.GetRelated(resourceType)
 	if len(defs) == 0 {
 		return nil, false
 	}
-	ck := runtime.RelatedCacheKey(resourceType, res.ID)
+	ck := runtime.RelatedCacheKeyIn(resourceType, region, res.ID)
 	cached, hit := c.core.RelatedCacheGet(ck)
 	if !hit || len(cached) == 0 {
 		return cached, false
@@ -495,11 +498,12 @@ func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refre
 //
 // Callers must hold c.mu (write).
 func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource, refresh, forceRelated bool) (runtime.DetailOperation, []runtime.TaskRequest) {
-	key := runtime.RelatedCacheKey(rt, res.ID)
+	region := c.topRegionLocked()
+	key := runtime.RelatedCacheKeyIn(rt, region, res.ID)
 	_, pendingRefresh := c.core.PendingDetailRefreshGet(key)
 	effectiveRefresh := refresh || pendingRefresh
 
-	op, built := c.core.BeginDetailOperation(rt, res, effectiveRefresh)
+	op, built := c.core.BeginDetailOperation(rt, res, region, effectiveRefresh)
 
 	hasEnrich, hasRelated := false, false
 	for _, t := range built {
@@ -523,7 +527,7 @@ func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource,
 	if forceRelated {
 		c.core.RelatedCacheDelete(key)
 	}
-	cached, complete := c.relatedCacheCoverage(rt, res)
+	cached, complete := c.relatedCacheCoverage(rt, region, res)
 	c.mergeRelatedCacheIntoDetail(rt, res, cached)
 	if complete {
 		tasks := make([]runtime.TaskRequest, 0, len(built)-1)
@@ -543,10 +547,13 @@ func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource,
 // ActionOpenDetail). Shared by the cache-hit related-navigate path
 // (NavigationKindDetail) and the web by-ID auto-open path. Caller must hold
 // c.mu (write).
-func (c *Controller) openRelatedDetail(cached resource.Resource, targetType string) []runtime.TaskRequest {
+//
+// region is the Region the resource was read in ("" for the session's),
+// whatever Region the screen it is opened from reads.
+func (c *Controller) openRelatedDetail(cached resource.Resource, targetType, region string) []runtime.TaskRequest {
 	c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenDetail,
-		Context: runtime.ScreenContext{ResourceType: targetType, ResourceID: cached.ID},
+		Context: runtime.ScreenContext{ResourceType: targetType, ResourceID: cached.ID, Region: c.localRegion(region)},
 	}})
 	c.ensureDetailState(cached, targetType)
 	if c.topDetailState() == nil {
@@ -601,7 +608,7 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				return []runtime.TaskRequest{{
 					Key:     runtime.TaskKey{Kind: runtime.KindFetchFiltered, Scope: res.TargetType},
 					Cache:   runtime.CacheNone,
-					Payload: runtime.FetchFilteredPayload{Filter: res.FetchFilter},
+					Payload: runtime.FetchFilteredPayload{Filter: res.FetchFilter, Region: res.Region},
 				}}
 			}
 			if res.TargetID == "" {
@@ -655,13 +662,14 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 			}
 			return nil
 		}
-		return c.openRelatedDetail(cached, res.TargetType)
+		return c.openRelatedDetail(cached, res.TargetType, res.Region)
 
 	case runtime.NavigationKindEnterChildView:
 		// Delegate to the same path used by ActionChildView, with the target
 		// type already resolved.
 		ev := runtime.EnterChildViewEvent{
 			ChildType: res.TargetType,
+			Region:    res.Region,
 		}
 		intents, tasks := c.core.HandleEnterChildView(ev)
 		c.applyIntents(intents)
@@ -671,7 +679,7 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				top.Ctx.ResourceType = res.TargetType
 				if top.State.List == nil {
 					top.State.List = &ListState{Loading: true}
-					c.initListState(top.State.List, top.Ctx.ResourceType)
+					c.initListState(top.State.List, top.Ctx)
 				}
 				if res.FetchFilter != nil {
 					top.State.List.ParentContext = res.FetchFilter

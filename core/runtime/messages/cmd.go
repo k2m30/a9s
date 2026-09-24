@@ -27,6 +27,8 @@ type Navigate struct {
 	ResourceType   string
 	Resource       *resource.Resource
 	ReplaceCurrent bool // when true, pop current view before pushing target (used by auto-open flows)
+	// Region is the Region the resource was read in, "" for the session's.
+	Region string
 }
 
 func (Navigate) isCmd() {}
@@ -92,6 +94,8 @@ type EnterChildView struct {
 	ChildType     string
 	ParentContext map[string]string
 	DisplayName   string
+	// Region is the Region the parent was read in, "" for the session's.
+	Region string
 }
 
 func (EnterChildView) isCmd() {}
@@ -100,6 +104,8 @@ func (EnterChildView) isCmd() {}
 type LoadResources struct {
 	ResourceType  string
 	ParentContext map[string]string
+	// Region is the Region the parent was read in, "" for the session's.
+	Region string
 }
 
 func (LoadResources) isCmd() {}

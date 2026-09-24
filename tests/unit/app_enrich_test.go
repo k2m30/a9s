@@ -687,7 +687,7 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 		},
 	}
 
-	_, tasks := m.Core().BeginDetailOperation("ec2", ec2Res, false)
+	_, tasks := m.Core().BeginDetailOperation("ec2", ec2Res, "", false)
 
 	if enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail); enrichTask != nil {
 		t.Error("BeginDetailOperation should return no KindEnrichDetail task when no enricher is registered for the type")
@@ -709,7 +709,7 @@ func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testi
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
 
-	_, tasks := m.Core().BeginDetailOperation("role_policies", res, false)
+	_, tasks := m.Core().BeginDetailOperation("role_policies", res, "", false)
 	enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail)
 	if enrichTask == nil {
 		t.Fatal("BeginDetailOperation should return a KindEnrichDetail task when an enricher is registered")

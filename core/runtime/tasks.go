@@ -260,6 +260,8 @@ func (EmitAPIErrorPayload) isTaskPayload() {}
 type FetchChildResourcesPayload struct {
 	ChildType     string
 	ParentContext map[string]string
+	// Region is the Region the parent was read in, "" for the session's.
+	Region string
 }
 
 func (FetchChildResourcesPayload) isTaskPayload() {}
