@@ -1,8 +1,6 @@
-// Pins relatedCheckCmd's
-// panic-recovery closure (internal/tui/runtime_adapter_related.go).
-//
-// A related checker that panics is a defect in that pivot. The recover()
-// branch reports it as that pivot's error — Result is the pivot's
+// A related checker that panics is a defect in that pivot. RunRelatedDef
+// (core/runtime/executor.go) recovers it on the TUI lane and reports it as
+// that pivot's error — Result is the pivot's
 // ErrorRelated, which Core.HandleRelatedCheckResult announces as
 // "related <type>: …" — and no by-ID fetch ran, so LazyAddError stays nil.
 package unit
@@ -21,7 +19,7 @@ import (
 )
 
 // TestRelatedCheckCmd_CheckerPanic_IsThatPivotsError registers a related
-// checker that panics, drives it through the real relatedCheckCmd fan-out (by
+// checker that panics, drives it through the TUI's related-check fan-out (by
 // opening the resource's detail view, which begins a DetailOperation and
 // dispatches the related-check task directly), and asserts the recovered
 // result is the pivot's error naming the panic.

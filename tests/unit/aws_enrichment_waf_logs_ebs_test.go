@@ -395,10 +395,6 @@ var _ awsclient.CWLogsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeLogStreamsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeMetricFiltersAPI = (*cwLogsFullFake)(nil)
 
-func TestEnrichLogsMetricFilters_MetricFiltersAPIAssertionFailsReturnsEmpty(t *testing.T) {
-	t.Skip("CWLogsAPI embeds CWLogsDescribeMetricFiltersAPI — assertion always succeeds for valid clients; nil guard already covered")
-}
-
 // TestEnrichLogsMetricFilters_GroupWithoutStreamsHasNoLastEventAt: a log
 // group nothing has written to yet holds no log streams, so DescribeLogStreams
 // answers an empty list and the group has no last event time.

@@ -326,12 +326,33 @@ func taskDefJoined(res resource.Resource) bool {
 	return res.Fields["task_def_join_error"] != "true"
 }
 
-// splitECSTaskJoin parts ecs-task rows into the ones whose definition join
-// answers field without a call — the join wrote it, or failed and left the
-// row unread — and the ones that need their definition read.
+// ecsTaskJoinedLogGroups is ecsTaskLogGroups for a row the list's join
+// answers (ecsTaskAnsweredByJoin).
+func ecsTaskJoinedLogGroups(row resource.Resource) (groups []string, read bool) {
+	field := row.Fields["log_groups"]
+	if !taskDefJoined(row) {
+		return nil, false
+	}
+	whole := row.Fields["log_groups_unread"] != "true"
+	if field == "" {
+		return nil, whole
+	}
+	return strings.Split(field, ","), whole
+}
+
+// ecsTaskAnsweredByJoin reports whether the list's definition join answers
+// field for row without a call: the join wrote it, or failed and left the row
+// unread.
+func ecsTaskAnsweredByJoin(row resource.Resource, field string) bool {
+	_, ok := row.Fields[field]
+	return ok || !taskDefJoined(row)
+}
+
+// splitECSTaskJoin parts ecs-task rows into the ones the join answers for
+// field and the ones that need their definition read.
 func splitECSTaskJoin(rows []resource.Resource, field string) (joined, unjoined []resource.Resource) {
 	for _, r := range rows {
-		if _, ok := r.Fields[field]; ok || !taskDefJoined(r) {
+		if ecsTaskAnsweredByJoin(r, field) {
 			joined = append(joined, r)
 		} else {
 			unjoined = append(unjoined, r)
@@ -347,15 +368,9 @@ func splitECSTaskJoin(rows []resource.Resource, field string) (joined, unjoined 
 // the failure. A group in another Region is left out: its one reader,
 // logs → ecs-task, asks about a group listed in the Region the tasks are.
 func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (groups []string, read bool, err error) {
-	if !taskDefJoined(row) {
-		return nil, false, nil
-	}
-	if joined, ok := row.Fields["log_groups"]; ok {
-		whole := row.Fields["log_groups_unread"] != "true"
-		if joined == "" {
-			return nil, whole, nil
-		}
-		return strings.Split(joined, ","), whole, nil
+	if ecsTaskAnsweredByJoin(row, "log_groups") {
+		groups, read := ecsTaskJoinedLogGroups(row)
+		return groups, read, nil
 	}
 	taskDef, taskARN := row.Fields["task_definition"], row.Fields["arn"]
 	if task, ok := assertStruct[ecstypes.Task](row.RawStruct); ok {

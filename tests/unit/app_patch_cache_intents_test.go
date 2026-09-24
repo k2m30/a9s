@@ -220,21 +220,21 @@ func TestOpenSelectedListDetail_TypeWithDetailEnricher_DispatchesEnrichDetailTas
 }
 
 func TestOpenSelectedListDetail_TypeWithoutDetailEnricher_NoEnrichDetailTask(t *testing.T) {
-	if resource.HasDetailEnricher("s3") {
-		t.Skip("s3 unexpectedly has a registered detail enricher in this test binary — assumption broken")
+	if resource.HasDetailEnricher("ebs") {
+		t.Fatal("ebs has a detail enricher; this test needs a type without one")
 	}
 
 	c := newTestController(t)
 
-	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
-	c.ApplyResourcesLoaded("s3", []resource.Resource{
-		{ID: "bucket-no-enrich", Type: "s3", Name: "bucket-no-enrich"},
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ebs"})
+	c.ApplyResourcesLoaded("ebs", []resource.Resource{
+		{ID: "vol-0123456789abcdef0", Type: "ebs", Name: "vol-no-enrich"},
 	}, nil, false)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if hasTaskKind(tasks, runtime.KindEnrichDetail) {
-		t.Errorf("ActionSelect on s3 (no registered detail enricher): got a KindEnrichDetail task (%v), want none",
+		t.Errorf("ActionSelect on ebs (no registered detail enricher): got a KindEnrichDetail task (%v), want none",
 			taskKindStrings(tasks))
 	}
 }

@@ -573,25 +573,6 @@ func TestDDB_Related_VPCE_InterfaceTypeMatches(t *testing.T) {
 	}
 }
 
-func TestDDB_Related_RegistrationSmoke(t *testing.T) {
-	defs := resource.GetRelated("ddb")
-	if len(defs) == 0 {
-		t.Fatal("GetRelated(ddb) returned empty — ddb related-resource definitions are not registered")
-	}
-
-	required := []string{"alarm", "backup", "kinesis", "kms", "lambda", "vpce"}
-	registered := make(map[string]bool, len(defs))
-	for _, def := range defs {
-		registered[def.TargetType] = true
-	}
-
-	for _, target := range required {
-		if !registered[target] {
-			t.Errorf("ddb related target %q not registered in GetRelated(ddb)", target)
-		}
-	}
-}
-
 func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 

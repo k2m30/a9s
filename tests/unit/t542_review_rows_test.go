@@ -491,13 +491,14 @@ func TestKMSRole_GrantToAnAssumedRoleSessionCountsTheRole(t *testing.T) {
 // ─── row 12: no client set at all reads unknown ────────────────────────────
 
 // Before a connect settles, or after it fails, the session holds no client set
-// while its disk rows are browsable. Every list fetcher reached then answers
-// the one missing-client signal, typed nil or untyped.
+// while its disk rows are browsable; a set built for a partial connect holds
+// some clients and not others. Every list fetcher reached without its client
+// answers the one missing-client signal, typed nil, untyped or empty.
 func TestFetchRelatedTarget_NoClientSetIsClientMissing(t *testing.T) {
 	for _, clients := range []struct {
 		name string
 		c    any
-	}{{"typed nil", (*awsclient.ServiceClients)(nil)}, {"untyped nil", nil}} {
+	}{{"typed nil", (*awsclient.ServiceClients)(nil)}, {"untyped nil", nil}, {"empty", &awsclient.ServiceClients{}}} {
 		for _, td := range resource.AllResourceTypes() {
 			if resource.GetPaginatedFetcher(td.ShortName) == nil {
 				continue

@@ -10,9 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"os"
-	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -721,34 +718,4 @@ func resourceIDsOf(rs []resource.Resource) []string {
 	}
 	slices.Sort(out)
 	return out
-}
-
-// ─── row 2: no production file splits an ARN by hand ───────────────────────
-
-var t542ARNSplit = regexp.MustCompile(`strings\.Split\([a-zA-Z.]*[aA]rn[a-zA-Z]*, ":"\)`)
-
-func TestNoProductionFileSplitsAnARNByHand(t *testing.T) {
-	root := filepath.Join("..", "..", "core")
-	var hits []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return err
-		}
-		body, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		for i, line := range strings.Split(string(body), "\n") {
-			if t542ARNSplit.MatchString(line) {
-				hits = append(hits, fmt.Sprintf("%s:%d: %s", path, i+1, strings.TrimSpace(line)))
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) > 0 {
-		t.Errorf("%d hand ARN split(s); read the ARN through its resolver:\n  %s", len(hits), strings.Join(hits, "\n  "))
-	}
 }

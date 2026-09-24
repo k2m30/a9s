@@ -201,23 +201,31 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 	var reads rowReads
 	// A row the list joined answers from its fields; only the rest cost a
 	// call each.
-	joined, unjoined := splitECSTaskJoin(taskList, "log_groups")
-	unjoined, capped := fanOut(unjoined)
-	truncated = truncated || capped
-	for _, taskRes := range slices.Concat(joined, unjoined) {
-		groups, read, err := ecsTaskLogGroups(ctx, clients, taskRes)
+	tally := func(id string, groups []string, read bool) {
 		switch {
-		case err != nil:
-			reads.fail(taskRes.ID, err)
-			continue
 		case slices.Contains(groups, group):
 			reads.read++
-			ids = append(ids, taskRes.ID)
+			ids = append(ids, id)
 		case !read:
 			reads.missed()
 		default:
 			reads.read++
 		}
+	}
+	joined, unjoined := splitECSTaskJoin(taskList, "log_groups")
+	for _, taskRes := range joined {
+		groups, read := ecsTaskJoinedLogGroups(taskRes)
+		tally(taskRes.ID, groups, read)
+	}
+	unjoined, capped := fanOut(unjoined)
+	truncated = truncated || capped
+	for _, taskRes := range unjoined {
+		groups, read, err := ecsTaskLogGroups(ctx, clients, taskRes)
+		if err != nil {
+			reads.fail(taskRes.ID, err)
+			continue
+		}
+		tally(taskRes.ID, groups, read)
 	}
 	return reads.answer("ecs-task", "logs-related: DescribeTaskDefinition", ids, truncated)
 }

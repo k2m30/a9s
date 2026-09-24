@@ -45,8 +45,8 @@ func New(s *session.Session, types []catalog.ResourceTypeDef) *Core {
 	return &Core{session: s, types: types}
 }
 
-// SetIsDemo sets the demo-mode flag. Demo mode skips Wave-2 enrichment probes
-// that require real AWS credentials against synthetic fakes.
+// SetIsDemo sets the demo-mode flag. A demo session's resources exist in no
+// account, so its console links are not opened.
 func (c *Core) SetIsDemo(v bool) { c.isDemo = v }
 
 // IsDemo reports whether the runtime is operating in demo mode.

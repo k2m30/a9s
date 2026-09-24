@@ -98,7 +98,7 @@ type Model struct {
 	headerCache    string
 	headerCacheKey string
 
-	isDemo bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
+	isDemo bool // true when running in --demo mode (synthetic clients); console links are not opened
 
 	// screens is the renderer-side parallel of runtime.ScreenRegistry: it
 	// resolves runtime.ScreenID -> builder closure for the

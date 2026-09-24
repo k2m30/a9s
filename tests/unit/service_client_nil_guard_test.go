@@ -278,38 +278,82 @@ func TestListReadTargetsHaveFetchers(t *testing.T) {
 	}
 }
 
-// A reverse scan that reads each row of a target list with a call of its own
-// runs on every detail open, so it reads at most relatedFanOutCap rows
-// (docs/related-resources.md rule 7): the list goes through fanOut before the
-// loop that records a per-row read with reads.fail.
+// awsCallers is every core/aws function that makes an AWS call, directly or
+// through another: a method call through an interface (every client in
+// core/aws is one), a ServiceClients field, or the retry and paging wrappers.
+func awsCallers(t *testing.T) map[string]bool {
+	t.Helper()
+	direct := map[string]bool{}
+	callers := map[string][]string{}
+	t570EachFunc(t, func(pkg *packages.Package, _ string, fn *ast.FuncDecl) {
+		info := pkg.TypesInfo
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			switch f := call.Fun.(type) {
+			case *ast.Ident:
+				callers[f.Name] = append(callers[f.Name], fn.Name.Name)
+				if f.Name == "RetryOnThrottle" || f.Name == "PageAll" || f.Name == "firstPage" {
+					direct[fn.Name.Name] = true
+				}
+			case *ast.IndexExpr:
+				if id, isID := f.X.(*ast.Ident); isID {
+					callers[id.Name] = append(callers[id.Name], fn.Name.Name)
+				}
+			case *ast.SelectorExpr:
+				if xt := info.TypeOf(f.X); xt != nil && types.IsInterface(xt) {
+					if named, isNamed := types.Unalias(xt).(*types.Named); isNamed && strings.HasSuffix(named.Obj().Name(), "API") {
+						direct[fn.Name.Name] = true
+					}
+				}
+			}
+			return true
+		})
+	})
+	calls := map[string]bool{}
+	var mark func(string)
+	mark = func(fn string) {
+		if calls[fn] {
+			return
+		}
+		calls[fn] = true
+		for _, c := range callers[fn] {
+			mark(c)
+		}
+	}
+	for fn := range direct {
+		mark(fn)
+	}
+	return calls
+}
+
+// A related read that makes an AWS call per row of a target list runs on
+// every detail open, so the rows it calls for go through fanOut first
+// (docs/related-resources.md rule 7), whether the loop ranges over the list
+// as read or over a part of it.
 func TestPerRowReverseScansAreCapped(t *testing.T) {
-	listReaders := map[string]bool{"relatedResourcesFor": true, "FetchRelatedTarget": true, "relatedRowsByID": true, "relatedListIn": true}
+	calls := awsCallers(t)
 	var found []string
 	t570EachFunc(t, func(pkg *packages.Package, path string, fn *ast.FuncDecl) {
-		lists := map[string]bool{}
-		capped := map[string]bool{}
+		base := filepath.Base(path)
+		if !strings.Contains(base, "related") {
+			return
+		}
+		info := pkg.TypesInfo
+		capped := map[types.Object]bool{}
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
 			as, ok := n.(*ast.AssignStmt)
 			if !ok || len(as.Rhs) != 1 {
 				return true
 			}
-			call, ok := as.Rhs[0].(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			id, ok := call.Fun.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			lhs, ok := as.Lhs[0].(*ast.Ident)
-			if !ok {
-				return true
-			}
-			switch {
-			case listReaders[id.Name]:
-				lists[lhs.Name] = true
-			case id.Name == "fanOut":
-				capped[lhs.Name] = true
+			if call, isCall := as.Rhs[0].(*ast.CallExpr); isCall {
+				if id, isID := call.Fun.(*ast.Ident); isID && id.Name == "fanOut" {
+					if lhs, isLHS := as.Lhs[0].(*ast.Ident); isLHS {
+						capped[info.ObjectOf(lhs)] = true
+					}
+				}
 			}
 			return true
 		})
@@ -318,28 +362,42 @@ func TestPerRowReverseScansAreCapped(t *testing.T) {
 			if !ok {
 				return true
 			}
-			x, ok := rng.X.(*ast.Ident)
-			if !ok || !lists[x.Name] || capped[x.Name] {
+			slice, isSlice := types.Unalias(info.TypeOf(rng.X)).(*types.Slice)
+			if !isSlice {
 				return true
 			}
-			perRow := false
+			elem, isNamed := types.Unalias(slice.Elem()).(*types.Named)
+			if !isNamed || elem.Obj().Name() != "Resource" {
+				return true
+			}
+			if x, isID := rng.X.(*ast.Ident); isID && capped[info.ObjectOf(x)] {
+				return true
+			}
+			callsAWS := false
 			ast.Inspect(rng.Body, func(m ast.Node) bool {
-				if call, ok := m.(*ast.CallExpr); ok {
-					if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "fail" && types.ExprString(sel.X) == "reads" {
-						perRow = true
+				if call, isCall := m.(*ast.CallExpr); isCall {
+					switch f := call.Fun.(type) {
+					case *ast.Ident:
+						callsAWS = callsAWS || calls[f.Name]
+					case *ast.SelectorExpr:
+						if xt := info.TypeOf(f.X); xt != nil && types.IsInterface(xt) {
+							if named, ok := types.Unalias(xt).(*types.Named); ok && strings.HasSuffix(named.Obj().Name(), "API") {
+								callsAWS = true
+							}
+						}
 					}
 				}
-				return !perRow
+				return !callsAWS
 			})
-			if perRow {
-				found = append(found, filepath.Base(path)+":"+strconv.Itoa(pkg.Fset.Position(rng.Pos()).Line)+" "+fn.Name.Name+" ranges over "+x.Name)
+			if callsAWS {
+				found = append(found, base+":"+strconv.Itoa(pkg.Fset.Position(rng.Pos()).Line)+" "+fn.Name.Name+" ranges over "+types.ExprString(rng.X))
 			}
 			return true
 		})
 	})
 	sort.Strings(found)
 	for _, f := range found {
-		t.Errorf("%s with a call per row and no fanOut cap", f)
+		t.Errorf("%s with an AWS call per row and no fanOut cap", f)
 	}
 }
 

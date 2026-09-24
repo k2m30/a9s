@@ -7,260 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.59.0] - 2026-09-24
+
+### Changed
+
+- An Elastic IP no longer has a CloudWatch Alarms row: no CloudWatch metric
+  is keyed by an address or its network interface, and an alarm on the
+  instance behind the address is on the instance's own row.
+- A DynamoDB table no longer has a Log Groups row: DynamoDB writes no log
+  group.
+- A security group's related row "Referenced SGs" lists the groups this
+  group's own rules name. The secrets → CodeArtifact row is labelled
+  "CodeArtifact Repositories".
+- Related lookups that must make one AWS call per row of another resource
+  type make at most 50 calls and show the count as a lower bound (`N+`) past
+  that. Opening a Lambda function no longer makes a call for every API
+  Gateway API in the account. A secret's or log group's ECS tasks are read
+  from the task list with no call per task, and an ECR repository reads only
+  the Lambda functions packaged as container images.
+
 ### Fixed
 
-- A related panel opened in a session missing a service's client answers
-  `?` for the rows that client would read, instead of an error saying the
-  checker panicked. This covers the Auto Scaling group, Elastic Beanstalk,
-  IAM group, user, role and policy panels and a secret's Elastic Beanstalk
-  row. A read that was never sent is `?` on every path, never an error.
-- Reverse lookups that make one call per row of another type make at most
-  50 calls and show the count as a lower bound past that. Opening one Lambda
-  function no longer makes a call for every API Gateway API in the account.
-  The same bound applies to the ECR, CodeBuild, Kinesis, CloudWatch Logs,
-  Secrets Manager and ECS service lookups that read that way. Only rows that
-  need a call count: a secret's or log group's ECS tasks are read from the
-  task list, with no call per task, and an ECR repository reads only the
-  container-image Lambda functions.
-- An AMI's Auto Scaling groups row is a lower bound when the instance list
-  could not be read, instead of counting only the groups whose launch
-  sources name the image.
-- A VPC endpoint's log groups include the flow logs on the endpoint's own
-  network interfaces.
-- An ECS service's EventBridge rules keep what the rule scan found when the
-  target lookup could not be read.
-
-- Paged AWS reads follow every page. The policy list reaches every IAM group
-  and every inline policy past the first `ListGroups`/`ListGroupPolicies`
-  page, and says it is a lower bound when the walk stops at its cap. Kinesis
-  → CloudFormation finds the stack tag on a later tag page, and a Route 53
-  zone's record scan reads every record page, so an S3 bucket's Route 53 row
-  no longer reads as a confident zero when the scan failed or stopped
-  short. Enrichers that read one page on purpose (the newest activity, build,
-  run or execution) are the only single-page reads left, and a throttled
-  page of an account-wide walk is retried rather than ending the walk.
-  Opening EC2 instances, AMIs, EBS snapshots or network interfaces by ID
-  sends at most 1,000 IDs per call, and an AMI deregistered since it was
-  referenced no longer fails the whole drill.
-- ECR vulnerability counts are the newest image's, found by push time over
-  every `DescribeImages` page rather than taken from ten images in no set
-  order, and counted from the scan's findings on every page. A repository
-  too large to read in full is marked not inspected.
-- A page read that fails part-way keeps what it found. A related row whose
-  second page fails shows the matches from the first as a lower bound
-  instead of an error. API Gateway, WAF web ACL and DB cluster lists keep the
-  rows the other source returned when one source fails, and resume the
-  failed one on load more. A background refresh no longer shrinks a list
-  back to its first page when a page reports a failure on one of its own
-  rows. A VPC whose subnets could not be listed is marked not inspected for
-  flow logs rather than reported as having none, and Route 53's dangling
-  record check reads each record page once.
-- A detail opened on a row listed in another Region reads that Region: a
-  certificate opened through a CloudFront distribution's ACM row from a
-  session outside us-east-1 reads its details, related rows and CloudTrail
-  events in us-east-1, and a list read there is read once per session and
-  never joins the session's own list. A CodePipeline action names its
-  CodeBuild project, stack, repository, ECS service or Lambda function in the
-  action's Region, not a same-named one in the session's; a private hosted
-  zone's VPCs resolve in their own Regions; a CloudFront distribution's
-  Lambda@Edge functions resolve in us-east-1.
-
-- Everything opened from a resource read in another Region stays in that
-  Region: its YAML and JSON views, a revealed secret value, its child views,
-  a refresh of the list, a navigable field holding a bare ID, the console
-  link, and its CloudTrail events (`t` and the CloudTrail Events row) all
-  read where the resource lives. A Lambda function or DynamoDB table opened
-  in two Regions under the same name keeps its own related rows and findings.
-  CloudFront's load-balancer origins, an ECS task's `awslogs-region` log
-  groups, a pipeline's KMS keys and SNS approval topics, and CloudTrail's log
-  group and topic count in the Region AWS puts them in, and a row that could
-  not read one of those Regions is a lower bound or unknown rather than an
-  exact count. A bucket whose location constraint is the legacy `EU` is read
-  in eu-west-1.
-
-- Related rows count every place AWS records the link. A Lambda function's
-  dead-letter queue or topic counts on both ends, and so does an EventBridge
-  target's dead-letter queue; a log group counts the functions that log to it
-  through `LoggingConfig`, the buckets its export tasks wrote to and its
-  subscription consumers; an Athena workgroup counts all three of its keys; a
-  CodeBuild project its secondary sources and S3 build-log bucket; an ECS
-  service its task and execution roles; a Glue job its continuous-logging
-  group and its connections' secrets; a Beanstalk environment its operations
-  role and only the bucket of the version it runs; an EKS Auto Mode cluster
-  its node role; a state machine the log group its logging configuration
-  names; a Kinesis stream the functions reading it through an enhanced
-  fan-out consumer; an instance the target groups whose target health lists
-  it and its AMI's snapshots; an AMI the keys of its snapshots; a security
-  group the groups its own rules reference; a REST API its Lambda, KMS, role
-  and load-balancer rows from its method integrations and authorizers; a
-  CloudTrail event the role it ran under and the ECR repository it names.
-  Backup plans that select by tag count on DynamoDB tables, buckets and RDS
-  and DocumentDB snapshots, and an EBS volume counts the plans covering the
-  instance it is attached to.
-- ECS task-definition secret references (`secrets` and log-driver
-  `secretOptions` by ARN, registry credentials by ARN or name) and Auto Scaling
-  launch sources (launch template, launch configuration, mixed-instances
-  policy and its overrides) are each read by one function, so every pivot
-  over them agrees.
-- A deleted, failed or rejected Transit Gateway attachment, a disabled SES
-  receipt rule or event destination, a disabled DynamoDB streaming
-  destination and a disabled OpenSearch log-publishing option are no longer
-  counted.
-- The ENI detail shows every private address the interface holds, and an
-  Elastic IP on a secondary address links to its address row.
-- A DynamoDB table no longer has a Log Groups row: DynamoDB writes no log
-  group. The secrets → CodeArtifact row is labelled "CodeArtifact
-  Repositories", and the security-group row "Referenced SGs".
-- Who an IAM policy is attached to is read again on every open, so a profile
-  switch or a cancelled read never shows another account's or a stale answer;
-  a web refresh of the SES list re-reads the active receipt rule set, as the
-  terminal's does.
-
+- Related counts say what was read. A count is exact only when every place
+  the link lives was read in full; a place that was read in part, or could
+  not be read beside rows found elsewhere, makes it a lower bound; nothing
+  read makes it unknown; `(0)` means everything was read and held nothing.
+  Rows that used to read `(0)` where nothing was read — an MSK serverless
+  cluster's networking, a node group's launch-template security groups, an
+  S3 bucket on the default `aws/s3` key, a resource without the ARN or tag a
+  lookup needs — now count or read unknown. A list restored from disk is read
+  again before a related row counts over it, so rows such as Secrets Manager
+  → Elastic Beanstalk no longer read `(0)` after a restart.
+- A related row counts every place AWS records the link: a Lambda function's
+  dead-letter queue or topic and its `LoggingConfig` log group, a log group's
+  export buckets and subscription consumers, an Athena workgroup's three
+  keys, a CodeBuild project's secondary sources and build-log bucket, an ECS
+  service's task and execution roles, a Glue job's continuous-logging group
+  and connection secrets, an EKS Auto Mode cluster's node role, a state
+  machine's logging group, a Kinesis stream's enhanced fan-out readers, an
+  instance's target groups and its AMI's snapshots, a REST API's Lambda,
+  KMS, role and load-balancer rows, and the role a CloudTrail event ran
+  under. Backup plans that select by tag count on the tables, buckets and
+  snapshots they cover.
+- A related row reads the field AWS records the link in rather than guessing
+  from names: an API's load balancers from its private integration, an ECS
+  cluster's Auto Scaling groups from its capacity providers and its instances
+  from its container instances, a log group's ECS tasks from their
+  `awslogs-group` option, EC2 ↔ IAM Role through the instance profile's
+  roles, a web ACL's alarms by its metric name.
+- Names match on their whole name or boundary: a state machine running
+  task-definition family `api-worker` is no longer counted on the `api`
+  service, a queue's subscriptions match on its ARN rather than a name
+  another Region's queue shares, and log groups, stacks and Beanstalk
+  references match on whole names.
 - EventBridge rules are counted on an ECR repository, S3 bucket or ECS
   service when their event pattern can match an event about it, read the way
-  EventBridge reads a pattern: every content filter it documents (`prefix`,
-  `suffix`, `anything-but`, `equals-ignore-case`, `exists`, `numeric`,
-  `cidr`, `wildcard`, empty, null and `$or`). A rule matching on the source
-  alone, or with a filter EventBridge does not document, makes the count a
-  lower bound instead of a match. A scheduled rule that runs an ECS service's
-  task-definition family on its cluster counts on that service.
-- Names join on their boundary: a state machine running task-definition
-  family `api-worker` is no longer counted on the `api` service; an SES
-  identity counts the receipt rules whose recipient conditions match it the
-  way SES does and the one public hosted zone its domain lives in; a queue's
-  subscriptions and dead-letter sources are matched on its ARN, not on a name
-  another Region's queue shares; log groups, CloudFormation stacks, secrets'
-  CodeArtifact repositories and Beanstalk references match on a whole name.
-- Related rows read the field AWS records the link in: an API's load
-  balancers from its private integration's listener, a Lambda function's APIs
-  from their integrations, an ECS cluster's Auto Scaling groups from its
-  capacity providers and its instances from its container instances, a Lambda
-  function's network interfaces by the subnet and security groups the
-  Hyperplane interface is shared by, a log group's ECS tasks from their
-  `awslogs-group` option, a web ACL's alarms by its metric name, an ECS task's
-  alarms including the `AWS/ECS` service metrics, an IAM user's CloudTrail
-  events without the role sessions named like the user, and a CodeArtifact
-  repository's events including its package requests. An Elastic IP no longer
-  has a CloudWatch Alarms row: no CloudWatch metric is keyed by an address or
-  its network interface, and an alarm on the instance behind the address is on
-  the instance's own row.
-- A related row's count says what was read. A row whose details could not be
-  read makes a count a lower bound only for a pivot that matches on those
-  details: a demo alarm reads `EKS Clusters (0)`, and a node group's cluster
-  and an Auto Scaling group's node group read `(1)`, never `(1+)`. A list
-  restored from disk is read again before a pivot counts over it, so Secrets
-  Manager → Elastic Beanstalk, ECS service and ECR → EventBridge rules, and
-  Secrets Manager → ECS tasks no longer read `(0)` after a restart. The
-  alarm row of a restored EC2 instance, ECS service or task, load balancer,
-  target group, SNS topic, state machine, CloudFront distribution or web ACL
-  reads unknown until its details load.
-- Related rows no longer read `(0)` where nothing was read: an MSK serverless
-  cluster counts the security groups, subnets and VPCs of its VPC
-  configurations; a node group counts the security groups its launch template
-  names, and its AMI row reads unknown on the EKS-optimised image; an S3
-  bucket on SSE-KMS with no key named counts the `aws/s3` key; an AMI without
-  a CloudFormation stack tag, a pipeline or state machine without an ARN, and
-  a Lambda function or EC2 instance with no candidate API or log group read
-  unknown; every ECS task of a task definition that could not be read reads
-  unknown for its roles, secrets and parameters, not only the first.
-- A list stored with rows missing — a node-group page that lost a cluster's
-  groups to a refused call — reads as a lower bound from the cache, as it
-  does when fetched live, whether the list view, the availability probe or
-  the demo prefetch stored it, and it stays one when the list view writes
-  its rows back on a filter change. Rows added one at a time for a detail,
-  or restored from disk, are no longer read as the type's list by any pivot:
-  a node group's or launch template's EC2, Auto Scaling and node-group rows,
-  an EBS snapshot's instance, a Kinesis stream's tables and a peering
-  connection's route tables and VPCs read unknown until the list loads, and
-  an issue scan that needs such a list fetches its first page. A full first
-  page read after them is no longer marked a lower bound for the rest of the
-  session.
-- A reverse scan whose every per-row read was refused (Kinesis → DynamoDB,
-  ECS service → Step Functions, Secrets Manager → Elastic Beanstalk and ECS
-  tasks, Backup → SNS, Lambda → EventBridge rules, CodeBuild and ECR →
-  CodePipeline, ECR → Lambda) reads unknown on every pivot, and the refusal
-  is flashed. An EventBridge rule pivot keeps the rules found on the buses
-  that answered as a lower bound when another bus refuses. Elastic Beanstalk
-  → Target Groups counts the groups its load balancers forward to through
-  listener rules too. ACM → Route 53 reports a refused zone list as an error.
-- MSK → Secrets asks `ListScramSecrets` only for a cluster with SASL/SCRAM
-  enabled, and reads unknown when the call is refused.
-- A log group restored from disk counts its KMS key from its fields; a target
-  group's load balancers count exactly over a partial load balancer list; an
-  AMI's node groups are a lower bound while a node group's launch template
-  could not be read.
-- A CloudTrail event's TARGET rows open the row they name: an IAM user filed
-  under a path opens the user, a secret named by ARN (with its random suffix)
-  or by name opens the secret, an S3 object opens its bucket, and a Lambda
-  function, VPC, security group or subnet opens its own row. An ARN's resource
-  type sets the label, so a security group or VPC is no longer labelled
-  Instance.
-- Related-panel counts no longer include values the target list can never
-  hold: a launch template's `resolve:ssm:` image, an API Gateway
-  stage-variable placeholder, an API Gateway custom domain ID, an Elastic
-  Beanstalk environment's Classic Load Balancer, and a Step Functions
-  `FunctionName` alias, partial ARN or JSONata expression. API Gateway and
-  Step Functions count only the Lambda functions the list holds, and read
-  unknown when that list cannot be read.
-- A KMS key field holding a customer alias (Secrets Manager, CloudTrail
-  trail, MSK, SSM parameter) opens the key the alias names even before the
-  KMS list has loaded, the same key the related panel counts. An AWS-managed
-  alias (`alias/aws/…`) is a link only once a loaded KMS list holds its key.
-- A detail field that names another resource by ARN opens that resource's row
-  for every resource type, and a value no row of its type can hold is no
-  longer shown as a link.
-- ECS task → SSM Parameters counts a parameter named without a leading slash
-  (`db_password`), by name or by ARN.
-- A KMS key's CloudTrail Events row finds the events that name the key by ARN.
-  An SNS subscription with no ARN yet shows no CloudTrail Events row.
-- A blackholed route's NAT gateway, network interface, transit gateway,
-  internet gateway or peering target is no longer a link in the route table's
-  detail.
-- Opening a network interface by ID reaches one past the list's first page,
-  and opening EBS snapshots by ID shows the ones that exist and reports the
-  missing one instead of failing all of them.
+  EventBridge reads a pattern, every documented content filter included. A
+  rule matching on the source alone, or with a filter EventBridge does not
+  document, makes the count a lower bound. A scheduled rule running an ECS
+  service's task family on its cluster counts on that service.
+- Rows that no longer carry the link are no longer counted: a pending SNS
+  subscription, a terminated instance or one leaving its Auto Scaling group,
+  a failed NAT gateway, a failed or cancelled log export, a deregistered ECS
+  container instance, a deleted or failed Transit Gateway attachment, and
+  disabled SES rules, DynamoDB streaming destinations and OpenSearch log
+  publishing. A load balancer's access-log bucket and the log groups of
+  logging options that are off no longer count.
+- Values no row can hold are no longer counted or shown as links: a
+  launch template's `resolve:ssm:` image, an API Gateway stage variable, a
+  Step Functions alias or expression, an S3 access point or an SSM managed
+  node ID. A detail field naming another resource by ARN opens that row for
+  every resource type, and a KMS alias opens the key it names.
+- A detail opened on a row listed in another Region reads that Region, and
+  so does everything opened from it: its YAML and JSON views, a revealed
+  secret, child views, a list refresh, navigable fields, the console link and
+  its CloudTrail events. A certificate opened from a CloudFront distribution
+  reads us-east-1; a CodePipeline action's resources, a private zone's VPCs,
+  Lambda@Edge functions, an ECS task's `awslogs-region` log groups and a
+  multi-Region trail's topic and key resolve in the Region AWS puts them in.
+  Two resources with the same name in two Regions keep their own related rows
+  and findings. A bucket in the legacy `EU` location is read in eu-west-1.
 - A CloudTrail event's related panel counts only this account's resources in
-  this Region, the ones its TARGET rows open, and finds a KMS key named by any
-  of its aliases. A TARGET row naming a resource in another Region shows the
-  whole ARN and opens it there. The Principal row of another account's caller
-  is not a link, even before the session's identity has loaded.
-- An S3 bucket's KMS key is read in the bucket's Region, and a multi-Region
-  trail's SNS topic and KMS key in the trail's home Region.
-- EC2 → IAM Role and IAM Role → EC2 read the roles an instance profile holds
-  from IAM instead of matching a profile's name to a role's.
-- An S3 access point, Batch Operations job or Storage Lens ARN, and an SSM
-  managed node (`mi-…`), are no longer links to a bucket or an instance. A
-  Secrets Manager ARN whose name may end in the random suffix is matched
-  against the secrets list instead of having the suffix guessed, and codebuild,
-  ECS service, Glue and MSK → Secrets read unknown when that list cannot be
-  read.
-- KMS → IAM Roles counts a role granted through an assumed-role session.
-- Before the session connects, or after a failed connect, every related row
-  reads unknown with no error flash naming a call that was never made.
-- A related check that fails unexpectedly shows as that row's error, not as a
-  failed by-ID fetch.
-- Related rows count only what carries the link. An SNS subscription pending
-  confirmation, a terminated or shutting-down instance, an instance leaving
-  its Auto Scaling group, a failed NAT gateway or an address leaving one, a
-  failed or cancelled log export, and a deregistered ECS container instance
-  no longer count. A load balancer's access-log bucket, an ElastiCache
-  notification topic, an MWAA module's log group, a CodeBuild project's log
-  group and an ECS cluster's exec log group count only while that logging is
-  on.
-- ACM → API Gateway lists the APIs a certificate's custom domain maps to,
-  including an edge-optimized domain's base path mappings and a domain's
-  routing rules, and
-  an Auto Scaling group's AMI row includes the images its instance-type
-  overrides set.
-- ECS task and service log groups include the CloudWatch group a FireLens
-  container names, and a FireLens config file makes the count a lower bound.
-  An ECS task's SSM parameters are matched against the loaded parameter list,
-  so a parameter in another Region is not a local one of the same name.
-- A related row whose link lives in two places keeps what the first place
-  found, and the error, when the second cannot be read. A related row whose
-  target list fails to load shows that error instead of reading unknown.
-- Refreshing an IAM policy, role, user or group reads the attached policies
-  again instead of drilling into the ones cached earlier.
+  this Region, and each TARGET row opens the row it names; one in another
+  Region shows the whole ARN and opens it there.
+- Paged AWS reads follow every page. IAM groups and inline policies past the
+  first page are listed; Kinesis finds a stack tag on a later tag page;
+  Route 53 reads every record page. A read that fails part-way keeps what it
+  found as a lower bound instead of an error, and a throttled page is retried
+  instead of ending the walk. API Gateway, WAF web ACL and DB cluster lists
+  keep the rows one source returned when the other fails and resume the
+  failed one on load more; a denied DocumentDB still lets the DB cluster list
+  walk every Aurora page. A background refresh no longer shrinks a list back
+  to its first page when a page reports a failure on one of its own rows.
+- Opening EC2 instances, AMIs, EBS snapshots or network interfaces by ID sends
+  at most 1,000 IDs per call, and one deregistered AMI or deleted snapshot no
+  longer fails the whole drill.
+- ECR vulnerability counts are the newest image's, found by push time over
+  every image page, and counted from the scan's findings on every page. A
+  repository too large to read in full is marked not inspected.
+- A VPC whose subnets could not be listed is marked not inspected for flow
+  logs instead of reported as having none. A VPC endpoint's log groups
+  include the flow logs on the endpoint's own network interfaces.
+- A related row is `?` when the session has no client for the service it
+  reads, never an error; the Auto Scaling group, Elastic Beanstalk, IAM and
+  secrets panels used to show an error saying the check panicked. Before the
+  session connects, every related row reads unknown with no error flash.
+- The ENI detail shows every private address the interface holds, and an
+  Elastic IP on a secondary address links to its address row.
+- Refreshing an IAM policy, role, user or group reads its attachments again,
+  and a profile switch never shows another account's answer.
 
 ## [3.58.1] - 2026-09-23
 

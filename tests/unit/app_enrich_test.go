@@ -664,36 +664,6 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 	}
 }
 
-func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
-	app := newBlessedModel(t, "demo", "us-east-1",
-		tui.WithClients(demo.NewServiceClients()),
-		tui.WithIsDemo(true),
-		tui.WithNoCache(true),
-		tui.WithProfileForTest(demo.DemoProfile),
-		tui.WithRegionForTest(demo.DemoRegion))
-	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
-
-	// The test needs a type with no detail enricher.
-	if resource.HasDetailEnricher("ec2") {
-		t.Skip("ec2 now has a detail enricher — update this test to use a type without one")
-	}
-
-	ec2Res := resource.Resource{
-		ID:   "i-1234567890abcdef0",
-		Name: "test-instance",
-		Fields: map[string]string{
-			"instance_id": "i-1234567890abcdef0",
-			"state":       "running",
-		},
-	}
-
-	_, tasks := m.Core().BeginDetailOperation("ec2", ec2Res, "", false)
-
-	if enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail); enrichTask != nil {
-		t.Error("BeginDetailOperation should return no KindEnrichDetail task when no enricher is registered for the type")
-	}
-}
-
 func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testing.T) {
 	if !resource.HasDetailEnricher("role_policies") {
 		t.Fatal("expected role_policies detail enricher to be registered")

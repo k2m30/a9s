@@ -14,11 +14,11 @@ import (
 // runtime is the single decision-maker for the dispatch gate, so the
 // adapter does not need to re-check enricher existence.
 func TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
-	if resource.HasDetailEnricher("ec2") {
-		t.Skip("ec2 now has a detail enricher — pick a different no-enricher type")
+	if resource.HasDetailEnricher("ebs") {
+		t.Fatal("ebs has a detail enricher; this test needs a type without one")
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	_, tasks := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, "", false)
+	_, tasks := core.BeginDetailOperation("ebs", resource.Resource{ID: "vol-0123456789abcdef0", Name: "no-enricher"}, "", false)
 	if enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail); enrichTask != nil {
 		t.Errorf("expected no KindEnrichDetail task, got %+v", enrichTask)
 	}
