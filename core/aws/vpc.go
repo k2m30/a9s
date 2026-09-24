@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,8 +22,10 @@ import (
 //
 // One DescribeSubnets for the page, not one per VPC. Reached by type assertion
 // so a client with only DescribeVpcs still lists VPCs, with no subnet ids
-// stamped. A failure is silent for the same reason: the subnet list is context
-// for another check, not a fact this page promises.
+// stamped. A read that failed or stopped at its page cap does not fail the
+// page, since the subnet list is context for another check, not a fact this
+// page promises; it sets subnet_ids_unread on every row instead, because an
+// empty subnet_ids there says nothing about the VPC's subnets.
 func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []resource.Resource) {
 	subnetAPI, ok := api.(EC2DescribeSubnetsAPI)
 	if !ok || len(resources) == 0 {
@@ -32,7 +35,7 @@ func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []
 	for _, r := range resources {
 		vpcIDs = append(vpcIDs, r.ID)
 	}
-	subnets, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
+	subnets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
 		out, err := subnetAPI.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 			Filters:   []ec2types.Filter{{Name: aws.String("vpc-id"), Values: vpcIDs}},
 			NextToken: token,
@@ -42,7 +45,11 @@ func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []
 		}
 		return out.Subnets, out.NextToken, nil
 	})
-	if err != nil {
+	unread := err != nil || !complete
+	for i := range resources {
+		resources[i].Fields["subnet_ids_unread"] = strconv.FormatBool(unread)
+	}
+	if unread {
 		return
 	}
 	byVPC := map[string][]string{}

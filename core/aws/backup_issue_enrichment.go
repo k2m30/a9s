@@ -43,7 +43,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 	// history scan far more pages than needed and hit EnrichmentCap early,
 	// reporting a cut walk even when zero issues exist in the window.
 	cutoff := time.Now().Add(-24 * time.Hour)
-	allJobs, pages, cut, walkErr := walkAccountPages(&result, resources, manyItemsPerRow,
+	allJobs, pages, cut, walkErr := walkAccountPages(ctx, &result, resources, manyItemsPerRow,
 		func(job backuptypes.BackupJob) string {
 			if job.CreatedBy == nil {
 				return ""
@@ -51,11 +51,9 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			return aws.ToString(job.CreatedBy.BackupPlanId)
 		},
 		func(token *string) ([]backuptypes.BackupJob, *string, error) {
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupJobsOutput, error) {
-				return clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{
-					ByCreatedAfter: &cutoff,
-					NextToken:      token,
-				})
+			out, err := clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{
+				ByCreatedAfter: &cutoff,
+				NextToken:      token,
 			})
 			if err != nil {
 				return nil, nil, err

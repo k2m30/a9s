@@ -399,7 +399,7 @@ type ecrRepository struct {
 	// ImagesErrorCode is set when DescribeImages itself failed.
 	ImagesErrorCode string     `json:"images_error_code,omitempty"`
 	Images          []ecrImage `json:"images"`
-	// The totals are absent when any image's scan results could not be read:
+	// The totals are absent when the newest image's scan results could not be read:
 	// a sum over the readable images is neither the total nor a proven zero.
 	CriticalTotal *int32 `json:"critical_total,omitempty"`
 	HighTotal     *int32 `json:"high_total,omitempty"`
@@ -414,10 +414,6 @@ type ecrImage struct {
 	FindingSeverityCounts map[string]int32 `json:"finding_severity_counts,omitempty"`
 	ScanErrorCode         string           `json:"scan_error_code,omitempty"`
 }
-
-// ecrImagesPerRepo is the app's ECRImagesPerRepo: the repository pass reads
-// one DescribeImages page of this many images and no further.
-const ecrImagesPerRepo = 10
 
 // captureECR lists every repository (DescribeRepositories, all pages) and
 // captures the Wave 1 scanOnPush flag plus the scan evidence the Wave 2
@@ -449,48 +445,88 @@ func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 	return ecrData{Repositories: repositories}, nil
 }
 
+// captureECRImages records the image the app inspects: the newest by
+// imagePushedAt over every DescribeImages page, and its severity counts
+// tallied from findings and enhancedFindings over every
+// DescribeImageScanFindings page.
 func captureECRImages(ctx context.Context, client *ecr.Client, repo *ecrRepository) {
-	out, err := client.DescribeImages(ctx, &ecr.DescribeImagesInput{
-		RepositoryName: aws.String(repo.RepositoryName),
-		MaxResults:     aws.Int32(ecrImagesPerRepo),
-	})
-	if err != nil {
-		repo.ImagesErrorCode = apiErrorCode(err)
-		return
-	}
-	var critical, high int32
-	complete := true
-	for _, detail := range out.ImageDetails {
-		img := ecrImage{
-			ImageDigest:   aws.ToString(detail.ImageDigest),
-			ImagePushedAt: snapFormatTime(detail.ImagePushedAt),
+	var latest *ecrtypes.ImageDetail
+	images := ecr.NewDescribeImagesPaginator(client, &ecr.DescribeImagesInput{RepositoryName: aws.String(repo.RepositoryName)})
+	for images.HasMorePages() {
+		out, err := images.NextPage(ctx)
+		if err != nil {
+			repo.ImagesErrorCode = apiErrorCode(err)
+			return
 		}
-		if detail.ImageScanFindingsSummary != nil {
-			img.FindingSeverityCounts = detail.ImageScanFindingsSummary.FindingSeverityCounts
-		} else {
-			// Basic Scanning leaves DescribeImages without a scan summary;
-			// the counts are only in DescribeImageScanFindings.
-			scan, err := client.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
-				RepositoryName: aws.String(repo.RepositoryName),
-				ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: detail.ImageDigest},
-			})
-			var notScanned *ecrtypes.ScanNotFoundException
-			switch {
-			case errors.As(err, &notScanned):
-			case err != nil:
-				img.ScanErrorCode = apiErrorCode(err)
-				complete = false
-			case scan.ImageScanFindings != nil:
-				img.FindingSeverityCounts = scan.ImageScanFindings.FindingSeverityCounts
+		for i := range out.ImageDetails {
+			at := out.ImageDetails[i].ImagePushedAt
+			if latest == nil || at != nil && (latest.ImagePushedAt == nil || at.After(*latest.ImagePushedAt)) {
+				latest = &out.ImageDetails[i]
 			}
 		}
-		critical += img.FindingSeverityCounts[string(ecrtypes.FindingSeverityCritical)]
-		high += img.FindingSeverityCounts[string(ecrtypes.FindingSeverityHigh)]
-		repo.Images = append(repo.Images, img)
 	}
-	if complete {
+	var critical, high int32
+	if latest == nil {
 		repo.CriticalTotal, repo.HighTotal = &critical, &high
+		return
 	}
+	img := ecrImage{
+		ImageDigest:   aws.ToString(latest.ImageDigest),
+		ImagePushedAt: snapFormatTime(latest.ImagePushedAt),
+	}
+	if latest.ImageScanFindingsSummary != nil {
+		img.FindingSeverityCounts = latest.ImageScanFindingsSummary.FindingSeverityCounts
+	} else {
+		// Basic Scanning leaves DescribeImages without a scan summary;
+		// the counts are only in DescribeImageScanFindings.
+		img.FindingSeverityCounts, img.ScanErrorCode = captureECRScanCounts(ctx, client, repo.RepositoryName, latest.ImageDigest)
+	}
+	repo.Images = []ecrImage{img}
+	if img.ScanErrorCode != "" {
+		return
+	}
+	critical = img.FindingSeverityCounts[string(ecrtypes.FindingSeverityCritical)]
+	high = img.FindingSeverityCounts[string(ecrtypes.FindingSeverityHigh)]
+	repo.CriticalTotal, repo.HighTotal = &critical, &high
+}
+
+// captureECRScanCounts tallies one image's scan findings by severity over
+// every page; an image never scanned has no counts, and a failed read names
+// its error code.
+func captureECRScanCounts(ctx context.Context, client *ecr.Client, repoName string, digest *string) (map[string]int32, string) {
+	var counts map[string]int32
+	pages := ecr.NewDescribeImageScanFindingsPaginator(client, &ecr.DescribeImageScanFindingsInput{
+		RepositoryName: aws.String(repoName),
+		ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: digest},
+	})
+	for pages.HasMorePages() {
+		out, err := pages.NextPage(ctx)
+		var notScanned *ecrtypes.ScanNotFoundException
+		switch {
+		case errors.As(err, &notScanned):
+			return nil, ""
+		case err != nil:
+			return nil, apiErrorCode(err)
+		}
+		f := out.ImageScanFindings
+		if f == nil {
+			continue
+		}
+		if counts == nil {
+			counts = map[string]int32{}
+		}
+		for _, finding := range f.Findings {
+			if finding.Severity != "" {
+				counts[string(finding.Severity)]++
+			}
+		}
+		for _, finding := range f.EnhancedFindings {
+			if sev := aws.ToString(finding.Severity); sev != "" {
+				counts[sev]++
+			}
+		}
+	}
+	return counts, ""
 }
 
 // ---------------------------------------------------------------------------

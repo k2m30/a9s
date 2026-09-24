@@ -27,9 +27,9 @@ import (
 // several. An api that cannot enumerate buses is asked for rules without
 // naming one, which is the default bus.
 func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI, _ string) (resource.FetchResult, error) {
-	buses, busesComplete, err := ebRuleBuses(ctx, api)
-	if err != nil {
-		return resource.FetchResult{}, err
+	buses, busesComplete, busErr := ebRuleBuses(ctx, api)
+	if busErr != nil && len(buses) == 0 {
+		return resource.FetchResult{}, busErr
 	}
 
 	var resources []resource.Resource
@@ -37,7 +37,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 	if err != nil {
 		return resource.FetchResult{}, err
 	}
-	complete = complete && busesComplete
+	complete = complete && busesComplete && busErr == nil
 
 	for _, rule := range rules {
 		name := ""
@@ -103,7 +103,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 			PageSize:       len(resources),
 			TotalHint:      totalHint,
 		},
-	}, nil
+	}, busErr
 }
 
 // ebRuleBuses returns the names of the account's event buses. Both ListRules
@@ -126,7 +126,7 @@ func ebRuleBuses(ctx context.Context, api any) ([]string, bool, error) {
 		}
 		return out.EventBuses, out.NextToken, nil
 	})
-	if err != nil {
+	if err != nil && len(buses) == 0 {
 		return nil, false, fmt.Errorf("listing EventBridge event buses: %w", err)
 	}
 	var names []string
@@ -134,6 +134,9 @@ func ebRuleBuses(ctx context.Context, api any) ([]string, bool, error) {
 		if name := aws.ToString(bus.Name); name != "" {
 			names = append(names, name)
 		}
+	}
+	if err != nil {
+		return names, false, fmt.Errorf("listing EventBridge event buses: %w", err)
 	}
 	if len(names) == 0 {
 		// Every account has a default bus, so an answer naming none of them

@@ -7,7 +7,9 @@ package unit_test
 
 import (
 	"context"
+	"fmt"
 	"maps"
+	"slices"
 	"testing"
 	"time"
 
@@ -70,8 +72,31 @@ func (f *t561ECRFake) DescribeImageScanFindings(_ context.Context, in *ecr.Descr
 			ImageScanCompletedAt:         aws.Time(time.Date(2026, 9, 1, 10, 31, 0, 0, time.UTC)),
 			VulnerabilitySourceUpdatedAt: aws.Time(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)),
 			FindingSeverityCounts:        f.counts[repo],
+			Findings:                     t561ScanFindings(f.counts[repo]),
 		},
 	}, nil
+}
+
+// t561ScanFindings is the findings[] a Basic scan returns alongside the
+// findingSeverityCounts that summarise it: one CVE entry per counted finding.
+func t561ScanFindings(counts map[string]int32) []ecrtypes.ImageScanFinding {
+	var out []ecrtypes.ImageScanFinding
+	for _, sev := range slices.Sorted(maps.Keys(counts)) {
+		for i := range counts[sev] {
+			cve := fmt.Sprintf("CVE-2026-%d%04d", len(sev), i+1)
+			out = append(out, ecrtypes.ImageScanFinding{
+				Name:        aws.String(cve),
+				Severity:    ecrtypes.FindingSeverity(sev),
+				Uri:         aws.String("https://security-tracker.debian.org/tracker/" + cve),
+				Description: aws.String("Out-of-bounds read in libexample before 1.2.3."),
+				Attributes: []ecrtypes.Attribute{
+					{Key: aws.String("package_name"), Value: aws.String("libexample")},
+					{Key: aws.String("package_version"), Value: aws.String("1.2.2-1")},
+				},
+			})
+		}
+	}
+	return out
 }
 
 func (f *t561ECRFake) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {

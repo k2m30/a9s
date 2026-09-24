@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -141,22 +142,25 @@ func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLs
 		return resource.FetchResult{}, err
 	}
 
+	// A scope that fails keeps the rows both scopes read, and the cursor
+	// resumes it where it failed: the page is a lower bound carrying the
+	// error.
 	var resources []resource.Resource
+	var errs []error
 
 	regionalDone := cur.RegionalDone
 	regionalNext := cur.RegionalNext
 	if !regionalDone {
 		regResult, regErr := fetchWAFWebACLsScopePage(ctx, api, wafv2types.ScopeRegional, regionalNext)
-		if regErr != nil {
-			return resource.FetchResult{}, regErr
+		switch {
+		case regErr != nil:
+			errs = append(errs, regErr)
+		case regResult.Pagination != nil && regResult.Pagination.IsTruncated:
+			regionalNext = regResult.Pagination.NextToken
+		default:
+			regionalNext, regionalDone = "", true
 		}
 		resources = append(resources, regResult.Resources...)
-		regionalNext = ""
-		if regResult.Pagination != nil && regResult.Pagination.IsTruncated {
-			regionalNext = regResult.Pagination.NextToken
-		} else {
-			regionalDone = true
-		}
 	}
 
 	cfDone := cfAPI == nil || cur.CFDone
@@ -165,7 +169,8 @@ func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLs
 		for pages := 0; ; pages++ {
 			cfResult, cfErr := fetchWAFWebACLsScopePage(ctx, cfAPI, wafv2types.ScopeCloudfront, cfNext)
 			if cfErr != nil {
-				return resource.FetchResult{}, cfErr
+				errs = append(errs, cfErr)
+				break
 			}
 			resources = append(resources, cfResult.Resources...)
 			if cfResult.Pagination == nil || !cfResult.Pagination.IsTruncated {
@@ -179,13 +184,17 @@ func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLs
 			}
 		}
 	}
+	err = errors.Join(errs...)
+	if err != nil && len(resources) == 0 {
+		return resource.FetchResult{}, err
+	}
 
 	isTruncated := !regionalDone || !cfDone
 	nextToken := ""
 	switch {
 	case !isTruncated:
 		// nextToken stays "" — both lanes are done.
-	case cfDone:
+	case cfDone && regionalNext != "":
 		// CLOUDFRONT needs no more resuming: round-trip the bare REGIONAL
 		// marker directly, matching decodeWAFMergedCursor's bare-marker
 		// fallback, the external format for this common
@@ -213,7 +222,7 @@ func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLs
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, err
 }
 
 // wafCloudFrontPageCap bounds the CLOUDFRONT-scope walk above to this many

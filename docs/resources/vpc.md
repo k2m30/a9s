@@ -121,7 +121,7 @@ One bullet per distinct signal.
 
 - **Signal**: No flow log capturing this VPC or any of its subnets → Warning (CIS / Well-Architected SEC — network traffic is unlogged).
   - **State bucket**: Warning.
-  - **API call**: `DescribeFlowLogs` — one account-wide call; ask for the VPC id and every subnet id on the row with a `resource-id` filter, because a flow log attaches to a VPC or to a subnet and both write the same records. Raise the signal when no flow log targets either scope. A log scoped to a single network interface is not counted: attributing one to a VPC would need the interface list, and it records one interface rather than the VPC.
+  - **API call**: `DescribeFlowLogs` — one account-wide call; ask for the VPC id and every subnet id on the row with a `resource-id` filter, because a flow log attaches to a VPC or to a subnet and both write the same records. Raise the signal when no flow log targets either scope. A log scoped to a single network interface is not counted: attributing one to a VPC would need the interface list, and it records one interface rather than the VPC. A VPC whose subnets could not be listed in full is not inspected rather than asked about by its own id alone.
   - **Cost shape**: account-wide (one call covers every VPC in the region).
 
 ### 3.3 Wave 3 — OUT OF SCOPE

@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `cfn`
 
 - **Why related**: CloudFormation stack that created the stream — operators routinely pivot from a stream to "what owns this? who deploys changes to it?" when investigating drift, outages, or on-call handoff.
-- **How discovered**: call `ListTagsForStream(StreamName=...)` (per stream) and read the tag `aws:cloudformation:stack-name`; cross-reference the already-loaded `cfn` list by stack name — a9s-devops: CloudFormation stamps this tag on every managed resource; Kinesis tags are not on `ListStreams` or `DescribeStreamSummary` so the per-stream tag call is unavoidable but cheap and cached with the detail view.
+- **How discovered**: read `ListTagsForStream(StreamName=...)` (per stream) page by page, following `HasMoreTags` from `ExclusiveStartTagKey` ([API_ListTagsForStream](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_ListTagsForStream.html)), and read the tag `aws:cloudformation:stack-name` — tags left unread past the page cap or behind a failed page make a missing stack tag a lower bound or the failure, never a proven 0; cross-reference the already-loaded `cfn` list by stack name — a9s-devops: CloudFormation stamps this tag on every managed resource; Kinesis tags are not on `ListStreams` or `DescribeStreamSummary` so the per-stream tag call is unavoidable but cheap and cached with the detail view.
 - **Count shown**: yes (0 or 1).
 
 ### `ct-events`

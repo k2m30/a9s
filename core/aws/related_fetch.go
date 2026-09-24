@@ -129,7 +129,7 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 // holds lost its details, not its place in the list — the row says so itself
 // (anyDegraded), for the pivots that read details.
 func FetchIsPartial(result resource.FetchResult, err error) bool {
-	return (result.Pagination != nil && result.Pagination.IsTruncated) || !rowsHeld(err, result.Resources)
+	return (result.Pagination != nil && result.Pagination.IsTruncated) || !RowsHeld(err, result.Resources)
 }
 
 // StoredPagination is the pagination a fetch result is stored under: its own,
@@ -148,9 +148,9 @@ func StoredPagination(result resource.FetchResult, err error) *resource.Paginati
 	return &meta
 }
 
-// rowsHeld reports whether err, returned beside rows, is nothing but per-item
+// RowsHeld reports whether err, returned beside rows, is nothing but per-item
 // failures on rows that rows still holds. Any other error may have cost a row.
-func rowsHeld(err error, rows []resource.Resource) bool {
+func RowsHeld(err error, rows []resource.Resource) bool {
 	switch e := err.(type) {
 	case nil:
 		return true
@@ -160,7 +160,7 @@ func rowsHeld(err error, rows []resource.Resource) bool {
 		})
 	case interface{ Unwrap() []error }:
 		for _, inner := range e.Unwrap() {
-			if !rowsHeld(inner, rows) {
+			if !RowsHeld(inner, rows) {
 				return false
 			}
 		}
@@ -199,13 +199,16 @@ type relatedRead struct {
 	// it, so no call was made; what the other places found is not the
 	// answer a connected session gives, and the row reads unknown.
 	noClient bool
+	// heuristic: the ids are candidates matched by a shared property, not
+	// rows AWS names as related (heuristicResult).
+	heuristic bool
 }
 
 // readOf is what answer r says was read, so a checker whose relation lives
 // in several places folds each place's answer into one relatedAnswer.
 func readOf(r resource.RelatedCheckResult) relatedRead {
 	if r.State() == domain.RelatedResolved {
-		return relatedRead{ids: r.ResourceIDs(), partial: r.Truncated(), failure: r.Failure()}
+		return relatedRead{ids: r.ResourceIDs(), partial: r.Truncated(), failure: r.Failure(), heuristic: r.Coverage() == resource.CoverageHeuristic}
 	}
 	return relatedRead{unread: true, failure: cmp.Or(r.Err(), r.Failure()), failed: r.State() == domain.RelatedError}
 }
@@ -219,6 +222,16 @@ func unreadBy(err error) relatedRead {
 	return relatedRead{unread: true, failure: err, failed: err != nil}
 }
 
+// pagedRead is what a PageAll walk says beside the items it returned:
+// partial when it stopped at its cap, unread with the failure when a page
+// failed, so the items of the pages before it stay a lower bound.
+func pagedRead(complete bool, err error) relatedRead {
+	if err != nil {
+		return unreadBy(err)
+	}
+	return relatedRead{partial: !complete}
+}
+
 // joinReads is the read of a relation that lives in several places: every id
 // any place found, partial or unread when any place was.
 func joinReads(reads ...relatedRead) relatedRead {
@@ -230,6 +243,7 @@ func joinReads(reads ...relatedRead) relatedRead {
 		out.unread = out.unread || r.unread
 		out.failed = out.failed || r.failed
 		out.noClient = out.noClient || r.noClient
+		out.heuristic = out.heuristic || r.heuristic
 		if r.failure != nil {
 			failures = append(failures, r.failure)
 		}
@@ -268,6 +282,12 @@ func relatedState(target string, r relatedRead) resource.RelatedCheckResult {
 		return resource.KnownRelated(target, ids, false)
 	case r.unread && (len(ids) == 0 || r.noClient):
 		return resource.UnknownRelated(target)
+	case r.heuristic && (len(ids) > 0 || r.partial):
+		h := resource.HeuristicRelated(target, ids)
+		if r.unread || r.partial {
+			return h.PartialScan()
+		}
+		return h
 	case r.unread || r.partial:
 		return resource.KnownRelated(target, ids, true)
 	case len(ids) == 0:

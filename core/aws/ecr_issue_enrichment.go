@@ -34,25 +34,27 @@ const (
 	ecrCodeNoLifecyclePolicy domain.FindingCode = "ecr.no-lifecycle-policy"
 )
 
-// ECRImagesPerRepo caps how many images are inspected per repository: one
-// DescribeImages call returns at most this many, and each is then read through
-// DescribeImageScanFindings.
-const ECRImagesPerRepo = 10
+// ecrPageSize is the largest page DescribeImages and DescribeImageScanFindings
+// accept (maxResults 1-1000,
+// https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html,
+// https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImageScanFindings.html).
+const ecrPageSize = 1000
 
-// EnrichECRRepository issues one DescribeImages call per repository with
-// maxResults=ECRImagesPerRepo, reads each image's scan results through
-// DescribeImageScanFindings (ecrReadScanResults) and aggregates the CRITICAL
-// and HIGH counts.
+// EnrichECRRepository reads every DescribeImages page of each repository,
+// picks the newest image by imagePushedAt — DescribeImages documents no order
+// and cannot sort — and reads that image's scan results
+// (ecrReadScanResults) for its CRITICAL and HIGH counts.
 //
 // Findings:
-//   - Any CRITICAL across scanned images → "!" severity.
+//   - Any CRITICAL in the newest image → "!" severity.
 //   - Any HIGH (no CRITICAL) → "~" severity.
 //
 // fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
-// Per-repo errors aggregate into a composite returned error. An image never
-// scanned contributes nothing; a repository with an image whose scan results
-// could not be read gets no count at all and is marked not inspected, since
-// the counts it would show are neither the total nor a proven zero.
+// Per-repo errors aggregate into a composite returned error. A never-scanned
+// image contributes nothing. A repository whose image list or scan results
+// could not be read in full gets no count and is marked not inspected: the
+// newest image may be on a page nobody read, and a partial count is neither
+// the total nor a proven zero.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -87,11 +89,16 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		total++
 		mu.Unlock()
 
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImagesOutput, error) {
-			return describeAPI.DescribeImages(ctx, &ecr.DescribeImagesInput{
+		images, imagesComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ecrtypes.ImageDetail, *string, error) {
+			out, err := describeAPI.DescribeImages(ctx, &ecr.DescribeImagesInput{
 				RepositoryName: aws.String(repoName),
-				MaxResults:     aws.Int32(int32(ECRImagesPerRepo)),
+				MaxResults:     aws.Int32(ecrPageSize),
+				NextToken:      token,
 			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.ImageDetails, out.NextToken, nil
 		})
 		if err != nil {
 			mu.Lock()
@@ -100,11 +107,18 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			mu.Unlock()
 			return
 		}
-		var scanErr error
-		for j := range out.ImageDetails {
-			if scanErr = ecrReadScanResults(ctx, scanAPI, repoName, &out.ImageDetails[j]); scanErr != nil {
-				break
+		// An image with no push time sorts oldest.
+		var latest *ecrtypes.ImageDetail
+		for j := range images {
+			at := images[j].ImagePushedAt
+			if latest == nil || at != nil && (latest.ImagePushedAt == nil || at.After(*latest.ImagePushedAt)) {
+				latest = &images[j]
 			}
+		}
+		scanComplete := true
+		var scanErr error
+		if imagesComplete && latest != nil {
+			scanComplete, scanErr = ecrReadScanResults(ctx, scanAPI, repoName, latest)
 		}
 
 		// The two policy reads are issued before the lock is taken: holding it
@@ -133,29 +147,24 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			setWave2Finding(&result, r.ID, ecrCodeNoLifecyclePolicy, nil)
 		}
 
-		if scanErr != nil {
+		switch {
+		case scanErr != nil:
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, scanErr)
+			return
+		case !imagesComplete || !scanComplete:
+			truncated = true
+			markUninspected(&result, r.ID, CheckCap)
 			return
 		}
 
 		scannedCount := 0
-		var criticalTotal int32
-		var highTotal int32
-		for _, img := range out.ImageDetails {
-			summary := img.ImageScanFindingsSummary
-			if summary == nil {
-				continue
-			}
-			scannedCount++
-			for sev, n := range summary.FindingSeverityCounts {
-				switch sev {
-				case string(ecrtypes.FindingSeverityCritical):
-					criticalTotal += n
-				case string(ecrtypes.FindingSeverityHigh):
-					highTotal += n
-				}
-			}
+		var criticalTotal, highTotal int32
+		if latest != nil && latest.ImageScanFindingsSummary != nil {
+			scannedCount = 1
+			counts := latest.ImageScanFindingsSummary.FindingSeverityCounts
+			criticalTotal = counts[string(ecrtypes.FindingSeverityCritical)]
+			highTotal = counts[string(ecrtypes.FindingSeverityHigh)]
 		}
 
 		result.FieldUpdates[r.ID] = map[string]string{
@@ -172,14 +181,14 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		if criticalTotal > 0 {
 			rows = append(rows, domain.DetailRow{
 				Label: "Critical",
-				Value: fmt.Sprintf("%d critical findings across %d image(s)", criticalTotal, scannedCount),
+				Value: fmt.Sprintf("%d critical findings in the newest image", criticalTotal),
 				Tier:  "!",
 			})
 		}
 		if highTotal > 0 {
 			rows = append(rows, domain.DetailRow{
 				Label: "High",
-				Value: fmt.Sprintf("%d high findings across %d image(s)", highTotal, scannedCount),
+				Value: fmt.Sprintf("%d high findings in the newest image", highTotal),
 				Tier:  "~",
 			})
 		}

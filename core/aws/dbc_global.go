@@ -9,7 +9,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 )
 
 // DocDBDescribeGlobalClustersAPI lists DocumentDB global clusters and their
@@ -74,25 +76,28 @@ func readDocDBGlobalRoles(ctx context.Context, api any) dbcGlobalRoles {
 	if !ok {
 		return dbcGlobalRoles{}
 	}
-	roles := dbcGlobalRoles{writer: map[string]bool{}}
-	input := &docdb.DescribeGlobalClustersInput{}
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeGlobalClustersOutput, error) {
-			return gapi.DescribeGlobalClusters(ctx, input)
-		})
+	// DescribeGlobalClusters pages by Marker
+	// (https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeGlobalClusters.html).
+	globals, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]docdbtypes.GlobalCluster, *string, error) {
+		out, err := gapi.DescribeGlobalClusters(ctx, &docdb.DescribeGlobalClustersInput{Marker: marker})
 		if err != nil {
-			return dbcGlobalRoles{err: fmt.Errorf("DocumentDB DescribeGlobalClusters: %w", err)}
+			return nil, nil, err
 		}
-		for _, g := range out.GlobalClusters {
-			for _, m := range g.GlobalClusterMembers {
-				roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
-			}
-		}
-		if aws.ToString(out.Marker) == "" {
-			return roles
-		}
-		input.Marker = out.Marker
+		return out.GlobalClusters, out.Marker, nil
+	})
+	if err == nil && !complete {
+		err = fmt.Errorf("more than %d pages", PerParentPageCap)
 	}
+	if err != nil {
+		return dbcGlobalRoles{err: fmt.Errorf("DocumentDB DescribeGlobalClusters: %w", err)}
+	}
+	roles := dbcGlobalRoles{writer: map[string]bool{}}
+	for _, g := range globals {
+		for _, m := range g.GlobalClusterMembers {
+			roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
+		}
+	}
+	return roles
 }
 
 func readRDSGlobalRoles(ctx context.Context, api any) dbcGlobalRoles {
@@ -100,23 +105,26 @@ func readRDSGlobalRoles(ctx context.Context, api any) dbcGlobalRoles {
 	if !ok {
 		return dbcGlobalRoles{}
 	}
-	roles := dbcGlobalRoles{writer: map[string]bool{}}
-	input := &rds.DescribeGlobalClustersInput{}
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeGlobalClustersOutput, error) {
-			return gapi.DescribeGlobalClusters(ctx, input)
-		})
+	// DescribeGlobalClusters pages by Marker
+	// (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeGlobalClusters.html).
+	globals, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]rdstypes.GlobalCluster, *string, error) {
+		out, err := gapi.DescribeGlobalClusters(ctx, &rds.DescribeGlobalClustersInput{Marker: marker})
 		if err != nil {
-			return dbcGlobalRoles{err: fmt.Errorf("RDS DescribeGlobalClusters: %w", err)}
+			return nil, nil, err
 		}
-		for _, g := range out.GlobalClusters {
-			for _, m := range g.GlobalClusterMembers {
-				roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
-			}
-		}
-		if aws.ToString(out.Marker) == "" {
-			return roles
-		}
-		input.Marker = out.Marker
+		return out.GlobalClusters, out.Marker, nil
+	})
+	if err == nil && !complete {
+		err = fmt.Errorf("more than %d pages", PerParentPageCap)
 	}
+	if err != nil {
+		return dbcGlobalRoles{err: fmt.Errorf("RDS DescribeGlobalClusters: %w", err)}
+	}
+	roles := dbcGlobalRoles{writer: map[string]bool{}}
+	for _, g := range globals {
+		for _, m := range g.GlobalClusterMembers {
+			roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
+		}
+	}
+	return roles
 }

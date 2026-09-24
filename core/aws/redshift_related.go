@@ -227,7 +227,7 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 		}
 		return out.ClusterSubnetGroups, out.Marker, nil
 	})
-	if err != nil {
+	if err != nil && len(groups) == 0 {
 		return ReadFailed("subnet", err)
 	}
 	if len(groups) == 0 {

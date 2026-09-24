@@ -398,7 +398,7 @@ func redisMemberCluster(ctx context.Context, clients any, res resource.Resource)
 		}
 		return out.CacheClusters, out.Marker, nil
 	})
-	if err != nil {
+	if err != nil && len(clusters) == 0 {
 		return nil, fmt.Errorf("describing member cluster %s: %w", memberID, err)
 	}
 	if len(clusters) == 0 {
@@ -439,7 +439,7 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 		}
 		return out.CacheSubnetGroups, out.Marker, nil
 	})
-	if err != nil {
+	if err != nil && len(groups) == 0 {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
 	if len(groups) == 0 {

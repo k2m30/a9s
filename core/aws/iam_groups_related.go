@@ -24,14 +24,11 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 		return keyMissing("iam-user", "groupName")
 	}
 	users, complete, err := iamGroupUsers(ctx, c.IAM, groupName)
-	if err != nil {
-		return ReadFailed("iam-user", err)
-	}
-	var ids []string
+	read := pagedRead(complete, err)
 	for _, u := range users {
-		ids = append(ids, aws.ToString(u.UserName))
+		read.ids = append(read.ids, aws.ToString(u.UserName))
 	}
-	return relatedResultTrunc("iam-user", ids, !complete)
+	return relatedAnswer("iam-user", read)
 }
 
 // checkGroupPolicy returns the combined count of managed and inline policies for this IAM group.

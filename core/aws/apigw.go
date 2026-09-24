@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -29,8 +30,12 @@ import (
 // like: a V2 lane that drained while V1 was still mid-walk would otherwise be
 // restarted from its first page by every following continuation, delivering
 // its rows again.
+//
+// V1Retry resumes a V1 walk whose page at V1Position failed, the first page
+// (an empty V1Position) included.
 type apigwMergedCursor struct {
 	V1Position string `json:"v1,omitempty"`
+	V1Retry    bool   `json:"v1retry,omitempty"`
 	V2Token    string `json:"v2,omitempty"`
 	V2Done     bool   `json:"v2done,omitempty"`
 }
@@ -83,39 +88,52 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 		return resource.FetchResult{}, err
 	}
 
+	// A lane that fails keeps the rows it and the other lane read, and the
+	// cursor resumes it where it failed: the page is a lower bound carrying
+	// the error.
 	var resources []resource.Resource
+	var errs []error
 	v1Position := cur.V1Position
-	if c.APIGatewayV1 != nil && (continuationToken == "" || v1Position != "") {
+	v1Failed := false
+	if c.APIGatewayV1 != nil && (continuationToken == "" || v1Position != "" || cur.V1Retry) {
 		v1Resources, resumePosition, v1Err := fetchAPIGWV1RestApisBatch(ctx, c.APIGatewayV1, v1Position)
-		if v1Err != nil {
-			return resource.FetchResult{}, v1Err
-		}
 		resources = append(resources, v1Resources...)
 		v1Position = resumePosition
+		if v1Err != nil {
+			v1Failed = true
+			errs = append(errs, v1Err)
+		}
 	}
 
-	v2Token := ""
+	v2Token := cur.V2Token
 	v2Truncated := false
 	if !cur.V2Done {
 		v2Result, v2Err := FetchAPIGatewaysPage(ctx, c.APIGatewayV2, cur.V2Token)
-		if v2Err != nil {
-			return resource.FetchResult{}, v2Err
-		}
-		resources = append(resources, v2Result.Resources...)
-		if v2Result.Pagination != nil {
+		switch {
+		case v2Err != nil:
+			v2Truncated = true
+			errs = append(errs, v2Err)
+		case v2Result.Pagination != nil:
 			v2Token = v2Result.Pagination.NextToken
 			v2Truncated = v2Result.Pagination.IsTruncated
 		}
+		resources = append(resources, v2Result.Resources...)
+	}
+	err = errors.Join(errs...)
+	if err != nil && len(resources) == 0 {
+		return resource.FetchResult{}, err
 	}
 
-	isTruncated := v1Position != "" || v2Truncated
+	isTruncated := v1Position != "" || v1Failed || v2Truncated
+	next := apigwMergedCursor{
+		V1Position: v1Position,
+		V1Retry:    v1Failed,
+		V2Token:    v2Token,
+		V2Done:     !v2Truncated,
+	}
 	nextToken := ""
-	if isTruncated {
-		nextToken = apigwMergedCursor{
-			V1Position: v1Position,
-			V2Token:    v2Token,
-			V2Done:     !v2Truncated,
-		}.encode()
+	if isTruncated && next != (apigwMergedCursor{}) {
+		nextToken = next.encode()
 	}
 
 	totalHint := len(resources)
@@ -127,11 +145,14 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: isTruncated,
-			NextToken:   nextToken,
-			PageSize:    len(resources),
-			TotalHint:   totalHint,
+			// A V2 first page that failed after V1 drained has no cursor
+			// the decoder accepts: the rows read are a lower bound.
+			LowerBoundOnly: isTruncated && nextToken == "",
+			NextToken:      nextToken,
+			PageSize:       len(resources),
+			TotalHint:      totalHint,
 		},
-	}, nil
+	}, err
 }
 
 // apigwV1PageCap bounds fetchAPIGWV1RestApisBatch's per-call walk above.
@@ -149,7 +170,9 @@ const apigwV1PageCap = 40
 // pages even if AWS reports more. resumePosition is non-empty only when the
 // cap fired before AWS's own pagination reached its terminal (nil-or-empty)
 // Position — the caller threads it back into the next call's cursor so the
-// walk continues from exactly where this batch stopped.
+// walk continues from exactly where this batch stopped. On error resources
+// holds the pages read and resumePosition the position of the page that
+// failed.
 func fetchAPIGWV1RestApisBatch(ctx context.Context, api APIGatewayV1GetRestApisAPI, position string) (resources []resource.Resource, resumePosition string, err error) {
 	pos := position
 	for pages := 0; ; pages++ {
@@ -161,7 +184,7 @@ func fetchAPIGWV1RestApisBatch(ctx context.Context, api APIGatewayV1GetRestApisA
 		}
 		out, err := api.GetRestApis(ctx, input)
 		if err != nil {
-			return nil, "", fmt.Errorf("fetching REST API gateways: %w", err)
+			return resources, pos, fmt.Errorf("fetching REST API gateways: %w", err)
 		}
 		for _, item := range out.Items {
 			apiID := aws.ToString(item.Id)

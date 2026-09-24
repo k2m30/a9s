@@ -254,8 +254,5 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return ids, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("eni", err)
-	}
-	return heuristicResult("eni", ids, !complete)
+	return alsoRead(heuristicResult("eni", ids, false), pagedRead(complete, err))
 }

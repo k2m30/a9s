@@ -111,8 +111,6 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		return NotRead("sns")
 	}
 
-	var ids []string
-
 	notifs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]asgtypes.NotificationConfiguration, *string, error) {
 		out, err := c.AutoScaling.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
 			AutoScalingGroupNames: []string{asgName},
@@ -123,12 +121,10 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return out.NotificationConfigurations, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("sns", err)
-	}
+	notifications := pagedRead(complete, err)
 	for _, n := range notifs {
 		if n.TopicARN != nil && *n.TopicARN != "" {
-			ids = append(ids, *n.TopicARN)
+			notifications.ids = append(notifications.ids, *n.TopicARN)
 		}
 	}
 
@@ -138,18 +134,18 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return relatedAnswer("sns", joinReads(relatedRead{ids: ids, partial: !complete}, unreadBy(err)))
+		return relatedAnswer("sns", joinReads(notifications, unreadBy(err)))
 	}
+	hooks := relatedRead{}
 	for _, h := range hookOut.LifecycleHooks {
 		if h.NotificationTargetARN == nil {
 			continue
 		}
 		if _, isTopic := ARNForService(*h.NotificationTargetARN, "sns"); isTopic {
-			ids = append(ids, *h.NotificationTargetARN)
+			hooks.ids = append(hooks.ids, *h.NotificationTargetARN)
 		}
 	}
-
-	return relatedResultTrunc("sns", ids, !complete)
+	return relatedAnswer("sns", joinReads(notifications, hooks))
 }
 
 // checkASGVPC resolves VPCs associated with this ASG via VPCZoneIdentifier.
@@ -186,14 +182,11 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return out.Subnets, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("vpc", err)
-	}
-	var vpcIDs []string
+	read := pagedRead(complete, err)
 	for _, sn := range subnets {
 		if sn.VpcId != nil && *sn.VpcId != "" {
-			vpcIDs = append(vpcIDs, *sn.VpcId)
+			read.ids = append(read.ids, *sn.VpcId)
 		}
 	}
-	return relatedResultTrunc("vpc", vpcIDs, !complete)
+	return relatedAnswer("vpc", read)
 }

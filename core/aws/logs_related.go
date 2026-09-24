@@ -6,7 +6,6 @@ package aws
 import (
 	"cmp"
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -46,14 +45,13 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 // deliver to: the destinations that are ARNs of service.
 func subscribedRead(ctx context.Context, clients any, cache resource.ResourceCache, group, target, service string) relatedRead {
 	filters, complete, err := logsSubscriptionFilters(ctx, clients, group)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return relatedRead{unread: true}
-		}
-		return relatedRead{unread: true, failure: err}
-	}
+	read := pagedRead(complete, err)
+	// A session without a CloudWatch Logs client leaves the subscriptions
+	// unread, not the relation: the other places it lives still answer.
+	read.noClient = false
 	ids, dropped := resolveRefs(target, destinationARNs(filters, service), refContext(clients, cache, target))
-	return relatedRead{ids: ids, partial: dropped || !complete}
+	read.ids, read.partial = ids, read.partial || dropped
+	return read
 }
 
 // checkLogsAlarms reports the alarms watching this log group: the ones
@@ -87,9 +85,6 @@ func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string
 		}
 		return out.MetricFilters, out.NextToken, nil
 	})
-	if err != nil {
-		return nil, unreadBy(err)
-	}
 	emitted := map[AlarmMetric]bool{}
 	for _, f := range filters {
 		for _, t := range f.MetricTransformations {
@@ -99,7 +94,7 @@ func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string
 			}
 		}
 	}
-	return emitted, relatedRead{partial: !complete}
+	return emitted, pagedRead(complete, err)
 }
 
 // alarmMetricLogGroups returns the log groups whose metric filters emit the
@@ -121,16 +116,13 @@ func alarmMetricLogGroups(ctx context.Context, clients any, m AlarmMetric) (map[
 		}
 		return out.MetricFilters, out.NextToken, nil
 	})
-	if err != nil {
-		return nil, unreadBy(err)
-	}
 	groups := map[string]bool{}
 	for _, f := range filters {
 		if name := aws.ToString(f.LogGroupName); name != "" {
 			groups[name] = true
 		}
 	}
-	return groups, relatedRead{partial: !complete}
+	return groups, pagedRead(complete, err)
 }
 
 // metricFiltersAPI is the session's CloudWatch Logs client, or nil for a
@@ -284,9 +276,6 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		return out.ExportTasks, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("s3", err)
-	}
 	var buckets []string
 	for _, t := range tasks {
 		if aws.ToString(t.LogGroupName) == res.ID && exportTaskWrites(t) {
@@ -294,7 +283,7 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	ids, dropped := resolveRefs("s3", buckets, refContext(clients, cache, "s3"))
-	return relatedResultTrunc("s3", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("s3", ids, dropped), pagedRead(complete, err))
 }
 
 // exportTaskWrites is the one predicate over ExportTaskStatus.code: a

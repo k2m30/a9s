@@ -4,8 +4,11 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -14,6 +17,146 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// dbcRetryCursor resumes a DocumentDB walk whose page failed while the RDS
+// walk went on beside it: DocDBToken is the marker of the page that failed,
+// RDSToken the next RDS page, RDSDone that the RDS walk has ended.
+type dbcRetryCursor struct {
+	DocDBToken string `json:"docdb,omitempty"`
+	RDSToken   string `json:"rds,omitempty"`
+	RDSDone    bool   `json:"rdsdone,omitempty"`
+}
+
+const dbcRetryPrefix = "docdb-retry:"
+
+func (c dbcRetryCursor) encode() string {
+	b, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return dbcRetryPrefix + string(b)
+}
+
+// FetchDBClustersPageMerged lists DocumentDB clusters, then the RDS-side
+// clusters. The cursor is "docdb:<marker>" while DocumentDB is being walked,
+// "rds:<marker>" once it is done, and a dbcRetryCursor while a DocumentDB
+// page that failed is retried and RDS is walked beside it. A source that
+// fails keeps the rows the other returned, as a lower bound with the error.
+// errGlobalRolesUnread comes with a complete page whose rows stand; it is
+// carried to the return as a partial-success error.
+func FetchDBClustersPageMerged(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+	var partial error
+	if rdsTok, ok := strings.CutPrefix(continuationToken, "rds:"); ok {
+		result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
+		if errors.Is(err, errGlobalRolesUnread) {
+			partial, err = err, nil
+		}
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		if result.Pagination != nil && result.Pagination.IsTruncated {
+			result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
+		}
+		return result, partial
+	}
+	var cur dbcRetryCursor
+	retrying := false
+	if raw, ok := strings.CutPrefix(continuationToken, dbcRetryPrefix); ok {
+		if err := json.Unmarshal([]byte(raw), &cur); err != nil {
+			return resource.FetchResult{}, fmt.Errorf("decoding DB cluster continuation token %q: %w", continuationToken, err)
+		}
+		retrying = true
+	} else {
+		cur.DocDBToken, _ = strings.CutPrefix(continuationToken, "docdb:")
+	}
+
+	docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, cur.DocDBToken)
+	if errors.Is(err, errGlobalRolesUnread) {
+		partial, err = err, nil
+	}
+	if err != nil {
+		docErr := fmt.Errorf("dbc: DocumentDB-side cluster fetch failed: %w", err)
+		// no finding: a list fetch with no rows returns its errors to the list screen, which shows them.
+		if cur.RDSDone {
+			return resource.FetchResult{}, errors.Join(partial, docErr)
+		}
+		rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, cur.RDSToken)
+		if errors.Is(rdsErr, errGlobalRolesUnread) {
+			partial, rdsErr = errors.Join(partial, rdsErr), nil
+		}
+		// no finding: a list fetch with no rows returns its errors to the list screen, which shows them.
+		if rdsErr != nil || len(rdsResult.Resources) == 0 {
+			return resource.FetchResult{}, errors.Join(partial, docErr, rdsErr)
+		}
+		next := dbcRetryCursor{DocDBToken: cur.DocDBToken, RDSDone: true}
+		if p := rdsResult.Pagination; p != nil && p.IsTruncated {
+			next.RDSToken, next.RDSDone = p.NextToken, false
+		}
+		return resource.FetchResult{
+			Resources: rdsResult.Resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: true,
+				NextToken:   next.encode(),
+				PageSize:    len(rdsResult.Resources),
+				TotalHint:   -1,
+			},
+		}, errors.Join(partial, docErr)
+	}
+	if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
+		if retrying {
+			next := cur
+			next.DocDBToken = docResult.Pagination.NextToken
+			docResult.Pagination.NextToken = next.encode()
+		} else {
+			docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
+		}
+		return docResult, partial
+	}
+	if cur.RDSDone {
+		return resource.FetchResult{
+			Resources: docResult.Resources,
+			Pagination: &resource.PaginationMeta{
+				PageSize:  len(docResult.Resources),
+				TotalHint: len(docResult.Resources),
+			},
+		}, partial
+	}
+	rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, cur.RDSToken)
+	if errors.Is(rdsErr, errGlobalRolesUnread) {
+		partial, rdsErr = errors.Join(partial, rdsErr), nil
+	}
+	if rdsErr != nil {
+		return resource.FetchResult{
+			Resources: docResult.Resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: true,
+				NextToken:   "rds:" + cur.RDSToken,
+				PageSize:    len(docResult.Resources),
+				TotalHint:   -1,
+			},
+		}, errors.Join(partial, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr))
+	}
+	resources := dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
+	if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
+		return resource.FetchResult{
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: true,
+				NextToken:   "rds:" + rdsResult.Pagination.NextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
+		}, partial
+	}
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: false,
+			PageSize:    len(resources),
+			TotalHint:   len(resources),
+		},
+	}, partial
+}
 
 // FetchDocDBClustersPage fetches a single page of DocumentDB clusters. The
 // DocumentDB endpoint is shared with RDS and Neptune and answers every

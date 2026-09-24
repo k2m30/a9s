@@ -7,6 +7,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -43,25 +44,20 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	failed := false
 	providers, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ecstypes.CapacityProvider, *string, error) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeCapacityProvidersOutput, error) {
-			return api.DescribeCapacityProviders(ctx, &ecs.DescribeCapacityProvidersInput{CapacityProviders: cluster.CapacityProviders, NextToken: token})
-		})
+		out, err := api.DescribeCapacityProviders(ctx, &ecs.DescribeCapacityProvidersInput{CapacityProviders: cluster.CapacityProviders, NextToken: token})
 		if err != nil {
 			return nil, nil, err
 		}
 		failed = failed || len(out.Failures) > 0
 		return out.CapacityProviders, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("asg", err)
-	}
 	var refs []string
 	for _, p := range providers {
 		if p.AutoScalingGroupProvider != nil {
 			refs = append(refs, aws.ToString(p.AutoScalingGroupProvider.AutoScalingGroupArn))
 		}
 	}
-	return listedRelated(ctx, clients, cache, "asg", refs, failed || !complete)
+	return alsoRead(listedRelated(ctx, clients, cache, "asg", refs, failed), pagedRead(complete, err))
 }
 
 // checkECSEC2 reports the EC2 instances registered with this cluster as
@@ -99,25 +95,29 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		return out.ContainerInstanceArns, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("ec2", err)
-	}
+	listed := pagedRead(complete, err)
 	var ids []string
+	var batchErrs []error
 	for batch := range slices.Chunk(arns, containerInstancesPerDescribe) {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
 			return describer.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{Cluster: &clusterRef, ContainerInstances: batch})
 		})
 		if err != nil {
-			return ReadFailed("ec2", err)
+			batchErrs = append(batchErrs, err)
+			continue
 		}
-		complete = complete && len(out.Failures) == 0
+		listed.partial = listed.partial || len(out.Failures) > 0
 		for _, ci := range out.ContainerInstances {
 			if id := aws.ToString(ci.Ec2InstanceId); strings.HasPrefix(id, "i-") && ecsContainerInstanceMember(ci) {
 				ids = append(ids, id)
 			}
 		}
 	}
-	return listedRelated(ctx, clients, cache, "ec2", ids, !complete)
+	described := relatedRead{}
+	if err := errors.Join(batchErrs...); err != nil {
+		described = unreadBy(err)
+	}
+	return alsoRead(listedRelated(ctx, clients, cache, "ec2", ids, false), joinReads(listed, described))
 }
 
 // ecsContainerInstanceMember is the one predicate over ContainerInstance.Status

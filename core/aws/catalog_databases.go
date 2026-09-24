@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -311,72 +310,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color:          colorDBC,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.RDS, c.DocDB} }),
-		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
-			// errGlobalRolesUnread comes with a complete page whose rows stand;
-			// it is carried to the return as a partial-success error.
-			var partial error
-			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
-				result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
-				if errors.Is(err, errGlobalRolesUnread) {
-					partial, err = err, nil
-				}
-				if err != nil {
-					return resource.FetchResult{}, err
-				}
-				if result.Pagination != nil && result.Pagination.IsTruncated {
-					result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
-				}
-				return result, partial
-			}
-			docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
-			docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, docdbTok)
-			if errors.Is(err, errGlobalRolesUnread) {
-				partial, err = err, nil
-			}
-			if err != nil {
-				return resource.FetchResult{}, err
-			}
-			if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
-				docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
-				return docResult, partial
-			}
-			rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, "")
-			if errors.Is(rdsErr, errGlobalRolesUnread) {
-				partial, rdsErr = errors.Join(partial, rdsErr), nil
-			}
-			if rdsErr != nil {
-				return resource.FetchResult{
-					Resources: docResult.Resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: true,
-						NextToken:   "rds:",
-						PageSize:    len(docResult.Resources),
-						TotalHint:   -1,
-					},
-				}, errors.Join(partial, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr))
-			}
-			docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
-			if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
-				return resource.FetchResult{
-					Resources: docResult.Resources,
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: true,
-						NextToken:   "rds:" + rdsResult.Pagination.NextToken,
-						PageSize:    len(docResult.Resources),
-						TotalHint:   -1,
-					},
-				}, partial
-			}
-			return resource.FetchResult{
-				Resources: docResult.Resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: false,
-					PageSize:    len(docResult.Resources),
-					TotalHint:   len(docResult.Resources),
-				},
-			}, partial
-		}),
-		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
+		Fetcher:        fetcherWithClients(FetchDBClustersPageMerged),
+		Wave2:          IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
 		FieldKeys: []string{
 			"cluster_id", "engine", "engine_version", "status", "status_raw", "instances", "endpoint", "arn",
 			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",

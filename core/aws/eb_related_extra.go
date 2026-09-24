@@ -347,15 +347,11 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		}
 		return out.ApplicationVersions, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("s3", err)
-	}
-
 	var buckets []string
 	for _, av := range versions {
 		if av.SourceBundle != nil && av.SourceBundle.S3Bucket != nil && *av.SourceBundle.S3Bucket != "" {
 			buckets = append(buckets, *av.SourceBundle.S3Bucket)
 		}
 	}
-	return relatedResultTrunc("s3", buckets, !complete)
+	return alsoRead(relatedResultTrunc("s3", buckets, false), pagedRead(complete, err))
 }

@@ -414,23 +414,25 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// truncated first page must never downgrade a stored exact total;
 		// without this loop a 55-row cached/exact list would silently swap
 		// down to a 50-row truncated one. Bounded by CachedListDepth so this
-		// never fetches deeper than what was already shown.
-		for err == nil && res.Pagination != nil && res.Pagination.IsTruncated &&
+		// never fetches deeper than what was already shown. A page that
+		// answers with per-row failures on rows it holds is a page read, so
+		// the walk goes on and carries the failures.
+		for awsclient.RowsHeld(err, res.Resources) && res.Pagination != nil && res.Pagination.IsTruncated &&
 			res.Pagination.NextToken != "" && len(res.Resources) < c.CachedListDepth(resourceType) {
-			var more resource.FetchResult
-			more, err = c.FetchMoreResources(ctx, clients, FetchMoreParams{
+			more, moreErr := c.FetchMoreResources(ctx, clients, FetchMoreParams{
 				ResourceType: resourceType,
 				Token:        res.Pagination.NextToken,
 			})
-			if err != nil {
-				break
-			}
+			err = errors.Join(err, moreErr)
 			if len(more.Resources) == 0 {
 				// A zero-progress page (hostile/buggy pagination: a NextToken
 				// that keeps returning empty pages) must terminate the loop —
 				// len(res.Resources) never grows past this point, so the
 				// CachedListDepth bound above would otherwise spin forever.
-				res.Pagination = more.Pagination
+				// A page that failed outright leaves the cursor where it was.
+				if moreErr == nil {
+					res.Pagination = more.Pagination
+				}
 				break
 			}
 			res.Resources = append(res.Resources, more.Resources...)

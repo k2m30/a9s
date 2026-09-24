@@ -43,9 +43,7 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 		return NotRead(target)
 	}
 	targets, complete, err := ebListTargets(ctx, c.EventBridge, res.Fields["event_bus"], ruleName)
-	if err != nil {
-		return ReadFailed(target, err)
-	}
+	walk := pagedRead(complete, err)
 	var arns []string
 	for _, t := range targets {
 		named := []string{aws.ToString(t.Arn)}
@@ -59,7 +57,7 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 		}
 	}
 	ids, dropped := resolveRefs(target, arns, refContext(clients, cache, target))
-	return relatedResultTrunc(target, ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc(target, ids, dropped), walk)
 }
 
 func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -160,9 +158,9 @@ func ebTargetRead(ctx context.Context, clients any, targetARN string, keep func(
 	if !ok || c == nil || c.EventBridge == nil {
 		return relatedRead{}, errClientMissing
 	}
-	buses, complete, err := ebRuleBuses(ctx, c.EventBridge)
-	if err != nil {
-		return relatedRead{}, err
+	buses, complete, busErr := ebRuleBuses(ctx, c.EventBridge)
+	if busErr != nil && len(buses) == 0 {
+		return relatedRead{}, busErr
 	}
 	var ids []string
 	var failures []Failure
@@ -201,10 +199,11 @@ func ebTargetRead(ctx context.Context, clients any, targetARN string, keep func(
 			}
 		}
 	}
-	return relatedRead{
+	read := relatedRead{
 		ids:     ids,
 		partial: !complete,
 		unread:  len(failures) == asked && asked > 0,
 		failure: AggregateFailures("eb-rule: ListRuleNamesByTarget", failures, asked),
-	}, nil
+	}
+	return joinReads(read, pagedRead(true, busErr)), nil
 }

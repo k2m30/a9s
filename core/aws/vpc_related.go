@@ -286,16 +286,13 @@ func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return out.TransitGatewayAttachments, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("tgw", err)
-	}
-	var ids []string
+	read := pagedRead(complete, err)
 	for _, att := range atts {
 		if tgwAttachmentLive(att) {
-			ids = append(ids, aws.ToString(att.TransitGatewayId))
+			read.ids = append(read.ids, aws.ToString(att.TransitGatewayId))
 		}
 	}
-	return relatedResultTrunc("tgw", ids, !complete)
+	return relatedAnswer("tgw", read)
 }
 
 // vpcIDFromResource extracts the VPC ID from a VPC resource.

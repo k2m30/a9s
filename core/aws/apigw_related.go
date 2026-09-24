@@ -5,7 +5,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,13 +27,6 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	if apiID == "" {
 		return keyMissing("kms", "apiID")
 	}
-	items, complete, err := apigwIntegrations(ctx, clients, res)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("kms")
-		}
-		return ReadFailed("kms", err)
-	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return NotRead("kms")
@@ -43,6 +35,8 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok {
 		return NotRead("kms")
 	}
+	items, complete, err := apigwIntegrations(ctx, clients, res)
+	integrations := pagedRead(complete, err)
 	var refs []string
 	var failures []Failure
 	total := 0
@@ -71,11 +65,11 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	// them, which is a fetch failure; some refusing leave what was read a
 	// lower bound.
 	reads := kmsReads(ctx, clients, cache, "", refs)
-	functions := relatedRead{partial: len(failures) > 0 || !complete}
+	functions := relatedRead{partial: len(failures) > 0}
 	if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil && len(failures) == total {
 		functions = relatedRead{unread: true, failure: aggErr, failed: true}
 	}
-	reads[""] = joinReads(reads[""], functions)
+	reads[""] = joinReads(reads[""], functions, integrations)
 	return regionalAnswer(clients, "kms", reads)
 }
 
@@ -176,9 +170,6 @@ func apigwRESTIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 		}
 		return out.Items, out.Position, nil
 	})
-	if err != nil {
-		return nil, false, err
-	}
 	var items []apigwIntegration
 	links := false
 	for _, r := range resources {
@@ -195,12 +186,12 @@ func apigwRESTIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 			items = append(items, item)
 		}
 	}
-	if !links {
-		return items, complete, nil
+	if !links || err != nil {
+		return items, complete, err
 	}
 	linkAPI, ok := c.APIGatewayV1.(APIGatewayV1GetVpcLinksAPI)
 	if !ok {
-		return nil, false, errClientMissing
+		return items, false, errClientMissing
 	}
 	vpcLinks, linksComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.VpcLink, *string, error) {
 		out, linkErr := linkAPI.GetVpcLinks(ctx, &apigateway.GetVpcLinksInput{Position: token})
@@ -209,15 +200,12 @@ func apigwRESTIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 		}
 		return out.Items, out.Position, nil
 	})
-	if err != nil {
-		return nil, false, err
-	}
 	for i := range items {
 		if l := slices.IndexFunc(vpcLinks, func(l apigwv1types.VpcLink) bool { return aws.ToString(l.Id) == items[i].vpcLink }); items[i].vpcLink != "" && l >= 0 {
 			items[i].loadBalancers = vpcLinks[l].TargetArns
 		}
 	}
-	return items, complete && linksComplete, nil
+	return items, complete && linksComplete, err
 }
 
 // checkApigwLambda reports the functions this API's integrations invoke:
@@ -228,17 +216,11 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 		return keyMissing("lambda", "apiID")
 	}
 	items, complete, err := apigwIntegrations(ctx, clients, res)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("lambda")
-		}
-		return ReadFailed("lambda", err)
-	}
 	var arns []string
 	for _, item := range items {
 		arns = append(arns, lambdaIntegrationARN(item.uri))
 	}
-	return listedRelated(ctx, clients, cache, "lambda", arns, !complete)
+	return alsoRead(listedRelated(ctx, clients, cache, "lambda", arns, false), pagedRead(complete, err))
 }
 
 // checkApigwACM reports ACM certificates attached to this API's custom domain names.
@@ -265,9 +247,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		return out.Items, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("acm", err)
-	}
+	walk := pagedRead(true, err)
 	var refs []string
 	var failures []Failure
 	total := 0
@@ -297,13 +277,13 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 		// them, which is a fetch failure rather than a lower bound over what
 		// was read.
 		if aggErr := AggregateFailures("apigw-related: GetApiMappings", failures, total); aggErr != nil && len(failures) == total {
-			return ReadFailed("acm", aggErr)
+			return alsoRead(ReadFailed("acm", aggErr), walk)
 		}
 	}
 	// Some GetApiMappings calls may have failed: ids is a proven subset, not
 	// necessarily exhaustive. Truncated (not Errored) keeps the row
 	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("acm", ids, dropped || len(failures) > 0 || !complete)
+	return alsoRead(relatedResultTrunc("acm", ids, dropped || len(failures) > 0 || !complete), walk)
 }
 
 // apigwDomainAPIs is the one reader of the APIs a custom domain sends
@@ -341,10 +321,7 @@ func apigwDomainRoutingRules(ctx context.Context, clients any, domain string) re
 		}
 		return out.RoutingRules, out.NextToken, nil
 	})
-	if err != nil {
-		return unreadBy(err)
-	}
-	read := relatedRead{partial: !complete}
+	read := pagedRead(complete, err)
 	for _, rule := range rules {
 		for _, action := range rule.Actions {
 			if action.InvokeApi != nil {
@@ -380,14 +357,11 @@ func apigwDomainMappings(ctx context.Context, clients any, domain string) relate
 		}
 		return out.Items, out.NextToken, nil
 	})
-	if err != nil {
-		return unreadBy(err)
-	}
-	read := relatedRead{partial: !complete}
+	read := pagedRead(complete, err)
 	for _, m := range mappings {
 		read.ids = append(read.ids, aws.ToString(m.ApiId))
 	}
-	if len(mappings) > 0 {
+	if len(mappings) > 0 || err != nil {
 		return read
 	}
 	baseAPI, ok := c.APIGatewayV1.(APIGatewayV1GetBasePathMappingsAPI)
@@ -401,10 +375,7 @@ func apigwDomainMappings(ctx context.Context, clients any, domain string) relate
 		}
 		return out.Items, out.Position, nil
 	})
-	if err != nil {
-		return unreadBy(err)
-	}
-	read = relatedRead{partial: !complete}
+	read = pagedRead(complete, err)
 	for _, b := range bases {
 		read.ids = append(read.ids, aws.ToString(b.RestApiId))
 	}
@@ -464,17 +435,11 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		return keyMissing("elb", "apiID")
 	}
 	items, complete, err := apigwIntegrations(ctx, clients, res)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("elb")
-		}
-		return ReadFailed("elb", err)
-	}
 	var refs []string
 	for _, item := range items {
 		refs = append(refs, item.loadBalancers...)
 	}
-	return listedRelated(ctx, clients, cache, "elb", refs, !complete)
+	return alsoRead(listedRelated(ctx, clients, cache, "elb", refs, false), pagedRead(complete, err))
 }
 
 // checkApigwRole reports IAM roles this API assumes to call an integration's
@@ -485,15 +450,9 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 		return keyMissing("role", "apiID")
 	}
 	items, complete, err := apigwIntegrations(ctx, clients, res)
-	integrations := relatedRead{partial: !complete}
-	if err != nil {
-		integrations = unreadBy(err)
-	}
+	integrations := pagedRead(complete, err)
 	refs, authComplete, err := apigwAuthorizerRoles(ctx, clients, res)
-	authorizers := relatedRead{partial: !authComplete}
-	if err != nil {
-		authorizers = unreadBy(err)
-	}
+	authorizers := pagedRead(authComplete, err)
 	for _, item := range items {
 		refs = append(refs, item.credentials)
 	}

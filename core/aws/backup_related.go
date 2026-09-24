@@ -37,15 +37,12 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		return out.BackupSelectionsList, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("role", err)
-	}
 	var refs []string
 	for _, sel := range sels {
 		refs = append(refs, aws.ToString(sel.IamRoleArn))
 	}
 	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
-	return relatedResultTrunc("role", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("role", ids, dropped), pagedRead(complete, err))
 }
 
 // checkBackupKMS resolves the KMS key(s) encrypting this plan's target

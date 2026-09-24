@@ -73,17 +73,19 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	var reads rowReads
 	for _, apiRes := range apiList {
 		items, complete, err := apigwIntegrations(ctx, clients, apiRes)
+		if slices.ContainsFunc(items, func(item apigwIntegration) bool {
+			return lambdaRefNamesFunction(lambdaIntegrationARN(item.uri), res.ID, rc)
+		}) {
+			reads.read++
+			ids = append(ids, apiRes.ID)
+			continue
+		}
 		if err != nil {
 			reads.fail(apiRes.ID, err)
 			continue
 		}
 		reads.read++
 		truncated = truncated || !complete
-		if slices.ContainsFunc(items, func(item apigwIntegration) bool {
-			return lambdaRefNamesFunction(lambdaIntegrationARN(item.uri), res.ID, rc)
-		}) {
-			ids = append(ids, apiRes.ID)
-		}
 	}
 	return reads.answer("apigw", "lambda-related: GetIntegrations", ids, truncated)
 }

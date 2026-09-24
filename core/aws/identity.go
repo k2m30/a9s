@@ -42,9 +42,17 @@ func FetchCallerIdentity(ctx context.Context, stsClient STSGetCallerIdentityAPI,
 	parseARN(id)
 
 	if iamClient != nil {
-		aliasOut, aliasErr := iamClient.ListAccountAliases(ctx, &iam.ListAccountAliasesInput{})
-		if aliasErr == nil && aliasOut != nil && len(aliasOut.AccountAliases) > 0 {
-			id.AccountAlias = aliasOut.AccountAliases[0]
+		// ListAccountAliases pages by IsTruncated and Marker
+		// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListAccountAliases.html).
+		aliases, _, aliasErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]string, *string, error) {
+			out, err := iamClient.ListAccountAliases(ctx, &iam.ListAccountAliasesInput{Marker: marker})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.AccountAliases, iamNextMarker(out.IsTruncated, out.Marker), nil
+		})
+		if aliasErr == nil && len(aliases) > 0 {
+			id.AccountAlias = aliases[0]
 		}
 	}
 

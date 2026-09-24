@@ -65,7 +65,8 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 	scanAPI, _ := api.(ECRDescribeImageScanFindingsAPI)
 	unread := make([]bool, len(pageImages))
 	if err := ForEachParallel(ctx, len(pageImages), EnrichmentParallelism, func(i int) {
-		unread[i] = ecrReadScanResults(ctx, scanAPI, repositoryName, &pageImages[i]) != nil
+		complete, err := ecrReadScanResults(ctx, scanAPI, repositoryName, &pageImages[i])
+		unread[i] = err != nil || !complete
 	}); err != nil {
 		return resource.FetchResult{}, fmt.Errorf("reading scan results for %s: %w", repositoryName, err)
 	}
@@ -108,34 +109,65 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 
 // ecrReadScanResults fills img's scan status and severity summary from
 // DescribeImageScanFindings: under Basic Scanning DescribeImages leaves both
-// empty. An image that already carries a summary is left as it is, and so is
-// one never scanned (ScanNotFoundException). A nil api is a client that
-// predates the call and reads nothing.
-func ecrReadScanResults(ctx context.Context, api ECRDescribeImageScanFindingsAPI, repo string, img *ecrtypes.ImageDetail) error {
+// empty. The counts are tallied from findings and enhancedFindings on every
+// page, since API_ImageScanFindings does not say whether its
+// findingSeverityCounts covers the scan or the page it rides on
+// (https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_ImageScanFindings.html).
+// complete is false when the walk stopped at its page cap, so the counts are
+// a lower bound. An image that already carries a summary is left as it is,
+// and so is one never scanned (ScanNotFoundException). A nil api is a client
+// that predates the call and reads nothing.
+func ecrReadScanResults(ctx context.Context, api ECRDescribeImageScanFindingsAPI, repo string, img *ecrtypes.ImageDetail) (complete bool, err error) {
 	if img.ImageScanFindingsSummary != nil || api == nil {
-		return nil
+		return true, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImageScanFindingsOutput, error) {
-		return api.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
+	var status *ecrtypes.ImageScanStatus
+	var summary *ecrtypes.ImageScanFindingsSummary
+	severities, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, callErr := api.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
 			RepositoryName: aws.String(repo),
 			ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
+			MaxResults:     aws.Int32(ecrPageSize),
+			NextToken:      token,
 		})
-	})
-	if _, notScanned := errors.AsType[*ecrtypes.ScanNotFoundException](err); notScanned {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	img.ImageScanStatus = out.ImageScanStatus
-	if f := out.ImageScanFindings; f != nil {
-		img.ImageScanFindingsSummary = &ecrtypes.ImageScanFindingsSummary{
-			FindingSeverityCounts:        f.FindingSeverityCounts,
+		if callErr != nil {
+			return nil, nil, callErr
+		}
+		status = out.ImageScanStatus
+		f := out.ImageScanFindings
+		if f == nil {
+			return nil, out.NextToken, nil
+		}
+		summary = &ecrtypes.ImageScanFindingsSummary{
 			ImageScanCompletedAt:         f.ImageScanCompletedAt,
 			VulnerabilitySourceUpdatedAt: f.VulnerabilitySourceUpdatedAt,
 		}
+		var sevs []string
+		for _, finding := range f.Findings {
+			sevs = append(sevs, string(finding.Severity))
+		}
+		for _, finding := range f.EnhancedFindings {
+			sevs = append(sevs, aws.ToString(finding.Severity))
+		}
+		return sevs, out.NextToken, nil
+	})
+	if _, notScanned := errors.AsType[*ecrtypes.ScanNotFoundException](err); notScanned {
+		return true, nil
 	}
-	return nil
+	if err != nil {
+		return false, err
+	}
+	img.ImageScanStatus = status
+	if summary != nil {
+		summary.FindingSeverityCounts = map[string]int32{}
+		for _, sev := range severities {
+			if sev != "" {
+				summary.FindingSeverityCounts[sev]++
+			}
+		}
+		img.ImageScanFindingsSummary = summary
+	}
+	return complete, nil
 }
 
 // convertECRImage converts a single ecrtypes.ImageDetail into a generic Resource.

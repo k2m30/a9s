@@ -71,16 +71,14 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 	// the walked pages never named is uninspected once the walk is cut, not
 	// private. Membership of the all-restorable set is decided by a single
 	// sighting, so a named snapshot stays answered.
-	public, pages, cut, walkErr := walkAccountPages(result, resources, oneItemPerRow,
+	public, pages, cut, walkErr := walkAccountPages(ctx, result, resources, oneItemPerRow,
 		func(snap ec2types.Snapshot) string { return aws.ToString(snap.SnapshotId) },
 		func(token *string) ([]ec2types.Snapshot, *string, error) {
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeSnapshotsOutput, error) {
-				return clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
-					OwnerIds:            []string{"self"},
-					RestorableByUserIds: []string{"all"},
-					MaxResults:          aws.Int32(DefaultPageSize),
-					NextToken:           token,
-				})
+			out, err := clients.EC2.DescribeSnapshots(ctx, &ec2svc.DescribeSnapshotsInput{
+				OwnerIds:            []string{"self"},
+				RestorableByUserIds: []string{"all"},
+				MaxResults:          aws.Int32(DefaultPageSize),
+				NextToken:           token,
 			})
 			if err != nil {
 				return nil, nil, err

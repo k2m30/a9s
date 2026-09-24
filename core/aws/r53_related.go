@@ -21,24 +21,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// r53ListRecordsFirstPage makes a single ListResourceRecordSets call for the
-// given hosted zone via RetryOnThrottle. Zone ID may be in the raw form
-// ("Z1ABCD") or canonical "/hostedzone/Z1ABCD"; the API accepts both. AWS
-// defaults this call to at most 100 records per page (no MaxItems is set
-// here), so truncated reports whether out.IsTruncated came back true — a
-// zone with more than 100 records has records this single call never saw.
-func r53ListRecordsFirstPage(ctx context.Context, clients any, zoneID string) (sets []r53types.ResourceRecordSet, truncated bool, err error) {
+// r53ListRecords reads the zone's record sets through r53ZoneRecords.
+// Zone ID may be in the raw form ("Z1ABCD") or canonical "/hostedzone/Z1ABCD";
+// the API accepts both. truncated reports record sets left unread.
+func r53ListRecords(ctx context.Context, clients any, zoneID string) (sets []r53types.ResourceRecordSet, truncated bool, err error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
 		return nil, false, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListResourceRecordSetsOutput, error) {
-		return c.Route53.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID})
-	})
-	if err != nil {
-		return nil, false, err
-	}
-	return out.ResourceRecordSets, out.IsTruncated, nil
+	sets, complete, err := r53ZoneRecords(ctx, c.Route53, zoneID)
+	return sets, !complete, err
 }
 
 // r53AliasDNSNames returns every AliasTarget.DNSName found across the record
@@ -69,7 +61,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if zoneID == "" {
 		return keyMissing("elb", "zoneID")
 	}
-	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("elb")
@@ -112,7 +104,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	if zoneID == "" {
 		return keyMissing("cf", "zoneID")
 	}
-	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("cf")
@@ -155,7 +147,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if zoneID == "" {
 		return keyMissing("apigw", "zoneID")
 	}
-	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("apigw")
@@ -182,7 +174,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	if zoneID == "" {
 		return keyMissing("s3", "zoneID")
 	}
-	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("s3")
@@ -227,7 +219,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 	if zoneID == "" {
 		return keyMissing("acm", "zoneID")
 	}
-	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
+	sets, recordsTruncated, err := r53ListRecords(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("acm")
@@ -294,11 +286,9 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 		return out.QueryLoggingConfigs, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("logs", err)
-	}
+	walk := pagedRead(configsComplete, err)
 	if len(configs) == 0 {
-		return relatedResultTrunc("logs", nil, !configsComplete)
+		return relatedAnswer("logs", walk)
 	}
 
 	var arns []string
@@ -309,11 +299,11 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	// Route 53 is a global service and writes public-zone query logs to a
 	// us-east-1 log group; each config's ARN names the Region holding it.
-	reads := map[string]relatedRead{"": {partial: !configsComplete}}
+	reads := map[string]relatedRead{"": walk}
 	for region, group := range refsByRegion(arns) {
 		reads[region] = readListIn(ctx, clients, cache, "logs", region, func(logList []resource.Resource, rc domain.RefContext, _ bool) relatedRead {
 			ids, lowerBound := listedRefs("logs", group, rc, logList)
-			return relatedRead{ids: ids, partial: lowerBound || !configsComplete}
+			return relatedRead{ids: ids, partial: lowerBound || walk.partial || walk.unread}
 		})
 	}
 	return regionalAnswer(clients, "logs", reads)

@@ -43,9 +43,11 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		if r.Name == "" {
 			return
 		}
-		out, err := clients.Glue.GetJobRuns(ctx, &glue.GetJobRunsInput{
-			JobName:    aws.String(r.Name),
-			MaxResults: aws.Int32(1),
+		out, err := firstPage(ctx, func() (*glue.GetJobRunsOutput, error) {
+			return clients.Glue.GetJobRuns(ctx, &glue.GetJobRunsInput{
+				JobName:    aws.String(r.Name),
+				MaxResults: aws.Int32(1),
+			})
 		})
 		mu.Lock()
 		defer mu.Unlock()

@@ -71,7 +71,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if r.Fields["type"] == "EXPRESS" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.ListExecutionsOutput, error) {
+		out, err := firstPage(ctx, func() (*sfn.ListExecutionsOutput, error) {
 			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
 				StateMachineArn: aws.String(smARN),
 				MaxResults:      1,

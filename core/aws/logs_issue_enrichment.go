@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -57,11 +58,13 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			if name == "" {
 				return
 			}
-			out, err := logStreamsAPI.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
-				LogGroupName: aws.String(name),
-				OrderBy:      "LastEventTime",
-				Descending:   aws.Bool(true),
-				Limit:        aws.Int32(1),
+			out, err := firstPage(ctx, func() (*cwlogssvc.DescribeLogStreamsOutput, error) {
+				return logStreamsAPI.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
+					LogGroupName: aws.String(name),
+					OrderBy:      "LastEventTime",
+					Descending:   aws.Bool(true),
+					Limit:        aws.Int32(1),
+				})
 			})
 			// no finding: last_event_at is a column, left empty when the read fails or the group has no stream.
 			if err != nil || len(out.LogStreams) == 0 || out.LogStreams[0].LastEventTimestamp == nil {
@@ -94,11 +97,21 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	loopErr := ForEachRow(ctx, &result, resourceIDs(audit), EnrichmentParallelism, func(i int) {
 		r := audit[i]
 		logGroupName := logGroupNameOf(r)
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cwlogssvc.DescribeMetricFiltersOutput, error) {
-			return metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
+		// DescribeMetricFilters pages by NextToken
+		// (https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeMetricFilters.html).
+		filters, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cwlogstypes.MetricFilter, *string, error) {
+			out, err := metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
 				LogGroupName: aws.String(logGroupName),
+				NextToken:    token,
 			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.MetricFilters, out.NextToken, nil
 		})
+		if err == nil && len(filters) == 0 && !complete {
+			err = fmt.Errorf("DescribeMetricFilters: more than %d pages for %s", PerParentPageCap, logGroupName)
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -106,7 +119,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			return
 		}
 
-		if len(out.MetricFilters) > 0 {
+		if len(filters) > 0 {
 			return
 		}
 

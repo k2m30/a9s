@@ -157,23 +157,23 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 // efsAccessPointIDs returns the IDs of fsID's access points, every page of
 // them.
 func efsAccessPointIDs(ctx context.Context, api EFSDescribeAccessPointsAPI, fsID string) ([]string, error) {
-	var ids []string
-	input := &efs.DescribeAccessPointsInput{FileSystemId: &fsID}
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
-			return api.DescribeAccessPoints(ctx, input)
-		})
+	// DescribeAccessPoints pages by NextToken
+	// (https://docs.aws.amazon.com/efs/latest/ug/API_DescribeAccessPoints.html).
+	points, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]efstypes.AccessPointDescription, *string, error) {
+		out, err := api.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{FileSystemId: &fsID, NextToken: token})
 		if err != nil {
-			return ids, err
+			return nil, nil, err
 		}
-		for _, ap := range out.AccessPoints {
-			if ap.AccessPointId != nil {
-				ids = append(ids, *ap.AccessPointId)
-			}
+		return out.AccessPoints, out.NextToken, nil
+	})
+	var ids []string
+	for _, ap := range points {
+		if ap.AccessPointId != nil {
+			ids = append(ids, *ap.AccessPointId)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			return ids, nil
-		}
-		input.NextToken = out.NextToken
 	}
+	if err == nil && !complete {
+		err = fmt.Errorf("DescribeAccessPoints: more than %d pages for %s", PerParentPageCap, fsID)
+	}
+	return ids, err
 }

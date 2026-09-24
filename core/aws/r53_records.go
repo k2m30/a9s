@@ -5,11 +5,9 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -144,44 +142,4 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 		},
 		RawStruct: record,
 	}
-}
-
-// errRecordPagesCapped is the walk stopping at its own page cap rather than
-// on anything AWS said. It is a cause a9s owns, so it reads as one.
-var errRecordPagesCapped = errors.New("record listing stopped at the page cap")
-
-// listAllR53Records walks a zone's record sets to PerParentPageCap and reports
-// whether it reached the end. Route 53 paginates records by a three-part
-// cursor rather than a token, so the walk lives here beside the cursor
-// encoding rather than in the enricher that consumes it.
-//
-// A non-nil error means the zone was not seen whole — a page failed, or the
-// walk hit the cap (errRecordPagesCapped). A dangling record found in the
-// pages that did arrive is still real, so the caller reports those and marks
-// the zone truncated: what a short walk cannot say is that the rest of the
-// zone is clean.
-func listAllR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (records []r53types.ResourceRecordSet, err error) {
-	// Route 53 resumes from a three-part cursor carried in input between
-	// pages; the token handed back only marks that another page follows.
-	input := &route53.ListResourceRecordSetsInput{HostedZoneId: &zoneID}
-	records, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, _ *string) ([]r53types.ResourceRecordSet, *string, error) {
-		out, callErr := api.ListResourceRecordSets(ctx, input)
-		if callErr != nil {
-			return nil, nil, callErr
-		}
-		if !out.IsTruncated {
-			return out.ResourceRecordSets, nil, nil
-		}
-		input.StartRecordName = out.NextRecordName
-		input.StartRecordType = out.NextRecordType
-		input.StartRecordIdentifier = out.NextRecordIdentifier
-		return out.ResourceRecordSets, aws.String("more"), nil
-	})
-	if err != nil {
-		return records, err
-	}
-	if !complete {
-		return records, errRecordPagesCapped
-	}
-	return records, nil
 }

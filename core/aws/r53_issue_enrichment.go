@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"net/netip"
@@ -222,9 +223,15 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 		markUninspected(result, r.ID, checkListIncomplete("address"))
 		return
 	}
-	records, recordsErr := listAllR53Records(ctx, clients.Route53, zoneID)
-	if recordsErr != nil {
+	// A dangling record found on the pages that were read is real; what a
+	// scan that did not read the whole zone cannot say is that the rest is
+	// clean.
+	records, complete, recordsErr := r53ZoneRecords(ctx, clients.Route53, zoneID)
+	switch {
+	case recordsErr != nil:
 		MarkSkipped(result, r.ID, failures, recordsErr)
+	case !complete:
+		markUninspected(result, r.ID, CheckCap)
 	}
 	for _, rec := range r53DanglingRecords(records, held) {
 		name := aws.ToString(rec.Name)
@@ -240,24 +247,28 @@ func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result 
 }
 
 // r53QueryLoggingFinding evaluates the query-logging row for one public zone.
-// A zone with no config on any page has none at all, so the walk stops at the
-// first config it sees rather than counting them.
+// A zone with no config on any page has none at all.
 func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, zoneID string) {
-	input := &r53svc.ListQueryLoggingConfigsInput{HostedZoneId: aws.String(zoneID)}
-	for {
-		logs, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.ListQueryLoggingConfigsOutput, error) {
-			return clients.Route53.ListQueryLoggingConfigs(ctx, input)
-		})
-		switch {
-		case err != nil:
-			MarkSkipped(result, r.ID, failures, err)
-			return
-		case len(logs.QueryLoggingConfigs) > 0:
-			return
-		case logs.NextToken == nil:
-			setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, []domain.DetailRow{{Label: "Zone type", Value: "public", Tier: tierOf(CodeR53QueryLoggingOff)}})
-			return
+	// ListQueryLoggingConfigs pages by NextToken
+	// (https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListQueryLoggingConfigs.html).
+	configs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]r53types.QueryLoggingConfig, *string, error) {
+		out, err := clients.Route53.ListQueryLoggingConfigs(ctx, &r53svc.ListQueryLoggingConfigsInput{HostedZoneId: aws.String(zoneID), NextToken: token})
+		if err != nil {
+			return nil, nil, err
 		}
-		input.NextToken = logs.NextToken
+		if len(out.QueryLoggingConfigs) > 0 {
+			// One config means query logging is on: the walk ends at the first.
+			return out.QueryLoggingConfigs, nil, nil
+		}
+		return out.QueryLoggingConfigs, out.NextToken, nil
+	})
+	if err == nil && len(configs) == 0 && !complete {
+		err = fmt.Errorf("ListQueryLoggingConfigs: more than %d pages for %s", PerParentPageCap, zoneID)
+	}
+	switch {
+	case err != nil:
+		MarkSkipped(result, r.ID, failures, err)
+	case len(configs) == 0:
+		setWave2Finding(result, r.ID, CodeR53QueryLoggingOff, []domain.DetailRow{{Label: "Zone type", Value: "public", Tier: tierOf(CodeR53QueryLoggingOff)}})
 	}
 }

@@ -605,7 +605,7 @@ const (
 	manyItemsPerRow sightingRule = false
 )
 
-// walkAccountPages runs an account-wide paginated walk bounded at
+// walkAccountPages runs an account-wide paginated walk, through PageAll, bounded at
 // EnrichmentCap pages and returns everything the walked pages carried.
 //
 // next reads one page for the given token and returns that page's items and
@@ -631,29 +631,30 @@ const (
 // The aggregate Truncated flag stays with the caller: a walk that can hide
 // only informational coverage lower-bounds no issue count.
 func walkAccountPages[T any](
+	ctx context.Context,
 	result *IssueEnricherResult,
 	resources []resource.Resource,
 	rule sightingRule,
 	idOf func(T) string,
 	next func(token *string) ([]T, *string, error),
 ) (items []T, pages int, cut bool, err error) {
-	seen := make(map[string]bool, len(resources))
-	var token *string
-	for pages < EnrichmentCap {
-		var page []T
-		page, token, err = next(token)
+	items, complete, err := PageAll(ctx, EnrichmentCap, func(_ context.Context, token *string) ([]T, *string, error) {
+		page, following, pageErr := next(token)
+		if pageErr == nil {
+			pages++
+		}
+		return page, following, pageErr
+	})
+	if err != nil {
 		pages++
-		if err != nil {
-			break
-		}
-		items = append(items, page...)
-		for _, item := range page {
-			if id := idOf(item); id != "" {
-				seen[id] = true
-			}
-		}
-		if token == nil || *token == "" {
-			return items, pages, false, nil
+	}
+	if complete {
+		return items, pages, false, nil
+	}
+	seen := make(map[string]bool, len(resources))
+	for _, item := range items {
+		if id := idOf(item); id != "" {
+			seen[id] = true
 		}
 	}
 	// A walk a refused page ended names that call; only a walk that ran out

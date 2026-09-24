@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Paged AWS reads follow every page. The policy list reaches every IAM group
+  and every inline policy past the first `ListGroups`/`ListGroupPolicies`
+  page, and says it is a lower bound when the walk stops at its cap. Kinesis
+  → CloudFormation finds the stack tag on a later tag page, and a Route 53
+  zone's record scan reads every record page, so an S3 bucket's Route 53 row
+  no longer reads as a confident zero when the scan failed or stopped
+  short. Enrichers that read one page on purpose (the newest activity, build,
+  run or execution) are the only single-page reads left, and a throttled
+  page of an account-wide walk is retried rather than ending the walk.
+  Opening EC2 instances, AMIs, EBS snapshots or network interfaces by ID
+  sends at most 1,000 IDs per call, and an AMI deregistered since it was
+  referenced no longer fails the whole drill.
+- ECR vulnerability counts are the newest image's, found by push time over
+  every `DescribeImages` page rather than taken from ten images in no set
+  order, and counted from the scan's findings on every page. A repository
+  too large to read in full is marked not inspected.
+- A page read that fails part-way keeps what it found. A related row whose
+  second page fails shows the matches from the first as a lower bound
+  instead of an error. API Gateway, WAF web ACL and DB cluster lists keep the
+  rows the other source returned when one source fails, and resume the
+  failed one on load more. A background refresh no longer shrinks a list
+  back to its first page when a page reports a failure on one of its own
+  rows. A VPC whose subnets could not be listed is marked not inspected for
+  flow logs rather than reported as having none, and Route 53's dangling
+  record check reads each record page once.
 - A detail opened on a row listed in another Region reads that Region: a
   certificate opened through a CloudFront distribution's ACM row from a
   session outside us-east-1 reads its details, related rows and CloudTrail

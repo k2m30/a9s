@@ -347,18 +347,26 @@ func scanRoleInlinePolicies(
 	roleName string,
 ) inlinePolicyScan {
 	var scan inlinePolicyScan
-	listOut, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
-		RoleName: aws.String(roleName),
+	// ListRolePolicies pages by IsTruncated and Marker
+	// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListRolePolicies.html).
+	policyNames, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]string, *string, error) {
+		out, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{RoleName: aws.String(roleName), Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		if out == nil {
+			return nil, nil, UnusableAnswerErr{Call: "ListRolePolicies", Field: "policy names"}
+		}
+		return out.PolicyNames, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
 	switch {
 	case err != nil:
 		scan.failures = append(scan.failures, FailedCall(roleName, err))
 		return scan
-	case listOut == nil:
-		scan.failures = append(scan.failures, UnusableAnswer(roleName, "ListRolePolicies returned no answer"))
-		return scan
+	case !complete:
+		scan.failures = append(scan.failures, UnusableAnswer(roleName, fmt.Sprintf("ListRolePolicies: more than %d pages", PerParentPageCap)))
 	}
-	for _, policyName := range listOut.PolicyNames {
+	for _, policyName := range policyNames {
 		getOut, getErr := getAPI.GetRolePolicy(ctx, &iam.GetRolePolicyInput{
 			RoleName:   aws.String(roleName),
 			PolicyName: aws.String(policyName),

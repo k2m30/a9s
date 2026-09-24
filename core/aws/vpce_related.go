@@ -119,9 +119,6 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		return out.FlowLogs, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("logs", err)
-	}
 	var refs []string
 	for _, fl := range flowLogs {
 		switch {
@@ -134,7 +131,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	ids, dropped := resolveRefs("logs", refs, refContext(clients, cache, "logs"))
-	return relatedResultTrunc("logs", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("logs", ids, dropped), pagedRead(complete, err))
 }
 
 // checkVPCER53 reports Route 53 private hosted zones associated with this VPC
@@ -173,13 +170,10 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache
 		}
 		return out.HostedZoneSummaries, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("r53", err)
-	}
 	var refs []string
 	for _, z := range zones {
 		refs = append(refs, aws.ToString(z.HostedZoneId))
 	}
 	ids, dropped := resolveRefs("r53", refs, refContext(clients, cache, "r53"))
-	return relatedResultTrunc("r53", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("r53", ids, dropped), pagedRead(complete, err))
 }

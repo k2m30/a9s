@@ -220,7 +220,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 // err when the list or every DescribeNodegroup was refused.
 func clusterNodegroups(ctx context.Context, c *ServiceClients, clusterName string) (ngs []ekstypes.Nodegroup, partial bool, err error) {
 	ngNames, ngComplete, err := listClusterNodegroups(ctx, c.EKS, clusterName)
-	if err != nil {
+	if err != nil && len(ngNames) == 0 {
 		return nil, false, err
 	}
 	var failures []Failure
@@ -241,9 +241,9 @@ func clusterNodegroups(ctx context.Context, c *ServiceClients, clusterName strin
 	}
 	aggErr := AggregateFailures("eks-related: DescribeNodegroup", failures, len(ngNames))
 	if aggErr != nil && len(failures) == len(ngNames) {
-		return nil, false, aggErr
+		return nil, false, errors.Join(err, aggErr)
 	}
-	return ngs, aggErr != nil || !ngComplete, nil
+	return ngs, aggErr != nil || !ngComplete || err != nil, err
 }
 
 // nodegroupASGNames lists the Auto Scaling groups behind the node groups.
@@ -353,14 +353,14 @@ func asgInstances(ctx context.Context, c *ServiceClients, asgNames []string, see
 			}
 			return out.AutoScalingGroups, out.NextToken, nil
 		})
-		if err != nil {
-			return false, err
-		}
 		partial = partial || !batchComplete
 		for _, asg := range asgs {
 			for _, id := range asgMembers(asg) {
 				seen[id] = struct{}{}
 			}
+		}
+		if err != nil {
+			return true, err
 		}
 	}
 	return partial, nil

@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -210,14 +211,23 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 		setWave2Finding(result, apiID, code, rows)
 	}
 
-	authorizers, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetAuthorizersOutput, error) {
-		return api.GetAuthorizers(ctx, &apigateway.GetAuthorizersInput{RestApiId: aws.String(apiID)})
+	// GetAuthorizers pages by Position
+	// (https://docs.aws.amazon.com/apigateway/latest/api/API_GetAuthorizers.html).
+	authorizers, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, position *string) ([]apigwtypes.Authorizer, *string, error) {
+		out, err := api.GetAuthorizers(ctx, &apigateway.GetAuthorizersInput{RestApiId: aws.String(apiID), Position: position})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.Position, nil
 	})
 	if err != nil {
 		return err
 	}
+	if len(authorizers) == 0 && !complete {
+		return fmt.Errorf("GetAuthorizers: more than %d pages for %s", PerParentPageCap, apiID)
+	}
 	var policyErr error
-	if len(authorizers.Items) == 0 {
+	if len(authorizers) == 0 {
 		endpoint := strings.ToLower(r.Fields["endpoint"])
 		// A method with no IAM authorization admits an anonymous caller only
 		// when the resource policy grants it and no Deny matches, so the API
@@ -286,23 +296,27 @@ func apigwRESTPolicy(r resource.Resource) string {
 // apigwHTTPNoAuthorizer evaluates the no-authorizer rule for one HTTP (v2) API. There is no
 // private endpoint type on v2, so an unauthorized one is always the warn code.
 func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, apiID string) error {
-	// One authorizer on any page is enough to clear the row, so the walk stops
-	// at the first page that has one.
-	input := &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(apiID)}
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
-			return clients.APIGatewayV2.GetAuthorizers(ctx, input)
-		})
-		switch {
-		case err != nil:
-			return err
-		case len(out.Items) > 0:
-			return nil
-		case out.NextToken == nil:
-			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
-			return nil
+	// GetAuthorizers pages by NextToken
+	// (https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-authorizers.html).
+	authorizers, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigatewayv2types.Authorizer, *string, error) {
+		out, err := clients.APIGatewayV2.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(apiID), NextToken: token})
+		if err != nil {
+			return nil, nil, err
 		}
-		input.NextToken = out.NextToken
+		if len(out.Items) > 0 {
+			// One authorizer clears the row: the walk ends at the first.
+			return out.Items, nil, nil
+		}
+		return out.Items, out.NextToken, nil
+	})
+	switch {
+	case err != nil:
+		return err
+	case len(authorizers) > 0:
+		return nil
+	case !complete:
+		return fmt.Errorf("GetAuthorizers: more than %d pages for %s", PerParentPageCap, apiID)
 	}
-
+	setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
+	return nil
 }

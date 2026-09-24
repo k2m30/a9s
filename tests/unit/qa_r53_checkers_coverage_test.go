@@ -1,5 +1,5 @@
-// Behavioural coverage for the R53 related-resource checkers. They read one
-// ListResourceRecordSets page per zone (r53ListRecordsFirstPage), which needs
+// Behavioural coverage for the R53 related-resource checkers. They read every
+// ListResourceRecordSets page of a zone through r53ZoneRecords, which needs
 // *ServiceClients with a non-nil Route53 field, and resolve targets through
 // FetchRelatedTarget.
 package unit_test

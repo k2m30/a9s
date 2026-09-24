@@ -15,60 +15,32 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchAMIsByIDs fetches specific AMIs by image ID, bypassing the
-// Owners=self filter the paginated fetcher applies. Used by the related-panel
-// lazy-add path so checkers referencing public or cross-account AMIs
-// (ec2→ami, asg→ami, eks→ami, ng→ami) still drill into a real entry instead
-// of landing on an empty list. DescribeImages accepts ImageIds as a batched
-// filter, so this is a single API call regardless of how many IDs were
-// requested (up to the AWS per-request limit).
-//
-// The DescribeImages call is wrapped in RetryOnThrottle. IDs that are not
-// present in the response (e.g. deleted, cross-account without explicit share)
-// are collected into a composite error returned alongside the partial results.
+// FetchAMIsByIDs fetches specific AMIs by image ID, for the related-panel
+// lazy-add path, so checkers referencing an AMI outside the account's own
+// images (ec2→ami, asg→ami, eks→ami, ng→ami) still drill into a real entry.
+// Missing and deregistered IDs (InvalidAMIID.NotFound) are handled by
+// fetchEC2ByIDs.
 func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string) ([]resource.Resource, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	filtered := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if id != "" {
-			filtered = append(filtered, id)
-		}
-	}
-	if len(filtered) == 0 {
-		return nil, nil
-	}
-	// IncludeDeprecated / IncludeDisabled: a batch drill from a related-panel
-	// pivot (ec2→ami, asg→ami, etc.) may reference a deprecated or disabled
-	// AMI; DescribeImages omits both by default, so without these flags those
-	// IDs silently vanish from results.
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
-		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
-			ImageIds:          filtered,
-			IncludeDeprecated: aws.Bool(true),
-			IncludeDisabled:   aws.Bool(true),
+	return fetchEC2ByIDs(ctx, "ami FetchByIDs", "InvalidAMIID.NotFound", "ami-", ids, func(ids []string) ([]resource.Resource, error) {
+		// IncludeDeprecated / IncludeDisabled: DescribeImages omits both by
+		// default, so without them a deprecated or disabled AMI a pivot
+		// names silently vanishes.
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
+			return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
+				ImageIds:          ids,
+				IncludeDeprecated: aws.Bool(true),
+				IncludeDisabled:   aws.Bool(true),
+			})
 		})
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fetching AMIs by id: %w", err)
-	}
-
-	returned := make(map[string]struct{}, len(out.Images))
-	resources := make([]resource.Resource, 0, len(out.Images))
-	for _, img := range out.Images {
-		r := imageResource(img)
-		resources = append(resources, r)
-		returned[r.ID] = struct{}{}
-	}
-
-	var failures []string
-	for _, id := range filtered {
-		if _, found := returned[id]; !found {
-			failures = append(failures, id)
+		if err != nil {
+			return nil, err
 		}
-	}
-	return resources, AggregateMissing("ami FetchByIDs", failures, len(filtered))
+		resources := make([]resource.Resource, 0, len(out.Images))
+		for _, img := range out.Images {
+			resources = append(resources, imageResource(img))
+		}
+		return resources, nil
+	})
 }
 
 // FetchAMIsPage calls the EC2 DescribeImages API and returns a single page

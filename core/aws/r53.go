@@ -86,12 +86,12 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 		recordsTruncated := ""
 		if recordSetsAPI != nil && zoneID != "" {
 			var aliasErr error
-			var pageTruncated bool
-			aliasTargets, s3WebsiteAliasNames, pageTruncated, aliasErr = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
+			var unread bool
+			aliasTargets, s3WebsiteAliasNames, unread, aliasErr = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
 			if aliasErr != nil {
 				failures = append(failures, FailedCall(zoneID, aliasErr))
 			}
-			if pageTruncated {
+			if unread {
 				recordsTruncated = "true"
 			}
 		}
@@ -139,8 +139,8 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 	}, AggregateFailures("ListResourceRecordSets", failures, len(output.HostedZones))
 }
 
-// enumerateR53AliasTargets lists one page of the zone's record sets and
-// returns two comma-separated lists:
+// enumerateR53AliasTargets reads the zone's record sets and returns two
+// comma-separated lists:
 //  1. aliasTargets — every AliasTarget.DNSName (for pivots that key off
 //     the DNSName shape, e.g. elb/cf).
 //  2. s3WebsiteAliasNames — record FQDNs (trailing dot stripped) whose
@@ -151,35 +151,61 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 //     name, NOT a substring of DNSName (which never contains the bucket
 //     name in real AWS).
 //
-// It also reports pageTruncated: the zone has record sets this one page did
-// not carry, so both lists are partial and the pivots joining on them owe the
-// operator a lower bound rather than a zero drawn from an unread page.
-//
-// Cost: one ListResourceRecordSets call per zone.
-// A call that did not answer returns the reason: both lists feed related
-// pivots that join on them, and an empty list read as "this zone aliases
-// nothing" is a confident zero drawn from a call nobody made.
-func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (aliasTargets, s3WebsiteNames string, pageTruncated bool, _ error) {
-	out, err := api.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId: aws.String(zoneID),
-	})
-	if err != nil {
-		return "", "", false, err
-	}
-	if out == nil {
-		return "", "", false, UnusableAnswerErr{Call: "ListResourceRecordSets", Field: "record sets"}
-	}
+// It also reports unread: record sets the scan did not read, past the page
+// cap or behind a failed page, so both lists are partial and the pivots
+// joining on them owe the operator a lower bound rather than a zero.
+func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (aliasTargets, s3WebsiteNames string, unread bool, _ error) {
+	sets, complete, err := r53ZoneRecords(ctx, api, zoneID)
 	var aliases []string
-	for _, rr := range out.ResourceRecordSets {
+	for _, rr := range sets {
 		if rr.AliasTarget == nil || rr.AliasTarget.DNSName == nil {
 			continue
 		}
 		aliases = append(aliases, *rr.AliasTarget.DNSName)
 	}
 	return strings.Join(aliases, ","),
-		strings.Join(r53S3WebsiteBucketNames(out.ResourceRecordSets), ","),
-		out.IsTruncated,
-		nil
+		strings.Join(r53S3WebsiteBucketNames(sets), ","),
+		!complete,
+		err
+}
+
+// r53ZoneRecords is the one reader of a zone's record sets. The list pages
+// by IsTruncated; the next request starts at NextRecordName, NextRecordType
+// and NextRecordIdentifier
+// (https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListResourceRecordSets.html).
+// A truncated page with no next record is read as a scan that stopped, not a
+// whole zone. The cursor joins the three Start* values on a newline, which no
+// record name holds.
+func r53ZoneRecords(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) ([]r53types.ResourceRecordSet, bool, error) {
+	stuck := false
+	sets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, cursor *string) ([]r53types.ResourceRecordSet, *string, error) {
+		in := &route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(zoneID)}
+		if cursor != nil {
+			name, rest, _ := strings.Cut(*cursor, "\n")
+			typ, id, _ := strings.Cut(rest, "\n")
+			in.StartRecordName, in.StartRecordType = aws.String(name), r53types.RRType(typ)
+			if id != "" {
+				in.StartRecordIdentifier = aws.String(id)
+			}
+		}
+		out, err := api.ListResourceRecordSets(ctx, in)
+		if err != nil {
+			return nil, nil, err
+		}
+		if out == nil {
+			return nil, nil, UnusableAnswerErr{Call: "ListResourceRecordSets", Field: "record sets"}
+		}
+		if !out.IsTruncated {
+			return out.ResourceRecordSets, nil, nil
+		}
+		if out.NextRecordName == nil {
+			stuck = true
+			return out.ResourceRecordSets, nil, nil
+		}
+		next := aws.ToString(out.NextRecordName) + "\n" + string(out.NextRecordType) + "\n" + aws.ToString(out.NextRecordIdentifier)
+		return out.ResourceRecordSets, &next, nil
+	})
+	return sets, complete && !stuck && err == nil, err
 }
 
 // r53S3WebsiteBucketNames returns the bucket each S3-website alias record in

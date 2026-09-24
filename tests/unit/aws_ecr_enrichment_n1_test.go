@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecrsvc "github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -121,20 +122,24 @@ func TestEnrichECRRepository_N1_OneCallPerRepo(t *testing.T) {
 	}
 }
 
-func TestEnrichECRRepository_N1_CriticalAggregatesAcrossImages(t *testing.T) {
+// The repository's counts are its newest image's, found by imagePushedAt:
+// DescribeImages documents no order
+// (https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImages.html),
+// so the image listed first is not the latest. An older image's criticals do
+// not add to the newest image's.
+func TestEnrichECRRepository_N1_CountsAreTheNewestImages(t *testing.T) {
 	const repo = "repo-with-crits"
+	older := ecrImageDetailWithCounts(repo, map[string]int32{
+		string(ecrtypes.FindingSeverityCritical): 2,
+	})
+	older.ImagePushedAt = aws.Time(time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC))
+	newest := ecrImageDetailWithCounts(repo, map[string]int32{
+		string(ecrtypes.FindingSeverityCritical): 1,
+		string(ecrtypes.FindingSeverityHigh):     5,
+	})
+	newest.ImagePushedAt = aws.Time(time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC))
 	fake := &ecrDescribeImagesFake{
-		detailsByRepo: map[string][]ecrtypes.ImageDetail{
-			repo: {
-				ecrImageDetailWithCounts(repo, map[string]int32{
-					string(ecrtypes.FindingSeverityCritical): 2,
-				}),
-				ecrImageDetailWithCounts(repo, map[string]int32{
-					string(ecrtypes.FindingSeverityCritical): 1,
-					string(ecrtypes.FindingSeverityHigh):     5,
-				}),
-			},
-		},
+		detailsByRepo: map[string][]ecrtypes.ImageDetail{repo: {older, newest}},
 	}
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repo)}
@@ -147,18 +152,17 @@ func TestEnrichECRRepository_N1_CriticalAggregatesAcrossImages(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q", repo)
 	}
-	f := fs[0]
-	if f.Severity != domain.SevBroken {
-		t.Errorf("severity = %v, want %v", f.Severity, "!")
+	if f := fs[0]; f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, domain.SevBroken)
 	}
-	if got := result.FieldUpdates[repo]["critical_vulns"]; got != "3" {
-		t.Errorf("critical_vulns = %q, want 3 (aggregate across both images)", got)
+	if got := result.FieldUpdates[repo]["critical_vulns"]; got != "1" {
+		t.Errorf("critical_vulns = %q, want 1 (the newest image's, not summed with the older image's 2)", got)
 	}
 	if got := result.FieldUpdates[repo]["high_vulns"]; got != "5" {
 		t.Errorf("high_vulns = %q, want 5", got)
 	}
-	if got := result.FieldUpdates[repo]["images_scanned"]; got != "2" {
-		t.Errorf("images_scanned = %q, want 2", got)
+	if got := result.FieldUpdates[repo]["images_scanned"]; got != "1" {
+		t.Errorf("images_scanned = %q, want 1 (the newest image)", got)
 	}
 }
 

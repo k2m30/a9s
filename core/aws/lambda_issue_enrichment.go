@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -167,16 +168,25 @@ func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, own
 
 // lambdaFunctionURLExposure reports a function URL whose AuthType is NONE.
 func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlConfigsAPI, name string) ([]domain.DetailRow, bool, error) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListFunctionUrlConfigsOutput, error) {
-		return api.ListFunctionUrlConfigs(ctx, &lambda.ListFunctionUrlConfigsInput{FunctionName: aws.String(name)})
+	// ListFunctionUrlConfigs pages by Marker and NextMarker
+	// (https://docs.aws.amazon.com/lambda/latest/api/API_ListFunctionUrlConfigs.html).
+	configs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]lambdatypes.FunctionUrlConfig, *string, error) {
+		out, err := api.ListFunctionUrlConfigs(ctx, &lambda.ListFunctionUrlConfigsInput{FunctionName: aws.String(name), Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		if out == nil {
+			return nil, nil, UnusableAnswerErr{Call: "ListFunctionUrlConfigs", Field: "function URL configs"}
+		}
+		return out.FunctionUrlConfigs, out.NextMarker, nil
 	})
 	if err != nil {
 		return nil, false, err
 	}
-	if out == nil {
-		return nil, false, nil
+	if !complete {
+		return nil, false, fmt.Errorf("ListFunctionUrlConfigs: more than %d pages for %s", PerParentPageCap, name)
 	}
-	for _, cfg := range out.FunctionUrlConfigs {
+	for _, cfg := range configs {
 		if cfg.AuthType != lambdatypes.FunctionUrlAuthTypeNone {
 			continue
 		}

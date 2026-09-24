@@ -202,10 +202,9 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		return keyMissing("policy", "roleName")
 	}
 	attached, complete, err := listAttachedRolePolicies(ctx, c.IAM, roleName)
-	if err != nil {
-		return ReadFailed("policy", err)
-	}
-	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
+	read := pagedRead(complete, err)
+	read.ids = attachedPolicyIDs(attached)
+	return relatedAnswer("policy", read)
 }
 
 // checkRoleEC2 lists the instance profiles that hold this role
@@ -258,14 +257,11 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 		return out.InstanceProfiles, out.Marker, nil
 	})
-	if err != nil {
-		return ReadFailed("ec2", err)
-	}
 	var ids []string
 	for _, ec2Res := range ec2List {
 		if slices.ContainsFunc(profiles, func(p iamtypes.InstanceProfile) bool { return aws.ToString(p.Arn) == profileOf[ec2Res.ID] }) {
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	return relatedResultTrunc("ec2", ids, truncated || !complete)
+	return alsoRead(relatedResultTrunc("ec2", ids, truncated), pagedRead(complete, err))
 }

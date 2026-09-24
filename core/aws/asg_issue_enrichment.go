@@ -51,7 +51,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		total++
 		mu.Unlock()
 		name := r.ID
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeScalingActivitiesOutput, error) {
+		out, err := firstPage(ctx, func() (*autoscaling.DescribeScalingActivitiesOutput, error) {
 			return clients.AutoScaling.DescribeScalingActivities(ctx, &autoscaling.DescribeScalingActivitiesInput{
 				AutoScalingGroupName: &name,
 				MaxRecords:           aws.Int32(1),

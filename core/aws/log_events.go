@@ -116,7 +116,7 @@ func readStreamPage(ctx context.Context, api CWLogsGetLogEventsAPI, group, strea
 	probeInput := *input
 	probeInput.NextToken = aws.String(back)
 	probeInput.Limit = aws.Int32(1)
-	probe, err := api.GetLogEvents(ctx, &probeInput)
+	probe, err := firstPage(ctx, func() (*cloudwatchlogs.GetLogEventsOutput, error) { return api.GetLogEvents(ctx, &probeInput) })
 	if err == nil && len(probe.Events) == 0 && aws.ToString(probe.NextBackwardToken) == back {
 		return out.Events, "", nil
 	}

@@ -152,9 +152,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		return out.Listeners, out.NextMarker, nil
 	})
-	if err != nil {
-		return ReadFailed("acm", err)
-	}
+	walk := pagedRead(true, err)
 	var ids []string
 	seen := make(map[string]bool)
 	add := func(certs []elbv2types.Certificate) {
@@ -199,12 +197,12 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	if aggErr := AggregateFailures("elb-related: DescribeListenerCertificates", failures, len(listeners)); aggErr != nil && len(ids) == 0 {
 		// Nothing was read at all: the failures establish nothing about how
 		// many certificates the listeners carry, only that the attempt failed.
-		return ReadFailed("acm", aggErr)
+		return alsoRead(ReadFailed("acm", aggErr), walk)
 	}
 	// A listener whose certificate list could not be read may serve one this
 	// count does not name, so what was read is a lower bound rather than a
 	// dead end.
-	return relatedResultTrunc("acm", ids, !complete || len(failures) > 0)
+	return alsoRead(relatedResultTrunc("acm", ids, !complete || len(failures) > 0), walk)
 }
 
 // checkELBCF reports CloudFront distributions using this ELB as an origin.

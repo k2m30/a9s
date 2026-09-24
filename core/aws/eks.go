@@ -177,16 +177,20 @@ func eksVersionCatalogue(ctx context.Context, api EKSAPI) map[string]ekstypes.Cl
 	if !ok {
 		return nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeClusterVersionsOutput, error) {
-		return versionsAPI.DescribeClusterVersions(ctx, &eks.DescribeClusterVersionsInput{
-			IncludeAll: aws.Bool(true),
-		})
+	// DescribeClusterVersions pages by NextToken
+	// (https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeClusterVersions.html).
+	versions, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ekstypes.ClusterVersionInformation, *string, error) {
+		out, err := versionsAPI.DescribeClusterVersions(ctx, &eks.DescribeClusterVersionsInput{IncludeAll: aws.Bool(true), NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.ClusterVersions, out.NextToken, nil
 	})
 	if err != nil {
 		return nil
 	}
-	catalogue := make(map[string]ekstypes.ClusterVersionInformation, len(out.ClusterVersions))
-	for _, v := range out.ClusterVersions {
+	catalogue := make(map[string]ekstypes.ClusterVersionInformation, len(versions))
+	for _, v := range versions {
 		if key := aws.ToString(v.ClusterVersion); key != "" {
 			catalogue[key] = v
 		}

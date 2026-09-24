@@ -61,14 +61,11 @@ func kinesisConsumerARNs(ctx context.Context, clients any, streamARN string) ([]
 		}
 		return out.Consumers, out.NextToken, nil
 	})
-	if err != nil {
-		return nil, unreadBy(err)
-	}
 	arns := make([]string, 0, len(consumers))
 	for _, cons := range consumers {
 		arns = append(arns, aws.ToString(cons.ConsumerARN))
 	}
-	return arns, relatedRead{partial: !complete}
+	return arns, pagedRead(complete, err)
 }
 
 // checkKinesisCFN calls kinesis:ListTagsForStream and looks up the
@@ -86,21 +83,31 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return NotRead("cfn")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.ListTagsForStreamOutput, error) {
-		return tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName)})
+	// ListTagsForStream pages by HasMoreTags, resuming after
+	// ExclusiveStartTagKey, the last key read
+	// (https://docs.aws.amazon.com/kinesis/latest/APIReference/API_ListTagsForStream.html).
+	tags, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, lastKey *string) ([]kinesistypes.Tag, *string, error) {
+		out, err := tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName), ExclusiveStartTagKey: lastKey})
+		if err != nil {
+			return nil, nil, err
+		}
+		if !aws.ToBool(out.HasMoreTags) || len(out.Tags) == 0 {
+			return out.Tags, nil, nil
+		}
+		return out.Tags, out.Tags[len(out.Tags)-1].Key, nil
 	})
-	if err != nil {
-		return ReadFailed("cfn", err)
-	}
 	stackName := ""
-	for _, tag := range out.Tags {
-		if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil {
-			stackName = *tag.Value
+	for _, tag := range tags {
+		if aws.ToString(tag.Key) == "aws:cloudformation:stack-name" {
+			stackName = aws.ToString(tag.Value)
 			break
 		}
 	}
 	if stackName == "" {
-		return foundNone("cfn", "stackName")
+		if err != nil {
+			return relatedAnswer("cfn", unreadBy(err))
+		}
+		return relatedAnswer("cfn", relatedRead{partial: !complete})
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {

@@ -39,16 +39,14 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return NotRead("vpc")
 	}
 	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
-	if err != nil {
-		return ReadFailed("vpc", err)
-	}
+	walk := pagedRead(complete, err)
 	var ids []string
 	for _, att := range atts {
 		if att.VpcId != nil && *att.VpcId != "" {
 			ids = append(ids, *att.VpcId)
 		}
 	}
-	return relatedResultTrunc("vpc", ids, !complete)
+	return alsoRead(relatedResultTrunc("vpc", ids, false), walk)
 }
 
 // tgwVpcAttachments walks the live VPC attachments of one transit gateway.
@@ -177,9 +175,7 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 		return NotRead("subnet")
 	}
 	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
-	if err != nil {
-		return ReadFailed("subnet", err)
-	}
+	walk := pagedRead(complete, err)
 	seen := make(map[string]bool)
 	var ids []string
 	for _, att := range atts {
@@ -191,5 +187,5 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 			ids = append(ids, sID)
 		}
 	}
-	return relatedResultTrunc("subnet", ids, !complete)
+	return alsoRead(relatedResultTrunc("subnet", ids, false), walk)
 }

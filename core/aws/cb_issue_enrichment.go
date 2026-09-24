@@ -55,8 +55,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		// Descending is already the default, and setting the sort order at
 		// all is an error once a project has more than 100 builds — exactly
 		// the busy projects whose latest build matters most.
-		out, err := clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
-			ProjectName: aws.String(name),
+		out, err := firstPage(ctx, func() (*codebuild.ListBuildsForProjectOutput, error) {
+			return clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
+				ProjectName: aws.String(name),
+			})
 		})
 		mu.Lock()
 		defer mu.Unlock()

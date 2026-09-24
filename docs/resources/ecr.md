@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: ECR Repositories
 - **AWS API reference**: <https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html>
 - **List API**: `DescribeRepositories` (returns `Repository` objects with `RepositoryName`, `RepositoryArn`, `RepositoryUri`, `RegistryId`, `CreatedAt`, `ImageTagMutability`, `ImageScanningConfiguration`, `EncryptionConfiguration` — no runtime state field; a repo is always "available" once created).
-- **Describe API (if any)**: `DescribeImages` (per repository, used in Wave 2 to list up to ten images) and `DescribeImageScanFindings` (per image, for its severity counts — Basic Scanning leaves `imageScanFindingsSummary` and `imageScanStatus` empty on `DescribeImages`).
+- **Describe API (if any)**: `DescribeImages` (per repository, every page, used in Wave 2 to find the newest image) and `DescribeImageScanFindings` (for that image, every page, for its severity counts — Basic Scanning leaves `imageScanFindingsSummary` and `imageScanStatus` empty on `DescribeImages`).
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -101,16 +101,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: the repository's images carry `imageScanFindings.findingSeverityCounts.CRITICAL>0` → CRITICAL vulnerabilities present.
+- **Signal**: the newest image (largest `imagePushedAt`) has a CRITICAL finding → CRITICAL vulnerabilities present.
   - **State bucket**: Broken.
-  - **API call**: `DescribeImages` (`maxResults=10`) — one call per repository — then `DescribeImageScanFindings` once per returned image; the counts are summed across those images.
+  - **API call**: `DescribeImages` over every page — it documents no order and cannot sort, so the newest image is found by comparing `imagePushedAt` — then `DescribeImageScanFindings` for that image over every page. The severities are counted from `findings[]` and `enhancedFindings[]`: [API_ImageScanFindings](https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_ImageScanFindings.html) does not say whether `findingSeverityCounts` covers the scan or the page.
   - **Cost shape**: per-resource.
 
 - **Signal**: the same counts show `HIGH>0` (and `CRITICAL==0`) → HIGH-severity vulnerabilities present.
   - **State bucket**: Warning.
   - **API call**: the same `DescribeImageScanFindings` answers as above — no extra call.
   - **Cost shape**: per-resource.
-  - Note: an image never scanned answers `ScanNotFoundException` and contributes nothing. A repository with an image whose scan results could not be read shows no count and is not inspected — never a proven 0.
+  - Note: an image never scanned answers `ScanNotFoundException` and contributes nothing. A repository whose image list or newest image's scan results could not be read in full shows no count and is not inspected — never a proven 0.
 
 - **Signal**: the repository policy grants a wildcard principal.
   - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.

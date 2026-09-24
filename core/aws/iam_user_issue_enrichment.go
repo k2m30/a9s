@@ -90,8 +90,14 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		hasMFA := false
 		if hasConsolePassword {
-			mfaOut, mfaErr := mfaAPI.ListMFADevices(ctx, &iam.ListMFADevicesInput{
-				UserName: aws.String(userName),
+			// ListMFADevices pages by IsTruncated and Marker
+			// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListMFADevices.html).
+			devices, _, mfaErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.MFADevice, *string, error) {
+				out, err := mfaAPI.ListMFADevices(ctx, &iam.ListMFADevicesInput{UserName: aws.String(userName), Marker: marker})
+				if err != nil {
+					return nil, nil, err
+				}
+				return out.MFADevices, iamNextMarker(out.IsTruncated, out.Marker), nil
 			})
 			if mfaErr != nil {
 				mu.Lock()
@@ -100,12 +106,21 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				mu.Unlock()
 				return
 			}
-			hasMFA = len(mfaOut.MFADevices) > 0
+			hasMFA = len(devices) > 0
 		}
 
-		keysOut, keysErr := accessKeyAPI.ListAccessKeys(ctx, &iam.ListAccessKeysInput{
-			UserName: aws.String(userName),
+		// ListAccessKeys pages by IsTruncated and Marker
+		// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListAccessKeys.html).
+		keys, keysComplete, keysErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.AccessKeyMetadata, *string, error) {
+			out, err := accessKeyAPI.ListAccessKeys(ctx, &iam.ListAccessKeysInput{UserName: aws.String(userName), Marker: marker})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.AccessKeyMetadata, iamNextMarker(out.IsTruncated, out.Marker), nil
 		})
+		if keysErr == nil && !keysComplete {
+			keysErr = fmt.Errorf("ListAccessKeys: more than %d pages for %s", PerParentPageCap, userName)
+		}
 		if keysErr != nil {
 			mu.Lock()
 			truncated = true
@@ -122,7 +137,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			mu.Unlock()
 		}
 
-		activeKeys := activeAccessKeys(keysOut.AccessKeyMetadata)
+		activeKeys := activeAccessKeys(keys)
 		unusedKeys, keyUseErr := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
 
 		mu.Lock()

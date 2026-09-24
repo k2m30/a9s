@@ -106,15 +106,12 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		return out.TargetGroups, out.NextMarker, nil
 	})
-	if err != nil {
-		return ReadFailed("elb", err)
-	}
 	var refs []string
 	for _, tg := range tgs {
 		refs = append(refs, tg.LoadBalancerArns...)
 	}
 	ids, dropped := resolveRefs("elb", refs, refContext(clients, cache, "elb"))
-	return relatedResultTrunc("elb", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("elb", ids, dropped), pagedRead(complete, err))
 }
 
 // checkASGRole reports the group's roles: its service-linked role, and the

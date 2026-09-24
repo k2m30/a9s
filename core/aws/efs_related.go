@@ -185,9 +185,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		return out.AccessPoints, out.NextToken, nil
 	})
-	if err != nil {
-		return ReadFailed("lambda", err)
-	}
+	accessPoints := pagedRead(apsComplete, err)
 	apARNs := make(map[string]struct{})
 	for _, ap := range aps {
 		if ap.AccessPointArn != nil && *ap.AccessPointArn != "" {
@@ -196,7 +194,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(apARNs) == 0 {
 		// No access points exist for this filesystem — no Lambda can mount it.
-		return relatedResultTrunc("lambda", nil, !apsComplete)
+		return relatedAnswer("lambda", accessPoints)
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -223,7 +221,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	return relatedResultTrunc("lambda", ids, truncated || !apsComplete)
+	return alsoRead(relatedResultTrunc("lambda", ids, truncated), accessPoints)
 }
 
 // checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.

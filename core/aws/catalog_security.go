@@ -146,9 +146,10 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			if err != nil {
 				return result, err
 			}
-			// Inline group policies are not paginated by AWS — fetch once on the
-			// first page only. Appending on every continuation token would
-			// duplicate the same inline rows across pages. fetchInlineGroupPolicies
+			// The inline sweep walks every group and inline-policy page itself,
+			// so it runs on the first list page only. Appending on every
+			// continuation token would duplicate the same inline rows across
+			// pages. fetchInlineGroupPolicies
 			// itself fans the per-group ListGroupPolicies sweep out with bounded
 			// concurrency (core/aws/iam_policies.go) so this stays well inside
 			// any real list-open caller's deadline. The availability/count probe
@@ -158,15 +159,23 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			if continuationToken != "" {
 				return result, nil
 			}
-			inlines, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
+			inlines, whole, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
 			// Partial failure: inline group policy enumeration failed for some
 			// groups. Preserve the inline results we did get, then propagate the
 			// composite error so app.go's ResourcesLoadedMsg handler surfaces it
 			// via FlashMsg → `!` log. Managed policies above are
 			// still returned in result.Resources regardless.
 			result.Resources = append(result.Resources, inlines...)
-			if result.Pagination != nil {
-				result.Pagination.PageSize = len(result.Resources)
+			if result.Pagination == nil {
+				result.Pagination = &resource.PaginationMeta{}
+			}
+			result.Pagination.PageSize = len(result.Resources)
+			if !whole && !result.Pagination.IsTruncated {
+				// The sweep stopped at PerParentPageCap with groups or inline
+				// policies unread: a lower bound with no cursor to resume.
+				result.Pagination.IsTruncated = true
+				result.Pagination.LowerBoundOnly = true
+				result.Pagination.TotalHint = -1
 			}
 			return result, inlineErr
 		}),

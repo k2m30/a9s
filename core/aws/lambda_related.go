@@ -173,11 +173,8 @@ func lambdaDLQUsers(ctx context.Context, clients any, cache resource.ResourceCac
 // resolver.
 func lambdaEventSourceRefs(ctx context.Context, api LambdaListEventSourceMappingsAPI, functionName, target, service string, rc domain.RefContext) resource.RelatedCheckResult {
 	mappings, complete, err := listEventSourceMappings(ctx, api, lambda.ListEventSourceMappingsInput{FunctionName: &functionName})
-	if err != nil {
-		return ReadFailed(target, err)
-	}
 	ids, dropped := resolveRefs(target, eventSourceARNs(mappings, service), rc)
-	return relatedResultTrunc(target, ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc(target, ids, dropped), pagedRead(complete, err))
 }
 
 // listEventSourceMappings walks ListEventSourceMappings for the function or

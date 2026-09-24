@@ -283,7 +283,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichVPCFlowLogs, Priority: 100},
 		IssueEnricherFieldKeys: []string{"flow_logs"},
-		FieldKeys:              []string{"vpc_id", "name", "cidr_block", "state", "is_default", "subnet_ids"},
+		FieldKeys:              []string{"vpc_id", "name", "cidr_block", "state", "is_default", "subnet_ids", "subnet_ids_unread"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCSubnet, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCSG, NeedsTargetCache: true, Truncated: true, Mirror: true},

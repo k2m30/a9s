@@ -385,22 +385,23 @@ func TestWave2DeniedCalls_NoEnricherRaisesAFindingTheDataRefutes(t *testing.T) {
 }
 
 // bkEC2Fake serves DescribeInstanceStatus and DescribeSnapshots from ordered
-// pages; a nil page with an error is a refused call.
+// pages. A DescribeInstanceStatus request carrying statusErrToken is refused
+// with statusErr on every attempt, so a retry never reads that page.
 type bkEC2Fake struct {
 	awsclient.EC2API
-	statusPages []*ec2sdk.DescribeInstanceStatusOutput
-	statusErrAt int
-	statusErr   error
-	statusCalls int
-	snapErr     error
+	statusPages    []*ec2sdk.DescribeInstanceStatusOutput
+	statusErrToken string
+	statusErr      error
+	statusCalls    int
+	snapErr        error
 }
 
-func (f *bkEC2Fake) DescribeInstanceStatus(_ context.Context, _ *ec2sdk.DescribeInstanceStatusInput, _ ...func(*ec2sdk.Options)) (*ec2sdk.DescribeInstanceStatusOutput, error) {
-	i := f.statusCalls
-	f.statusCalls++
-	if f.statusErr != nil && i == f.statusErrAt {
+func (f *bkEC2Fake) DescribeInstanceStatus(_ context.Context, in *ec2sdk.DescribeInstanceStatusInput, _ ...func(*ec2sdk.Options)) (*ec2sdk.DescribeInstanceStatusOutput, error) {
+	if f.statusErr != nil && aws.ToString(in.NextToken) == f.statusErrToken {
 		return nil, f.statusErr
 	}
+	i := f.statusCalls
+	f.statusCalls++
 	if i >= len(f.statusPages) {
 		return &ec2sdk.DescribeInstanceStatusOutput{}, nil
 	}
@@ -463,8 +464,9 @@ func TestEBSSnapPublicWalk_RefusedCallIsNotReportedAsTheCap(t *testing.T) {
 }
 
 // TestEC2StatusWalk_ThrottledPageNamesTheCall: page 1 answers for one
-// instance, page 2 is throttled. The instance page 1 named keeps its answer;
-// the one it did not is uninspected because of DescribeInstanceStatus.
+// instance, page 2 stays throttled through every retry. The instance page 1
+// named keeps its answer; the one it did not is uninspected because of
+// DescribeInstanceStatus.
 func TestEC2StatusWalk_ThrottledPageNamesTheCall(t *testing.T) {
 	const seen, unseen = "i-0aaa111111111111a", "i-0bbb222222222222b"
 	fake := &bkEC2Fake{
@@ -472,8 +474,8 @@ func TestEC2StatusWalk_ThrottledPageNamesTheCall(t *testing.T) {
 			InstanceStatuses: []ec2types.InstanceStatus{bkInstanceStatus(seen)},
 			NextToken:        aws.String("page-2"),
 		}},
-		statusErrAt: 1,
-		statusErr:   bkOpErr("EC2", "DescribeInstanceStatus", "RequestLimitExceeded"),
+		statusErrToken: "page-2",
+		statusErr:      bkOpErr("EC2", "DescribeInstanceStatus", "RequestLimitExceeded"),
 	}
 
 	res, _ := awsclient.EnrichEC2InstanceStatus(context.Background(), &awsclient.ServiceClients{EC2: fake}, bkInstances(seen, unseen), nil) //nolint:errcheck // the throttled page's error is not under test

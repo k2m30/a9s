@@ -300,7 +300,7 @@ func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) 
 		}
 		return out.DBSubnetGroups, out.Marker, nil
 	})
-	if err != nil {
+	if err != nil && len(groups) == 0 {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
 	if len(groups) == 0 {
@@ -336,7 +336,7 @@ func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource
 		}
 		return out.DBSubnetGroups, out.Marker, nil
 	})
-	if err != nil {
+	if err != nil && len(groups) == 0 {
 		return nil, fmt.Errorf("describing subnet group %s: %w", name, err)
 	}
 	if len(groups) == 0 {

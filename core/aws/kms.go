@@ -141,34 +141,37 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 // guard.
 func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string][]string, []Failure) {
 	var failures []Failure
+	stuck := false
+	// ListAliases pages by Truncated and NextMarker, sent back as Marker
+	// (https://docs.aws.amazon.com/kms/latest/APIReference/API_ListAliases.html).
+	aliases, complete, aliasErr := PageAll(ctx, EnrichmentCap, func(ctx context.Context, marker *string) ([]kmstypes.AliasListEntry, *string, error) {
+		out, err := c.KMS.ListAliases(ctx, &kms.ListAliasesInput{Limit: aws.Int32(DefaultPageSize), Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		if out.Truncated && out.NextMarker == nil {
+			stuck = true
+		}
+		if !out.Truncated {
+			return out.Aliases, nil, nil
+		}
+		return out.Aliases, out.NextMarker, nil
+	})
+	switch {
+	case aliasErr != nil:
+		// Soft-fallback: aliases become empty strings, but record the failure
+		// so operators know aliases may be missing.
+		failures = append(failures, FailedCall("ListAliases", aliasErr))
+	case stuck:
+		failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
+	case !complete:
+		failures = append(failures, UnusableAnswer("ListAliases", fmt.Sprintf("more than %d pages", EnrichmentCap)))
+	}
 	aliasMap := make(map[string][]string)
-	var aliasMarker *string
-	for {
-		aliasOutput, aliasErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
-			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
-				Limit:  aws.Int32(DefaultPageSize),
-				Marker: aliasMarker,
-			})
-		})
-		if aliasErr != nil {
-			// Soft-fallback: aliases become empty strings, but record the failure
-			// so operators know aliases may be missing.
-			failures = append(failures, FailedCall("ListAliases", aliasErr))
-			break
+	for _, alias := range aliases {
+		if alias.TargetKeyId != nil && alias.AliasName != nil {
+			aliasMap[*alias.TargetKeyId] = append(aliasMap[*alias.TargetKeyId], *alias.AliasName)
 		}
-		for _, alias := range aliasOutput.Aliases {
-			if alias.TargetKeyId != nil && alias.AliasName != nil {
-				aliasMap[*alias.TargetKeyId] = append(aliasMap[*alias.TargetKeyId], *alias.AliasName)
-			}
-		}
-		if !aliasOutput.Truncated {
-			break
-		}
-		if aliasOutput.NextMarker == nil {
-			failures = append(failures, UnusableAnswer("ListAliases", "truncated response with no NextMarker"))
-			break
-		}
-		aliasMarker = aliasOutput.NextMarker
 	}
 	return aliasMap, failures
 }

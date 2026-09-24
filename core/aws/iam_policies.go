@@ -237,7 +237,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 		// both attached and inline names) finds the inline entries in
 		// cache too. Per-group failures are surfaced via the returned error
 		// and propagated into the composite failure list below.
-		inlines, inlineErr := fetchInlineGroupPolicies(ctx, api)
+		inlines, _, inlineErr := fetchInlineGroupPolicies(ctx, api)
 		for _, r := range inlines {
 			store.Set(r.ID, r)
 		}
@@ -306,35 +306,37 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 // out even on empty accounts. AWS-managed policy names are instead resolved
 // on demand, one GetPolicy per requested name, in FetchIAMPoliciesByIDsFull.
 func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
-	var marker *string
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListPoliciesOutput, error) {
-			return api.ListPolicies(ctx, &iam.ListPoliciesInput{
-				Scope:    iamtypes.PolicyScopeTypeLocal,
-				MaxItems: aws.Int32(DefaultPageSize),
-				Marker:   marker,
-			})
+	// ListPolicies pages by IsTruncated and Marker, at most 1000 items a page
+	// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListPolicies.html).
+	policies, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Policy, *string, error) {
+		out, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
+			Scope:    iamtypes.PolicyScopeTypeLocal,
+			MaxItems: aws.Int32(1000),
+			Marker:   marker,
 		})
 		if err != nil {
-			return fmt.Errorf("listing customer-managed IAM policies for lazy-add: %w", err)
+			return nil, nil, err
 		}
-		for _, p := range out.Policies {
-			if aws.ToString(p.PolicyName) == "" {
-				continue
-			}
-			r := managedPolicyToResource(p)
-			// Indexed by name as well as by ID, so a reference that names the
-			// policy the way a checker read it — a bare name from an
-			// attachment, an ARN from an SDK struct — resolves either way.
-			store.Set(r.ID, r)
-			if name := aws.ToString(p.PolicyName); name != r.ID {
-				store.Set(name, r)
-			}
+		return out.Policies, iamNextMarker(out.IsTruncated, out.Marker), nil
+	})
+	if err == nil && !complete {
+		err = fmt.Errorf("more than %d pages", PerParentPageCap)
+	}
+	if err != nil {
+		return fmt.Errorf("listing customer-managed IAM policies for lazy-add: %w", err)
+	}
+	for _, p := range policies {
+		if aws.ToString(p.PolicyName) == "" {
+			continue
 		}
-		if !out.IsTruncated || out.Marker == nil {
-			break
+		r := managedPolicyToResource(p)
+		// Indexed by name as well as by ID, so a reference that names the
+		// policy the way a checker read it — a bare name from an
+		// attachment, an ARN from an SDK struct — resolves either way.
+		store.Set(r.ID, r)
+		if name := aws.ToString(p.PolicyName); name != r.ID {
+			store.Set(name, r)
 		}
-		marker = out.Marker
 	}
 	return nil
 }
@@ -351,15 +353,21 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 // stays capped lower than a typical per-resource enrichment fan-out.
 const iamInlineGroupSweepParallelism = 5
 
-func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resource, error) {
-	groupsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupsOutput, error) {
-		return api.ListGroups(ctx, &iam.ListGroupsInput{})
+func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resource, bool, error) {
+	// ListGroups pages by IsTruncated and Marker
+	// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListGroups.html).
+	groups, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Group, *string, error) {
+		out, err := api.ListGroups(ctx, &iam.ListGroupsInput{Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Groups, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing IAM groups for inline policies: %w", err)
+		return nil, false, fmt.Errorf("listing IAM groups for inline policies: %w", err)
 	}
 
-	n := len(groupsOut.Groups)
+	n := len(groups)
 	// perGroup keeps each group's inline resources at its own index — the
 	// bounded fan-out below writes concurrently, so a single shared slice
 	// (mutex or not) would need its own ordering discipline; indexing by
@@ -383,8 +391,9 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 	// this the sweep would silently return a partial result with a nil
 	// error whenever the deadline expires before any single group's call
 	// has failed on its own.
+	capped := false
 	sweepErr := ForEachParallel(ctx, n, iamInlineGroupSweepParallelism, func(i int) {
-		group := groupsOut.Groups[i]
+		group := groups[i]
 		if group.GroupName == nil {
 			return
 		}
@@ -392,17 +401,15 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		mu.Lock()
 		visited[i] = true
 		mu.Unlock()
-		out, gpErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupPoliciesOutput, error) {
-			return api.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})
-		})
+		policyNames, whole, gpErr := iamGroupInlinePolicies(ctx, api, groupName)
 		if gpErr != nil {
 			mu.Lock()
 			groupFailures = append(groupFailures, FailedCall(groupName, gpErr))
 			mu.Unlock()
 			return
 		}
-		names := make([]resource.Resource, 0, len(out.PolicyNames))
-		for _, name := range out.PolicyNames {
+		names := make([]resource.Resource, 0, len(policyNames))
+		for _, name := range policyNames {
 			names = append(names, resource.Resource{
 				ID:   inlinePolicyID(groupName, name),
 				Name: name,
@@ -417,6 +424,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		}
 		mu.Lock()
 		perGroup[i] = names
+		capped = capped || !whole
 		mu.Unlock()
 	})
 
@@ -445,7 +453,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		}
 	}
 
-	return resources, AggregateFailures("ListGroupPolicies", groupFailures, n)
+	return resources, complete && !capped, AggregateFailures("ListGroupPolicies", groupFailures, n)
 }
 
 // inlinePolicyPathPrefix marks the path of a group's inline policy row,

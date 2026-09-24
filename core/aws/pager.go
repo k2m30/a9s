@@ -32,3 +32,12 @@ func PageAll[T any](ctx context.Context, maxPages int, next func(ctx context.Con
 	}
 	return items, false, nil
 }
+
+// firstPage reads one page of a paged API on purpose, through
+// RetryOnThrottle: the request names its one item, asks whether a page
+// exists at all, or the API reference documents an order that puts the item
+// on the first page (newest first). An API that documents no order is walked
+// with PageAll.
+func firstPage[T any](ctx context.Context, read func() (T, error)) (T, error) {
+	return RetryOnThrottle(ctx, DefaultRetryConfig(), read)
+}

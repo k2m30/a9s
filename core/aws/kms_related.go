@@ -202,10 +202,6 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		}
 		return out.Grants, out.NextMarker, nil
 	})
-	if err != nil {
-		// Permission errors, throttling, or any unrecoverable failure must yield -1.
-		return ReadFailed("role", err)
-	}
 	ids, dropped := resolveRefs("role", refs, rc)
 	// A grant principal is an ARN (a role, an assumed-role session, a user)
 	// or an AWS service principal; the role resolver reads the ones that
@@ -219,5 +215,5 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, id)
 		}
 	}
-	return relatedResultTrunc("role", ids, dropped || !complete)
+	return alsoRead(relatedResultTrunc("role", ids, dropped), pagedRead(complete, err))
 }

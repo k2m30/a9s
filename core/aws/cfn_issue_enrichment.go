@@ -52,7 +52,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStackEventsOutput, error) {
+		out, err := firstPage(ctx, func() (*cloudformation.DescribeStackEventsOutput, error) {
 			return clients.CloudFormation.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
 				StackName: aws.String(stackName),
 			})
@@ -160,7 +160,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStacksOutput, error) {
+		out, err := firstPage(ctx, func() (*cloudformation.DescribeStacksOutput, error) {
 			return clients.CloudFormation.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
 				StackName: aws.String(stackName),
 			})

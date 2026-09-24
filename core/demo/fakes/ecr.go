@@ -55,11 +55,18 @@ func (f *ECRFake) DescribeImageScanFindings(_ context.Context, input *ecr.Descri
 		if aws.ToString(img.ImageDigest) != digest || img.ImageScanFindingsSummary == nil {
 			continue
 		}
+		var findings []ecrtypes.ImageScanFinding
+		for sev, n := range img.ImageScanFindingsSummary.FindingSeverityCounts {
+			for range n {
+				findings = append(findings, ecrtypes.ImageScanFinding{Severity: ecrtypes.FindingSeverity(sev)})
+			}
+		}
 		return &ecr.DescribeImageScanFindingsOutput{
 			RepositoryName:  input.RepositoryName,
 			ImageId:         input.ImageId,
 			ImageScanStatus: &ecrtypes.ImageScanStatus{Status: ecrtypes.ScanStatusComplete},
 			ImageScanFindings: &ecrtypes.ImageScanFindings{
+				Findings:                     findings,
 				FindingSeverityCounts:        img.ImageScanFindingsSummary.FindingSeverityCounts,
 				ImageScanCompletedAt:         img.ImageScanFindingsSummary.ImageScanCompletedAt,
 				VulnerabilitySourceUpdatedAt: img.ImageScanFindingsSummary.VulnerabilitySourceUpdatedAt,

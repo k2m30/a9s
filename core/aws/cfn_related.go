@@ -132,12 +132,6 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 		}
 		return out.StackResourceSummaries, out.NextToken, nil
 	})
-	// Both checkCfn* callers turn false into UnknownRelated, so the pivot
-	// renders "?" rather than claiming the stack holds no such resources.
-	// no finding: false is the answer this helper exists to give.
-	if err != nil {
-		return nil, false, false
-	}
 	for _, r := range summaries {
 		if r.ResourceType == nil || *r.ResourceType != resourceType {
 			continue
@@ -147,7 +141,14 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 		}
 		ids = append(ids, *r.PhysicalResourceId)
 	}
-	return ids, !complete, true
+	// Both checkCfn* callers turn false into UnknownRelated, so the pivot
+	// renders "?" rather than claiming the stack holds no such resources; a
+	// failed page beside resources found leaves them a lower bound.
+	// no finding: false is the answer this helper exists to give.
+	if err != nil && len(ids) == 0 {
+		return nil, false, false
+	}
+	return ids, !complete || err != nil, true
 }
 
 // checkCfnS3 calls ListStackResources and returns S3 buckets created by the

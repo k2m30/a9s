@@ -83,7 +83,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// instances they name have real pending maintenance whatever happened
 	// afterwards. A failed page does lower-bound the walk, unlike the cap,
 	// which bounds only informational coverage for this "~"-only pass.
-	allActions, _, _, walkErr := walkAccountPages(&result, resources, oneItemPerRow, instanceKeyOf,
+	allActions, _, _, walkErr := walkAccountPages(ctx, &result, resources, oneItemPerRow, instanceKeyOf,
 		func(token *string) ([]rdstypes.ResourcePendingMaintenanceActions, *string, error) {
 			out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: token})
 			if err != nil {
@@ -157,7 +157,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 		}
 		deprecated, known := deprecatedByPair[pair]
 		if !known {
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBEngineVersionsOutput, error) {
+			out, err := firstPage(ctx, func() (*rds.DescribeDBEngineVersionsOutput, error) {
 				return clients.RDS.DescribeDBEngineVersions(ctx, &rds.DescribeDBEngineVersionsInput{
 					Engine:        aws.String(pair.engine),
 					EngineVersion: aws.String(pair.version),

@@ -34,14 +34,11 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 		}
 		return out.Groups, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
-	if err != nil {
-		return ReadFailed("iam-group", err)
-	}
-	var ids []string
+	read := pagedRead(complete, err)
 	for _, g := range groups {
-		ids = append(ids, aws.ToString(g.GroupName))
+		read.ids = append(read.ids, aws.ToString(g.GroupName))
 	}
-	return relatedResultTrunc("iam-group", ids, !complete)
+	return relatedAnswer("iam-group", read)
 }
 
 // checkUserPolicy uses the IAM ListAttachedUserPolicies API to return the
@@ -56,8 +53,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		return keyMissing("policy", "userName")
 	}
 	attached, complete, err := listAttachedUserPolicies(ctx, c.IAM, userName)
-	if err != nil {
-		return ReadFailed("policy", err)
-	}
-	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
+	read := pagedRead(complete, err)
+	read.ids = attachedPolicyIDs(attached)
+	return relatedAnswer("policy", read)
 }
