@@ -104,7 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer fails the whole drill.
 - ECR vulnerability counts are the newest image's, found by push time over
   every image page, and counted from the scan's findings on every page. A
-  repository too large to read in full is marked not inspected.
+  repository too large to read in full is marked not inspected, and so is
+  one whose newest image was never scanned or whose scan failed, is still
+  running or has any status other than complete (basic scanning) or active
+  (enhanced scanning); it used to read 0 critical and 0 high.
 - A VPC whose subnets could not be listed is marked not inspected for flow
   logs instead of reported as having none. A VPC endpoint's log groups
   include the flow logs on the endpoint's own network interfaces.

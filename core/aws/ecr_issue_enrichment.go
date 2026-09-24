@@ -50,11 +50,12 @@ const ecrPageSize = 1000
 //   - Any HIGH (no CRITICAL) → "~" severity.
 //
 // fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
-// Per-repo errors aggregate into a composite returned error. A never-scanned
-// image contributes nothing. A repository whose image list or scan results
-// could not be read in full gets no count and is marked not inspected: the
-// newest image may be on a page nobody read, and a partial count is neither
-// the total nor a proven zero.
+// Per-repo errors aggregate into a composite returned error. A repository
+// whose image list or scan results could not be read in full, or whose newest
+// image's scan holds no findings to count (ecrScanUnread), gets no count and
+// is marked not inspected: the newest image may be on a page nobody read, a
+// scan may not have finished, and a partial count is neither the total nor a
+// proven zero.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -156,11 +157,19 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			truncated = true
 			markUninspected(&result, r.ID, CheckCap)
 			return
+		case latest != nil && latest.ImageScanFindingsSummary == nil && scanAPI == nil:
+			// A client without DescribeImageScanFindings reads no scan: no
+			// count, and no mark, as for any call a client predates.
+			return
+		case latest != nil && ecrScanUnread(*latest) != "":
+			truncated = true
+			markUninspected(&result, r.ID, ecrScanUnread(*latest))
+			return
 		}
 
 		scannedCount := 0
 		var criticalTotal, highTotal int32
-		if latest != nil && latest.ImageScanFindingsSummary != nil {
+		if latest != nil {
 			scannedCount = 1
 			counts := latest.ImageScanFindingsSummary.FindingSeverityCounts
 			criticalTotal = counts[string(ecrtypes.FindingSeverityCritical)]

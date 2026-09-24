@@ -399,18 +399,21 @@ type ecrRepository struct {
 	// ImagesErrorCode is set when DescribeImages itself failed.
 	ImagesErrorCode string     `json:"images_error_code,omitempty"`
 	Images          []ecrImage `json:"images"`
-	// The totals are absent when the newest image's scan results could not be read:
-	// a sum over the readable images is neither the total nor a proven zero.
+	// The totals are absent when the newest image's scan results could not be
+	// read, or its scan holds no findings to count (never scanned, or a status
+	// other than COMPLETE or ACTIVE): neither is a proven zero.
 	CriticalTotal *int32 `json:"critical_total,omitempty"`
 	HighTotal     *int32 `json:"high_total,omitempty"`
 }
 
 // ecrImage is one image the app inspects and its scan counts. ScanErrorCode
 // is set when its scan results could not be read, so its counts are unknown
-// rather than zero.
+// rather than zero. ScanStatus is the scan's API_ImageScanStatus status, ""
+// when the image was never scanned or the answer named none.
 type ecrImage struct {
 	ImageDigest           string           `json:"image_digest"`
 	ImagePushedAt         string           `json:"image_pushed_at,omitempty"`
+	ScanStatus            string           `json:"scan_status,omitempty"`
 	FindingSeverityCounts map[string]int32 `json:"finding_severity_counts,omitempty"`
 	ScanErrorCode         string           `json:"scan_error_code,omitempty"`
 }
@@ -474,15 +477,21 @@ func captureECRImages(ctx context.Context, client *ecr.Client, repo *ecrReposito
 		ImageDigest:   aws.ToString(latest.ImageDigest),
 		ImagePushedAt: snapFormatTime(latest.ImagePushedAt),
 	}
-	if latest.ImageScanFindingsSummary != nil {
+	scanned := latest.ImageScanFindingsSummary != nil
+	if scanned {
 		img.FindingSeverityCounts = latest.ImageScanFindingsSummary.FindingSeverityCounts
+		if latest.ImageScanStatus != nil {
+			img.ScanStatus = string(latest.ImageScanStatus.Status)
+		}
 	} else {
 		// Basic Scanning leaves DescribeImages without a scan summary;
 		// the counts are only in DescribeImageScanFindings.
-		img.FindingSeverityCounts, img.ScanErrorCode = captureECRScanCounts(ctx, client, repo.RepositoryName, latest.ImageDigest)
+		img.FindingSeverityCounts, img.ScanStatus, img.ScanErrorCode = captureECRScanCounts(ctx, client, repo.RepositoryName, latest.ImageDigest)
+		scanned = img.FindingSeverityCounts != nil
 	}
 	repo.Images = []ecrImage{img}
-	if img.ScanErrorCode != "" {
+	st := ecrtypes.ScanStatus(img.ScanStatus)
+	if img.ScanErrorCode != "" || !scanned || st != "" && st != ecrtypes.ScanStatusComplete && st != ecrtypes.ScanStatusActive {
 		return
 	}
 	critical = img.FindingSeverityCounts[string(ecrtypes.FindingSeverityCritical)]
@@ -491,10 +500,10 @@ func captureECRImages(ctx context.Context, client *ecr.Client, repo *ecrReposito
 }
 
 // captureECRScanCounts tallies one image's scan findings by severity over
-// every page; an image never scanned has no counts, and a failed read names
-// its error code.
-func captureECRScanCounts(ctx context.Context, client *ecr.Client, repoName string, digest *string) (map[string]int32, string) {
-	var counts map[string]int32
+// every page and reads the scan's status; an image never scanned, or a scan
+// that returned no findings, has no counts, and a failed read names its error
+// code.
+func captureECRScanCounts(ctx context.Context, client *ecr.Client, repoName string, digest *string) (counts map[string]int32, status, errCode string) {
 	pages := ecr.NewDescribeImageScanFindingsPaginator(client, &ecr.DescribeImageScanFindingsInput{
 		RepositoryName: aws.String(repoName),
 		ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: digest},
@@ -504,9 +513,12 @@ func captureECRScanCounts(ctx context.Context, client *ecr.Client, repoName stri
 		var notScanned *ecrtypes.ScanNotFoundException
 		switch {
 		case errors.As(err, &notScanned):
-			return nil, ""
+			return nil, "", ""
 		case err != nil:
-			return nil, apiErrorCode(err)
+			return nil, "", apiErrorCode(err)
+		}
+		if out.ImageScanStatus != nil {
+			status = string(out.ImageScanStatus.Status)
 		}
 		f := out.ImageScanFindings
 		if f == nil {
@@ -526,7 +538,7 @@ func captureECRScanCounts(ctx context.Context, client *ecr.Client, repoName stri
 			}
 		}
 	}
-	return counts, ""
+	return counts, status, ""
 }
 
 // ---------------------------------------------------------------------------

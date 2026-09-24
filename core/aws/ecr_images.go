@@ -170,6 +170,26 @@ func ecrReadScanResults(ctx context.Context, api ECRDescribeImageScanFindingsAPI
 	return complete, nil
 }
 
+// ecrScanUnread names why img's scan holds no findings to count, "" when it
+// does. A scan has findings once it is COMPLETE (basic scanning) or ACTIVE
+// (enhanced scanning: Amazon Inspector sets ACTIVE once it has scanned the
+// image, https://docs.aws.amazon.com/inspector/latest/user/enable-disable-scanning-ecr.html).
+// Every other status in API_ImageScanStatus
+// (https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_ImageScanStatus.html)
+// — FAILED, IN_PROGRESS, PENDING, UNSUPPORTED_IMAGE, SCAN_ELIGIBILITY_EXPIRED
+// and the rest — leaves none, and so does an image never scanned; a count
+// read off either would be a zero nothing proved.
+func ecrScanUnread(img ecrtypes.ImageDetail) string {
+	if st := img.ImageScanStatus; st != nil && st.Status != "" &&
+		st.Status != ecrtypes.ScanStatusComplete && st.Status != ecrtypes.ScanStatusActive {
+		return "image scan " + string(st.Status)
+	}
+	if img.ImageScanFindingsSummary == nil {
+		return "image not scanned"
+	}
+	return ""
+}
+
 // convertECRImage converts a single ecrtypes.ImageDetail into a generic Resource.
 func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName string) resource.Resource {
 	digest := ""

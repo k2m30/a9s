@@ -110,7 +110,7 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **API call**: the same `DescribeImageScanFindings` answers as above — no extra call.
   - **Cost shape**: per-resource.
-  - Note: an image never scanned answers `ScanNotFoundException` and contributes nothing. A repository whose image list or newest image's scan results could not be read in full shows no count and is not inspected — never a proven 0.
+  - Note: only a scan with findings is counted: `COMPLETE` (basic scanning) or `ACTIVE` (enhanced scanning, which Amazon Inspector sets once it has scanned the image). A newest image never scanned (`ScanNotFoundException`) or whose scan is in any other `ImageScanStatus` state (`FAILED`, `IN_PROGRESS`, `PENDING`, `UNSUPPORTED_IMAGE`, `SCAN_ELIGIBILITY_EXPIRED`, …) leaves the repository with no count and not inspected, naming the status. So does an image list or scan result that could not be read in full — never a proven 0. A repository with no images counts 0.
 
 - **Signal**: the repository policy grants a wildcard principal.
   - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
