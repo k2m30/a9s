@@ -3,43 +3,60 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// resolveNGImageID calls DescribeLaunchTemplateVersions for the given
-// LaunchTemplateSpecification and returns the ImageId from the first version
-// found.
+// resolveNGImageID returns the ImageId of the launch template version a node
+// group names.
 //
 // The error is the caller's to record: a node group that names a launch
 // template has an AMI, so an empty image_id cell after a failed read is a
 // blank the operator cannot tell from a template that declares none. A
-// template that genuinely declares no image returns ("", nil).
+// template that genuinely declares no image returns ("", nil): the node group
+// inherits the EKS-optimised default.
 func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) (string, error) {
-	if api == nil || lt == nil || lt.Id == nil {
+	if api == nil {
 		return "", nil
 	}
-	versions, err := launchTemplateVersions(ctx, api, lt.Id, lt.Version)
+	data, err := ngLaunchTemplateData(ctx, api, lt)
 	if err != nil {
 		return "", err
 	}
-	if len(versions) == 0 {
-		return "", UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "launch template version"}
-	}
-	data := versions[0].LaunchTemplateData
-	// no finding: the version was read and declares no image, which is an
-	// answer — the node group inherits the EKS-optimised default.
-	if data == nil || data.ImageId == nil {
+	if data == nil {
 		return "", nil
 	}
-	return *data.ImageId, nil
+	return aws.ToString(data.ImageId), nil
+}
+
+// ngLaunchTemplateData reads the version of the launch template a node group
+// names: nil for a node group that names none by id, which runs the template
+// EKS generates from its own settings.
+func ngLaunchTemplateData(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) (*ec2types.ResponseLaunchTemplateData, error) {
+	if lt == nil || aws.ToString(lt.Id) == "" {
+		return nil, nil
+	}
+	if api == nil {
+		return nil, errClientMissing
+	}
+	versions, err := launchTemplateVersions(ctx, api, lt.Id, lt.Version)
+	if err != nil {
+		return nil, err
+	}
+	if len(versions) == 0 {
+		return nil, UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "launch template version"}
+	}
+	return cmp.Or(versions[0].LaunchTemplateData, &ec2types.ResponseLaunchTemplateData{}), nil
 }
 
 // healthIssueFinding builds a Broken Finding for an unhealthy lifecycle

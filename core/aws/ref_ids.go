@@ -35,9 +35,7 @@ func refContext(clients any, cache resource.ResourceCache, target string) domain
 			rc.AccountID = store.AccountID()
 		}
 	}
-	if entry, ok := cache[target]; ok {
-		rc.Targets = entry.Resources
-	}
+	rc.Targets, _, _ = cachedRelatedList(cache, target)
 	return rc
 }
 
@@ -129,9 +127,9 @@ func listedRelated(ctx context.Context, clients any, cache resource.ResourceCach
 	list, _, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if list == nil {
 		if err != nil && !errors.Is(err, errClientMissing) {
-			return resource.ErrorRelated(target, err)
+			return ReadFailed(target, err)
 		}
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	ids, lowerBound := listedRefs(target, refs, refContext(clients, cache, target), list)
 	return relatedResultTrunc(target, ids, truncated || lowerBound)
@@ -469,7 +467,7 @@ func kmsRelated(ctx context.Context, clients any, cache resource.ResourceCache, 
 func kmsRelatedIn(ctx context.Context, clients any, cache resource.ResourceCache, region string, refs []string) resource.RelatedCheckResult {
 	ids, lowerBound, err := kmsResolve(ctx, clients, cache, region, refs)
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	return inRegion(clients, region, relatedResultTrunc("kms", ids, lowerBound))
 }

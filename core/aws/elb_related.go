@@ -28,15 +28,15 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if elbARN == "" {
-		return resource.ProvenZero("tg", "elbARN")
+		return foundNone("tg", "elbARN")
 	}
 
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.ErrorRelated("tg", err)
+		return ReadFailed("tg", err)
 	}
 	if tgList == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 
 	var ids []string
@@ -64,7 +64,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, sgID := range raw.SecurityGroups {
@@ -80,7 +80,7 @@ func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkELBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -97,21 +97,21 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.ProvenZero("cfn", "elbARN")
+		return foundNone("cfn", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	api, ok := c.ELBv2.(ELBv2DescribeTagsAPI)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTagsOutput, error) {
 		return api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{elbARN}})
 	})
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	for _, td := range out.TagDescriptions {
 		for _, tag := range td.Tags {
@@ -120,7 +120,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 			}
 		}
 	}
-	return resource.ProvenZero("cfn", "the aws:cloudformation:stack-name tag")
+	return foundNone("cfn", "the aws:cloudformation:stack-name tag")
 }
 
 // checkELBACM reports ACM certificates attached to this ELB's HTTPS/TLS
@@ -139,11 +139,11 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.ProvenZero("acm", "elbARN")
+		return foundNone("acm", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	listeners, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.Listener, *string, error) {
 		out, err := c.ELBv2.DescribeListeners(ctx, &elbv2.DescribeListenersInput{LoadBalancerArn: &elbARN, Marker: marker})
@@ -153,7 +153,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		return out.Listeners, out.NextMarker, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("acm", err)
+		return ReadFailed("acm", err)
 	}
 	var ids []string
 	seen := make(map[string]bool)
@@ -199,7 +199,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	if aggErr := AggregateFailures("elb-related: DescribeListenerCertificates", failures, len(listeners)); aggErr != nil && len(ids) == 0 {
 		// Nothing was read at all: the failures establish nothing about how
 		// many certificates the listeners carry, only that the attempt failed.
-		return resource.ErrorRelated("acm", aggErr)
+		return ReadFailed("acm", aggErr)
 	}
 	// A listener whose certificate list could not be read may serve one this
 	// count does not name, so what was read is a lower bound rather than a
@@ -212,15 +212,15 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dnsName := res.Fields["dns_name"]
 	if dnsName == "" {
-		return resource.ProvenZero("cf", "dnsName")
+		return foundNone("cf", "dnsName")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	if cfList == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 
 	var ids []string
@@ -247,15 +247,15 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		lbName = res.Name
 	}
 	if lbName == "" {
-		return resource.ProvenZero("eni", "lbName")
+		return foundNone("eni", "lbName")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 
 	var ids []string
@@ -289,17 +289,17 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	if elbARN == "" {
-		return resource.ProvenZero("s3", "elbARN")
+		return foundNone("s3", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
 		return c.ELBv2.DescribeLoadBalancerAttributes(ctx, &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: &elbARN})
 	})
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	var ids []string
 	for _, a := range out.Attributes {
@@ -314,7 +314,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkELBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	var ids []string
 	seen := make(map[string]bool)
@@ -351,7 +351,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return resource.ProvenZero("waf", "elbARN")
+		return foundNone("waf", "elbARN")
 	}
 	lbType := res.Fields["type"]
 	if lbType == "" {
@@ -360,24 +360,24 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if lbType == "network" || lbType == "gateway" {
-		return resource.ProvenZero("waf", "lbType")
+		return foundNone("waf", "lbType")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.UnknownRelated("waf")
+		return NotRead("waf")
 	}
 	api, ok := c.WAFv2.(WAFv2GetWebACLForResourceAPI)
 	if !ok {
-		return resource.UnknownRelated("waf")
+		return NotRead("waf")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetWebACLForResourceOutput, error) {
 		return api.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{ResourceArn: &elbARN})
 	})
 	if err != nil {
-		return resource.ErrorRelated("waf", err)
+		return ReadFailed("waf", err)
 	}
 	if out.WebACL == nil {
-		return resource.ProvenZero("waf", "out.WebACL")
+		return foundNone("waf", "out.WebACL")
 	}
 	id := ""
 	if out.WebACL.Id != nil {
@@ -387,7 +387,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		id = *out.WebACL.ARN
 	}
 	if id == "" {
-		return resource.ProvenZero("waf", "id")
+		return foundNone("waf", "id")
 	}
 	return relatedResultTrunc("waf", []string{id}, false)
 }

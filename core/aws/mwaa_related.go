@@ -28,10 +28,10 @@ func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, ca
 func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if env.KmsKey == nil || *env.KmsKey == "" {
-		return resource.ProvenZero("kms", "env.KmsKey")
+		return foundNone("kms", "env.KmsKey")
 	}
 	return kmsRelated(ctx, clients, cache, []string{kmsRefFromField(*env.KmsKey, res.Type)})
 }
@@ -41,10 +41,10 @@ func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache
 func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	if env.LoggingConfiguration == nil {
-		return resource.ProvenZero("logs", "env.LoggingConfiguration")
+		return foundNone("logs", "env.LoggingConfiguration")
 	}
 	var ids []string
 	for _, m := range []*mwaatypes.ModuleLoggingConfiguration{
@@ -65,10 +65,10 @@ func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache 
 func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if env.ExecutionRoleArn == nil || *env.ExecutionRoleArn == "" {
-		return resource.ProvenZero("role", "env.ExecutionRoleArn")
+		return foundNone("role", "env.ExecutionRoleArn")
 	}
 	return relatedRefs("role", []string{*env.ExecutionRoleArn}, refContext(clients, cache, "role"))
 }
@@ -77,14 +77,14 @@ func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache 
 func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	if env.SourceBucketArn == nil || *env.SourceBucketArn == "" {
-		return resource.ProvenZero("s3", "env.SourceBucketArn")
+		return foundNone("s3", "env.SourceBucketArn")
 	}
 	a, ok := ARNForService(*env.SourceBucketArn, "s3")
 	if !ok || a.Resource == "" {
-		return resource.ProvenZero("s3", "a.Resource")
+		return foundNone("s3", "a.Resource")
 	}
 	return relatedResultTrunc("s3", []string{a.Resource}, false)
 }
@@ -93,10 +93,10 @@ func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkMWAASG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	if env.NetworkConfiguration == nil || len(env.NetworkConfiguration.SecurityGroupIds) == 0 {
-		return resource.ProvenZero("sg", "env.NetworkConfiguration.SecurityGroupIds")
+		return foundNone("sg", "env.NetworkConfiguration.SecurityGroupIds")
 	}
 	return relatedResultTrunc("sg", env.NetworkConfiguration.SecurityGroupIds, false)
 }
@@ -105,10 +105,10 @@ func checkMWAASG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkMWAASubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if env.NetworkConfiguration == nil || len(env.NetworkConfiguration.SubnetIds) == 0 {
-		return resource.ProvenZero("subnet", "env.NetworkConfiguration.SubnetIds")
+		return foundNone("subnet", "env.NetworkConfiguration.SubnetIds")
 	}
 	return relatedResultTrunc("subnet", env.NetworkConfiguration.SubnetIds, false)
 }

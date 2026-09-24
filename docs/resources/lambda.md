@@ -35,7 +35,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: API Gateway integrations that invoke this function.
 - **How discovered**: the integration that names the function is the fact, and it lives on the API's routes, which `Api` does not embed and only `GetIntegrations` per API returns. Until that read exists, the row offers candidates — the loaded APIs that name this function in a tag key or in their own Name. — a9s-devops: this is an apigw-side reference (the integration lives on the route), not a Lambda-side field.
-- **Count shown**: no — the candidates are not a count of the APIs that invoke this function.
+- **Count shown**: no — the candidates are not a count of the APIs that invoke this function, and no candidate is no answer: the integrations were not read.
 
 ### `cf`
 

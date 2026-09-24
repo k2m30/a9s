@@ -72,9 +72,9 @@ func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName strin
 // Flash + the "!" error log, never silently collapsed to Unknown).
 func pipelineRelatedOnErr(targetType string, err error) resource.RelatedCheckResult {
 	if errors.Is(err, errPipelineNotConfigured) {
-		return resource.UnknownRelated(targetType)
+		return NotRead(targetType)
 	}
-	return resource.ErrorRelated(targetType, err)
+	return ReadFailed(targetType, err)
 }
 
 // pipelineActions iterates every action across every stage and invokes fn. The
@@ -300,9 +300,5 @@ func mapKeys(m map[string]struct{}) []string {
 // One events:ListRuleNamesByTarget call using the pipeline ARN from
 // res.Fields["arn"]. Count = len(RuleNames).
 func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	pipelineARN := res.Fields["arn"]
-	if pipelineARN == "" {
-		return resource.ProvenZero("eb-rule", "pipelineARN")
-	}
-	return ebRulesTargeting(ctx, clients, cache, pipelineARN)
+	return ebRulesTargeting(ctx, clients, cache, res.Fields["arn"])
 }

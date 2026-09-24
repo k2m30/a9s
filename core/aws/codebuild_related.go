@@ -21,7 +21,7 @@ import (
 func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("pipeline")
+		return NotRead("pipeline")
 	}
 	projectName := ""
 	if project.Name != nil {
@@ -31,47 +31,45 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 		projectName = res.ID
 	}
 	if projectName == "" {
-		return resource.ProvenZero("pipeline", "projectName")
+		return foundNone("pipeline", "projectName")
 	}
 
-	entry, ok := cache["pipeline"]
-	if !ok {
-		// cache not yet populated — unknown, not a definitive 0
-		return resource.UnknownRelated("pipeline")
+	pipelineList, truncated, err := relatedResourcesFor(ctx, clients, cache, "pipeline")
+	if err != nil {
+		return ReadFailed("pipeline", err)
+	}
+	if pipelineList == nil {
+		return NotRead("pipeline")
 	}
 
 	// If there are pipelines to check but no CodePipeline client to call GetPipeline,
 	// we cannot determine the relationship — return -1 (unknown).
-	if len(entry.Resources) > 0 {
+	if len(pipelineList) > 0 {
 		c, cok := clients.(*ServiceClients)
 		if !cok || c == nil || c.CodePipeline == nil {
-			return resource.UnknownRelated("pipeline")
+			return NotRead("pipeline")
 		}
 	}
 
 	var ids []string
-	attempted, failed := 0, 0
-	for _, pipelineRes := range entry.Resources {
+	var reads rowReads
+	for _, pipelineRes := range pipelineList {
 		pipelineName := pipelineRes.ID
 		if pipelineName == "" {
+			reads.missed()
 			continue
 		}
-		attempted++
 		p, err := pipelineGetDeclaration(ctx, clients, pipelineName)
 		if err != nil {
-			failed++
+			reads.fail(pipelineName, err)
 			continue
 		}
+		reads.read++
 		if cbPipelineHasProject(p.Stages, projectName) {
 			ids = append(ids, pipelineName)
 		}
 	}
-	// Every lookup in the loop failed (throttled, denied, deleted mid-scan):
-	// nothing was actually resolved, so this is not a proven zero.
-	if attempted > 0 && failed == attempted {
-		return resource.UnknownRelated("pipeline")
-	}
-	return relatedResultTrunc("pipeline", ids, entry.IsTruncated || failed > 0)
+	return reads.answer("pipeline", "cb-related: GetPipeline", ids, truncated)
 }
 
 // cbPipelineHasProject returns true if any action across the given stages has

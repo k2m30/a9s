@@ -27,15 +27,15 @@ import (
 func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := ecsSvcName(res)
 	if svcName == "" {
-		return resource.ProvenZero("ecs-task", "svcName")
+		return foundNone("ecs-task", "svcName")
 	}
 	cluster := res.Fields["cluster"]
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.ErrorRelated("ecs-task", err)
+		return ReadFailed("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -59,10 +59,10 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.ProvenZero("subnet", "raw.NetworkConfiguration.AwsvpcConfiguration")
+		return foundNone("subnet", "raw.NetworkConfiguration.AwsvpcConfiguration")
 	}
 	var ids []string
 	for _, s := range raw.NetworkConfiguration.AwsvpcConfiguration.Subnets {
@@ -78,24 +78,21 @@ func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("vpc")
-		}
-		return resource.KnownRelated("vpc", nil, false)
+		return NotRead("vpc")
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.ProvenZero("vpc", "raw.NetworkConfiguration.AwsvpcConfiguration")
+		return foundNone("vpc", "raw.NetworkConfiguration.AwsvpcConfiguration")
 	}
 	subnetIDs := raw.NetworkConfiguration.AwsvpcConfiguration.Subnets
 	if len(subnetIDs) == 0 {
-		return resource.ProvenZero("vpc", "subnetIDs")
+		return foundNone("vpc", "subnetIDs")
 	}
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	if subnetList == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	wanted := make(map[string]struct{}, len(subnetIDs))
 	for _, s := range subnetIDs {
@@ -121,20 +118,23 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 // Pattern C+reverse: iterate cache["eb-rule"]; for each rule whose EventPattern
 // has source ["aws.ecs"] and detail.clusterArn / detail.group matching this service,
 // add the rule name. NeedsTargetCache: true.
-func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECSSvcEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := ecsSvcName(res)
 	if svcName == "" {
-		return resource.ProvenZero("eb-rule", "svcName")
+		return foundNone("eb-rule", "svcName")
 	}
 	clusterName := res.Fields["cluster"]
 
-	entry, ok := cache["eb-rule"]
-	if !ok {
-		return resource.UnknownRelated("eb-rule")
+	ebRuleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
+	if err != nil {
+		return ReadFailed("eb-rule", err)
+	}
+	if ebRuleList == nil {
+		return NotRead("eb-rule")
 	}
 
 	var ids []string
-	for _, ruleRes := range entry.Resources {
+	for _, ruleRes := range ebRuleList {
 		rule, ok := assertStruct[eventbridgetypes.Rule](ruleRes.RawStruct)
 		if !ok {
 			continue
@@ -146,7 +146,7 @@ func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache re
 			ids = append(ids, ruleRes.ID)
 		}
 	}
-	return relatedResultTrunc("eb-rule", ids, entry.IsTruncated)
+	return relatedResultTrunc("eb-rule", ids, truncated)
 }
 
 // ecsSvcEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecs"]
@@ -216,20 +216,20 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.ProvenZero("ecr", "raw.TaskDefinition")
+		return foundNone("ecr", "raw.TaskDefinition")
 	}
 	taskDefARN := *raw.TaskDefinition
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECS == nil {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 	api, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
@@ -240,7 +240,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cac
 	// The related panel's error result carries the refusal to the pivot.
 	// no finding: this arm already answers with it.
 	if err != nil || out.TaskDefinition == nil {
-		return resource.ErrorRelated("ecr", err)
+		return ReadFailed("ecr", err)
 	}
 
 	var images []string
@@ -260,20 +260,20 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return resource.ProvenZero("secrets", "raw.TaskDefinition")
+		return foundNone("secrets", "raw.TaskDefinition")
 	}
 	taskDefARN := *raw.TaskDefinition
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECS == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	api, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
@@ -285,7 +285,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 	// than shown a count.
 	// no finding: this arm already answers with the error result.
 	if err != nil || out.TaskDefinition == nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 
 	var refs []string
@@ -319,38 +319,43 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 // NeedsTargetCache: true.
 func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return unreadZero(res, resource.KnownRelated("sfn", nil, false))
+		return NotRead("sfn")
 	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sfn")
+		return NotRead("sfn")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
-		return unreadZero(res, resource.ProvenZero("sfn", "raw.TaskDefinition"))
+		return unreadZero(res, foundNone("sfn", "raw.TaskDefinition"))
 	}
 
 	family := taskDefFamily(*raw.TaskDefinition)
 	if family == "" {
-		return unreadZero(res, resource.ProvenZero("sfn", "family"))
+		return unreadZero(res, foundNone("sfn", "family"))
 	}
 
-	entry, ok := cache["sfn"]
-	if !ok {
-		return resource.UnknownRelated("sfn")
+	sfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sfn")
+	if err != nil {
+		return ReadFailed("sfn", err)
+	}
+	if sfnList == nil {
+		return NotRead("sfn")
 	}
 
 	var ids []string
-	var failures []Failure
-	for _, sfnRes := range entry.Resources {
+	var reads rowReads
+	for _, sfnRes := range sfnList {
 		sfnARN := sfnRes.Fields["arn"]
 		if sfnARN == "" {
+			reads.missed()
 			continue
 		}
 		sm, err := sfnDescribe(ctx, clients, sfnARN)
 		if err != nil {
-			failures = append(failures, FailedCall(sfnRes.ID, err))
+			reads.fail(sfnRes.ID, err)
 			continue
 		}
+		reads.read++
 		if sm == nil || sm.Definition == nil || *sm.Definition == "" {
 			continue
 		}
@@ -358,19 +363,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, sfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && !entry.IsTruncated {
-		// Every state machine refused its read and the cache page was
-		// complete: nothing was established about any of them, which is a
-		// fetch failure rather than a lower bound over what was read.
-		if aggErr := AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources)); aggErr != nil &&
-			len(failures) == len(entry.Resources) {
-			return resource.ErrorRelated("sfn", aggErr)
-		}
-	}
-	// Some DescribeStateMachine calls may have failed: ids is a proven subset,
-	// not necessarily exhaustive. Truncated (not Errored) keeps the row
-	// actionable rather than discarding confirmed matches as a dead end.
-	return unreadZero(res, relatedResultTrunc("sfn", ids, entry.IsTruncated || len(failures) > 0))
+	return unreadZero(res, reads.answer("sfn", "ecs-svc-related: DescribeStateMachine", ids, truncated))
 }
 
 // sfnASLHasECSFamily walks an ASL definition JSON and returns true if any Task state

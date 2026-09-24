@@ -58,10 +58,7 @@ func checkAlarmLogs(ctx context.Context, clients any, res resource.Resource, cac
 	result := alarmRowsNaming(ctx, clients, cache, "logs", res, func(row resource.Resource) bool {
 		return groups[row.ID]
 	})
-	if partial {
-		return result.PartialScan()
-	}
-	return result
+	return alsoPartial(result, partial)
 }
 
 func checkAlarmS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

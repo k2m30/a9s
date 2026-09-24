@@ -18,13 +18,10 @@ import (
 func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("ec2")
-		}
-		return resource.KnownRelated("ec2", nil, false)
+		return NotRead("ec2")
 	}
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
-		return resource.ProvenZero("ec2", "raw.Attachment.InstanceId")
+		return foundNone("ec2", "raw.Attachment.InstanceId")
 	}
 	return relatedResultTrunc("ec2", []string{*raw.Attachment.InstanceId}, false)
 }
@@ -34,10 +31,7 @@ func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("sg")
-		}
-		return resource.KnownRelated("sg", nil, false)
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, g := range raw.Groups {
@@ -57,10 +51,7 @@ func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("eip")
-		}
-		return resource.KnownRelated("eip", nil, false)
+		return NotRead("eip")
 	}
 	// In-body: Association.AllocationId IS the eip resource id (eip keyed by AllocationId).
 	var ids []string
@@ -77,7 +68,7 @@ func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		add(addr.Association)
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("eip", "raw.Association.AllocationId")
+		return foundNone("eip", "raw.Association.AllocationId")
 	}
 	return relatedResultTrunc("eip", ids, false)
 }
@@ -87,7 +78,7 @@ func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -96,10 +87,10 @@ func checkENIVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENISubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.ProvenZero("subnet", "raw.SubnetId")
+		return foundNone("subnet", "raw.SubnetId")
 	}
 	return relatedResultTrunc("subnet", []string{*raw.SubnetId}, false)
 }
@@ -111,21 +102,21 @@ func checkENISubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	// ELB-owned ENIs are marked by RequesterId "amazon-elb" and their
 	// Description starts with "ELB " — the name segment follows.
 	if raw.RequesterId == nil || *raw.RequesterId != "amazon-elb" {
-		return resource.ProvenZero("elb", "raw.RequesterId")
+		return foundNone("elb", "raw.RequesterId")
 	}
 	if raw.Description == nil || *raw.Description == "" {
 		// ENI is owned by ELB but no description — the specific ELB cannot be
 		// identified from the ENI alone without cross-referencing the ELB cache.
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	name := elbNameFromENIDescription(*raw.Description)
 	if name == "" {
-		return resource.ProvenZero("elb", "name")
+		return foundNone("elb", "name")
 	}
 	return relatedResultTrunc("elb", []string{name}, false)
 }
@@ -137,15 +128,15 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	if !isLambdaENI(raw) {
-		return resource.ProvenZero("lambda", "the interface type")
+		return foundNone("lambda", "the interface type")
 	}
 	// Parse function name from Description: "AWS Lambda VPC ENI-<name>-<uuid>".
 	name := lambdaFunctionNameFromENIDescription(aws.ToString(raw.Description))
 	if name == "" {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	return relatedResultTrunc("lambda", []string{name}, false)
 }
@@ -159,15 +150,15 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return resource.ProvenZero("nat", "eniID")
+		return foundNone("nat", "eniID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.ErrorRelated("nat", err)
+		return ReadFailed("nat", err)
 	}
 	if natList == nil {
-		return resource.UnknownRelated("nat")
+		return NotRead("nat")
 	}
 
 	var ids []string
@@ -195,15 +186,15 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return resource.ProvenZero("vpce", "eniID")
+		return foundNone("vpce", "eniID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.ErrorRelated("vpce", err)
+		return ReadFailed("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 
 	var ids []string

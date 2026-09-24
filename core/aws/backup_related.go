@@ -21,11 +21,11 @@ import (
 func checkBackupRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	planID := res.ID
 	if planID == "" {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	sels, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]backuptypes.BackupSelectionsListMember, *string, error) {
 		out, err := c.Backup.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
@@ -38,7 +38,7 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, ca
 		return out.BackupSelectionsList, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	var refs []string
 	for _, sel := range sels {
@@ -54,14 +54,14 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, ca
 func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if len(vaults) == 0 {
-		return resource.ProvenZero("kms", "vaults")
+		return foundNone("kms", "vaults")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	var refs []string
 	for _, v := range vaults {
@@ -72,7 +72,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 			})
 		})
 		if err != nil {
-			return resource.ErrorRelated("kms", err)
+			return ReadFailed("kms", err)
 		}
 		if out == nil || out.EncryptionKeyArn == nil || *out.EncryptionKeyArn == "" {
 			continue
@@ -88,18 +88,18 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	if len(vaults) == 0 {
-		return resource.ProvenZero("sns", "vaults")
+		return foundNone("sns", "vaults")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	seen := make(map[string]struct{})
 	var topicARNs []string
-	var failures []Failure
+	var reads rowReads
 	for _, v := range vaults {
 		name := v
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupVaultNotificationsOutput, error) {
@@ -110,11 +110,13 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		if err != nil {
 			// ResourceNotFoundException means the vault has no notifications configured — treat as empty.
 			if _, ok := errors.AsType[*backuptypes.ResourceNotFoundException](err); ok {
+				reads.read++
 				continue
 			}
-			failures = append(failures, FailedCall(name, err))
+			reads.fail(name, err)
 			continue
 		}
+		reads.read++
 		if out == nil || out.SNSTopicArn == nil || *out.SNSTopicArn == "" {
 			continue
 		}
@@ -125,29 +127,8 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		seen[arn] = struct{}{}
 		topicARNs = append(topicARNs, arn)
 	}
-	aggErr := AggregateFailures("backup-related: GetBackupVaultNotifications", failures, len(vaults))
-	// Every vault refused its read: nothing was established about any of
-	// them, which is a fetch failure rather than a lower bound over what was
-	// read.
-	allRefused := aggErr != nil && len(failures) == len(vaults)
-	if len(topicARNs) == 0 {
-		if allRefused {
-			return resource.ErrorRelated("sns", aggErr)
-		}
-		if aggErr != nil {
-			return relatedResultTrunc("sns", nil, true)
-		}
-		return resource.ProvenZero("sns", "topicARNs")
-	}
-
 	ids, dropped := resolveRefs("sns", topicARNs, refContext(clients, cache, "sns"))
-	if len(ids) == 0 && allRefused {
-		return resource.ErrorRelated("sns", aggErr)
-	}
-	// Some GetBackupVaultNotifications calls may have failed: ids is a proven
-	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
-	// row actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("sns", ids, dropped || aggErr != nil)
+	return reads.answer("sns", "backup-related: GetBackupVaultNotifications", ids, dropped)
 }
 
 // backupPlanVaults returns the unique TargetBackupVaultName values from the

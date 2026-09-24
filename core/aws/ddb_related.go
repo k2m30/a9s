@@ -17,10 +17,10 @@ import (
 func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
-		return resource.ProvenZero("kms", "table.SSEDescription.KMSMasterKeyArn")
+		return foundNone("kms", "table.SSEDescription.KMSMasterKeyArn")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*table.SSEDescription.KMSMasterKeyArn})
 }
@@ -36,14 +36,14 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
-		return resource.ProvenZero("backup", "tableARN")
+		return foundNone("backup", "tableARN")
 	}
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if backupList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	return backupPivot(backupList, truncated, backupTarget{arn: tableARN, unread: "ListTagsOfResource"})
 }
@@ -54,21 +54,21 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return resource.ProvenZero("kinesis", "tableName")
+		return foundNone("kinesis", "tableName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
-		return resource.UnknownRelated("kinesis")
+		return NotRead("kinesis")
 	}
 	api, ok := c.DynamoDB.(DynamoDBDescribeKinesisStreamingDestinationAPI)
 	if !ok {
-		return resource.UnknownRelated("kinesis")
+		return NotRead("kinesis")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 		return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{TableName: &tableName})
 	})
 	if err != nil {
-		return resource.ErrorRelated("kinesis", err)
+		return ReadFailed("kinesis", err)
 	}
 	var arns []string
 	for _, dest := range out.KinesisDataStreamDestinations {
@@ -89,11 +89,11 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, ca
 func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	if table.LatestStreamArn == nil || *table.LatestStreamArn == "" {
 		// Streams not enabled on this table — no Lambda triggers are possible.
-		return resource.ProvenZero("lambda", "table.LatestStreamArn")
+		return foundNone("lambda", "table.LatestStreamArn")
 	}
 	rc := refContext(clients, cache, "ddb")
 	return lambdaEventSourceMappingsNaming(ctx, clients, cache, lambda.ListEventSourceMappingsInput{}, func(sourceARN string) bool {

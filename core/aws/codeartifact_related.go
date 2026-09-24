@@ -27,18 +27,18 @@ import (
 func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[catypes.RepositorySummary](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if repo.DomainName == nil || *repo.DomainName == "" {
-		return resource.ProvenZero("kms", "repo.DomainName")
+		return foundNone("kms", "repo.DomainName")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.CodeArtifact == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	api, ok := c.CodeArtifact.(CodeArtifactDescribeDomainAPI)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	input := &codeartifact.DescribeDomainInput{Domain: repo.DomainName}
 	if repo.DomainOwner != nil && *repo.DomainOwner != "" {
@@ -52,10 +52,10 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 	//
 	// no finding: as above.
 	if err != nil || out == nil || out.Domain == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
-		return resource.ProvenZero("kms", "out.Domain.EncryptionKey")
+		return foundNone("kms", "out.Domain.EncryptionKey")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*out.Domain.EncryptionKey})
 }

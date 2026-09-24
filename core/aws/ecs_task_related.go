@@ -18,11 +18,11 @@ import (
 func checkECSTaskService(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ecs-svc")
+		return NotRead("ecs-svc")
 	}
 	ref, ofService := ecsSvcRefFromTask(res, raw)
 	if !ofService {
-		return resource.ProvenZero("ecs-svc", "raw.Group")
+		return foundNone("ecs-svc", "raw.Group")
 	}
 	return relatedRefs("ecs-svc", []string{ref}, refContext(clients, cache, "ecs-svc"))
 }
@@ -43,11 +43,11 @@ func checkECSTaskCluster(_ context.Context, clients any, res resource.Resource, 
 func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	taskDefARN := aws.ToString(raw.TaskDefinitionArn)
 	if taskDefARN == "" {
-		return resource.ProvenZero("logs", "raw.TaskDefinitionArn")
+		return foundNone("logs", "raw.TaskDefinitionArn")
 	}
 	return ecsTaskDefLogGroups(ctx, clients, cache, taskDefARN)
 }
@@ -63,7 +63,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 // (0, 1, or 2 roles).
 func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !taskDefJoined(res) {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	var arns []string
 	if v := strings.TrimSpace(res.Fields["task_role"]); v != "" {
@@ -73,15 +73,15 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		arns = append(arns, v)
 	}
 	if len(arns) == 0 {
-		return resource.ProvenZero("role", "arns")
+		return foundNone("role", "arns")
 	}
 
 	roleList, _, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if roleList == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	ids, lowerBound := listedRefs("role", arns, refContext(clients, cache, "role"), roleList)
 	return relatedResultTrunc("role", ids, lowerBound)

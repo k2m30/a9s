@@ -26,10 +26,10 @@ import (
 func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if fn.VpcConfig == nil {
-		return resource.ProvenZero("subnet", "fn.VpcConfig")
+		return foundNone("subnet", "fn.VpcConfig")
 	}
 	var ids []string
 	for _, s := range fn.VpcConfig.SubnetIds {
@@ -45,7 +45,7 @@ func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resour
 func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("efs")
+		return NotRead("efs")
 	}
 	var refs []string
 	for _, cfg := range fn.FileSystemConfigs {
@@ -60,18 +60,19 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 // their own Name, as candidates. Which function an API invokes is in its
 // integrations, which apigatewayv2.Api does not embed and only
 // GetIntegrations per API returns; a name or a tag key is free text an
-// operator chooses, so the row shows candidates rather than a count.
+// operator chooses, so the row shows candidates rather than a count, and no
+// candidate is no answer: the integrations were not read.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.ProvenZero("apigw", "fnName")
+		return foundNone("apigw", "fnName")
 	}
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
 	if err != nil {
-		return resource.ErrorRelated("apigw", err)
+		return ReadFailed("apigw", err)
 	}
 	if apiList == nil {
-		return resource.UnknownRelated("apigw")
+		return NotRead("apigw")
 	}
 	var ids []string
 	for _, apiRes := range apiList {
@@ -89,7 +90,7 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, apiRes.ID)
 		}
 	}
-	return heuristicResult("apigw", ids, truncated)
+	return candidatesResult("apigw", ids, truncated)
 }
 
 // checkLambdaCF scans the cloudfront cache for Lambda@Edge distributions that
@@ -105,14 +106,14 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 		fnARN = *fn.FunctionArn
 	}
 	if fnARN == "" {
-		return unreadZero(res, resource.ProvenZero("cf", "fnARN"))
+		return unreadZero(res, foundNone("cf", "fnARN"))
 	}
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	if cfList == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 	rc := refContext(clients, cache, "lambda")
 	var ids []string
@@ -137,11 +138,11 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.ProvenZero("ddb", "fnName")
+		return foundNone("ddb", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("ddb")
+		return NotRead("ddb")
 	}
 	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "ddb", "dynamodb", refContext(clients, cache, "ddb"))
 }
@@ -151,11 +152,11 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.ProvenZero("kinesis", "fnName")
+		return foundNone("kinesis", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("kinesis")
+		return NotRead("kinesis")
 	}
 	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "kinesis", "kinesis", refContext(clients, cache, "kinesis"))
 }
@@ -165,11 +166,11 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.ProvenZero("msk", "fnName")
+		return foundNone("msk", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("msk")
+		return NotRead("msk")
 	}
 	return lambdaEventSourceRefs(ctx, c.Lambda, fnName, "msk", "kafka", refContext(clients, cache, "msk"))
 }
@@ -189,15 +190,15 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 // aggregated per the error contract rather than silently skipped.
 func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("tg", "res.ID")
+		return foundNone("tg", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.ErrorRelated("tg", err)
+		return ReadFailed("tg", err)
 	}
 	if tgList == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 
 	var lambdaTGs []resource.Resource
@@ -210,16 +211,16 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 		if truncated {
 			return relatedResultTrunc("tg", nil, true)
 		}
-		return resource.ProvenZero("tg", "lambdaTGs")
+		return foundNone("tg", "lambdaTGs")
 	}
 
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.ELBv2 == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 	healthAPI, hok := c.ELBv2.(ELBv2DescribeTargetHealthAPI)
 	if !hok {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 
 	var ids []string
@@ -256,7 +257,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 		// Every target group refused its read and the tg cache page was
 		// complete: nothing was established about any of them, which is a
 		// fetch failure rather than a lower bound over what was read.
-		return resource.ErrorRelated("tg", aggErr)
+		return ReadFailed("tg", aggErr)
 	}
 	// Some DescribeTargetHealth calls may have failed: ids is a proven subset,
 	// not necessarily exhaustive. Truncated (not Errored) keeps the row
@@ -269,15 +270,15 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 // DescribeTopic alone doesn't list subscriptions, so we check the sns-sub cache.
 func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("sns", "res.ID")
+		return foundNone("sns", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if subList == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	topicSet := make(map[string]struct{})
 	for _, subRes := range subList {
@@ -305,15 +306,15 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 // Lambda is the endpoint.
 func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("sns-sub", "res.ID")
+		return foundNone("sns-sub", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.ErrorRelated("sns-sub", err)
+		return ReadFailed("sns-sub", err)
 	}
 	if subList == nil {
-		return resource.UnknownRelated("sns-sub")
+		return NotRead("sns-sub")
 	}
 	var ids []string
 	for _, subRes := range subList {
@@ -332,15 +333,15 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 // Fields["notification_lambda"] if the fetcher enriched it.
 func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("s3", "res.ID")
+		return foundNone("s3", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if s3List == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	var ids []string
 	for _, bRes := range s3List {
@@ -374,14 +375,14 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return resource.ProvenZero("eni", "fnName")
+		return foundNone("eni", "fnName")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -402,13 +403,10 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("secrets")
-		}
-		return resource.KnownRelated("secrets", nil, false)
+		return NotRead("secrets")
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.ProvenZero("secrets", "fn.Environment.Variables")
+		return foundNone("secrets", "fn.Environment.Variables")
 	}
 	arnSet := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -417,14 +415,14 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if len(arnSet) == 0 {
-		return resource.ProvenZero("secrets", "arnSet")
+		return foundNone("secrets", "arnSet")
 	}
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	var ids []string
 	for _, sRes := range secretList {
@@ -447,13 +445,10 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("ssm")
-		}
-		return resource.KnownRelated("ssm", nil, false)
+		return NotRead("ssm")
 	}
 	if fn.Environment == nil || len(fn.Environment.Variables) == 0 {
-		return resource.ProvenZero("ssm", "fn.Environment.Variables")
+		return foundNone("ssm", "fn.Environment.Variables")
 	}
 	candidates := make(map[string]struct{})
 	for _, v := range fn.Environment.Variables {
@@ -462,14 +457,14 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(candidates) == 0 {
-		return resource.ProvenZero("ssm", "candidates")
+		return foundNone("ssm", "candidates")
 	}
 	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {
-		return resource.ErrorRelated("ssm", err)
+		return ReadFailed("ssm", err)
 	}
 	if ssmList == nil {
-		return resource.UnknownRelated("ssm")
+		return NotRead("ssm")
 	}
 	var ids []string
 	for _, pRes := range ssmList {

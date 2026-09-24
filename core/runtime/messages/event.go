@@ -362,6 +362,7 @@ type AvailabilityPrefetched struct {
 	IssueTruncated map[string]bool                     // shortName -> true if issue count is lower bound
 	Resources      map[string][]resource.Resource      // shortName -> retained first-page resources for Wave 2
 	Pagination     map[string]*resource.PaginationMeta // shortName -> full pagination meta (NextToken, etc.) for cache seeding
+	Errs           map[string]error                    // shortName -> the error its rows arrived with
 	Gen            domain.Gen                          // availabilityGen captured at dispatch — stale if != current
 	// PrefetchErr is the composite error aggregating HARD per-type fetch
 	// failures (the type yielded no rows) during the synchronous availability

@@ -23,18 +23,18 @@ import (
 func checkWAFELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	if res.Fields["scope"] == wafScopeCloudFront {
-		return resource.ProvenZero("elb", "scope")
+		return foundNone("elb", "scope")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	arns, err := wafResourcesOfType(ctx, c.WAFv2, webACLArn, wafv2types.ResourceTypeApplicationLoadBalancer)
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	return relatedRefs("elb", arns, refContext(clients, cache, "elb"))
 }
@@ -52,11 +52,11 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.ProvenZero("logs", "webACLArn")
+		return foundNone("logs", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	region := wafRegionOf(res.Fields["scope"])
 	api := c.wafIn(res.Fields["scope"])
@@ -66,12 +66,12 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if err != nil {
 		// WAFNonexistentItemException = no logging configured → real 0.
 		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-			return resource.ProvenZero("logs", "the API answered that none is configured")
+			return foundNone("logs", "the API answered that none is configured")
 		}
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if out.LoggingConfiguration == nil {
-		return resource.ProvenZero("logs", "out.LoggingConfiguration")
+		return foundNone("logs", "out.LoggingConfiguration")
 	}
 	var groups []string
 	for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
@@ -89,7 +89,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	scope := res.Fields["scope"]
 	if scope != wafScopeCloudFront {
-		return resource.ProvenZero("cf", "scope")
+		return foundNone("cf", "scope")
 	}
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
@@ -99,19 +99,19 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		webACLArn = res.ID
 	}
 	if webACLArn == "" {
-		return resource.ProvenZero("cf", "webACLArn")
+		return foundNone("cf", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 	ids, complete, err := wafDistributionIDs(ctx, c, webACLArn)
 	var noList UnusableAnswerErr
 	switch {
 	case errors.Is(err, errClientMissing), errors.As(err, &noList):
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	case err != nil:
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	return relatedResultTrunc("cf", ids, !complete)
 }
@@ -123,18 +123,18 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.UnknownRelated("apigw")
+		return NotRead("apigw")
 	}
 	if res.Fields["scope"] == wafScopeCloudFront {
-		return resource.ProvenZero("apigw", "scope")
+		return foundNone("apigw", "scope")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.UnknownRelated("apigw")
+		return NotRead("apigw")
 	}
 	arns, err := wafResourcesOfType(ctx, c.WAFv2, webACLArn, wafv2types.ResourceTypeApiGateway)
 	if err != nil {
-		return resource.ErrorRelated("apigw", err)
+		return ReadFailed("apigw", err)
 	}
 	return relatedRefs("apigw", arns, refContext(clients, cache, "apigw"))
 }

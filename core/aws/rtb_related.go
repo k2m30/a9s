@@ -20,10 +20,7 @@ import (
 func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("subnet")
-		}
-		return resource.KnownRelated("subnet", nil, false)
+		return NotRead("subnet")
 	}
 	var ids []string
 	isMain := false
@@ -41,17 +38,17 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 
 	subnetList, subnetTrunc, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	rtbList, rtbTrunc, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if subnetList == nil || rtbList == nil {
 		// Which subnets fall to this table implicitly is unreadable without
 		// both lists: the subnets of its VPC, and the tables that name one
 		// explicitly.
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	for _, subnetRes := range subnetList {
 		if slices.Contains(ids, subnetRes.ID) {
@@ -69,10 +66,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("nat")
-		}
-		return resource.KnownRelated("nat", nil, false)
+		return NotRead("nat")
 	}
 	var ids []string
 	for _, route := range rtb.Routes {
@@ -88,10 +82,7 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("igw")
-		}
-		return resource.KnownRelated("igw", nil, false)
+		return NotRead("igw")
 	}
 	var ids []string
 	for _, route := range rtb.Routes {
@@ -107,15 +98,15 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := rtbCFNStackName(res)
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -147,7 +138,7 @@ func rtbCFNStackName(res resource.Resource) string {
 func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -157,10 +148,7 @@ func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("eni")
-		}
-		return resource.KnownRelated("eni", nil, false)
+		return NotRead("eni")
 	}
 	// RouteTable.Routes[].NetworkInterfaceId are the referenced ENIs.
 	// Skip blackhole routes — the target id is stale once the ENI is gone.
@@ -181,10 +169,7 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("tgw")
-		}
-		return resource.KnownRelated("tgw", nil, false)
+		return NotRead("tgw")
 	}
 	var ids []string
 	for _, route := range rtb.Routes {
@@ -200,15 +185,15 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtbID := res.ID
 	if rtbID == "" {
-		return resource.ProvenZero("vpce", "rtbID")
+		return foundNone("vpce", "rtbID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.ErrorRelated("vpce", err)
+		return ReadFailed("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {

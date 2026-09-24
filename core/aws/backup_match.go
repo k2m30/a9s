@@ -155,14 +155,14 @@ func backupPivot(plans []resource.Resource, truncated bool, t backupTarget) reso
 	// A nil list is a list nobody read: whether a plan covers the target is
 	// unanswered, not answered "none".
 	if plans == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	if t.arn == "" && len(plans) > 0 {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	ids, undecided := backupPlansCovering(plans, t)
 	if undecided != "" && len(ids) == 0 {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	return relatedResultTrunc("backup", ids, truncated || undecided != "")
 }

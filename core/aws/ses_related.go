@@ -36,15 +36,15 @@ type ruleSetStore interface {
 func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain := canonicalDNS(sesIdentityDomain(res))
 	if domain == "" {
-		return resource.ProvenZero("r53", "domain")
+		return foundNone("r53", "domain")
 	}
 
 	r53List, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.ErrorRelated("r53", err)
+		return ReadFailed("r53", err)
 	}
 	if r53List == nil {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 
 	var ids []string
@@ -152,32 +152,32 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.ProvenZero("eb-rule", "identityName")
+		return foundNone("eb-rule", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		// Without a client we cannot query SESv2 to discover EventBridge bus names.
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
 	if csErr != nil {
 		if errors.Is(csErr, errClientMissing) {
-			return resource.UnknownRelated("eb-rule")
+			return NotRead("eb-rule")
 		}
-		return resource.ErrorRelated("eb-rule", csErr)
+		return ReadFailed("eb-rule", csErr)
 	}
 	if configSetName == "" {
 		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
-		return resource.ProvenZero("eb-rule", "configSetName")
+		return foundNone("eb-rule", "configSetName")
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
+		return ReadFailed("eb-rule", err)
 	}
 	if out == nil {
 		// sesEventDestinations' (nil, nil) sentinel means the interface was
 		// not satisfied — we could not attempt the call, not a proven zero.
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 
 	busNames := map[string]struct{}{}
@@ -195,15 +195,15 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(busNames) == 0 {
-		return resource.ProvenZero("eb-rule", "busNames")
+		return foundNone("eb-rule", "busNames")
 	}
 
 	ebRules, truncated, cacheErr := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if cacheErr != nil {
-		return resource.ErrorRelated("eb-rule", cacheErr)
+		return ReadFailed("eb-rule", cacheErr)
 	}
 	if ebRules == nil {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 
 	var ids []string
@@ -301,15 +301,15 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	out, err := sesActiveReceiptRuleSet(ctx, c)
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.ProvenZero("lambda", "out")
+		return foundNone("lambda", "out")
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -328,15 +328,15 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	out, err := sesActiveReceiptRuleSet(ctx, c)
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
-		return resource.ProvenZero("s3", "out")
+		return foundNone("s3", "out")
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
@@ -390,31 +390,31 @@ func sesS3BucketsFromRules(rules []sestypes.ReceiptRule) []string {
 func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return resource.ProvenZero("sns", "identityName")
+		return foundNone("sns", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	configSetName, csErr := sesConfigSetName(ctx, c, identityName)
 	if csErr != nil {
 		if errors.Is(csErr, errClientMissing) {
-			return resource.UnknownRelated("sns")
+			return NotRead("sns")
 		}
-		return resource.ErrorRelated("sns", csErr)
+		return ReadFailed("sns", csErr)
 	}
 	if configSetName == "" {
 		// GetEmailIdentity succeeded and confirmed no configuration set — proven zero.
-		return resource.ProvenZero("sns", "configSetName")
+		return foundNone("sns", "configSetName")
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if out == nil {
 		// sesEventDestinations' (nil, nil) sentinel means the interface was
 		// not satisfied — we could not attempt the call, not a proven zero.
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	var ids []string
 	for _, dest := range out.EventDestinations {
@@ -432,5 +432,5 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 // target cache is truncated and matches were found. Later pages may contain
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult {
-	return resource.KnownRelated(target, ids, true)
+	return relatedResultTrunc(target, ids, true)
 }

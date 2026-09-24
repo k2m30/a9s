@@ -17,15 +17,15 @@ import (
 func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("iam-user")
+		return NotRead("iam-user")
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return resource.ProvenZero("iam-user", "groupName")
+		return foundNone("iam-user", "groupName")
 	}
 	users, complete, err := iamGroupUsers(ctx, c.IAM, groupName)
 	if err != nil {
-		return resource.ErrorRelated("iam-user", err)
+		return ReadFailed("iam-user", err)
 	}
 	var ids []string
 	for _, u := range users {
@@ -38,16 +38,16 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("policy")
+		return NotRead("policy")
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return resource.ProvenZero("policy", "groupName")
+		return foundNone("policy", "groupName")
 	}
 	attached, attachedComplete, err := iamGroupAttachedPolicies(ctx, c.IAM, groupName)
 	inline, inlineComplete, err2 := iamGroupInlinePolicies(ctx, c.IAM, groupName)
 	if err != nil && err2 != nil && len(attached) == 0 && len(inline) == 0 {
-		return resource.ErrorRelated("policy", err)
+		return ReadFailed("policy", err)
 	}
 	// A walk that failed or stopped at the cap leaves ids a proven subset of
 	// the group's policies, not the exhaustive answer.

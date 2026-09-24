@@ -172,13 +172,12 @@ func (m *Model) cacheTopLevelResourceList() {
 			}
 		}
 	}
-	trunc, cursor := m.ctrl.GetListPagination()
+	// The stored pagination is the completeness the rows were stored under,
+	// a lower bound no cursor resumes included; the list view's own flags say
+	// only whether another page can be fetched.
 	var paginationMeta *domain.PaginationMeta
-	if trunc || cursor != "" {
-		paginationMeta = &domain.PaginationMeta{
-			IsTruncated: trunc,
-			NextToken:   cursor,
-		}
+	if stored, ok := m.core.AnyOriginResourceCache(rt); ok {
+		paginationMeta = stored.Pagination
 	}
 	m.core.SetResourceCache(rt, &domain.ListViewCacheEntry{
 		Resources:     m.ctrl.GetListAllResources(),

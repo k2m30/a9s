@@ -22,6 +22,10 @@ const (
 	SecretCrossAccountPolicy = "prod/partner/analytics-readonly"
 )
 
+// KafkaSASLSecretARN is the ARN of the prod/kafka/sasl-password secret, fixed
+// rather than generated so a witness can name the secret by its ARN.
+const KafkaSASLSecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/kafka/sasl-password-AbCdEf"
+
 // SecretsFixtures holds typed fixture data for Secrets Manager.
 type SecretsFixtures struct {
 	Secrets []smtypes.SecretListEntry
@@ -346,10 +350,13 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		lastAccessed := time.Now().AddDate(0, 0, -(47 - i%7))
 		lastChanged := time.Now().AddDate(0, -(4 - i%3), -i)
 		created := time.Date(2025, time.Month(1+i%12), 1+i, 10, 0, 0, 0, time.UTC)
-		suffix := fmt.Sprintf("%06x", i+1000)
+		arn := fmt.Sprintf("arn:aws:secretsmanager:us-east-1:123456789012:secret:%s-%06x", name, i+1000)
+		if name == "prod/kafka/sasl-password" {
+			arn = KafkaSASLSecretARN
+		}
 		secrets = append(secrets, smtypes.SecretListEntry{
 			Name:             aws.String(name),
-			ARN:              aws.String(fmt.Sprintf("arn:aws:secretsmanager:us-east-1:123456789012:secret:%s-%s", name, suffix)),
+			ARN:              aws.String(arn),
 			Description:      aws.String(desc),
 			LastAccessedDate: aws.Time(lastAccessed),
 			LastChangedDate:  aws.Time(lastChanged),

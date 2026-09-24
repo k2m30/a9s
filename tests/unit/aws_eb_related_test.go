@@ -439,9 +439,11 @@ func TestRelated_Eb_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// DescribeEnvironmentResources names the load balancer; DescribeListeners
-// needs its ARN, so checkEbTG resolves it through DescribeLoadBalancers first.
-func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
+// DescribeEnvironmentResources names the load balancer and
+// DescribeLoadBalancers gives its ARN; a target group names every load
+// balancer that forwards to it in LoadBalancerArns, so the environment's
+// groups are the tg rows that name that ARN.
+func TestRelated_Eb_TG_MatchByTargetGroupLoadBalancerArns(t *testing.T) {
 	envName := "my-eb-env"
 	lbName := "awseb-AWSEBLB-ABCDEF123456"
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/awseb-AWSEBLB-ABCDEF123456/0123456789abcdef"
@@ -460,18 +462,20 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 				LoadBalancerArn:  aws.String(lbARN),
 			},
 		},
-		[]elbv2types.Listener{
-			{
-				LoadBalancerArn: aws.String(lbARN),
-				DefaultActions: []elbv2types.Action{
-					{
-						Type:           elbv2types.ActionTypeEnumForward,
-						TargetGroupArn: aws.String(tgARN),
-					},
-				},
-			},
-		},
+		nil,
 	)
+	tgCache := resource.ResourceCache{"tg": {Resources: []resource.Resource{
+		{ID: "awseb-AWSEBTA-ABCDEF123456", Name: "awseb-AWSEBTA-ABCDEF123456", RawStruct: elbv2types.TargetGroup{
+			TargetGroupName:  aws.String("awseb-AWSEBTA-ABCDEF123456"),
+			TargetGroupArn:   aws.String(tgARN),
+			LoadBalancerArns: []string{lbARN},
+		}},
+		{ID: "other-app-tg", Name: "other-app-tg", RawStruct: elbv2types.TargetGroup{
+			TargetGroupName:  aws.String("other-app-tg"),
+			TargetGroupArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-app-tg/fedcba9876543210"),
+			LoadBalancerArns: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/other-app/fedcba9876543210"},
+		}},
+	}}}
 	clients := &awsclient.ServiceClients{
 		ElasticBeanstalk: fakeEB,
 		ELBv2:            fakeELBv2,
@@ -487,10 +491,10 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	}
 
 	checker := ebCheckerByTarget(t, "tg")
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+	result := checker(context.Background(), clients, res, tgCache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	if result.Count() != 1 || result.Truncated() {
+		t.Errorf("Count = %d truncated=%v, want exactly 1", result.Count(), result.Truncated())
 	}
 	// tg rows are keyed by the target group name, not the ARN.
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "awseb-AWSEBTA-ABCDEF123456" {

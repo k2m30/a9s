@@ -39,10 +39,10 @@ func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *ath
 func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.OutputLocation == nil {
-		return resource.ProvenZero("s3", "cfg.ResultConfiguration.OutputLocation")
+		return foundNone("s3", "cfg.ResultConfiguration.OutputLocation")
 	}
 	return relatedRefs("s3", []string{*cfg.ResultConfiguration.OutputLocation}, refContext(clients, cache, "s3"))
 }
@@ -52,13 +52,13 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cach
 func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if cfg.ResultConfiguration == nil ||
 		cfg.ResultConfiguration.EncryptionConfiguration == nil ||
 		cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == nil ||
 		*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey == "" {
-		return resource.ProvenZero("kms", "cfg")
+		return foundNone("kms", "cfg")
 	}
 	keyID := kmsRefFromField(*cfg.ResultConfiguration.EncryptionConfiguration.KmsKey, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -70,19 +70,19 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cac
 func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	if cfg.MonitoringConfiguration == nil || cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration == nil {
-		return resource.ProvenZero("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration")
+		return foundNone("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration")
 	}
 	cw := cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration
 	if !aws.ToBool(cw.Enabled) {
-		return resource.ProvenZero("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration.Enabled")
+		return foundNone("logs", "cfg.MonitoringConfiguration.CloudWatchLoggingConfiguration.Enabled")
 	}
 	// Logging on with no LogGroup leaves the group to Athena, which names none
 	// in the configuration.
 	if aws.ToString(cw.LogGroup) == "" {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	return relatedResultTrunc("logs", []string{*cw.LogGroup}, false)
 }
@@ -92,10 +92,10 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if cfg.ExecutionRole == nil || *cfg.ExecutionRole == "" {
-		return resource.ProvenZero("role", "cfg.ExecutionRole")
+		return foundNone("role", "cfg.ExecutionRole")
 	}
 	return relatedRefs("role", []string{*cfg.ExecutionRole}, refContext(clients, cache, "role"))
 }

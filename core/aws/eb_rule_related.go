@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"slices"
 
@@ -18,10 +19,10 @@ import (
 func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rule, ok := assertStruct[eventbridgetypes.Rule](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if rule.RoleArn == nil || *rule.RoleArn == "" {
-		return resource.ProvenZero("role", "rule.RoleArn")
+		return foundNone("role", "rule.RoleArn")
 	}
 	return relatedRefs("role", []string{*rule.RoleArn}, refContext(clients, cache, "role"))
 }
@@ -32,11 +33,11 @@ func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cach
 func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCache, res resource.Resource, target, service string) resource.RelatedCheckResult {
 	ruleName := res.Fields["name"]
 	if ruleName == "" {
-		return resource.KnownRelated(target, nil, false)
+		return NotRead(target)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	targets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Target, *string, error) {
 		in := &eventbridge.ListTargetsByRuleInput{
@@ -54,7 +55,7 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 	})
 	// no finding: the pivot shows "?" rather than a target count nobody read.
 	if err != nil {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	var arns []string
 	for _, t := range targets {
@@ -97,21 +98,26 @@ func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, cac
 // target: the rules events:ListRuleNamesByTarget names for targetARN. The
 // call answers for one bus and hands back bare names, and a rule row is keyed
 // by the bus it sits on, so it is asked once per bus of the account and each
-// name it returns belongs to the bus it was asked about.
+// name it returns belongs to the bus it was asked about. Without the target's
+// ARN nothing can be asked.
 func ebRulesTargeting(ctx context.Context, clients any, cache resource.ResourceCache, targetARN string) resource.RelatedCheckResult {
+	if targetARN == "" {
+		return relatedAnswer("eb-rule", relatedRead{unread: true})
+	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
 	if !ok {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	buses, complete, err := ebRuleBuses(ctx, c.EventBridge)
 	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
+		return ReadFailed("eb-rule", err)
 	}
 	var ids []string
+	var failures []Failure
 	for _, bus := range buses {
 		names, busComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
 			in := &eventbridge.ListRuleNamesByTargetInput{TargetArn: &targetARN, NextToken: token}
@@ -125,14 +131,19 @@ func ebRulesTargeting(ctx context.Context, clients any, cache resource.ResourceC
 			return out.RuleNames, out.NextToken, nil
 		})
 		if err != nil {
-			return resource.ErrorRelated("eb-rule", err)
+			failures = append(failures, FailedCall(cmp.Or(bus, "default"), err))
 		}
-		complete = complete && busComplete
+		complete = complete && busComplete && err == nil
 		for _, name := range names {
 			if id := ebRuleID(bus, name); !slices.Contains(ids, id) {
 				ids = append(ids, id)
 			}
 		}
 	}
-	return relatedResultTrunc("eb-rule", ids, !complete)
+	return relatedAnswer("eb-rule", relatedRead{
+		ids:     ids,
+		partial: !complete,
+		unread:  len(failures) == len(buses) && len(buses) > 0,
+		failure: AggregateFailures("eb-rule: ListRuleNamesByTarget", failures, len(buses)),
+	})
 }

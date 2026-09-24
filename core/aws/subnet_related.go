@@ -20,15 +20,15 @@ import (
 func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("ec2", "subnetID")
+		return foundNone("ec2", "subnetID")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	var ids []string
@@ -50,15 +50,15 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("eni", "subnetID")
+		return foundNone("eni", "subnetID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 
 	var ids []string
@@ -80,15 +80,15 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("nat", "subnetID")
+		return foundNone("nat", "subnetID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.ErrorRelated("nat", err)
+		return ReadFailed("nat", err)
 	}
 	if natList == nil {
-		return resource.UnknownRelated("nat")
+		return NotRead("nat")
 	}
 
 	var ids []string
@@ -105,15 +105,15 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("elb", "subnetID")
+		return foundNone("elb", "subnetID")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if elbList == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -173,15 +173,15 @@ func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource, rt
 func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("rtb", "subnetID")
+		return foundNone("rtb", "subnetID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.ErrorRelated("rtb", err)
+		return ReadFailed("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 	return relatedResultTrunc("rtb", subnetRouteTableIDs(subnetID, res.Fields["vpc_id"], rtbList, !truncated), truncated)
 }
@@ -190,11 +190,11 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Subnet](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
@@ -204,7 +204,7 @@ func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkSubnetVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -214,15 +214,15 @@ func checkSubnetVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("asg", "subnetID")
+		return foundNone("asg", "subnetID")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 
 	var ids []string
@@ -248,15 +248,15 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("efs", "subnetID")
+		return foundNone("efs", "subnetID")
 	}
 
 	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("efs", err)
+		return ReadFailed("efs", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("efs")
+		return NotRead("efs")
 	}
 
 	fsIDSet := make(map[string]struct{})
@@ -276,15 +276,15 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		if eniTruncated {
 			return relatedResultTrunc("efs", nil, true)
 		}
-		return resource.ProvenZero("efs", "fsIDSet")
+		return foundNone("efs", "fsIDSet")
 	}
 
 	efsList, efsTruncated, err := relatedResourcesFor(ctx, clients, cache, "efs")
 	if err != nil {
-		return resource.ErrorRelated("efs", err)
+		return ReadFailed("efs", err)
 	}
 	if efsList == nil {
-		return resource.UnknownRelated("efs")
+		return NotRead("efs")
 	}
 
 	var ids []string
@@ -301,15 +301,15 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("eks", "subnetID")
+		return foundNone("eks", "subnetID")
 	}
 
 	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.ErrorRelated("eks", err)
+		return ReadFailed("eks", err)
 	}
 	if eksList == nil {
-		return resource.UnknownRelated("eks")
+		return NotRead("eks")
 	}
 
 	var ids []string
@@ -333,15 +333,15 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return resource.ProvenZero("vpce", "subnetID")
+		return foundNone("vpce", "subnetID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.ErrorRelated("vpce", err)
+		return ReadFailed("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 
 	var ids []string

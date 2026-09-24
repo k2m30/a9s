@@ -536,7 +536,6 @@ func (pagedEB) DescribeEnvironmentResources(_ context.Context, in *elasticbeanst
 
 type pagedELBv2 struct {
 	awsclient.ELBv2API
-	listeners *pagedList
 }
 
 const pagedLBARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/awseb-e-m-AWSEBLoa-1ABCDEF/50dc6c495c0c9188"
@@ -551,35 +550,41 @@ func (f *pagedELBv2) DescribeLoadBalancers(_ context.Context, in *elbv2.Describe
 	}}}, nil
 }
 
-func (f *pagedELBv2) DescribeListeners(_ context.Context, in *elbv2.DescribeListenersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error) {
-	lo, hi, next := f.listeners.page(in.Marker)
-	out := &elbv2.DescribeListenersOutput{NextMarker: next}
-	for i := lo; i < hi; i++ {
-		out.Listeners = append(out.Listeners, elbv2types.Listener{
-			ListenerArn:     aws.String(fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/awseb-e-m-AWSEBLoa-1ABCDEF/50dc6c495c0c9188/%016x", i)),
-			LoadBalancerArn: aws.String(pagedLBARN),
-			Port:            aws.Int32(int32(8000 + i%1000)), //nolint:gosec // bounded test port
-			Protocol:        elbv2types.ProtocolEnumHttp,
-			DefaultActions: []elbv2types.Action{{
-				Type:           elbv2types.ActionTypeEnumForward,
-				TargetGroupArn: aws.String(fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/%s/0123456789abcdef", pagedTGName(i))),
-			}},
-		})
+// pagedTGRows is a target-group list of n groups forwarded to by the
+// environment's load balancer, plus one another load balancer uses.
+func pagedTGRows(n int) []resource.Resource {
+	row := func(name string, lbARNs ...string) resource.Resource {
+		return resource.Resource{ID: name, Name: name, RawStruct: elbv2types.TargetGroup{
+			TargetGroupName:  aws.String(name),
+			TargetGroupArn:   aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/" + name + "/0123456789abcdef"),
+			LoadBalancerArns: lbARNs,
+		}}
 	}
-	return out, nil
+	rows := []resource.Resource{row("other-app-tg", "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/other-app/0fedcba987654321")}
+	for i := range n {
+		rows = append(rows, row(pagedTGName(i), pagedLBARN))
+	}
+	return rows
 }
 
+// TestRelatedPaging_BeanstalkTargetGroups: a target group names every load
+// balancer that forwards to it, so the environment's groups are read off the
+// target-group list. A whole list gives an exact count; a list cut short
+// gives what it holds as a lower bound.
 func TestRelatedPaging_BeanstalkTargetGroups(t *testing.T) {
 	env := resource.Resource{ID: "web-prod", Name: "web-prod", RawStruct: ebtypes.EnvironmentDescription{EnvironmentName: aws.String("web-prod")}}
+	clients := &awsclient.ServiceClients{ElasticBeanstalk: pagedEB{}, ELBv2: &pagedELBv2{}}
 	t.Run("exact", func(t *testing.T) {
-		listeners := &pagedList{total: 7, size: 5}
-		clients := &awsclient.ServiceClients{ElasticBeanstalk: pagedEB{}, ELBv2: &pagedELBv2{listeners: listeners}}
-		assertPagedExact(t, pagedChecker(t, "eb", "tg")(context.Background(), clients, env, resource.ResourceCache{}), pagedIDs(7, pagedTGName))
+		cache := resource.ResourceCache{"tg": {Resources: pagedTGRows(7)}}
+		assertPagedExact(t, pagedChecker(t, "eb", "tg")(context.Background(), clients, env, cache), pagedIDs(7, pagedTGName))
 	})
-	t.Run("capped", func(t *testing.T) {
-		listeners := &pagedList{total: pagedEndless, size: 5}
-		clients := &awsclient.ServiceClients{ElasticBeanstalk: pagedEB{}, ELBv2: &pagedELBv2{listeners: listeners}}
-		assertPagedCapped(t, pagedChecker(t, "eb", "tg")(context.Background(), clients, env, resource.ResourceCache{}), listeners, pagedTGName)
+	t.Run("list cut short", func(t *testing.T) {
+		cache := resource.ResourceCache{"tg": {Resources: pagedTGRows(5), IsTruncated: true}}
+		got := pagedChecker(t, "eb", "tg")(context.Background(), clients, env, cache)
+		ids := slices.Sorted(slices.Values(got.ResourceIDs()))
+		if !slices.Equal(ids, pagedIDs(5, pagedTGName)) || !got.Truncated() {
+			t.Errorf("eb → tg over a truncated tg list = %v truncated=%v, want the 5 listed groups as a lower bound", ids, got.Truncated())
+		}
 	})
 }
 

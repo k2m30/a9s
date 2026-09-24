@@ -24,7 +24,7 @@ import (
 func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	var hosts []string
 	if dist.Origins != nil {
@@ -48,10 +48,10 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 
 	s3List, _, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if s3List == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	ids, lowerBound := listedRefs("s3", buckets, refContext(clients, cache, "s3"), s3List)
 	return relatedResultTrunc("s3", ids, lowerBound || cfgErr != nil)
@@ -78,10 +78,10 @@ func cfDistributionConfig(ctx context.Context, clients any, distID string) (*cft
 func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	if dist.Origins == nil {
-		return resource.ProvenZero("elb", "dist.Origins")
+		return foundNone("elb", "dist.Origins")
 	}
 
 	var origins []string
@@ -91,15 +91,15 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(origins) == 0 {
-		return resource.ProvenZero("elb", "the distribution's origins")
+		return foundNone("elb", "the distribution's origins")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if elbList == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -116,19 +116,19 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("waf")
+		return NotRead("waf")
 	}
 	if dist.WebACLId == nil || *dist.WebACLId == "" {
-		return resource.ProvenZero("waf", "dist.WebACLId")
+		return foundNone("waf", "dist.WebACLId")
 	}
 	webACLID := *dist.WebACLId
 
 	wafList, truncated, err := relatedResourcesFor(ctx, clients, cache, "waf")
 	if err != nil {
-		return resource.ErrorRelated("waf", err)
+		return ReadFailed("waf", err)
 	}
 	if wafList == nil {
-		return resource.UnknownRelated("waf")
+		return NotRead("waf")
 	}
 
 	var ids []string
@@ -145,10 +145,10 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	if dist.ViewerCertificate == nil || dist.ViewerCertificate.ACMCertificateArn == nil || *dist.ViewerCertificate.ACMCertificateArn == "" {
-		return resource.ProvenZero("acm", "dist.ViewerCertificate.ACMCertificateArn")
+		return foundNone("acm", "dist.ViewerCertificate.ACMCertificateArn")
 	}
 	certARN := *dist.ViewerCertificate.ACMCertificateArn
 
@@ -157,10 +157,10 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	certRegion := arnRegionOf(certARN, "acm")
 	acmList, _, truncated, err := relatedListIn(ctx, clients, cache, "acm", certRegion)
 	if err != nil {
-		return resource.ErrorRelated("acm", err)
+		return ReadFailed("acm", err)
 	}
 	if acmList == nil {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 
 	var ids []string
@@ -185,15 +185,15 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 		domainName = *dist.DomainName
 	}
 	if domainName == "" {
-		return resource.ProvenZero("r53", "domain_name")
+		return foundNone("r53", "domain_name")
 	}
 
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.ErrorRelated("r53", err)
+		return ReadFailed("r53", err)
 	}
 	if zoneList == nil {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 
 	var ids []string
@@ -226,17 +226,17 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 // LambdaFunctionAssociations across default + ordered cache behaviors.
 func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.KnownRelated("lambda", nil, false)
+		return NotRead("lambda")
 	}
 	cfg, err := cfDistributionConfig(ctx, clients, res.ID)
 	if errors.Is(err, errClientMissing) {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if cfg == nil {
-		return resource.ProvenZero("lambda", "cfg")
+		return foundNone("lambda", "cfg")
 	}
 	var arns []string
 	collect := func(lfa *cftypes.LambdaFunctionAssociations) {

@@ -787,7 +787,7 @@ type RelatedDef struct {
 
 **Two checker patterns:**
 - **Live API** (`NeedsTargetCache: false`): Calls AWS directly (e.g., `DescribeTargetHealth`). Fast, specific.
-- **Cache scan** (`NeedsTargetCache: true`): Reads a `RowStore.SnapshotAll(true)` snapshot — one entry per type, `Partial` (lazy-add) entries included, and observed-empty types stay present in the snapshot. The dispatcher pre-fetches the target type if absent.
+- **Cache scan** (`NeedsTargetCache: true`): Reads a `RowStore.SnapshotAll(true)` snapshot — one entry per type, `Partial` (lazy-add) entries included, and observed-empty types stay present in the snapshot. The dispatcher pre-fetches the target type if absent. A `Partial` or disk-restored (`FieldsOnly`) entry is not the type's list: `awsclient.CachedList` (`core/aws/related_fetch.go`) is the one place that says so, and every reader — the fetching ones, the cache-only ones, the issue-scan prefetch — treats such an entry as absent.
 
 `(*Core).HandleRelatedCheckStarted` (`core/runtime/related.go`; TUI adapter `handleRelatedCheckStarted` in `internal/tui/runtime_adapter_related.go`) fans out one goroutine per `RelatedDef`, capped by `MaxConcurrentProbes`. Results carry a generation to discard stale results after Ctrl+R or profile/region switch.
 
@@ -801,6 +801,8 @@ type RelatedDef struct {
 | `DeferredRelated(target)` | not resolved yet by design | deferred |
 
 This exists because the old struct permitted `Count: 0` after a failed call, and ~136 hand-written checkers each re-derived their own error handling — so they disagreed. `dbc_related.go` and `redis_related.go` performed the identical two-hop subnet-group resolution and returned opposite answers on failure; both shipped. A denied `logs:DescribeSubscriptionFilters` rendered as a proven `(0)` on a log group that was actively streaming. **Writing `RelatedCheckResult{Count: 0}` is now a compile error outside `core/domain`**, so the lazy default is unavailable; what the type cannot prevent is a well-typed but wrong choice — calling `KnownRelated` where the code should have caught an error and called `UnknownRelated`.
+
+Checkers never call these constructors. They report what they read — ids found, a place read in part, a place not read — and `relatedAnswer` in `core/aws/related_fetch.go` picks the state; `foundNone`, `NotRead` and `ReadFailed` there are its shorthands. A guard test fails on any constructor call outside that file.
 
 A genuine zero stays a proven zero: a successful call returning an empty list is `KnownRelated(target, nil, false)`. Turning those into unknowns is the opposite defect and makes every panel useless.
 

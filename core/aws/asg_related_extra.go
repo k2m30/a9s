@@ -20,10 +20,10 @@ import (
 func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.ProvenZero("subnet", "asg.VPCZoneIdentifier")
+		return foundNone("subnet", "asg.VPCZoneIdentifier")
 	}
 	parts := strings.Split(*asg.VPCZoneIdentifier, ",")
 	var ids []string
@@ -34,7 +34,7 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("subnet", "ids")
+		return foundNone("subnet", "ids")
 	}
 	return relatedResultTrunc("subnet", ids, false)
 }
@@ -43,10 +43,10 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
-		return resource.ProvenZero("tg", "asg.TargetGroupARNs")
+		return foundNone("tg", "asg.TargetGroupARNs")
 	}
 
 	arnSet := map[string]bool{}
@@ -58,10 +58,10 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.ErrorRelated("tg", err)
+		return ReadFailed("tg", err)
 	}
 	if tgList == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 
 	var ids []string
@@ -79,12 +79,12 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	var ids []string
@@ -92,7 +92,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
 		if err != nil {
-			return resource.ErrorRelated("sg", err)
+			return ReadFailed("sg", err)
 		}
 		if len(lcs) > 0 {
 			ids = append(ids, lcs[0].SecurityGroups...)
@@ -105,12 +105,12 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.ProvenZero("sg", "ltSpec.LaunchTemplateId")
+		return foundNone("sg", "ltSpec.LaunchTemplateId")
 	}
 
 	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	for _, v := range versions {
 		if v.LaunchTemplateData == nil {
@@ -130,7 +130,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	asgName := ""
 	if asg.AutoScalingGroupName != nil {
@@ -140,12 +140,12 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		asgName = res.ID
 	}
 	if asgName == "" {
-		return resource.ProvenZero("sns", "asgName")
+		return foundNone("sns", "asgName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	var ids []string
@@ -161,7 +161,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		return out.NotificationConfigurations, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	for _, n := range notifs {
 		if n.TopicARN != nil && *n.TopicARN != "" {
@@ -175,7 +175,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	for _, h := range hookOut.LifecycleHooks {
 		if h.NotificationTargetARN == nil {
@@ -195,10 +195,10 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
-		return resource.ProvenZero("vpc", "asg.VPCZoneIdentifier")
+		return foundNone("vpc", "asg.VPCZoneIdentifier")
 	}
 	var subnetIDs []string
 	for s := range strings.SplitSeq(*asg.VPCZoneIdentifier, ",") {
@@ -208,12 +208,12 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.ProvenZero("vpc", "subnetIDs")
+		return foundNone("vpc", "subnetIDs")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 
 	subnets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.Subnet, *string, error) {
@@ -224,7 +224,7 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return out.Subnets, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	var vpcIDs []string
 	for _, sn := range subnets {

@@ -29,7 +29,7 @@ import (
 func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("codeartifact")
+		return NotRead("codeartifact")
 	}
 	text := []string{aws.ToString(secret.Name), aws.ToString(secret.Description)}
 	linked := strings.Contains(strings.ToLower(text[0]), "codeartifact")
@@ -39,14 +39,14 @@ func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Res
 		text = append(text, val)
 	}
 	if !linked {
-		return resource.ProvenZero("codeartifact", "the secret's name, description and tags")
+		return foundNone("codeartifact", "the secret's name, description and tags")
 	}
 	repos, truncated, err := relatedResourcesFor(ctx, clients, cache, "codeartifact")
 	if err != nil {
-		return resource.ErrorRelated("codeartifact", err)
+		return ReadFailed("codeartifact", err)
 	}
 	if repos == nil {
-		return resource.UnknownRelated("codeartifact")
+		return NotRead("codeartifact")
 	}
 	var ids []string
 	for _, repo := range repos {
@@ -68,31 +68,35 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	// the ARN and the name off Fields, which survive the disk cache.
 	if res.RawStruct != nil {
 		if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-			return resource.UnknownRelated("eb")
+			return NotRead("eb")
 		}
 	}
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.ProvenZero("eb", "secretARN")
+		return foundNone("eb", "secretARN")
 	}
 
-	entry, ok := cache["eb"]
-	if !ok {
-		return resource.UnknownRelated("eb")
+	ebList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb")
+	if err != nil {
+		return ReadFailed("eb", err)
+	}
+	if ebList == nil {
+		return NotRead("eb")
 	}
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.UnknownRelated("eb")
+		return NotRead("eb")
 	}
 
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
-	var failures []Failure
-	for _, ebRes := range entry.Resources {
+	var reads rowReads
+	for _, ebRes := range ebList {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)
 		if !ok {
+			reads.missed()
 			continue
 		}
 		appName := ""
@@ -104,6 +108,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			envName = *eb.EnvironmentName
 		}
 		if appName == "" || envName == "" {
+			reads.missed()
 			continue
 		}
 		cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
@@ -113,9 +118,10 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			})
 		})
 		if err != nil {
-			failures = append(failures, FailedCall(ebRes.ID, err))
+			reads.fail(ebRes.ID, err)
 			continue
 		}
+		reads.read++
 		for _, cfg := range cfgOut.ConfigurationSettings {
 			for _, opt := range cfg.OptionSettings {
 				if opt.Value == nil {
@@ -130,19 +136,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	nextEB:
 	}
 
-	if len(ids) == 0 && !entry.IsTruncated {
-		// Every environment refused its read and the cache page was complete:
-		// nothing was established about any of them, which is a fetch failure
-		// rather than a lower bound over what was read.
-		if aggErr := AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, len(entry.Resources)); aggErr != nil &&
-			len(failures) == len(entry.Resources) {
-			return resource.ErrorRelated("eb", aggErr)
-		}
-	}
-	// Some DescribeConfigurationSettings calls may have failed: ids is a proven
-	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
-	// row actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("eb", ids, entry.IsTruncated || len(failures) > 0)
+	return reads.answer("eb", "secrets-related: DescribeConfigurationSettings", ids, truncated)
 }
 
 // checkSecretsECSTask is a reverse-scan checker for the secrets→ecs-task relationship.
@@ -156,37 +150,40 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	// the ARN and the name off Fields, which survive the disk cache.
 	if res.RawStruct != nil {
 		if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-			return resource.UnknownRelated("ecs-task")
+			return NotRead("ecs-task")
 		}
 	}
 
 	secretARN, _ := secretIdentifiers(res)
 	if secretARN == "" {
-		return resource.ProvenZero("ecs-task", "secretARN")
+		return foundNone("ecs-task", "secretARN")
 	}
 
-	entry, ok := cache["ecs-task"]
-	if !ok {
-		return resource.UnknownRelated("ecs-task")
+	ecsTaskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
+	if err != nil {
+		return ReadFailed("ecs-task", err)
+	}
+	if ecsTaskList == nil {
+		return NotRead("ecs-task")
 	}
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 
 	ecsAPI, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 
 	var ids []string
-	var failures []Failure
-	attempted := 0
-	for _, taskRes := range entry.Resources {
+	var reads rowReads
+	for _, taskRes := range ecsTaskList {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
 		if !ok {
+			reads.missed()
 			continue
 		}
 		taskDefARN := ""
@@ -197,9 +194,9 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			taskDefARN = taskRes.Fields["task_definition"]
 		}
 		if taskDefARN == "" {
+			reads.missed()
 			continue
 		}
-		attempted++
 		tdOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecspkg.DescribeTaskDefinitionOutput, error) {
 			return ecsAPI.DescribeTaskDefinition(ctx, &ecspkg.DescribeTaskDefinitionInput{
 				TaskDefinition: &taskDefARN,
@@ -210,11 +207,13 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			// absence, not a real failure — skip without aggregating. Every
 			// other error (AccessDenied, Throttling, transient) aggregates.
 			if ErrCodeIs(err, "ClientException") {
+				reads.read++
 				continue
 			}
-			failures = append(failures, FailedCall(taskRes.ID, err))
+			reads.fail(taskRes.ID, err)
 			continue
 		}
+		reads.read++
 		if tdOut == nil || tdOut.TaskDefinition == nil {
 			continue
 		}
@@ -223,17 +222,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		}
 	}
 
-	// Some DescribeTaskDefinition calls may have failed: ids is a proven
-	// subset, not necessarily exhaustive. Truncated (not Errored) keeps the
-	// row actionable rather than discarding confirmed matches as a dead end.
-	if aggErr := AggregateFailures("secrets-related: DescribeTaskDefinition", failures, attempted); aggErr != nil &&
-		len(ids) == 0 && !entry.IsTruncated && len(failures) == attempted {
-		// Every definition refused its read and the ecs-task cache page was
-		// complete: nothing was established about any task, which is a fetch
-		// failure rather than a lower bound over what was read.
-		return resource.ErrorRelated("ecs-task", aggErr)
-	}
-	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || len(failures) > 0)
+	return reads.answer("ecs-task", "secrets-related: DescribeTaskDefinition", ids, truncated)
 }
 
 // secretsECSTaskRefsSecret returns true if the TaskDefinition references the
@@ -267,16 +256,16 @@ func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secret resource.Resour
 func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.ProvenZero("logs", "secret.RotationLambdaARN")
+		return foundNone("logs", "secret.RotationLambdaARN")
 	}
 	rotationARN := *secret.RotationLambdaARN
 
 	funcName, local := resource.ResolveRef("lambda", rotationARN, refContext(clients, cache, "lambda"))
 	if !local {
-		return resource.KnownRelated("logs", nil, true)
+		return relatedResultTrunc("logs", nil, true)
 	}
 
 	defaultLogGroup := "/aws/lambda/" + funcName
@@ -286,11 +275,11 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 	// configuration the default is a candidate, not a read.
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
+		return heuristicResult("logs", []string{defaultLogGroup}, false)
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
+		return heuristicResult("logs", []string{defaultLogGroup}, false)
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
@@ -298,7 +287,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 	})
 	// no finding: the row carries the default log group as a candidate.
 	if err != nil || out == nil || out.Configuration == nil {
-		return resource.HeuristicRelated("logs", []string{defaultLogGroup})
+		return heuristicResult("logs", []string{defaultLogGroup}, false)
 	}
 
 	logGroup := defaultLogGroup
@@ -326,12 +315,12 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 		secretID = secretName
 	}
 	if secretID == "" {
-		return unreadZero(res, resource.ProvenZero("role", "secretID"))
+		return unreadZero(res, foundNone("role", "secretID"))
 	}
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	rc := policyRefContext(clients, cache, "role", secretID)
@@ -384,7 +373,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 	if len(finalIDs) == 0 && partial {
 		// Neither path could be checked (or both failed): nothing was
 		// confirmed, so this is unresolved, not a proven zero or a lower bound.
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial || dropped))
 }
@@ -397,20 +386,20 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
-		return resource.ProvenZero("sns", "secret.RotationLambdaARN")
+		return foundNone("sns", "secret.RotationLambdaARN")
 	}
 	rotationARN := *secret.RotationLambdaARN
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
@@ -421,14 +410,14 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	// zero read as "checked, no topic".
 	// no finding: this arm answers with the related panel's unknown.
 	if err != nil || out == nil || out.Configuration == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	dlc := out.Configuration.DeadLetterConfig
 	if dlc == nil || dlc.TargetArn == nil || *dlc.TargetArn == "" {
-		return resource.ProvenZero("sns", "dlc.TargetArn")
+		return foundNone("sns", "dlc.TargetArn")
 	}
 	if _, isTopic := ARNForService(*dlc.TargetArn, "sns"); !isTopic {
-		return resource.ProvenZero("sns", "isTopic")
+		return foundNone("sns", "isTopic")
 	}
 	return relatedResultTrunc("sns", []string{*dlc.TargetArn}, false)
 }

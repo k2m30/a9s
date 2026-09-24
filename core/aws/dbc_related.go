@@ -122,10 +122,10 @@ func dbcClusterMasterSecretARN(raw any) string {
 func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := dbcClusterVpcSecurityGroupIDs(res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("sg", "ids")
+		return foundNone("sg", "ids")
 	}
 	return relatedResultTrunc("sg", ids, false)
 }
@@ -141,15 +141,15 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if clusterID == "" {
-		return resource.ProvenZero("logs", "clusterID")
+		return foundNone("logs", "clusterID")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora
@@ -176,15 +176,15 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		clusterID = id
 	}
 	if clusterID == "" {
-		return resource.ProvenZero("dbi", "clusterID")
+		return foundNone("dbi", "clusterID")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.ErrorRelated("dbi", err)
+		return ReadFailed("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.UnknownRelated("dbi")
+		return NotRead("dbi")
 	}
 
 	var ids []string
@@ -204,15 +204,15 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 // cluster (dbcSnapTakenFrom).
 func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("dbc-snap", "res.ID")
+		return foundNone("dbc-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc-snap")
 	if err != nil {
-		return resource.ErrorRelated("dbc-snap", err)
+		return ReadFailed("dbc-snap", err)
 	}
 	if snapList == nil {
-		return resource.UnknownRelated("dbc-snap")
+		return NotRead("dbc-snap")
 	}
 
 	var ids []string
@@ -236,7 +236,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
-		return resource.ProvenZero("subnet", "sng")
+		return foundNone("subnet", "sng")
 	}
 	var ids []string
 	for _, s := range sng.Subnets {
@@ -256,10 +256,10 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
-		return resource.ProvenZero("vpc", "sng")
+		return foundNone("vpc", "sng")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.ProvenZero("vpc", "sng.VpcId")
+		return foundNone("vpc", "sng.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*sng.VpcId}, false)
 }
@@ -368,15 +368,15 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		// Parent has no MasterUserSecret — true regardless of whether the
 		// RawStruct shape was a recognised cluster. Returning Count=0 is
 		// definitive: there is no cluster-managed master secret to associate.
-		return unreadZero(res, resource.ProvenZero("secrets", "secretARN"))
+		return unreadZero(res, foundNone("secrets", "secretARN"))
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	var ids []string
@@ -399,7 +399,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
-		return unreadZero(res, resource.ProvenZero("kms", "keyID"))
+		return unreadZero(res, foundNone("kms", "keyID"))
 	}
 	keyID = kmsRefFromField(keyID, res.Type)
 	return unreadZero(res, kmsRelated(ctx, clients, cache, []string{keyID}))

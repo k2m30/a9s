@@ -101,6 +101,10 @@ type ResourceCacheEntry struct {
 	// struct treats such an entry as absent and fetches the type live; a
 	// reader that matches on Fields uses it as is.
 	FieldsOnly bool
+	// Partial marks rows added one by one for a detail (FetchByIDs), not a
+	// page of the type's list: a reader of the list treats the entry as
+	// absent and fetches the type's first page.
+	Partial bool
 }
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
@@ -207,6 +211,9 @@ type RelatedCheckResult struct {
 	// the session's. A drill into the row has to read the same Region, or it
 	// lists another one and finds none of what the count names.
 	region string
+	// failure is a read that failed beside the answer: it is reported, and
+	// the row's state stays what was read.
+	failure error
 }
 
 // RelatedCoverage states how far a related lookup searched, and so whether a
@@ -288,6 +295,17 @@ func (r RelatedCheckResult) Region() string { return r.region }
 // own, so this cannot turn an unknown into a number.
 func (r RelatedCheckResult) WithRegion(region string) RelatedCheckResult {
 	r.region = region
+	return r
+}
+
+// Failure returns the read that failed beside the answer, or nil. Unlike
+// Err it never decides the row's state.
+func (r RelatedCheckResult) Failure() error { return r.failure }
+
+// WithFailure returns a copy of r that reports err as a read that failed
+// beside the answer, leaving its state as it is.
+func (r RelatedCheckResult) WithFailure(err error) RelatedCheckResult {
+	r.failure = err
 	return r
 }
 

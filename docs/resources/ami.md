@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 ### `ng`
 
 - **Why related**: EKS managed node groups using a custom launch template pull their worker AMI from `LaunchTemplateData.ImageId`. Custom-AMI shops need to audit node groups before retiring a base image; EKS-managed AMI types (AL2_x86_64 and friends) are not operator-relevant here.
-- **How discovered**: iterate the already-loaded `ng` list; for NGs with a custom launch template, resolve `LaunchTemplateData.ImageId` via `ec2:DescribeLaunchTemplateVersions` and match. — a9s-devops (2026-04-20): same launch-template resolution path used for `asg`.
+- **How discovered**: iterate the already-loaded `ng` list; for NGs with a custom launch template, resolve `LaunchTemplateData.ImageId` via `ec2:DescribeLaunchTemplateVersions` and match. — a9s-devops (2026-04-20): same launch-template resolution path used for `asg`. A node group whose template could not be read may run this image, so the count is a lower bound.
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm

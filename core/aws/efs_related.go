@@ -28,10 +28,10 @@ import (
 func checkEFSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if fs.KmsKeyId == nil || *fs.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "fs.KmsKeyId")
+		return foundNone("kms", "fs.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*fs.KmsKeyId})
 }
@@ -41,15 +41,15 @@ func checkEFSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := efsCFNStackName(res)
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -86,15 +86,15 @@ func efsCFNStackName(res resource.Resource) string {
 func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("sg", "fsID")
+		return foundNone("sg", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	sgSet := make(map[string]struct{})
@@ -125,15 +125,15 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("subnet", "fsID")
+		return foundNone("subnet", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 
 	subnetSet := make(map[string]struct{})
@@ -167,12 +167,12 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("lambda", "fsID")
+		return foundNone("lambda", "fsID")
 	}
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EFS == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	aps, apsComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]efstypes.AccessPointDescription, *string, error) {
@@ -186,7 +186,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return out.AccessPoints, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	apARNs := make(map[string]struct{})
 	for _, ap := range aps {
@@ -201,10 +201,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	var ids []string
@@ -232,20 +232,23 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 // joined by the ecs-task fetcher via DescribeTaskDefinition) and match against
 // this filesystem's ID.
 // NeedsTargetCache: true.
-func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkEFSECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("ecs-task", "fsID")
+		return foundNone("ecs-task", "fsID")
 	}
 
-	entry, ok := cache["ecs-task"]
-	if !ok {
-		return resource.UnknownRelated("ecs-task")
+	ecsTaskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
+	if err != nil {
+		return ReadFailed("ecs-task", err)
+	}
+	if ecsTaskList == nil {
+		return NotRead("ecs-task")
 	}
 
 	var ids []string
 	joinIncomplete := false
-	for _, tRes := range entry.Resources {
+	for _, tRes := range ecsTaskList {
 		// A task whose DescribeTaskDefinition failed has incomplete
 		// efs_file_system_ids; treat its contribution as unknown and mark
 		// the overall result Truncated instead of a silently-wrong zero.
@@ -260,5 +263,5 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 			ids = append(ids, tRes.ID)
 		}
 	}
-	return relatedResultTrunc("ecs-task", ids, entry.IsTruncated || joinIncomplete)
+	return relatedResultTrunc("ecs-task", ids, truncated || joinIncomplete)
 }

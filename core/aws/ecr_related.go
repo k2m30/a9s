@@ -30,14 +30,14 @@ func ecrRepoURI(res resource.Resource) string {
 // images: the loaded repositories those images name.
 func ecrWorkloadRepos(ctx context.Context, clients any, cache resource.ResourceCache, images []string) resource.RelatedCheckResult {
 	if len(images) == 0 {
-		return resource.ProvenZero("ecr", "container images")
+		return foundNone("ecr", "container images")
 	}
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecr")
 	if err != nil {
-		return resource.ErrorRelated("ecr", err)
+		return ReadFailed("ecr", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 	var ids []string
 	for _, repoRes := range list {
@@ -55,39 +55,34 @@ func ecrWorkloadRepos(ctx context.Context, clients any, cache resource.ResourceC
 func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := ecrRepoURI(res)
 	if repoURI == "" {
-		return resource.ProvenZero("lambda", "repoURI")
+		return foundNone("lambda", "repoURI")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	var ids []string
-	attempted, failed := 0, 0
+	var reads rowReads
 	for _, r := range lambdaList {
 		if !lambdaRunsImage(r) {
 			continue
 		}
-		attempted++
 		image, err := lambdaImageURI(ctx, clients, r.ID)
 		if err != nil {
-			failed++
+			reads.fail(r.ID, err)
 			continue
 		}
+		reads.read++
 		if imageRefersToRepo(image, repoURI) {
 			ids = append(ids, r.ID)
 		}
 	}
-	// Every lookup in the loop failed (throttled, denied, deleted mid-scan):
-	// nothing was actually resolved, so this is not a proven zero.
-	if attempted > 0 && failed == attempted {
-		return resource.UnknownRelated("lambda")
-	}
-	return relatedResultTrunc("lambda", ids, truncated || failed > 0)
+	return reads.answer("lambda", "ecr-related: GetFunction", ids, truncated)
 }
 
 // checkECRCodeBuild reports the CodeBuild projects whose build environment
@@ -95,15 +90,15 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := ecrRepoURI(res)
 	if repoURI == "" {
-		return resource.ProvenZero("cb", "repoURI")
+		return foundNone("cb", "repoURI")
 	}
 
 	cbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cb")
 	if err != nil {
-		return resource.ErrorRelated("cb", err)
+		return ReadFailed("cb", err)
 	}
 	if cbList == nil {
-		return resource.UnknownRelated("cb")
+		return NotRead("cb")
 	}
 
 	var ids []string
@@ -125,18 +120,18 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName, err := ecrCFNStackName(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -194,9 +189,9 @@ func checkECRKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "repo.EncryptionConfiguration.KmsKey")
+		return foundNone("kms", "repo.EncryptionConfiguration.KmsKey")
 	}
 	keyID := kmsRefFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -206,30 +201,33 @@ func checkECRKMS(ctx context.Context, clients any, res resource.Resource, cache 
 // Iterates cache["eb-rule"]; for each rule, checks if rule.EventPattern JSON
 // contains source: ["aws.ecr"] AND (detail.repository-name == repo name OR
 // resources containing the repo ARN). NeedsTargetCache: true.
-func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkECREbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.ProvenZero("eb-rule", "repoName")
+		return foundNone("eb-rule", "repoName")
 	}
 	repoARN := ""
 	if repo.RepositoryArn != nil {
 		repoARN = *repo.RepositoryArn
 	}
 
-	entry, ok := cache["eb-rule"]
-	if !ok {
-		return resource.UnknownRelated("eb-rule")
+	ebRuleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
+	if err != nil {
+		return ReadFailed("eb-rule", err)
+	}
+	if ebRuleList == nil {
+		return NotRead("eb-rule")
 	}
 
 	var ids []string
-	for _, ruleRes := range entry.Resources {
+	for _, ruleRes := range ebRuleList {
 		raw, ok := assertStruct[eventbridgetypes.Rule](ruleRes.RawStruct)
 		if !ok {
 			continue
@@ -241,7 +239,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 			ids = append(ids, ruleRes.ID)
 		}
 	}
-	return relatedResultTrunc("eb-rule", ids, entry.IsTruncated)
+	return relatedResultTrunc("eb-rule", ids, truncated)
 }
 
 // ecrEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecr"]

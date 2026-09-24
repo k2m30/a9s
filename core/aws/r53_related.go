@@ -66,14 +66,14 @@ func r53RelatedResult(target string, ids []string, recordsTruncated, targetTrunc
 func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("elb", "zoneID")
+		return foundNone("elb", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("elb")
+			return NotRead("elb")
 		}
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
@@ -87,12 +87,12 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	elbList, elbTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
 	if elbList == nil {
 		if fetchErr != nil {
-			return resource.ErrorRelated("elb", fetchErr)
+			return ReadFailed("elb", fetchErr)
 		}
 		// Nothing cached and no fetcher: the aliases name something we cannot
 		// look up. The alias DNS name is not a elb ID, so reporting it would
 		// offer the operator a row that navigates to nothing.
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	var ids []string
 	for _, elbRes := range elbList {
@@ -109,14 +109,14 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("cf", "zoneID")
+		return foundNone("cf", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("cf")
+			return NotRead("cf")
 		}
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
@@ -130,12 +130,12 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	cfList, cfTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
 	if cfList == nil {
 		if fetchErr != nil {
-			return resource.ErrorRelated("cf", fetchErr)
+			return ReadFailed("cf", fetchErr)
 		}
 		// Nothing cached and no fetcher: the aliases name something we cannot
 		// look up. The alias DNS name is not a cf ID, so reporting it would
 		// offer the operator a row that navigates to nothing.
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 	var ids []string
 	for _, cfRes := range cfList {
@@ -152,14 +152,14 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("apigw", "zoneID")
+		return foundNone("apigw", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("apigw")
+			return NotRead("apigw")
 		}
-		return resource.ErrorRelated("apigw", err)
+		return ReadFailed("apigw", err)
 	}
 	var apiIDs []string
 	for _, d := range r53AliasDNSNames(sets) {
@@ -179,14 +179,14 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("s3", "zoneID")
+		return foundNone("s3", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("s3")
+			return NotRead("s3")
 		}
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	wantedBuckets := make(map[string]struct{})
 	for _, name := range r53S3WebsiteBucketNames(sets) {
@@ -198,12 +198,12 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	s3List, s3Truncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
 	if s3List == nil {
 		if fetchErr != nil {
-			return resource.ErrorRelated("s3", fetchErr)
+			return ReadFailed("s3", fetchErr)
 		}
 		// Nothing cached and no fetcher: the aliases name something we cannot
 		// look up. The alias DNS name is not a s3 ID, so reporting it would
 		// offer the operator a row that navigates to nothing.
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	var ids []string
 	for _, s3Res := range s3List {
@@ -224,14 +224,14 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("acm", "zoneID")
+		return foundNone("acm", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("acm")
+			return NotRead("acm")
 		}
-		return resource.ErrorRelated("acm", err)
+		return ReadFailed("acm", err)
 	}
 	validated := map[string]bool{}
 	for _, r := range sets {
@@ -251,10 +251,10 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	certs, certsTruncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
 	if err != nil {
-		return resource.ErrorRelated("acm", err)
+		return ReadFailed("acm", err)
 	}
 	if certs == nil {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	var ids []string
 	for _, cert := range certs {
@@ -276,15 +276,15 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("logs", "zoneID")
+		return foundNone("logs", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	api, ok := c.Route53.(Route53ListQueryLoggingConfigsAPI)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	configs, configsComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]r53types.QueryLoggingConfig, *string, error) {
 		out, err := api.ListQueryLoggingConfigs(ctx, &route53.ListQueryLoggingConfigsInput{HostedZoneId: &zoneID, NextToken: token})
@@ -294,7 +294,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return out.QueryLoggingConfigs, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if len(configs) == 0 {
 		return relatedResultTrunc("logs", nil, !configsComplete)
@@ -315,12 +315,12 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 	logList, rc, _, fetchErr := relatedListIn(ctx, clients, cache, "logs", region)
 	if logList == nil {
 		if fetchErr != nil {
-			return resource.ErrorRelated("logs", fetchErr)
+			return ReadFailed("logs", fetchErr)
 		}
 		// Nothing cached and no fetcher: the aliases name something we cannot
 		// look up. The alias DNS name is not a logs ID, so reporting it would
 		// offer the operator a row that navigates to nothing.
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	ids, lowerBound := listedRefs("logs", arns, rc, logList)
 	return inRegion(clients, region, relatedResultTrunc("logs", ids, lowerBound || !configsComplete))
@@ -331,21 +331,21 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 // for private zones.
 func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["private_zone"] != "true" {
-		return resource.ProvenZero("vpc", "res.Fields[private_zone]")
+		return foundNone("vpc", "res.Fields[private_zone]")
 	}
 	zoneID := res.ID
 	if zoneID == "" {
-		return resource.ProvenZero("vpc", "zoneID")
+		return foundNone("vpc", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.GetHostedZoneOutput, error) {
 		return c.Route53.GetHostedZone(ctx, &route53.GetHostedZoneInput{Id: &zoneID})
 	})
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	var ids []string
 	seen := make(map[string]bool)

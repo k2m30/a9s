@@ -30,15 +30,15 @@ func kmsKeyID(res resource.Resource) string {
 func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.ProvenZero("ebs", "keyID")
+		return foundNone("ebs", "keyID")
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
 	if err != nil {
-		return resource.ErrorRelated("ebs", err)
+		return ReadFailed("ebs", err)
 	}
 	if ebsList == nil {
-		return resource.UnknownRelated("ebs")
+		return NotRead("ebs")
 	}
 
 	rc := kmsViewedKeyContext(clients, cache, res)
@@ -64,15 +64,15 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.ProvenZero("dbi", "keyID")
+		return foundNone("dbi", "keyID")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.ErrorRelated("dbi", err)
+		return ReadFailed("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.UnknownRelated("dbi")
+		return NotRead("dbi")
 	}
 
 	rc := kmsViewedKeyContext(clients, cache, res)
@@ -99,15 +99,15 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.ProvenZero("secrets", "keyID")
+		return foundNone("secrets", "keyID")
 	}
 
 	secretsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretsList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	rc := kmsViewedKeyContext(clients, cache, res)
@@ -156,19 +156,19 @@ func kmsRefNames(ref, keyID string, rc domain.RefContext) (match, unknown bool) 
 func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := kmsKeyID(res)
 	if keyID == "" {
-		return resource.ProvenZero("role", "keyID")
+		return foundNone("role", "keyID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.KMS == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	policyAPI, ok := c.KMS.(KMSGetKeyPolicyAPI)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	grantsAPI, ok := c.KMS.(KMSListGrantsAPI)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	keyARN := ""
@@ -187,11 +187,11 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if policyOut != nil && policyOut.Policy != nil {
 		if refs, ok = grantedPrincipalRefs(*policyOut.Policy, "role/"); !ok {
-			return resource.UnknownRelated("role")
+			return NotRead("role")
 		}
 	}
 
@@ -204,7 +204,7 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	ids, dropped := resolveRefs("role", refs, rc)
 	// A grant principal is an ARN (a role, an assumed-role session, a user)

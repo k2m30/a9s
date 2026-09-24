@@ -37,7 +37,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: EventBridge rules with this state machine as target — `docs/related-resources.md` § Per-type contract `sfn` → "EventBridge rules with this state machine as target."
 - **How discovered**: reverse-scan the already-loaded `eb-rule` list (targets are resolved Wave 2 for `eb-rule`); keep rules whose `Targets[].Arn == <this state machine's ARN>` — a9s-devops: EventBridge → SFN wiring lives on the rule's target list; the state-machine side has no back-reference. This is the same reverse-scan pattern `pipeline` uses for `eb-rule`. Operator workflow: "which scheduled or event-driven trigger kicks off this state machine?".
-- **Count shown**: yes.
+- **Count shown**: yes; unknown for a row carrying no ARN, since the rules are found by it.
 
 ### `kms`
 

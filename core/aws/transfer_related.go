@@ -23,10 +23,10 @@ import (
 func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	if server.Certificate == nil || *server.Certificate == "" {
-		return resource.ProvenZero("acm", "server.Certificate")
+		return foundNone("acm", "server.Certificate")
 	}
 	return relatedResultTrunc("acm", []string{*server.Certificate}, false)
 }
@@ -37,11 +37,11 @@ func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkTransferLambda(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	if server.IdentityProviderType != transfertypes.IdentityProviderTypeAwsLambda ||
 		server.IdentityProviderDetails == nil || server.IdentityProviderDetails.Function == nil {
-		return resource.ProvenZero("lambda", "IdentityProviderDetails.Function")
+		return foundNone("lambda", "IdentityProviderDetails.Function")
 	}
 	return relatedRefs("lambda", []string{*server.IdentityProviderDetails.Function}, refContext(clients, cache, "lambda"))
 }
@@ -50,7 +50,7 @@ func checkTransferLambda(_ context.Context, clients any, res resource.Resource, 
 func checkTransferLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	return relatedRefs("logs", server.StructuredLogDestinations, refContext(clients, cache, "logs"))
 }
@@ -59,10 +59,10 @@ func checkTransferLogs(_ context.Context, clients any, res resource.Resource, ca
 func checkTransferRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if server.LoggingRole == nil || *server.LoggingRole == "" {
-		return resource.ProvenZero("role", "server.LoggingRole")
+		return foundNone("role", "server.LoggingRole")
 	}
 	return relatedRefs("role", []string{*server.LoggingRole}, refContext(clients, cache, "role"))
 }
@@ -72,10 +72,10 @@ func checkTransferRole(_ context.Context, clients any, res resource.Resource, ca
 func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.SubnetIds) == 0 {
-		return resource.ProvenZero("subnet", "server.EndpointDetails.SubnetIds")
+		return foundNone("subnet", "server.EndpointDetails.SubnetIds")
 	}
 	return relatedResultTrunc("subnet", server.EndpointDetails.SubnetIds, false)
 }
@@ -87,10 +87,10 @@ func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ reso
 func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eip")
+		return NotRead("eip")
 	}
 	if server.EndpointDetails == nil || len(server.EndpointDetails.AddressAllocationIds) == 0 {
-		return resource.ProvenZero("eip", "server.EndpointDetails.AddressAllocationIds")
+		return foundNone("eip", "server.EndpointDetails.AddressAllocationIds")
 	}
 	return relatedResultTrunc("eip", server.EndpointDetails.AddressAllocationIds, false)
 }
@@ -100,10 +100,10 @@ func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcId == nil || *server.EndpointDetails.VpcId == "" {
-		return resource.ProvenZero("vpc", "server.EndpointDetails.VpcId")
+		return foundNone("vpc", "server.EndpointDetails.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*server.EndpointDetails.VpcId}, false)
 }
@@ -114,10 +114,10 @@ func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkTransferVPCE(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 	if server.EndpointDetails == nil || server.EndpointDetails.VpcEndpointId == nil || *server.EndpointDetails.VpcEndpointId == "" {
-		return resource.ProvenZero("vpce", "server.EndpointDetails.VpcEndpointId")
+		return foundNone("vpce", "server.EndpointDetails.VpcEndpointId")
 	}
 	return relatedResultTrunc("vpce", []string{*server.EndpointDetails.VpcEndpointId}, false)
 }

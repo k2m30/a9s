@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -20,21 +21,33 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 	return alarmIDsByDimension(ctx, clients, cache, "msk", res)
 }
 
-// checkMSKSG returns the security groups associated with the MSK cluster's broker nodes.
-// It reads the SecurityGroups field from the Provisioned.BrokerNodeGroupInfo struct.
+// checkMSKSG returns the security groups of the cluster's network: the
+// broker nodes' of a provisioned cluster, the VPC configurations' of a
+// serverless one.
 func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
-	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.ProvenZero("sg", "cluster.Provisioned.BrokerNodeGroupInfo")
+	_, sgs := mskNetwork(cluster)
+	return relatedResultTrunc("sg", sgs, false)
+}
+
+// mskNetwork returns the subnets and security groups a cluster's network is
+// made of: Provisioned.BrokerNodeGroupInfo for a provisioned cluster,
+// Serverless.VpcConfigs for a serverless one.
+func mskNetwork(cluster kafkatypes.Cluster) (subnets, sgs []string) {
+	if p := cluster.Provisioned; p != nil && p.BrokerNodeGroupInfo != nil {
+		subnets = append(subnets, p.BrokerNodeGroupInfo.ClientSubnets...)
+		sgs = append(sgs, p.BrokerNodeGroupInfo.SecurityGroups...)
 	}
-	ids := cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups
-	if len(ids) == 0 {
-		return resource.ProvenZero("sg", "ids")
+	if cluster.Serverless != nil {
+		for _, vc := range cluster.Serverless.VpcConfigs {
+			subnets = append(subnets, vc.SubnetIds...)
+			sgs = append(sgs, vc.SecurityGroupIds...)
+		}
 	}
-	return relatedResultTrunc("sg", ids, false)
+	return subnets, sgs
 }
 
 // checkMSKLambda calls lambda:ListEventSourceMappings with the EventSourceArn
@@ -46,9 +59,9 @@ func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cac
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("lambda")
+			return NotRead("lambda")
 		}
-		return resource.ProvenZero("lambda", "ClusterArn")
+		return foundNone("lambda", "ClusterArn")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *cluster.ClusterArn, cache)
 }
@@ -59,19 +72,19 @@ func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	stackName := cluster.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -88,60 +101,53 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("cfn", ids, truncated)
 }
 
-// checkMSKSubnet returns the subnets the cluster's broker nodes run in
-// (Provisioned.BrokerNodeGroupInfo.ClientSubnets).
+// checkMSKSubnet returns the subnets of the cluster's network (mskNetwork).
 func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
-	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.ProvenZero("subnet", "cluster.Provisioned.BrokerNodeGroupInfo")
-	}
-	ids := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
-	return relatedResultTrunc("subnet", ids, false)
+	subnets, _ := mskNetwork(cluster)
+	return relatedResultTrunc("subnet", subnets, false)
 }
 
-// checkMSKVPC returns the VPC that hosts the cluster's broker subnets by
-// looking up the first ClientSubnet in the subnet cache and reading its VpcId.
+// checkMSKVPC returns the VPCs that host the cluster's subnets, read off each
+// subnet's VpcId in the subnet list. A subnet the list may hold on a page
+// nobody read is a VPC unread.
 func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
-	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
-		return resource.ProvenZero("vpc", "cluster.Provisioned.BrokerNodeGroupInfo")
-	}
-	subnets := cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets
+	subnets, _ := mskNetwork(cluster)
 	if len(subnets) == 0 {
-		return resource.ProvenZero("vpc", "subnets")
+		return foundNone("vpc", "the cluster's subnets")
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	if subnetList == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 
-	want := subnets[0]
-	for _, subnetRes := range subnetList {
-		if subnetRes.ID != want {
+	var vpcs []string
+	unread := false
+	for _, want := range subnets {
+		i := slices.IndexFunc(subnetList, func(r resource.Resource) bool { return r.ID == want })
+		if i < 0 {
+			unread = unread || truncated
 			continue
 		}
-		sn, snOk := assertStruct[ec2types.Subnet](subnetRes.RawStruct)
-		if !snOk || sn.VpcId == nil || *sn.VpcId == "" {
+		sn, snOk := assertStruct[ec2types.Subnet](subnetList[i].RawStruct)
+		if !snOk || aws.ToString(sn.VpcId) == "" {
+			unread = true
 			continue
 		}
-		return relatedResultTrunc("vpc", []string{*sn.VpcId}, false)
+		vpcs = append(vpcs, *sn.VpcId)
 	}
-	if truncated {
-		// Subnet cache is truncated — the cluster's client subnet may be on a
-		// dropped page; answer is unknown rather than a definitive non-match.
-		return resource.UnknownRelated("vpc")
-	}
-	return resource.ProvenZero("vpc", "the complete subnet list")
+	return relatedAnswer("vpc", relatedRead{ids: vpcs, unread: unread})
 }
 
 // checkMSKLogs resolves the CloudWatch log group configured for broker
@@ -151,17 +157,17 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	if cluster.Provisioned == nil ||
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs == nil {
-		return resource.ProvenZero("logs", "BrokerLogs.CloudWatchLogs")
+		return foundNone("logs", "BrokerLogs.CloudWatchLogs")
 	}
 	cw := cluster.Provisioned.LoggingInfo.BrokerLogs.CloudWatchLogs
 	if cw.Enabled == nil || !*cw.Enabled || cw.LogGroup == nil || *cw.LogGroup == "" {
-		return resource.ProvenZero("logs", "cw.LogGroup")
+		return foundNone("logs", "cw.LogGroup")
 	}
 	return relatedResultTrunc("logs", []string{*cw.LogGroup}, false)
 }
@@ -171,38 +177,46 @@ func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	if cluster.Provisioned == nil ||
 		cluster.Provisioned.LoggingInfo == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs == nil ||
 		cluster.Provisioned.LoggingInfo.BrokerLogs.S3 == nil {
-		return resource.ProvenZero("s3", "BrokerLogs.S3")
+		return foundNone("s3", "BrokerLogs.S3")
 	}
 	s3Log := cluster.Provisioned.LoggingInfo.BrokerLogs.S3
 	if s3Log.Enabled == nil || !*s3Log.Enabled || s3Log.Bucket == nil || *s3Log.Bucket == "" {
-		return resource.ProvenZero("s3", "s3Log.Bucket")
+		return foundNone("s3", "s3Log.Bucket")
 	}
 	return relatedResultTrunc("s3", []string{*s3Log.Bucket}, false)
 }
 
-// checkMSKSecrets calls kafka:ListScramSecrets(clusterArn) and returns the
-// Secrets Manager secret names associated with this cluster's SCRAM auth.
+// checkMSKSecrets returns the Secrets Manager secrets associated with the
+// cluster for SASL/SCRAM, read with kafka:ListScramSecrets. MSK associates
+// secrets only with a provisioned cluster that has SCRAM enabled
+// (ServerlessSasl carries IAM alone), so any other cluster has none and is
+// not asked. A refused call is a place not read; Kafka answers a caller it
+// denies with 401 UnauthorizedException or 403 ForbiddenException
+// (docs.aws.amazon.com/msk/1.0/apireference/clusters-clusterarn-scram-secrets.html).
 func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("secrets")
+			return NotRead("secrets")
 		}
-		return resource.ProvenZero("secrets", "ClusterArn")
+		return foundNone("secrets", "ClusterArn")
+	}
+	if !mskSCRAMEnabled(cluster) {
+		return foundNone("secrets", "ClientAuthentication.Sasl.Scram")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.MSK == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	scramAPI, ok := c.MSK.(MSKListScramSecretsAPI)
 	if !ok {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	arns, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
 		out, err := scramAPI.ListScramSecrets(ctx, &kafka.ListScramSecretsInput{
@@ -214,10 +228,20 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		return out.SecretArnList, out.NextToken, nil
 	})
-	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+	switch {
+	case err != nil && isAWSRefusal(err):
+		return relatedAnswer("secrets", relatedRead{unread: true})
+	case err != nil:
+		return ReadFailed("secrets", err)
 	}
 	return listedRelated(ctx, clients, cache, "secrets", arns, !complete)
+}
+
+// mskSCRAMEnabled reports whether a provisioned cluster accepts SASL/SCRAM.
+func mskSCRAMEnabled(cluster kafkatypes.Cluster) bool {
+	p := cluster.Provisioned
+	return p != nil && p.ClientAuthentication != nil && p.ClientAuthentication.Sasl != nil &&
+		p.ClientAuthentication.Sasl.Scram != nil && aws.ToBool(p.ClientAuthentication.Sasl.Scram.Enabled)
 }
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's
@@ -230,9 +254,9 @@ func checkMSKKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == nil ||
 		*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "EncryptionAtRest.DataVolumeKMSKeyId")
+		return foundNone("kms", "EncryptionAtRest.DataVolumeKMSKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId})
 }

@@ -19,13 +19,10 @@ import (
 func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
-		}
-		return resource.KnownRelated("role", nil, false)
+		return NotRead("role")
 	}
 	if stack.RoleARN == nil || *stack.RoleARN == "" {
-		return resource.ProvenZero("role", "stack.RoleARN")
+		return foundNone("role", "stack.RoleARN")
 	}
 	// In-body: the stack's service RoleARN normalizes to the role name (== the
 	// role's Resource.ID). Resolve by identity — no role-list fetch.
@@ -38,18 +35,15 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("cfn")
-		}
-		return resource.KnownRelated("cfn", nil, false)
+		return NotRead("cfn")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	thisStackID := ""
@@ -99,7 +93,7 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	var ids []string
 	for _, arn := range stack.NotificationARNs {
@@ -108,7 +102,7 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("sns", "ids")
+		return foundNone("sns", "ids")
 	}
 	return relatedResultTrunc("sns", ids, false)
 }
@@ -161,7 +155,7 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	return relatedResultTrunc("s3", ids, truncated)
 }
@@ -172,7 +166,7 @@ func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	refs, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
 	if !ok {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	ids, dropped := resolveRefs("eb-rule", refs, refContext(clients, cache, "eb-rule"))
 	return relatedResultTrunc("eb-rule", ids, truncated || dropped)

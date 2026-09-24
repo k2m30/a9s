@@ -19,15 +19,15 @@ var ebsSnapCreateImageRe = regexp.MustCompile(`Created by CreateImage\((i-[a-zA-
 func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
-		return resource.ProvenZero("ami", "snapID")
+		return foundNone("ami", "snapID")
 	}
 
 	amiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ami")
 	if err != nil {
-		return resource.ErrorRelated("ami", err)
+		return ReadFailed("ami", err)
 	}
 	if amiList == nil {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 
 	var ids []string
@@ -49,7 +49,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
 func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !ebsSnapParentIsLocal(res.RawStruct) {
-		return resource.ProvenZero("ebs", "snap.VolumeId")
+		return foundNone("ebs", "snap.VolumeId")
 	}
 	return relatedRefs("ebs", []string{res.Fields["volume_id"]}, refContext(clients, cache, "ebs"))
 }
@@ -60,27 +60,27 @@ func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cach
 func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	matches := ebsSnapCreateImageRe.FindStringSubmatch(res.Fields["description"])
 	if len(matches) < 2 {
-		return resource.ProvenZero("ec2", "matches")
+		return foundNone("ec2", "matches")
 	}
-	entry, ok := cache["ec2"]
-	if !ok {
-		return resource.UnknownRelated("ec2")
+	ec2List, truncated, loaded := cachedRelatedList(cache, "ec2")
+	if !loaded {
+		return NotRead("ec2")
 	}
 	var ids []string
-	if slices.ContainsFunc(entry.Resources, func(r resource.Resource) bool { return r.ID == matches[1] }) {
+	if slices.ContainsFunc(ec2List, func(r resource.Resource) bool { return r.ID == matches[1] }) {
 		ids = []string{matches[1]}
 	}
-	return relatedResultTrunc("ec2", ids, entry.IsTruncated)
+	return relatedAnswer("ec2", relatedRead{ids: ids, partial: truncated, atMostOne: true})
 }
 
 // checkEBSSnapKMS reads the KMS key from RawStruct.KmsKeyId (Pattern F).
 func checkEBSSnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "snap.KmsKeyId")
+		return foundNone("kms", "snap.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*snap.KmsKeyId})
 }
@@ -110,21 +110,21 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	if !isBackupCreated {
 		// No Backup signature in Description/Tags — the parent's own fields
 		// rule out coverage; not a truncated-cache situation.
-		return unreadZero(res, resource.ProvenZero("backup", "isBackupCreated"))
+		return unreadZero(res, foundNone("backup", "isBackupCreated"))
 	}
 	if sourceARN == "" {
 		// Backup-created signature confirmed via Description alone, but no
 		// source-resource ARN to cross-reference against plan selections —
 		// honestly unresolvable to a specific plan.
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if backupList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 
 	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, backupTarget{arn: sourceARN, unread: "DescribeVolumes"}))

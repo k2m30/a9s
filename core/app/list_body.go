@@ -148,7 +148,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if ls != nil {
 		switch {
 		case topLevelCanonical:
-			accepted, gen := c.core.ObserveRows(typeName, resources, pagination, session.OriginFetch, appendPage)
+			accepted, gen := c.core.ObserveFetchResult(typeName, resource.FetchResult{Resources: resources, Pagination: pagination}, fetchErr, session.OriginFetch, appendPage)
 			ls.Rows = accepted
 			ls.RowsGen = gen
 			ls.rowsVersion++

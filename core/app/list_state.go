@@ -729,17 +729,6 @@ func (c *Controller) PatchListAutoOpenSingle(v bool) {
 	ls.AutoOpenSingle = v
 }
 
-// GetListPagination returns truncated+cursor for the top list screen.
-func (c *Controller) GetListPagination() (truncated bool, cursor string) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	ls := c.topListState()
-	if ls == nil {
-		return false, ""
-	}
-	return ls.HasPagination, ls.PaginationCursor
-}
-
 // GetListEscPops reports whether Esc should pop the top list screen.
 func (c *Controller) GetListEscPops() bool {
 	c.mu.RLock()

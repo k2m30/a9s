@@ -358,7 +358,8 @@ func (s *t548bKinesisDDBStub) DescribeKinesisStreamingDestination(_ context.Cont
 // TestT548b_OneRefusedReadIsALowerBoundNotAFailedRow pins what a per-item
 // scan answers when one item refuses its read: the tables it did read are a
 // proven subset, so the count is a lower bound and the row stays drillable.
-// Only a scan where every item refused establishes nothing and is an error.
+// A scan where every item refused established nothing: the row is unknown,
+// and the refusal travels beside it as its failure.
 func TestT548b_OneRefusedReadIsALowerBoundNotAFailedRow(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/orders-events"
 	stream := resource.Resource{ID: "orders-events", Name: "orders-events", Fields: map[string]string{"stream_arn": streamARN}}
@@ -383,7 +384,7 @@ func TestT548b_OneRefusedReadIsALowerBoundNotAFailedRow(t *testing.T) {
 
 	allDenied := &t548bKinesisDDBStub{denied: map[string]bool{"orders": true, "payments": true}}
 	got = checker(context.Background(), &awsclient.ServiceClients{DynamoDB: allDenied, Region: "us-east-1"}, stream, cache)
-	if got.Err() == nil {
-		t.Errorf("every table refused its read, which establishes nothing: want an error, got %d", got.Count())
+	if got.State() != domain.RelatedUnknown || got.Failure() == nil {
+		t.Errorf("every table refused its read, which establishes nothing: state %s failure %v, want unknown with the refusal as its failure", got.State(), got.Failure())
 	}
 }

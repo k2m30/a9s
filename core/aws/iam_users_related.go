@@ -18,11 +18,11 @@ import (
 func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("iam-group")
+		return NotRead("iam-group")
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.ProvenZero("iam-group", "userName")
+		return foundNone("iam-group", "userName")
 	}
 	groups, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Group, *string, error) {
 		out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
@@ -35,7 +35,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 		return out.Groups, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("iam-group", err)
+		return ReadFailed("iam-group", err)
 	}
 	var ids []string
 	for _, g := range groups {
@@ -49,15 +49,15 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("policy")
+		return NotRead("policy")
 	}
 	userName := res.ID
 	if userName == "" {
-		return resource.ProvenZero("policy", "userName")
+		return foundNone("policy", "userName")
 	}
 	attached, complete, err := listAttachedUserPolicies(ctx, c.IAM, userName)
 	if err != nil {
-		return resource.ErrorRelated("policy", err)
+		return ReadFailed("policy", err)
 	}
 	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
 }

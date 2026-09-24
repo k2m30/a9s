@@ -43,7 +43,7 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	if ls == nil {
 		// No list screen owns the result: the real lane
 		// (handleResourcesLoadedEvent) hands a canonical one to the store.
-		c.core.ObserveRows(canon, resources, pagination, session.OriginFetch, appendPage)
+		c.core.ObserveFetchResult(canon, resource.FetchResult{Resources: resources, Pagination: pagination}, nil, session.OriginFetch, appendPage)
 		return
 	}
 	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)

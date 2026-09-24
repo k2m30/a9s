@@ -18,7 +18,7 @@ import (
 func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -28,15 +28,15 @@ func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.ProvenZero("ec2", "sgID")
+		return foundNone("ec2", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	var ids []string
@@ -60,15 +60,15 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.ProvenZero("eni", "sgID")
+		return foundNone("eni", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 
 	var ids []string
@@ -92,15 +92,15 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.ProvenZero("elb", "sgID")
+		return foundNone("elb", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -120,11 +120,11 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.SecurityGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
@@ -135,15 +135,15 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.ProvenZero("sg", "sgID")
+		return foundNone("sg", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	var ids []string
@@ -167,15 +167,15 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return resource.ProvenZero("lambda", "sgID")
+		return foundNone("lambda", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	var ids []string

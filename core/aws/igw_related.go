@@ -17,13 +17,10 @@ import (
 func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("vpc")
-		}
-		return resource.KnownRelated("vpc", nil, false)
+		return NotRead("vpc")
 	}
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
-		return resource.ProvenZero("vpc", "raw.Attachments[0].VpcId")
+		return foundNone("vpc", "raw.Attachments[0].VpcId")
 	}
 	// The IGW's own Attachments[0].VpcId is the attached VPC.
 	return relatedResultTrunc("vpc", []string{*raw.Attachments[0].VpcId}, false)
@@ -38,15 +35,15 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		igwID = *raw.InternetGatewayId
 	}
 	if igwID == "" {
-		return resource.ProvenZero("rtb", "igwID")
+		return foundNone("rtb", "igwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.ErrorRelated("rtb", err)
+		return ReadFailed("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 
 	var ids []string

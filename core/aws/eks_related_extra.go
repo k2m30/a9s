@@ -25,10 +25,10 @@ import (
 func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if cluster.ResourcesVpcConfig == nil {
-		return resource.ProvenZero("subnet", "cluster.ResourcesVpcConfig")
+		return foundNone("subnet", "cluster.ResourcesVpcConfig")
 	}
 	var ids []string
 	for _, s := range cluster.ResourcesVpcConfig.SubnetIds {
@@ -47,7 +47,7 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.ProvenZero("asg", "clusterName")
+		return foundNone("asg", "clusterName")
 	}
 	seen := make(map[string]struct{})
 	nodes, partial, err := clusterTaggedNodes(ctx, clients, clusterName)
@@ -65,7 +65,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	} else {
 		ngList, truncated, listErr := relatedResourcesFor(ctx, clients, cache, "ng")
 		if ngList == nil && listErr == nil && len(seen) == 0 {
-			return resource.UnknownRelated("asg")
+			return NotRead("asg")
 		}
 		ngPartial, ngErr = truncated || ngList == nil, listErr
 		for _, ngRes := range ngList {
@@ -161,7 +161,7 @@ func clusterTaggedNodes(ctx context.Context, clients any, clusterName string) (n
 // elsewhere the row is that error, otherwise what was found is a lower bound.
 func nodeSourcesResult(target string, ids map[string]struct{}, partial bool, err error) resource.RelatedCheckResult {
 	if len(ids) == 0 && err != nil {
-		return resource.ErrorRelated(target, err)
+		return ReadFailed(target, err)
 	}
 	resolved, dropped := resolveRefs(target, slices.Collect(maps.Keys(ids)), domain.RefContext{})
 	return relatedResultTrunc(target, resolved, partial || dropped || err != nil)
@@ -190,19 +190,19 @@ func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) 
 func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 	clusterName := res.ID
 	if clusterName == "" && cluster.Name != nil {
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.ProvenZero("ami", "clusterName")
+		return foundNone("ami", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EKS == nil {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 
 	amiSet := make(map[string]struct{})
@@ -310,19 +310,19 @@ const asgNamesPerDescribe = 50
 func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	clusterName := res.ID
 	if clusterName == "" && cluster.Name != nil {
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return resource.ProvenZero("ec2", "clusterName")
+		return foundNone("ec2", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EKS == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	seen := make(map[string]struct{})

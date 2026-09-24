@@ -19,14 +19,14 @@ import (
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repoURI := ecrRepoURI(res)
 	if repoURI == "" {
-		return resource.ProvenZero("ecs-task", "repoURI")
+		return foundNone("ecs-task", "repoURI")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.ErrorRelated("ecs-task", err)
+		return ReadFailed("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -51,53 +51,52 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("pipeline")
+		return NotRead("pipeline")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.ProvenZero("pipeline", "repoName")
+		return foundNone("pipeline", "repoName")
 	}
 
-	entry, ok := cache["pipeline"]
-	if !ok {
-		return resource.UnknownRelated("pipeline")
+	pipelineList, truncated, err := relatedResourcesFor(ctx, clients, cache, "pipeline")
+	if err != nil {
+		return ReadFailed("pipeline", err)
+	}
+	if pipelineList == nil {
+		return NotRead("pipeline")
 	}
 
 	// If there are pipelines to check but no CodePipeline client to call
 	// GetPipeline, we cannot determine the relationship at all.
-	if len(entry.Resources) > 0 {
+	if len(pipelineList) > 0 {
 		c, cok := clients.(*ServiceClients)
 		if !cok || c == nil || c.CodePipeline == nil {
-			return resource.UnknownRelated("pipeline")
+			return NotRead("pipeline")
 		}
 	}
 
 	var ids []string
-	attempted, failed := 0, 0
-	for _, pipelineRes := range entry.Resources {
+	var reads rowReads
+	for _, pipelineRes := range pipelineList {
 		pipelineName := pipelineRes.ID
 		if pipelineName == "" {
+			reads.missed()
 			continue
 		}
-		attempted++
 		p, err := pipelineGetDeclaration(ctx, clients, pipelineName)
 		if err != nil {
-			failed++
+			reads.fail(pipelineName, err)
 			continue
 		}
+		reads.read++
 		if ecrPipelineHasRepo(p.Stages, repoName) {
 			ids = append(ids, pipelineName)
 		}
 	}
-	// Every lookup in the loop failed (throttled, denied, deleted mid-scan):
-	// nothing was actually resolved, so this is not a proven zero.
-	if attempted > 0 && failed == attempted {
-		return resource.UnknownRelated("pipeline")
-	}
-	return relatedResultTrunc("pipeline", ids, entry.IsTruncated || failed > 0)
+	return reads.answer("pipeline", "ecr-related: GetPipeline", ids, truncated)
 }
 
 // ecrPipelineHasRepo returns true if any action in the given stages has
@@ -118,23 +117,23 @@ func ecrPipelineHasRepo(stages []cptypes.StageDeclaration, repoName string) bool
 func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {
 		repoName = *repo.RepositoryName
 	}
 	if repoName == "" {
-		return resource.ProvenZero("role", "repoName")
+		return foundNone("role", "repoName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECR == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	api, ok := c.ECR.(ECRGetRepositoryPolicyAPI)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
@@ -145,12 +144,12 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 	if err != nil {
 		// RepositoryPolicyNotFoundException means no policy exists → 0
 		if ErrCodeIs(err, "RepositoryPolicyNotFoundException") {
-			return resource.ProvenZero("role", "the API answered that none is configured")
+			return foundNone("role", "the API answered that none is configured")
 		}
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if out.PolicyText == nil || *out.PolicyText == "" {
-		return resource.ProvenZero("role", "out.PolicyText")
+		return foundNone("role", "out.PolicyText")
 	}
 
 	// repo.RegistryId is the owning account, the one whose roles are local.
@@ -158,7 +157,7 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 	rc.AccountID = cmp.Or(aws.ToString(repo.RegistryId), rc.AccountID)
 	refs, ok := grantedPrincipalRefs(*out.PolicyText, "role/")
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	return relatedRefs("role", refs, rc)
 }

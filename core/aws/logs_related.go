@@ -25,15 +25,15 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	functionName := logGroupOwner(logGroupName, "/aws/lambda/")
 	if functionName == "" {
-		return resource.ProvenZero("lambda", "functionName")
+		return foundNone("lambda", "functionName")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	var ids []string
@@ -56,10 +56,7 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 		m, ok := AlarmMetricWatched(a)
 		return ok && emitted[m]
 	})
-	if partial {
-		return result.PartialScan()
-	}
-	return result
+	return alsoPartial(result, partial)
 }
 
 // logGroupFilterMetrics returns the metrics the group's metric filters emit.
@@ -138,15 +135,18 @@ func metricFiltersAPI(clients any) CWLogsDescribeMetricFiltersAPI {
 // checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId
 // field. The value may be a full ARN (arn:aws:kms:…/key-id) or a plain key ID.
 func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
-	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
-		}
-		return resource.ProvenZero("kms", "lg.KmsKeyId")
+	// The key is on the row's fields too, which a disk-restored row keeps.
+	keyID, read := res.Fields["kms_key_id"]
+	if lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct); ok {
+		keyID, read = aws.ToString(lg.KmsKeyId), true
 	}
-	keyID := kmsRefFromField(*lg.KmsKeyId, res.Type)
-	return kmsRelated(ctx, clients, cache, []string{keyID})
+	if !read {
+		return NotRead("kms")
+	}
+	if keyID == "" {
+		return foundNone("kms", "lg.KmsKeyId")
+	}
+	return kmsRelated(ctx, clients, cache, []string{kmsRefFromField(keyID, res.Type)})
 }
 
 // checkLogsAPIGW matches log groups whose name indicates API Gateway execution
@@ -155,19 +155,19 @@ func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache
 func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.ProvenZero("apigw", "logGroupName")
+		return foundNone("apigw", "logGroupName")
 	}
 	apiID := logGroupOwner(logGroupName, "API-Gateway-Execution-Logs_")
 	if apiID == "" {
-		return resource.ProvenZero("apigw", "apiID")
+		return foundNone("apigw", "apiID")
 	}
 
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
 	if err != nil {
-		return resource.ErrorRelated("apigw", err)
+		return ReadFailed("apigw", err)
 	}
 	if apiList == nil {
-		return resource.UnknownRelated("apigw")
+		return NotRead("apigw")
 	}
 	var ids []string
 	for _, api := range apiList {
@@ -183,19 +183,19 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return resource.ProvenZero("ecs-task", "logGroupName")
+		return foundNone("ecs-task", "logGroupName")
 	}
 	family := logGroupOwner(logGroupName, "/ecs/")
 	if family == "" {
-		return resource.ProvenZero("ecs-task", "family")
+		return foundNone("ecs-task", "family")
 	}
 
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.ErrorRelated("ecs-task", err)
+		return ReadFailed("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 	var ids []string
 	for _, taskRes := range taskList {
@@ -245,9 +245,9 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, c
 	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("kinesis")
+			return NotRead("kinesis")
 		}
-		return resource.ErrorRelated("kinesis", err)
+		return ReadFailed("kinesis", err)
 	}
 	ids, dropped := resolveRefs("kinesis", destinationARNs(filters, "kinesis"), refContext(clients, cache, "kinesis"))
 	return relatedResultTrunc("kinesis", ids, dropped || !complete)
@@ -261,9 +261,9 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache 
 	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("s3")
+			return NotRead("s3")
 		}
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	ids, dropped := resolveRefs("s3", destinationARNs(filters, "s3"), refContext(clients, cache, "s3"))
 	return relatedResultTrunc("s3", ids, dropped || !complete)

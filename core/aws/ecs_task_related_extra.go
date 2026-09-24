@@ -25,18 +25,18 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	if task.ContainerInstanceArn == nil || *task.ContainerInstanceArn == "" {
-		return resource.ProvenZero("ec2", "task.ContainerInstanceArn")
+		return foundNone("ec2", "task.ContainerInstanceArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	api, ok := c.ECS.(ECSDescribeContainerInstancesAPI)
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
 		return api.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
@@ -45,7 +45,7 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	var ids []string
 	for _, ci := range out.ContainerInstances {
@@ -62,7 +62,7 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 func checkECSTaskECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 	var images []string
 	for _, c := range task.Containers {
@@ -77,7 +77,7 @@ func checkECSTaskECR(ctx context.Context, clients any, res resource.Resource, ca
 func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var ids []string
 	for _, att := range task.Attachments {
@@ -90,7 +90,7 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("eni", "ids")
+		return foundNone("eni", "ids")
 	}
 	return relatedResultTrunc("eni", ids, false)
 }
@@ -103,18 +103,18 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 // secrets cache, per docs/resources/ecs-task.md.
 func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !taskDefJoined(res) {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	joined := res.Fields["secret_arns"]
 	if joined == "" {
-		return resource.ProvenZero("secrets", "joined")
+		return foundNone("secrets", "joined")
 	}
 	secretList, _, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	ids, lowerBound := listedRefs("secrets", strings.Split(joined, ","), refContext(clients, cache, "secrets"), secretList)
@@ -128,11 +128,11 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 // already-loaded ssm cache by name, per docs/resources/ecs-task.md.
 func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !taskDefJoined(res) {
-		return resource.UnknownRelated("ssm")
+		return NotRead("ssm")
 	}
 	joined := res.Fields["ssm_param_names"]
 	if joined == "" {
-		return resource.ProvenZero("ssm", "joined")
+		return foundNone("ssm", "joined")
 	}
 	nameSet := make(map[string]struct{})
 	for name := range strings.SplitSeq(joined, ",") {
@@ -141,15 +141,15 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(nameSet) == 0 {
-		return resource.ProvenZero("ssm", "nameSet")
+		return foundNone("ssm", "nameSet")
 	}
 
 	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {
-		return resource.ErrorRelated("ssm", err)
+		return ReadFailed("ssm", err)
 	}
 	if ssmList == nil {
-		return resource.UnknownRelated("ssm")
+		return NotRead("ssm")
 	}
 
 	var ids []string
@@ -173,7 +173,7 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var eniIDs []string
 	for _, att := range task.Attachments {
@@ -186,15 +186,15 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(eniIDs) == 0 {
-		return resource.ProvenZero("sg", "eniIDs")
+		return foundNone("sg", "eniIDs")
 	}
 
 	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	eniIDSet := make(map[string]struct{}, len(eniIDs))
@@ -214,17 +214,17 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(sgIDSet) == 0 {
 		if eniTruncated {
-			return resource.UnknownRelated("sg")
+			return NotRead("sg")
 		}
-		return resource.ProvenZero("sg", "sgIDSet")
+		return foundNone("sg", "sgIDSet")
 	}
 
 	sgList, sgTruncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if sgList == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	var ids []string
@@ -240,7 +240,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSTaskSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	seen := make(map[string]struct{})
 	for _, att := range task.Attachments {
@@ -257,7 +257,7 @@ func checkECSTaskSubnet(_ context.Context, _ any, res resource.Resource, _ resou
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("subnet", "ids")
+		return foundNone("subnet", "ids")
 	}
 	return relatedResultTrunc("subnet", ids, false)
 }

@@ -37,17 +37,17 @@ func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn
 func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sfnName := res.ID
 	if sfnName == "" {
-		return resource.ProvenZero("logs", "sfnName")
+		return foundNone("logs", "sfnName")
 	}
 
 	expectedLogGroup := "/aws/vendedlogs/states/" + sfnName
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -68,17 +68,17 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.ProvenZero("role", "arn")
+		return foundNone("role", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if out == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if out.RoleArn == nil || *out.RoleArn == "" {
-		return resource.ProvenZero("role", "out.RoleArn")
+		return foundNone("role", "out.RoleArn")
 	}
 	return relatedRefs("role", []string{*out.RoleArn}, refContext(clients, cache, "role"))
 }
@@ -88,18 +88,18 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.ProvenZero("kms", "arn")
+		return foundNone("kms", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	if out == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.KmsKeyId == nil ||
 		*out.EncryptionConfiguration.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "out")
+		return foundNone("kms", "out")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*out.EncryptionConfiguration.KmsKeyId})
 }
@@ -110,17 +110,17 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return resource.ProvenZero("lambda", "arn")
+		return foundNone("lambda", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if out == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	if out.Definition == nil || *out.Definition == "" {
-		return resource.ProvenZero("lambda", "out.Definition")
+		return foundNone("lambda", "out.Definition")
 	}
 
 	var refs []string
@@ -160,9 +160,5 @@ func sfnCollectLambdaRefs(def []byte, refs *[]string) {
 // Pattern C: one events:ListRuleNamesByTarget call using the state machine ARN
 // from res.Fields["arn"]. Count = len(RuleNames).
 func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	sfnARN := res.Fields["arn"]
-	if sfnARN == "" {
-		return resource.ProvenZero("eb-rule", "sfnARN")
-	}
-	return ebRulesTargeting(ctx, clients, cache, sfnARN)
+	return ebRulesTargeting(ctx, clients, cache, res.Fields["arn"])
 }

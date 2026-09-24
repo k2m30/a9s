@@ -230,11 +230,14 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			}
 			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
 			if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+				// A template nobody could read leaves image_id absent, which
+				// the ami → ng pivot reads as an image unread.
 				imageID, imgErr := resolveNGImageID(ctx, c.EC2, lt)
 				if imgErr != nil {
 					failures = append(failures, FailedCall(cluster+"/"+ngName, imgErr))
+				} else {
+					res.Fields["image_id"] = imageID
 				}
-				res.Fields["image_id"] = imageID
 			}
 			return []resource.Resource{res}, nil
 		},

@@ -600,6 +600,13 @@ func (c *Core) ObserveRows(canon string, rows []resource.Resource, pagination *r
 	return c.session.RowStore.Observe(canon, rows, pagination, origin, appendPage)
 }
 
+// ObserveFetchResult is the one write of a fetch result into RowStore: the
+// page's completeness is decided once, by FetchIsPartial over the rows and
+// the error they came with, whichever lane fetched them.
+func (c *Core) ObserveFetchResult(canon string, result resource.FetchResult, err error, origin session.Origin, appendPage bool) ([]resource.Resource, domain.Gen) {
+	return c.ObserveRows(canon, result.Resources, awsclient.StoredPagination(result, err), origin, appendPage)
+}
+
 // ObserveCountRows is the dual-write chokepoint for a counts-only observation
 // (never touches Rows — e.g. the disk-cache-loaded seed when no
 // per-type disk row data is available and placeholder rows stand in, which

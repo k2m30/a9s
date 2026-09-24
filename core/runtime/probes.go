@@ -68,6 +68,9 @@ type DemoPrefetchResult struct {
 	IssueTruncated map[string]bool
 	Resources      map[string][]resource.Resource
 	Pagination     map[string]*resource.PaginationMeta
+	// Errs is the error each type's rows arrived with, which decides whether
+	// the stored page is whole.
+	Errs map[string]error
 	// PrefetchErr aggregates HARD per-type failures (the type yielded no
 	// rows) — surfaced as a blocking flash banner.
 	PrefetchErr error
@@ -882,6 +885,7 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	issueTruncated := make(map[string]bool)
 	retainedResources := make(map[string][]resource.Resource, len(allNames))
 	pagination := make(map[string]*resource.PaginationMeta, len(allNames))
+	errs := make(map[string]error)
 	var failures []awsclient.Failure
 	var softFailures []awsclient.Failure
 	attempted := 0
@@ -916,6 +920,7 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 			if !hasRows {
 				continue
 			}
+			errs[shortName] = err
 		}
 		entries[shortName] = len(result.Resources)
 		// Preserve full pagination meta so the seeded ResourceCache entry's
@@ -949,6 +954,7 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 		IssueTruncated:  issueTruncated,
 		Resources:       retainedResources,
 		Pagination:      pagination,
+		Errs:            errs,
 		PrefetchErr:     awsclient.AggregateFailures("availability-prefetch", failures, attempted),
 		PrefetchSoftErr: awsclient.AggregateFailures("availability-prefetch (partial)", softFailures, attempted),
 	}
@@ -1035,13 +1041,14 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	// it does not declare comes back empty in every session rather than only
 	// in the ones that never loaded that list. A declared list this session
 	// has not observed — a list opened before any sweep — or holds only as
-	// disk rows without their SDK struct is fetched here, first page only, the
+	// disk rows or rows added for a detail (awsclient.CachedList) is fetched
+	// here, first page only, the
 	// way RunRelatedDef prefetches a NeedsTargetCache target; one that cannot
 	// be fetched stays absent and its rows are marked.
 	loaded := c.BuildResourceCacheSnapshot()
 	cacheSnap := make(resource.ResourceCache, len(e.Reads))
 	for _, name := range e.Reads {
-		if entry, ok := loaded[name]; ok && !entry.FieldsOnly {
+		if entry, ok := awsclient.CachedList(loaded, name); ok {
 			cacheSnap[name] = entry
 			continue
 		}
@@ -1137,6 +1144,7 @@ func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 			Resources:   tr.Rows,
 			IsTruncated: isTruncated,
 			FieldsOnly:  tr.Origin == session.OriginDisk && !tr.Partial,
+			Partial:     tr.Partial,
 		}
 	}
 	return snap

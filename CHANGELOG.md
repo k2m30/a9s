@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A related row's count says what was read. A row whose details could not be
+  read makes a count a lower bound only for a pivot that matches on those
+  details: a demo alarm reads `EKS Clusters (0)`, and a node group's cluster
+  and an Auto Scaling group's node group read `(1)`, never `(1+)`. A list
+  restored from disk is read again before a pivot counts over it, so Secrets
+  Manager → Elastic Beanstalk, ECS service and ECR → EventBridge rules, and
+  Secrets Manager → ECS tasks no longer read `(0)` after a restart. The
+  alarm row of a restored EC2 instance, ECS service or task, load balancer,
+  target group, SNS topic, state machine, CloudFront distribution or web ACL
+  reads unknown until its details load.
+- Related rows no longer read `(0)` where nothing was read: an MSK serverless
+  cluster counts the security groups, subnets and VPCs of its VPC
+  configurations; a node group counts the security groups its launch template
+  names, and its AMI row reads unknown on the EKS-optimised image; an S3
+  bucket on SSE-KMS with no key named counts the `aws/s3` key; an AMI without
+  a CloudFormation stack tag, a pipeline or state machine without an ARN, and
+  a Lambda function or EC2 instance with no candidate API or log group read
+  unknown; every ECS task of a task definition that could not be read reads
+  unknown for its roles, secrets and parameters, not only the first.
+- A list stored with rows missing — a node-group page that lost a cluster's
+  groups to a refused call — reads as a lower bound from the cache, as it
+  does when fetched live, whether the list view, the availability probe or
+  the demo prefetch stored it, and it stays one when the list view writes
+  its rows back on a filter change. Rows added one at a time for a detail,
+  or restored from disk, are no longer read as the type's list by any pivot:
+  a node group's or launch template's EC2, Auto Scaling and node-group rows,
+  an EBS snapshot's instance, a Kinesis stream's tables and a peering
+  connection's route tables and VPCs read unknown until the list loads, and
+  an issue scan that needs such a list fetches its first page. A full first
+  page read after them is no longer marked a lower bound for the rest of the
+  session.
+- A reverse scan whose every per-row read was refused (Kinesis → DynamoDB,
+  ECS service → Step Functions, Secrets Manager → Elastic Beanstalk and ECS
+  tasks, Backup → SNS, Lambda → EventBridge rules, CodeBuild and ECR →
+  CodePipeline, ECR → Lambda) reads unknown on every pivot, and the refusal
+  is flashed. An EventBridge rule pivot keeps the rules found on the buses
+  that answered as a lower bound when another bus refuses. Elastic Beanstalk
+  → Target Groups counts the groups its load balancers forward to through
+  listener rules too. ACM → Route 53 reports a refused zone list as an error.
+- MSK → Secrets asks `ListScramSecrets` only for a cluster with SASL/SCRAM
+  enabled, and reads unknown when the call is refused.
+- A log group restored from disk counts its KMS key from its fields; a target
+  group's load balancers count exactly over a partial load balancer list; an
+  AMI's node groups are a lower bound while a node group's launch template
+  could not be read.
 - A CloudTrail event's TARGET rows open the row they name: an IAM user filed
   under a path opens the user, a secret named by ARN (with its random suffix)
   or by name opens the secret, an S3 object opens its bucket, and a Lambda

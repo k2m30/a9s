@@ -28,7 +28,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.ProvenZero("lambda", "streamARN")
+		return foundNone("lambda", "streamARN")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
 }
@@ -38,21 +38,21 @@ func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.ProvenZero("cfn", "streamName")
+		return foundNone("cfn", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	tagAPI, ok := c.Kinesis.(KinesisListTagsForStreamAPI)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.ListTagsForStreamOutput, error) {
 		return tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName)})
 	})
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.Tags {
@@ -62,14 +62,14 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -90,24 +90,24 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return resource.ProvenZero("kms", "streamName")
+		return foundNone("kms", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	descAPI, ok := c.Kinesis.(KinesisDescribeStreamSummaryAPI)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.DescribeStreamSummaryOutput, error) {
 		return descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
 	})
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
-		return resource.ProvenZero("kms", "out.StreamDescriptionSummary.KeyId")
+		return foundNone("kms", "out.StreamDescriptionSummary.KeyId")
 	}
 	keyID := kmsRefFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -120,41 +120,41 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return resource.ProvenZero("ddb", "streamARN")
+		return foundNone("ddb", "streamARN")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
-		return resource.UnknownRelated("ddb")
+		return NotRead("ddb")
 	}
 	api, ok := c.DynamoDB.(DynamoDBDescribeKinesisStreamingDestinationAPI)
 	if !ok {
-		return resource.UnknownRelated("ddb")
+		return NotRead("ddb")
 	}
 
-	entry, ok := cache["ddb"]
-	if !ok {
-		return resource.UnknownRelated("ddb")
+	ddbList, truncated, loaded := cachedRelatedList(cache, "ddb")
+	if !loaded {
+		return NotRead("ddb")
 	}
 
 	var ids []string
-	var failures []Failure
-	attempted := 0
-	for _, ddbRes := range entry.Resources {
+	var reads rowReads
+	for _, ddbRes := range ddbList {
 		tableName := ddbRes.ID
 		if tableName == "" {
+			reads.missed()
 			continue
 		}
-		attempted++
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 			return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{
 				TableName: aws.String(tableName),
 			})
 		})
 		if err != nil {
-			failures = append(failures, FailedCall(tableName, err))
+			reads.fail(tableName, err)
 			continue
 		}
+		reads.read++
 		for _, dest := range out.KinesisDataStreamDestinations {
 			if dest.StreamArn != nil && *dest.StreamArn == streamARN {
 				ids = append(ids, tableName)
@@ -162,16 +162,5 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if aggErr := AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, attempted); aggErr != nil &&
-		len(ids) == 0 && !entry.IsTruncated && len(failures) == attempted {
-		// Every table refused its read and the cache page was complete:
-		// nothing was established about any of them, which is a fetch failure
-		// rather than a lower bound over what was read.
-		return resource.ErrorRelated("ddb", aggErr)
-	}
-	// Some DescribeKinesisStreamingDestination calls may have failed: ids is a
-	// proven subset, not necessarily exhaustive. Truncated (not Errored) keeps
-	// the row actionable — "at least N, could not verify the rest" — rather
-	// than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("ddb", ids, entry.IsTruncated || len(failures) > 0)
+	return reads.answer("ddb", "kinesis-related: DescribeKinesisStreamingDestination", ids, truncated)
 }

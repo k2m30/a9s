@@ -89,7 +89,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: CloudWatch Log Groups fed by CloudWatch agent on this instance.
 - **How discovered**: cross-reference the already-loaded `logs` list by log-group name convention — the CloudWatch agent writes streams keyed on `<instance-id>`, and common groups follow `/aws/ec2/<id>` — a9s-devops: there is no authoritative EC2→log-group link in the AWS surface, so the matches are candidates and the row shows them without a count; operators still benefit because agent-managed groups are the top place they look during an incident.
-- **Count shown**: no — the candidates are not a count of the groups this instance writes to.
+- **Count shown**: no — the candidates are not a count of the groups this instance writes to, and no candidate is no answer.
 
 ### `ng`
 

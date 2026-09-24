@@ -79,15 +79,15 @@ func resolveIAMAPI(c *ServiceClients) IAMListEntitiesForPolicyAPI {
 func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.ProvenZero("role", "policyARN")
+		return foundNone("role", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	var ids []string
 	for _, r := range out.PolicyRoles {
@@ -103,15 +103,15 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("iam-user")
+		return NotRead("iam-user")
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.ProvenZero("iam-user", "policyARN")
+		return foundNone("iam-user", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.ErrorRelated("iam-user", err)
+		return ReadFailed("iam-user", err)
 	}
 	var ids []string
 	for _, u := range out.PolicyUsers {
@@ -127,18 +127,18 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("iam-group")
+		return NotRead("iam-group")
 	}
 	if groupName, ok := inlinePolicyGroup(res); ok {
 		return relatedResultTrunc("iam-group", []string{groupName}, false)
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
-		return resource.ProvenZero("iam-group", "policyARN")
+		return foundNone("iam-group", "policyARN")
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.ErrorRelated("iam-group", err)
+		return ReadFailed("iam-group", err)
 	}
 	var ids []string
 	for _, g := range out.PolicyGroups {

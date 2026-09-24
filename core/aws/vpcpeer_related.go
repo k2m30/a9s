@@ -31,7 +31,7 @@ import (
 func checkVpcPeerRTB(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtbList, truncated, ok := cachedTypedRows[ec2types.RouteTable](cache, "rtb")
 	if !ok {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 	var ids []string
 	for _, row := range rtbList {
@@ -54,11 +54,11 @@ func checkVpcPeerRTB(_ context.Context, _ any, res resource.Resource, cache reso
 func checkVpcPeerVPC(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcList, truncated, ok := cachedTypedRows[ec2types.Vpc](cache, "vpc")
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	raw, asserted := assertStruct[ec2types.VpcPeeringConnection](res.RawStruct)
 	if !asserted {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 
 	present := make(map[string]struct{}, len(vpcList))

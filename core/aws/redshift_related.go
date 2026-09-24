@@ -23,7 +23,7 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, vsg := range cluster.VpcSecurityGroups {
@@ -39,10 +39,10 @@ func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource
 func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	if cluster.VpcId == nil || *cluster.VpcId == "" {
-		return resource.ProvenZero("vpc", "cluster.VpcId")
+		return foundNone("vpc", "cluster.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*cluster.VpcId}, false)
 }
@@ -51,10 +51,10 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkRedshiftRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if len(cluster.IamRoles) == 0 {
-		return resource.ProvenZero("role", "cluster.IamRoles")
+		return foundNone("role", "cluster.IamRoles")
 	}
 	var refs []string
 	for _, r := range cluster.IamRoles {
@@ -71,9 +71,9 @@ func checkRedshiftKMS(ctx context.Context, clients any, res resource.Resource, c
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "KmsKeyId")
+		return foundNone("kms", "KmsKeyId")
 	}
 	keyID := kmsRefFromField(*cluster.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -84,7 +84,7 @@ func checkRedshiftKMS(ctx context.Context, clients any, res resource.Resource, c
 func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	stackName := ""
 	for _, tag := range cluster.Tags {
@@ -94,15 +94,15 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -125,19 +125,19 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	if cluster.MasterPasswordSecretArn == nil || *cluster.MasterPasswordSecretArn == "" {
-		return resource.ProvenZero("secrets", "cluster.MasterPasswordSecretArn")
+		return foundNone("secrets", "cluster.MasterPasswordSecretArn")
 	}
 	secretARN := *cluster.MasterPasswordSecretArn
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	var ids []string
@@ -156,25 +156,25 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status, err := redshiftLoggingStatus(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if status == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
-		return resource.ProvenZero("logs", "status.LoggingEnabled")
+		return foundNone("logs", "status.LoggingEnabled")
 	}
 	if status.LogDestinationType != redshifttypes.LogDestinationTypeCloudwatch {
 		// S3-only audit logging — no log group association.
-		return resource.ProvenZero("logs", "status.LogDestinationType")
+		return foundNone("logs", "status.LogDestinationType")
 	}
 	clusterID := res.ID
 	if clusterID == "" {
-		return resource.ProvenZero("logs", "clusterID")
+		return foundNone("logs", "clusterID")
 	}
 	if len(status.LogExports) == 0 {
 		// CloudWatch logging enabled but no specific exports configured.
-		return resource.ProvenZero("logs", "status.LogExports")
+		return foundNone("logs", "status.LogExports")
 	}
 	// Emit one log-group ID per enabled export:
 	// /aws/redshift/cluster/{clusterID}/{logExport}
@@ -191,16 +191,16 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status, err := redshiftLoggingStatus(ctx, clients, res)
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if status == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
-		return resource.ProvenZero("s3", "status.LoggingEnabled")
+		return foundNone("s3", "status.LoggingEnabled")
 	}
 	if status.BucketName == nil || *status.BucketName == "" {
-		return resource.ProvenZero("s3", "status.BucketName")
+		return foundNone("s3", "status.BucketName")
 	}
 	return relatedResultTrunc("s3", []string{*status.BucketName}, false)
 }
@@ -210,11 +210,11 @@ func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ 
 func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterSubnetGroupName == nil || *cluster.ClusterSubnetGroupName == "" {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Redshift == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	name := *cluster.ClusterSubnetGroupName
 	groups, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]redshifttypes.ClusterSubnetGroup, *string, error) {
@@ -228,10 +228,10 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 		return out.ClusterSubnetGroups, out.Marker, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if len(groups) == 0 {
-		return resource.ProvenZero("subnet", "ClusterSubnetGroups")
+		return foundNone("subnet", "ClusterSubnetGroups")
 	}
 	var ids []string
 	for _, sn := range groups[0].Subnets {

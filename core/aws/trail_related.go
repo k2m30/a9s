@@ -17,18 +17,18 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.S3BucketName == nil || *trail.S3BucketName == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("s3")
+			return NotRead("s3")
 		}
-		return resource.ProvenZero("s3", "trail.S3BucketName")
+		return foundNone("s3", "trail.S3BucketName")
 	}
 	bucketName := *trail.S3BucketName
 
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if s3List == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 
 	var ids []string
@@ -47,9 +47,9 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsLogGroupArn == nil || *trail.CloudWatchLogsLogGroupArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("logs")
+			return NotRead("logs")
 		}
-		return resource.ProvenZero("logs", "trail.CloudWatchLogsLogGroupArn")
+		return foundNone("logs", "trail.CloudWatchLogsLogGroupArn")
 	}
 
 	// A trail delivers to a log group in its own home region, which a
@@ -59,10 +59,10 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 	region := arnRegionOf(groupARN, "logs")
 	logList, rc, truncated, err := relatedListIn(ctx, clients, cache, "logs", region)
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	logGroupName, local := resource.ResolveRef("logs", groupARN, rc)
 	if !local {
@@ -84,9 +84,9 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.SnsTopicARN == nil || *trail.SnsTopicARN == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("sns")
+			return NotRead("sns")
 		}
-		return resource.ProvenZero("sns", "trail.SnsTopicARN")
+		return foundNone("sns", "trail.SnsTopicARN")
 	}
 	// A multi-region trail publishes to a topic in its home region, which the
 	// topic's ARN names.
@@ -94,10 +94,10 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 	region := arnRegionOf(topicARN, "sns")
 	snsList, rc, truncated, err := relatedListIn(ctx, clients, cache, "sns", region)
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if snsList == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 	ids, lowerBound := listedRefs("sns", []string{topicARN}, rc, snsList)
 	return inRegion(clients, region, relatedResultTrunc("sns", ids, truncated && lowerBound))
@@ -108,9 +108,9 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.KmsKeyId == nil || *trail.KmsKeyId == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "trail.KmsKeyId")
+		return foundNone("kms", "trail.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*trail.KmsKeyId})
 }
@@ -121,9 +121,9 @@ func checkTrailRole(_ context.Context, clients any, res resource.Resource, cache
 	trail, ok := assertStruct[cloudtrailtypes.Trail](res.RawStruct)
 	if !ok || trail.CloudWatchLogsRoleArn == nil || *trail.CloudWatchLogsRoleArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
+			return NotRead("role")
 		}
-		return resource.ProvenZero("role", "trail.CloudWatchLogsRoleArn")
+		return foundNone("role", "trail.CloudWatchLogsRoleArn")
 	}
 	return relatedRefs("role", arnsOnly([]string{*trail.CloudWatchLogsRoleArn}), refContext(clients, cache, "role"))
 }

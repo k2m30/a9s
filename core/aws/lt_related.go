@@ -36,11 +36,11 @@ import (
 func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 	imageID := aws.ToString(raw.DefaultVersion.LaunchTemplateData.ImageId)
 	if !strings.HasPrefix(imageID, "ami-") {
-		return resource.ProvenZero("ami", "imageID")
+		return foundNone("ami", "imageID")
 	}
 	return relatedResultTrunc("ami", []string{imageID}, false)
 }
@@ -52,7 +52,7 @@ func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkLTKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	var ids []string
 	for _, bdm := range raw.DefaultVersion.LaunchTemplateData.BlockDeviceMappings {
@@ -74,7 +74,7 @@ func checkLTKMS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkLTSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	data := raw.DefaultVersion.LaunchTemplateData
 	ids := make([]string, 0, len(data.SecurityGroupIds))
@@ -91,7 +91,7 @@ func checkLTSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	var ids []string
 	for _, ni := range raw.DefaultVersion.LaunchTemplateData.NetworkInterfaces {
@@ -110,7 +110,7 @@ func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgList, truncated, ok := cachedTypedRows[asgtypes.AutoScalingGroup](cache, "asg")
 	if !ok {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 	var ids []string
 	for _, row := range asgList {
@@ -149,7 +149,7 @@ func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID, ltName string) bool 
 func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ngList, truncated, ok := cachedTypedRows[ekstypes.Nodegroup](cache, "ng")
 	if !ok {
-		return resource.UnknownRelated("ng")
+		return NotRead("ng")
 	}
 	var ids []string
 	for _, row := range ngList {
@@ -170,7 +170,7 @@ func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.R
 func checkLTEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	var ids []string
 	for _, row := range ec2List {

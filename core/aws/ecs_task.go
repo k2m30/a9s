@@ -31,7 +31,7 @@ func fetchECSTasksPageWithJoin(
 	continuationToken string,
 ) (resource.FetchResult, error) {
 	// Memoize DescribeTaskDefinition results across every cluster of the page.
-	seenTaskDefs := make(map[string]*ecstypes.TaskDefinition)
+	seenTaskDefs := make(map[string]taskDefRead)
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
 			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
@@ -176,6 +176,36 @@ type taskDefJoinFields struct {
 	ssmParamNames string
 }
 
+// taskDefRead is one DescribeTaskDefinition answer, kept for every task of
+// the page that runs the definition: a failure is theirs as much as the
+// first task's.
+type taskDefRead struct {
+	def *ecstypes.TaskDefinition
+	err error
+}
+
+// readTaskDefinition reads one task definition. "Task definition does not
+// exist" (ClientException) is a definitive absence, not an error worth
+// surfacing as truncation — no volumes = no EFS IDs. Every other error
+// (access denied, throttled, transient) is kept so the task is marked
+// unjoined and reverse-scan checkers report Truncated.
+func readTaskDefinition(ctx context.Context, api ECSDescribeTaskDefinitionAPI, arn string) taskDefRead {
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
+		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+			TaskDefinition: &arn,
+		})
+	})
+	switch {
+	case ErrCodeIs(err, "ClientException"):
+		return taskDefRead{}
+	case err != nil:
+		return taskDefRead{err: fmt.Errorf("describing task definition %s: %w", arn, err)}
+	case out == nil:
+		return taskDefRead{}
+	}
+	return taskDefRead{def: out.TaskDefinition}
+}
+
 // ecsJoinTaskDefinition resolves the task definition for a task (using the
 // memoized seenTaskDefs map) and extracts the fields required by the
 // ecs-task related-panel pivots: EFS file-system IDs, the task/execution IAM
@@ -188,7 +218,7 @@ type taskDefJoinFields struct {
 func ecsJoinTaskDefinition(
 	ctx context.Context,
 	task ecstypes.Task,
-	seenTaskDefs map[string]*ecstypes.TaskDefinition,
+	seenTaskDefs map[string]taskDefRead,
 	api ECSDescribeTaskDefinitionAPI,
 ) (taskDefJoinFields, error) {
 	if api == nil {
@@ -199,36 +229,15 @@ func ecsJoinTaskDefinition(
 	}
 	arn := *task.TaskDefinitionArn
 
-	td, cached := seenTaskDefs[arn]
+	read, cached := seenTaskDefs[arn]
 	if !cached {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-			return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-				TaskDefinition: &arn,
-			})
-		})
-		if err != nil {
-			seenTaskDefs[arn] = nil
-			// "Task definition does not exist" (ClientException) is a
-			// definitive absence, not an error worth surfacing as
-			// truncation — no volumes = no EFS IDs. Every other error
-			// (access denied, throttled, transient) is propagated so the
-			// fetcher marks Pagination.IsTruncated and reverse-scan
-			// checkers report Truncated.
-			if ErrCodeIs(err, "ClientException") {
-				return taskDefJoinFields{}, nil
-			}
-			return taskDefJoinFields{}, fmt.Errorf("describing task definition %s: %w", arn, err)
-		}
-		if out == nil || out.TaskDefinition == nil {
-			seenTaskDefs[arn] = nil
-			return taskDefJoinFields{}, nil
-		}
-		seenTaskDefs[arn] = out.TaskDefinition
-		td = out.TaskDefinition
+		read = readTaskDefinition(ctx, api, arn)
+		seenTaskDefs[arn] = read
 	}
-	if td == nil {
-		return taskDefJoinFields{}, nil
+	if read.err != nil || read.def == nil {
+		return taskDefJoinFields{}, read.err
 	}
+	td := read.def
 
 	var out taskDefJoinFields
 

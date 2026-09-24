@@ -14,15 +14,15 @@ import (
 func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
-		return resource.ProvenZero("sns", "topicARN")
+		return foundNone("sns", "topicARN")
 	}
 
 	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if snsList == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	var ids []string
@@ -39,20 +39,20 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 // names is matched against lambda cache IDs.
 func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "lambda" {
-		return resource.ProvenZero("lambda", "res.Fields[protocol]")
+		return foundNone("lambda", "res.Fields[protocol]")
 	}
 
 	endpoint := res.Fields["endpoint"]
 	if endpoint == "" {
-		return resource.ProvenZero("lambda", "endpoint")
+		return foundNone("lambda", "endpoint")
 	}
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	funcName, local := resource.ResolveRef("lambda", endpoint, refContext(clients, cache, "lambda"))
 	if !local {
@@ -73,20 +73,20 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 // is matched against sqs cache IDs.
 func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["protocol"] != "sqs" {
-		return resource.ProvenZero("sqs", "res.Fields[protocol]")
+		return foundNone("sqs", "res.Fields[protocol]")
 	}
 
 	endpoint := res.Fields["endpoint"]
 	if endpoint == "" {
-		return resource.ProvenZero("sqs", "endpoint")
+		return foundNone("sqs", "endpoint")
 	}
 
 	sqsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sqs")
 	if err != nil {
-		return resource.ErrorRelated("sqs", err)
+		return ReadFailed("sqs", err)
 	}
 	if sqsList == nil {
-		return resource.UnknownRelated("sqs")
+		return NotRead("sqs")
 	}
 	queueName, local := resource.ResolveRef("sqs", endpoint, refContext(clients, cache, "sqs"))
 	if !local {

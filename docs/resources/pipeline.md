@@ -43,7 +43,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 
 - **Why related**: EventBridge rule that triggers this pipeline on source events (CodeCommit push, ECR push, schedule) — `docs/related-resources.md` § Per-type contract `pipeline`.
 - **How discovered**: reverse-scan the already-loaded `eb-rule` list; keep rules whose `Targets[].Arn` matches `arn:aws:codepipeline:<region>:<account>:<pipelineName>` — a9s-devops: EventBridge → CodePipeline trigger wiring lives on the rule target list, not on the pipeline. The pipeline declaration's own `Triggers[]` field describes Git-tag/branch triggers (V2 only) and does not reference EventBridge rules. Reverse scan is the only way.
-- **Count shown**: yes.
+- **Count shown**: yes; unknown for a row carrying no ARN, since the rules are found by it.
 
 ### `ecr`
 

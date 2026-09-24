@@ -156,7 +156,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// ObserveRows below is this reseed's only destination. The
 		// enrichment-rerun reseed is a genuine fetch result — OriginFetch,
 		// wholesale replace, not an append.
-		c.ObserveRows(resType, ev.Resources, ev.Pagination, session.OriginFetch, false)
+		c.ObserveFetchResult(resType, resource.FetchResult{Resources: ev.Resources, Pagination: ev.Pagination}, ev.Err, session.OriginFetch, false)
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
 		})
@@ -488,7 +488,10 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 	if ev.LazyAddError != nil {
 		lines = append(lines, failureLine("related-fetch", ev.LazyAddError, region))
 	}
-	if err := ev.Result.Err(); err != nil {
+	for _, err := range []error{ev.Result.Err(), ev.Result.Failure()} {
+		if err == nil {
+			continue
+		}
 		if line := failureLine("related "+ev.Result.TargetType(), err, region); !slices.Contains(lines, line) {
 			lines = append(lines, line)
 		}

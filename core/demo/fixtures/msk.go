@@ -61,6 +61,11 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 						// pivot (checkMSKSG). Reuses the acme-web-alb-sg fixture.
 						SecurityGroups: []string{"sg-0aaa111111111111a"},
 					},
+					// SASL/SCRAM — the msk:secrets pivot lists the secrets
+					// of a cluster that accepts it (ScramSecretsByCluster).
+					ClientAuthentication: &kafkatypes.ClientAuthentication{
+						Sasl: &kafkatypes.Sasl{Scram: &kafkatypes.Scram{Enabled: aws.Bool(true)}},
+					},
 					NumberOfBrokerNodes: aws.Int32(3),
 					// EncryptionInfo — required for the msk:kms related-panel
 					// pivot (checkMSKKMS). checkMSKKMS passes the raw field
@@ -160,6 +165,17 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				State:          kafkatypes.ClusterStateActive,
 				CurrentVersion: aws.String("K7BFGT2P"),
 				CreationTime:   aws.Time(mustParseMSKTime("2025-09-20T11:30:00+00:00")),
+				// A serverless cluster's network lives in VpcConfigs, the
+				// msk:sg, msk:subnet and msk:vpc witnesses for that shape.
+				Serverless: &kafkatypes.Serverless{
+					VpcConfigs: []kafkatypes.VpcConfig{{
+						SubnetIds:        []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
+						SecurityGroupIds: []string{fixtProdAPIInternalSGID},
+					}},
+					ClientAuthentication: &kafkatypes.ServerlessClientAuthentication{
+						Sasl: &kafkatypes.ServerlessSasl{Iam: &kafkatypes.Iam{Enabled: aws.Bool(true)}},
+					},
+				},
 			},
 			{
 				ClusterName:    aws.String("staging-events"),

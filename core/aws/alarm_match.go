@@ -89,9 +89,9 @@ type AlarmMatchSpec struct {
 	// whether the row said who it is at all; with no Values, the row's ID and
 	// Name are its identity.
 	Values func(resource.Resource) (values []string, read bool)
-	// ValuesFromRawStruct marks a type whose identity is read from the row's
-	// RawStruct, so a row restored without one may be named by alarms this
-	// scan cannot recognise.
+	// ValuesFromRawStruct marks a type whose match reads beyond the row's ID
+	// and Name (Values, QualifierValue or MetricsRegion): a row whose details
+	// were not read may be named by alarms this scan cannot recognise.
 	ValuesFromRawStruct bool
 	// MetricsRegion returns the region a row's metrics are published in, and
 	// so the only region an alarm over them can live in. Nil for a type whose
@@ -220,20 +220,20 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"apigw":      {Namespaces: []string{"AWS/ApiGateway"}, DimensionNames: []string{"ApiId", "ApiName"}},
 	"asg":        {Namespaces: []string{"AWS/AutoScaling", "AWS/EC2"}, DimensionNames: []string{"AutoScalingGroupName"}, ActionService: "autoscaling"},
 	"cb":         {Namespaces: []string{"AWS/CodeBuild"}, DimensionNames: []string{"ProjectName"}},
-	"cf":         {Namespaces: []string{"AWS/CloudFront"}, DimensionNames: []string{"DistributionId"}, MetricsRegion: metricsRegionUSEast1},
+	"cf":         {Namespaces: []string{"AWS/CloudFront"}, DimensionNames: []string{"DistributionId"}, MetricsRegion: metricsRegionUSEast1, ValuesFromRawStruct: true},
 	"dbc":        {Namespaces: []string{"AWS/RDS", "AWS/DocDB"}, DimensionNames: []string{"DBClusterIdentifier"}},
 	"dbi":        {Namespaces: []string{"AWS/RDS"}, DimensionNames: []string{"DBInstanceIdentifier"}},
 	"ddb":        {Namespaces: []string{"AWS/DynamoDB"}, DimensionNames: []string{"TableName"}},
 	"eb":         {Namespaces: []string{"AWS/ElasticBeanstalk", "ElasticBeanstalk/SQSD"}, DimensionNames: []string{"EnvironmentName"}},
 	"ebs":        {Namespaces: []string{"AWS/EBS"}, DimensionNames: []string{"VolumeId"}},
-	"ec2":        {Namespaces: []string{"AWS/EC2"}, DimensionNames: []string{"InstanceId"}, Values: ec2AlarmValues},
+	"ec2":        {Namespaces: []string{"AWS/EC2"}, DimensionNames: []string{"InstanceId"}, Values: ec2AlarmValues, ValuesFromRawStruct: true},
 	"ecs":        {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName"}},
-	"ecs-svc":    {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ServiceName"}, QualifierDimension: "ClusterName", QualifierValue: ecsClusterField},
-	"ecs-task":   {Namespaces: []string{"ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName", "TaskId"}, QualifierDimension: "ServiceName", QualifierValue: ecsTaskServiceName, Values: ecsTaskAlarmValues},
+	"ecs-svc":    {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ServiceName"}, QualifierDimension: "ClusterName", QualifierValue: ecsClusterField, ValuesFromRawStruct: true},
+	"ecs-task":   {Namespaces: []string{"ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName", "TaskId"}, QualifierDimension: "ServiceName", QualifierValue: ecsTaskServiceName, Values: ecsTaskAlarmValues, ValuesFromRawStruct: true},
 	"efs":        {Namespaces: []string{"AWS/EFS"}, DimensionNames: []string{"FileSystemId"}},
 	"eip":        {Namespaces: []string{"AWS/EC2"}, DimensionNames: []string{"NetworkInterfaceId"}, Values: eipAlarmValues, ValuesFromRawStruct: true},
 	"eks":        {Namespaces: []string{"AWS/EKS", "ContainerInsights"}, DimensionNames: []string{"ClusterName"}},
-	"elb":        {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB", "AWS/ELB"}, DimensionNames: []string{"LoadBalancer", "LoadBalancerName"}, Values: elbAlarmValues},
+	"elb":        {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB", "AWS/ELB"}, DimensionNames: []string{"LoadBalancer", "LoadBalancerName"}, Values: elbAlarmValues, ValuesFromRawStruct: true},
 	"glue":       {Namespaces: []string{"Glue"}, DimensionNames: []string{"JobName"}},
 	"kinesis":    {Namespaces: []string{"AWS/Kinesis"}, DimensionNames: []string{"StreamName"}},
 	"kms":        {Namespaces: []string{"AWS/KMS"}, DimensionNames: []string{"KeyId"}},
@@ -246,12 +246,12 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"redis":      {Namespaces: []string{"AWS/ElastiCache"}, DimensionNames: []string{"CacheClusterId", "ReplicationGroupId"}, Values: redisAlarmValues, ValuesFromRawStruct: true},
 	"redshift":   {Namespaces: []string{"AWS/Redshift"}, DimensionNames: []string{"ClusterIdentifier"}},
 	"s3":         {Namespaces: []string{"AWS/S3"}, DimensionNames: []string{"BucketName"}},
-	"sfn":        {Namespaces: []string{"AWS/States"}, DimensionNames: []string{"StateMachineArn"}, Values: sfnAlarmValues},
-	"sns":        {Namespaces: []string{"AWS/SNS"}, DimensionNames: []string{"TopicName"}, ActionService: "sns", Values: snsAlarmValues},
+	"sfn":        {Namespaces: []string{"AWS/States"}, DimensionNames: []string{"StateMachineArn"}, Values: sfnAlarmValues, ValuesFromRawStruct: true},
+	"sns":        {Namespaces: []string{"AWS/SNS"}, DimensionNames: []string{"TopicName"}, ActionService: "sns", Values: snsAlarmValues, ValuesFromRawStruct: true},
 	"sqs":        {Namespaces: []string{"AWS/SQS"}, DimensionNames: []string{"QueueName"}},
-	"tg":         {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB"}, DimensionNames: []string{"TargetGroup"}, Values: tgAlarmValues},
+	"tg":         {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB"}, DimensionNames: []string{"TargetGroup"}, Values: tgAlarmValues, ValuesFromRawStruct: true},
 	"vpce":       {Namespaces: []string{"AWS/PrivateLinkEndpoints"}, DimensionNames: []string{"VPC Endpoint Id", "VpcEndpointId"}},
-	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL"}, MetricsRegion: metricsRegionOfWebACL},
+	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL"}, MetricsRegion: metricsRegionOfWebACL, ValuesFromRawStruct: true},
 }
 
 // AlarmMatchSpecFor returns how an alarm names a resource of the type, and

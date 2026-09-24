@@ -20,10 +20,10 @@ import (
 func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if len(vpce.SubnetIds) == 0 {
-		return resource.ProvenZero("subnet", "vpce.SubnetIds")
+		return foundNone("subnet", "vpce.SubnetIds")
 	}
 	return relatedResultTrunc("subnet", vpce.SubnetIds, false)
 }
@@ -33,7 +33,7 @@ func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource
 func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, g := range vpce.Groups {
@@ -42,7 +42,7 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("sg", "ids")
+		return foundNone("sg", "ids")
 	}
 	return relatedResultTrunc("sg", ids, false)
 }
@@ -52,10 +52,10 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 	if len(vpce.RouteTableIds) == 0 {
-		return resource.ProvenZero("rtb", "vpce.RouteTableIds")
+		return foundNone("rtb", "vpce.RouteTableIds")
 	}
 	return relatedResultTrunc("rtb", vpce.RouteTableIds, false)
 }
@@ -65,10 +65,10 @@ func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	if len(vpce.NetworkInterfaceIds) == 0 {
-		return resource.ProvenZero("eni", "vpce.NetworkInterfaceIds")
+		return foundNone("eni", "vpce.NetworkInterfaceIds")
 	}
 	return relatedResultTrunc("eni", vpce.NetworkInterfaceIds, false)
 }
@@ -78,7 +78,7 @@ func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -97,11 +97,11 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpceID := res.ID
 	if vpceID == "" {
-		return resource.ProvenZero("logs", "vpceID")
+		return foundNone("logs", "vpceID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	flowLogs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.FlowLog, *string, error) {
 		out, err := c.EC2.DescribeFlowLogs(ctx, &ec2.DescribeFlowLogsInput{
@@ -114,7 +114,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 		return out.FlowLogs, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	var refs []string
 	for _, fl := range flowLogs {
@@ -142,15 +142,15 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if vpcID == "" {
-		return resource.ProvenZero("r53", "vpcID")
+		return foundNone("r53", "vpcID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 	api, ok := c.Route53.(Route53ListHostedZonesByVPCAPI)
 	if !ok {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 	region := c.Region
 	if region == "" {
@@ -168,7 +168,7 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, cache
 		return out.HostedZoneSummaries, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("r53", err)
+		return ReadFailed("r53", err)
 	}
 	var refs []string
 	for _, z := range zones {

@@ -418,18 +418,30 @@ func TestRelated_MSK_S3_WrongRawStruct(t *testing.T) {
 	}
 }
 
+// mskSCRAMCluster is a provisioned cluster with SASL/SCRAM enabled, the only
+// client authentication MSK associates Secrets Manager secrets with.
+func mskSCRAMCluster(clusterARN string) resource.Resource {
+	return resource.Resource{
+		ID: "analytics-kafka-cluster",
+		RawStruct: kafkatypes.Cluster{
+			ClusterName: aws.String("analytics-kafka-cluster"),
+			ClusterArn:  aws.String(clusterARN),
+			ClusterType: kafkatypes.ClusterTypeProvisioned,
+			Provisioned: &kafkatypes.Provisioned{
+				ClientAuthentication: &kafkatypes.ClientAuthentication{
+					Sasl: &kafkatypes.Sasl{Scram: &kafkatypes.Scram{Enabled: aws.Bool(true)}},
+				},
+			},
+		},
+	}
+}
+
 // The SCRAM secrets ListScramSecrets names are counted as the secrets list
 // holds them, by name; with the secrets list not loaded, only the list could
 // tell a name from its ARN's six-character suffix, so the count is unknown.
 func TestRelated_MSK_Secrets_Found(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
-	source := resource.Resource{
-		ID: "analytics-kafka-cluster",
-		RawStruct: kafkatypes.Cluster{
-			ClusterName: aws.String("analytics-kafka-cluster"),
-			ClusterArn:  aws.String(clusterARN),
-		},
-	}
+	source := mskSCRAMCluster(clusterARN)
 	arns := []string{
 		"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-scram-secret-abc123",
 		"arn:aws:secretsmanager:us-east-1:123456789012:secret:AmazonMSK_kafka-user2-xyz456",
@@ -449,21 +461,15 @@ func TestRelated_MSK_Secrets_Found(t *testing.T) {
 
 func TestRelated_MSK_Secrets_EmptyList(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
-	source := resource.Resource{
-		ID: "analytics-kafka-cluster",
-		RawStruct: kafkatypes.Cluster{
-			ClusterName: aws.String("analytics-kafka-cluster"),
-			ClusterArn:  aws.String(clusterARN),
-		},
-	}
+	source := mskSCRAMCluster(clusterARN)
 	clients := &awsclient.ServiceClients{
 		MSK: &fakeMSKScram{secretArns: []string{}},
 	}
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (no SCRAM secrets)", result.Count())
+	if result.State() != domain.RelatedResolved || result.Count() != 0 || result.Truncated() {
+		t.Errorf("msk → secrets = state %v count %d truncated %v, want a proven 0 (SCRAM on, no secrets associated)", result.State(), result.Count(), result.Truncated())
 	}
 }
 
@@ -483,13 +489,7 @@ func TestRelated_MSK_Secrets_NilClusterARN(t *testing.T) {
 
 func TestRelated_MSK_Secrets_NilClients(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
-	source := resource.Resource{
-		ID: "analytics-kafka-cluster",
-		RawStruct: kafkatypes.Cluster{
-			ClusterName: aws.String("analytics-kafka-cluster"),
-			ClusterArn:  aws.String(clusterARN),
-		},
-	}
+	source := mskSCRAMCluster(clusterARN)
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 

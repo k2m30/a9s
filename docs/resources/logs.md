@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `kms`
 
 - **Why related**: When the log group is encrypted with a customer-managed KMS key, any KMS key disable / pending-deletion will silently block log ingestion — the operator reading "no new events" needs the key one key press away. Cited in `docs/related-resources.md` §`logs` → "LogGroup.KmsKeyId."
-- **How discovered**: Read `LogGroup.kmsKeyId` directly from the list response (`AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § KmsKeyId`); if non-empty, cross-reference the already-loaded `kms` list by key ARN.
+- **How discovered**: Read `LogGroup.kmsKeyId` directly from the list response (`AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § KmsKeyId`); if non-empty, cross-reference the already-loaded `kms` list by key ARN. A row restored from the disk cache carries no struct; its `kms_key_id` field holds the same key.
 - **Count shown**: yes.
 
 ### `lambda`

@@ -21,26 +21,26 @@ import (
 func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	tgwID := res.ID
 	if tgwID == "" && raw.TransitGatewayId != nil {
 		tgwID = *raw.TransitGatewayId
 	}
 	if tgwID == "" {
-		return resource.ProvenZero("vpc", "tgwID")
+		return foundNone("vpc", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	api, ok := c.EC2.(EC2DescribeTransitGatewayVpcAttachmentsAPI)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	var ids []string
 	for _, att := range atts {
@@ -70,15 +70,15 @@ func tgwVpcAttachments(ctx context.Context, api EC2DescribeTransitGatewayVpcAtta
 func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.ProvenZero("rtb", "tgwID")
+		return foundNone("rtb", "tgwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.ErrorRelated("rtb", err)
+		return ReadFailed("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 
 	var ids []string
@@ -100,16 +100,16 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 // (NoSuchEntity); unknown state on unexpected errors.
 func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.KnownRelated("role", nil, false)
+		return NotRead("role")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.IAM == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	const slrName = "AWSServiceRoleForVPCTransitGateway"
@@ -120,12 +120,12 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 	})
 	if err != nil {
 		if ErrCodeIs(err, "NoSuchEntity") {
-			return resource.ProvenZero("role", "the API answered that none is configured")
+			return foundNone("role", "the API answered that none is configured")
 		}
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
-		return resource.ProvenZero("role", "out.Role.Arn")
+		return foundNone("role", "out.Role.Arn")
 	}
 	ids, dropped := resolveRefs("role", []string{*out.Role.Arn}, refContext(clients, cache, "role"))
 	return heuristicResult("role", ids, dropped)
@@ -137,19 +137,19 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return resource.ProvenZero("subnet", "tgwID")
+		return foundNone("subnet", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	api, ok := c.EC2.(EC2DescribeTransitGatewayVpcAttachmentsAPI)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	atts, complete, err := tgwVpcAttachments(ctx, api, tgwID)
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string

@@ -22,14 +22,14 @@ import (
 func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.ProvenZero("tg", "instanceID")
+		return foundNone("tg", "instanceID")
 	}
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.ErrorRelated("tg", err)
+		return ReadFailed("tg", err)
 	}
 	if tgList == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 	var ids []string
 	for _, tgRes := range tgList {
@@ -58,14 +58,14 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.ProvenZero("asg", "instanceID")
+		return foundNone("asg", "instanceID")
 	}
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 	var ids []string
 	for _, asgRes := range asgList {
@@ -90,18 +90,18 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.
 func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return unreadZero(res, resource.KnownRelated("cfn", nil, false))
+		return NotRead("cfn")
 	}
 	_, _, stackName := ec2Identity(res)
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -121,14 +121,14 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return resource.ProvenZero("eip", "instanceID")
+		return foundNone("eip", "instanceID")
 	}
 	eipList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eip")
 	if err != nil {
-		return resource.ErrorRelated("eip", err)
+		return ReadFailed("eip", err)
 	}
 	if eipList == nil {
-		return resource.UnknownRelated("eip")
+		return NotRead("eip")
 	}
 	var ids []string
 	for _, eipRes := range eipList {
@@ -147,7 +147,7 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids := ec2VolumeIDs(res)
 	if len(ids) == 0 {
-		return unreadZero(res, resource.ProvenZero("ebs", "ids"))
+		return unreadZero(res, foundNone("ebs", "ids"))
 	}
 	ordered := make([]string, 0, len(ids))
 	for id := range ids {
@@ -162,25 +162,25 @@ func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
-		return unreadZero(res, resource.KnownRelated("ng", nil, false))
+		return NotRead("ng")
 	}
 	instanceID, _, _ := ec2Identity(res)
 	if instanceID == "" {
-		return unreadZero(res, resource.ProvenZero("ng", "instanceID"))
+		return unreadZero(res, foundNone("ng", "instanceID"))
 	}
 	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return unreadZero(res, resource.KnownRelated("ng", nil, false))
+		return NotRead("ng")
 	}
 	if tagValue(inst.Tags, "eks:nodegroup-name") == "" {
-		return unreadZero(res, resource.ProvenZero("ng", "the eks:nodegroup-name tag"))
+		return unreadZero(res, foundNone("ng", "the eks:nodegroup-name tag"))
 	}
-	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedRowsByID(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.ErrorRelated("ng", err)
+		return ReadFailed("ng", err)
 	}
 	if ngList == nil {
-		return resource.UnknownRelated("ng")
+		return NotRead("ng")
 	}
 	var ids []string
 	for _, ngRes := range ngList {
@@ -189,21 +189,21 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, ngRes.ID)
 		}
 	}
-	return unreadZeroScanned(res, len(ngList), relatedResultTrunc("ng", ids, truncated))
+	return unreadZeroScanned(res, len(ngList), relatedAnswer("ng", relatedRead{ids: ids, partial: truncated, atMostOne: true}))
 }
 
 // checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
 func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volumeIDs := ec2VolumeIDs(res)
 	if len(volumeIDs) == 0 {
-		return unreadZero(res, resource.ProvenZero("ebs-snap", "volumeIDs"))
+		return unreadZero(res, foundNone("ebs-snap", "volumeIDs"))
 	}
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
 	if err != nil {
-		return resource.ErrorRelated("ebs-snap", err)
+		return ReadFailed("ebs-snap", err)
 	}
 	if snapList == nil {
-		return resource.UnknownRelated("ebs-snap")
+		return NotRead("ebs-snap")
 	}
 	var ids []string
 	for _, snapRes := range snapList {
@@ -224,7 +224,7 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, sg := range raw.SecurityGroups {
@@ -290,7 +290,7 @@ func tagValue(tags []ec2types.Tag, key string) string {
 func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
-		return resource.ProvenZero("vpc", "vpcID")
+		return foundNone("vpc", "vpcID")
 	}
 	return relatedResultTrunc("vpc", []string{vpcID}, false)
 }
@@ -310,18 +310,18 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok || inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil || *inst.IamInstanceProfile.Arn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
+			return NotRead("role")
 		}
-		return resource.ProvenZero("role", "inst.IamInstanceProfile.Arn")
+		return foundNone("role", "inst.IamInstanceProfile.Arn")
 	}
 	profileName := instanceProfileName(*inst.IamInstanceProfile.Arn)
 	if profileName == "" {
-		return resource.ProvenZero("role", "profileName")
+		return foundNone("role", "profileName")
 	}
 	c, err := svcClients(clients)
 	// no finding: without the IAM client nothing was read.
 	if err != nil || c.IAM == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
 		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
@@ -329,7 +329,7 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	var refs []string
 	if out.InstanceProfile != nil {

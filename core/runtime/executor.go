@@ -301,6 +301,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			IssueTruncated:  r.IssueTruncated,
 			Resources:       r.Resources,
 			Pagination:      r.Pagination,
+			Errs:            r.Errs,
 			Gen:             gen,
 			PrefetchErr:     r.PrefetchErr,
 			PrefetchSoftErr: r.PrefetchSoftErr,
@@ -891,7 +892,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 				ResourceType:     op.ResourceType,
 				SourceResourceID: op.Resource.ID,
 				DefDisplayName:   def.DisplayName,
-				Result:           resource.ErrorRelated(def.TargetType, fmt.Errorf("checker panicked: %v", r)),
+				Result:           awsclient.ReadFailed(def.TargetType, fmt.Errorf("checker panicked: %v", r)),
 				OperationID:      op.ID,
 			}
 		}
@@ -903,7 +904,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 			ResourceType:     op.ResourceType,
 			SourceResourceID: op.Resource.ID,
 			DefDisplayName:   def.DisplayName,
-			Result:           resource.UnknownRelated(def.TargetType),
+			Result:           awsclient.NotRead(def.TargetType),
 			OperationID:      op.ID,
 		}
 	}
@@ -924,9 +925,6 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					// came — a partially-visible target cache beats an unknown
 					// "?" row.
 					isTrunc := awsclient.FetchIsPartial(fr, err)
-					if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
-						isTrunc = true
-					}
 					entry := resource.ResourceCacheEntry{
 						Resources:   fr.Resources,
 						IsTruncated: isTrunc,
@@ -950,7 +948,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 						ResourceType:     op.ResourceType,
 						SourceResourceID: op.Resource.ID,
 						DefDisplayName:   def.DisplayName,
-						Result:           resource.UnknownRelated(def.TargetType),
+						Result:           awsclient.NotRead(def.TargetType),
 						OperationID:      op.ID,
 					}
 				}

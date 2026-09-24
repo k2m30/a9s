@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -22,15 +23,15 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if clusterName == "" {
-		return resource.ProvenZero("eks", "clusterName")
+		return foundNone("eks", "clusterName")
 	}
 
-	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
+	eksList, truncated, err := relatedRowsByID(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.ErrorRelated("eks", err)
+		return ReadFailed("eks", err)
 	}
 	if eksList == nil {
-		return resource.UnknownRelated("eks")
+		return NotRead("eks")
 	}
 
 	var ids []string
@@ -39,7 +40,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, eksRes.ID)
 		}
 	}
-	return relatedResultTrunc("eks", ids, truncated)
+	return relatedAnswer("eks", relatedRead{ids: ids, partial: truncated, atMostOne: true})
 }
 
 // checkNGRole extracts the NodeRole ARN from the Node Group RawStruct, derives
@@ -47,13 +48,10 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
-		}
-		return resource.KnownRelated("role", nil, false)
+		return NotRead("role")
 	}
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
-		return resource.ProvenZero("role", "ng.NodeRole")
+		return foundNone("role", "ng.NodeRole")
 	}
 	// The node group's NodeRole ARN normalizes to the role name (== the
 	// role's Resource.ID), so it resolves by identity.
@@ -65,13 +63,10 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("asg")
-		}
-		return resource.KnownRelated("asg", nil, false)
+		return NotRead("asg")
 	}
 	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {
-		return resource.ProvenZero("asg", "ng.Resources.AutoScalingGroups")
+		return foundNone("asg", "ng.Resources.AutoScalingGroups")
 	}
 
 	asgNames := make(map[string]struct{}, len(ng.Resources.AutoScalingGroups))
@@ -81,15 +76,15 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if len(asgNames) == 0 {
-		return resource.ProvenZero("asg", "asgNames")
+		return foundNone("asg", "asgNames")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 
 	var ids []string
@@ -113,12 +108,12 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.ProvenZero("ec2", "nodegroupName")
+		return foundNone("ec2", "nodegroupName")
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
@@ -161,53 +156,65 @@ func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, c
 	return matches
 }
 
-// checkNGSG extracts the remote access security group from the EKS Node Group's
-// Resources.RemoteAccessSecurityGroup field (present when the node group is not
-// using a launch template and SSH access is configured).
-func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkNGSG returns the security groups on the node group's nodes: the
+// remote-access group EKS creates and the client groups it admits
+// (docs/resources/ng.md), and the groups the launch template names, on the
+// instance or on its network interfaces.
+func checkNGSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
-	if ng.Resources == nil || ng.Resources.RemoteAccessSecurityGroup == nil ||
-		*ng.Resources.RemoteAccessSecurityGroup == "" {
-		return resource.ProvenZero("sg", "Resources.RemoteAccessSecurityGroup")
+	var ids []string
+	if ng.Resources != nil {
+		ids = append(ids, aws.ToString(ng.Resources.RemoteAccessSecurityGroup))
 	}
-	return relatedResultTrunc("sg", []string{*ng.Resources.RemoteAccessSecurityGroup}, false)
+	if ng.RemoteAccess != nil {
+		ids = append(ids, ng.RemoteAccess.SourceSecurityGroups...)
+	}
+	data, err := ngLaunchTemplateData(ctx, ngTemplateAPI(clients), ng.LaunchTemplate)
+	if err != nil && !isAWSRefusal(err) {
+		return ReadFailed("sg", err)
+	}
+	if data != nil {
+		ids = append(ids, data.SecurityGroupIds...)
+		for _, ni := range data.NetworkInterfaces {
+			ids = append(ids, ni.Groups...)
+		}
+	}
+	return relatedAnswer("sg", relatedRead{ids: ids, unread: err != nil})
 }
 
-// checkNGAMI resolves the AMI used by this node group's launch template.
-// Calls ec2:DescribeLaunchTemplateVersions when LaunchTemplate is set; a
-// managed NG without a custom launch template returns Count:0.
+// checkNGAMI resolves the AMI of the launch template the node group names,
+// with ec2:DescribeLaunchTemplateVersions. A node group on no template of its
+// own, or on one that names no image, runs the EKS-optimised image of its
+// AmiType and release version, which no image id here names.
 func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
-	if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
-		return resource.ProvenZero("ami", "ng.LaunchTemplate.Id")
-	}
-
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("ami")
-	}
-
-	versions, err := launchTemplateVersions(ctx, c.EC2, ng.LaunchTemplate.Id, ng.LaunchTemplate.Version)
-	if err != nil {
+	data, err := ngLaunchTemplateData(ctx, ngTemplateAPI(clients), ng.LaunchTemplate)
+	switch {
+	case ErrCodeIs(err, "InvalidLaunchTemplateId.NotFound"):
 		// Launch template deleted upstream — that is a true zero, not a
 		// fetch failure: there is no AMI for this NG to relate to.
-		if ErrCodeIs(err, "InvalidLaunchTemplateId.NotFound") {
-			return resource.ProvenZero("ami", "the API answered that none is configured")
-		}
-		return resource.ErrorRelated("ami", err)
+		return foundNone("ami", "the API answered that none is configured")
+	case err != nil && !isAWSRefusal(err):
+		return ReadFailed("ami", err)
+	case err != nil || data == nil || aws.ToString(data.ImageId) == "":
+		return relatedAnswer("ami", relatedRead{unread: true})
 	}
-	for _, v := range versions {
-		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedRefs("ami", []string{*v.LaunchTemplateData.ImageId}, refContext(clients, nil, "ami"))
-		}
+	return relatedRefs("ami", []string{*data.ImageId}, refContext(clients, nil, "ami"))
+}
+
+// ngTemplateAPI is the EC2 client a node group's launch template is read
+// with, nil when the session has none.
+func ngTemplateAPI(clients any) EC2DescribeLaunchTemplateVersionsAPI {
+	if c, ok := clients.(*ServiceClients); ok && c != nil && c.EC2 != nil {
+		return c.EC2
 	}
-	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")
+	return nil
 }
 
 // checkNGEBS scans the EC2 instance cache for instances tagged with this node
@@ -219,12 +226,12 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
-		return resource.ProvenZero("ebs", "nodegroupName")
+		return foundNone("ebs", "nodegroupName")
 	}
 
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
-		return resource.UnknownRelated("ebs")
+		return NotRead("ebs")
 	}
 
 	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
@@ -250,7 +257,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	var ids []string
 	for _, s := range ng.Subnets {
@@ -259,7 +266,7 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("subnet", "ids")
+		return foundNone("subnet", "ids")
 	}
 	return relatedResultTrunc("subnet", ids, false)
 }

@@ -21,10 +21,10 @@ import (
 func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if job.Role == nil || *job.Role == "" {
-		return resource.ProvenZero("role", "job.Role")
+		return foundNone("role", "job.Role")
 	}
 	// The job's Role ARN normalizes to the role name, which is the role's
 	// Resource.ID, so it resolves by identity.
@@ -41,10 +41,10 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -62,11 +62,11 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
-		return resource.ProvenZero("cfn", "jobName")
+		return foundNone("cfn", "jobName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	region := sessionRegion(c)
 	account := accountIDFromClients(ctx, c, c.IdentityStore())
@@ -75,27 +75,27 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 		// unavailable; the session recorded no region): a job ARN carries both
 		// in segments of its own, so the ARN this checker needs cannot be
 		// constructed and the result is unknown, not a real zero.
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	jobARN := "arn:" + PartitionForRegion(region) + ":glue:" + region + ":" + account + ":job/" + jobName
 	tagAPI, ok := c.Glue.(GlueGetTagsAPI)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	out, err := tagAPI.GetTags(ctx, &glue.GetTagsInput{ResourceArn: aws.String(jobARN)})
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	stackName := out.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -117,10 +117,10 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 func checkGlueS3(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
-		return resource.ProvenZero("s3", "job.Command.ScriptLocation")
+		return foundNone("s3", "job.Command.ScriptLocation")
 	}
 	return relatedRefs("s3", []string{*job.Command.ScriptLocation}, refContext(clients, cache, "s3"))
 }
@@ -131,27 +131,27 @@ func checkGlueS3(_ context.Context, clients any, res resource.Resource, cache re
 func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
-		return resource.ProvenZero("kms", "job.SecurityConfiguration")
+		return foundNone("kms", "job.SecurityConfiguration")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	secCfgAPI, ok := c.Glue.(GlueGetSecurityConfigurationAPI)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	out, err := secCfgAPI.GetSecurityConfiguration(ctx, &glue.GetSecurityConfigurationInput{
 		Name: aws.String(*job.SecurityConfiguration),
 	})
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	if out.SecurityConfiguration == nil || out.SecurityConfiguration.EncryptionConfiguration == nil {
-		return resource.ProvenZero("kms", "out.SecurityConfiguration.EncryptionConfiguration")
+		return foundNone("kms", "out.SecurityConfiguration.EncryptionConfiguration")
 	}
 	enc := out.SecurityConfiguration.EncryptionConfiguration
 	var refs []string
@@ -178,10 +178,10 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 func checkGlueSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 	if len(job.DefaultArguments) == 0 {
-		return resource.ProvenZero("secrets", "job.DefaultArguments")
+		return foundNone("secrets", "job.DefaultArguments")
 	}
 	var refs []string
 	for _, v := range job.DefaultArguments {

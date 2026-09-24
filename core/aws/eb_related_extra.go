@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,7 +23,7 @@ import (
 func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	envName := ""
 	if eb.EnvironmentName != nil {
@@ -32,12 +33,12 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 		envName = res.Name
 	}
 	if envName == "" {
-		return resource.ProvenZero("elb", "envName")
+		return foundNone("elb", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
@@ -46,10 +47,10 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if out.EnvironmentResources == nil {
-		return resource.ProvenZero("elb", "out.EnvironmentResources")
+		return foundNone("elb", "out.EnvironmentResources")
 	}
 	var refs []string
 	for _, lb := range out.EnvironmentResources.LoadBalancers {
@@ -59,13 +60,14 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkEbTG resolves target groups for this EB environment.
-// elasticbeanstalk:DescribeEnvironmentResources returns LoadBalancers[].Name (not ARN).
-// elbv2:DescribeListeners requires an ARN, so we first resolve name→ARN via
-// elbv2:DescribeLoadBalancers(Names=[name]), then call DescribeListeners with the ARN.
+// elasticbeanstalk:DescribeEnvironmentResources returns LoadBalancers[].Name
+// (not ARN), resolved to an ARN with elbv2:DescribeLoadBalancers(Names=[name]).
+// A target group names every load balancer that forwards to it, through a
+// listener's default action or its rules, in TargetGroup.LoadBalancerArns.
 func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 	envName := ""
 	if eb.EnvironmentName != nil {
@@ -75,12 +77,12 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		envName = res.Name
 	}
 	if envName == "" {
-		return resource.ProvenZero("tg", "envName")
+		return foundNone("tg", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 
 	resOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
@@ -89,17 +91,17 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("tg", err)
+		return ReadFailed("tg", err)
 	}
 	if resOut.EnvironmentResources == nil || len(resOut.EnvironmentResources.LoadBalancers) == 0 {
-		return resource.ProvenZero("tg", "resOut.EnvironmentResources.LoadBalancers")
+		return foundNone("tg", "resOut.EnvironmentResources.LoadBalancers")
 	}
 
-	var tgARNs []string
-	var failures []Failure
-	complete := true
+	var lbARNs []string
+	var reads rowReads
 	for _, lb := range resOut.EnvironmentResources.LoadBalancers {
 		if lb.Name == nil || *lb.Name == "" {
+			reads.missed()
 			continue
 		}
 		lbName, isV2 := resource.ResolveRef("elb", *lb.Name, refContext(clients, cache, "elb"))
@@ -108,77 +110,51 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 
 		lbs, _, lbErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.LoadBalancer, *string, error) {
-			out, err := c.ELBv2.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
+			out, callErr := c.ELBv2.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
 				Names:  []string{lbName},
 				Marker: marker,
 			})
-			if err != nil {
-				return nil, nil, err
+			if callErr != nil {
+				return nil, nil, callErr
 			}
 			return out.LoadBalancers, out.NextMarker, nil
 		})
 		// A Classic Load Balancer is no ELBv2 load balancer: the call answers
 		// LoadBalancerNotFound, and a Classic one has no target groups.
 		if ErrCodeIs(lbErr, "LoadBalancerNotFound") {
+			reads.read++
 			continue
 		}
 		if lbErr != nil {
-			failures = append(failures, FailedCall(lbName, lbErr))
+			reads.fail(lbName, lbErr)
 			continue
 		}
-		if len(lbs) == 0 {
-			continue
+		reads.read++
+		for _, found := range lbs {
+			if aws.ToString(found.LoadBalancerName) == lbName {
+				lbARNs = append(lbARNs, aws.ToString(found.LoadBalancerArn))
+			}
 		}
-		lbARNPtr := lbs[0].LoadBalancerArn
-		if lbARNPtr == nil || *lbARNPtr == "" {
-			continue
-		}
-		lbARN := *lbARNPtr
+	}
+	if len(lbARNs) == 0 {
+		return reads.answer("tg", "eb-related: DescribeLoadBalancers", nil, false)
+	}
 
-		listeners, listenersComplete, lsnErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.Listener, *string, error) {
-			out, err := c.ELBv2.DescribeListeners(ctx, &elbv2.DescribeListenersInput{
-				LoadBalancerArn: &lbARN,
-				Marker:          marker,
-			})
-			if err != nil {
-				return nil, nil, err
-			}
-			return out.Listeners, out.NextMarker, nil
-		})
-		if lsnErr != nil {
-			failures = append(failures, FailedCall(lbName, lsnErr))
-			continue
-		}
-		complete = complete && listenersComplete
-		for _, l := range listeners {
-			for _, act := range l.DefaultActions {
-				if act.TargetGroupArn != nil && *act.TargetGroupArn != "" {
-					tgARNs = append(tgARNs, *act.TargetGroupArn)
-				}
-				if act.ForwardConfig != nil {
-					for _, tgTuple := range act.ForwardConfig.TargetGroups {
-						if tgTuple.TargetGroupArn != nil && *tgTuple.TargetGroupArn != "" {
-							tgARNs = append(tgARNs, *tgTuple.TargetGroupArn)
-						}
-					}
-				}
-			}
+	tgList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "tg")
+	if err != nil {
+		return ReadFailed("tg", err)
+	}
+	if tgList == nil {
+		return NotRead("tg")
+	}
+	var ids []string
+	for _, tgRes := range tgList {
+		raw, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct)
+		if ok && slices.ContainsFunc(raw.LoadBalancerArns, func(arn string) bool { return slices.Contains(lbARNs, arn) }) {
+			ids = append(ids, tgRes.ID)
 		}
 	}
-	if len(tgARNs) == 0 {
-		// Every load balancer refused its read: nothing was established about
-		// any of them, which is a fetch failure rather than a lower bound
-		// over what was read.
-		if aggErr := AggregateFailures("eb-related: LB/Listener lookup", failures, len(resOut.EnvironmentResources.LoadBalancers)); aggErr != nil &&
-			len(failures) == len(resOut.EnvironmentResources.LoadBalancers) {
-			return resource.ErrorRelated("tg", aggErr)
-		}
-	}
-	// Some DescribeListeners calls may have failed: tgARNs is a proven subset,
-	// not necessarily exhaustive. Truncated (not Errored) keeps the row
-	// actionable rather than discarding confirmed matches as a dead end.
-	ids, dropped := resolveRefs("tg", tgARNs, refContext(clients, cache, "tg"))
-	return relatedResultTrunc("tg", ids, dropped || len(failures) > 0 || !complete)
+	return reads.answer("tg", "eb-related: DescribeLoadBalancers", ids, truncated)
 }
 
 // checkEbSG resolves security groups configured for this EB environment via configuration settings.
@@ -188,7 +164,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	appName := ""
@@ -203,12 +179,12 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return resource.ProvenZero("sg", "envName")
+		return foundNone("sg", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
@@ -218,7 +194,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 
 	var ids []string
@@ -261,7 +237,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	appName := ""
@@ -276,12 +252,12 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return resource.ProvenZero("role", "envName")
+		return foundNone("role", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
@@ -291,7 +267,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 
 	var refs []string
@@ -330,7 +306,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		if len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	return relatedResultTrunc("role", ids, dropped)
 }
@@ -340,7 +316,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 
 	appName := ""
@@ -348,12 +324,12 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		appName = *eb.ApplicationName
 	}
 	if appName == "" {
-		return resource.ProvenZero("s3", "appName")
+		return foundNone("s3", "appName")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 
 	versions, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ebtypes.ApplicationVersionDescription, *string, error) {
@@ -367,7 +343,7 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		return out.ApplicationVersions, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 
 	var buckets []string

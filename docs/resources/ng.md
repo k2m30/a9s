@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `ami`
 
 - **Why related**: node groups run a specific EKS-optimized AMI; operator checks it to confirm patch level, compare against latest approved image, or diagnose boot-time failures after an AMI drift.
-- **How discovered**: for node groups without a custom launch template, `Nodegroup.ReleaseVersion` identifies the AWS-managed AMI alias directly. For node groups with a custom launch template, `Nodegroup.LaunchTemplate.{Id,Version}` resolves to an `ImageId` via `ec2:DescribeLaunchTemplateVersions` — a9s-devops: the field is only populated when a launch template was supplied at create time. An `ImageId` of `resolve:ssm:<parameter>` names a parameter, not an image, and makes the count a lower bound.
+- **How discovered**: for node groups without a custom launch template, `Nodegroup.ReleaseVersion` identifies the AWS-managed AMI alias directly. For node groups with a custom launch template, `Nodegroup.LaunchTemplate.{Id,Version}` resolves to an `ImageId` via `ec2:DescribeLaunchTemplateVersions` — a9s-devops: the field is only populated when a launch template was supplied at create time. An `ImageId` of `resolve:ssm:<parameter>` names a parameter, not an image, and makes the count a lower bound. A node group on no launch template of its own, or on one that names no image, runs the EKS-optimised image of its `AmiType` and `ReleaseVersion`, which no loaded image id names: the row reads unknown, never 0.
 - **Count shown**: yes (0 or 1 — a node group pins exactly one AMI).
 
 ### `asg`
@@ -71,8 +71,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `sg`
 
 - **Why related**: the security groups attached to worker-node ENIs — first stop when pods cannot reach the control plane or when SSH access is misconfigured.
-- **How discovered**: two fields on the Describe response, showing two different SG sets — a9s-devops: worth surfacing together. `Resources.RemoteAccessSecurityGroup` is the EKS-managed SG attached to the nodes' ENIs for remote access. `RemoteAccess.SourceSecurityGroups[]` is the list of *client* SGs permitted to SSH into nodes (populated only when `RemoteAccess` was configured). The primary data-plane SG for pod traffic is inherited from the cluster's `resourcesVpcConfig` and is discoverable via the parent `eks` record, not the node group itself.
-- **Count shown**: yes (union of the two fields, deduplicated).
+- **How discovered**: two fields on the Describe response, showing two different SG sets — a9s-devops: worth surfacing together. `Resources.RemoteAccessSecurityGroup` is the EKS-managed SG attached to the nodes' ENIs for remote access. `RemoteAccess.SourceSecurityGroups[]` is the list of *client* SGs permitted to SSH into nodes (populated only when `RemoteAccess` was configured). On a node group with a launch template, the groups the template names — `LaunchTemplateData.SecurityGroupIds` or `NetworkInterfaces[].Groups`, read with `ec2:DescribeLaunchTemplateVersions` — are the nodes' groups; a template that could not be read makes the count a lower bound, or unknown. The primary data-plane SG for pod traffic is inherited from the cluster's `resourcesVpcConfig` and is discoverable via the parent `eks` record, not the node group itself.
+- **Count shown**: yes (union of the fields, deduplicated).
 
 ### `subnet`
 

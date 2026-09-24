@@ -22,14 +22,14 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("eni", "fsID")
+		return foundNone("eni", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -48,14 +48,14 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return resource.ProvenZero("vpc", "fsID")
+		return foundNone("vpc", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("vpc", err)
+		return ReadFailed("vpc", err)
 	}
 	if eniList == nil {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	vpcSet := make(map[string]struct{})
 	for _, eniRes := range eniList {
@@ -83,19 +83,16 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("backup")
-		}
-		return resource.KnownRelated("backup", nil, false)
+		return NotRead("backup")
 	}
 	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {
-		return resource.ProvenZero("backup", "fs.FileSystemArn")
+		return foundNone("backup", "fs.FileSystemArn")
 	}
 	fsARN := *fs.FileSystemArn
 
 	plans, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	tags := make(map[string]string, len(fs.Tags))
 	for _, t := range fs.Tags {

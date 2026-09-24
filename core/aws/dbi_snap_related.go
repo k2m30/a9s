@@ -16,18 +16,18 @@ import (
 func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("dbi")
+		return NotRead("dbi")
 	}
 	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
-		return resource.ProvenZero("dbi", "snap.DBInstanceIdentifier")
+		return foundNone("dbi", "snap.DBInstanceIdentifier")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.ErrorRelated("dbi", err)
+		return ReadFailed("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.UnknownRelated("dbi")
+		return NotRead("dbi")
 	}
 
 	var ids []string
@@ -43,10 +43,10 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "snap.KmsKeyId")
+		return foundNone("kms", "snap.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*snap.KmsKeyId})
 }
@@ -72,7 +72,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	parentName := ""
 	if snap.DBInstanceIdentifier != nil {
@@ -80,17 +80,17 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 	if parentName == "" {
 		// No parent reference on the snapshot — can't pivot.
-		return resource.ProvenZero("backup", "parentName")
+		return foundNone("backup", "parentName")
 	}
 
 	// Resolve parent DBInstanceArn via the dbi cache. If the cache isn't loaded,
 	// the parent ARN is unavailable and the answer is genuinely unknown.
 	dbiList, dbiTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if dbiList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	parentARN := ""
 	for _, dbiRes := range dbiList {
@@ -106,19 +106,19 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		// Parent not found in visible window.
 		if dbiTruncated {
 			// Cache is truncated — parent may be in a later page; answer is unknown.
-			return resource.UnknownRelated("backup")
+			return NotRead("backup")
 		}
 		// Cache is complete — parent is genuinely absent (orphan) — Backup
 		// tracks the parent so this pivot has no answer for orphan snapshots.
-		return resource.ProvenZero("backup", "parentARN")
+		return foundNone("backup", "parentARN")
 	}
 
 	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if planList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 
 	return backupPivot(planList, truncated, backupTarget{arn: parentARN, unread: "ListTagsForResource"})

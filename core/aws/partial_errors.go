@@ -225,6 +225,16 @@ type classCarrier interface {
 
 func (e classErr) errClass() string { return e.class }
 
+// failuresErr is the composite AggregateFailures returns: its phrased error,
+// and the failures it phrased, which say whether a row went missing or only
+// its details did.
+type failuresErr struct {
+	error
+	failures []Failure
+}
+
+func (e failuresErr) Unwrap() error { return e.error }
+
 // isPhrased reports whether err is a composite AggregateFailures has already
 // phrased. Its words are the failure line — the class it carries is for a
 // surface that branches on it, never for one that reads it.
@@ -335,10 +345,10 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 
 	err := fmt.Errorf("%s failed for %d of %d IDs: %s%s",
 		opName, failed, total, strings.Join(parts, "; "), suffix)
-	if class == "" {
-		return err
+	if class != "" {
+		err = classErr{error: err, class: class}
 	}
-	return classErr{error: err, class: class}
+	return failuresErr{error: err, failures: failures}
 }
 
 // JoinAggregates returns the composite of an outer pass's aggregate and an
@@ -403,10 +413,16 @@ func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 // isAWSRefusal reports whether err is AWS answering the request with a
 // client-side refusal (denied, not found, invalid): asked again, the same
 // request gets the same answer. A throttle, a server fault, a transport
-// failure, or a cancelled or lapsed context is not one.
+// failure, or a cancelled or lapsed context is not one. The SDK builds an
+// error whose code the service did not model with no fault at all, so a
+// denial is read off the code table as well.
 func isAWSRefusal(err error) bool {
 	apiErr, ok := errors.AsType[smithy.APIError](err)
-	return ok && apiErr.ErrorFault() == smithy.FaultClient && awsCodeClass[apiErr.ErrorCode()] != ClassThrottled
+	if !ok {
+		return false
+	}
+	class := awsCodeClass[apiErr.ErrorCode()]
+	return class == ClassAccessDenied || apiErr.ErrorFault() == smithy.FaultClient && class != ClassThrottled
 }
 
 // awsCodeClass is the one AWS-error-code table in a9s: which class each code

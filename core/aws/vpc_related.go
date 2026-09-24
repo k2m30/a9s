@@ -19,15 +19,15 @@ import (
 func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("subnet", "vpcID")
+		return foundNone("subnet", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 
 	var ids []string
@@ -44,15 +44,15 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("sg", "vpcID")
+		return foundNone("sg", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	var ids []string
@@ -69,15 +69,15 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("ec2", "vpcID")
+		return foundNone("ec2", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	var ids []string
@@ -94,15 +94,15 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("elb", "vpcID")
+		return foundNone("elb", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -124,15 +124,15 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("nat", "vpcID")
+		return foundNone("nat", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.ErrorRelated("nat", err)
+		return ReadFailed("nat", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("nat")
+		return NotRead("nat")
 	}
 
 	var ids []string
@@ -149,15 +149,15 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("igw", "vpcID")
+		return foundNone("igw", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "igw")
 	if err != nil {
-		return resource.ErrorRelated("igw", err)
+		return ReadFailed("igw", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("igw")
+		return NotRead("igw")
 	}
 
 	var ids []string
@@ -174,15 +174,15 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("rtb", "vpcID")
+		return foundNone("rtb", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.ErrorRelated("rtb", err)
+		return ReadFailed("rtb", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("rtb")
+		return NotRead("rtb")
 	}
 
 	var ids []string
@@ -199,15 +199,15 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("vpce", "vpcID")
+		return foundNone("vpce", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.ErrorRelated("vpce", err)
+		return ReadFailed("vpce", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 
 	var ids []string
@@ -223,11 +223,11 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Vpc](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
@@ -237,15 +237,15 @@ func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("eni", "vpcID")
+		return foundNone("eni", "vpcID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	if list == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var ids []string
 	for _, r := range list {
@@ -267,11 +267,11 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := vpcIDFromResource(res)
 	if vpcID == "" {
-		return resource.ProvenZero("tgw", "vpcID")
+		return foundNone("tgw", "vpcID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("tgw")
+		return NotRead("tgw")
 	}
 	atts, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayAttachment, *string, error) {
 		out, err := c.EC2.DescribeTransitGatewayAttachments(ctx, &ec2.DescribeTransitGatewayAttachmentsInput{
@@ -287,7 +287,7 @@ func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ reso
 		return out.TransitGatewayAttachments, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("tgw", err)
+		return ReadFailed("tgw", err)
 	}
 	var ids []string
 	for _, att := range atts {

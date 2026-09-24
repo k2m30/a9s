@@ -325,8 +325,8 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// shape but are never the type's global population, and must neither
 		// replace nor extend the shared per-type entry a canonical fetch owns.
 		if msg.Provenance.CanonicalList() && canon != "" && !msg.Superseded {
-			c.core.ObserveRows(canon, msg.Resources,
-				msg.Pagination, session.OriginFetch, msg.Append)
+			c.core.ObserveFetchResult(canon, resource.FetchResult{Resources: msg.Resources, Pagination: msg.Pagination},
+				msg.Err, session.OriginFetch, msg.Append)
 		}
 		return
 	}

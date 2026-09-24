@@ -1,11 +1,10 @@
 package unit
 
-// BuildResourceCacheSnapshot
-// marks lazy-only entries (no matching resourceCache key) IsTruncated=true.
-// A lazy-only entry is sparse; a complete-looking one would make a
-// NeedsTargetCache=true checker skip the prefetch that fetches the real first
-// page. When both lazy and resourceCache entries exist, the snapshot inherits
-// resourceCache's pagination IsTruncated.
+// BuildResourceCacheSnapshot marks lazy-only entries (no matching
+// resourceCache key) Partial and IsTruncated=true: a lazy-only entry is a few
+// rows added for one detail, not the type's list, so a reader fetches the
+// first page instead. When both lazy and resourceCache entries exist, the
+// snapshot inherits resourceCache's pagination IsTruncated.
 
 import (
 	"context"
@@ -19,9 +18,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestBuildResourceCacheSnapshot_LazyOnlyTruncated verifies that when a resource
-// type exists only in lazyResourceCache (not in resourceCache), the snapshot
-// entry for that type has IsTruncated=true.
+// TestBuildResourceCacheSnapshot_LazyOnlyTruncated: a type known only through
+// lazily added rows is snapshotted as Partial and truncated, so it is never
+// read as the type's list; a NeedsTargetCache checker gets the first page its
+// prefetch read instead, as complete as that page is.
 func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	tui.Version = "test"
 
@@ -143,10 +143,16 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	}
 	entry, ok := capturedCache[targetType]
 	if !ok {
-		t.Fatalf("captured cache does not contain %q — lazy-only entry was not included in snapshot", targetType)
+		t.Fatalf("captured cache does not contain %q — neither the lazy entry nor the prefetched page reached the checker", targetType)
 	}
-	if !entry.IsTruncated {
-		t.Errorf("buildResourceCacheSnapshot: lazy-only entry for %q has IsTruncated=false, want true — LAZY-ONLY TRUNCATED BUG: NeedsTargetCache checkers will wrongly skip prefetch", targetType)
+	if len(entry.Resources) != 1 || entry.Resources[0].ID != "ge-target-001" || entry.IsTruncated || entry.Partial {
+		t.Errorf("checker's %q entry = %d rows truncated=%v partial=%v, want the prefetched first page [ge-target-001], complete",
+			targetType, len(entry.Resources), entry.IsTruncated, entry.Partial)
+	}
+
+	lazy, ok := m.Core().BuildResourceCacheSnapshot()[targetType]
+	if !ok || !lazy.Partial || !lazy.IsTruncated {
+		t.Errorf("snapshot of the lazy-only %q entry = present %v partial=%v truncated=%v, want Partial and truncated", targetType, ok, lazy.Partial, lazy.IsTruncated)
 	}
 }
 

@@ -19,15 +19,17 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 		clusterName = res.Fields["cluster_name"]
 	}
 	if clusterName == "" {
-		return resource.ProvenZero("ng", "clusterName")
+		return foundNone("ng", "clusterName")
 	}
 
-	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
+	// A node group's cluster is on its row's identity fields, which a row
+	// whose details were not read carries too.
+	ngList, truncated, err := relatedRowsByID(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.ErrorRelated("ng", err)
+		return ReadFailed("ng", err)
 	}
 	if ngList == nil {
-		return resource.UnknownRelated("ng")
+		return NotRead("ng")
 	}
 
 	var ids []string
@@ -58,15 +60,15 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		stackName = raw.Tags["aws:cloudformation:stack-name"]
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -88,17 +90,17 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.ProvenZero("logs", "clusterName")
+		return foundNone("logs", "clusterName")
 	}
 
 	expectedLogGroup := "/aws/eks/" + clusterName + "/cluster"
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -116,10 +118,10 @@ func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	if raw.ResourcesVpcConfig == nil {
-		return resource.ProvenZero("sg", "raw.ResourcesVpcConfig")
+		return foundNone("sg", "raw.ResourcesVpcConfig")
 	}
 	var ids []string
 	if raw.ResourcesVpcConfig.ClusterSecurityGroupId != nil && *raw.ResourcesVpcConfig.ClusterSecurityGroupId != "" {
@@ -138,10 +140,10 @@ func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	if raw.ResourcesVpcConfig == nil || raw.ResourcesVpcConfig.VpcId == nil || *raw.ResourcesVpcConfig.VpcId == "" {
-		return resource.ProvenZero("vpc", "raw.ResourcesVpcConfig.VpcId")
+		return foundNone("vpc", "raw.ResourcesVpcConfig.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*raw.ResourcesVpcConfig.VpcId}, false)
 }
@@ -156,9 +158,9 @@ func checkEKSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		raw.EncryptionConfig[0].Provider.KeyArn == nil ||
 		*raw.EncryptionConfig[0].Provider.KeyArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "EncryptionConfig.Provider.KeyArn")
+		return foundNone("kms", "EncryptionConfig.Provider.KeyArn")
 	}
 	keyID := kmsRefFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -169,9 +171,9 @@ func checkEKSRole(_ context.Context, clients any, res resource.Resource, cache r
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
+			return NotRead("role")
 		}
-		return resource.ProvenZero("role", "raw.RoleArn")
+		return foundNone("role", "raw.RoleArn")
 	}
 	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
 }

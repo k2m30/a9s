@@ -48,15 +48,15 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.UnknownRelated("sns-sub")
+		return NotRead("sns-sub")
 	}
 
 	subList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.ErrorRelated("sns-sub", err)
+		return ReadFailed("sns-sub", err)
 	}
 	if subList == nil {
-		return resource.UnknownRelated("sns-sub")
+		return NotRead("sns-sub")
 	}
 
 	var ids []string
@@ -76,15 +76,15 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.ProvenZero("kms", "topicARN")
+		return foundNone("kms", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	keyID := attrs["KmsMasterKeyId"]
 	if keyID == "" {
-		return resource.ProvenZero("kms", "keyID")
+		return foundNone("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -97,20 +97,20 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.ProvenZero("role", "topicARN")
+		return foundNone("role", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	policy := attrs["Policy"]
 	if policy == "" {
-		return resource.ProvenZero("role", "policy")
+		return foundNone("role", "policy")
 	}
 	rc := policyRefContext(clients, cache, "role", topicARN)
 	refs, ok := grantedPrincipalRefs(policy, "role/")
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	return relatedRefs("role", refs, rc)
 }

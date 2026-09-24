@@ -22,13 +22,10 @@ import (
 func checkLambdaRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
-		}
-		return resource.KnownRelated("role", nil, false)
+		return NotRead("role")
 	}
 	if fn.Role == nil || *fn.Role == "" {
-		return resource.ProvenZero("role", "fn.Role")
+		return foundNone("role", "fn.Role")
 	}
 	// The execution Role ARN normalizes to the role name, which is the role's
 	// Resource.ID (roles keyed by name; role FetchByIDs drives the drill), so
@@ -48,7 +45,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.ProvenZero("logs", "functionName")
+		return foundNone("logs", "functionName")
 	}
 
 	expectedLogGroup := "/aws/lambda/" + functionName
@@ -59,10 +56,10 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -79,10 +76,10 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	if fn.VpcConfig == nil {
-		return resource.ProvenZero("sg", "fn.VpcConfig")
+		return foundNone("sg", "fn.VpcConfig")
 	}
 	var ids []string
 	for _, sgID := range fn.VpcConfig.SecurityGroupIds {
@@ -99,10 +96,10 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("vpc")
+		return NotRead("vpc")
 	}
 	if fn.VpcConfig == nil || fn.VpcConfig.VpcId == nil || *fn.VpcConfig.VpcId == "" {
-		return resource.ProvenZero("vpc", "fn.VpcConfig.VpcId")
+		return foundNone("vpc", "fn.VpcConfig.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*fn.VpcConfig.VpcId}, false)
 }
@@ -114,9 +111,9 @@ func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cac
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ProvenZero("kms", "fn.KMSKeyArn")
+		return foundNone("kms", "fn.KMSKeyArn")
 	}
 	keyID := kmsRefFromField(*fn.KMSKeyArn, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -133,11 +130,11 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cac
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return resource.ProvenZero("sqs", "functionName")
+		return foundNone("sqs", "functionName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("sqs")
+		return NotRead("sqs")
 	}
 	return lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", "sqs", refContext(clients, cache, "sqs"))
 }
@@ -148,7 +145,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cac
 func lambdaEventSourceRefs(ctx context.Context, api LambdaListEventSourceMappingsAPI, functionName, target, service string, rc domain.RefContext) resource.RelatedCheckResult {
 	mappings, complete, err := listEventSourceMappings(ctx, api, lambda.ListEventSourceMappingsInput{FunctionName: &functionName})
 	if err != nil {
-		return resource.ErrorRelated(target, err)
+		return ReadFailed(target, err)
 	}
 	ids, dropped := resolveRefs(target, eventSourceARNs(mappings, service), rc)
 	return relatedResultTrunc(target, ids, dropped || !complete)
@@ -177,31 +174,31 @@ func listEventSourceMappings(ctx context.Context, api LambdaListEventSourceMappi
 func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	if fn.FunctionArn == nil || *fn.FunctionArn == "" {
-		return resource.ProvenZero("cfn", "fn.FunctionArn")
+		return foundNone("cfn", "fn.FunctionArn")
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	tagsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListTagsOutput, error) {
 		return c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
 	})
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	stackName := tagsOut.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -247,18 +244,18 @@ func lambdaImageURI(ctx context.Context, clients any, fnName string) (string, er
 // per docs/resources/lambda.md).
 func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !lambdaRunsImage(res) {
-		return resource.ProvenZero("ecr", "the function's package type")
+		return foundNone("ecr", "the function's package type")
 	}
 	fnName := cmp.Or(res.ID, res.Name)
 	image, err := lambdaImageURI(ctx, clients, fnName)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("ecr")
+			return NotRead("ecr")
 		}
-		return resource.ErrorRelated("ecr", err)
+		return ReadFailed("ecr", err)
 	}
 	if image == "" {
-		return resource.UnknownRelated("ecr")
+		return NotRead("ecr")
 	}
 	return ecrWorkloadRepos(ctx, clients, cache, []string{image})
 }
@@ -271,27 +268,27 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cac
 // look for Lambda ARN targets when live clients are available.
 func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if _, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); !ok {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	if res.ID == "" {
-		return resource.ProvenZero("eb-rule", "res.ID")
+		return foundNone("eb-rule", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.EventBridge == nil {
 		// Without live EventBridge access there is no cached field on the rule
 		// struct that links to Lambda targets — targets come from a separate API.
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
+		return ReadFailed("eb-rule", err)
 	}
 	if ruleList == nil {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	idSet := make(map[string]struct{})
-	var failures []Failure
+	var reads rowReads
 	for _, ruleRes := range ruleList {
 		parentCtx := map[string]string{
 			"rule_name": ruleRes.Fields["name"],
@@ -299,9 +296,10 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		}
 		targets, err := FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, "")
 		if err != nil {
-			failures = append(failures, FailedCall(ruleRes.ID, err))
+			reads.fail(ruleRes.ID, err)
 			continue
 		}
+		reads.read++
 		for _, tgt := range targets.Resources {
 			arn := tgt.Fields["target_arn"]
 			if arn == "" {
@@ -317,17 +315,5 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	for id := range idSet {
 		ids = append(ids, id)
 	}
-	if aggErr := AggregateFailures("lambda-related: ListTargetsByRule", failures, len(ruleList)); aggErr != nil {
-		if len(ids) == 0 && len(failures) == len(ruleList) {
-			// Every rule refused its read: the failures establish nothing
-			// about any of them, only that the attempt failed.
-			return resource.ErrorRelated("eb-rule", aggErr)
-		}
-		// Some ListTargetsByRule calls failed: ids is a proven subset, not the
-		// exhaustive answer. Truncated (not Errored) keeps the row actionable —
-		// "at least N, could not verify the rest" — rather than discarding the
-		// confirmed matches as a dead end.
-		return resource.KnownRelated("eb-rule", ids, true)
-	}
-	return relatedResultTrunc("eb-rule", ids, truncated)
+	return reads.answer("eb-rule", "lambda-related: ListTargetsByRule", ids, truncated)
 }

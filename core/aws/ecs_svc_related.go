@@ -19,7 +19,7 @@ import (
 func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.Fields["cluster"]
 	if clusterName == "" {
-		return resource.ProvenZero("ecs", "clusterName")
+		return foundNone("ecs", "clusterName")
 	}
 	return relatedResultTrunc("ecs", []string{clusterName}, false)
 }
@@ -29,10 +29,10 @@ func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resou
 func checkECSSvcTargetGroups(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("tg")
+		return NotRead("tg")
 	}
 	if len(raw.LoadBalancers) == 0 {
-		return resource.ProvenZero("tg", "raw.LoadBalancers")
+		return foundNone("tg", "raw.LoadBalancers")
 	}
 
 	var arns []string
@@ -63,15 +63,15 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if stackName == "" {
-		return unreadZero(res, resource.ProvenZero("cfn", "stackName"))
+		return unreadZero(res, foundNone("cfn", "stackName"))
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -97,13 +97,10 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("elb")
-		}
-		return resource.KnownRelated("elb", nil, false)
+		return NotRead("elb")
 	}
 	if len(raw.LoadBalancers) == 0 {
-		return resource.ProvenZero("elb", "raw.LoadBalancers")
+		return foundNone("elb", "raw.LoadBalancers")
 	}
 
 	tgARNs := make(map[string]struct{})
@@ -113,15 +110,15 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(tgARNs) == 0 {
-		return resource.ProvenZero("elb", "tgARNs")
+		return foundNone("elb", "tgARNs")
 	}
 
 	tgList, truncatedTG, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if tgList == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	elbARNs := make(map[string]struct{})
@@ -144,9 +141,9 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(elbARNs) == 0 {
 		if truncatedTG {
-			return resource.UnknownRelated("elb")
+			return NotRead("elb")
 		}
-		return resource.ProvenZero("elb", "elbARNs")
+		return foundNone("elb", "elbARNs")
 	}
 
 	// LoadBalancerArn — not the LB name (res.ID) — is the join key:
@@ -156,10 +153,10 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 	// rows without the field.
 	elbList, truncatedELB, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	if elbList == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -185,14 +182,11 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("logs")
-		}
-		return resource.KnownRelated("logs", nil, false)
+		return NotRead("logs")
 	}
 	taskDefARN := aws.ToString(raw.TaskDefinition)
 	if taskDefARN == "" {
-		return resource.ProvenZero("logs", "raw.TaskDefinition")
+		return foundNone("logs", "raw.TaskDefinition")
 	}
 	return ecsTaskDefLogGroups(ctx, clients, cache, taskDefARN)
 }
@@ -203,11 +197,11 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	if raw.NetworkConfiguration == nil ||
 		raw.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return resource.ProvenZero("sg", "NetworkConfiguration.AwsvpcConfiguration")
+		return foundNone("sg", "NetworkConfiguration.AwsvpcConfiguration")
 	}
 	var ids []string
 	for _, sgID := range raw.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups {
@@ -223,9 +217,9 @@ func checkECSSvcRole(_ context.Context, clients any, res resource.Resource, cach
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("role")
+			return NotRead("role")
 		}
-		return resource.ProvenZero("role", "raw.RoleArn")
+		return foundNone("role", "raw.RoleArn")
 	}
 	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
 }

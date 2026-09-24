@@ -25,14 +25,14 @@ import (
 func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.ProvenZero("asg", "clusterName")
+		return foundNone("asg", "clusterName")
 	}
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 	var ids []string
 	for _, asgRes := range asgList {
@@ -60,14 +60,14 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.ProvenZero("ec2", "clusterName")
+		return foundNone("ec2", "clusterName")
 	}
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	var ids []string
 	for _, ec2Res := range ec2List {
@@ -93,14 +93,14 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return resource.ProvenZero("ecs-task", "clusterName")
+		return foundNone("ecs-task", "clusterName")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.ErrorRelated("ecs-task", err)
+		return ReadFailed("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.UnknownRelated("ecs-task")
+		return NotRead("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -125,21 +125,21 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	group := ""
 	if cfg := cluster.Configuration; cfg != nil && cfg.ExecuteCommandConfiguration != nil && cfg.ExecuteCommandConfiguration.LogConfiguration != nil {
 		group = aws.ToString(cfg.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName)
 	}
 	if group == "" {
-		return resource.ProvenZero("logs", "the cluster's exec-command log configuration")
+		return foundNone("logs", "the cluster's exec-command log configuration")
 	}
 	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	ids, lowerBound := listedRefs("logs", []string{group}, refContext(clients, cache, "logs"), logList)
 	return relatedResultTrunc("logs", ids, lowerBound)

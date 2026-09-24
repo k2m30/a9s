@@ -82,8 +82,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `tg`
 
 - **Why related**: Target groups the environment's ALB listener forwards to; target-health per instance lives here.
-- **How discovered**: Call `DescribeEnvironmentResources` to get `LoadBalancers[].Name`, then `elbv2:DescribeListeners` and read `DefaultActions[].ForwardConfig.TargetGroups[].TargetGroupArn` (or `DefaultActions[].TargetGroupArn`).
-- **Count shown**: unknown.
+- **How discovered**: Call `DescribeEnvironmentResources` to get `LoadBalancers[].Name`, resolve each to its ARN with `elbv2:DescribeLoadBalancers`, and count the loaded `tg` rows whose `TargetGroup.LoadBalancerArns` holds one — a target group names every load balancer that forwards to it, through a listener's default action or its rules.
+- **Count shown**: yes; a lower bound when a load balancer could not be read.
 
 ### `ct-events`
 

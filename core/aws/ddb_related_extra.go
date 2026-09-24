@@ -18,14 +18,14 @@ import (
 func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	name := res.ID
 	if name == "" {
-		return resource.ProvenZero("logs", "name")
+		return foundNone("logs", "name")
 	}
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	prefix := "/aws/dynamodb/tables/" + name + "/"
 	var ids []string
@@ -46,10 +46,10 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 	_ = res
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.ErrorRelated("vpce", err)
+		return ReadFailed("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.UnknownRelated("vpce")
+		return NotRead("vpce")
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {

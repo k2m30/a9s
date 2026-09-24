@@ -21,15 +21,15 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	queueName := res.ID
 	if queueARN == "" && queueName == "" {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if subList == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	topicSet := make(map[string]struct{})
@@ -53,7 +53,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		if truncated {
 			return relatedResultTrunc("sns", nil, true)
 		}
-		return resource.ProvenZero("sns", "topicSet")
+		return foundNone("sns", "topicSet")
 	}
 
 	var ids []string
@@ -73,15 +73,15 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	queueName := res.ID
 	if queueARN == "" && queueName == "" {
-		return resource.UnknownRelated("sns-sub")
+		return NotRead("sns-sub")
 	}
 
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.ErrorRelated("sns-sub", err)
+		return ReadFailed("sns-sub", err)
 	}
 	if subList == nil {
-		return resource.UnknownRelated("sns-sub")
+		return NotRead("sns-sub")
 	}
 
 	var ids []string
@@ -135,10 +135,10 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	sqsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sqs")
 	if err != nil {
-		return resource.ErrorRelated("sqs", err)
+		return ReadFailed("sqs", err)
 	}
 	if sqsList == nil {
-		return resource.UnknownRelated("sqs")
+		return NotRead("sqs")
 	}
 
 	// Forward: find the DLQ that this queue targets.
@@ -190,11 +190,11 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	row, ok := res.RawStruct.(SQSQueueAttributesRow)
 	if !ok {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	queueARN := row.Attributes["QueueArn"]
 	if queueARN == "" {
-		return resource.ProvenZero("lambda", "queueARN")
+		return foundNone("lambda", "queueARN")
 	}
 	return lambdaEventSourceMappingLambdaCheck(ctx, clients, queueARN, cache)
 }
@@ -204,7 +204,7 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkSQSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := res.Fields["kms_key_id"]
 	if keyID == "" {
-		return resource.ProvenZero("kms", "keyID")
+		return foundNone("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -218,8 +218,5 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
 		queueARN = raw.Attributes["QueueArn"]
 	}
-	if queueARN == "" {
-		return unreadZero(res, resource.ProvenZero("eb-rule", "queueARN"))
-	}
-	return unreadZero(res, ebRulesTargeting(ctx, clients, cache, queueARN))
+	return ebRulesTargeting(ctx, clients, cache, queueARN)
 }

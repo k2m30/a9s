@@ -29,15 +29,15 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if certARN == "" {
-		return resource.ProvenZero("cf", "certARN")
+		return foundNone("cf", "certARN")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	if cfList == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 
 	var ids []string
@@ -87,14 +87,14 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 // acm:DescribeCertificate.InUseBy filtered to elbv2:loadbalancer ARNs.
 func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return unreadZero(res, resource.KnownRelated("elb", nil, false))
+		return NotRead("elb")
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("elb")
+			return NotRead("elb")
 		}
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	var refs []string
 	for _, arn := range arns {
@@ -109,14 +109,14 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache 
 // via acm:DescribeCertificate.InUseBy filtered to apigateway domain ARNs.
 func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return unreadZero(res, resource.KnownRelated("apigw", nil, false))
+		return NotRead("apigw")
 	}
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("apigw")
+			return NotRead("apigw")
 		}
-		return resource.ErrorRelated("apigw", err)
+		return ReadFailed("apigw", err)
 	}
 	var refs []string
 	for _, arn := range arns {
@@ -134,7 +134,7 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 // record name against cached zones' names (longest suffix match).
 func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
-		return unreadZero(res, resource.KnownRelated("r53", nil, false))
+		return NotRead("r53")
 	}
 	certARN := ""
 	raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct)
@@ -142,20 +142,20 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		certARN = *raw.CertificateArn
 	}
 	if certARN == "" {
-		return unreadZero(res, resource.ProvenZero("r53", "certARN"))
+		return unreadZero(res, foundNone("r53", "certARN"))
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ACM == nil {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
 		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
 	})
 	if err != nil {
-		return resource.ErrorRelated("r53", err)
+		return ReadFailed("r53", err)
 	}
 	if out.Certificate == nil {
-		return unreadZero(res, resource.ProvenZero("r53", "out.Certificate"))
+		return unreadZero(res, foundNone("r53", "out.Certificate"))
 	}
 	var recordNames []string
 	for _, dvo := range out.Certificate.DomainValidationOptions {
@@ -164,12 +164,15 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(recordNames) == 0 {
-		return unreadZero(res, resource.ProvenZero("r53", "recordNames"))
+		return unreadZero(res, foundNone("r53", "recordNames"))
 	}
-	zoneList, truncated, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
+	zoneList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "r53")
+	if err != nil {
+		return ReadFailed("r53", err)
+	}
 	if zoneList == nil {
 		// Without zone cache we can only report a "we saw validation records" signal.
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 	seen := map[string]bool{}
 	var ids []string

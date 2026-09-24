@@ -16,15 +16,15 @@ import (
 func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.ProvenZero("ec2", "amiID")
+		return foundNone("ec2", "amiID")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	var ids []string
@@ -41,7 +41,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ebs-snap")
+		return NotRead("ebs-snap")
 	}
 
 	var ids []string
@@ -51,7 +51,7 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("ebs-snap", "ids")
+		return foundNone("ebs-snap", "ids")
 	}
 	return relatedResultTrunc("ebs-snap", ids, false)
 }
@@ -67,15 +67,15 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return resource.ProvenZero("asg", "amiID")
+		return foundNone("asg", "amiID")
 	}
 
 	asgList, asgTruncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 	// The ec2 list is read only for the groups' instances: with no group
 	// there is nothing to look up.
@@ -83,7 +83,7 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 	var ec2Truncated bool
 	if len(asgList) > 0 {
 		if ec2List, ec2Truncated, err = relatedResourcesFor(ctx, clients, cache, "ec2"); err != nil {
-			return resource.ErrorRelated("asg", err)
+			return ReadFailed("asg", err)
 		}
 	}
 

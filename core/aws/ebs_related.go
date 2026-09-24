@@ -15,7 +15,7 @@ import (
 func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	attachedTo := res.Fields["attached_to"]
 	if attachedTo == "" {
-		return resource.ProvenZero("ec2", "attachedTo")
+		return foundNone("ec2", "attachedTo")
 	}
 	return relatedResultTrunc("ec2", splitCSV(attachedTo), false)
 }
@@ -24,15 +24,15 @@ func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return resource.ProvenZero("ebs-snap", "volID")
+		return foundNone("ebs-snap", "volID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
 	if err != nil {
-		return resource.ErrorRelated("ebs-snap", err)
+		return ReadFailed("ebs-snap", err)
 	}
 	if snapList == nil {
-		return resource.UnknownRelated("ebs-snap")
+		return NotRead("ebs-snap")
 	}
 
 	var ids []string
@@ -48,10 +48,10 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 func checkEBSKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "vol.KmsKeyId")
+		return foundNone("kms", "vol.KmsKeyId")
 	}
 	return kmsRelated(ctx, clients, cache, []string{*vol.KmsKeyId})
 }
@@ -68,10 +68,7 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("cfn")
-		}
-		return resource.KnownRelated("cfn", nil, false)
+		return NotRead("cfn")
 	}
 	stackName := ""
 	for _, tag := range vol.Tags {
@@ -81,15 +78,15 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -113,16 +110,16 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return unreadZero(res, resource.ProvenZero("backup", "volID"))
+		return unreadZero(res, foundNone("backup", "volID"))
 	}
 	tags, tagsKnown := ebsVolumeTags(res)
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if backupList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 
 	target := backupTarget{arn: sessionEC2ARN(ctx, clients, "volume", volID), tags: tags}

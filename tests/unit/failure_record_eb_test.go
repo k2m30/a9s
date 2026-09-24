@@ -1,7 +1,7 @@
 package unit_test
 
-// failure_record_eb_test.go — one aggregate covering two different calls
-// says which call failed.
+// failure_record_eb_test.go — a failure record says which call failed,
+// on what, and why.
 //
 // Lives beside the Elastic Beanstalk related fakes, which are in this
 // package; the other failure-record pins are in failure_record_test.go.
@@ -14,32 +14,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall: one aggregate covers
-// two different calls (resolving the load balancer's name, then reading its
-// listeners), so a failure whose cause does not already name what it was
-// doing says which call refused. A denial names its action itself and is
-// not decorated twice.
-func TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall(t *testing.T) {
+// TestRelated_Eb_TG_TimeoutOnLoadBalancer_NamesTheCall: the environment's
+// only load balancer could not be resolved, so nothing was read and the row is
+// unknown. The failure travels beside the answer and says which call failed,
+// on which load balancer, and why.
+func TestRelated_Eb_TG_TimeoutOnLoadBalancer_NamesTheCall(t *testing.T) {
 	const envName = "acme-web-env"
 	const lbName = "awseb-AWSEBLB-ABCDEF123456"
-	const lbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/awseb-AWSEBLB-ABCDEF123456/0123456789abcdef"
 
 	fakeELBv2 := &fakeELBv2ForEB{
 		describeLoadBalancersFn: func(_ *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
-			return &elbv2.DescribeLoadBalancersOutput{LoadBalancers: []elbv2types.LoadBalancer{
-				{LoadBalancerName: aws.String(lbName), LoadBalancerArn: aws.String(lbARN)},
-			}}, nil
-		},
-		describeListenersFn: func(_ *elbv2.DescribeListenersInput) (*elbv2.DescribeListenersOutput, error) {
 			return nil, &smithy.OperationError{
-				ServiceID: "Elastic Load Balancing v2", OperationName: "DescribeListeners",
+				ServiceID: "Elastic Load Balancing v2", OperationName: "DescribeLoadBalancers",
 				Err: context.DeadlineExceeded,
 			}
 		},
@@ -55,12 +48,15 @@ func TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall(t *testing.T) {
 		RawStruct: ebtypes.EnvironmentDescription{EnvironmentName: aws.String(envName)}}
 
 	result := ebCheckerByTarget(t, "tg")(context.Background(), clients, res, resource.ResourceCache{})
-	if result.Err() == nil {
-		t.Fatal("a timed-out listener read returned no error")
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("state = %s, want unknown: the only load balancer was not read", result.State())
 	}
-	for _, want := range []string{"DescribeListeners", "timeout", lbName} {
-		if !strings.Contains(result.Err().Error(), want) {
-			t.Errorf("failure line %q does not carry %q", result.Err(), want)
+	if result.Failure() == nil {
+		t.Fatal("a timed-out load balancer read carried no failure")
+	}
+	for _, want := range []string{"DescribeLoadBalancers", "timeout", lbName} {
+		if !strings.Contains(result.Failure().Error(), want) {
+			t.Errorf("failure line %q does not carry %q", result.Failure(), want)
 		}
 	}
 }

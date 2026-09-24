@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `elb`
 
 - **Why related**: the Load Balancers forwarding traffic to this TG — the other side of the traffic path. An orphan TG (no LB) shows up here as "no entries".
-- **How discovered**: read `TargetGroup.LoadBalancerArns[]` on the list response and cross-reference the already-loaded `elb` list by `LoadBalancerArn`.
+- **How discovered**: read `TargetGroup.LoadBalancerArns[]` on the list response and cross-reference the already-loaded `elb` list by `LoadBalancerArn`. The ARNs are a closed set: the count is exact however far the elb list was read, and a lower bound only for an ARN no loaded row holds.
 - **Count shown**: yes.
 
 ### `lambda`

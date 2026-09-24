@@ -517,7 +517,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 		"sfn": {
 			ID:     "arn:aws:states:us-east-1:123456789012:stateMachine:test-sm",
 			Name:   "test-sm",
-			Fields: map[string]string{},
+			Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:test-sm"},
 		},
 		"sns": {
 			ID:     "arn:aws:sns:us-east-1:123456789012:test-topic",
@@ -811,8 +811,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 // truncated-scan path, with the reason for each. Most read a list OTHER than
 // their target type, and the harness seeds only the target entry — so the join
 // list is absent, the target list is never fetched, and the nil-list rule makes
-// that Unknown rather than a zero nobody counted. Two need a live client to read the
-// rows they were handed, and the harness has none. Either way there are no
+// that Unknown rather than a zero nobody counted. The rest ask AWS through a live
+// client, and the harness has none. Either way there are no
 // pages for a lower bound to be over, so Unknown is the honest answer and the
 // truncation rule has nothing to apply to.
 var reverseScanExpectsUnknown = map[string]string{
@@ -824,4 +824,5 @@ var reverseScanExpectsUnknown = map[string]string{
 	"secrets→eb":       "describes each environment's config through a live client to see which resolves this secret",
 	"secrets→ecs-task": "describes each task definition through a live client to see which reads this secret",
 	"ecs-svc→ecr":      "describes the service's task definition through a live client to read the images it runs",
+	"sfn→eb-rule":      "asks EventBridge for the rules targeting the state machine's ARN through a live client",
 }

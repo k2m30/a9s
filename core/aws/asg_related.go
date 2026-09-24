@@ -23,7 +23,7 @@ import (
 func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	var ids []string
 	for _, inst := range asg.Instances {
@@ -32,7 +32,7 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("ec2", "ids")
+		return foundNone("ec2", "ids")
 	}
 	return relatedResultTrunc("ec2", ids, false)
 }
@@ -48,15 +48,15 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgName := res.ID
 	if asgName == "" {
-		return resource.ProvenZero("ng", "asgName")
+		return foundNone("ng", "asgName")
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.ErrorRelated("ng", err)
+		return ReadFailed("ng", err)
 	}
 	if ngList == nil {
-		return resource.UnknownRelated("ng")
+		return NotRead("ng")
 	}
 
 	var ids []string
@@ -75,7 +75,7 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	return relatedResultTrunc("ng", ids, truncated)
+	return relatedAnswer("ng", relatedRead{ids: ids, partial: truncated, atMostOne: true})
 }
 
 // checkASGAMI resolves the AMI used by the ASG's launch configuration or launch template.
@@ -84,23 +84,23 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
 		if err != nil {
-			return resource.ErrorRelated("ami", err)
+			return ReadFailed("ami", err)
 		}
 		if len(lcs) > 0 && aws.ToString(lcs[0].ImageId) != "" {
 			return relatedRefs("ami", []string{*lcs[0].ImageId}, refContext(clients, nil, "ami"))
 		}
-		return resource.ProvenZero("ami", "LaunchConfiguration.ImageId")
+		return foundNone("ami", "LaunchConfiguration.ImageId")
 	}
 
 	ltSpec := asg.LaunchTemplate
@@ -108,19 +108,19 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return resource.ProvenZero("ami", "ltSpec.LaunchTemplateId")
+		return foundNone("ami", "ltSpec.LaunchTemplateId")
 	}
 
 	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
 	if err != nil {
-		return resource.ErrorRelated("ami", err)
+		return ReadFailed("ami", err)
 	}
 	for _, v := range versions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
 			return relatedRefs("ami", []string{*v.LaunchTemplateData.ImageId}, refContext(clients, nil, "ami"))
 		}
 	}
-	return resource.ProvenZero("ami", "LaunchTemplateData.ImageId")
+	return foundNone("ami", "LaunchTemplateData.ImageId")
 }
 
 // checkASGELB resolves the ALB/NLB behind this ASG's TargetGroupARNs via
@@ -129,14 +129,14 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
-		return resource.ProvenZero("elb", "asg.TargetGroupARNs")
+		return foundNone("elb", "asg.TargetGroupARNs")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	tgs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbv2types.TargetGroup, *string, error) {
 		out, err := c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
@@ -149,7 +149,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 		return out.TargetGroups, out.NextMarker, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	var refs []string
 	for _, tg := range tgs {
@@ -165,7 +165,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	var refs []string
@@ -181,7 +181,7 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 		if ids, _ := resolveRefs("role", refs, rc); len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	// Resolve instance profile from launch config or launch template. A call
@@ -199,7 +199,7 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 		if len(ids) > 0 {
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	return relatedResultTrunc("role", ids, dropped)

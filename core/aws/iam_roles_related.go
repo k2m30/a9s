@@ -32,10 +32,10 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 
 	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.ErrorRelated("eks", err)
+		return ReadFailed("eks", err)
 	}
 	if eksList == nil {
-		return resource.UnknownRelated("eks")
+		return NotRead("eks")
 	}
 
 	var ids []string
@@ -71,7 +71,7 @@ func checkRoleIamUser(_ context.Context, clients any, res resource.Resource, cac
 func roleTrustPrincipals(clients any, res resource.Resource, cache resource.ResourceCache, target, kind string) resource.RelatedCheckResult {
 	doc := res.Fields["assume_role_policy_document"]
 	if doc == "" {
-		return resource.ProvenZero(target, "assume_role_policy_document")
+		return foundNone(target, "assume_role_policy_document")
 	}
 	roleARN := ""
 	if raw, ok := assertStruct[iamtypes.Role](res.RawStruct); ok {
@@ -80,7 +80,7 @@ func roleTrustPrincipals(clients any, res resource.Resource, cache resource.Reso
 	rc := policyRefContext(clients, cache, target, roleARN)
 	refs, ok := grantedPrincipalRefs(doc, kind)
 	if !ok {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	return relatedRefs(target, refs, rc)
 }
@@ -105,10 +105,10 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	var ids []string
@@ -136,10 +136,10 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 
 	glueList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
-		return resource.ErrorRelated("glue", err)
+		return ReadFailed("glue", err)
 	}
 	if glueList == nil {
-		return resource.UnknownRelated("glue")
+		return NotRead("glue")
 	}
 
 	var ids []string
@@ -163,10 +163,10 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.ErrorRelated("ng", err)
+		return ReadFailed("ng", err)
 	}
 	if ngList == nil {
-		return resource.UnknownRelated("ng")
+		return NotRead("ng")
 	}
 
 	var ids []string
@@ -188,7 +188,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.UnknownRelated("policy")
+		return NotRead("policy")
 	}
 	roleName := res.ID
 	if roleName == "" {
@@ -198,11 +198,11 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	if roleName == "" {
-		return resource.ProvenZero("policy", "roleName")
+		return foundNone("policy", "roleName")
 	}
 	attached, complete, err := listAttachedRolePolicies(ctx, c.IAM, roleName)
 	if err != nil {
-		return resource.ErrorRelated("policy", err)
+		return ReadFailed("policy", err)
 	}
 	return relatedResultTrunc("policy", attachedPolicyIDs(attached), !complete)
 }
@@ -218,15 +218,15 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if roleName == "" {
-		return resource.ProvenZero("ec2", "roleName")
+		return foundNone("ec2", "roleName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	profileOf := make(map[string]string, len(ec2List))
 	for _, ec2Res := range ec2List {
@@ -241,11 +241,11 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 	c, err := svcClients(clients)
 	// no finding: without the IAM client nothing was read.
 	if err != nil || c.IAM == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	api, ok := c.IAM.(IAMListInstanceProfilesForRoleAPI)
 	if !ok {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 	profiles, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.InstanceProfile, *string, error) {
 		out, callErr := api.ListInstanceProfilesForRole(ctx, &iam.ListInstanceProfilesForRoleInput{RoleName: aws.String(roleName), Marker: marker})
@@ -255,7 +255,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		return out.InstanceProfiles, out.Marker, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	var ids []string
 	for _, ec2Res := range ec2List {

@@ -39,15 +39,15 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok || rg.ARN == nil || *rg.ARN == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("cfn")
+			return NotRead("cfn")
 		}
 		// A group that carries no ARN cannot be passed to ListTagsForResource,
 		// so no stack can own it.
-		return resource.ProvenZero("cfn", "rg.ARN")
+		return foundNone("cfn", "rg.ARN")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	arn := *rg.ARN
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.ListTagsForResourceOutput, error) {
@@ -56,7 +56,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		})
 	})
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.TagList {
@@ -66,15 +66,15 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -91,7 +91,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return relatedResultTrunc("cfn", nil, true)
 	}
 	if truncated {
-		return truncatedResultRedis("cfn", ids)
+		return relatedResultTrunc("cfn", ids, true)
 	}
 	return relatedResultTrunc("cfn", ids, false)
 }
@@ -102,13 +102,10 @@ func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, cach
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
 		// Without RawStruct we cannot read KmsKeyId — report 0 (no known key).
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("kms")
-		}
-		return resource.KnownRelated("kms", nil, false)
+		return NotRead("kms")
 	}
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "rg.KmsKeyId")
+		return foundNone("kms", "rg.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*rg.KmsKeyId, res.Type)
 	return kmsRelated(ctx, clients, cache, []string{keyID})
@@ -120,10 +117,7 @@ func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, cach
 func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("logs")
-		}
-		return resource.KnownRelated("logs", nil, false)
+		return NotRead("logs")
 	}
 	var names []string
 	for _, ldc := range rg.LogDeliveryConfigurations {
@@ -138,15 +132,15 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(names) == 0 {
-		return resource.ProvenZero("logs", "names")
+		return foundNone("logs", "names")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	wanted := make(map[string]struct{}, len(names))
@@ -167,7 +161,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return relatedResultTrunc("logs", nil, true)
 	}
 	if truncated {
-		return truncatedResultRedis("logs", ids)
+		return relatedResultTrunc("logs", ids, true)
 	}
 	return relatedResultTrunc("logs", ids, false)
 }
@@ -188,15 +182,15 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return resource.ProvenZero("secrets", "rgID")
+		return foundNone("secrets", "rgID")
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	namingConvention := rgID + "/auth-token"
@@ -222,7 +216,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		return relatedResultTrunc("secrets", nil, true)
 	}
 	if truncated {
-		return truncatedResultRedis("secrets", ids)
+		return relatedResultTrunc("secrets", ids, true)
 	}
 	return relatedResultTrunc("secrets", ids, false)
 }
@@ -236,14 +230,14 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		return relatedFromErr("sg", err)
 	}
 	if cc == nil {
-		return resource.ProvenZero("sg", "cc")
+		return foundNone("sg", "cc")
 	}
 	sgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.ErrorRelated("sg", err)
+		return ReadFailed("sg", err)
 	}
 	if sgList == nil {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 
 	var sgIDs []string
@@ -253,7 +247,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.ProvenZero("sg", "sgIDs")
+		return foundNone("sg", "sgIDs")
 	}
 
 	wantedSet := make(map[string]struct{}, len(sgIDs))
@@ -270,7 +264,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		return relatedResultTrunc("sg", nil, true)
 	}
 	if truncated {
-		return truncatedResultRedis("sg", ids)
+		return relatedResultTrunc("sg", ids, true)
 	}
 	return relatedResultTrunc("sg", ids, false)
 }
@@ -284,19 +278,19 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return relatedFromErr("sns", err)
 	}
 	if cc == nil {
-		return resource.ProvenZero("sns", "cc")
+		return foundNone("sns", "cc")
 	}
 	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
-		return resource.ProvenZero("sns", "cc.NotificationConfiguration.TopicArn")
+		return foundNone("sns", "cc.NotificationConfiguration.TopicArn")
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 
 	snsList, _, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
-		return resource.ErrorRelated("sns", err)
+		return ReadFailed("sns", err)
 	}
 	if snsList == nil {
-		return resource.UnknownRelated("sns")
+		return NotRead("sns")
 	}
 
 	ids, lowerBound := listedRefs("sns", []string{topicARN}, refContext(clients, cache, "sns"), snsList)
@@ -312,15 +306,15 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		return relatedFromErr("subnet", err)
 	}
 	if sng == nil {
-		return resource.ProvenZero("subnet", "sng")
+		return foundNone("subnet", "sng")
 	}
 
 	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.ErrorRelated("subnet", err)
+		return ReadFailed("subnet", err)
 	}
 	if subnetList == nil {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 
 	var subnetIDs []string
@@ -330,7 +324,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(subnetIDs) == 0 {
-		return resource.ProvenZero("subnet", "subnetIDs")
+		return foundNone("subnet", "subnetIDs")
 	}
 
 	wantedSet := make(map[string]struct{}, len(subnetIDs))
@@ -347,7 +341,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		return relatedResultTrunc("subnet", nil, true)
 	}
 	if truncated {
-		return truncatedResultRedis("subnet", ids)
+		return relatedResultTrunc("subnet", ids, true)
 	}
 	return relatedResultTrunc("subnet", ids, false)
 }
@@ -360,10 +354,10 @@ func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ re
 		return relatedFromErr("vpc", err)
 	}
 	if sng == nil {
-		return resource.ProvenZero("vpc", "sng")
+		return foundNone("vpc", "sng")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
-		return resource.ProvenZero("vpc", "sng.VpcId")
+		return foundNone("vpc", "sng.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*sng.VpcId}, false)
 }
@@ -448,11 +442,4 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 		return nil, nil
 	}
 	return &groups[0], nil
-}
-
-// truncatedResultRedis returns a RelatedCheckResult with Truncated=true when the
-// target cache is truncated and matches were found. Later pages may contain
-// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
-func truncatedResultRedis(target string, ids []string) resource.RelatedCheckResult {
-	return resource.KnownRelated(target, ids, true)
 }

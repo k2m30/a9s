@@ -38,14 +38,13 @@ import (
 var truncatedUnknownAllowed = map[string]string{
 	"dbc_snap_related.go:126":       "dbc is the join list; the backup target is unread until the parent ARN resolves",
 	"dbi_snap_related.go:107":       "dbi is the join list; the backup target is unread until the parent ARN resolves",
-	"ecs_svc_related.go:146":        "tg is the join list; the elb target is unread until the load balancer ARNs resolve",
+	"ecs_svc_related.go:143":        "tg is the join list; the elb target is unread until the load balancer ARNs resolve",
 	"ecs_task_related_extra.go:216": "eni is the join list; the sg target is unread until the group ids resolve",
 	"eip_related.go:147":            "ec2 is the join list; asg is never fetched, the name comes off an instance tag",
-	"msk_related.go:139":            "subnet is the join list; vpc is never fetched, the id comes off a subnet struct",
 }
 
 var (
-	unknownReturnRe  = regexp.MustCompile(`UnknownRelated\(`)
+	unknownReturnRe  = regexp.MustCompile(`\b(NotRead|UnknownRelated)\(`)
 	ifHeaderRe       = regexp.MustCompile(`^\s*(\}\s*else\s+)?if\b`)
 	truncationWordRe = regexp.MustCompile(`(?i)truncat`)
 )
@@ -97,7 +96,7 @@ func TestRelatedTruncatedList_IsALowerBoundNotUnknown(t *testing.T) {
 	}
 
 	if unknowns == 0 {
-		t.Fatal("the scan found no UnknownRelated call at all — the pattern has stopped reaching the code")
+		t.Fatal("the scan found no NotRead or UnknownRelated call at all — the pattern has stopped reaching the code")
 	}
 	if len(offenders) > 0 {
 		sort.Strings(offenders)

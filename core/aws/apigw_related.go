@@ -26,22 +26,22 @@ import (
 func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("kms", "apiID")
+		return foundNone("kms", "apiID")
 	}
 	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("kms")
+			return NotRead("kms")
 		}
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	var refs []string
 	var failures []Failure
@@ -73,10 +73,10 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 		// of them, which is a fetch failure rather than a lower bound over
 		// what was read.
 		if aggErr := AggregateFailures("apigw-related: GetFunction", failures, total); aggErr != nil && len(failures) == total {
-			return resource.ErrorRelated("kms", aggErr)
+			return ReadFailed("kms", aggErr)
 		}
 		if err != nil {
-			return resource.ErrorRelated("kms", err)
+			return ReadFailed("kms", err)
 		}
 	}
 	// Some calls may have failed: ids is a proven subset, not necessarily
@@ -96,15 +96,15 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		apiName = res.Fields["name"]
 	}
 	if apiID == "" && apiName == "" {
-		return resource.ProvenZero("logs", "apiName")
+		return foundNone("logs", "apiName")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	executionPrefix := "API-Gateway-Execution-Logs_" + apiID + "/"
@@ -148,14 +148,14 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) (item
 func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("lambda", "apiID")
+		return foundNone("lambda", "apiID")
 	}
 	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("lambda")
+			return NotRead("lambda")
 		}
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 	var arns []string
 	for _, item := range items {
@@ -171,19 +171,19 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("acm", "apiID")
+		return foundNone("acm", "apiID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	dnAPI, ok := c.APIGatewayV2.(APIGatewayV2GetDomainNamesAPI)
 	if !ok {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	mapAPI, ok := c.APIGatewayV2.(APIGatewayV2GetApiMappingsAPI)
 	if !ok {
-		return resource.UnknownRelated("acm")
+		return NotRead("acm")
 	}
 	domains, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.DomainName, *string, error) {
 		out, err := dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{NextToken: token})
@@ -193,7 +193,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 		return out.Items, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("acm", err)
+		return ReadFailed("acm", err)
 	}
 	var refs []string
 	var failures []Failure
@@ -231,7 +231,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 		// them, which is a fetch failure rather than a lower bound over what
 		// was read.
 		if aggErr := AggregateFailures("apigw-related: GetApiMappings", failures, total); aggErr != nil && len(failures) == total {
-			return resource.ErrorRelated("acm", aggErr)
+			return ReadFailed("acm", aggErr)
 		}
 	}
 	// Some GetApiMappings calls may have failed: ids is a proven subset, not
@@ -253,15 +253,15 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("cf", "apiID")
+		return foundNone("cf", "apiID")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	if cfList == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 
 	var ids []string
@@ -288,15 +288,15 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("elb", "apiID")
+		return foundNone("elb", "apiID")
 	}
 
 	items, integrationsComplete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.UnknownRelated("elb")
+			return NotRead("elb")
 		}
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	var vpcLinkIDs []string
 	seenLinks := make(map[string]struct{})
@@ -311,16 +311,16 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		vpcLinkIDs = append(vpcLinkIDs, *item.ConnectionId)
 	}
 	if len(vpcLinkIDs) == 0 {
-		return resource.ProvenZero("elb", "vpcLinkIDs")
+		return foundNone("elb", "vpcLinkIDs")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 	vpcLinkAPI, ok := c.APIGatewayV2.(APIGatewayV2GetVpcLinksAPI)
 	if !ok {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	// GetVpcLinks is account-wide, not API-scoped.
@@ -332,7 +332,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		return out.Items, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("elb", err)
+		return ReadFailed("elb", err)
 	}
 	wantedSubnets := make(map[string]struct{})
 	wantedSGs := make(map[string]struct{})
@@ -357,10 +357,10 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 
 	elbList, truncated, fetchErr := relatedResourcesFor(ctx, clients, cache, "elb")
 	if fetchErr != nil {
-		return resource.ErrorRelated("elb", fetchErr)
+		return ReadFailed("elb", fetchErr)
 	}
 	if elbList == nil {
-		return resource.UnknownRelated("elb")
+		return NotRead("elb")
 	}
 
 	var ids []string
@@ -402,7 +402,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return resource.ProvenZero("role", "apiID")
+		return foundNone("role", "apiID")
 	}
 
 	var refs []string
@@ -410,7 +410,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 
 	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil && !errors.Is(err, errClientMissing) {
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	for _, item := range items {
 		if item.CredentialsArn != nil && *item.CredentialsArn != "" {
@@ -428,7 +428,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 			ids, _ := resolveRefs("role", refs, rc)
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
 	if !ok {
@@ -436,7 +436,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 			ids, _ := resolveRefs("role", refs, rc)
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	authorizers, authComplete, authErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Authorizer, *string, error) {
 		out, err := authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID, NextToken: token})
@@ -450,7 +450,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cac
 			ids, _ := resolveRefs("role", refs, rc)
 			return relatedResultTrunc("role", ids, true)
 		}
-		return resource.ErrorRelated("role", authErr)
+		return ReadFailed("role", authErr)
 	}
 	for _, a := range authorizers {
 		if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {

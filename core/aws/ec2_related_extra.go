@@ -17,10 +17,10 @@ import (
 func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("ami")
+		return NotRead("ami")
 	}
 	if raw.ImageId == nil || *raw.ImageId == "" {
-		return resource.ProvenZero("ami", "raw.ImageId")
+		return foundNone("ami", "raw.ImageId")
 	}
 	return relatedResultTrunc("ami", []string{*raw.ImageId}, false)
 }
@@ -30,7 +30,7 @@ func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEC2ENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var ids []string
 	for _, eni := range raw.NetworkInterfaces {
@@ -46,10 +46,10 @@ func checkEC2ENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
-		return resource.ProvenZero("subnet", "raw.SubnetId")
+		return foundNone("subnet", "raw.SubnetId")
 	}
 	return relatedResultTrunc("subnet", []string{*raw.SubnetId}, false)
 }
@@ -60,15 +60,15 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return resource.ProvenZero("kms", "instanceID")
+		return foundNone("kms", "instanceID")
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	if ebsList == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 
 	var refs []string
@@ -93,7 +93,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	ids, lowerBound, err := kmsResolve(ctx, clients, cache, kmsRegion(refs), refs)
 	if err != nil {
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	return relatedResultTrunc("kms", ids, truncated || lowerBound)
 }
@@ -111,7 +111,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return unreadZero(res, resource.ProvenZero("backup", "instanceID"))
+		return unreadZero(res, foundNone("backup", "instanceID"))
 	}
 
 	tags := map[string]string{}
@@ -129,10 +129,10 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if backupList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 
 	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, target))

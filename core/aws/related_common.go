@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -29,41 +27,14 @@ import (
 // a "?".
 var errRawStructMissing = errors.New("resource details have not been read yet")
 
-// unreadZero is what a checker owes when it found nothing and could not read
-// its source row. A disk-cache replay carries no RawStruct, so a zero there is
-// a claim about a row nobody looked at — the checker had no filter to scan
-// with, and "none" and "we have not looked" are not the same answer.
-//
-// Everything else passes through untouched: anything the checker did find, an
-// error, an already-unknown, and a truncated zero — a truncated result means a
-// real list was read with whatever filter the row's Fields could supply, and
-// that lower bound is honest whether or not the RawStruct was there.
-func unreadZero(res resource.Resource, r resource.RelatedCheckResult) resource.RelatedCheckResult {
-	if res.RawStruct != nil || r.State() != domain.RelatedResolved || r.Count() != 0 || r.Truncated() {
-		return r
-	}
-	return resource.UnknownRelated(r.TargetType())
-}
-
-// unreadZeroScanned is unreadZero for a checker that did read the target list.
-// A zero over a population of none is proven whatever the source row could or
-// could not say — no row existed for it to match — so only a zero over rows
-// that were really there is a claim the source row has to back.
-func unreadZeroScanned(res resource.Resource, scanned int, r resource.RelatedCheckResult) resource.RelatedCheckResult {
-	if scanned == 0 {
-		return r
-	}
-	return unreadZero(res, r)
-}
-
 // relatedFromErr turns the error a two-hop helper returned into the result the
 // panel owes. It is the single place that knows "we have not read this row yet"
 // is Unknown while every other error is Error.
 func relatedFromErr(target string, err error) resource.RelatedCheckResult {
 	if errors.Is(err, errRawStructMissing) {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
-	return resource.ErrorRelated(target, err)
+	return ReadFailed(target, err)
 }
 
 // assertStruct extracts a value of type T from an interface that may hold
@@ -138,32 +109,6 @@ func kmsRefFromField(raw, srcType string) string {
 	return raw
 }
 
-// relatedResultTrunc is the result of a checker that searched: ids found,
-// and whether the search stopped short. A truncated scan renders "(N+)" —
-// 0+ and 10+ are the same case (N found so far, list truncated). A complete
-// search that found nothing is a proven zero.
-func relatedResultTrunc(target string, ids []string, truncated bool) resource.RelatedCheckResult {
-	if !truncated && !slices.ContainsFunc(ids, func(id string) bool { return id != "" }) {
-		return resource.ProvenZero(target, "the checker's search")
-	}
-	return resource.KnownRelated(target, ids, truncated)
-}
-
-// heuristicResult is the result of a pivot that matches by a property every
-// related resource must share with the source but unrelated ones may share
-// too: the matches are candidates, and a complete scan that found none is a
-// proven zero.
-func heuristicResult(target string, ids []string, truncated bool) resource.RelatedCheckResult {
-	if !truncated && len(ids) == 0 {
-		return resource.ProvenZero(target, "the checker's scan")
-	}
-	r := resource.HeuristicRelated(target, ids)
-	if truncated {
-		return r.PartialScan()
-	}
-	return r
-}
-
 // logGroupsNaming offers the log groups whose name carries name, as
 // candidates. A log group's name is free text an operator chooses, and what
 // binds one to a resource is written where no list response reaches — the
@@ -172,14 +117,14 @@ func heuristicResult(target string, ids []string, truncated bool) resource.Relat
 // unrelated group may share too.
 func logGroupsNaming(ctx context.Context, clients any, cache resource.ResourceCache, name string) resource.RelatedCheckResult {
 	if name == "" {
-		return resource.ProvenZero("logs", "the source's name")
+		return relatedAnswer("logs", relatedRead{unread: true})
 	}
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	var ids []string
 	for _, logRes := range logList {
@@ -187,7 +132,7 @@ func logGroupsNaming(ctx context.Context, clients any, cache resource.ResourceCa
 			ids = append(ids, logRes.ID)
 		}
 	}
-	return heuristicResult("logs", ids, truncated)
+	return candidatesResult("logs", ids, truncated)
 }
 
 // ecsTaskDefLogGroups is the logs pivot of a workload that runs a task
@@ -215,14 +160,14 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 		}
 	}
 	if len(groups) == 0 {
-		return resource.ProvenZero("logs", "the definition's awslogs-group options")
+		return foundNone("logs", "the definition's awslogs-group options")
 	}
 	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 	ids, lowerBound := listedRefs("logs", groups, refContext(clients, cache, "logs"), logList)
 	return relatedResultTrunc("logs", ids, lowerBound)
@@ -260,22 +205,22 @@ func ecsTaskDefinition(ctx context.Context, clients any, taskDefARN string) (*ec
 func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, source string, res resource.Resource, also ...func(cwtypes.MetricAlarm) bool) resource.RelatedCheckResult {
 	spec, ok := AlarmMatchSpecFor(source)
 	if !ok {
-		return resource.UnknownRelated("alarm")
+		return NotRead("alarm")
 	}
 	values, read := spec.alarmValuesOf(res)
 	if !read {
-		return resource.UnknownRelated("alarm")
+		return NotRead("alarm")
 	}
 	if len(values) == 0 {
-		return unreadZero(res, resource.ProvenZero("alarm", "the row's identity"))
+		return unreadZero(res, foundNone("alarm", "the row's identity"))
 	}
 
 	alarmList, _, truncated, err := relatedListIn(ctx, clients, cache, "alarm", spec.metricsRegionOf(res))
 	if err != nil {
-		return resource.ErrorRelated("alarm", err)
+		return ReadFailed("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
+		return NotRead("alarm")
 	}
 
 	var ids []string
@@ -302,18 +247,22 @@ func alarmIDsByDimension(ctx context.Context, clients any, cache resource.Resour
 func alarmRowsNaming(ctx context.Context, clients any, cache resource.ResourceCache, target string, res resource.Resource, also ...func(resource.Resource) bool) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	spec, ok := AlarmMatchSpecFor(target)
 	if !ok {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
-	rows, truncated, err := relatedResourcesFor(ctx, clients, cache, target)
+	read := relatedRowsByID
+	if spec.ValuesFromRawStruct {
+		read = FetchRelatedTarget
+	}
+	rows, truncated, err := read(ctx, clients, cache, target)
 	if err != nil {
-		return resource.ErrorRelated(target, err)
+		return ReadFailed(target, err)
 	}
 	if rows == nil {
-		return resource.UnknownRelated(target)
+		return NotRead(target)
 	}
 	// An alarm watches the metrics of its own region, so a row whose metrics
 	// are published elsewhere is none of this alarm's business.
@@ -328,43 +277,6 @@ func alarmRowsNaming(ctx context.Context, clients any, cache resource.ResourceCa
 		}
 	}
 	return relatedResultTrunc(target, ids, truncated)
-}
-
-// typedRow pairs a cached Resource's ID with its RawStruct already asserted
-// to T, so callers of cachedTypedRows never re-assert.
-type typedRow[T any] struct {
-	ID  string
-	Raw T
-}
-
-// cachedTypedRows reads the shortName entry directly from cache — it never
-// fetches. Tri-state contract: cache absent →
-// (nil, false, false) = unknown; entry present but zero rows assert to T
-// (disk-seeded, no RawStruct) → (nil, false, false) = unknown; entry present
-// and typed → the asserting rows only. A row that carries no T — a row of
-// another type, a row whose details could not be read — may be the one that
-// matches, so dropping it makes the rows a subset and truncated true.
-func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []typedRow[T], truncated bool, ok bool) {
-	entry, present := cache[shortName]
-	if !present {
-		return nil, false, false
-	}
-	if len(entry.Resources) == 0 {
-		return nil, entry.IsTruncated, true
-	}
-	dropped := false
-	for _, r := range entry.Resources {
-		raw, asserted := assertStruct[T](r.RawStruct)
-		if !asserted {
-			dropped = true
-			continue
-		}
-		rows = append(rows, typedRow[T]{ID: r.ID, Raw: raw})
-	}
-	if len(rows) == 0 {
-		return nil, false, false
-	}
-	return rows, entry.IsTruncated || dropped, true
 }
 
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
@@ -385,16 +297,16 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 func lambdaEventSourceMappingsNaming(ctx context.Context, clients any, cache resource.ResourceCache, filter lambda.ListEventSourceMappingsInput, keep func(eventSourceARN string) bool) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 	api, ok := c.Lambda.(LambdaListEventSourceMappingsAPI)
 	if !ok {
-		return resource.UnknownRelated("lambda")
+		return NotRead("lambda")
 	}
 
 	mappings, complete, err := listEventSourceMappings(ctx, api, filter)
 	if err != nil {
-		return resource.ErrorRelated("lambda", err)
+		return ReadFailed("lambda", err)
 	}
 
 	var functionArns []string

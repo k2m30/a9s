@@ -19,7 +19,7 @@ import (
 func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("sg")
+		return NotRead("sg")
 	}
 	var ids []string
 	for _, sg := range db.VpcSecurityGroups {
@@ -28,7 +28,7 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("sg", "ids")
+		return foundNone("sg", "ids")
 	}
 	return relatedResultTrunc("sg", ids, false)
 }
@@ -37,14 +37,14 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
-		return resource.ProvenZero("kms", "db.KmsKeyId")
+		return foundNone("kms", "db.KmsKeyId")
 	}
 	keyID := kmsRefFromField(*db.KmsKeyId, res.Type)
 	if keyID == "" {
-		return resource.ProvenZero("kms", "keyID")
+		return foundNone("kms", "keyID")
 	}
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
@@ -53,10 +53,10 @@ func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("subnet")
+		return NotRead("subnet")
 	}
 	if db.DBSubnetGroup == nil || len(db.DBSubnetGroup.Subnets) == 0 {
-		return resource.ProvenZero("subnet", "db.DBSubnetGroup.Subnets")
+		return foundNone("subnet", "db.DBSubnetGroup.Subnets")
 	}
 	var ids []string
 	for _, subnet := range db.DBSubnetGroup.Subnets {
@@ -65,7 +65,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 	}
 	if len(ids) == 0 {
-		return resource.ProvenZero("subnet", "ids")
+		return foundNone("subnet", "ids")
 	}
 	return relatedResultTrunc("subnet", ids, false)
 }
@@ -80,15 +80,15 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 // DB instance.
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return resource.ProvenZero("dbi-snap", "res.ID")
+		return foundNone("dbi-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi-snap")
 	if err != nil {
-		return resource.ErrorRelated("dbi-snap", err)
+		return ReadFailed("dbi-snap", err)
 	}
 	if snapList == nil {
-		return resource.UnknownRelated("dbi-snap")
+		return NotRead("dbi-snap")
 	}
 
 	var ids []string
@@ -109,17 +109,17 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return resource.ProvenZero("logs", "dbID")
+		return foundNone("logs", "dbID")
 	}
 
 	prefix := "/aws/rds/instance/" + dbID + "/"
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -139,23 +139,23 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("secrets")
+			return NotRead("secrets")
 		}
 		// A parent that is not a DBInstance carries no MasterUserSecret, so
 		// there is no link to find.
-		return resource.KnownRelated("secrets", nil, false)
+		return NotRead("secrets")
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
-		return resource.ProvenZero("secrets", "db.MasterUserSecret.SecretArn")
+		return foundNone("secrets", "db.MasterUserSecret.SecretArn")
 	}
 	secretARN := *db.MasterUserSecret.SecretArn
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.ErrorRelated("secrets", err)
+		return ReadFailed("secrets", err)
 	}
 	if secretList == nil {
-		return resource.UnknownRelated("secrets")
+		return NotRead("secrets")
 	}
 
 	var ids []string
@@ -176,9 +176,9 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	inst, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok || inst.DBSubnetGroup == nil || inst.DBSubnetGroup.VpcId == nil || *inst.DBSubnetGroup.VpcId == "" {
 		if res.RawStruct == nil {
-			return resource.UnknownRelated("vpc")
+			return NotRead("vpc")
 		}
-		return resource.ProvenZero("vpc", "inst.DBSubnetGroup.VpcId")
+		return foundNone("vpc", "inst.DBSubnetGroup.VpcId")
 	}
 	return relatedResultTrunc("vpc", []string{*inst.DBSubnetGroup.VpcId}, false)
 }
@@ -189,16 +189,13 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		if res.RawStruct == nil {
-			return resource.UnknownRelated("dbc")
-		}
-		return resource.KnownRelated("dbc", nil, false)
+		return NotRead("dbc")
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
-		return resource.ProvenZero("dbc", "db.DBClusterIdentifier")
+		return foundNone("dbc", "db.DBClusterIdentifier")
 	}
 	if !isDBCListedEngine(aws.ToString(db.Engine)) {
-		return resource.ProvenZero("dbc", "db.Engine")
+		return foundNone("dbc", "db.Engine")
 	}
 	// In-body: DBClusterIdentifier IS the cluster's resource id (dbc keyed by identifier).
 	return relatedResultTrunc("dbc", []string{*db.DBClusterIdentifier}, false)
@@ -210,7 +207,7 @@ func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	var refs []string
 	for _, r := range db.AssociatedRoles {
@@ -231,7 +228,7 @@ func checkDbiRole(_ context.Context, clients any, res resource.Resource, cache r
 func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	var sgIDs []string
 	for _, sg := range db.VpcSecurityGroups {
@@ -240,11 +237,11 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if len(sgIDs) == 0 {
-		return resource.ProvenZero("eni", "sgIDs")
+		return foundNone("eni", "sgIDs")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EC2 == nil {
-		return resource.UnknownRelated("eni")
+		return NotRead("eni")
 	}
 	descName := "description"
 	descVal := "RDSNetworkInterface"
@@ -267,7 +264,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return ids, out.NextToken, nil
 	})
 	if err != nil {
-		return resource.ErrorRelated("eni", err)
+		return ReadFailed("eni", err)
 	}
 	return heuristicResult("eni", ids, !complete)
 }

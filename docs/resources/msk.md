@@ -64,26 +64,26 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `secrets`
 
 - **Why related**: Secrets Manager secrets holding SASL/SCRAM client credentials associated with the cluster. If a secret is deleted or its KMS key is broken, SCRAM clients can no longer authenticate.
-- **How discovered**: the `Cluster.Provisioned.ClientAuthentication.Sasl.Scram.Enabled` flag only indicates SCRAM is turned on — it does not carry the secret ARNs. When `Enabled == true`, call `ListScramSecrets(ClusterArn=<arn>)` once per cluster; the response `SecretArnList []string` is the association. Cross-reference the loaded `secrets` list by secret ARN — a9s-devops: there is no way to read MSK-associated SCRAM secrets without `ListScramSecrets`; the call is one-per-cluster only when SCRAM is enabled, so cost is bounded and worth paying for the pivot.
+- **How discovered**: the `Cluster.Provisioned.ClientAuthentication.Sasl.Scram.Enabled` flag only indicates SCRAM is turned on — it does not carry the secret ARNs. When `Enabled == true`, call `ListScramSecrets(ClusterArn=<arn>)` once per cluster; the response `SecretArnList []string` is the association. Cross-reference the loaded `secrets` list by secret ARN — a9s-devops: there is no way to read MSK-associated SCRAM secrets without `ListScramSecrets`; the call is one-per-cluster only when SCRAM is enabled, so cost is bounded and worth paying for the pivot. A cluster without SCRAM, and every serverless cluster (`ServerlessSasl` carries IAM only), has no associated secret and is not asked; a refused `ListScramSecrets` reads unknown.
 - **Count shown**: yes.
 
 ### `sg`
 
 - **Why related**: Security groups attached to the broker elastic network interfaces — the firewall in front of the Kafka ports. Misconfigured SGs are the single most common cause of "can't connect to the cluster".
-- **How discovered**: read `Cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups []string`; cross-reference the loaded `sg` list by group ID.
+- **How discovered**: read `Cluster.Provisioned.BrokerNodeGroupInfo.SecurityGroups []string` on a provisioned cluster and `Cluster.Serverless.VpcConfigs[].SecurityGroupIds` on a serverless one; cross-reference the loaded `sg` list by group ID.
 - **Count shown**: yes.
 
 ### `subnet`
 
 - **Why related**: Client subnets where the broker ENIs live — one per AZ. Subnet AZ distribution determines broker AZ placement.
-- **How discovered**: read `Cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets []string`; cross-reference the loaded `subnet` list by subnet ID.
+- **How discovered**: read `Cluster.Provisioned.BrokerNodeGroupInfo.ClientSubnets []string` on a provisioned cluster and `Cluster.Serverless.VpcConfigs[].SubnetIds` on a serverless one; cross-reference the loaded `subnet` list by subnet ID.
 - **Count shown**: yes (typically 2 or 3).
 
 ### `vpc`
 
 - **Why related**: The VPC hosting the cluster. Operators pivot here to see peerings, route tables, and the overall network context.
-- **How discovered**: the MSK `Cluster` response does not carry a direct `VpcId` field — derive it by reading the first subnet ID from `BrokerNodeGroupInfo.ClientSubnets`, look it up in the already-loaded `subnet` list, and follow `Subnet.VpcId` — a9s-devops: MSK places all brokers in one VPC (subnets are required to share a VPC), so any client subnet's VPC is the cluster's VPC; cross-referencing via the loaded subnet list avoids a dedicated `DescribeSubnets` call.
-- **Count shown**: yes (1).
+- **How discovered**: the MSK `Cluster` response does not carry a direct `VpcId` field — derive it by looking each of the cluster's subnets (the `subnet` pivot's fields) up in the already-loaded `subnet` list and following `Subnet.VpcId` — a9s-devops: a provisioned cluster's client subnets share one VPC, while a serverless cluster's `VpcConfigs` may each name another; cross-referencing via the loaded subnet list avoids a dedicated `DescribeSubnets` call. A subnet the list may hold on a page not read leaves its VPC unread.
+- **Count shown**: yes (1 for a provisioned cluster).
 
 ### `ct-events`
 

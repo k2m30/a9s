@@ -284,7 +284,7 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			if pageMeta == nil {
 				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
 			}
-			c.ObserveRows(rt, resources, pageMeta, session.OriginFetch, false)
+			c.ObserveFetchResult(rt, resource.FetchResult{Resources: resources, Pagination: pageMeta}, msg.Errs[rt], session.OriginFetch, false)
 		}
 	}
 
@@ -375,7 +375,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		// write destination.
 		previous, _ := c.ProbeResources(canon)
 		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canon))
-		c.ObserveRows(canon, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
+		c.ObserveFetchResult(canon, resource.FetchResult{Resources: freshResources, Pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated}}, msg.Err, session.OriginProbe, false)
 	}
 
 	// Surface probe failures. A soft failure records into the `!` error log

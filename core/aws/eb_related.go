@@ -23,7 +23,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envID == "" {
-		return resource.ProvenZero("cfn", "envID")
+		return foundNone("cfn", "envID")
 	}
 
 	envIDPrefix := "awseb-" + envID
@@ -31,10 +31,10 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 
 	var ids []string
@@ -58,17 +58,17 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if envName == "" {
-		return resource.ProvenZero("logs", "envName")
+		return foundNone("logs", "envName")
 	}
 
 	prefix := "/aws/elasticbeanstalk/" + envName + "/"
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.ErrorRelated("logs", err)
+		return ReadFailed("logs", err)
 	}
 	if logList == nil {
-		return resource.UnknownRelated("logs")
+		return NotRead("logs")
 	}
 
 	var ids []string
@@ -90,15 +90,15 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return resource.ProvenZero("asg", "envName")
+		return foundNone("asg", "envName")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.ErrorRelated("asg", err)
+		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
-		return resource.UnknownRelated("asg")
+		return NotRead("asg")
 	}
 
 	var ids []string
@@ -129,15 +129,15 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return resource.ProvenZero("ec2", "envName")
+		return foundNone("ec2", "envName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.ErrorRelated("ec2", err)
+		return ReadFailed("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
+		return NotRead("ec2")
 	}
 
 	var ids []string

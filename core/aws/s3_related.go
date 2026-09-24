@@ -59,7 +59,7 @@ func s3NotificationRelated(
 	cache resource.ResourceCache,
 ) resource.RelatedCheckResult {
 	if msg := res.Fields["notification_error"]; msg != "" {
-		return resource.ErrorRelated(target, errors.New(msg))
+		return ReadFailed(target, errors.New(msg))
 	}
 	if res.Fields["notification_truncated"] == "true" {
 		return relatedResultTrunc(target, nil, true)
@@ -91,15 +91,15 @@ func checkS3SQS(_ context.Context, clients any, res resource.Resource, cache res
 func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("cfn", "bucket")
+		return foundNone("cfn", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	tagAPI, ok := c.s3For(ctx, bucket).(S3GetBucketTaggingAPI)
 	if !ok {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
 		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
@@ -108,14 +108,14 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		// NoSuchTagSet is a "no tags" response, and a deleted bucket is a
 		// resolved zero — both are a benign absence, not a hard failure.
 		if s3BenignAbsenceErr(err, "NoSuchTagSet") {
-			return resource.ProvenZero("cfn", "the API answered that none is configured")
+			return foundNone("cfn", "the API answered that none is configured")
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
 			return relatedResultTrunc("cfn", nil, true)
 		}
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.TagSet {
@@ -125,14 +125,14 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if stackName == "" {
-		return resource.ProvenZero("cfn", "stackName")
+		return foundNone("cfn", "stackName")
 	}
 	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.ErrorRelated("cfn", err)
+		return ReadFailed("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.UnknownRelated("cfn")
+		return NotRead("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -154,11 +154,11 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("kms", "bucket")
+		return foundNone("kms", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	// The key encrypting a bucket lives in the bucket's region, and is read
 	// there.
@@ -166,7 +166,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 	inBucketRegion := c.InRegion(bucketRegion)
 	encAPI, ok := inBucketRegion.S3.(S3GetBucketEncryptionAPI)
 	if !ok {
-		return resource.UnknownRelated("kms")
+		return NotRead("kms")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketEncryptionOutput, error) {
 		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
@@ -175,26 +175,28 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 		// ServerSideEncryptionConfigurationNotFoundError means no encryption,
 		// and a deleted bucket is a resolved zero — both are honest 0s.
 		if s3BenignAbsenceErr(err, "ServerSideEncryptionConfigurationNotFoundError") {
-			return resource.ProvenZero("kms", "the API answered that none is configured")
+			return foundNone("kms", "the API answered that none is configured")
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
 			return relatedResultTrunc("kms", nil, true)
 		}
-		return resource.ErrorRelated("kms", err)
+		return ReadFailed("kms", err)
 	}
 	if out.ServerSideEncryptionConfiguration == nil {
-		return resource.ProvenZero("kms", "out.ServerSideEncryptionConfiguration")
+		return foundNone("kms", "out.ServerSideEncryptionConfiguration")
 	}
 	var ids []string
 	for _, rule := range out.ServerSideEncryptionConfiguration.Rules {
 		if rule.ApplyServerSideEncryptionByDefault == nil {
 			continue
 		}
-		keyID := ""
-		if rule.ApplyServerSideEncryptionByDefault.KMSMasterKeyID != nil {
-			keyID = *rule.ApplyServerSideEncryptionByDefault.KMSMasterKeyID
+		byDefault := rule.ApplyServerSideEncryptionByDefault
+		keyID := aws.ToString(byDefault.KMSMasterKeyID)
+		// SSE-KMS naming no key encrypts with the AWS managed key aws/s3.
+		if keyID == "" && strings.HasPrefix(string(byDefault.SSEAlgorithm), "aws:kms") {
+			keyID = "alias/aws/s3"
 		}
 		if keyID == "" {
 			continue
@@ -215,15 +217,15 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("s3", "bucket")
+		return foundNone("s3", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	logAPI, ok := c.s3For(ctx, bucket).(S3GetBucketLoggingAPI)
 	if !ok {
-		return resource.UnknownRelated("s3")
+		return NotRead("s3")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
 		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
@@ -231,17 +233,17 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if err != nil {
 		// A deleted bucket is a resolved zero, not a hard failure.
 		if s3BenignAbsenceErr(err, "") {
-			return resource.ProvenZero("s3", "the API answered that none is configured")
+			return foundNone("s3", "the API answered that none is configured")
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
 			return relatedResultTrunc("s3", nil, true)
 		}
-		return resource.ErrorRelated("s3", err)
+		return ReadFailed("s3", err)
 	}
 	if out.LoggingEnabled == nil || out.LoggingEnabled.TargetBucket == nil || *out.LoggingEnabled.TargetBucket == "" {
-		return resource.ProvenZero("s3", "out.LoggingEnabled.TargetBucket")
+		return foundNone("s3", "out.LoggingEnabled.TargetBucket")
 	}
 	return relatedResultTrunc("s3", []string{*out.LoggingEnabled.TargetBucket}, false)
 }
@@ -253,14 +255,14 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("athena", "bucket")
+		return foundNone("athena", "bucket")
 	}
 	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
-		return resource.ErrorRelated("athena", err)
+		return ReadFailed("athena", err)
 	}
 	if wgList == nil {
-		return resource.UnknownRelated("athena")
+		return NotRead("athena")
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -289,14 +291,14 @@ func s3URINames(uri, bucket string) bool {
 func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("glue", "bucket")
+		return foundNone("glue", "bucket")
 	}
 	jobList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
-		return resource.ErrorRelated("glue", err)
+		return ReadFailed("glue", err)
 	}
 	if jobList == nil {
-		return resource.UnknownRelated("glue")
+		return NotRead("glue")
 	}
 	var ids []string
 	for _, jobRes := range jobList {
@@ -317,7 +319,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("backup", "bucket")
+		return foundNone("backup", "bucket")
 	}
 	// An S3 bucket ARN names no region, but it does name a partition, and the
 	// partition comes from the session's region. Without one there is no ARN
@@ -325,15 +327,15 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	// covers this bucket" in every other partition.
 	region := sessionRegion(clients)
 	if region == "" {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	bucketARN := "arn:" + PartitionForRegion(region) + ":s3:::" + bucket
 	bkList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.ErrorRelated("backup", err)
+		return ReadFailed("backup", err)
 	}
 	if bkList == nil {
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	}
 	// A plan backs up only buckets in its own Region, and ListBuckets returns
 	// buckets from every Region.
@@ -341,7 +343,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	switch bucketRegion := aws.ToString(b.BucketRegion); {
 	case len(bkList) == 0:
 	case bucketRegion == "":
-		return resource.UnknownRelated("backup")
+		return NotRead("backup")
 	case bucketRegion != region:
 		return relatedResultTrunc("backup", nil, false)
 	}
@@ -355,14 +357,14 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("eb-rule", "bucket")
+		return foundNone("eb-rule", "bucket")
 	}
 	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
-		return resource.ErrorRelated("eb-rule", err)
+		return ReadFailed("eb-rule", err)
 	}
 	if ruleList == nil {
-		return resource.UnknownRelated("eb-rule")
+		return NotRead("eb-rule")
 	}
 	bucketQuoted := `"` + bucket + `"`
 	var ids []string
@@ -391,14 +393,14 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("r53", "bucket")
+		return foundNone("r53", "bucket")
 	}
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.ErrorRelated("r53", err)
+		return ReadFailed("r53", err)
 	}
 	if zoneList == nil {
-		return resource.UnknownRelated("r53")
+		return NotRead("r53")
 	}
 	var ids []string
 	for _, zone := range zoneList {
@@ -431,15 +433,15 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.ProvenZero("role", "bucket")
+		return foundNone("role", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	policyAPI, ok := c.s3For(ctx, bucket).(S3GetBucketPolicyAPI)
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
 		return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
@@ -449,17 +451,17 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		// response, and a deleted bucket is a resolved zero — both are
 		// honest 0s, not errors.
 		if s3BenignAbsenceErr(err, "NoSuchBucketPolicy") {
-			return resource.ProvenZero("role", "the API answered that none is configured")
+			return foundNone("role", "the API answered that none is configured")
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
 			return relatedResultTrunc("role", nil, true)
 		}
-		return resource.ErrorRelated("role", err)
+		return ReadFailed("role", err)
 	}
 	if out == nil || out.Policy == nil || *out.Policy == "" {
-		return resource.ProvenZero("role", "out.Policy")
+		return foundNone("role", "out.Policy")
 	}
 
 	// A bucket ARN names no account, so only the session's can tell a
@@ -467,18 +469,18 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	rc := refContext(clients, cache, "role")
 	roleARNs, ok := grantedPrincipalRefs(*out.Policy, "role/")
 	if !ok {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 	if len(roleARNs) == 0 {
-		return resource.ProvenZero("role", "roleARNs")
+		return foundNone("role", "roleARNs")
 	}
 
 	roleList, _, rerr := relatedResourcesFor(ctx, clients, cache, "role")
 	if rerr != nil {
-		return resource.ErrorRelated("role", rerr)
+		return ReadFailed("role", rerr)
 	}
 	if roleList == nil {
-		return resource.UnknownRelated("role")
+		return NotRead("role")
 	}
 
 	ids, lowerBound := listedRefs("role", roleARNs, rc, roleList)
@@ -491,15 +493,15 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return resource.ProvenZero("trail", "bucketName")
+		return foundNone("trail", "bucketName")
 	}
 
 	trailList, truncated, err := relatedResourcesFor(ctx, clients, cache, "trail")
 	if err != nil {
-		return resource.ErrorRelated("trail", err)
+		return ReadFailed("trail", err)
 	}
 	if trailList == nil {
-		return resource.UnknownRelated("trail")
+		return NotRead("trail")
 	}
 
 	var ids []string
@@ -525,15 +527,15 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return resource.ProvenZero("cf", "bucketName")
+		return foundNone("cf", "bucketName")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.ErrorRelated("cf", err)
+		return ReadFailed("cf", err)
 	}
 	if cfList == nil {
-		return resource.UnknownRelated("cf")
+		return NotRead("cf")
 	}
 
 	var ids []string
