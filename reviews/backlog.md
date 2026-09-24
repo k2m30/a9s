@@ -17,9 +17,7 @@ Small, obvious fixes do not live here — they are done directly rather than fil
 2. **Backup pivots ignore resource tags.** A plan that selects by tag makes the count a lower
    bound on ddb, s3, dbi-snap and dbc-snap, because the pivot never reads the resource's tags.
    Needs a per-resource tag read on detail open.
-3. **A one-to-one pivot renders `(1+)`.** `ng` → eks cluster and `asg` → ng show a lower bound
-   when the target list holds a degraded row, though the relationship can hold at most one row.
-   Needs a per-pivot "at most one" notion.
+3. Closed by #567 (`cad809f0`); the number is kept because issues cite rows 4–6 by number.
 4. **Cross-Region related lists are fetched with a nil cache** (`core/aws/related_shared.go:33`),
    so every detail open re-issues the other Region's list call. Needs a per-Region cache that
    does not let foreign rows into the session's own list for that type.
