@@ -171,28 +171,6 @@ func elbNameFromENIDescription(desc string) string {
 	return parts[1]
 }
 
-// lambdaFunctionNameFromENIDescription extracts the Lambda function name from
-// the ENI Description field. Returns "" when it cannot parse reliably.
-func lambdaFunctionNameFromENIDescription(desc string) string {
-	const prefix = "AWS Lambda VPC ENI"
-	if !strings.HasPrefix(desc, prefix) {
-		return ""
-	}
-	rest := strings.TrimPrefix(desc, prefix)
-	rest = strings.TrimLeft(rest, "- ")
-	// The trailing segment is a UUID (8-4-4-4-12 hex + dashes = 36 chars).
-	if len(rest) >= 37 && rest[len(rest)-37] == '-' {
-		uuidPart := rest[len(rest)-36:]
-		if uuidPart[8] == '-' && uuidPart[13] == '-' && uuidPart[18] == '-' && uuidPart[23] == '-' {
-			return rest[:len(rest)-37]
-		}
-	}
-	if idx := strings.LastIndex(rest, "-"); idx > 0 {
-		return rest[:idx]
-	}
-	return rest
-}
-
 // logGroupOwner returns the resource a log group is named after by AWS's
 // naming convention prefix<owner>[/<suffix>] ("/aws/lambda/<function>",
 // "/ecs/<family>", "API-Gateway-Execution-Logs_<api-id>/<stage>"), or "" when

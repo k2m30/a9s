@@ -261,11 +261,11 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 			}`,
 			// The remaining three state machines get a real ASL definition too
 			// (rather than the fake's "{}" fallback) so the on-demand sfn detail
-			// enrichment renders a populated Definition block. Pass/Choice/Wait/
-			// Succeed/Fail states only — no Task states, so these definitions
-			// carry no Lambda ARNs and no "states:::ecs:runTask" resource,
-			// leaving the sfn:lambda and ecs-svc:sfn related-panel pivot counts
-			// (which only order-fulfillment-workflow's definition feeds) unchanged.
+			// enrichment renders a populated Definition block. They carry no
+			// Lambda ARNs. data-pipeline-orchestrator runs the
+			// ECSFamilyPrefixedByAnother family through a JSONata Arguments
+			// block: the ecs-svc:sfn pivot counts it on that service and not on
+			// api-gateway, whose family is a prefix of it.
 			"arn:aws:states:us-east-1:123456789012:stateMachine:data-pipeline-orchestrator": `{
 				"Comment": "Data pipeline orchestration workflow",
 				"StartAt": "ValidateInput",
@@ -278,8 +278,13 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 						"Default": "NoRecords"
 					},
 					"ProcessBatch": {
-						"Type": "Pass",
-						"Result": {"status": "processed"},
+						"Type": "Task",
+						"QueryLanguage": "JSONata",
+						"Resource": "arn:aws:states:::ecs:runTask.sync",
+						"Arguments": {
+							"Cluster": "` + ecsClusterArnServices + `",
+							"TaskDefinition": "` + ECSFamilyPrefixedByAnother + `"
+						},
 						"Next": "WaitForDownstream"
 					},
 					"WaitForDownstream": {

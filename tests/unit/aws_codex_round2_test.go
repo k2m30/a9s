@@ -10,7 +10,6 @@ import (
 	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -158,23 +157,22 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	}
 }
 
-// GetVpcLinksOutput.NextToken means the wanted VpcLink can be on any page.
-// The fake errors on a third call, so a checker that loops forever fails
-// instead of hanging.
+// GetIntegrationsOutput.NextToken means the private integration can be on any
+// page. The fake errors on a call past its last page, so a checker that loops
+// forever fails instead of hanging.
 
-type fakeAPIGWV2VpcLinksPaginated struct {
+type fakeAPIGWV2IntegrationsPaginated struct {
 	awsclient.APIGatewayV2API
-	integrations []apigwv2types.Integration
-	pages        [][]apigwv2types.VpcLink // pages[0] = page 1, pages[1] = page 2, ...
-	calls        int
-	gotTokens    []string
+	pages     [][]apigwv2types.Integration
+	calls     int
+	gotTokens []string
 }
 
 // GetAuthorizers answers rather than leaving the call to the embedded
 // nil interface. EnrichAPIGatewayStage calls it for every v2 API, and a nil
 // embedded field dereferences into a SIGSEGV that takes the whole unit
 // package down before any other test reports.
-func (f *fakeAPIGWV2VpcLinksPaginated) GetAuthorizers(
+func (f *fakeAPIGWV2IntegrationsPaginated) GetAuthorizers(
 	_ context.Context,
 	_ *apigatewayv2.GetAuthorizersInput,
 	_ ...func(*apigatewayv2.Options),
@@ -186,95 +184,51 @@ func (f *fakeAPIGWV2VpcLinksPaginated) GetAuthorizers(
 	}}}, nil
 }
 
-func (f *fakeAPIGWV2VpcLinksPaginated) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
-	return &apigatewayv2.GetIntegrationsOutput{Items: f.integrations}, nil
-}
-
-func (f *fakeAPIGWV2VpcLinksPaginated) GetVpcLinks(_ context.Context, params *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
+func (f *fakeAPIGWV2IntegrationsPaginated) GetIntegrations(_ context.Context, params *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
 	f.calls++
-	token := ""
-	if params != nil && params.NextToken != nil {
-		token = *params.NextToken
-	}
-	f.gotTokens = append(f.gotTokens, token)
-
+	f.gotTokens = append(f.gotTokens, aws.ToString(params.NextToken))
 	if f.calls > len(f.pages) {
-		return nil, errAPIGWTooManyVpcLinksCalls
+		return nil, errAPIGWTooManyIntegrationsCalls
 	}
-
-	page := f.pages[f.calls-1]
-	out := &apigatewayv2.GetVpcLinksOutput{Items: page}
+	out := &apigatewayv2.GetIntegrationsOutput{Items: f.pages[f.calls-1]}
 	if f.calls < len(f.pages) {
-		next := "vpclink-page-token-1"
-		out.NextToken = &next
+		out.NextToken = aws.String("integrations-page-token-1")
 	}
 	return out, nil
 }
 
-var errAPIGWTooManyVpcLinksCalls = &apigwTooManyCallsErr{}
+var errAPIGWTooManyIntegrationsCalls = &apigwTooManyCallsErr{}
 
 type apigwTooManyCallsErr struct{}
 
 func (*apigwTooManyCallsErr) Error() string {
-	return "GetVpcLinks called more times than there are pages — infinite loop guard tripped"
+	return "GetIntegrations called more times than there are pages — infinite loop guard tripped"
 }
 
-func TestApigw_Related_ELB_GetVpcLinks_FollowsPagination(t *testing.T) {
-	apiID := "abc123def"
-	vpcLinkID := "vpcl-checkout-nlb"
-	subnetID := "subnet-0checkout1"
-
-	fake := &fakeAPIGWV2VpcLinksPaginated{
-		integrations: []apigwv2types.Integration{
-			{
-				ConnectionType: apigwv2types.ConnectionTypeVpcLink,
-				ConnectionId:   aws.String(vpcLinkID),
-			},
-		},
-		pages: [][]apigwv2types.VpcLink{
-			{
-				{VpcLinkId: aws.String("vpcl-unrelated"), SubnetIds: []string{"subnet-unrelated"}},
-			},
-			{
-				{VpcLinkId: aws.String(vpcLinkID), SubnetIds: []string{subnetID}},
-			},
+// An HTTP API private integration names its load balancer by a listener ARN
+// in IntegrationUri, and that integration can sit on any page of
+// GetIntegrations.
+func TestApigw_Related_ELB_GetIntegrations_FollowsPagination(t *testing.T) {
+	const listenerARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/net/checkout-nlb/5d1b75f4f1cee11e/8e4497da625e2d8a"
+	fake := &fakeAPIGWV2IntegrationsPaginated{
+		pages: [][]apigwv2types.Integration{
+			{{IntegrationId: aws.String("int0001"), IntegrationType: apigwv2types.IntegrationTypeHttpProxy, ConnectionType: apigwv2types.ConnectionTypeInternet,
+				IntegrationUri: aws.String("https://status.acme.example.com"), IntegrationMethod: aws.String("ANY"), PayloadFormatVersion: aws.String("1.0")}},
+			{{IntegrationId: aws.String("int0002"), IntegrationType: apigwv2types.IntegrationTypeHttpProxy, ConnectionType: apigwv2types.ConnectionTypeVpcLink,
+				ConnectionId: aws.String("vpcl-0checkout"), IntegrationUri: aws.String(listenerARN), IntegrationMethod: aws.String("ANY"), PayloadFormatVersion: aws.String("1.0")}},
 		},
 	}
+	clients := &awsclient.ServiceClients{APIGatewayV2: fake, Region: "us-east-1"}
+	cache := resource.ResourceCache{"elb": {Resources: []resource.Resource{
+		t568LB("checkout-nlb", "net", "5d1b75f4f1cee11e", "subnet-0a1b2c3d4e5f60001"),
+		t568LB("checkout-nlb-canary", "net", "0f1e2d3c4b5a6978", "subnet-0a1b2c3d4e5f60001"),
+	}}}
 
-	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
+	result := checkerByTarget(t, "apigw", "elb")(context.Background(), clients, t568HTTPAPI("abc123def", "checkout-api"), cache)
 
-	elbRes := resource.Resource{
-		ID:   "checkout-nlb",
-		Name: "checkout-nlb",
-		RawStruct: elbv2types.LoadBalancer{
-			AvailabilityZones: []elbv2types.AvailabilityZone{
-				{SubnetId: aws.String(subnetID)},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"elb": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{elbRes},
-		},
-	}
-
-	apiRes := resource.Resource{ID: apiID, Name: apiID}
-
-	checker := checkerByTarget(t, "apigw", "elb")
-	result := checker(context.Background(), clients, apiRes, cache)
-
-	if result.Count() < 1 {
-		t.Fatalf("Count = %d, want >=1 — GetVpcLinks must page through to page 2 to find the wanted VpcLink", result.Count())
-	}
-
-	if fake.calls < 2 {
-		t.Fatalf("GetVpcLinks called %d time(s), want >=2 (must follow NextToken to page 2)", fake.calls)
-	}
-	if len(fake.gotTokens) < 2 || fake.gotTokens[1] != "vpclink-page-token-1" {
-		t.Fatalf("second GetVpcLinks call token = %q, want %q (the checker must pass back the page-1 NextToken)", safeIndex(fake.gotTokens, 1), "vpclink-page-token-1")
-	}
-	if fake.calls > len(fake.pages) {
-		t.Fatalf("GetVpcLinks called %d times, only %d pages exist — infinite loop", fake.calls, len(fake.pages))
+	t568RequireExact(t, "apigw → elb", result, "checkout-nlb")
+	if fake.calls != 2 || len(fake.gotTokens) != 2 || fake.gotTokens[1] != "integrations-page-token-1" {
+		t.Fatalf("GetIntegrations calls = %d tokens %v, want 2 calls with the page-1 NextToken passed back", fake.calls, fake.gotTokens)
 	}
 }
 

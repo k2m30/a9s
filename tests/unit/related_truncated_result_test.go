@@ -402,6 +402,14 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			Fields: map[string]string{
 				"vpc_id": "vpc-00000001",
 			},
+			RawStruct: ec2types.NetworkInterface{
+				NetworkInterfaceId: aws.String("eni-00000001"),
+				InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
+				RequesterId:        aws.String("123456789012:awslambda_us-east-1"),
+				VpcId:              aws.String("vpc-00000001"),
+				SubnetId:           aws.String("subnet-00000001"),
+				Groups:             []ec2types.GroupIdentifier{{GroupId: aws.String("sg-00000001")}},
+			},
 		},
 		"nat": {
 			ID:   "nat-00000001",
@@ -825,4 +833,5 @@ var reverseScanExpectsUnknown = map[string]string{
 	"secrets→ecs-task": "describes each task definition through a live client to see which reads this secret",
 	"ecs-svc→ecr":      "describes the service's task definition through a live client to read the images it runs",
 	"sfn→eb-rule":      "asks EventBridge for the rules targeting the state machine's ARN through a live client",
+	"ecs-svc→eb-rule":  "asks EventBridge for the rules that run the service's task definition family on its cluster through a live client",
 }

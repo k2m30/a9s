@@ -396,31 +396,29 @@ func claimAPI(id, name string, tags map[string]string) resource.Resource {
 // have been found, so an API related to it only by the characters of its name
 // may not be inside a number that says so, and an API sharing nothing with it
 // is not a candidate either.
+// TestLambdaAPIGatewayRowClaimsOnlyWhatItCanShow pins what a function's API
+// Gateway row may assert. An API invokes a function through an integration
+// whose IntegrationUri is the function's ARN. An API's name and its tags are
+// labels an operator chooses: an API called "acme-orders-api", or one tagged
+// with the function's name, invokes whatever its integrations name. Without
+// the integrations read, which APIs invoke the function is unknown, never a
+// count built from names or tags.
 func TestLambdaAPIGatewayRowClaimsOnlyWhatItCanShow(t *testing.T) {
-	const byName, byTag, unrelated = "abc1234567", "def8901234", "ghi5678901"
+	const byName, byTag, byIntegration = "abc1234567", "def8901234", "ghi5678901"
 	cache := resource.ResourceCache{"apigw": {Resources: []resource.Resource{
 		claimAPI(byName, "acme-orders-api", map[string]string{"Environment": "production"}),
 		claimAPI(byTag, "acme-checkout-api", map[string]string{"orders": "invoke"}),
-		claimAPI(unrelated, "acme-billing-api", nil),
+		claimAPI(byIntegration, "acme-billing-api", nil),
 	}}}
 	fn := resource.Resource{ID: "orders", Name: "orders", Fields: map[string]string{"function_name": "orders"}}
+	checker := checkerByTarget(t, "lambda", "apigw")
 
-	res := checkerByTarget(t, "lambda", "apigw")(context.Background(), nil, fn, cache)
-	ids := res.ResourceIDs()
-
-	if !slices.Contains(ids, byTag) {
-		t.Errorf("lambda orders -> apigw omits %s, whose tags name the function (lists %v)", byTag, ids)
+	if unread := checker(context.Background(), nil, fn, cache); unread.EffectiveState() != domain.RelatedUnknown || claimCell(unread) != "" {
+		t.Errorf("lambda orders -> apigw without GetIntegrations = state %v cell %q ids %v, want unknown and blank", unread.EffectiveState(), claimCell(unread), unread.ResourceIDs())
 	}
-	if slices.Contains(ids, unrelated) {
-		t.Errorf("lambda orders -> apigw lists %s, which names the function nowhere (lists %v)", unrelated, ids)
-	}
-	if cell := claimCell(res); slices.Contains(ids, byName) && cell != "" {
-		t.Errorf("lambda orders -> apigw renders %s over %s: that API's name merely contains the function's, and a count states the API was found to invoke it",
-			cell, byName)
-	}
+	clients := lambdaAPIGWWorld(map[string]string{byName: "orders-legacy", byTag: "checkout", byIntegration: "orders"})
+	t568RequireExact(t, "lambda orders -> apigw", checker(context.Background(), clients, fn, cache), byIntegration)
 }
-
-// --- VPC peering connection → route tables ----------------------------------
 
 func claimPeerRouteTable(id string, routes ...ec2types.Route) resource.Resource {
 	return resource.Resource{

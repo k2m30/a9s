@@ -12,7 +12,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -326,56 +326,34 @@ func TestRelated_ECS_CFN_EmptySourceID(t *testing.T) {
 	}
 }
 
+// A cluster's Auto Scaling groups are the ones its capacity providers name.
+// FARGATE and FARGATE_SPOT carry no AutoScalingGroupProvider, so a
+// Fargate-only cluster has none, whatever AmazonECSManaged groups other
+// clusters' providers manage in the account.
 func TestRelated_ECS_ASG_MatchByAmazonECSManagedTag(t *testing.T) {
-	tagKey := "AmazonECSManaged"
-	tagVal := "true"
-	asgRes := resource.Resource{
-		ID: "ecs-asg-managed",
-		RawStruct: asgtypes.AutoScalingGroup{
-			AutoScalingGroupName: aws.String("ecs-asg-managed"),
-			Tags: []asgtypes.TagDescription{
-				{Key: &tagKey, Value: &tagVal},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{asgRes}},
-	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
-
-	checker := ecsCheckerByTarget(t, "asg")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "ecs-asg-managed" {
-		t.Errorf("ResourceIDs = %v, want [ecs-asg-managed]", result.ResourceIDs())
-	}
+	fake := &t568ECS{providers: map[string]ecstypes.CapacityProvider{
+		"FARGATE":      {Name: aws.String("FARGATE"), Status: ecstypes.CapacityProviderStatusActive},
+		"FARGATE_SPOT": {Name: aws.String("FARGATE_SPOT"), Status: ecstypes.CapacityProviderStatusActive},
+	}}
+	cache := resource.ResourceCache{"asg": {Resources: []resource.Resource{t568ASG("ecs-asg-managed")}}}
+	clients := &awsclient.ServiceClients{ECS: fake, Region: "us-east-1"}
+	result := ecsCheckerByTarget(t, "asg")(context.Background(), clients, t568ClusterRow("my-cluster", "FARGATE", "FARGATE_SPOT"), cache)
+	t568RequireExact(t, "ecs my-cluster → asg", result)
 }
 
+// A ClusterName tag on an Auto Scaling group is free text; the cluster's
+// groups are read from DescribeCapacityProviders, and without that read they
+// are unknown.
 func TestRelated_ECS_ASG_MatchByClusterNameTag(t *testing.T) {
-	tagKey := "ClusterName"
-	tagVal := "my-cluster"
-	asgRes := resource.Resource{
-		ID: "ecs-asg-cluster",
-		RawStruct: asgtypes.AutoScalingGroup{
-			AutoScalingGroupName: aws.String("ecs-asg-cluster"),
-			Tags: []asgtypes.TagDescription{
-				{Key: &tagKey, Value: &tagVal},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"asg": resource.ResourceCacheEntry{Resources: []resource.Resource{asgRes}},
-	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
-
-	checker := ecsCheckerByTarget(t, "asg")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	asg := t568ASG("ecs-asg-cluster")
+	raw := asg.RawStruct.(asgtypes.AutoScalingGroup)
+	raw.Tags = append(raw.Tags, asgtypes.TagDescription{Key: aws.String("ClusterName"), Value: aws.String("my-cluster"),
+		ResourceId: aws.String("ecs-asg-cluster"), ResourceType: aws.String("auto-scaling-group")})
+	asg.RawStruct = raw
+	cache := resource.ResourceCache{"asg": {Resources: []resource.Resource{asg}}}
+	result := ecsCheckerByTarget(t, "asg")(context.Background(), nil, t568ClusterRow("my-cluster", "my-cluster-cp"), cache)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("ecs my-cluster → asg without DescribeCapacityProviders = state %v ids %v, want unknown", result.State(), result.ResourceIDs())
 	}
 }
 
@@ -422,52 +400,36 @@ func TestRelated_ECS_ASG_NilCache(t *testing.T) {
 	}
 }
 
+// A cluster's EC2 instances are its registered container instances'
+// ec2InstanceId. An instance tagged with the cluster's name but not
+// registered is not in it, and an external instance's mi- id is a Systems
+// Manager managed instance, no EC2 instance.
 func TestRelated_ECS_EC2_MatchByECSClusterNameTag(t *testing.T) {
-	ec2Res := resource.Resource{
-		ID: "i-0a1b2c3d4e5f67890",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-0a1b2c3d4e5f67890"),
-			Tags: []ec2types.Tag{
-				{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("my-cluster")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
-	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
-
-	checker := ecsCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "i-0a1b2c3d4e5f67890" {
-		t.Errorf("ResourceIDs = %v, want [i-0a1b2c3d4e5f67890]", result.ResourceIDs())
-	}
+	const clusterARN = "arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster"
+	fake := &t568ECS{instances: map[string][]ecstypes.ContainerInstance{clusterARN: {
+		{ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/my-cluster/2dd1b186f39845a584488d2ef155c131"),
+			Ec2InstanceId: aws.String("i-0a1b2c3d4e5f60001"), Status: aws.String("ACTIVE"), AgentConnected: true},
+		{ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/my-cluster/7b3e0c9a1f2d4e5f8a9b0c1d2e3f4a5b"),
+			Ec2InstanceId: aws.String("mi-0a1b2c3d4e5f60009"), Status: aws.String("ACTIVE"), AgentConnected: true},
+	}}}
+	cache := resource.ResourceCache{"ec2": {Resources: []resource.Resource{
+		t568Instance("i-0a1b2c3d4e5f60001", map[string]string{"Name": "acme-node"}),
+		t568Instance("i-0a1b2c3d4e5f67890", map[string]string{"aws:ecs:cluster-name": "my-cluster"}),
+	}}}
+	clients := &awsclient.ServiceClients{ECS: fake, Region: "us-east-1"}
+	result := ecsCheckerByTarget(t, "ec2")(context.Background(), clients, t568ClusterRow("my-cluster"), cache)
+	t568RequireExact(t, "ecs my-cluster → ec2", result, "i-0a1b2c3d4e5f60001")
 }
 
+// ECS sets no cluster tag on an instance, so a ClusterName tag is free text;
+// without ListContainerInstances the cluster's instances are unknown.
 func TestRelated_ECS_EC2_MatchByClusterNameTag(t *testing.T) {
-	ec2Res := resource.Resource{
-		ID: "i-0a1b2c3d4e5f67890",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-0a1b2c3d4e5f67890"),
-			Tags: []ec2types.Tag{
-				{Key: aws.String("ClusterName"), Value: aws.String("my-cluster")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}},
-	}
-	source := resource.Resource{ID: "my-cluster", Fields: map[string]string{}}
-
-	checker := ecsCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	cache := resource.ResourceCache{"ec2": {Resources: []resource.Resource{
+		t568Instance("i-0a1b2c3d4e5f67890", map[string]string{"ClusterName": "my-cluster"}),
+	}}}
+	result := ecsCheckerByTarget(t, "ec2")(context.Background(), nil, t568ClusterRow("my-cluster"), cache)
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("ecs my-cluster → ec2 without ListContainerInstances = state %v ids %v, want unknown", result.State(), result.ResourceIDs())
 	}
 }
 

@@ -8,12 +8,12 @@
 package aws
 
 import (
+	"context"
 	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -98,6 +98,29 @@ type AlarmMatchSpec struct {
 	// metrics are in the region its rows are, and a nil answer of "" says the
 	// same of one row.
 	MetricsRegion func(resource.Resource) string
+	// Complete fills in what Values reads when the list response does not
+	// carry it, with the read the row's own API answers it by.
+	Complete func(ctx context.Context, clients any, row resource.Resource) (resource.Resource, error)
+}
+
+// complete is Complete for a spec that declares none: the row as listed.
+func (s AlarmMatchSpec) complete(ctx context.Context, clients any, row resource.Resource) (resource.Resource, error) {
+	if s.Complete == nil {
+		return row, nil
+	}
+	return s.Complete(ctx, clients, row)
+}
+
+// watchedBy reports whether the alarm watches a metric of one of the
+// spec's namespaces under one of its dimension names, or runs an action of
+// its service: the only alarms that can name a row of the type.
+func (s AlarmMatchSpec) watchedBy(a cwtypes.MetricAlarm) bool {
+	for _, d := range AlarmDimensions(a) {
+		if slices.Contains(s.Namespaces, d.Namespace) && slices.Contains(s.DimensionNames, d.Name) {
+			return true
+		}
+	}
+	return s.ActionService != ""
 }
 
 // metricsRegionOf is MetricsRegion for a spec that declares none.
@@ -229,9 +252,8 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"ec2":        {Namespaces: []string{"AWS/EC2"}, DimensionNames: []string{"InstanceId"}, Values: ec2AlarmValues, ValuesFromRawStruct: true},
 	"ecs":        {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName"}},
 	"ecs-svc":    {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ServiceName"}, QualifierDimension: "ClusterName", QualifierValue: ecsClusterField, ValuesFromRawStruct: true},
-	"ecs-task":   {Namespaces: []string{"ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName", "TaskId"}, QualifierDimension: "ServiceName", QualifierValue: ecsTaskServiceName, Values: ecsTaskAlarmValues, ValuesFromRawStruct: true},
+	"ecs-task":   {Namespaces: []string{"AWS/ECS", "ECS/ContainerInsights"}, DimensionNames: []string{"ClusterName", "TaskId"}, QualifierDimension: "ServiceName", QualifierValue: ecsTaskServiceName, Values: ecsTaskAlarmValues, ValuesFromRawStruct: true},
 	"efs":        {Namespaces: []string{"AWS/EFS"}, DimensionNames: []string{"FileSystemId"}},
-	"eip":        {Namespaces: []string{"AWS/EC2"}, DimensionNames: []string{"NetworkInterfaceId"}, Values: eipAlarmValues, ValuesFromRawStruct: true},
 	"eks":        {Namespaces: []string{"AWS/EKS", "ContainerInsights"}, DimensionNames: []string{"ClusterName"}},
 	"elb":        {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB", "AWS/ELB"}, DimensionNames: []string{"LoadBalancer", "LoadBalancerName"}, Values: elbAlarmValues, ValuesFromRawStruct: true},
 	"glue":       {Namespaces: []string{"Glue"}, DimensionNames: []string{"JobName"}},
@@ -251,7 +273,7 @@ var alarmMatchSpecs = map[string]AlarmMatchSpec{
 	"sqs":        {Namespaces: []string{"AWS/SQS"}, DimensionNames: []string{"QueueName"}},
 	"tg":         {Namespaces: []string{"AWS/ApplicationELB", "AWS/NetworkELB", "AWS/GatewayELB"}, DimensionNames: []string{"TargetGroup"}, Values: tgAlarmValues, ValuesFromRawStruct: true},
 	"vpce":       {Namespaces: []string{"AWS/PrivateLinkEndpoints"}, DimensionNames: []string{"VPC Endpoint Id", "VpcEndpointId"}},
-	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL"}, MetricsRegion: metricsRegionOfWebACL, ValuesFromRawStruct: true},
+	"waf":        {Namespaces: []string{"AWS/WAFV2"}, DimensionNames: []string{"WebACL", "WebACLArn"}, Values: wafAlarmValues, MetricsRegion: metricsRegionOfWebACL, ValuesFromRawStruct: true, Complete: wafWithMetricName},
 }
 
 // AlarmMatchSpecFor returns how an alarm names a resource of the type, and
@@ -282,15 +304,13 @@ func tgAlarmValues(res resource.Resource) ([]string, bool) {
 	return nonEmpty(elbv2Dimension(tgARN(res)), res.ID, res.Name), true
 }
 
-// eipAlarmValues: an Elastic IP publishes no metric of its own, and the
-// traffic through it is metered on the network interface it is associated
-// with.
-func eipAlarmValues(res resource.Resource) ([]string, bool) {
-	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
-	if !ok {
-		return nil, false
-	}
-	return nonEmpty(aws.ToString(raw.NetworkInterfaceId)), true
+// wafAlarmValues: AWS/WAFV2's WebACL dimension is "the metric name of the
+// WebACL" — its VisibilityConfig.MetricName, which need not be its name —
+// and WebACLArn is its ARN.
+// https://docs.aws.amazon.com/waf/latest/developerguide/waf-metrics.html
+func wafAlarmValues(res resource.Resource) ([]string, bool) {
+	metric := res.Fields["metric_name"]
+	return nonEmpty(metric, res.Fields["arn"]), metric != ""
 }
 
 func ecsClusterField(res resource.Resource) (string, bool) {

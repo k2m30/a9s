@@ -48,7 +48,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `elb`
 
 - **Why related**: VpcLink NLB backend — HTTP APIs use a VpcLink backed by a Network Load Balancer to reach private VPC services.
-- **How discovered**: call `GetVpcLinks` (one account-wide call) and read each VpcLink's `TargetArns` — the NLB ARNs — then match them against the already-loaded `elb` cache — a9s-devops: `TargetArns` is the only field that names the NLBs behind the links; the per-API integration intersection would cost an extra `GetIntegrations` beyond the checker budget.
+- **How discovered**: call `GetIntegrations` for the API and read each `VPC_LINK` integration's `IntegrationUri` — "for an HTTP API private integration, specify the ARN of an Application Load Balancer listener, Network Load Balancer listener, or AWS Cloud Map service" ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)); a listener names the one load balancer it belongs to, matched against the already-loaded `elb` list. A Cloud Map service names no load balancer and leaves the count a lower bound.
 - **Count shown**: yes.
 
 ### `kms`
@@ -177,7 +177,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `acm` discovery via `GetDomainNames` + `GetApiMappings` with `DomainNameConfigurations[].CertificateArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Cert expiry is a known outage vector for custom-domain APIs and operators want a direct pivot from the API to the cert.
 - `alarm` discovery via reverse scan on `Namespace=AWS/ApiGateway` dimensions — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard CloudWatch dimension convention, no extra API call when alarm list is already loaded.
 - `cf` discovery via reverse scan on `Origins[].DomainName` matching `execute-api` — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFront origin hostname is the only AWS-exposed link.
-- `elb` discovery via `GetVpcLinks` `TargetArns` matched against the elb cache — a9s-devops (2026-04-20): possible=yes, worth=yes. `TargetArns` is the only field naming the NLBs behind the links; one account-wide call fits the checker budget.
+- `elb` discovery via the private integration's `IntegrationUri` listener ARN — the field the integration records its backend in; a VPC link's subnets and security groups are shared by every load balancer placed in them.
 - `kms` discovery is transitive via Lambda integration — a9s-devops (2026-04-20): possible=yes, worth=marginal. Keep per golden-doc contract; low-value but cheap since Lambda panel already resolves KMS.
 - `lambda` discovery via `GetIntegrations` parsing Lambda function ARN in `IntegrationUri` — a9s-devops (2026-04-20): possible=yes, worth=yes. Highest-traffic pivot for this resource type.
 - `logs` discovery via `Stage.AccessLogSettings.DestinationArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Stage access logs are the first log surface an operator wants when an API misbehaves.

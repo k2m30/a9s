@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -333,28 +334,46 @@ func TestRelated_Logs_APIGW_CacheMissNoClients(t *testing.T) {
 // extracts the family from Fields["task_definition"] (the full task-definition
 // ARN, with the trailing :revision stripped after arnLastSegment), not from
 // the task's Name/ID.
+// A task writes to every log group its containers name in the awslogs
+// driver's awslogs-group option, in the task's Region unless awslogs-region
+// names another; a group of the same name in another Region is a different
+// group. A sidecar on another driver writes to no CloudWatch Logs group.
+// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html
 func TestRelated_Logs_ECSTask_MatchByFamily(t *testing.T) {
-	const family = "web-task"
-	taskRes := resource.Resource{
-		ID:   "web-task:3",
-		Name: "web-task",
-		Fields: map[string]string{
-			"task_definition": "arn:aws:ecs:us-east-1:123456789012:task-definition/" + family + ":3",
-		},
+	const (
+		webTD    = "arn:aws:ecs:us-east-1:123456789012:task-definition/web-task:3"
+		reportTD = "arn:aws:ecs:us-east-1:123456789012:task-definition/report-task:5"
+	)
+	awslogs := func(name, group, region string) ecstypes.ContainerDefinition {
+		return ecstypes.ContainerDefinition{Name: aws.String(name), Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + name + ":v3"),
+			LogConfiguration: &ecstypes.LogConfiguration{LogDriver: ecstypes.LogDriverAwslogs, Options: map[string]string{
+				"awslogs-group": group, "awslogs-region": region, "awslogs-stream-prefix": name}}}
 	}
-	cache := resource.ResourceCache{
-		"ecs-task": resource.ResourceCacheEntry{Resources: []resource.Resource{taskRes}},
+	fake := &t568ECS{taskDefs: map[string]ecstypes.TaskDefinition{
+		webTD: {Family: aws.String("web-task"), Revision: 3, ContainerDefinitions: []ecstypes.ContainerDefinition{
+			awslogs("web", "/ecs/web-task", "us-east-1"),
+			awslogs("envoy", "/ecs/web-task/envoy", "us-east-1"),
+			{Name: aws.String("log-router"), Image: aws.String("public.ecr.aws/aws-observability/aws-for-fluent-bit:stable"),
+				FirelensConfiguration: &ecstypes.FirelensConfiguration{Type: ecstypes.FirelensConfigurationTypeFluentbit}},
+		}},
+		reportTD: {Family: aws.String("report-task"), Revision: 5, ContainerDefinitions: []ecstypes.ContainerDefinition{
+			awslogs("report", "/ecs/web-task", "us-west-2"),
+		}},
+	}}
+	task := func(id, td string) resource.Resource {
+		return resource.Resource{ID: id, Name: id, Type: "ecs-task",
+			Fields: map[string]string{"cluster": "prod", "task_definition": td, "last_status": "RUNNING"},
+			RawStruct: ecstypes.Task{TaskArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task/prod/" + id),
+				TaskDefinitionArn: aws.String(td), ClusterArn: aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/prod"), LastStatus: aws.String("RUNNING")}}
 	}
-	source := resource.Resource{ID: "/ecs/" + family}
-
+	const webTask, reportTask = "3c4d5e6f7a8b4c9d0e1f2a3b4c5d6e7f", "8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e"
+	cache := resource.ResourceCache{"ecs-task": {Resources: []resource.Resource{task(webTask, webTD), task(reportTask, reportTD)}}}
+	clients := &awsclient.ServiceClients{ECS: fake, Region: "us-east-1"}
 	checker := logsCheckerByTarget(t, "ecs-task")
-	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "web-task:3" {
-		t.Errorf("ResourceIDs = %v, want [web-task:3]", result.ResourceIDs())
+	for _, group := range []string{"/ecs/web-task", "/ecs/web-task/envoy"} {
+		source := resource.Resource{ID: group, Name: group, Type: "logs", Fields: map[string]string{"log_group_name": group}}
+		t568RequireExact(t, "logs "+group+" → ecs-task", checker(context.Background(), clients, source, cache), webTask)
 	}
 }
 

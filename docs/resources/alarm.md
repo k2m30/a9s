@@ -108,7 +108,7 @@ All non-action pivots (everything except `sns`, `asg`, and `ct-events`) are disc
 ### `waf`
 
 - **Why related**: WAF blocked-request / allowed-request alarms.
-- **How discovered**: `Namespace == "AWS/WAFV2"` (WAFv2) or `"AWS/WAF"` (legacy WAF Classic); read `Dimensions[]` for `WebACL` (WAFv2) or `WebACLName`/`WebACLId` (Classic); cross-reference the loaded `waf` list by ACL identifier — a9s-devops (2026-04-20): possible=yes, worth=yes. WAFv2 is the modern namespace and the dimension is `WebACL` + `Region` + `Rule`; the cross-reference uses the `WebACL` value.
+- **How discovered**: `Namespace == "AWS/WAFV2"`; read `Dimensions[]` for `WebACL` — "The metric name of the WebACL", the ACL's `VisibilityConfig.MetricName` read with `GetWebACL` — or `WebACLArn`; cross-reference the loaded `waf` list ([waf-metrics](https://docs.aws.amazon.com/waf/latest/developerguide/waf-metrics.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

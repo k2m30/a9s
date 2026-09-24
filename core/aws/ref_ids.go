@@ -541,11 +541,17 @@ var secretSuffix = regexp.MustCompile(`-[A-Za-z0-9]{6}$`)
 
 // elbRefToID reads a load balancer ARN (application, network, gateway —
 // "loadbalancer/<kind>/<name>/<id>" — or classic — "loadbalancer/<name>")
-// as the load balancer's name. A bare name never holds a "/".
+// as the load balancer's name, and a listener ARN
+// ("listener/<kind>/<name>/<id>/<listener-id>") as the name of the one load
+// balancer the listener belongs to. A bare name never holds a "/".
 func elbRefToID(ref string, rc domain.RefContext) (string, bool) {
 	res, isARN, ok := localARN(ref, rc, "elasticloadbalancing")
 	if !ok || !isARN {
 		return res, ok && !strings.Contains(res, "/")
+	}
+	if rest, isListener := afterPrefix(res, "listener/"); isListener {
+		parts := strings.Split(rest, "/")
+		return parts[min(1, len(parts)-1)], len(parts) == 4
 	}
 	rest, ok := afterPrefix(res, "loadbalancer/")
 	if !ok {

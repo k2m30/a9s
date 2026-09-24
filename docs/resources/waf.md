@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: Blocked-request alarms — CloudWatch alarms tracking WAF `BlockedRequests` / `AllowedRequests` on this Web ACL are the primary runtime observability signal for a WAF deployment (docs/related-resources.md §`waf`).
-- **How discovered**: cross-reference the already-loaded `alarm` list by `Dimensions` — CloudWatch alarms with `Namespace=AWS/WAFV2` and a `WebACL` dimension matching this ACL's `Name` (and optionally `Region` dimension) — a9s-devops: reverse-scan of the alarms list is the operator's established pattern for binding alarms to their protected resource, with no extra API call required.
+- **How discovered**: cross-reference the already-loaded `alarm` list by `Dimensions` — CloudWatch alarms with `Namespace=AWS/WAFV2` and a `WebACL` dimension equal to the ACL's `VisibilityConfig.MetricName` ("The metric name of the WebACL", read with `GetWebACL`), or a `WebACLArn` dimension equal to its ARN ([waf-metrics](https://docs.aws.amazon.com/waf/latest/developerguide/waf-metrics.html)). The metric name need not be the ACL's name.
 - **Count shown**: yes.
 
 ### `apigw`

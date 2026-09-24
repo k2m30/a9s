@@ -24,8 +24,11 @@ type ECSFixtures struct {
 	// DeniedTaskDefinitions are the ARNs ecs:DescribeTaskDefinition refuses,
 	// the shape a read-only role denied that one call meets.
 	DeniedTaskDefinitions map[string]bool
-	// ContainerInstances is the list DescribeContainerInstances answers from.
+	// ContainerInstances is the list ListContainerInstances and
+	// DescribeContainerInstances answer from.
 	ContainerInstances []ecstypes.ContainerInstance
+	// CapacityProviders is the list DescribeCapacityProviders answers from.
+	CapacityProviders []ecstypes.CapacityProvider
 }
 
 // NewECSFixtures builds and returns a fully-populated ECSFixtures struct.
@@ -45,6 +48,15 @@ var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
 			Ec2InstanceId:        aws.String(ECSBatchHostInstanceID),
 			Status:               aws.String("ACTIVE"),
 		}},
+		CapacityProviders: []ecstypes.CapacityProvider{{
+			Name:                aws.String(ECSBatchCapacityProvider),
+			CapacityProviderArn: aws.String("arn:aws:ecs:us-east-1:123456789012:capacity-provider/" + ECSBatchCapacityProvider),
+			Status:              ecstypes.CapacityProviderStatusActive,
+			AutoScalingGroupProvider: &ecstypes.AutoScalingGroupProvider{
+				AutoScalingGroupArn:          aws.String(ECSBatchASGARN),
+				ManagedTerminationProtection: ecstypes.ManagedTerminationProtectionDisabled,
+			},
+		}},
 	}
 })
 
@@ -54,7 +66,11 @@ func NewECSFixtures() *ECSFixtures {
 
 // ECSBatchHostInstanceID is the EC2 instance behind the acme-batch cluster's
 // one container instance, the host batch-etl-runner's task runs on.
+// ECSBatchCapacityProvider is acme-batch's EC2 capacity provider, whose Auto
+// Scaling group is ECSBatchASGARN (asg.go).
 const (
+	ECSBatchCapacityProvider     = "acme-batch-ec2"
+	ECSBatchASGARN               = "arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:22222222-2222-2222-2222-222222222222:autoScalingGroupName/acme-worker-batch-asg"
 	ECSBatchHostInstanceID       = "i-0e1f2a3b4c5d60050"
 	ecsBatchContainerInstanceArn = "arn:aws:ecs:us-east-1:123456789012:container-instance/acme-batch/e1f2a3b4c5d6e1f2a3b4c5d6"
 )
@@ -140,8 +156,13 @@ var ecsServiceNamePool = []string{
 	"notification-dispatcher", "email-service", "file-upload-svc", "payments-svc",
 	"recommendation-engine", "analytics-collector", "session-manager",
 	"report-builder", "data-importer", "audit-trail-svc", "config-manager",
-	"rate-limiter-svc", "feature-flag-svc",
+	"rate-limiter-svc", ECSFamilyPrefixedByAnother,
 }
+
+// ECSFamilyPrefixedByAnother is the service and task-definition family whose
+// name starts with another service's family, api-gateway: a state machine
+// running it (sfn.go) belongs to it alone.
+const ECSFamilyPrefixedByAnother = "api-gateway-canary"
 
 func buildECSClusters() []ecstypes.Cluster {
 	return []ecstypes.Cluster{
@@ -188,7 +209,7 @@ func buildECSClusters() []ecstypes.Cluster {
 			PendingTasksCount:                 0,
 			ActiveServicesCount:               2,
 			RegisteredContainerInstancesCount: 4,
-			CapacityProviders:                 []string{"FARGATE"},
+			CapacityProviders:                 []string{"FARGATE", ECSBatchCapacityProvider},
 			Configuration: &ecstypes.ClusterConfiguration{
 				ExecuteCommandConfiguration: &ecstypes.ExecuteCommandConfiguration{
 					KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),

@@ -153,19 +153,41 @@ func predFunction(name string) resource.Resource {
 }
 
 // TestLambdaENIsMatchOnInterfaceTypeBothWays pins the one test for "Lambda
-// owns this ENI": EC2's InterfaceType "lambda". Lambda's hyperplane ENIs carry
-// an AWS account as RequesterId, not a fixed marker string, so an ENI
-// recognised from the ENI side must be found from the function side too; and
-// an ordinary ENI whose description merely mentions Lambda belongs to no
-// function, which is a known zero rather than an unknown.
+// owns this ENI": EC2's InterfaceType "lambda". A Hyperplane ENI serves every
+// function attached to its subnet with its exact set of security groups
+// (docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html, "Other
+// functions in your account that use the same subnet and security group
+// combination can also use this ENI"), whichever one its description names.
+// An ordinary ENI in the same subnet and group, whose description merely
+// mentions Lambda, belongs to no function: a known zero rather than an unknown.
 func TestLambdaENIsMatchOnInterfaceTypeBothWays(t *testing.T) {
+	withGroups := func(eni ec2types.NetworkInterface, sgs ...string) ec2types.NetworkInterface {
+		for _, sg := range sgs {
+			eni.Groups = append(eni.Groups, ec2types.GroupIdentifier{GroupId: aws.String(sg), GroupName: aws.String(sg)})
+		}
+		return eni
+	}
 	enis := predFetchENIs(t,
-		predENI("eni-0lambda0000000001", "subnet-0aaa000000000001", ec2types.NetworkInterfaceTypeLambda,
-			"AWS Lambda VPC ENI-orders-api-a1b2c3d4-5678-90ab-cdef-111111111111", "210987654321", true),
-		predENI("eni-0jumphost00000001", "subnet-0aaa000000000001", ec2types.NetworkInterfaceTypeInterface,
-			"Lambda debugging jump host", "", false),
+		withGroups(predENI("eni-0lambda0000000001", "subnet-0aaa000000000001", ec2types.NetworkInterfaceTypeLambda,
+			"AWS Lambda VPC ENI-orders-api-a1b2c3d4-5678-90ab-cdef-111111111111", "210987654321", true), "sg-0aaa000000000001"),
+		withGroups(predENI("eni-0jumphost00000001", "subnet-0aaa000000000001", ec2types.NetworkInterfaceTypeInterface,
+			"Lambda debugging jump host", "", false), "sg-0aaa000000000001"),
 	)
-	cache := resource.ResourceCache{"eni": {Resources: enis}}
+	inGroups := func(fn resource.Resource, sgs ...string) resource.Resource {
+		cfg := fn.RawStruct.(lambdatypes.FunctionConfiguration)
+		vpc := *cfg.VpcConfig
+		vpc.SecurityGroupIds = sgs
+		cfg.VpcConfig = &vpc
+		fn.RawStruct = cfg
+		return fn
+	}
+	api := inGroups(predFunction("orders-api"), "sg-0aaa000000000001")
+	orders := inGroups(predFunction("orders"), "sg-0aaa000000000001")
+	billing := inGroups(predFunction("billing"), "sg-0aaa000000000001", "sg-0bbb000000000002")
+	cache := resource.ResourceCache{
+		"eni":    {Resources: enis},
+		"lambda": {Resources: []resource.Resource{api, orders, billing}},
+	}
 	ctx := context.Background()
 	byID := map[string]resource.Resource{}
 	for _, r := range enis {
@@ -173,13 +195,19 @@ func TestLambdaENIsMatchOnInterfaceTypeBothWays(t *testing.T) {
 	}
 
 	owned := checkerByTarget(t, "eni", "lambda")(ctx, nil, byID["eni-0lambda0000000001"], cache)
-	assertSameIDs(t, "eni eni-0lambda0000000001 -> lambda", owned.ResourceIDs(), []string{"orders-api"})
+	assertSameIDs(t, "eni eni-0lambda0000000001 -> lambda", owned.ResourceIDs(), []string{"orders", "orders-api"})
 
-	fn := checkerByTarget(t, "lambda", "eni")(ctx, nil, predFunction("orders-api"), cache)
-	assertSameIDs(t, "lambda orders-api -> eni", fn.ResourceIDs(), []string{"eni-0lambda0000000001"})
-
-	prefix := checkerByTarget(t, "lambda", "eni")(ctx, nil, predFunction("orders"), cache)
-	assertSameIDs(t, "lambda orders -> eni (another function's ENI)", prefix.ResourceIDs(), nil)
+	for _, tc := range []struct {
+		fn   resource.Resource
+		want []string
+	}{
+		{api, []string{"eni-0lambda0000000001"}},
+		{orders, []string{"eni-0lambda0000000001"}},
+		{billing, nil},
+	} {
+		got := checkerByTarget(t, "lambda", "eni")(ctx, nil, tc.fn, cache)
+		assertSameIDs(t, "lambda "+tc.fn.ID+" -> eni", got.ResourceIDs(), tc.want)
+	}
 
 	plain := checkerByTarget(t, "eni", "lambda")(ctx, nil, byID["eni-0jumphost00000001"], cache)
 	if plain.EffectiveState() != domain.RelatedResolved || len(plain.ResourceIDs()) != 0 {

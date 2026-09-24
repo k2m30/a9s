@@ -7,8 +7,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -121,11 +121,10 @@ func checkENIELB(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("elb", []string{name}, false)
 }
 
-// checkENILambda reports the Lambda function that owns this ENI. The
-// Description carries the function's name by convention only, so an ENI
-// Lambda owns whose description does not parse identifies no function and
-// the answer is unknown.
-func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkENILambda reports the Lambda functions that use this Hyperplane ENI:
+// the functions whose subnets hold it and whose security groups are its own
+// (hyperplaneENIServes).
+func checkENILambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
 		return NotRead("lambda")
@@ -133,12 +132,20 @@ func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.
 	if !isLambdaENI(raw) {
 		return foundNone("lambda", "the interface type")
 	}
-	// Parse function name from Description: "AWS Lambda VPC ENI-<name>-<uuid>".
-	name := lambdaFunctionNameFromENIDescription(aws.ToString(raw.Description))
-	if name == "" {
+	fnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
+	if err != nil {
+		return ReadFailed("lambda", err)
+	}
+	if fnList == nil {
 		return NotRead("lambda")
 	}
-	return relatedResultTrunc("lambda", []string{name}, false)
+	var ids []string
+	for _, fnRes := range fnList {
+		if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](fnRes.RawStruct); ok && hyperplaneENIServes(raw, fn) {
+			ids = append(ids, fnRes.ID)
+		}
+	}
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkENINAT reports NAT gateways whose NatGatewayAddresses include this

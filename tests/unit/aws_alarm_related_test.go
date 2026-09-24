@@ -6,8 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -867,30 +868,25 @@ func TestRelated_Alarm_SFN_NoDimension(t *testing.T) {
 	}
 }
 
+// AWS/WAFV2's WebACL dimension is the ACL's VisibilityConfig.MetricName,
+// which the console fills with the ACL's name unless the owner changes it;
+// the ACL list carries no metric name, so each ACL is read with GetWebACL.
 func TestRelated_Alarm_WAF_MatchByWebACL(t *testing.T) {
-	raw := cwtypes.MetricAlarm{
-		Namespace: aws.String("AWS/WAFV2"),
-		Dimensions: []cwtypes.Dimension{
-			{Name: aws.String("WebACL"), Value: aws.String("my-waf-acl")},
-		},
-	}
-	res := resource.Resource{ID: "test-alarm", RawStruct: raw}
+	const aclID = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b"
+	fake := &t568WAF{acl: wafv2types.WebACL{
+		Name: aws.String("my-waf-acl"), Id: aws.String(aclID),
+		ARN:              aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-waf-acl/" + aclID),
+		DefaultAction:    &wafv2types.DefaultAction{Allow: &wafv2types.AllowAction{}},
+		VisibilityConfig: &wafv2types.VisibilityConfig{MetricName: aws.String("my-waf-acl"), CloudWatchMetricsEnabled: true, SampledRequestsEnabled: true},
+	}}
+	acl := resource.Resource{ID: aclID, Name: "my-waf-acl", Type: "waf",
+		Fields:    map[string]string{"name": "my-waf-acl", "id": aclID, "scope": "REGIONAL"},
+		RawStruct: wafv2types.WebACLSummary{Name: aws.String("my-waf-acl"), Id: aws.String(aclID), ARN: fake.acl.ARN}}
+	cache := resource.ResourceCache{"waf": {Resources: []resource.Resource{acl}}}
+	alarm := t568Alarm("test-alarm", "AWS/WAFV2", "BlockedRequests", "WebACL", "my-waf-acl", "Region", "us-east-1", "Rule", "ALL")
+	clients := &awsclient.ServiceClients{WAFv2: fake, Region: "us-east-1"}
 
-	cache := resource.ResourceCache{
-		"waf": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: "my-waf-acl", Name: "my-waf-acl"},
-		}},
-	}
-
-	checker := alarmCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-waf-acl" {
-		t.Errorf("ResourceIDs = %v, want [my-waf-acl]", result.ResourceIDs())
-	}
+	t568RequireExact(t, "alarm → waf", alarmCheckerByTarget(t, "waf")(context.Background(), clients, alarm, cache), aclID)
 }
 
 func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {

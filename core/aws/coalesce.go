@@ -401,25 +401,40 @@ type coalescingECS struct {
 	memo *completedResultMemo
 }
 
-// coalescingECSContainerInstances is coalescingECS for a client that also
-// answers DescribeContainerInstances, the one ECS operation outside ECSAPI
-// (ecs_interfaces.go): the ecs-task → ec2 pivot asserts it on the client, and
-// a decorator embedding ECSAPI alone would fail that assertion and take the
-// pivot's answer away. Forwarded, not coalesced: one pivot calls it once.
-type coalescingECSContainerInstances struct {
-	*coalescingECS
-	ECSDescribeContainerInstancesAPI
-}
-
 // NewCoalescingECS wraps api with DescribeTaskDefinition call coalescing.
 // Exported for construction at the live client bootstrap (client.go) and
 // from external tests; the concrete decorator types stay unexported.
 func NewCoalescingECS(api ECSAPI) ECSAPI {
-	c := &coalescingECS{ECSAPI: api, memo: newCompletedResultMemo()}
-	if withInstances, ok := api.(ECSDescribeContainerInstancesAPI); ok {
-		return &coalescingECSContainerInstances{coalescingECS: c, ECSDescribeContainerInstancesAPI: withInstances}
+	return &coalescingECS{ECSAPI: api, memo: newCompletedResultMemo()}
+}
+
+// ListContainerInstances, DescribeContainerInstances and
+// DescribeCapacityProviders sit outside ECSAPI (ecs_interfaces.go) and the
+// pivots that call them assert them on the client, so the decorator answers
+// them, forwarded, not coalesced: one pivot calls each once. A wrapped client
+// without the operation is a client that cannot make the call.
+func (c *coalescingECS) ListContainerInstances(ctx context.Context, params *ecs.ListContainerInstancesInput, optFns ...func(*ecs.Options)) (*ecs.ListContainerInstancesOutput, error) {
+	api, ok := c.ECSAPI.(ECSListContainerInstancesAPI)
+	if !ok {
+		return nil, errClientMissing
 	}
-	return c
+	return api.ListContainerInstances(ctx, params, optFns...)
+}
+
+func (c *coalescingECS) DescribeContainerInstances(ctx context.Context, params *ecs.DescribeContainerInstancesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeContainerInstancesOutput, error) {
+	api, ok := c.ECSAPI.(ECSDescribeContainerInstancesAPI)
+	if !ok {
+		return nil, errClientMissing
+	}
+	return api.DescribeContainerInstances(ctx, params, optFns...)
+}
+
+func (c *coalescingECS) DescribeCapacityProviders(ctx context.Context, params *ecs.DescribeCapacityProvidersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeCapacityProvidersOutput, error) {
+	api, ok := c.ECSAPI.(ECSDescribeCapacityProvidersAPI)
+	if !ok {
+		return nil, errClientMissing
+	}
+	return api.DescribeCapacityProviders(ctx, params, optFns...)
 }
 
 func (c *coalescingECS) DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {

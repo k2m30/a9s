@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `eb-rule`
 
 - **Why related**: EventBridge rules fire on ECR image-scan and image-action events — operator chasing a scan-to-alert pipeline starts here.
-- **How discovered**: Reverse-scan the already-loaded `eb-rule` list — rules with `EventPattern.source=["aws.ecr"]` AND `EventPattern.detail["repository-name"]` matching this repo's `RepositoryName`. — a9s-devops: `aws.ecr` events include `ECR Image Scan` and `ECR Image Action`; the event pattern's repository-name filter is the definitive per-rule link.
+- **How discovered**: Reverse-scan the already-loaded `eb-rule` list for the rules whose `EventPattern` matches an event ECR emits about this repository — `detail."repository-name"` on every one, `resources` `[<repository ARN>]` on scan, pull-through-cache and replication events ([ecr-eventbridge](https://docs.aws.amazon.com/AmazonECR/latest/userguide/ecr-eventbridge.html)); the pattern is read the way EventBridge reads one — literal lists and every content filter it documents (`prefix`, `suffix`, `anything-but`, `equals-ignore-case`, `exists`, `numeric`, `cidr`, `wildcard`, `""`, `null`, `$or`) ([eb-event-patterns](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-event-patterns.html), [eb-create-pattern-operators](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-pattern-operators.html)); a pattern it cannot read (an undocumented operator, a malformed filter), a field the events do not carry, or one naming no resource (the source alone) makes the count a lower bound rather than a match.
 - **Count shown**: yes.
 
 ### `ecs-task`

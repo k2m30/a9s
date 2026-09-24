@@ -86,6 +86,10 @@ func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ..
 			Id:    input.Id,
 			Name:  input.Name,
 			Rules: rules,
+			// The console names an ACL's metric after the ACL.
+			VisibilityConfig: &wafv2types.VisibilityConfig{
+				MetricName: input.Name, CloudWatchMetricsEnabled: true, SampledRequestsEnabled: true,
+			},
 		},
 	}, nil
 }

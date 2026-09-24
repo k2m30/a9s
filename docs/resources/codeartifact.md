@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `ct-events`
 
 - **Why related**: Universal pivot — audit trail for repo policy/package events (who published, who changed permissions). Source: `docs/related-resources.md § codeartifact`.
-- **How discovered**: Universal — CloudTrail `LookupEvents` filtered by the repo's ARN (`RepositorySummary.Arn`). No per-type discovery rule needed; the ct-events pivot is applied uniformly to every registered type via the policy in `docs/related-resources.md § Policy #4`.
+- **How discovered**: CloudTrail `LookupEvents` filtered by the repository's name (or ARN), kept to its domain; plus `LookupEvents(EventName=ReadFromRepository)` kept to the events whose `requestParameters.domainName` and `requestParameters.repositoryName` are the repository's — a package-manager request names the repository only there ([codeartifact-information-in-cloudtrail](https://docs.aws.amazon.com/codeartifact/latest/ug/codeartifact-information-in-cloudtrail.html)).
 - **Count shown**: yes (LookupEvents returns up to 50 events per call; the panel may display "50+" when paginated — general ct-events convention).
 
 > Universal pivot — applies to every registered type; see `docs/related-resources.md § Policy #4`.

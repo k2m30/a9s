@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -92,8 +93,11 @@ func TestBuildCloudTrailFilter_FieldsSource(t *testing.T) {
 	}
 }
 
-// TestBuildCloudTrailFilter_IAMUser verifies that iam-user (CloudTrailKey "Username:ID")
-// returns a Username filter using res.ID.
+// TestBuildCloudTrailFilter_IAMUser pins the events of an IAM user: LookupEvents'
+// Username attribute also matches an assumed-role session whose session name
+// is the user's name, so the lookup keeps only the events whose
+// userIdentity.type is IAMUser.
+// https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html
 func TestBuildCloudTrailFilter_IAMUser(t *testing.T) {
 	res := resource.Resource{
 		ID: "admin-user",
@@ -105,12 +109,10 @@ func TestBuildCloudTrailFilter_IAMUser(t *testing.T) {
 	got := resource.BuildCloudTrailFilter(res, "iam-user")
 	want := map[string]string{
 		"Username": "admin-user",
+		"_where":   "userIdentity.type=IAMUser",
 	}
-	if len(got) != len(want) {
-		t.Fatalf("filter length = %d, want %d; got %v", len(got), len(want), got)
-	}
-	if got["Username"] != want["Username"] {
-		t.Errorf("filter[Username] = %q, want %q", got["Username"], want["Username"])
+	if !maps.Equal(got, want) {
+		t.Errorf("filter = %v, want %v", got, want)
 	}
 }
 

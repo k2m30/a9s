@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -90,7 +92,64 @@ func ctServerFilter(filter map[string]string) map[string]string {
 // resource.CTAltNameFilterKey, and the list then pages whichever spelling
 // answered. Where both spellings occur in one account the list is what the
 // answering one holds — see docs/related-resources.md §4.
+//
+// A filter carrying resource.CTAlsoFilterKey is two lookups: each page holds
+// a page of each, and the continuation token carries both lookups' tokens.
 func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookupEventsAPI, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
+	attr, value, both := strings.Cut(filter[resource.CTAlsoFilterKey], "=")
+	if !both {
+		return ctKeyPage(ctx, api, filter, continuationToken)
+	}
+	tokens := url.Values{}
+	if rest, ok := strings.CutPrefix(continuationToken, ctBothPageToken); ok {
+		var err error
+		if tokens, err = url.ParseQuery(rest); err != nil {
+			return resource.FetchResult{}, fmt.Errorf("fetching filtered CloudTrail events: continuation token: %w", err)
+		}
+	}
+	also := ctWhere(filter[resource.CTAlsoWhereFilterKey])
+	lookups := []struct {
+		name string
+		page func(token string) (resource.FetchResult, error)
+	}{
+		{"key", func(token string) (resource.FetchResult, error) { return ctKeyPage(ctx, api, filter, token) }},
+		{"also", func(token string) (resource.FetchResult, error) {
+			return ctLookupPage(ctx, api, map[string]string{attr: value}, token, "", func(ev cloudtrailtypes.Event) bool { return ctEventHolds(ev, also) })
+		}},
+	}
+	var out resource.FetchResult
+	next := url.Values{}
+	for _, l := range lookups {
+		token, asked := tokens[l.name]
+		if continuationToken != "" && !asked {
+			continue
+		}
+		page, err := l.page(strings.Join(token, ""))
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		out.Resources = append(out.Resources, page.Resources...)
+		if page.Pagination != nil && page.Pagination.NextToken != "" {
+			next.Set(l.name, page.Pagination.NextToken)
+		}
+	}
+	slices.SortStableFunc(out.Resources, func(a, b resource.Resource) int {
+		return strings.Compare(b.Fields["event_time"], a.Fields["event_time"])
+	})
+	out.Pagination = &resource.PaginationMeta{IsTruncated: len(next) > 0, PageSize: len(out.Resources), TotalHint: -1}
+	if len(next) > 0 {
+		out.Pagination.NextToken = ctBothPageToken + next.Encode()
+	}
+	return out, nil
+}
+
+// ctBothPageToken marks a continuation token of a two-lookup list: the
+// query-encoded tokens of the lookups that have pages left.
+const ctBothPageToken = "both|"
+
+// ctKeyPage is one page of the lookup by the type's CloudTrailKey, under the
+// alternate spelling when the first page under the key came back empty.
+func ctKeyPage(ctx context.Context, api CloudTrailLookupEventsAPI, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
 	server := ctServerFilter(filter)
 	alt := filter[resource.CTAltNameFilterKey]
 
@@ -99,24 +158,28 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 	if p := filter[resource.CTQualifierPathsKey]; p != "" {
 		paths = strings.Split(p, ",")
 	}
+	where := ctWhere(filter[resource.CTWhereFilterKey])
+	keep := func(ev cloudtrailtypes.Event) bool {
+		return ctEventIsOfParent(ev, parent, paths) && ctEventHolds(ev, where)
+	}
 
 	if token, isAlt := strings.CutPrefix(continuationToken, ctAltPageToken); isAlt {
 		server["ResourceName"] = alt
-		return ctLookupPage(ctx, api, server, token, ctAltPageToken, parent, paths)
+		return ctLookupPage(ctx, api, server, token, ctAltPageToken, keep)
 	}
 
-	page, err := ctLookupPage(ctx, api, server, continuationToken, "", parent, paths)
+	page, err := ctLookupPage(ctx, api, server, continuationToken, "", keep)
 	if err != nil || alt == "" || continuationToken != "" || len(page.Resources) > 0 {
 		return page, err
 	}
 	server["ResourceName"] = alt
-	return ctLookupPage(ctx, api, server, "", ctAltPageToken, parent, paths)
+	return ctLookupPage(ctx, api, server, "", ctAltPageToken, keep)
 }
 
-// ctLookupPage fetches one LookupEvents page and marks the continuation token
-// it returns with tokenPrefix, which tells a later page which spelling this
-// one was asked under.
-func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map[string]string, continuationToken, tokenPrefix, parent string, paths []string) (resource.FetchResult, error) {
+// ctLookupPage fetches one LookupEvents page, keeps the events keep accepts,
+// and marks the continuation token it returns with tokenPrefix, which tells a
+// later page which spelling this one was asked under.
+func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map[string]string, continuationToken, tokenPrefix string, keep func(cloudtrailtypes.Event) bool) (resource.FetchResult, error) {
 	input := &cloudtrail.LookupEventsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -137,7 +200,7 @@ func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map
 
 	resources := make([]resource.Resource, 0, len(output.Events))
 	for _, event := range output.Events {
-		if !ctEventIsOfParent(event, parent, paths) {
+		if !keep(event) {
 			continue
 		}
 		resources = append(resources, buildCTResource(event))
@@ -159,6 +222,28 @@ func ctLookupPage(ctx context.Context, api CloudTrailLookupEventsAPI, server map
 			TotalHint:   -1,
 		},
 	}, nil
+}
+
+// ctWhere decodes the matches a filter key carries; a malformed one is read
+// as none.
+func ctWhere(encoded string) url.Values {
+	where, _ := url.ParseQuery(encoded)
+	return where
+}
+
+// ctEventHolds reports whether the event's body carries every match's value
+// at its path. An event whose body cannot be read holds none of them.
+func ctEventHolds(event cloudtrailtypes.Event, where url.Values) bool {
+	if len(where) == 0 {
+		return true
+	}
+	parsed := parseCTEventJSON(event.CloudTrailEvent)
+	for path := range where {
+		if parsed == nil || ctEventPathValue(parsed, path) != where.Get(path) {
+			return false
+		}
+	}
+	return true
 }
 
 // buildCTResource converts a cloudtrailtypes.Event into a resource.Resource,

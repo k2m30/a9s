@@ -421,35 +421,32 @@ func TestMSK_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 	}
 }
 
-// checkLogsECSTask matches the family:revision from
-// Fields["task_definition"] (arn:...:task-definition/<family>:<rev>); an
-// ecs-task row's ID and Name are the bare task UUID.
-
+// An ecs-task row's ID and Name are the bare task UUID; the definition whose
+// awslogs-group the task writes to is the one Fields["task_definition"]
+// names, read with DescribeTaskDefinition.
 func TestLogs_Related_ECSTask_MatchesFamilyFromTaskDefinitionField(t *testing.T) {
+	const taskDef = "arn:aws:ecs:us-east-1:123456789012:task-definition/checkout:7"
 	logRes := resource.Resource{ID: "/ecs/checkout/prod", Name: "/ecs/checkout/prod"}
-
 	taskRes := resource.Resource{
 		ID:   "9f8e7d6c-1234-4abc-9def-0123456789ab",
 		Name: "9f8e7d6c-1234-4abc-9def-0123456789ab",
 		Fields: map[string]string{
 			"task_id":         "9f8e7d6c-1234-4abc-9def-0123456789ab",
-			"task_definition": "arn:aws:ecs:us-east-1:123456789012:task-definition/checkout:7",
+			"task_definition": taskDef,
+			"arn":             "arn:aws:ecs:us-east-1:123456789012:task/prod/9f8e7d6c-1234-4abc-9def-0123456789ab",
 		},
 	}
+	fake := &t568ECS{taskDefs: map[string]ecstypes.TaskDefinition{taskDef: {Family: aws.String("checkout"), Revision: 7,
+		ContainerDefinitions: []ecstypes.ContainerDefinition{{Name: aws.String("checkout"),
+			Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout:v7"),
+			LogConfiguration: &ecstypes.LogConfiguration{LogDriver: ecstypes.LogDriverAwslogs, Options: map[string]string{
+				"awslogs-group": "/ecs/checkout/prod", "awslogs-region": "us-east-1", "awslogs-stream-prefix": "checkout"}},
+		}}}}}
+	cache := resource.ResourceCache{"ecs-task": {Resources: []resource.Resource{taskRes}}}
+	clients := &awsclient.ServiceClients{ECS: fake, Region: "us-east-1"}
 
-	cache := resource.ResourceCache{
-		"ecs-task": resource.ResourceCacheEntry{Resources: []resource.Resource{taskRes}},
-	}
-
-	checker := checkerByTarget(t, "logs", "ecs-task")
-	result := checker(context.Background(), nil, logRes, cache)
-
-	if result.Count() < 1 {
-		t.Fatalf("Count = %d, want >=1 (spec logs.md — family must come from Fields[task_definition], not the bare task UUID)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != taskRes.ID {
-		t.Fatalf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), taskRes.ID)
-	}
+	result := checkerByTarget(t, "logs", "ecs-task")(context.Background(), clients, logRes, cache)
+	t568RequireExact(t, "logs /ecs/checkout/prod → ecs-task", result, taskRes.ID)
 }
 
 // checkPipelineEbRule builds the pipeline ARN

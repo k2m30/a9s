@@ -175,6 +175,42 @@ func (f *ECSFake) DescribeContainerInstances(_ context.Context, input *ecs.Descr
 	return out, nil
 }
 
+// ListContainerInstances lists the container instances registered with the
+// cluster, named by its short name or ARN; a container instance ARN is
+// "container-instance/<cluster>/<id>".
+func (f *ECSFake) ListContainerInstances(_ context.Context, input *ecs.ListContainerInstancesInput, _ ...func(*ecs.Options)) (*ecs.ListContainerInstancesOutput, error) {
+	cluster := aws.ToString(input.Cluster)
+	if !f.hasCluster(cluster) {
+		return nil, &ecstypes.ClusterNotFoundException{Message: notFoundMessage("Cluster", cluster)}
+	}
+	cluster = arnResourceName(cluster)
+	out := &ecs.ListContainerInstancesOutput{ContainerInstanceArns: []string{}}
+	for _, ci := range f.fix.ContainerInstances {
+		a, err := arn.Parse(aws.ToString(ci.ContainerInstanceArn))
+		if err == nil && strings.Split(a.Resource, "/")[1] == cluster {
+			out.ContainerInstanceArns = append(out.ContainerInstanceArns, aws.ToString(ci.ContainerInstanceArn))
+		}
+	}
+	return out, nil
+}
+
+// DescribeCapacityProviders answers for the named capacity providers, by
+// name or ARN, and a MISSING failure for any other.
+func (f *ECSFake) DescribeCapacityProviders(_ context.Context, input *ecs.DescribeCapacityProvidersInput, _ ...func(*ecs.Options)) (*ecs.DescribeCapacityProvidersOutput, error) {
+	out := &ecs.DescribeCapacityProvidersOutput{}
+	for _, ref := range input.CapacityProviders {
+		i := slices.IndexFunc(f.fix.CapacityProviders, func(p ecstypes.CapacityProvider) bool {
+			return aws.ToString(p.Name) == ref || aws.ToString(p.CapacityProviderArn) == ref
+		})
+		if i < 0 {
+			out.Failures = append(out.Failures, ecstypes.Failure{Arn: aws.String(ref), Reason: aws.String("MISSING")})
+			continue
+		}
+		out.CapacityProviders = append(out.CapacityProviders, f.fix.CapacityProviders[i])
+	}
+	return out, nil
+}
+
 func (f *ECSFake) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	arn := aws.ToString(input.TaskDefinition)
 	if f.fix.DeniedTaskDefinitions[arn] {

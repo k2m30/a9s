@@ -92,12 +92,6 @@ func checkEIPCFN(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
-// checkEIPAlarm reports the CloudWatch alarms on what this Elastic IP is
-// associated with: the address publishes no metric of its own.
-func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	return alarmIDsByDimension(ctx, clients, cache, "eip", res)
-}
-
 // checkEIPASG reports Auto Scaling Groups whose instances hold this EIP.
 // Cache-based: if this EIP is attached to an EC2 instance, look up that
 // instance in the ec2 cache, read its aws:autoscaling:groupName tag, then

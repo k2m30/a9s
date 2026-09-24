@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- EventBridge rules are counted on an ECR repository, S3 bucket or ECS
+  service when their event pattern can match an event about it, read the way
+  EventBridge reads a pattern: every content filter it documents (`prefix`,
+  `suffix`, `anything-but`, `equals-ignore-case`, `exists`, `numeric`,
+  `cidr`, `wildcard`, empty, null and `$or`). A rule matching on the source
+  alone, or with a filter EventBridge does not document, makes the count a
+  lower bound instead of a match. A scheduled rule that runs an ECS service's
+  task-definition family on its cluster counts on that service.
+- Names join on their boundary: a state machine running task-definition
+  family `api-worker` is no longer counted on the `api` service; an SES
+  identity counts the receipt rules whose recipient conditions match it the
+  way SES does and the one public hosted zone its domain lives in; a queue's
+  subscriptions and dead-letter sources are matched on its ARN, not on a name
+  another Region's queue shares; log groups, CloudFormation stacks, secrets'
+  CodeArtifact repositories and Beanstalk references match on a whole name.
+- Related rows read the field AWS records the link in: an API's load
+  balancers from its private integration's listener, a Lambda function's APIs
+  from their integrations, an ECS cluster's Auto Scaling groups from its
+  capacity providers and its instances from its container instances, a Lambda
+  function's network interfaces by the subnet and security groups the
+  Hyperplane interface is shared by, a log group's ECS tasks from their
+  `awslogs-group` option, a web ACL's alarms by its metric name, an ECS task's
+  alarms including the `AWS/ECS` service metrics, an IAM user's CloudTrail
+  events without the role sessions named like the user, and a CodeArtifact
+  repository's events including its package requests. An Elastic IP no longer
+  has a CloudWatch Alarms row: no CloudWatch metric is keyed by an address or
+  its network interface, and an alarm on the instance behind the address is on
+  the instance's own row.
 - A related row's count says what was read. A row whose details could not be
   read makes a count a lower bound only for a pivot that matches on those
   details: a demo alarm reads `EKS Clusters (0)`, and a node group's cluster

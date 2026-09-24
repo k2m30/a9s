@@ -9,6 +9,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -56,15 +57,14 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 	return relatedRefs("efs", refs, refContext(clients, cache, "efs"))
 }
 
-// checkLambdaAPIGW offers the APIs that name this function in a tag or in
-// their own Name, as candidates. Which function an API invokes is in its
-// integrations, which apigatewayv2.Api does not embed and only
-// GetIntegrations per API returns; a name or a tag key is free text an
-// operator chooses, so the row shows candidates rather than a count, and no
-// candidate is no answer: the integrations were not read.
+// checkLambdaAPIGW reads which APIs invoke this function from their
+// integrations: an HTTP or WebSocket API invokes a function through an
+// integration whose IntegrationUri is the function's ARN, and only
+// apigatewayv2:GetIntegrations per API returns them. A REST API keeps its
+// integrations per method, which this pivot does not read, so a REST API
+// leaves the count a lower bound.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnName := res.ID
-	if fnName == "" {
+	if res.ID == "" {
 		return foundNone("apigw", "fnName")
 	}
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
@@ -74,23 +74,28 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	if apiList == nil {
 		return NotRead("apigw")
 	}
+	rc := refContext(clients, cache, "lambda")
 	var ids []string
+	var reads rowReads
 	for _, apiRes := range apiList {
-		api, ok := assertStruct[apigwtypes.Api](apiRes.RawStruct)
-		if !ok {
+		if apiRes.Fields["protocol"] == "REST" {
+			reads.missed()
 			continue
 		}
-		if api.Tags != nil {
-			if v, ok := api.Tags[fnName]; ok && v != "" {
-				ids = append(ids, apiRes.ID)
-				continue
-			}
+		items, complete, err := apigwListIntegrations(ctx, clients, apiRes.ID)
+		if err != nil {
+			reads.fail(apiRes.ID, err)
+			continue
 		}
-		if api.Name != nil && strings.Contains(*api.Name, fnName) {
+		reads.read++
+		truncated = truncated || !complete
+		if slices.ContainsFunc(items, func(item apigwtypes.Integration) bool {
+			return lambdaRefNamesFunction(lambdaIntegrationARN(aws.ToString(item.IntegrationUri)), res.ID, rc)
+		}) {
 			ids = append(ids, apiRes.ID)
 		}
 	}
-	return candidatesResult("apigw", ids, truncated)
+	return reads.answer("apigw", "lambda-related: GetIntegrations", ids, truncated)
 }
 
 // checkLambdaCF scans the cloudfront cache for Lambda@Edge distributions that
@@ -368,14 +373,15 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("s3", ids, truncated)
 }
 
-// checkLambdaENI scans the eni cache for the hyperplane ENIs EC2 creates for
-// this VPC-attached function. The interface type says Lambda owns the ENI;
-// the Description, "AWS Lambda VPC ENI-<FunctionName>-<uuid>", is what says
-// which function it belongs to.
+// checkLambdaENI scans the eni cache for the Hyperplane ENIs this
+// VPC-attached function uses (hyperplaneENIServes).
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fnName := res.ID
-	if fnName == "" {
-		return foundNone("eni", "fnName")
+	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
+	if !ok {
+		return NotRead("eni")
+	}
+	if fn.VpcConfig == nil || len(fn.VpcConfig.SubnetIds) == 0 {
+		return foundNone("eni", "fn.VpcConfig")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
@@ -386,11 +392,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	var ids []string
 	for _, eniRes := range eniList {
-		eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct)
-		if !ok || !isLambdaENI(eni) {
-			continue
-		}
-		if lambdaFunctionNameFromENIDescription(aws.ToString(eni.Description)) == fnName {
+		if eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct); ok && hyperplaneENIServes(eni, fn) {
 			ids = append(ids, eniRes.ID)
 		}
 	}

@@ -126,35 +126,24 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	}
 }
 
+// An ACL's alarms are the AWS/WAFV2 alarms whose WebACL dimension is its
+// VisibilityConfig.MetricName, read with GetWebACL. An alarm whose WebACL
+// value is the ACL's name watches another metric when the two differ.
 func TestRelated_WAF_Alarm_MatchByWebACLDimension(t *testing.T) {
 	res := wafSrcResource()
+	fake := &t568WAF{acl: wafv2types.WebACL{
+		Name: aws.String("my-waf"), Id: aws.String(res.ID),
+		ARN:              aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-waf/" + res.ID),
+		DefaultAction:    &wafv2types.DefaultAction{Allow: &wafv2types.AllowAction{}},
+		VisibilityConfig: &wafv2types.VisibilityConfig{MetricName: aws.String("myWafMetric"), CloudWatchMetricsEnabled: true, SampledRequestsEnabled: true},
+	}}
+	cache := resource.ResourceCache{"alarm": {Resources: []resource.Resource{
+		t568Alarm("waf-blocked-requests-alarm", "AWS/WAFV2", "BlockedRequests", "WebACL", "myWafMetric", "Region", "us-east-1", "Rule", "ALL"),
+		t568Alarm("waf-by-acl-name", "AWS/WAFV2", "BlockedRequests", "WebACL", "my-waf", "Region", "us-east-1", "Rule", "ALL"),
+	}}}
+	clients := &awsclient.ServiceClients{WAFv2: fake, Region: "us-east-1"}
 
-	alarmRes := resource.Resource{
-		ID: "waf-blocked-requests-alarm",
-		RawStruct: cwtypes.MetricAlarm{
-			Namespace: aws.String("AWS/WAFV2"),
-			AlarmName: aws.String("waf-blocked-requests-alarm"),
-			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("WebACL"), Value: aws.String("my-waf")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
-	}
-
-	checker := wafCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "waf-blocked-requests-alarm" {
-		t.Errorf("ResourceIDs = %v, want [waf-blocked-requests-alarm]", result.ResourceIDs())
-	}
-	if result.Err() != nil {
-		t.Errorf("unexpected error: %v", result.Err())
-	}
+	t568RequireExact(t, "waf → alarm", wafCheckerByTarget(t, "alarm")(context.Background(), clients, res, cache), "waf-blocked-requests-alarm")
 }
 
 func TestRelated_WAF_Alarm_NoMatch(t *testing.T) {

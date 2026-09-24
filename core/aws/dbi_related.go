@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -112,8 +111,6 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		return foundNone("logs", "dbID")
 	}
 
-	prefix := "/aws/rds/instance/" + dbID + "/"
-
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return ReadFailed("logs", err)
@@ -122,13 +119,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		return NotRead("logs")
 	}
 
-	var ids []string
-	for _, logRes := range logList {
-		if strings.HasPrefix(logRes.ID, prefix) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return relatedResultTrunc("logs", logGroupsUnder(logList, "/aws/rds/instance/"+dbID), truncated)
 }
 
 // checkDbiSecrets resolves the Secrets Manager secret managed for this RDS

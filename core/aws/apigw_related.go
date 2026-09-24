@@ -7,13 +7,11 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -107,19 +105,14 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return NotRead("logs")
 	}
 
-	executionPrefix := "API-Gateway-Execution-Logs_" + apiID + "/"
-	// One API's name is the prefix of another's ("orders" of "orders-v2"), so
-	// the group either is the API's own or sits under it on a path boundary.
-	accessLogName := "/aws/apigateway/" + apiName
-
-	var ids []string
-	for _, logRes := range logList {
-		if (apiID != "" && strings.HasPrefix(logRes.ID, executionPrefix)) ||
-			(apiName != "" && (logRes.ID == accessLogName || strings.HasPrefix(logRes.ID, accessLogName+"/"))) {
-			ids = append(ids, logRes.ID)
-		}
+	var executionLogs, accessLogs string
+	if apiID != "" {
+		executionLogs = "API-Gateway-Execution-Logs_" + apiID
 	}
-	return relatedResultTrunc("logs", ids, truncated)
+	if apiName != "" {
+		accessLogs = "/aws/apigateway/" + apiName
+	}
+	return relatedResultTrunc("logs", logGroupsUnder(logList, executionLogs, accessLogs), truncated)
 }
 
 // apigwListIntegrations walks apigatewayv2:GetIntegrations for the given
@@ -279,118 +272,32 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResultTrunc("cf", ids, truncated)
 }
 
-// checkApigwELB reports the Network Load Balancer behind this API's VPC
-// link. Uses apigatewayv2:GetIntegrations to find VPC_LINK integrations
-// and their ConnectionId (the VpcLink ID), apigatewayv2:GetVpcLinks
-// (account-wide, not API-scoped) to resolve that VpcLink's subnet/security-
-// group set, then intersect against the already-loaded elb cache's NLBs by
-// AvailabilityZones[].SubnetId / SecurityGroups membership.
+// checkApigwELB reports the load balancers behind this API's private
+// integrations. "For an HTTP API private integration, specify the ARN of an
+// Application Load Balancer listener, Network Load Balancer listener, or AWS
+// Cloud Map service" in IntegrationUri; a listener belongs to one load
+// balancer, and a Cloud Map service names none, which leaves the count a
+// lower bound.
+// https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html
 func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
 		return foundNone("elb", "apiID")
 	}
-
-	items, integrationsComplete, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("elb")
 		}
 		return ReadFailed("elb", err)
 	}
-	var vpcLinkIDs []string
-	seenLinks := make(map[string]struct{})
+	var refs []string
 	for _, item := range items {
-		if item.ConnectionType != apigwtypes.ConnectionTypeVpcLink || item.ConnectionId == nil || *item.ConnectionId == "" {
-			continue
-		}
-		if _, dup := seenLinks[*item.ConnectionId]; dup {
-			continue
-		}
-		seenLinks[*item.ConnectionId] = struct{}{}
-		vpcLinkIDs = append(vpcLinkIDs, *item.ConnectionId)
-	}
-	if len(vpcLinkIDs) == 0 {
-		return foundNone("elb", "vpcLinkIDs")
-	}
-
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return NotRead("elb")
-	}
-	vpcLinkAPI, ok := c.APIGatewayV2.(APIGatewayV2GetVpcLinksAPI)
-	if !ok {
-		return NotRead("elb")
-	}
-
-	// GetVpcLinks is account-wide, not API-scoped.
-	links, linksComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.VpcLink, *string, error) {
-		out, callErr := vpcLinkAPI.GetVpcLinks(ctx, &apigatewayv2.GetVpcLinksInput{NextToken: token})
-		if callErr != nil {
-			return nil, nil, callErr
-		}
-		return out.Items, out.NextToken, nil
-	})
-	if err != nil {
-		return ReadFailed("elb", err)
-	}
-	wantedSubnets := make(map[string]struct{})
-	wantedSGs := make(map[string]struct{})
-	for _, link := range links {
-		if link.VpcLinkId == nil {
-			continue
-		}
-		if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
-			continue
-		}
-		for _, s := range link.SubnetIds {
-			wantedSubnets[s] = struct{}{}
-		}
-		for _, sg := range link.SecurityGroupIds {
-			wantedSGs[sg] = struct{}{}
+		if item.ConnectionType == apigwtypes.ConnectionTypeVpcLink {
+			refs = append(refs, aws.ToString(item.IntegrationUri))
 		}
 	}
-	complete := integrationsComplete && linksComplete
-	if len(wantedSubnets) == 0 && len(wantedSGs) == 0 {
-		return relatedResultTrunc("elb", nil, !complete)
-	}
-
-	elbList, truncated, fetchErr := relatedResourcesFor(ctx, clients, cache, "elb")
-	if fetchErr != nil {
-		return ReadFailed("elb", fetchErr)
-	}
-	if elbList == nil {
-		return NotRead("elb")
-	}
-
-	var ids []string
-	for _, elbRes := range elbList {
-		lb, ok := assertStruct[elbv2types.LoadBalancer](elbRes.RawStruct)
-		if !ok {
-			continue
-		}
-		matched := false
-		for _, az := range lb.AvailabilityZones {
-			if az.SubnetId != nil {
-				if _, found := wantedSubnets[*az.SubnetId]; found {
-					matched = true
-					break
-				}
-			}
-		}
-		if !matched {
-			for _, sg := range lb.SecurityGroups {
-				if _, found := wantedSGs[sg]; found {
-					matched = true
-					break
-				}
-			}
-		}
-		if matched {
-			ids = append(ids, elbRes.ID)
-		}
-	}
-	return relatedResultTrunc("elb", ids, truncated || !complete)
+	return listedRelated(ctx, clients, cache, "elb", refs, !complete)
 }
 
 // checkApigwRole reports IAM roles this API assumes to call the integration

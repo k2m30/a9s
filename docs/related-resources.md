@@ -110,7 +110,7 @@
 | `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
 | `ecs-task` | [API_Task](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html) | `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet` |
 | `efs` | [API_FileSystemDescription](https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc` |
-| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat` |
+| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat` |
 | `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
 | `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
 | `eni` | [API_NetworkInterface](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html) | `ct-events`, `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce` |
@@ -210,7 +210,7 @@ AWS API: <https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.htm
 - **`alarm`** — Stage latency/error alarms.
 - **`cf`** — Distributions with an origin whose host is this API's own invoke host, `<api-id>.execute-api.<region>.amazonaws.com`, matched on the leading label.
 - **`ct-events`** — Audit trail for API changes.
-- **`elb`** — VpcLink NLB backend (`GetVpcLinks` — each VpcLink's `TargetArns` NLB ARNs matched against the loaded `elb` cache).
+- **`elb`** — Load balancers behind the API's private integrations: a `VPC_LINK` integration's `IntegrationUri` is an ALB or NLB listener ARN, which names its load balancer (a Cloud Map service ARN names none and leaves a lower bound) ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)).
 - **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn).
 - **`lambda`** — Lambda integrations.
 - **`logs`** — API access log destination.
@@ -298,7 +298,7 @@ AWS API: <https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_
 
 AWS API: <https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html>
 
-- **`ct-events`** — Audit trail for repo policy/package events.
+- **`ct-events`** — Calls naming the repository, and the package-manager requests recorded as `ReadFromRepository` with the repository only in `requestParameters.domainName` / `repositoryName` ([codeartifact-information-in-cloudtrail](https://docs.aws.amazon.com/codeartifact/latest/ug/codeartifact-information-in-cloudtrail.html)).
 - **`kms`** — Domain `EncryptionKey` (resolved via `DescribeDomain` using the repo's `DomainName` + `DomainOwner`); CodeArtifact encryption is a domain-level, not repository-level, property. <!-- amended by a9s-resource-spec during codeartifact gen: AWS SDK Go v2 shows EncryptionKey lives on DomainDescription/DomainSummary, not RepositoryDescription/RepositorySummary -->
 
 ### `ct-events`
@@ -472,10 +472,10 @@ AWS API: <https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Reposito
 AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html>
 
 - **`alarm`** — Cluster-level alarms on resource utilization.
-- **`asg`** — Container-instance ASG.
+- **`asg`** — The Auto Scaling groups of the cluster's capacity providers: `DescribeCapacityProviders` over `Cluster.CapacityProviders`, each one's `AutoScalingGroupProvider.AutoScalingGroupArn` ([API_AutoScalingGroupProvider](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_AutoScalingGroupProvider.html)).
 - **`cfn`** — CloudFormation stack that created the cluster.
 - **`ct-events`** — Audit trail for cluster config changes.
-- **`ec2`** — Container instances (if EC2 launch type).
+- **`ec2`** — The EC2 instances registered as the cluster's container instances: `ListContainerInstances`, then `DescribeContainerInstances` for each one's `ec2InstanceId` ([API_ContainerInstance](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html)).
 - **`ecs-svc`** — Services running on this cluster.
 - **`ecs-task`** — Tasks running in this cluster.
 - **`kms`** — ExecuteCommandConfiguration.KmsKeyId.
@@ -546,7 +546,7 @@ sg pivots, which remain registered. -->
 
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>
 
-- **`alarm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- ~~**`alarm`**~~ — Removed 2026-09-24. No CloudWatch metric is keyed by an Elastic IP or its network interface: `AWS/EC2` dimensions its metrics by `AutoScalingGroupName`, `ImageId`, `InstanceId` and `InstanceType` only (<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html#ec2-cloudwatch-dimensions>; the traffic-mirroring metrics use the same four, <https://docs.aws.amazon.com/vpc/latest/mirroring/traffic-mirror-cloudwatch.html>), so no alarm belongs to an address. An alarm on the instance behind the address is on the instance's own `alarm` pivot.
 - **`asg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — CFN stack that created the EIP.
 - **`ct-events`** — Audit trail for allocation/association.
@@ -600,7 +600,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInte
 - **`ec2`** — Attached instance, from `Attachment.InstanceId` (if any).
 - **`eip`** — Associated Elastic IPs: the `AllocationId` of the association on the primary private address and on each secondary one.
 - **`elb`** — ELB creates ENIs.
-- **`lambda`** — The function this hyperplane ENI belongs to: `InterfaceType` `lambda`, with the function named in the description.
+- **`lambda`** — The functions that use this Hyperplane ENI: `InterfaceType` `lambda`, in one of the function's subnets, with exactly the function's security groups — Lambda shares one ENI among the functions of a subnet and security-group combination ([configuration-vpc](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html)).
 - **`nat`** — NAT gateway backing ENI.
 - **`sg`** — Attached security groups.
 - **`subnet`** — ENI's subnet.
@@ -632,7 +632,7 @@ AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html>
 
 AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html>
 
-- **`ct-events`** — Audit trail for user actions and credential changes.
+- **`ct-events`** — The user's own calls: a `Username` lookup kept to events whose `userIdentity.type` is `IAMUser`, since the lookup also returns the calls of a role session named like the user ([userIdentity](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html)).
 - **`iam-group`** — Groups the user belongs to, from `ListGroupsForUser`.
 - **`policy`** — Attached managed policies.
 
@@ -670,7 +670,7 @@ AWS API: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.ht
 AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
 
 - **`alarm`** — Errors/Throttles/Duration alarms watching the function.
-- **`apigw`** — Candidates: the APIs naming this function in a tag key or in their own Name. Which function an API invokes is in its integrations, which `Api` does not embed, so the row offers candidates and shows no count.
+- **`apigw`** — HTTP and WebSocket APIs with an integration whose `IntegrationUri` is this function (`GetIntegrations` per API). A REST API keeps its integrations per method, which is not read, so a REST API leaves the count a lower bound.
 - **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — CloudFormation stack that created the function.
 - **`ct-events`** — Audit trail for function config changes.
@@ -678,7 +678,7 @@ AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguratio
 - **`eb-rule`** — EventBridge rules with this function as a target.
 - **`ecr`** — The repository the function's image belongs to (`lambda:GetFunction` `Code.ImageUri`, matched against the repository's URI).
 - **`efs`** — FileSystemConfigs.
-- **`eni`** — The hyperplane ENIs of this VPC-attached function: `InterfaceType` `lambda`, with the function named in the description.
+- **`eni`** — The Hyperplane ENIs this VPC-attached function uses: `InterfaceType` `lambda`, in one of its subnets, with exactly its security groups ([configuration-vpc](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html)).
 - **`kinesis`** — Kinesis event-source mapping.
 - **`kms`** — Env-var encryption key.
 - **`logs`** — CloudWatch Log Groups /aws/lambda/<name> where function logs land.
@@ -702,7 +702,7 @@ AWS API: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 - **`alarm`** — Metric-filter-driven alarms, found through the group's own metric filters, plus alarms carrying a `LogGroupName` dimension in `AWS/Logs`.
 - **`apigw`** — APIGW access logs.
 - **`ct-events`** — Audit trail for log group changes.
-- **`ecs-task`** — Tasks whose task-definition family this group's `/ecs/<family>` name carries, the ECS console's convention.
+- **`ecs-task`** — Tasks whose task definition names this group in a container's `awslogs-group` option, the field `ecs-task` → `logs` reads ([using_awslogs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html)).
 - **`kinesis`** — Subscription filter → Kinesis/Firehose.
 - **`kms`** — LogGroup.KmsKeyId.
 - **`lambda`** — Lambdas whose logs land here OR subscription-filter consumers.
@@ -1495,7 +1495,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eip | ec2 | EC2 Instances | no |
 | eip | eni | Network Interfaces | no |
 | eip | nat | NAT Gateways | yes |
-| eip | alarm | CloudWatch Alarms | no |
 | eip | asg | Auto Scaling Groups | no |
 | eip | cfn | CloudFormation | no |
 | eip | ecs | ECS Clusters | no |
@@ -1522,7 +1521,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eni | vpc | VPC | no |
 | eni | subnet | Subnet | no |
 | eni | elb | Load Balancers | no |
-| eni | lambda | Lambda Functions | no |
+| eni | lambda | Lambda Functions | yes |
 | eni | nat | NAT Gateways | yes |
 | eni | vpce | VPC Endpoints | yes |
 | eni | ct-events | CloudTrail Events | no |

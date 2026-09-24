@@ -5,14 +5,13 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
-	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -197,97 +196,23 @@ func checkECRKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkECREbRule is a reverse-scan checker for the ecr→eb-rule relationship.
-// Iterates cache["eb-rule"]; for each rule, checks if rule.EventPattern JSON
-// contains source: ["aws.ecr"] AND (detail.repository-name == repo name OR
-// resources containing the repo ARN). NeedsTargetCache: true.
+// checkECREbRule counts the eb-rule rows whose event pattern matches an event
+// ECR emits about this repository.
 func checkECREbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
 		return NotRead("eb-rule")
 	}
-	repoName := ""
-	if repo.RepositoryName != nil {
-		repoName = *repo.RepositoryName
-	}
+	repoName := aws.ToString(repo.RepositoryName)
 	if repoName == "" {
 		return foundNone("eb-rule", "repoName")
 	}
-	repoARN := ""
-	if repo.RepositoryArn != nil {
-		repoARN = *repo.RepositoryArn
-	}
-
-	ebRuleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
+	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
 		return ReadFailed("eb-rule", err)
 	}
-	if ebRuleList == nil {
+	if ruleList == nil {
 		return NotRead("eb-rule")
 	}
-
-	var ids []string
-	for _, ruleRes := range ebRuleList {
-		raw, ok := assertStruct[eventbridgetypes.Rule](ruleRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if raw.EventPattern == nil || *raw.EventPattern == "" {
-			continue
-		}
-		if ecrEbRuleMatches(*raw.EventPattern, repoName, repoARN) {
-			ids = append(ids, ruleRes.ID)
-		}
-	}
-	return relatedResultTrunc("eb-rule", ids, truncated)
-}
-
-// ecrEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecr"]
-// and references the repository by name or ARN.
-func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
-	var p map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(pattern), &p); err != nil {
-		return false
-	}
-
-	if src, ok := p["source"]; ok {
-		var sources []string
-		if err := json.Unmarshal(src, &sources); err != nil || !slices.Contains(sources, "aws.ecr") {
-			return false
-		}
-	} else {
-		return false
-	}
-
-	// If a repository-name filter is present but doesn't match, return false.
-	// Only fall through to "no filter → broad match" when no filter key exists.
-	hasRepoFilter := false
-	if detail, ok := p["detail"]; ok {
-		var d map[string]json.RawMessage
-		if err := json.Unmarshal(detail, &d); err == nil {
-			if rn, ok := d["repository-name"]; ok {
-				hasRepoFilter = true
-				var names []string
-				if err := json.Unmarshal(rn, &names); err == nil && slices.Contains(names, repoName) {
-					return true
-				}
-			}
-		}
-	}
-	if repoARN != "" {
-		if resources, ok := p["resources"]; ok {
-			hasRepoFilter = true
-			var res []string
-			// The whole ARN has to match: a prefix would let a rule scoped
-			// to ".../app-worker" answer for repository "app".
-			if err := json.Unmarshal(resources, &res); err == nil && slices.Contains(res, repoARN) {
-				return true
-			}
-		}
-	}
-	if hasRepoFilter {
-		return false
-	}
-	// Source matches aws.ecr with no repository filter — treat as broad match.
-	return true
+	return relatedAnswer("eb-rule", ebRulesMatching(ruleList, truncated, ecrEvents(repoName, aws.ToString(repo.RepositoryArn))))
 }

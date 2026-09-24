@@ -1,12 +1,14 @@
 package unit
 
 // A failed DescribeTaskDefinition join marks the task with
-// Fields["task_def_join_error"]="true" and leaves the page untruncated;
+// Fields["task_def_join_error"]="true", reports the refused read as the row's
+// failure with the page, and leaves the list whole and untruncated;
 // checkEFSECSTask turns such a task into Truncated=true, an honest lower bound
 // instead of a confident zero.
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -124,8 +126,11 @@ func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 	fetcher := ecsTaskPaginatedFetcher(t)
 
 	result, err := fetcher(context.Background(), clients, "")
-	if err != nil {
-		t.Fatalf("fetcher must not return an error on DescribeTaskDefinition join failure; got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "DescribeTaskDefinition") || !strings.Contains(err.Error(), "AccessDenied") {
+		t.Errorf("fetcher error = %v, want the refused DescribeTaskDefinition read (AccessDenied) reported with the page", err)
+	}
+	if awsclient.FetchIsPartial(result, err) {
+		t.Errorf("FetchIsPartial = true: the refused read is the row's own failure, and every task of the page is listed")
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("want 1 resource (task returned despite join failure), got %d", len(result.Resources))
@@ -137,9 +142,7 @@ func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 		t.Fatal("Pagination must not be nil")
 	}
 	if result.Pagination.IsTruncated {
-		t.Errorf("IsTruncated must be false when DescribeTaskDefinition fails — " +
-			"the fetcher must set Fields[task_def_join_error] instead of marking pagination truncated. " +
-			"Got IsTruncated=true (OLD BUG: would surface misleading 'm: load more' in TUI).")
+		t.Errorf("IsTruncated = true: every task of the page is listed, and no further page exists to load")
 	}
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken must be empty on join failure (no pagination in play); got %q", result.Pagination.NextToken)

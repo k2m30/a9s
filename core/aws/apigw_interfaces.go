@@ -44,15 +44,6 @@ type APIGatewayV2GetIntegrationsAPI interface {
 	GetIntegrations(ctx context.Context, params *apigatewayv2.GetIntegrationsInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error)
 }
 
-// APIGatewayV2GetVpcLinksAPI lists the account's VPC links (account-wide,
-// not API-scoped). Used with APIGatewayV2GetIntegrationsAPI to resolve
-// apigw→elb: an API's VPC_LINK integration references a VpcLink by
-// ConnectionId, and the VpcLink carries the subnet/security-group set of its
-// backing Network Load Balancer.
-type APIGatewayV2GetVpcLinksAPI interface {
-	GetVpcLinks(ctx context.Context, params *apigatewayv2.GetVpcLinksInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error)
-}
-
 // APIGatewayV2GetAuthorizersAPI lists the authorizers configured for a given
 // API. Used to resolve apigw→role via AuthorizerCredentialsArn.
 type APIGatewayV2GetAuthorizersAPI interface {
@@ -92,6 +83,5 @@ type APIGatewayV2API interface {
 	APIGatewayV2GetDomainNamesAPI  // custom domain → ACM/R53 pivot
 	APIGatewayV2GetApiMappingsAPI  // domain → API mapping pivot
 	APIGatewayV2GetIntegrationsAPI // Lambda/SFN/SNS integration pivot
-	APIGatewayV2GetVpcLinksAPI     // related-panel: apigw→elb
 	APIGatewayV2GetAuthorizersAPI  // related-panel: apigw→role
 }

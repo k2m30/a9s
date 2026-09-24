@@ -7,86 +7,123 @@ package aws
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkECSASG scans the asg cache for Auto Scaling Groups tagged with this
-// ECS cluster's capacity provider (Pattern C). ECS cluster capacity providers
-// reference ASG ARNs, but the Cluster struct exposes them only by name; the
-// reverse link from ASG→cluster surfaces through the
-// AmazonECSManaged tag that ECS adds to ASGs it manages.
+// checkECSASG reports the Auto Scaling groups of this cluster's capacity
+// providers: ecs:DescribeCapacityProviders over the cluster's
+// CapacityProviders names each one's
+// AutoScalingGroupProvider.AutoScalingGroupArn, "the Amazon Resource Name
+// (ARN) that identifies the Auto Scaling group, or the Auto Scaling group
+// name". FARGATE and FARGATE_SPOT carry no group.
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_AutoScalingGroupProvider.html
 func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
-		return foundNone("asg", "clusterName")
+	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if !ok {
+		return NotRead("asg")
 	}
-	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
+	if len(cluster.CapacityProviders) == 0 {
+		return foundNone("asg", "cluster.CapacityProviders")
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return NotRead("asg")
+	}
+	api, ok := c.ECS.(ECSDescribeCapacityProvidersAPI)
+	if !ok {
+		return NotRead("asg")
+	}
+	failed := false
+	providers, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ecstypes.CapacityProvider, *string, error) {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeCapacityProvidersOutput, error) {
+			return api.DescribeCapacityProviders(ctx, &ecs.DescribeCapacityProvidersInput{CapacityProviders: cluster.CapacityProviders, NextToken: token})
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		failed = failed || len(out.Failures) > 0
+		return out.CapacityProviders, out.NextToken, nil
+	})
 	if err != nil {
 		return ReadFailed("asg", err)
 	}
-	if asgList == nil {
-		return NotRead("asg")
-	}
-	var ids []string
-	for _, asgRes := range asgList {
-		asg, ok := assertStruct[asgtypes.AutoScalingGroup](asgRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, t := range asg.Tags {
-			if t.Key != nil && *t.Key == "AmazonECSManaged" {
-				// ASGs managed by this cluster's capacity provider
-				ids = append(ids, asgRes.ID)
-				break
-			}
-			if t.Key != nil && *t.Key == "ClusterName" && t.Value != nil && *t.Value == clusterName {
-				ids = append(ids, asgRes.ID)
-				break
-			}
+	var refs []string
+	for _, p := range providers {
+		if p.AutoScalingGroupProvider != nil {
+			refs = append(refs, aws.ToString(p.AutoScalingGroupProvider.AutoScalingGroupArn))
 		}
 	}
-	return relatedResultTrunc("asg", ids, truncated)
+	return listedRelated(ctx, clients, cache, "asg", refs, failed || !complete)
 }
 
-// checkECSEC2 scans the ec2 cache for instances running this ECS cluster's
-// container instances (tagged "ecs:cluster-name").
+// checkECSEC2 reports the EC2 instances registered with this cluster as
+// container instances: ecs:ListContainerInstances, then
+// ecs:DescribeContainerInstances (up to 100 per call) for each one's
+// ec2InstanceId — "for Amazon EC2 instances, this value is the Amazon EC2
+// instance ID. For external instances, this value is the AWS Systems Manager
+// managed instance ID", which is no EC2 instance.
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeContainerInstances.html
 func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
+	clusterRef := res.ID
+	if cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct); ok && cluster.ClusterArn != nil {
+		clusterRef = *cluster.ClusterArn
+	}
+	if clusterRef == "" {
 		return foundNone("ec2", "clusterName")
 	}
-	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return NotRead("ec2")
+	}
+	lister, ok := c.ECS.(ECSListContainerInstancesAPI)
+	if !ok {
+		return NotRead("ec2")
+	}
+	describer, ok := c.ECS.(ECSDescribeContainerInstancesAPI)
+	if !ok {
+		return NotRead("ec2")
+	}
+	arns, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]string, *string, error) {
+		out, err := lister.ListContainerInstances(ctx, &ecs.ListContainerInstancesInput{Cluster: &clusterRef, NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.ContainerInstanceArns, out.NextToken, nil
+	})
 	if err != nil {
 		return ReadFailed("ec2", err)
 	}
-	if ec2List == nil {
-		return NotRead("ec2")
-	}
 	var ids []string
-	for _, ec2Res := range ec2List {
-		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
-		if !ok {
-			continue
+	for batch := range slices.Chunk(arns, containerInstancesPerDescribe) {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
+			return describer.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{Cluster: &clusterRef, ContainerInstances: batch})
+		})
+		if err != nil {
+			return ReadFailed("ec2", err)
 		}
-		for _, t := range inst.Tags {
-			if t.Key == nil || t.Value == nil {
-				continue
-			}
-			if (*t.Key == "aws:ecs:cluster-name" || *t.Key == "ClusterName") && *t.Value == clusterName {
-				ids = append(ids, ec2Res.ID)
-				break
+		complete = complete && len(out.Failures) == 0
+		for _, ci := range out.ContainerInstances {
+			if id := aws.ToString(ci.Ec2InstanceId); strings.HasPrefix(id, "i-") {
+				ids = append(ids, id)
 			}
 		}
 	}
-	return relatedResultTrunc("ec2", ids, truncated)
+	return listedRelated(ctx, clients, cache, "ec2", ids, !complete)
 }
+
+// containerInstancesPerDescribe is DescribeContainerInstances' limit: "a list
+// of up to 100 container instance IDs or full Amazon Resource Name (ARN)
+// entries".
+const containerInstancesPerDescribe = 100
 
 // checkECSTasks scans the ecs-task cache for tasks whose ClusterArn refers
 // to this cluster.

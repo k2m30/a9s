@@ -568,11 +568,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images", "arn", "task_def_join_error"},
+		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "log_groups", "container_images", "arn", "task_def_join_error"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService, Mirror: true},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster, Mirror: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true, Truncated: true, Distinct: "the groups the containers write to, from the awslogs-group log option"},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ecs-task")},
@@ -660,7 +660,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEBRule, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLambdaSubnet},
 			{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkLambdaEFS, Mirror: true},
-			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "APIs carrying this function's name in Api.Name or a tag, as candidates"},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "APIs with an integration whose IntegrationUri is this function"},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkLambdaCF, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkLambdaDDB, Truncated: true, Mirror: true},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLambdaKinesis, Truncated: true, Mirror: true},

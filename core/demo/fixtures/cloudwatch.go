@@ -953,28 +953,6 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 				ActionsEnabled:        aws.Bool(true),
 				AlarmActions:          []string{relatedAlarmSNSARN},
 			},
-			// web-prod-01-eip's interface alarm — an Elastic IP's traffic is
-			// metered on the interface it is associated with.
-			{
-				AlarmName:             aws.String("eip-web-prod-01-network-out"),
-				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:eip-web-prod-01-network-out"),
-				AlarmDescription:      aws.String("Triggers when the interface behind web-prod-01-eip sends more than 5 GB in 5 minutes"),
-				StateValue:            cwtypes.StateValueOk,
-				StateReason:           aws.String("Threshold Crossed: 2 datapoints were less than the threshold (5000000000.0)."),
-				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 45, 0, 0, time.UTC)),
-				MetricName:            aws.String("NetworkOut"),
-				Namespace:             aws.String("AWS/EC2"),
-				Threshold:             aws.Float64(5000000000.0),
-				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
-				EvaluationPeriods:     aws.Int32(2),
-				Period:                aws.Int32(300),
-				Statistic:             cwtypes.StatisticSum,
-				ActionsEnabled:        aws.Bool(true),
-				AlarmActions:          []string{relatedAlarmSNSARN},
-				Dimensions: []cwtypes.Dimension{
-					{Name: aws.String("NetworkInterfaceId"), Value: aws.String("eni-0aaa111111111111a")},
-				},
-			},
 			// Log group alarm — the logs↔alarm pivot both ways. CloudWatch
 			// Logs publishes IncomingLogEvents per log group under AWS/Logs.
 			{
@@ -1021,8 +999,9 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 				},
 			},
 			// WAF blocked-request alarm — required for alarm:waf related-panel
-			// pivot. checkAlarmWAF matches dimension WebACL against the
-			// acme-prod-api-waf fixture (waf.go).
+			// pivot. checkAlarmWAF matches dimension WebACL against the metric
+			// name of the acme-prod-api-waf fixture (waf.go), which the WAF
+			// fake answers as the ACL's name.
 			{
 				AlarmName:             aws.String("waf-acme-prod-api-blocked-requests"),
 				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:waf-acme-prod-api-blocked-requests"),
@@ -1273,5 +1252,5 @@ const MetricMathELBAlarmName = "elb-acme-prod-web-5xx-ratio"
 const AlarmActionsDisabled = "acme-actions-disabled-alarm"
 
 func init() {
-	Register(Pin{ShortName: "alarm", Rows: 51, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "alarm", Rows: 50, Issues: 6, CoverageGaps: []string{"dim"}})
 }

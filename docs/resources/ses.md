@@ -34,13 +34,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `lambda`
 
 - **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature; a9s wires a dedicated SES v1 SDK client to surface this pivot.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn`; extract the function name after `:function:` for cross-referencing the lambda list. Function names (not ARNs) are returned to match the `lambda` resource type's ID format. Accounts with no active receipt rule set (pure outbound SES) render 0 — operator-honest absence.
+- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn` of the rules whose recipient conditions match the identity, label by label as SES matches them: an address (and its `+label` variants), a domain's own addresses "but not those within its subdomains", `.domain` for the subdomains only, and no condition for every verified domain ([receipt rules](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-receipt-rules-console-walkthrough.html)); extract the function name after `:function:` for cross-referencing the lambda list. Accounts with no active receipt rule set (pure outbound SES) render 0 — operator-honest absence.
 - **Count shown**: yes.
 
 ### `r53`
 
 - **Why related**: the DNS hosted zone that owns this identity's domain — operator needs it to fix a `FAILED` verification (MX/TXT/DKIM records live in the zone).
-- **How discovered**: cross-reference the already-loaded `r53` list. For `IdentityType==DOMAIN`, match `IdentityName` against hosted-zone `Name`. For `IdentityType==EMAIL_ADDRESS`, extract the domain portion (after `@`) and match the same way.
+- **How discovered**: cross-reference the already-loaded `r53` list for the public hosted zone the identity's domain is written in — the innermost public zone whose name is the domain or a parent of it at a label boundary. For `IdentityType==EMAIL_ADDRESS`, the domain is the part after `@`. A parent zone that delegates the subdomain to a zone of its own is not where its records live, and a private zone is not the DNS the identity is verified in.
 - **Count shown**: yes.
 
 ### `s3`

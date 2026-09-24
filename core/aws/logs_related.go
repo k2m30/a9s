@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -178,18 +179,15 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("apigw", ids, truncated)
 }
 
-// checkLogsECSTask matches log groups named /ecs/{task-family}. The family is
-// extracted and searched in the ecs-task cache.
+// checkLogsECSTask reports the tasks writing to this log group: the tasks
+// whose task definition names it in a container's awslogs-group option, the
+// field ecs-task → logs reads, as the ecs-task list's own join read it. A
+// group named /ecs/<family> belongs to whichever definition names it there.
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	logGroupName := res.ID
-	if logGroupName == "" {
+	group := res.ID
+	if group == "" {
 		return foundNone("ecs-task", "logGroupName")
 	}
-	family := logGroupOwner(logGroupName, "/ecs/")
-	if family == "" {
-		return foundNone("ecs-task", "family")
-	}
-
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return ReadFailed("ecs-task", err)
@@ -198,15 +196,23 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 		return NotRead("ecs-task")
 	}
 	var ids []string
+	var reads rowReads
 	for _, taskRes := range taskList {
-		// Fields["task_definition"] holds the full task-definition ARN; match
-		// its family rather than substring-matching the family against the
-		// task's own UUID ID/Name.
-		if taskDefFamily(taskRes.Fields["task_definition"]) == family {
+		groups, read, err := ecsTaskLogGroups(ctx, clients, taskRes)
+		switch {
+		case err != nil:
+			reads.fail(taskRes.ID, err)
+			continue
+		case !read:
+			reads.missed()
+			continue
+		}
+		reads.read++
+		if slices.Contains(groups, group) {
 			ids = append(ids, taskRes.ID)
 		}
 	}
-	return relatedResultTrunc("ecs-task", ids, truncated)
+	return reads.answer("ecs-task", "logs-related: DescribeTaskDefinition", ids, truncated)
 }
 
 // logsSubscriptionFilters fetches the log group's subscription filters via a

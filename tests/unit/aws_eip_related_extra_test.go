@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
@@ -76,90 +75,15 @@ func TestRelated_EIP_CFN_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// An Elastic IP's traffic is metered on the network interface it is
-// associated with, so an alarm on the instance behind it — its CPU, its
-// status checks — is an alarm on the instance, not on the address.
-func TestRelated_EIP_Alarm_InstanceAlarmIsNotTheAddresssAlarm(t *testing.T) {
-	source := resource.Resource{
-		ID: "eipalloc-001",
-		RawStruct: ec2types.Address{
-			AllocationId: aws.String("eipalloc-001"),
-			InstanceId:   aws.String("i-0abc1234567890def"),
-		},
-	}
-	alarmRes := resource.Resource{
-		ID: "instance-cpu-high",
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("instance-cpu-high"),
-			Namespace: aws.String("AWS/EC2"),
-			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("InstanceId"), Value: aws.String("i-0abc1234567890def")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
-	}
-
-	checker := eipCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (%v)", result.Count(), result.ResourceIDs())
-	}
-}
-
-func TestRelated_EIP_Alarm_MatchByNetworkInterfaceId(t *testing.T) {
-	source := resource.Resource{
-		ID: "eipalloc-002",
-		RawStruct: ec2types.Address{
-			AllocationId:       aws.String("eipalloc-002"),
-			NetworkInterfaceId: aws.String("eni-0deadbeefcafe0001"),
-		},
-	}
-	alarmRes := resource.Resource{
-		ID: "eni-bandwidth-alarm",
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("eni-bandwidth-alarm"),
-			Namespace: aws.String("AWS/EC2"),
-			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("NetworkInterfaceId"), Value: aws.String("eni-0deadbeefcafe0001")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
-	}
-
-	checker := eipCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-}
-
-func TestRelated_EIP_Alarm_NoAttachmentReturnsZero(t *testing.T) {
-	// EIP with no attached instance or ENI → no relevant alarms.
-	source := resource.Resource{
-		ID:        "eipalloc-003",
-		RawStruct: ec2types.Address{AllocationId: aws.String("eipalloc-003")},
-	}
-	checker := eipCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (not attached)", result.Count())
-	}
-}
-
-func TestRelated_EIP_Alarm_WrongRawStruct(t *testing.T) {
-	source := resource.Resource{ID: "eipalloc-004", RawStruct: "bad"}
-	checker := eipCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
+// AWS publishes no CloudWatch metric keyed by an Elastic IP or its network
+// interface: AWS/EC2 dimensions its metrics by AutoScalingGroupName, ImageId,
+// InstanceId and InstanceType, so no alarm belongs to an address.
+// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html#ec2-cloudwatch-dimensions
+func TestRelated_EIP_HasNoAlarmPivot(t *testing.T) {
+	for _, def := range resource.GetRelated("eip") {
+		if def.TargetType == "alarm" {
+			t.Errorf("eip registers a related %q pivot (%s); no alarm dimension names an Elastic IP", def.TargetType, def.DisplayName)
+		}
 	}
 }
 

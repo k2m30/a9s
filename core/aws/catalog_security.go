@@ -228,6 +228,11 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"iam-user", "iam-users", "users", "iam_users"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "Username:ID",
+		// A Username lookup also returns the calls of a role session named
+		// like the user; an IAM user's own call is recorded with
+		// userIdentity.type "IAMUser".
+		// https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html
+		CloudTrailWhere: []catalog.CloudTrailMatch{{Path: "userIdentity.type", Value: "=IAMUser"}},
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return consolelink.Global(region, "iam/home#/users/details/"+url.PathEscape(r.ID))
 		},

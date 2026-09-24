@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `alarm`
 
 - **Why related**: CloudWatch alarms scoped to `ClusterName` + `ServiceName` dimensions fire on task-level symptoms (CPU/memory saturation, task count deltas). The alarm entry is the fastest route from a broken task row to "what page is ringing right now?" — a9s-devops: an operator responding to a task failure almost always wants to see whether the on-call is already paged.
-- **How discovered**: cross-reference the already-loaded `alarm` list by `Dimensions[].Name == "ClusterName"` matching `Task.ClusterArn` suffix and, when the task belongs to a service, `Dimensions[].Name == "ServiceName"` matching `Task.Group` (stripped of the `service:` prefix). No extra API call.
+- **How discovered**: cross-reference the already-loaded `alarm` list by `Dimensions[].Name == "ClusterName"` matching `Task.ClusterArn` suffix and, when the task belongs to a service, `Dimensions[].Name == "ServiceName"` matching `Task.Group` (stripped of the `service:` prefix), in `AWS/ECS` — CPU and memory per `ClusterName`, `ServiceName` ([available-metrics](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/available-metrics.html)) — and `ECS/ContainerInsights`. No extra API call.
 - **Count shown**: yes.
 
 ### `ct-events`

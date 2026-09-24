@@ -350,10 +350,9 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	return backupPivot(bkList, truncated, backupTarget{arn: bucketARN, unread: "GetBucketTagging"})
 }
 
-// checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters
-// on `source=aws.s3` AND `detail.bucket.name` containing this bucket. An event
-// pattern is the only standard join between an S3 bucket and an EventBridge
-// rule.
+// checkS3EBRule counts the eb-rule rows whose event pattern matches an event
+// S3 sends EventBridge about this bucket. The bucket's ARN names no region but
+// does name the partition, which comes from the session's region.
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -366,22 +365,11 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 	if ruleList == nil {
 		return NotRead("eb-rule")
 	}
-	bucketQuoted := `"` + bucket + `"`
-	var ids []string
-	for _, ruleRes := range ruleList {
-		pattern := ruleRes.Fields["event_pattern"]
-		if pattern == "" {
-			continue
-		}
-		if !strings.Contains(pattern, `"aws.s3"`) {
-			continue
-		}
-		if !strings.Contains(pattern, bucketQuoted) {
-			continue
-		}
-		ids = append(ids, ruleRes.ID)
+	bucketARN := ""
+	if region := sessionRegion(clients); region != "" {
+		bucketARN = "arn:" + PartitionForRegion(region) + ":s3:::" + bucket
 	}
-	return relatedResultTrunc("eb-rule", ids, truncated)
+	return relatedAnswer("eb-rule", ebRulesMatching(ruleList, truncated, s3Events(bucket, bucketARN)))
 }
 
 // checkS3R53 scans the r53 cache for hosted zones containing an S3-website

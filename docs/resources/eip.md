@@ -23,13 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`.
-
-### `alarm`
-
-- **Why related**: CloudWatch alarms that fire on traffic through this EIP — operator needs to see alarm state next to the IP when investigating connectivity.
-- **How discovered**: cross-reference the already-loaded `alarm` list by `MetricAlarm.Dimensions[]` containing `{Name: "NetworkInterfaceId", Value: <Address.NetworkInterfaceId>}`. CloudWatch has no native EIP-scoped metric namespace, so in practice alarms attach to the backing ENI or to a NAT gateway consuming the EIP — persona (a9s-devops): alarms dimensioned on `NetworkInterfaceId` are the reliable pivot because EIP traffic shows up under the interface it is associated with. An alarm on the instance behind the address watches the instance, not the address, so the instance is no pivot here.
-- **Count shown**: yes.
+Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`.
 
 ### `asg`
 
@@ -142,13 +136,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above): `DescribeAddressesAttribute` per EIP (reverse-DNS lookup).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- `alarm` via dimensions other than `AllocationId` / `NetworkInterfaceId` — persona (a9s-devops): not worth it, no EIP-scoped CloudWatch namespace exists; alarms surface via the ENI or NAT pivots already listed.
+- `alarm` — no CloudWatch metric is keyed by an Elastic IP or its network interface: `AWS/EC2` dimensions its metrics by `AutoScalingGroupName`, `ImageId`, `InstanceId` and `InstanceType` only, so no alarm belongs to an address. An alarm on the instance behind the address is on the instance's own `alarm` pivot; `docs/related-resources.md` § `eip`.
 - `logs` cross-reference beyond best-effort VPC-flow-log-name matching — persona (a9s-devops): not worth a live API call; flow logs are configured out-of-band and may land in S3 or Kinesis rather than CloudWatch Logs.
 - Direct ECS discovery without an ENI association — persona (a9s-devops): not worth it, an EIP with no `NetworkInterfaceId` cannot be tied to a task.
 
 ## 6. Citations
 
-- a9s golden doc — per-type contract (`alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`) — `docs/related-resources.md` § Per-type contract / `eip`.
+- a9s golden doc — per-type contract (`asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat`) — `docs/related-resources.md` § Per-type contract / `eip`.
 - a9s golden doc — `nat` pivot direction (`NatGatewayAddresses[].AllocationId`) — `docs/related-resources.md` § Per-target reasoning / `nat` / `eip`.
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md` § Policy #4.
 - a9s golden doc — Wave 1 signals (unattached EIP; zombie-billing cross-ref to stopped `ec2`) — `docs/attention-signals.md § Signals § NETWORKING` row `eip`.
@@ -156,12 +150,12 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — read-only invariant used in §5 — `docs/architecture.md` § What is a9s?.
 - AWS Go SDK v2 — `Address.AllocationId`, `Address.AssociationId`, `Address.InstanceId`, `Address.NetworkInterfaceId`, `Address.Tags` — `AWS SDK Go v2 — service/ec2/types.Address § AllocationId, AssociationId, InstanceId, NetworkInterfaceId, Tags`.
 - AWS API Reference — `Address` response shape — `AWS API Reference: API_Address` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>).
-- a9s-devops persona — `alarm` discovered via CloudWatch `Dimensions[]` on `AllocationId`/`NetworkInterfaceId` — persona (2026-04-20): possible=partial, worth=yes-narrow. CloudWatch has no EIP-scoped metric namespace; alarms in practice dimension on the ENI or NAT that carries the traffic, so cache-scan of loaded alarms is the correct pivot.
+- AWS EC2 User Guide — `AWS/EC2` metric dimensions (`AutoScalingGroupName`, `ImageId`, `InstanceId`, `InstanceType`), cited for `alarm` in §5 — <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html#ec2-cloudwatch-dimensions>.
 - a9s-devops persona — `asg` via two-hop `ec2` lookup (`Address.InstanceId` → `Instance.Tags[aws:autoscaling:groupName]`) — persona (2026-04-20): possible=yes, worth=yes. Operator needs to know whether the underlying instance is replaceable by an ASG.
 - a9s-devops persona — `cfn` via `Address.Tags[aws:cloudformation:stack-name]` — persona (2026-04-20): possible=yes, worth=yes. CFN writes reserved tags on stack-managed resources; cheap cache pivot.
 - a9s-devops persona — `ecs` / `ecs-svc` / `ecs-task` via `NetworkInterfaceId` match on `attachments[].details[]` — persona (2026-04-20): possible=yes, worth=yes-narrow. Pattern is rare (ALB/Fargate auto-IP is more common) but valid for legacy task-per-EIP setups; skip when no ENI association.
 - `logs` budget exclusion — `docs/related-resources.md` § Explicitly excluded.
-- a9s-devops persona — `alarm` non-ENI/NAT dimensions, `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
+- a9s-devops persona — `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
 
 <!-- BEGIN GENERATED: header -->
 eip — NETWORKING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
@@ -179,7 +173,6 @@ eip — NETWORKING. Status key: `status` — the key the status cell reads, and 
 | ec2 | EC2 Instances | no |
 | eni | Network Interfaces | no |
 | nat | NAT Gateways | yes |
-| alarm | CloudWatch Alarms | yes |
 | asg | Auto Scaling Groups | no |
 | cfn | CloudFormation | no |
 | ecs | ECS Clusters | yes |

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdb_types "github.com/aws/aws-sdk-go-v2/service/docdb/types"
@@ -155,14 +154,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora
 	// (/aws/rds/cluster/<cluster>/*). Match either prefix so the pivot
 	// resolves on both engine families.
-	docdbPrefix := "/aws/docdb/" + clusterID + "/"
-	rdsPrefix := "/aws/rds/cluster/" + clusterID + "/"
-	var ids []string
-	for _, logRes := range logList {
-		if strings.HasPrefix(logRes.ID, docdbPrefix) || strings.HasPrefix(logRes.ID, rdsPrefix) {
-			ids = append(ids, logRes.ID)
-		}
-	}
+	ids := logGroupsUnder(logList, "/aws/docdb/"+clusterID, "/aws/rds/cluster/"+clusterID)
 	return relatedResultTrunc("logs", ids, truncated)
 }
 

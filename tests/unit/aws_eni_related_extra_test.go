@@ -2,10 +2,12 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -177,26 +179,41 @@ func TestRelated_ENI_ELB_WrongRawStruct(t *testing.T) {
 	}
 }
 
-func TestRelated_ENI_Lambda_ExtractsFunctionName(t *testing.T) {
-	// EC2 types a Lambda hyperplane ENI "lambda"; its description,
-	// "AWS Lambda VPC ENI-<name>-<uuid>", names the function.
+// A Hyperplane ENI serves every function attached to its subnet with its
+// exact set of security groups (docs.aws.amazon.com/lambda/latest/dg/
+// configuration-vpc.html); the function its description names is one of them.
+// With the function list not loaded, which functions share it is unknown.
+func TestRelated_ENI_Lambda_FunctionsSharingItsSubnetAndGroups(t *testing.T) {
 	source := resource.Resource{
-		ID: "eni-lambda-001",
+		ID: "eni-0a1b2c3d4e5f60101",
 		RawStruct: ec2types.NetworkInterface{
-			NetworkInterfaceId: aws.String("eni-lambda-001"),
+			NetworkInterfaceId: aws.String("eni-0a1b2c3d4e5f60101"),
 			InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
 			RequesterId:        aws.String("123456789012:awslambda_us-east-1"),
 			Description:        aws.String("AWS Lambda VPC ENI-process-orders-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"),
+			SubnetId:           aws.String("subnet-0a1b2c3d4e5f60001"),
+			Groups:             []ec2types.GroupIdentifier{{GroupId: aws.String("sg-0a1b2c3d4e5f60001"), GroupName: aws.String("orders")}},
 		},
 	}
-	checker := eniCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	fn := func(name string, sgs ...string) resource.Resource {
+		return resource.Resource{ID: name, Name: name, RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(name), FunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + name),
+			VpcConfig: &lambdatypes.VpcConfigResponse{SubnetIds: []string{"subnet-0a1b2c3d4e5f60001"}, SecurityGroupIds: sgs, VpcId: aws.String("vpc-0a1b2c3d4e5f60001")},
+		}}
 	}
-	if result.ResourceIDs()[0] != "process-orders" {
-		t.Errorf("ResourceIDs[0] = %q, want process-orders", result.ResourceIDs()[0])
+	checker := eniCheckerByTarget(t, "lambda")
+
+	if unlisted := checker(context.Background(), nil, source, resource.ResourceCache{}); unlisted.State() != domain.RelatedUnknown {
+		t.Errorf("eni → lambda with no lambda list = state %v ids %v, want unknown", unlisted.State(), unlisted.ResourceIDs())
+	}
+	cache := resource.ResourceCache{"lambda": {Resources: []resource.Resource{
+		fn("process-orders", "sg-0a1b2c3d4e5f60001"),
+		fn("process-refunds", "sg-0a1b2c3d4e5f60001"),
+		fn("process-payments", "sg-0a1b2c3d4e5f60001", "sg-0a1b2c3d4e5f60002"),
+	}}}
+	result := checker(context.Background(), nil, source, cache)
+	if ids := sortedIDs(result); !slices.Equal(ids, []string{"process-orders", "process-refunds"}) {
+		t.Errorf("eni → lambda = %v, want [process-orders process-refunds]", ids)
 	}
 }
 

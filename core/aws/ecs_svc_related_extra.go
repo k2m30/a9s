@@ -6,6 +6,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"slices"
@@ -114,99 +115,43 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("vpc", ids, truncated)
 }
 
-// checkECSSvcEbRule is a reverse-scan checker for the ecs-svc→eb-rule relationship.
-// Pattern C+reverse: iterate cache["eb-rule"]; for each rule whose EventPattern
-// has source ["aws.ecs"] and detail.clusterArn / detail.group matching this service,
-// add the rule name. NeedsTargetCache: true.
+// checkECSSvcEbRule counts the eb-rule rows whose event pattern matches an
+// event ECS emits about this service, and the rules that run the service's
+// task definition family on its cluster: a scheduled or event-driven task is a
+// rule whose target is the cluster, with the task definition in its
+// EcsParameters.
 func checkECSSvcEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	svcName := ecsSvcName(res)
 	if svcName == "" {
 		return foundNone("eb-rule", "svcName")
 	}
-	clusterName := res.Fields["cluster"]
+	raw, _ := assertStruct[ecstypes.Service](res.RawStruct)
+	clusterARN := aws.ToString(raw.ClusterArn)
+	family := taskDefFamily(cmp.Or(aws.ToString(raw.TaskDefinition), res.Fields["task_definition"]))
 
-	ebRuleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
+	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
 		return ReadFailed("eb-rule", err)
 	}
-	if ebRuleList == nil {
+	if ruleList == nil {
 		return NotRead("eb-rule")
 	}
-
-	var ids []string
-	for _, ruleRes := range ebRuleList {
-		rule, ok := assertStruct[eventbridgetypes.Rule](ruleRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if rule.EventPattern == nil || *rule.EventPattern == "" {
-			continue
-		}
-		if ecsSvcEbRuleMatches(*rule.EventPattern, svcName, clusterName) {
-			ids = append(ids, ruleRes.ID)
-		}
+	read := ebRulesMatching(ruleList, truncated, ecsServiceEvents(svcName, aws.ToString(raw.ServiceArn), clusterARN))
+	runs, err := ebTargetRead(ctx, clients, clusterARN, func(targets []eventbridgetypes.Target) bool {
+		return slices.ContainsFunc(targets, func(t eventbridgetypes.Target) bool {
+			return t.EcsParameters != nil && aws.ToString(t.Arn) == clusterARN &&
+				family != "" && taskDefFamily(aws.ToString(t.EcsParameters.TaskDefinitionArn)) == family
+		})
+	})
+	if err != nil {
+		runs = relatedRead{unread: true, failure: err}
 	}
-	return relatedResultTrunc("eb-rule", ids, truncated)
-}
-
-// ecsSvcEbRuleMatches returns true if the EventPattern JSON has source ["aws.ecs"]
-// and references the service by name or group ("service:{svcName}") or cluster name.
-func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
-	var p map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(pattern), &p); err != nil {
-		return false
-	}
-
-	if src, ok := p["source"]; ok {
-		var sources []string
-		if err := json.Unmarshal(src, &sources); err != nil || !slices.Contains(sources, "aws.ecs") {
-			return false
-		}
-	} else {
-		return false
-	}
-
-	// Every filter the pattern names has to match: a rule that names both a
-	// service group and a cluster fires for one cluster's service, and a
-	// service name is the name of a service in a cluster.
-	hasFilter := false
-	if detail, ok := p["detail"]; ok {
-		var d map[string]json.RawMessage
-		if err := json.Unmarshal(detail, &d); err == nil {
-			if grp, ok := d["group"]; ok {
-				hasFilter = true
-				var groups []string
-				if err := json.Unmarshal(grp, &groups); err != nil {
-					return false
-				}
-				if !slices.Contains(groups, "service:"+svcName) && !slices.Contains(groups, svcName) {
-					return false
-				}
-			}
-			if carn, ok := d["clusterArn"]; ok {
-				hasFilter = true
-				var carns []string
-				if err := json.Unmarshal(carn, &carns); err != nil {
-					return false
-				}
-				// A row that cannot say which cluster it is in is not held to
-				// one, the way an alarm's qualifier leaves an unanswerable
-				// question unanswered.
-				named := clusterName == ""
-				for _, c := range carns {
-					named = named || lastSegment(c, "/") == clusterName
-				}
-				if !named {
-					return false
-				}
-			}
-		}
-	}
-	if hasFilter {
-		return true
-	}
-	// Source matches aws.ecs with no narrowing filter — treat as broad match.
-	return true
+	return relatedAnswer("eb-rule", relatedRead{
+		ids:     append(read.ids, runs.ids...),
+		partial: read.partial || runs.partial,
+		unread:  runs.unread,
+		failure: runs.failure,
+	})
 }
 
 // checkECSSvcECR resolves ECR repositories used by this ECS service.
@@ -359,58 +304,57 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		if sm == nil || sm.Definition == nil || *sm.Definition == "" {
 			continue
 		}
-		if sfnASLHasECSFamily(*sm.Definition, family) {
+		runs, undecided := sfnASLRunsECSFamily(*sm.Definition, family)
+		if runs {
 			ids = append(ids, sfnRes.ID)
 		}
+		truncated = truncated || undecided && !runs
 	}
 	return unreadZero(res, reads.answer("sfn", "ecs-svc-related: DescribeStateMachine", ids, truncated))
 }
 
-// sfnASLHasECSFamily walks an ASL definition JSON and returns true if any Task state
-// has Resource starting with "arn:aws:states:::ecs:runTask" and
-// Parameters.TaskDefinition containing family.
-func sfnASLHasECSFamily(definition, family string) bool {
+// sfnASLRunsECSFamily walks an ASL definition for Task states whose Resource
+// is the ecs:runTask integration and reports whether one runs a task
+// definition of family, and whether one names its task definition by an
+// expression this reading cannot evaluate. RunTask's TaskDefinition is
+// "family", "family:revision" or the task definition's ARN; a JSONPath state
+// passes it in Parameters ("TaskDefinition.$" for a path), a JSONata state in
+// Arguments ("{% … %}" for an expression).
+// https://docs.aws.amazon.com/step-functions/latest/dg/connect-ecs.html
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RunTask.html
+func sfnASLRunsECSFamily(definition, family string) (runs, undecided bool) {
 	var raw any
 	if err := json.Unmarshal([]byte(definition), &raw); err != nil {
-		return false
+		return false, true
 	}
-	found := false
 	var walk func(v any)
 	walk = func(v any) {
-		if found {
-			return
-		}
-		m, ok := v.(map[string]any)
-		if !ok {
-			if arr, ok := v.([]any); ok {
-				for _, item := range arr {
-					walk(item)
-				}
+		switch x := v.(type) {
+		case []any:
+			for _, item := range x {
+				walk(item)
 			}
-			return
-		}
-		if res, ok := m["Resource"].(string); ok {
-			if a, ok := ARNForService(res, "states"); ok && strings.HasPrefix(a.Resource, "ecs:runTask") {
-				if params, ok := m["Parameters"].(map[string]any); ok {
-					if td, ok := params["TaskDefinition"].(string); ok {
-						if strings.Contains(td, family) {
-							found = true
-							return
-						}
-					}
-					if td, ok := params["TaskDefinition.$"].(string); ok {
-						if strings.Contains(td, family) {
-							found = true
-							return
+		case map[string]any:
+			if res, ok := x["Resource"].(string); ok {
+				if a, ok := ARNForService(res, "states"); ok && strings.HasPrefix(a.Resource, "ecs:runTask") {
+					for _, key := range []string{"Parameters", "Arguments"} {
+						params, _ := x[key].(map[string]any)
+						td, literal := params["TaskDefinition"].(string)
+						_, path := params["TaskDefinition.$"]
+						switch {
+						case path || literal && strings.HasPrefix(strings.TrimSpace(td), "{%"):
+							undecided = true
+						case literal:
+							runs = runs || taskDefFamily(td) == family
 						}
 					}
 				}
 			}
-		}
-		for _, val := range m {
-			walk(val)
+			for _, val := range x {
+				walk(val)
+			}
 		}
 	}
 	walk(raw)
-	return found
+	return runs, undecided
 }

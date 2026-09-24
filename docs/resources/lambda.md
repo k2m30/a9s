@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `apigw`
 
 - **Why related**: API Gateway integrations that invoke this function.
-- **How discovered**: the integration that names the function is the fact, and it lives on the API's routes, which `Api` does not embed and only `GetIntegrations` per API returns. Until that read exists, the row offers candidates — the loaded APIs that name this function in a tag key or in their own Name. — a9s-devops: this is an apigw-side reference (the integration lives on the route), not a Lambda-side field.
+- **How discovered**: call `GetIntegrations` for each loaded HTTP or WebSocket API and match each integration's `IntegrationUri` (the function ARN, or the `.../functions/<arn>/invocations` path) against this function. A REST API keeps its integrations per method, which this pivot does not read, so a REST API leaves the count a lower bound.
 - **Count shown**: no — the candidates are not a count of the APIs that invoke this function, and no candidate is no answer: the integrations were not read.
 
 ### `cf`
@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `eni`
 
 - **Why related**: Lambda-in-VPC creates requester-managed ENIs (Hyperplane ENIs) for outbound network access.
-- **How discovered**: cross-reference the `eni` list — EC2 types a hyperplane ENI `InterfaceType == lambda`, and its `Description`, `AWS Lambda VPC ENI-<FunctionName>-<uuid>`, names the function it belongs to. — a9s-devops: `FunctionConfiguration` has no ENI-ID list, and `RequesterId` is an account or service alias that varies.
+- **How discovered**: cross-reference the `eni` list — the Hyperplane ENIs (`InterfaceType == lambda`) in one of the function's `VpcConfig.SubnetIds` whose `Groups[]` are exactly its `VpcConfig.SecurityGroupIds`: Lambda creates one per subnet and security-group combination and shares it with every function of that combination ([configuration-vpc](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html)).
 - **Count shown**: yes.
 
 ### `kinesis`
@@ -309,7 +309,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - `efs` reasoning (FileSystemConfigs) — `docs/related-resources.md` § `lambda` bullet `efs`.
 - `efs` discovery (`FileSystemConfigs[].Arn`) — AWS SDK Go v2 — lambda/types.FunctionConfiguration § `FileSystemConfigs`; `FileSystemConfig.Arn` is the EFS access-point ARN.
 - `eni` reasoning (Lambda-in-VPC ENIs) — `docs/related-resources.md` § `lambda` bullet `eni`.
-- `eni` discovery (requester-managed ENI with `AWS Lambda VPC ENI` description) — a9s-devops (2026-04-20): possible=yes, worth=yes. Documented ENI description pattern.
+- `eni` discovery by the Hyperplane ENI's subnet and security-group combination — the Lambda VPC guide's sharing rule; the ENI description names only the function the ENI was created for.
 - `kinesis` reasoning (event-source mapping) — `docs/related-resources.md` § `lambda` bullet `kinesis`.
 - `kinesis` discovery (`ListEventSourceMappings` with kinesis `EventSourceArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes.
 - `kms` reasoning (env-var encryption key) — `docs/related-resources.md` § `lambda` bullet `kms`.

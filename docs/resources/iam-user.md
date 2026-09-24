@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `iam-gro
 ### `ct-events`
 
 - **Why related**: Universal pivot — "Audit trail for user actions and credential changes." Answers "what has this user been doing?" — the single most common question when a user looks dormant, has an old key, or is suspected of credential compromise.
-- **How discovered**: `LookupEvents` with attribute `Username == <user.UserName>` (the iam-user short-name is the bare user name, not the ARN — see `docs/testing-detail-view-coverage.md` §35 and `docs/design/resource-to-cloudtrail.md` §98).
+- **How discovered**: `LookupEvents` with attribute `Username == <user.UserName>` (the iam-user short-name is the bare user name, not the ARN — see `docs/testing-detail-view-coverage.md` §35 and `docs/design/resource-to-cloudtrail.md` §98), kept to the events whose `userIdentity.type` is `IAMUser`: the lookup also returns the calls of an assumed-role session named like the user ([userIdentity](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html)).
 - **Count shown**: yes.
 - Universal pivot — applies to every registered type; see `docs/related-resources.md` §Policy.
 

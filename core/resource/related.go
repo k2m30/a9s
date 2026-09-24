@@ -6,12 +6,14 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -726,6 +728,17 @@ const (
 	CTQualifierPathsKey  = "_qualifierpaths"
 )
 
+// CTWhereFilterKey carries, query-encoded, the event-body paths and the
+// values an event the lookup returns must carry to be the row's.
+// CTAlsoFilterKey carries a second lookup as "<attribute>=<value>" and
+// CTAlsoWhereFilterKey its matches in the same encoding. Like the keys above
+// these name no LookupAttribute.
+const (
+	CTWhereFilterKey     = "_where"
+	CTAlsoFilterKey      = "_also"
+	CTAlsoWhereFilterKey = "_alsowhere"
+)
+
 // BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
 // The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
 // Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
@@ -752,7 +765,54 @@ func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string 
 			filter[CTQualifierPathsKey] = strings.Join(q.EventPaths, ",")
 		}
 	}
+	where, ok := ctMatches(res, rt.CloudTrailWhere)
+	if !ok {
+		return nil
+	}
+	if where != "" {
+		filter[CTWhereFilterKey] = where
+	}
+	if also := buildFilterFromKey(res, rt.CloudTrailAlso.Key); len(also) == 1 {
+		if where, ok := ctMatches(res, rt.CloudTrailAlso.Where); ok {
+			for attr, val := range also {
+				filter[CTAlsoFilterKey] = attr + "=" + val
+			}
+			filter[CTAlsoWhereFilterKey] = where
+		}
+	}
 	return filter
+}
+
+// ctMatches encodes matches with the row's values; ok is false when the row
+// carries no value for one of them, which leaves nothing to match on.
+func ctMatches(res Resource, matches []catalog.CloudTrailMatch) (string, bool) {
+	where := url.Values{}
+	for _, m := range matches {
+		v := ctValue(res, m.Value)
+		if v == "" {
+			return "", false
+		}
+		where.Set(m.Path, v)
+	}
+	return where.Encode(), true
+}
+
+// ctValue reads source — "ID", "Name", "Fields.<key>" or a literal written
+// "=<value>" — from res.
+func ctValue(res Resource, source string) string {
+	switch source {
+	case "ID":
+		return res.ID
+	case "Name":
+		return res.Name
+	}
+	if literal, ok := strings.CutPrefix(source, "="); ok {
+		return literal
+	}
+	if key, ok := strings.CutPrefix(source, "Fields."); ok {
+		return res.Fields[key]
+	}
+	return ""
 }
 
 // ctAltName returns the spelling of res that a ResourceName lookup is not
@@ -780,19 +840,7 @@ func buildFilterFromKey(res Resource, ctKey string) map[string]string {
 	if len(parts) != 2 {
 		return nil
 	}
-	attr, source := parts[0], parts[1]
-
-	var val string
-	switch source {
-	case "ID":
-		val = res.ID
-	case "Name":
-		val = res.Name
-	default:
-		if key, ok := strings.CutPrefix(source, "Fields."); ok {
-			val = res.Fields[key]
-		}
-	}
+	attr, val := parts[0], ctValue(res, parts[1])
 	if val == "" {
 		return nil
 	}

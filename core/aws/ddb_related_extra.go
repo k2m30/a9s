@@ -27,14 +27,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if logList == nil {
 		return NotRead("logs")
 	}
-	prefix := "/aws/dynamodb/tables/" + name + "/"
-	var ids []string
-	for _, logRes := range logList {
-		if strings.HasPrefix(logRes.ID, prefix) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return relatedResultTrunc("logs", logGroupsUnder(logList, "/aws/dynamodb/tables/"+name), truncated)
 }
 
 // checkDdbVPCE scans the vpce cache for DynamoDB endpoints in this region.

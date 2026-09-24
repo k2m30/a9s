@@ -6,12 +6,14 @@
 package aws
 
 import (
+	"cmp"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -86,17 +88,115 @@ func rtbLiveRouteTarget(src resource.Resource, value string, _ []resource.Resour
 	return value
 }
 
-// endpointIsQueue reports whether an SNS subscription's Endpoint delivers to
-// the SQS queue with queueARN / queueName. An sqs-protocol subscription's
-// Endpoint is the queue's ARN, whole: one queue's ARN is the prefix of
-// another's ("…:orders" of "…:orders-dlq"), so anything looser reads a
-// dead-letter queue's subscription as the queue's own. The name fallback is
-// anchored on the ":" that opens an ARN's last field.
-func endpointIsQueue(endpoint, queueARN, queueName string) bool {
-	if queueARN != "" && endpoint == queueARN {
-		return true
+// refNamesResource reports whether ref — an ARN a service records, such as an
+// sqs-protocol subscription's Endpoint or a RedrivePolicy's
+// deadLetterTargetArn — names the resource with arn / name. A known ARN is
+// the answer, whole: one queue's ARN is the prefix of another's ("…:orders"
+// of "…:orders-dlq"), and a queue of the same name in another Region or
+// account is another queue. Only a row whose ARN is not known falls back to
+// the ARN's last ":" field.
+func refNamesResource(ref, arn, name string) bool {
+	if arn != "" {
+		return ref == arn
 	}
-	return queueName != "" && strings.HasSuffix(endpoint, ":"+queueName)
+	return name != "" && lastSegment(ref, ":") == name
+}
+
+// nameUnder reports whether name is parent itself or sits below it at a sep
+// boundary: log group "/aws/rds/instance/db-1/error" is under
+// "/aws/rds/instance/db-1" and "/aws/rds/instance/db-10/error" is not.
+func nameUnder(name, parent, sep string) bool {
+	return parent != "" && (name == parent || strings.HasPrefix(name, parent+sep))
+}
+
+// logGroupsUnder is the ids of the log groups that sit under one of dirs on a
+// "/" boundary; an empty dir names none.
+func logGroupsUnder(groups []resource.Resource, dirs ...string) []string {
+	var ids []string
+	for _, g := range groups {
+		if slices.ContainsFunc(dirs, func(dir string) bool { return nameUnder(g.ID, dir, "/") }) {
+			ids = append(ids, g.ID)
+		}
+	}
+	return ids
+}
+
+// textNames reports whether text holds token as a whole: where token starts
+// or ends with a character a name is spelled with, the text around it is not
+// one. "acme-npm" is in "token for acme-npm" but not in "acme-npm-internal".
+func textNames(text, token string) bool {
+	if token == "" {
+		return false
+	}
+	nameChar := func(c byte) bool {
+		return c == '-' || c == '_' || c == '.' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+	}
+	for from := 0; ; {
+		i := strings.Index(text[from:], token)
+		if i < 0 {
+			return false
+		}
+		start, end := from+i, from+i+len(token)
+		if (start == 0 || !nameChar(token[0]) || !nameChar(text[start-1])) &&
+			(end == len(text) || !nameChar(token[len(token)-1]) || !nameChar(text[end])) {
+			return true
+		}
+		from = start + 1
+	}
+}
+
+// sesRecipientMatches reports whether a receipt rule's recipient condition
+// applies to the SES identity: an email address, or a domain and the mail of
+// its subdomains. A condition is an address, which also matches the address
+// with a "+label" added; a domain, which matches its own addresses "but not
+// those within its subdomains"; or ".domain", which matches every subdomain
+// "but not those within the parent domain".
+// https://docs.aws.amazon.com/ses/latest/dg/receiving-email-receipt-rules-console-walkthrough.html
+func sesRecipientMatches(recipient, identity string) bool {
+	recipient = strings.ToLower(strings.TrimSpace(recipient))
+	identity = strings.ToLower(identity)
+	subdomains := strings.HasPrefix(recipient, ".")
+	rDomain := strings.TrimPrefix(recipient, ".")
+	rLocal := ""
+	if at := strings.LastIndex(recipient, "@"); at >= 0 {
+		rLocal, rDomain = recipient[:at], recipient[at+1:]
+	}
+	at := strings.LastIndex(identity, "@")
+	if at < 0 {
+		// A domain identity receives for itself and its subdomains.
+		return dnsZoneHosts(identity, rDomain) || subdomains && dnsZoneHosts(rDomain, identity)
+	}
+	local, domain := identity[:at], identity[at+1:]
+	switch {
+	case rLocal != "":
+		base, _, _ := strings.Cut(local, "+")
+		return domain == rDomain && (local == rLocal || !strings.Contains(rLocal, "+") && base == rLocal)
+	case subdomains:
+		return domain != rDomain && dnsZoneHosts(rDomain, domain)
+	}
+	return domain == rDomain
+}
+
+// publicZoneHolding is the public hosted zone a record called name is written
+// in: the innermost zone that hosts it, since a subdomain delegated to a zone
+// of its own is answered from that zone and not its parent. A private zone
+// answers only inside its VPCs, never for the public DNS a certificate or an
+// identity is verified in. Two public zones of the same name are both
+// returned: which one the registrar delegates to is not in either.
+func publicZoneHolding(zones []resource.Resource, name string) []string {
+	var ids []string
+	best := -1
+	for _, z := range zones {
+		zn := canonicalDNS(cmp.Or(z.Fields["name"], z.Name))
+		if z.Fields["private_zone"] == "true" || !dnsZoneHosts(zn, name) || len(zn) < best {
+			continue
+		}
+		if len(zn) > best {
+			ids, best = nil, len(zn)
+		}
+		ids = append(ids, z.ID)
+	}
+	return ids
 }
 
 // namesLaunchTemplate reports whether a launch-template specification, which
@@ -137,6 +237,30 @@ var efsFileSystemID = regexp.MustCompile(`\bfs-[0-9a-z]+\b`) //nolint:gochecknog
 func efsIDFromENIDescription(desc string) (string, bool) {
 	id := efsFileSystemID.FindString(desc)
 	return id, id != ""
+}
+
+// hyperplaneENIServes reports whether the Lambda Hyperplane ENI is one the
+// function uses. "Hyperplane ENIs are associated with a particular
+// combination of security groups and VPC subnets": Lambda creates one "the
+// first time you attach a function to a VPC using a particular subnet and
+// security group combination", and "other functions in your account that use
+// the same subnet and security group combination can also use this ENI". The
+// ENI's subnet is one of the function's, and its security groups are the
+// function's, all of them. The description names only the function the ENI
+// was first created for.
+// https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html
+func hyperplaneENIServes(eni ec2types.NetworkInterface, fn lambdatypes.FunctionConfiguration) bool {
+	if !isLambdaENI(eni) || fn.VpcConfig == nil || !slices.Contains(fn.VpcConfig.SubnetIds, aws.ToString(eni.SubnetId)) {
+		return false
+	}
+	groups := make([]string, 0, len(eni.Groups))
+	for _, g := range eni.Groups {
+		groups = append(groups, aws.ToString(g.GroupId))
+	}
+	want := slices.Clone(fn.VpcConfig.SecurityGroupIds)
+	slices.Sort(groups)
+	slices.Sort(want)
+	return slices.Equal(slices.Compact(groups), slices.Compact(want))
 }
 
 // eniMountsFileSystem reports whether the ENI is a mount target of the file

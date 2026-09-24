@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ec2`, `
 ### `lambda`
 
 - **Why related**: Lambda-in-VPC functions provision ENIs; when one is orphaned or stuck the operator wants to jump to the function.
-- **How discovered**: read field `NetworkInterface.InterfaceType == lambda`. The function name is embedded in `NetworkInterface.Description` (AWS format `AWS Lambda VPC ENI-<functionName>-<uuid>`); cross-reference the already-loaded `lambda` list by `FunctionConfiguration.FunctionName` — a9s-devops: parsing the description is the only in-band way to reach the function from the ENI; the AWS SDK does not expose a direct owning-function field on the ENI shape.
+- **How discovered**: read `NetworkInterface.InterfaceType == lambda`, the ENI's `SubnetId` and `Groups[]`; cross-reference the already-loaded `lambda` list for the functions whose `VpcConfig.SubnetIds` hold the subnet and whose `VpcConfig.SecurityGroupIds` are exactly the ENI's groups — "Other functions in your account that use the same subnet and security group combination can also use this ENI" ([configuration-vpc](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html)). The description names only the function the ENI was first created for.
 - **Count shown**: yes.
 
 ### `nat`
@@ -187,7 +187,7 @@ eni — NETWORKING. Status key: `status` — the key the status cell reads, and 
 | vpc | VPC | no |
 | subnet | Subnet | no |
 | elb | Load Balancers | no |
-| lambda | Lambda Functions | no |
+| lambda | Lambda Functions | yes |
 | nat | NAT Gateways | yes |
 | vpce | VPC Endpoints | yes |
 | ct-events | CloudTrail Events | no |

@@ -180,6 +180,14 @@ type ResourceTypeDef struct {
 	// server-side key: an event whose body names a different parent is left
 	// out on the way in, and an event naming none is kept.
 	CloudTrailQualifier CloudTrailQualifier
+	// CloudTrailWhere keeps, of the events the CloudTrailKey lookup returns,
+	// those whose body carries each match: a lookup attribute can match more
+	// than the row, as Username matches a role session named like the user.
+	CloudTrailWhere []CloudTrailMatch
+	// CloudTrailAlso is a second lookup, for the events that name the row only
+	// in their body: Key in CloudTrailKey's format, and the matches an event
+	// it returns must carry to be the row's.
+	CloudTrailAlso CloudTrailAlso
 	// CloudTrailRegion returns the Region whose event history holds this row's
 	// events. CloudTrail keeps event history per Region, and a global service
 	// records its events in one Region wherever the operator is browsing:
@@ -223,6 +231,20 @@ type ResourceTypeDef struct {
 type CloudTrailQualifier struct {
 	ParentField string
 	EventPaths  []string
+}
+
+// CloudTrailMatch is a path into an event's JSON body and the value it must
+// carry, from the row in CloudTrailKey's value format ("ID", "Name",
+// "Fields.<key>") or a literal written "=<value>".
+type CloudTrailMatch struct {
+	Path, Value string
+}
+
+// CloudTrailAlso is a second CloudTrail lookup of a type; see
+// ResourceTypeDef.CloudTrailAlso.
+type CloudTrailAlso struct {
+	Key   string
+	Where []CloudTrailMatch
 }
 
 // ResolveColor classifies r using d.Color, defaulting to a generic

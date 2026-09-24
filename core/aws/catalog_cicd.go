@@ -307,6 +307,17 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			ParentField: "domain_name",
 			EventPaths:  []string{"requestParameters.domain"},
 		},
+		// A package-manager request is recorded as ReadFromRepository with the
+		// repository only in requestParameters (domainName, repositoryName),
+		// and no resources entry a ResourceName lookup could find.
+		// https://docs.aws.amazon.com/codeartifact/latest/ug/codeartifact-information-in-cloudtrail.html
+		CloudTrailAlso: catalog.CloudTrailAlso{
+			Key: "EventName:=ReadFromRepository",
+			Where: []catalog.CloudTrailMatch{
+				{Path: "requestParameters.domainName", Value: "Fields.domain_name"},
+				{Path: "requestParameters.repositoryName", Value: "Fields.repo_name"},
+			},
+		},
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {
 			acct := r.Fields["domain_owner"]
 			if acct == "" {

@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -41,7 +40,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		if endpoint == "" {
 			continue
 		}
-		if !endpointIsQueue(endpoint, queueARN, queueName) {
+		if !refNamesResource(endpoint, queueARN, queueName) {
 			continue
 		}
 		if ta := sub.Fields["topic_arn"]; ta != "" {
@@ -93,7 +92,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 		if endpoint == "" {
 			continue
 		}
-		if endpointIsQueue(endpoint, queueARN, queueName) {
+		if refNamesResource(endpoint, queueARN, queueName) {
 			ids = append(ids, subRes.ID)
 		}
 	}
@@ -163,18 +162,9 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 			idSet[sqsRes.ID] = struct{}{}
 		}
 
-		// Reverse: candidate queue's RedrivePolicy points to thisARN.
-		if thisARN != "" {
-			dlqTarget := sqsRedriveTarget(raw.Attributes["RedrivePolicy"])
-			if dlqTarget != "" && dlqTarget == thisARN {
-				idSet[sqsRes.ID] = struct{}{}
-			}
-		} else if thisName != "" {
-			// Fallback: match by queue name suffix.
-			dlqTarget := sqsRedriveTarget(raw.Attributes["RedrivePolicy"])
-			if dlqTarget != "" && strings.HasSuffix(dlqTarget, ":"+thisName) {
-				idSet[sqsRes.ID] = struct{}{}
-			}
+		// Reverse: candidate queue's RedrivePolicy points to this queue.
+		if refNamesResource(sqsRedriveTarget(raw.Attributes["RedrivePolicy"]), thisARN, thisName) {
+			idSet[sqsRes.ID] = struct{}{}
 		}
 	}
 

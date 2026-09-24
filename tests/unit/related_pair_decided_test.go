@@ -32,13 +32,13 @@ var relatedPairFacts = []struct {
 	{a: "eip", b: "eni", oneFact: true, fieldAB: "NetworkInterfaceId", fieldBA: "AllocationId"},
 	{a: "iam-group", b: "policy", oneFact: true, fieldAB: "ListAttachedGroupPolicies", fieldBA: "ListEntitiesForPolicy"},
 	{a: "role", b: "policy", oneFact: true, fieldAB: "ListAttachedRolePolicies", fieldBA: "ListEntitiesForPolicy"},
+	{a: "ecs-task", b: "logs", oneFact: true, fieldAB: "awslogs-group", fieldBA: "awslogs-group"},
 
 	{a: "ec2", b: "ebs-snap", fieldAB: "Snapshot.VolumeId", fieldBA: "Snapshot.Description"},
 	{a: "ec2", b: "tg", fieldAB: "TargetGroup.VpcId", fieldBA: "DescribeTargetHealth"},
 	{a: "cf", b: "s3", fieldAB: "Logging.Bucket", fieldBA: "Origins.Items"},
 	{a: "cfn", b: "s3", fieldAB: "ListStackResources", fieldBA: "aws:cloudformation:stack-name"},
 	{a: "acm", b: "apigw", fieldAB: "InUseBy", fieldBA: "DomainNameConfigurations"},
-	{a: "ecs-task", b: "logs", fieldAB: "awslogs-group", fieldBA: "family"},
 	{a: "acm", b: "r53", fieldAB: "DomainValidationOptions", fieldBA: "acm-validations.aws"},
 }
 

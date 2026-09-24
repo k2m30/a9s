@@ -206,10 +206,8 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 			VpcId:         aws.String(fixtELBProdVPCID),
 			IpAddressType: elbv2types.IpAddressTypeIpv4,
 			CreatedTime:   aws.Time(time.Date(2025, 9, 10, 9, 0, 0, 0, time.UTC)),
-			// AvailabilityZones/SecurityGroups — required for the apigw:elb
-			// related-panel pivot (checkApigwELB), which intersects the
-			// PublicAPIGWID VpcLink's SubnetIds/SecurityGroupIds
-			// (apigw.go fixture) against this NLB's subnet/SG membership.
+			// The PublicAPIGWID private integration (apigw.go) names this
+			// NLB's listener, APIGWBackendListenerARN.
 			AvailabilityZones: []elbv2types.AvailabilityZone{
 				{SubnetId: aws.String(fixtProdPrivateSubnetA)},
 			},

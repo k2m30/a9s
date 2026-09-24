@@ -50,7 +50,7 @@ func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Res
 	}
 	var ids []string
 	for _, repo := range repos {
-		if slices.ContainsFunc(text, func(t string) bool { return strings.Contains(t, repo.Name) }) {
+		if slices.ContainsFunc(text, func(t string) bool { return textNames(t, repo.Name) }) {
 			ids = append(ids, repo.ID)
 		}
 	}
@@ -127,7 +127,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 				if opt.Value == nil {
 					continue
 				}
-				if strings.Contains(*opt.Value, resolveRef) {
+				if textNames(*opt.Value, resolveRef) {
 					ids = append(ids, ebRes.ID)
 					goto nextEB
 				}

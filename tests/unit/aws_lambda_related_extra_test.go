@@ -208,50 +208,43 @@ func TestRelated_Lambda_EFS_NilARN(t *testing.T) {
 	}
 }
 
-func TestRelated_Lambda_APIGW_MatchByName(t *testing.T) {
-	const fnName = "my-function"
-	apiRes := resource.Resource{
-		ID:   "api-id-123",
-		Name: "api-for-my-function",
-		RawStruct: apigwtypes.Api{
-			ApiId: aws.String("api-id-123"),
-			Name:  aws.String("api-for-my-function"),
-		},
+// lambdaAPIGWWorld answers GetIntegrations as API Gateway does for HTTP APIs,
+// whose Lambda proxy integrations carry the function ARN in IntegrationUri.
+func lambdaAPIGWWorld(integrations map[string]string) *awsclient.ServiceClients {
+	fake := &t568APIGW{integrations: map[string][]apigwtypes.Integration{}}
+	for apiID, fnName := range integrations {
+		fake.integrations[apiID] = []apigwtypes.Integration{{IntegrationId: aws.String("int-" + apiID), IntegrationType: apigwtypes.IntegrationTypeAwsProxy,
+			IntegrationUri: aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + fnName), PayloadFormatVersion: aws.String("2.0")}}
 	}
-	cache := resource.ResourceCache{
-		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{apiRes}},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, src, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (name contains function name)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "api-id-123" {
-		t.Errorf("ResourceIDs = %v, want [api-id-123]", result.ResourceIDs())
-	}
+	return &awsclient.ServiceClients{APIGatewayV2: fake, Region: "us-east-1"}
 }
 
+// An API invokes a function through an integration whose IntegrationUri is
+// the function's ARN; an API whose name holds the function's name invokes
+// whatever its own integrations name.
+func TestRelated_Lambda_APIGW_MatchByName(t *testing.T) {
+	cache := resource.ResourceCache{"apigw": {Resources: []resource.Resource{
+		t568HTTPAPI("a1b2c3d4e5", "api-for-my-function"),
+		t568HTTPAPI("f6g7h8i9j0", "checkout"),
+	}}}
+	clients := lambdaAPIGWWorld(map[string]string{"a1b2c3d4e5": "my-function-legacy", "f6g7h8i9j0": "my-function"})
+	src := resource.Resource{ID: "my-function", Name: "my-function"}
+	result := lambdaExtraCheckerByTarget(t, "apigw")(context.Background(), clients, src, cache)
+	t568RequireExact(t, "lambda my-function → apigw", result, "f6g7h8i9j0")
+}
+
+// A tag on an API is the API owner's label; which function the API invokes
+// is in its integrations.
 func TestRelated_Lambda_APIGW_MatchByTag(t *testing.T) {
-	const fnName = "my-tagged-fn"
-	apiRes := resource.Resource{
-		ID:   "tagged-api-id",
-		Name: "tagged-api",
-		RawStruct: apigwtypes.Api{
-			ApiId: aws.String("tagged-api-id"),
-			Name:  aws.String("tagged-api"),
-			Tags:  map[string]string{fnName: "true"},
-		},
-	}
-	cache := resource.ResourceCache{
-		"apigw": resource.ResourceCacheEntry{Resources: []resource.Resource{apiRes}},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, src, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (tag key matches function name)", result.Count())
-	}
+	api := t568HTTPAPI("k1l2m3n4o5", "tagged-api")
+	raw := api.RawStruct.(apigwtypes.Api)
+	raw.Tags = map[string]string{"my-tagged-fn": "true", "function": "my-tagged-fn"}
+	api.RawStruct = raw
+	cache := resource.ResourceCache{"apigw": {Resources: []resource.Resource{api}}}
+	clients := lambdaAPIGWWorld(map[string]string{"k1l2m3n4o5": "reporting"})
+	src := resource.Resource{ID: "my-tagged-fn", Name: "my-tagged-fn"}
+	result := lambdaExtraCheckerByTarget(t, "apigw")(context.Background(), clients, src, cache)
+	t568RequireExact(t, "lambda my-tagged-fn → apigw", result)
 }
 
 func TestRelated_Lambda_APIGW_NoMatch(t *testing.T) {
@@ -293,26 +286,15 @@ func TestRelated_Lambda_APIGW_EmptyFunctionName(t *testing.T) {
 	}
 }
 
+// Every API on a truncated first page was read and none integrates the
+// function: that is zero found so far, a lower bound rather than a proven zero.
 func TestRelated_Lambda_APIGW_TruncatedCacheNoMatch(t *testing.T) {
-	const fnName = "my-function"
-	apiRes := resource.Resource{
-		ID:   "unrelated-api",
-		Name: "unrelated-api",
-		RawStruct: apigwtypes.Api{
-			Name: aws.String("unrelated-api"),
-		},
-	}
-	cache := resource.ResourceCache{
-		"apigw": resource.ResourceCacheEntry{
-			Resources:   []resource.Resource{apiRes},
-			IsTruncated: true,
-		},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), nil, src, cache)
-	if !result.Truncated() {
-		t.Errorf("Truncated = false, want true (truncated cache, no match)")
+	cache := resource.ResourceCache{"apigw": {Resources: []resource.Resource{t568HTTPAPI("p1q2r3s4t5", "unrelated-api")}, IsTruncated: true}}
+	clients := lambdaAPIGWWorld(map[string]string{"p1q2r3s4t5": "reporting"})
+	src := resource.Resource{ID: "my-function", Name: "my-function"}
+	result := lambdaExtraCheckerByTarget(t, "apigw")(context.Background(), clients, src, cache)
+	if result.State() != domain.RelatedResolved || !result.Truncated() || result.Count() != 0 {
+		t.Errorf("lambda → apigw over a truncated page = state %v truncated %v ids %v, want resolved, truncated, none", result.State(), result.Truncated(), result.ResourceIDs())
 	}
 }
 
@@ -850,34 +832,34 @@ func TestRelated_Lambda_S3_NilCache(t *testing.T) {
 // mechanism: EC2 types a Lambda hyperplane ENI "lambda", and its Description,
 // "AWS Lambda VPC ENI-<FunctionName>-<uuid>", is what says which function it
 // belongs to — every VPC-attached function's ENIs carry the same type.
+// A Hyperplane ENI is shared by every function attached to its subnet with
+// its exact set of security groups (docs.aws.amazon.com/lambda/latest/dg/
+// configuration-vpc.html, "Other functions in your account that use the same
+// subnet and security group combination can also use this ENI"). Its
+// description names only the function it was first created for.
 func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
-	const fnName = "my-vpc-function"
-	eniRes := resource.Resource{
-		ID:   "eni-aaa111",
-		Name: "eni-aaa111",
-		Fields: map[string]string{
-			"requester_id": "AWS Lambda VPC ENI",
-			"description":  "AWS Lambda VPC ENI-my-vpc-function-abcdef",
-		},
-		RawStruct: ec2types.NetworkInterface{
-			NetworkInterfaceId: aws.String("eni-aaa111"),
+	eni := func(id, sg string) resource.Resource {
+		return resource.Resource{ID: id, Name: id, RawStruct: ec2types.NetworkInterface{
+			NetworkInterfaceId: aws.String(id),
 			InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
-			RequesterId:        aws.String("AWS Lambda VPC ENI"),
-			Description:        aws.String("AWS Lambda VPC ENI-my-vpc-function-abcdef"),
-		},
+			RequesterId:        aws.String("123456789012:awslambda_us-east-1"),
+			Description:        aws.String("AWS Lambda VPC ENI-first-vpc-function-1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"),
+			SubnetId:           aws.String("subnet-0a1b2c3d4e5f60001"),
+			Groups:             []ec2types.GroupIdentifier{{GroupId: aws.String(sg)}},
+		}}
 	}
-	cache := resource.ResourceCache{
-		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{eniRes}},
-	}
-	src := resource.Resource{ID: fnName, Name: fnName}
-	checker := lambdaExtraCheckerByTarget(t, "eni")
-	result := checker(context.Background(), nil, src, cache)
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (a lambda-type ENI whose description names this function)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "eni-aaa111" {
-		t.Errorf("ResourceIDs = %v, want [eni-aaa111]", result.ResourceIDs())
-	}
+	cache := resource.ResourceCache{"eni": {Resources: []resource.Resource{
+		eni("eni-0a1b2c3d4e5f60aaa", "sg-0a1b2c3d4e5f60001"),
+		eni("eni-0a1b2c3d4e5f60bbb", "sg-0a1b2c3d4e5f60002"),
+	}}}
+	src := resource.Resource{ID: "my-vpc-function", Name: "my-vpc-function", RawStruct: lambdatypes.FunctionConfiguration{
+		FunctionName: aws.String("my-vpc-function"),
+		FunctionArn:  aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-vpc-function"),
+		VpcConfig: &lambdatypes.VpcConfigResponse{VpcId: aws.String("vpc-0a1b2c3d4e5f60001"),
+			SubnetIds: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"}, SecurityGroupIds: []string{"sg-0a1b2c3d4e5f60001"}},
+	}}
+	result := lambdaExtraCheckerByTarget(t, "eni")(context.Background(), nil, src, cache)
+	t568RequireExact(t, "lambda my-vpc-function → eni", result, "eni-0a1b2c3d4e5f60aaa")
 }
 
 func TestRelated_Lambda_ENI_NoDescriptionField(t *testing.T) {

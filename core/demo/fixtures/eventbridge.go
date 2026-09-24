@@ -26,6 +26,10 @@ const prodEBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 // service of that name.
 const EBRuleForOneClustersService = "ecs-batch-log-aggregator-task-state-change"
 
+// EBRuleECRPrefix is the rule whose pattern matches ECR repositories by a
+// prefix of their name: acme/batch-processor and acme/batch-etl (ecr.go).
+const EBRuleECRPrefix = "ecr-batch-push-audit"
+
 // EBCustomBus is the account's bus beside the default one, and
 // EBRuleOnCustomBus is the rule that sits on it: a rule name is unique on its
 // bus, so a rule is only listed by the bus it was created on.
@@ -89,9 +93,10 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			Description:        aws.String("Disabled rule — targets are configured but this rule will not trigger"),
 			RoleArn:            aws.String(prodEBRoleARN),
 		},
-		// ECS service-scheduled-task rule — required for ecs-svc→eb-rule
-		// related-panel pivot. checkECSSvcEbRule matches source=["aws.ecs"] +
-		// detail.clusterArn containing "acme-services".
+		// ECS task-state rule for the acme-services cluster — required for
+		// the ecs-svc→eb-rule related-panel pivot: its pattern names the
+		// cluster in detail.clusterArn, so it matches every service's tasks
+		// there.
 		{
 			Name:         aws.String("ecs-acme-services-task-state-change"),
 			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/ecs-acme-services-task-state-change"),
@@ -111,9 +116,8 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			EventPattern: aws.String(`{"source":["aws.ecs"],"detail-type":["ECS Task State Change"],"detail":{"group":["service:log-aggregator"],"clusterArn":["arn:aws:ecs:us-east-1:123456789012:cluster/acme-batch"]}}`),
 			Description:  aws.String("Routes the acme-batch log-aggregator's task state changes to SNS"),
 		},
-		// S3 healthy-bucket event bridge rule (checkS3EBRule pivot).
-		// checkS3EBRule reads ruleRes.Fields["target_arns"] (emitted by the
-		// eventbridge fetcher); this rule is pre-set so the demo related graph renders.
+		// S3 healthy-bucket rule — required for the s3→eb-rule related-panel
+		// pivot: its pattern names the bucket in detail.bucket.name.
 		{
 			Name:         aws.String("a9s-demo-s3-events-rule"),
 			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/a9s-demo-s3-events-rule"),
@@ -123,8 +127,8 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			Description:  aws.String("Routes S3 object-created events from a9s-demo-healthy (" + HealthyBucketARN + ") to Lambda"),
 		},
 		// ECR image-scan-complete rule for acme/api-service — required for
-		// ecr:eb-rule related-panel pivot. checkECREbRule matches
-		// source=["aws.ecr"] + detail.repository-name containing the repo name.
+		// ecr:eb-rule related-panel pivot: its pattern names the repository
+		// in detail.repository-name.
 		{
 			Name:         aws.String("ecr-api-service-scan-complete"),
 			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/ecr-api-service-scan-complete"),
@@ -132,6 +136,16 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			EventBusName: aws.String("default"),
 			EventPattern: aws.String(`{"source":["aws.ecr"],"detail-type":["ECR Image Scan"],"detail":{"repository-name":["acme/api-service"]}}`),
 			Description:  aws.String("Routes ECR image scan completion events for acme/api-service to SNS"),
+		},
+		// EBRuleECRPrefix filters the repository name with a prefix, so it
+		// is counted on every repository whose name starts acme/batch-.
+		{
+			Name:         aws.String(EBRuleECRPrefix),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/" + EBRuleECRPrefix),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.ecr"],"detail-type":["ECR Image Action"],"detail":{"action-type":["PUSH"],"result":["SUCCESS"],"repository-name":[{"prefix":"acme/batch-"}]}}`),
+			Description:  aws.String("Routes successful pushes to the batch repositories to SNS"),
 		},
 		// order-fulfillment-workflow schedule rule — required for sfn:eb-rule
 		// related-panel pivot. checkSFNEbRule calls ListRuleNamesByTarget
@@ -255,6 +269,12 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 				Arn: aws.String(relatedAlarmSNSARN),
 			},
 		},
+		EBRuleECRPrefix: {
+			{
+				Id:  aws.String("SNSECRPushTopic"),
+				Arn: aws.String(relatedAlarmSNSARN),
+			},
+		},
 		"nightly-order-fulfillment-trigger": {
 			{
 				Id:  aws.String("SFNOrderFulfillmentWorkflow"),
@@ -302,5 +322,5 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "eb-rule", Rows: 14, Issues: 0})
+	Register(Pin{ShortName: "eb-rule", Rows: 15, Issues: 0})
 }

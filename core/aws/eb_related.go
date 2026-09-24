@@ -4,7 +4,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -14,7 +13,8 @@ import (
 )
 
 // checkEbCFN checks the CFN cache for a stack associated with this EB environment.
-// Pattern C: match by stack name prefix "awseb-{envID}".
+// Pattern C: match by stack name "awseb-{envID}-stack", or one under
+// "awseb-{envID}" on a "-" boundary.
 func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	envID := res.ID
 	if eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct); ok {
@@ -40,8 +40,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 	var ids []string
 	for _, cfnRes := range cfnList {
 		name := cfnRes.Fields["stack_name"]
-		if name == expectedName || cfnRes.ID == expectedName || cfnRes.Name == expectedName ||
-			strings.HasPrefix(name, envIDPrefix) {
+		if cfnRes.ID == expectedName || cfnRes.Name == expectedName || nameUnder(name, envIDPrefix, "-") {
 			ids = append(ids, cfnRes.ID)
 		}
 	}
@@ -61,8 +60,6 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		return foundNone("logs", "envName")
 	}
 
-	prefix := "/aws/elasticbeanstalk/" + envName + "/"
-
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return ReadFailed("logs", err)
@@ -71,13 +68,7 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		return NotRead("logs")
 	}
 
-	var ids []string
-	for _, logRes := range logList {
-		if strings.HasPrefix(logRes.ID, prefix) {
-			ids = append(ids, logRes.ID)
-		}
-	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return relatedResultTrunc("logs", logGroupsUnder(logList, "/aws/elasticbeanstalk/"+envName), truncated)
 }
 
 // checkEbASG checks the ASG cache for groups tagged with this EB environment name.

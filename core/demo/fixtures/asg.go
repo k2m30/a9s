@@ -162,7 +162,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 		},
 		{
 			AutoScalingGroupName:   aws.String("acme-worker-batch-asg"),
-			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:22222222-2222-2222-2222-222222222222:autoScalingGroupName/acme-worker-batch-asg"),
+			AutoScalingGroupARN:    aws.String(ECSBatchASGARN),
 			MinSize:                aws.Int32(0),
 			MaxSize:                aws.Int32(20),
 			DesiredCapacity:        aws.Int32(5),
@@ -180,8 +180,9 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 					},
 				},
 			},
-			// AmazonECSManaged — required for ecs→asg related-panel pivot.
-			// Marks this ASG as owned by an ECS cluster capacity provider.
+			// AmazonECSManaged is the tag ECS sets on the group of a
+			// capacity provider; acme-batch's provider names this group
+			// (ecs.go).
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Service"), Value: aws.String("batch-worker")},

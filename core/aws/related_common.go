@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -128,7 +127,7 @@ func logGroupsNaming(ctx context.Context, clients any, cache resource.ResourceCa
 	}
 	var ids []string
 	for _, logRes := range logList {
-		if strings.Contains(logRes.ID, name) {
+		if textNames(logRes.ID, name) {
 			ids = append(ids, logRes.ID)
 		}
 	}
@@ -150,15 +149,7 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 	if err != nil || def == nil {
 		return logGroupsNaming(ctx, clients, cache, family)
 	}
-	var groups []string
-	for _, container := range def.ContainerDefinitions {
-		if container.LogConfiguration == nil || container.LogConfiguration.LogDriver != ecstypes.LogDriverAwslogs {
-			continue
-		}
-		if g := container.LogConfiguration.Options["awslogs-group"]; g != "" {
-			groups = append(groups, g)
-		}
-	}
+	groups := awslogsGroups(def, sessionRegion(clients))
 	if len(groups) == 0 {
 		return foundNone("logs", "the definition's awslogs-group options")
 	}
@@ -171,6 +162,27 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 	}
 	ids, lowerBound := listedRefs("logs", groups, refContext(clients, cache, "logs"), logList)
 	return relatedResultTrunc("logs", ids, lowerBound)
+}
+
+// awslogsGroups is the log groups the containers of def write to: the
+// awslogs-group option of each container on the awslogs driver, in region
+// unless its awslogs-region option names another.
+// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html
+func awslogsGroups(def *ecstypes.TaskDefinition, region string) []string {
+	var groups []string
+	for _, container := range def.ContainerDefinitions {
+		logs := container.LogConfiguration
+		if logs == nil || logs.LogDriver != ecstypes.LogDriverAwslogs {
+			continue
+		}
+		if r := logs.Options["awslogs-region"]; r != "" && region != "" && r != region {
+			continue
+		}
+		if g := logs.Options["awslogs-group"]; g != "" {
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 // ecsTaskDefinition reads one task definition. errClientMissing stands for a
@@ -206,6 +218,10 @@ func alarmIDsByDimension(ctx context.Context, clients any, cache resource.Resour
 	spec, ok := AlarmMatchSpecFor(source)
 	if !ok {
 		return NotRead("alarm")
+	}
+	res, err := spec.complete(ctx, clients, res)
+	if err != nil {
+		return ReadFailed("alarm", err)
 	}
 	values, read := spec.alarmValuesOf(res)
 	if !read {
@@ -267,16 +283,29 @@ func alarmRowsNaming(ctx context.Context, clients any, cache resource.ResourceCa
 	// An alarm watches the metrics of its own region, so a row whose metrics
 	// are published elsewhere is none of this alarm's business.
 	alarmRegion := arnRegionOf(aws.ToString(alarm.AlarmArn), "cloudwatch")
+	// A row completed by a call of its own is read only for an alarm that
+	// could name one: any other names none, whatever the call would say.
+	completing := spec.Complete != nil && spec.watchedBy(alarm)
 	var ids []string
+	var reads rowReads
 	for _, row := range rows {
 		if region := spec.metricsRegionOf(row); region != "" && alarmRegion != "" && region != alarmRegion {
 			continue
 		}
+		if completing {
+			completed, err := spec.complete(ctx, clients, row)
+			if err != nil {
+				reads.fail(row.ID, err)
+				continue
+			}
+			row = completed
+		}
+		reads.read++
 		if spec.names(alarm, row) || anyMatch(also, row) {
 			ids = append(ids, row.ID)
 		}
 	}
-	return relatedResultTrunc(target, ids, truncated)
+	return reads.answer(target, "alarm-related: "+target, ids, truncated)
 }
 
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and

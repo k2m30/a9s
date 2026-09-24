@@ -3,8 +3,10 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -32,6 +34,7 @@ func fetchECSTasksPageWithJoin(
 ) (resource.FetchResult, error) {
 	// Memoize DescribeTaskDefinition results across every cluster of the page.
 	seenTaskDefs := make(map[string]taskDefRead)
+	var joinFailures []Failure
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
 			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
@@ -133,11 +136,13 @@ func fetchECSTasksPageWithJoin(
 					"execution_role":      taskDefJoin.executionRoleARN,
 					"secret_arns":         taskDefJoin.secretARNs,
 					"ssm_param_names":     taskDefJoin.ssmParamNames,
+					"log_groups":          taskDefJoin.logGroups,
 					"container_images":    containerImages,
 					"arn":                 taskArn,
 				}
 				if joinErr != nil {
 					fields["task_def_join_error"] = "true"
+					joinFailures = append(joinFailures, FailedCall(taskID, joinErr))
 				}
 
 				findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
@@ -156,7 +161,10 @@ func fetchECSTasksPageWithJoin(
 		},
 		batch: 100,
 	}
-	return walk.page(ctx, continuationToken)
+	// A task whose definition could not be read keeps its row: the failure
+	// is the row's, reported once with the page, and leaves the list whole.
+	result, err := walk.page(ctx, continuationToken)
+	return result, JoinAggregates(err, AggregateFailures("ecs-task: DescribeTaskDefinition", joinFailures, len(result.Resources)))
 }
 
 // taskDefJoinFields holds the per-task fields resolved by ecsJoinTaskDefinition
@@ -174,6 +182,9 @@ type taskDefJoinFields struct {
 	// parameters ContainerDefinitions[].Secrets[].ValueFrom names — required
 	// for the ecs-task:ssm related-panel pivot.
 	ssmParamNames string
+	// logGroups is a sorted, comma-joined list of the awslogs-group of each
+	// container — required for the logs:ecs-task related-panel pivot.
+	logGroups string
 }
 
 // taskDefRead is one DescribeTaskDefinition answer, kept for every task of
@@ -307,6 +318,9 @@ func ecsJoinTaskDefinition(
 		sort.Strings(ids)
 		out.ssmParamNames = strings.Join(ids, ",")
 	}
+	groups := awslogsGroups(td, arnRegionOf(aws.ToString(task.TaskArn), "ecs"))
+	sort.Strings(groups)
+	out.logGroups = strings.Join(slices.Compact(groups), ",")
 
 	return out, nil
 }
@@ -318,4 +332,35 @@ func ecsJoinTaskDefinition(
 // field for "none" states a zero about a definition nobody read.
 func taskDefJoined(res resource.Resource) bool {
 	return res.Fields["task_def_join_error"] != "true"
+}
+
+// ecsTaskLogGroups is the log groups the task's containers write to, and
+// whether its task definition was read: the list fetcher's join when the row
+// carries it, else one read of the definition. A task whose join failed was
+// not read; the fetcher already met the failure.
+func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (groups []string, read bool, err error) {
+	if !taskDefJoined(row) {
+		return nil, false, nil
+	}
+	if joined, ok := row.Fields["log_groups"]; ok {
+		if joined == "" {
+			return nil, true, nil
+		}
+		return strings.Split(joined, ","), true, nil
+	}
+	taskDef, taskARN := row.Fields["task_definition"], row.Fields["arn"]
+	if task, ok := assertStruct[ecstypes.Task](row.RawStruct); ok {
+		taskDef, taskARN = cmp.Or(aws.ToString(task.TaskDefinitionArn), taskDef), cmp.Or(aws.ToString(task.TaskArn), taskARN)
+	}
+	if taskDef == "" {
+		return nil, false, nil
+	}
+	def, err := ecsTaskDefinition(ctx, clients, taskDef)
+	if err == nil && def == nil {
+		err = errClientMissing
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return awslogsGroups(def, cmp.Or(arnRegionOf(taskARN, "ecs"), sessionRegion(clients))), true, nil
 }

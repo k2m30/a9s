@@ -148,7 +148,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
 			{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "the API id in this group's API-Gateway-Execution-Logs_<id> name"},
-			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true, Truncated: true, Distinct: "tasks whose task-definition family this group's /ecs/<family> name carries"},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLogsKinesis, Truncated: true},
 			{TargetType: "s3", DisplayName: "S3 (exports)", Checker: checkLogsS3, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("logs")},

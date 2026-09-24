@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ses"
@@ -26,13 +27,9 @@ type ruleSetStore interface {
 	GetOrFetch(context.Context, func(context.Context) (any, error)) (any, error)
 }
 
-// checkSESR53 searches the R53 cache for hosted zones whose domain matches the
-// SES identity domain. Pattern N — naming convention.
-//
-// EMAIL_ADDRESS identities: extract domain after "@".
-// DOMAIN identities: use the identity name directly.
-// Hosted zone names have a trailing dot (e.g. "acme-corp.com.") which is stripped
-// before comparison.
+// checkSESR53 finds the public hosted zone the SES identity's domain is
+// written in (publicZoneHolding): the domain of an address identity, or the
+// domain identity itself.
 func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain := canonicalDNS(sesIdentityDomain(res))
 	if domain == "" {
@@ -47,12 +44,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return NotRead("r53")
 	}
 
-	var ids []string
-	for _, zone := range r53List {
-		if dnsZoneHosts(zone.Name, domain) {
-			ids = append(ids, zone.ID)
-		}
-	}
+	ids := publicZoneHolding(r53List, domain)
 	if len(ids) == 0 && truncated {
 		return relatedResultTrunc("r53", nil, true)
 	}
@@ -222,22 +214,15 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // sesRuleAppliesToIdentity reports whether a receipt rule should be considered
-// when computing related resources for the given SES identity.
-//
-// Scoping rules:
-//   - len(rule.Recipients) == 0 → rule applies to all identities.
-//   - For single-address identities: a recipient matches if it equals the
-//     identity exactly, equals the identity's domain, or is a parent domain
-//     of the identity's domain.
-//   - For domain identities: a recipient matches if it equals the domain
-//     exactly, is a subdomain of it, or is an email address whose domain
-//     equals or is a subdomain of the identity domain.
+// when computing related resources for the given SES identity: a rule with no
+// recipient condition applies to every verified domain, and one with
+// conditions applies when one of them matches (sesRecipientMatches).
 //
 // Empty-string recipient entries are skipped conservatively. If every entry
 // is an empty string (rare data corruption), the rule is treated as applying
 // to all (AWS normalises absent Recipients to nil; a non-nil all-empty slice
 // is anomalous).
-func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityType string) bool {
+func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName string) bool {
 	if len(rule.Recipients) == 0 {
 		return true
 	}
@@ -254,42 +239,7 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 		return true
 	}
 
-	// identityType is Fields["identity_type"], which carries the rendered
-	// word, not the SDK enum.
-	switch identityType {
-	case sesIdentityTypeEmailAddress:
-		// Derive domain from identity (e.g. "billing@sub.acme.com" → "sub.acme.com").
-		domain, _ := emailDomain(identityName)
-		for _, r := range valid {
-			if strings.EqualFold(r, identityName) {
-				return true
-			}
-			// Recipient is the identity's domain or a parent domain.
-			if domain != "" {
-				rLower := strings.ToLower(r)
-				dLower := strings.ToLower(domain)
-				if rLower == dLower || strings.HasSuffix(dLower, "."+rLower) {
-					return true
-				}
-			}
-		}
-	default:
-		// DOMAIN identity.
-		domainLower := strings.ToLower(identityName)
-		for _, r := range valid {
-			rLower := strings.ToLower(r)
-			// Recipient is an email address — check its domain.
-			rDomain := rLower
-			if d, ok := emailDomain(rLower); ok {
-				rDomain = d
-			}
-			// rDomain equals the identity domain or is a subdomain of it.
-			if rDomain == domainLower || strings.HasSuffix(rDomain, "."+domainLower) {
-				return true
-			}
-		}
-	}
-	return false
+	return slices.ContainsFunc(valid, func(r string) bool { return sesRecipientMatches(r, identityName) })
 }
 
 // checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt
@@ -313,7 +263,7 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
-		if sesRuleAppliesToIdentity(rule, res.ID, res.Fields["identity_type"]) {
+		if sesRuleAppliesToIdentity(rule, res.ID) {
 			filtered = append(filtered, rule)
 		}
 	}
@@ -340,7 +290,7 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	var filtered []sestypes.ReceiptRule
 	for _, rule := range out.Rules {
-		if sesRuleAppliesToIdentity(rule, res.ID, res.Fields["identity_type"]) {
+		if sesRuleAppliesToIdentity(rule, res.ID) {
 			filtered = append(filtered, rule)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
@@ -312,4 +313,42 @@ func fetchWAFWebACLsScopePage(ctx context.Context, api WAFv2ListWebACLsAPI, scop
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// wafWithMetricName is the web ACL row carrying Fields["metric_name"], the
+// ACL's VisibilityConfig.MetricName, read with wafv2:GetWebACL when the list
+// response left it out: ListWebACLs returns summaries without it.
+func wafWithMetricName(ctx context.Context, clients any, row resource.Resource) (resource.Resource, error) {
+	if row.Fields["metric_name"] != "" {
+		return row, nil
+	}
+	name, id := row.Fields["name"], row.Fields["id"]
+	if name == "" || id == "" {
+		return row, nil
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return row, errClientMissing
+	}
+	api, ok := c.wafIn(row.Fields["scope"]).(WAFv2GetWebACLAPI)
+	if !ok {
+		return row, errClientMissing
+	}
+	scope := wafv2types.ScopeRegional
+	if row.Fields["scope"] == wafScopeCloudFront {
+		scope = wafv2types.ScopeCloudfront
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetWebACLOutput, error) {
+		return api.GetWebACL(ctx, &wafv2.GetWebACLInput{Name: &name, Id: &id, Scope: scope})
+	})
+	if err != nil {
+		return row, err
+	}
+	if out.WebACL == nil || out.WebACL.VisibilityConfig == nil {
+		return row, nil
+	}
+	fields := maps.Clone(row.Fields)
+	fields["metric_name"] = aws.ToString(out.WebACL.VisibilityConfig.MetricName)
+	row.Fields = fields
+	return row, nil
 }
