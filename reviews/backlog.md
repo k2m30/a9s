@@ -10,32 +10,13 @@ Small, obvious fixes do not live here — they are done directly rather than fil
 
 ## Related-panel and AWS reads
 
-1. **REST APIs error on three pivots.** `core/aws/apigw_related.go:136-152` calls the
-   apigatewayv2 `GetIntegrations` for v1 (REST) APIs, which answers NotFound for a REST id, so
-   the Lambda, KMS and Role pivots error for every REST API in the account. Needs the v1 API's
-   own call.
-2. **Backup pivots ignore resource tags.** A plan that selects by tag makes the count a lower
-   bound on ddb, s3, dbi-snap and dbc-snap, because the pivot never reads the resource's tags.
-   Needs a per-resource tag read on detail open.
+1. Closed by #570.
+2. Closed by #570.
 3. Closed by #567 (`cad809f0`); the number is kept because issues cite rows 4–6 by number.
-4. **Cross-Region related lists are fetched with a nil cache** (`core/aws/related_shared.go:33`),
-   so every detail open re-issues the other Region's list call. Needs a per-Region cache that
-   does not let foreign rows into the session's own list for that type.
-5. **`ct-events` registers no `ecr` pivot.** Over the read-only accounts, 60 of 61
-   `AWS::ECR::Repository` CloudTrail records carry the repository ARN and one carries the bare
-   name; the type is keyed on the ARN, so that record is reachable from neither end. Needs a
-   registration with its AWS-field citation in `docs/related-resources.md`, resolving through
-   `ctIDAlternatives`, which already offers both shapes.
+4. Closed by #569.
+5. Closed by #570.
 
-6. **A detail opened on a row read in another Region runs against the session Region.**
-   `core/runtime/detail_op.go:73` hands the detail operation `c.session.Clients`, and the list's
-   Region never reaches `BeginDetailOperation` (`core/app/navigate.go:502`, `:589`). A pivot that
-   drills into another Region (cf → acm in us-east-1, r53/trail/waf → logs, the alarm pivot)
-   reads its list correctly through `InRegion`, but the detail of a row in it runs its enricher,
-   every related checker and the CloudTrail row against the session Region: an ACM certificate is
-   asked for in the wrong Region and its load-balancer and API Gateway rows error, and the
-   CloudTrail row reports a confident 0. The detail operation should run on
-   `c.session.Clients.InRegion(<the row's list Region>)`.
+6. Closed by #569.
 
 ## Rendering and enrichment
 
@@ -56,18 +37,7 @@ Small, obvious fixes do not live here — they are done directly rather than fil
     Wave-1 row shows for a policy it could not read. AWS validates both on write, so there is no
     operator witness today.
 
-11. **Every alarm detail renders "EKS Clusters (0+)"** although the demo EKS fake returns no
-    NextToken. Both branches report `truncated=true` for different reasons: the cache branch from
-    `anyDegraded(rows)` alone, the fetch branch from a composite `DescribeCluster failed for 2 of
-    12` that `FetchRelatedTarget` swallows, so the caller sees `truncated=true, err=nil` and
-    cannot tell a per-item detail failure from a lost page. Excluding `anyDegraded` for an
-    ID/Name-only spec fixes the cache branch alone, and a half-fix still renders `0+` whenever the
-    operator has not already opened the EKS list. A correct fix has `FetchIsPartial` separate
-    "some rows' details are unread" from "the list is a subset", across 22 `FetchRelatedTarget`
-    and 197 `relatedResourcesFor` call sites. A spec reads beyond ID and Name exactly when
-    `Values != nil || QualifierValue != nil || MetricsRegion != nil` — 10 of 35 specs do, audited
-    by hand; whoever takes this should assert that `ValuesFromRawStruct` implies that predicate so
-    the two cannot drift.
+11. Closed by #567.
 12. **A `dbi-snap` parent row is navigable but Enter opens nothing.** `dbiSnapParentRow` resolves
     a snapshot's parent through `DbiResourceId`, while `dbiRefToID` (`core/aws/ref_ids.go:567`)
     matches only a name the loaded list holds, so a snapshot taken before the instance was renamed
