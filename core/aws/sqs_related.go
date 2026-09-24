@@ -33,7 +33,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	topicSet := make(map[string]struct{})
 	for _, sub := range subList {
-		if sub.Fields["protocol"] != "sqs" {
+		if sub.Fields["protocol"] != "sqs" || !snsSubCarries(sub) {
 			continue
 		}
 		endpoint := sub.Fields["endpoint"]
@@ -175,8 +175,9 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 	return unreadZeroScanned(res, len(sqsList), relatedResultTrunc("sqs", ids, truncated))
 }
 
-// checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions
-// triggered by this SQS queue (Pattern A — direct API call).
+// checkSQSLambda counts the functions this queue triggers
+// (lambda:ListEventSourceMappings) and the functions that use it as their
+// dead-letter queue.
 func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	row, ok := res.RawStruct.(SQSQueueAttributesRow)
 	if !ok {
@@ -186,7 +187,10 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, cac
 	if queueARN == "" {
 		return foundNone("lambda", "queueARN")
 	}
-	return lambdaEventSourceMappingLambdaCheck(ctx, clients, queueARN, cache)
+	return relatedAnswer("lambda", joinReads(
+		readOf(lambdaEventSourceMappingLambdaCheck(ctx, clients, queueARN, cache)),
+		lambdaDLQUsers(ctx, clients, cache, queueARN),
+	))
 }
 
 // checkSQSKMS returns the key in the queue's KmsMasterKeyId attribute
@@ -199,14 +203,18 @@ func checkSQSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkSQSEbRule resolves EventBridge rules that target this SQS queue.
-// Pattern C: one events:ListRuleNamesByTarget call using the queue ARN.
-// Queue ARN is read from SQSQueueAttributesRow.Attributes["QueueArn"].
-// Count = len(RuleNames).
+// checkSQSEbRule counts the EventBridge rules that deliver into this queue:
+// the rules targeting it (events:ListRuleNamesByTarget), and the rules whose
+// targets name it as their dead-letter queue, which ListRuleNamesByTarget does
+// not return, read off each rule's ListTargetsByRule.
 func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	queueARN := ""
 	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
 		queueARN = raw.Attributes["QueueArn"]
 	}
-	return ebRulesTargeting(ctx, clients, cache, queueARN)
+	targeting := ebRulesTargeting(ctx, clients, cache, queueARN)
+	if queueARN == "" {
+		return targeting
+	}
+	return relatedAnswer("eb-rule", joinReads(readOf(targeting), ebRulesWithDLQ(ctx, clients, cache, queueARN)))
 }

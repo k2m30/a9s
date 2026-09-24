@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
@@ -19,7 +20,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 		clusterName = res.Fields["cluster_name"]
 	}
 	if clusterName == "" {
-		return foundNone("ng", "clusterName")
+		return keyMissing("ng", "clusterName")
 	}
 
 	// A node group's cluster is on its row's identity fields, which a row
@@ -90,7 +91,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return foundNone("logs", "clusterName")
+		return keyMissing("logs", "clusterName")
 	}
 
 	expectedLogGroup := "/aws/eks/" + clusterName + "/cluster"
@@ -166,14 +167,22 @@ func checkEKSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkEKSRole returns the IAM role in the EKS Cluster's RoleArn field.
+// eksClusterRoles is the one reader of a cluster's role ARNs: Cluster.RoleArn,
+// and the role an Auto Mode cluster assigns its nodes,
+// ComputeConfig.NodeRoleArn
+// (https://docs.aws.amazon.com/eks/latest/APIReference/API_ComputeConfigResponse.html).
+func eksClusterRoles(cl ekstypes.Cluster) []string {
+	roles := []string{aws.ToString(cl.RoleArn)}
+	if cc := cl.ComputeConfig; cc != nil {
+		roles = append(roles, aws.ToString(cc.NodeRoleArn))
+	}
+	return roles
+}
+
 func checkEKSRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
-	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
-		if res.RawStruct == nil {
-			return NotRead("role")
-		}
-		return foundNone("role", "raw.RoleArn")
+	if !ok {
+		return NotRead("role")
 	}
-	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
+	return relatedRefs("role", eksClusterRoles(raw), refContext(clients, cache, "role"))
 }

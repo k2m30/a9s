@@ -130,6 +130,13 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 	return groups
 }
 
+// asgDefaultLT launches a group from the $Default version of a launch
+// template: CreateAutoScalingGroup requires a launch template, a launch
+// configuration or a mixed-instances policy.
+func asgDefaultLT(id string) *asgtypes.LaunchTemplateSpecification {
+	return &asgtypes.LaunchTemplateSpecification{LaunchTemplateId: aws.String(id), Version: aws.String("$Default")}
+}
+
 func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 	return []asgtypes.AutoScalingGroup{
 		{
@@ -224,6 +231,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(300),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2026-03-21T09:30:00Z")),
+			LaunchTemplate:         asgDefaultLT(EKSNodeLTID),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String(EKSSelfManagedNodeID1), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String(EKSSelfManagedNodeID2), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -245,6 +253,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(180),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-01-20T09:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(WarnLTIMDSv1DefaultID),
 			TargetGroupARNs:        []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0987654321fedcba"},
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -265,6 +274,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
 			Status:                 aws.String("Delete in progress"),
 			CreatedTime:            aws.Time(mustTime("2025-03-05T12:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(EKSNodeLTID),
 			// Instances — required for eks→ec2 related-panel pivot (via
 			// ListNodegroups/DescribeNodegroup → this ASG → DescribeAutoScalingGroups).
 			Instances: []asgtypes.Instance{
@@ -286,6 +296,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(300),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-06-01T10:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(WarnLTIMDSv1ID),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0aaa111111111111a"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0bbb222222222222b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -311,6 +322,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-04-20T08:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(LTUserDataSecret),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0ccc333333333333c"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0ddd444444444444d"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -337,6 +349,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-05-12T08:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(WarnLTUnencryptedID),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0eee555555555555e"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -361,6 +374,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-07-01T08:00:00Z")),
+			LaunchTemplate:         asgDefaultLT(WarnLTMultiID),
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0bbb888888888888b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0ccc999999999999c"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},

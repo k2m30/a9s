@@ -36,19 +36,17 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		return relatedResultTrunc("subnet", ids, false)
 	}
 
+	explicit := relatedRead{ids: ids}
 	subnetList, subnetTrunc, err := relatedResourcesFor(ctx, clients, cache, "subnet")
-	if err != nil {
-		return ReadFailed("subnet", err)
+	if subnetList == nil {
+		return relatedAnswer("subnet", joinReads(explicit, unreadBy(err)))
 	}
 	rtbList, rtbTrunc, err := relatedResourcesFor(ctx, clients, cache, "rtb")
-	if err != nil {
-		return ReadFailed("subnet", err)
-	}
-	if subnetList == nil || rtbList == nil {
-		// Which subnets fall to this table implicitly is unreadable without
-		// both lists: the subnets of its VPC, and the tables that name one
-		// explicitly.
-		return NotRead("subnet")
+	// Which subnets fall to this table implicitly is unreadable without
+	// both lists: the subnets of its VPC, and the tables that name one
+	// explicitly.
+	if rtbList == nil {
+		return relatedAnswer("subnet", joinReads(explicit, unreadBy(err)))
 	}
 	for _, subnetRes := range subnetList {
 		if slices.Contains(ids, subnetRes.ID) {
@@ -185,7 +183,7 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	rtbID := res.ID
 	if rtbID == "" {
-		return foundNone("vpce", "rtbID")
+		return keyMissing("vpce", "rtbID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

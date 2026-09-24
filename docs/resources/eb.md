@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ec2`
 
 - **Why related**: The individual EC2 instances running the application — the place to look for a specific node failing health checks or stuck in an impaired state.
-- **How discovered**: Call `DescribeEnvironmentResources` and read `EnvironmentResources.Instances[].Id`; alternatively, cross-reference the already-loaded `ec2` list by the `elasticbeanstalk:environment-name` tag.
+- **How discovered**: Call `DescribeEnvironmentResources` and read `EnvironmentResources.Instances[].Id`; alternatively, cross-reference the already-loaded `ec2` list by the `elasticbeanstalk:environment-name` tag. A `shutting-down` or `terminated` instance runs nothing and is not counted ([ec2-instance-lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html)).
 - **Count shown**: unknown.
 
 ### `elb`
@@ -64,14 +64,14 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `role`
 
 - **Why related**: The environment's EC2 instance profile and service role — the IAM identities that calls out to AWS APIs on the environment's behalf. Broken permissions here show up as environment health drops.
-- **How discovered**: Call `DescribeConfigurationSettings` and read `OptionSettings[]` where `Namespace=aws:autoscaling:launchconfiguration` `OptionName=IamInstanceProfile` (→ `GetInstanceProfile` for attached roles) and `Namespace=aws:elasticbeanstalk:environment` `OptionName=ServiceRole`.
-- **Count shown**: unknown.
+- **How discovered**: DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/IamInstanceProfile → GetInstanceProfile roles; aws:elasticbeanstalk:environment/ServiceRole; and `EnvironmentDescription.OperationsRole` ([API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)).
+- **Count shown**: yes.
 
 ### `s3`
 
 - **Why related**: S3 buckets that hold the environment's application-version bundles; lifecycle, encryption, and public-access posture of the deploy artifacts.
-- **How discovered**: Call `DescribeApplicationVersions` for the environment's `ApplicationName` and read `ApplicationVersions[].SourceBundle.S3Bucket`.
-- **Count shown**: unknown.
+- **How discovered**: The bucket of the source bundle this environment runs: `SourceBundle.S3Bucket` of the application version its `VersionLabel` names ([API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)).
+- **Count shown**: yes (0 or 1).
 
 ### `sg`
 

@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 ### `asg`
 
 - **Why related**: when a custom AMI is being rolled forward or deprecated, the operator needs to know which Auto Scaling Groups still launch from it so new scale-out events don't keep picking up the old image.
-- **How discovered**: iterate the already-loaded `asg` list and match on its `LaunchConfiguration.ImageId` / `LaunchTemplate.LaunchTemplateData.ImageId` (resolved via `DescribeLaunchTemplateVersions` when only an ID+version pair is on the ASG). — a9s-devops (2026-04-20): launch templates are the standard ASG launch path; resolving `ImageId` from the chosen template version is a normal per-ASG step.
+- **How discovered**: Groups whose launch sources (launch template, launch configuration, mixed-instances policy, its override templates and override `ImageId`s) launch this image, and groups running instances of it ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **Count shown**: yes.
 
 ### `cfn`
@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 ### `kms`
 
 - **Why related**: encrypted AMIs inherit KMS CMKs from their backing snapshots. Operators need to see the CMK to verify access (the role launching instances must be able to `Decrypt` on the key) and to catch cross-account AMI-sharing breakage when the key is scoped too tightly.
-- **How discovered**: read `BlockDeviceMappings[].Ebs.KmsKeyId` on the AMI and cross-reference the already-loaded `kms` list.
+- **How discovered**: The keys encrypting the AMI's snapshots, `Snapshot.KmsKeyId` of each snapshot its block devices name; a block device's `Ebs.KmsKeyId` "is only supported on BlockDeviceMapping objects called by RunInstances, RequestSpotFleet, and RequestSpotInstances" ([API_EbsBlockDevice](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html)).
 - **Count shown**: yes.
 
 ### `ng`
@@ -178,7 +178,7 @@ ami — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ebs-snap | EBS Snapshots | no |
 | asg | Auto Scaling Groups | yes |
 | cfn | CloudFormation Stacks | yes |
-| kms | KMS Keys | no |
+| kms | KMS Keys | yes |
 | ng | EKS Node Groups | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

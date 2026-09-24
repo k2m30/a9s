@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `s3`
 
 - **Why related**: Access-log S3 destination — lets the operator jump to the bucket receiving access logs when debugging.
-- **How discovered**: `TBD — a9s-devops: not available in AWS surface without a per-LB Describe call.` The access-log bucket lives in `DescribeLoadBalancerAttributes`, not on the list response, and that read is deferred — `docs/attention-signals.md § Not yet implemented`. a9s-devops: possible=yes via `DescribeLoadBalancerAttributes` (N+1), worth=no at list time — the related panel would require a bounded fan-out this type has explicitly deferred. Related-panel pivot is still documented as a contract target; discovery is deferred until this resource performs that read.
+- **How discovered**: `DescribeLoadBalancerAttributes`: the bucket `access_logs.s3.bucket` names, when `access_logs.s3.enabled` is `true` ([API_LoadBalancerAttribute](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html)).
 - **Count shown**: unknown.
 
 ### `sg`

@@ -74,3 +74,15 @@ func (f *KinesisFake) DescribeStreamSummary(_ context.Context, input *kinesis.De
 	}
 	return nil, &kinesistypes.ResourceNotFoundException{Message: notFoundMessage("Stream", name)}
 }
+
+// ListStreamConsumers answers the stream's enhanced fan-out consumers: the
+// demo streams register none.
+func (f *KinesisFake) ListStreamConsumers(_ context.Context, input *kinesis.ListStreamConsumersInput, _ ...func(*kinesis.Options)) (*kinesis.ListStreamConsumersOutput, error) {
+	arn := aws.ToString(input.StreamARN)
+	for _, s := range f.fix.Streams {
+		if aws.ToString(s.StreamARN) == arn {
+			return &kinesis.ListStreamConsumersOutput{Consumers: []kinesistypes.Consumer{}}, nil
+		}
+	}
+	return nil, &kinesistypes.ResourceNotFoundException{Message: notFoundMessage("Stream", arn)}
+}

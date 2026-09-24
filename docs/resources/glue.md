@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: CloudWatch Logs group where Spark driver/executor output lands — the first place an operator goes when a run fails, independent of a9s's own cause summary.
-- **How discovered**: two sources combined — (a) the Glue default log group `/aws-glue/jobs/output` and `/aws-glue/jobs/error` (continuous-logging convention), (b) `Job.DefaultArguments["--continuous-log-logGroup"]` when set. Cross-reference the loaded `logs` list by log-group name — a9s-devops persona (2026-04-20): possible=yes, worth=yes. The default groups are Glue convention; the argument override is the documented way to rename them. `Job.LogUri` on the `Job` shape is the *deprecated* S3-based log path and should not drive the `logs` pivot.
+- **How discovered**: The job's output and error groups, and its continuous-logging group: `--continuous-log-logGroup`, `/aws-glue/jobs/logs-v2` when unset ([monitor-continuous-logging-enable](https://docs.aws.amazon.com/glue/latest/dg/monitor-continuous-logging-enable.html)).
 - **Count shown**: yes.
 
 ### `role`
@@ -58,13 +58,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `s3`
 
 - **Why related**: S3 buckets holding the job script, the temp directory Spark spills to, and the source/sink datasets — a `NoSuchBucket` or lifecycle-expired script object silently kills job startup.
-- **How discovered**: parse `Job.Command.ScriptLocation` (always `s3://…`) and the well-known Glue arguments in `Job.DefaultArguments`: `--TempDir`, `--spark-event-logs-path`, `--extra-py-files`, `--extra-jars`, `--extra-files`. Extract bucket names and cross-reference the loaded `s3` list — a9s-devops persona (2026-04-20): possible=yes, worth=yes. These are the documented Special Parameters on the Glue arguments page; Glue does not offer a first-class "buckets this job reads" list, so argument parsing is the idiomatic path. User data paths inside the script itself are invisible at this layer and are legitimately out of scope.
-- **Count shown**: yes (typically 1–4).
+- **How discovered**: the bucket of `Job.Command.ScriptLocation`, the S3 path of the job's script ([API_JobCommand](https://docs.aws.amazon.com/glue/latest/webapi/API_JobCommand.html)); cross-reference the loaded `s3` list.
+- **Count shown**: yes (0 or 1).
 
 ### `secrets`
 
 - **Why related**: Secrets Manager secrets referenced by Glue Connections (database passwords, JDBC credentials) — a rotated-but-not-propagated secret turns a green Glue row into a red one the next run.
-- **How discovered**: read `Job.Connections.Connections[]` (names); resolve each via `GetConnection`, read `Connection.ConnectionProperties["SECRET_ID"]` when present; cross-reference the loaded `secrets` list by secret ARN/name — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Connections that use Secrets Manager store the secret ID under the `SECRET_ID` connection property; this is the only on-resource path from a Glue job to the consumed secret.
+- **How discovered**: The secret each of the job's connections names in `ConnectionProperties.SECRET_ID`, read with `GetConnection` ([API_Connection](https://docs.aws.amazon.com/glue/latest/webapi/API_Connection.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

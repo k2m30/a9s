@@ -6,6 +6,7 @@ package aws
 import (
 	"cmp"
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,7 +19,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkEC2TargetGroups checks the cache for target groups referencing this EC2 instance.
+// checkEC2TargetGroups counts the instance target groups the instance is
+// registered in, read from each group's DescribeTargetHealth. A target group
+// holds only targets in its own VPC (DescribeTargetHealth's InvalidTarget: "is
+// not in the same VPC as the target group"), so only the instance's VPC's
+// groups are asked.
 func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID, vpcID, _ := ec2Identity(res)
 	if instanceID == "" {
@@ -31,27 +36,19 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 	if tgList == nil {
 		return NotRead("tg")
 	}
-	var ids []string
+	var candidates []resource.Resource
 	for _, tgRes := range tgList {
 		raw, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct)
-		targetType := tgRes.Fields["target_type"]
-		tgVpcID := tgRes.Fields["vpc_id"]
+		targetType, tgVpcID := tgRes.Fields["target_type"], tgRes.Fields["vpc_id"]
 		if ok {
-			targetType = string(raw.TargetType)
-			if raw.VpcId != nil {
-				tgVpcID = *raw.VpcId
-			}
+			targetType, tgVpcID = string(raw.TargetType), cmp.Or(aws.ToString(raw.VpcId), tgVpcID)
 		}
-		if targetType != "instance" {
-			continue
-		}
-		// Without target-health rows in cache, best available approximation is
-		// VPC-level matching for instance target groups.
-		if tgVpcID == vpcID {
-			ids = append(ids, tgRes.ID)
+		if targetType == string(elbv2types.TargetTypeEnumInstance) && (vpcID == "" || tgVpcID == vpcID) {
+			candidates = append(candidates, tgRes)
 		}
 	}
-	return heuristicResult("tg", ids, truncated)
+	registered := tgsRegistering(ctx, clients, candidates, "ec2-related: DescribeTargetHealth", func(id string) bool { return id == instanceID })
+	return relatedAnswer("tg", joinReads(registered, relatedRead{partial: truncated}))
 }
 
 // checkEC2ASG checks the cache for ASGs containing this EC2 instance.
@@ -73,11 +70,8 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 		if !ok {
 			continue
 		}
-		for _, inst := range raw.Instances {
-			if inst.InstanceId != nil && *inst.InstanceId == instanceID {
-				ids = append(ids, asgRes.ID)
-				break
-			}
+		if slices.Contains(asgMembers(raw), instanceID) {
+			ids = append(ids, asgRes.ID)
 		}
 	}
 	return relatedResultTrunc("asg", ids, truncated)
@@ -192,18 +186,17 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	return unreadZeroScanned(res, len(ngList), relatedAnswer("ng", relatedRead{ids: ids, partial: truncated, atMostOne: true}))
 }
 
-// checkEC2EBSSnap checks the cache for EBS snapshots belonging to this EC2 instance.
+// checkEC2EBSSnap counts the snapshots of the instance's volumes and the
+// snapshots its AMI is registered from (Image.BlockDeviceMappings[].Ebs.SnapshotId).
 func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volumeIDs := ec2VolumeIDs(res)
+	image := ec2AMISnapshots(ctx, clients, cache, res)
 	if len(volumeIDs) == 0 {
-		return unreadZero(res, foundNone("ebs-snap", "volumeIDs"))
+		return unreadZero(res, relatedAnswer("ebs-snap", image))
 	}
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
-	if err != nil {
-		return ReadFailed("ebs-snap", err)
-	}
 	if snapList == nil {
-		return NotRead("ebs-snap")
+		return relatedAnswer("ebs-snap", joinReads(image, unreadBy(err)))
 	}
 	var ids []string
 	for _, snapRes := range snapList {
@@ -216,7 +209,29 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, snapRes.ID)
 		}
 	}
-	return unreadZeroScanned(res, len(snapList), relatedResultTrunc("ebs-snap", ids, truncated))
+	return unreadZeroScanned(res, len(snapList), relatedAnswer("ebs-snap", joinReads(image, relatedRead{ids: ids, partial: truncated})))
+}
+
+// ec2AMISnapshots reads the snapshots the instance's AMI is registered from,
+// off the AMI's row in the ami list, as the ami → ebs-snap pivot counts them.
+// An AMI the list does not hold is not the account's, and neither are its
+// snapshots.
+func ec2AMISnapshots(ctx context.Context, clients any, cache resource.ResourceCache, res resource.Resource) relatedRead {
+	inst, _ := assertStruct[ec2types.Instance](res.RawStruct)
+	imageID := cmp.Or(aws.ToString(inst.ImageId), res.Fields["image_id"])
+	if imageID == "" {
+		return relatedRead{}
+	}
+	amis, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ami")
+	if amis == nil {
+		return unreadBy(err)
+	}
+	for _, a := range amis {
+		if img, ok := assertStruct[ec2types.Image](a.RawStruct); ok && a.ID == imageID {
+			return relatedRead{ids: amiSnapshotIDs(img), failure: err}
+		}
+	}
+	return relatedRead{partial: truncated, failure: err}
 }
 
 // checkEC2SG extracts security group IDs from the EC2 Instance's SecurityGroups slice.
@@ -319,8 +334,11 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 		return foundNone("role", "profileName")
 	}
 	c, err := svcClients(clients)
+	if err != nil {
+		return ReadFailed("role", err)
+	}
 	// no finding: without the IAM client nothing was read.
-	if err != nil || c.IAM == nil {
+	if c.IAM == nil {
 		return NotRead("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {

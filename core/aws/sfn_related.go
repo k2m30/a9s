@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -31,32 +33,34 @@ func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn
 	})
 }
 
-// checkSFNLogs searches the logs cache for the vendedlogs log group associated
-// with this state machine by naming convention.
-// Pattern N — naming convention: /aws/vendedlogs/states/{sfnName}
+// checkSFNLogs resolves the log group a state machine's LoggingConfiguration
+// sends its execution history to; at level OFF it sends none. A destination
+// names its group by an ARN ending in ":*"
+// (https://docs.aws.amazon.com/step-functions/latest/apireference/API_LoggingConfiguration.html,
+// https://docs.aws.amazon.com/step-functions/latest/apireference/API_CloudWatchLogsLogGroup.html).
 func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	sfnName := res.ID
-	if sfnName == "" {
-		return foundNone("logs", "sfnName")
+	arn := res.Fields["arn"]
+	if arn == "" {
+		return keyMissing("logs", "arn")
 	}
-
-	expectedLogGroup := "/aws/vendedlogs/states/" + sfnName
-
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
+	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
 		return ReadFailed("logs", err)
 	}
-	if logList == nil {
+	if out == nil {
 		return NotRead("logs")
 	}
-
-	var ids []string
-	for _, logRes := range logList {
-		if logRes.ID == expectedLogGroup {
-			ids = append(ids, logRes.ID)
+	lc := out.LoggingConfiguration
+	if lc == nil || lc.Level == sfntypes.LogLevelOff {
+		return foundNone("logs", "out.LoggingConfiguration.Level")
+	}
+	var refs []string
+	for _, d := range lc.Destinations {
+		if g := d.CloudWatchLogsLogGroup; g != nil {
+			refs = append(refs, aws.ToString(g.LogGroupArn))
 		}
 	}
-	return relatedResultTrunc("logs", ids, truncated)
+	return relatedRefs("logs", refs, refContext(clients, cache, "logs"))
 }
 
 func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -68,7 +72,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return foundNone("role", "arn")
+		return keyMissing("role", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -88,7 +92,7 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return foundNone("kms", "arn")
+		return keyMissing("kms", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
@@ -110,7 +114,7 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["arn"]
 	if arn == "" {
-		return foundNone("lambda", "arn")
+		return keyMissing("lambda", "arn")
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {

@@ -151,6 +151,7 @@ var navigableContracts = []navContract{
 	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GroupIdentifier.html", fieldPath: "Groups.GroupId", targetType: "sg", reasoning: "NetworkInterface.Groups[].GroupId — attached SGs."},
 	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterfaceAttachment.html", fieldPath: "Attachment.InstanceId", targetType: "ec2", reasoning: "NetworkInterface.Attachment.InstanceId — instance the ENI is attached to (when attached)."},
 	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterfaceAssociation.html", fieldPath: "Association.AllocationId", targetType: "eip", reasoning: "NetworkInterface.Association.AllocationId — EIP allocation associated with the ENI."},
+	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterfacePrivateIpAddress.html", fieldPath: "PrivateIpAddresses.Association.AllocationId", targetType: "eip", reasoning: "NetworkInterfacePrivateIpAddress.Association.AllocationId — EIP allocation associated with a secondary private IPv4 address of the ENI."},
 
 	// glue — Glue Jobs
 	{shortName: "glue", apiDoc: "https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html", fieldPath: "Role", targetType: "role", reasoning: "Job.Role — IAM role Glue assumes to run the job."},

@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `kinesis
 ### `sqs`
 
 - **Why related**: SQS queue that this rule delivers events to — either the primary target, or (importantly) the dead-letter queue configured on a target via `DeadLetterConfig.Arn`. Both are worth a pivot because "events are piling up in an SQS queue" is the first symptom of a downstream-consumer failure.
-- **How discovered**: call `ListTargetsByRule`, take both `Targets[].Arn` whose prefix is `arn:aws:sqs:*:*:` and `Targets[].DeadLetterConfig.Arn`; cross-reference the already-loaded `sqs` list by queue ARN, de-duplicated — a9s-devops: surface DLQ ARNs alongside primary targets so the operator can jump straight to the queue where undelivered events land.
+- **How discovered**: SQS targets of this rule, and each target's `DeadLetterConfig.Arn` queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_DeadLetterConfig.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

@@ -90,7 +90,10 @@ func sesConfigSetName(ctx context.Context, c *ServiceClients, identityName strin
 }
 
 // sesEventDestinations calls sesv2:GetConfigurationSetEventDestinations for the
-// given configuration set name. Returns nil on error or missing config set.
+// given configuration set name and keeps the enabled destinations: a disabled
+// one sends no events
+// (https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_EventDestination.html).
+// Returns nil on error or missing config set.
 func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName string) (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
 	api, ok := c.SESv2.(SESv2GetConfigurationSetEventDestinationsAPI)
 	if !ok {
@@ -101,7 +104,17 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 			ConfigurationSetName: &configSetName,
 		})
 	})
-	return out, err
+	if out == nil {
+		return nil, err
+	}
+	enabled := *out
+	enabled.EventDestinations = nil
+	for _, d := range out.EventDestinations {
+		if d.Enabled {
+			enabled.EventDestinations = append(enabled.EventDestinations, d)
+		}
+	}
+	return &enabled, err
 }
 
 // sesActiveReceiptRuleSet returns the active SES v1 receipt rule set for this
@@ -144,7 +157,7 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return foundNone("eb-rule", "identityName")
+		return keyMissing("eb-rule", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -213,6 +226,20 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("eb-rule", ids, false)
 }
 
+// sesActiveRulesFor is the receipt rules that process the identity's mail:
+// the active ones ("If true, the receipt rule is active",
+// https://docs.aws.amazon.com/ses/latest/APIReference/API_ReceiptRule.html)
+// that apply to it.
+func sesActiveRulesFor(rules []sestypes.ReceiptRule, identityName string) []sestypes.ReceiptRule {
+	var out []sestypes.ReceiptRule
+	for _, rule := range rules {
+		if rule.Enabled && sesRuleAppliesToIdentity(rule, identityName) {
+			out = append(out, rule)
+		}
+	}
+	return out
+}
+
 // sesRuleAppliesToIdentity reports whether a receipt rule should be considered
 // when computing related resources for the given SES identity: a rule with no
 // recipient condition applies to every verified domain, and one with
@@ -261,12 +288,7 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, cac
 		// No active rule set — pure outbound account. Operator-honest 0.
 		return foundNone("lambda", "out")
 	}
-	var filtered []sestypes.ReceiptRule
-	for _, rule := range out.Rules {
-		if sesRuleAppliesToIdentity(rule, res.ID) {
-			filtered = append(filtered, rule)
-		}
-	}
+	filtered := sesActiveRulesFor(out.Rules, res.ID)
 	return relatedRefs("lambda", sesLambdaARNsFromRules(filtered), refContext(clients, cache, "lambda"))
 }
 
@@ -288,12 +310,7 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		// No active rule set — pure outbound account. Operator-honest 0.
 		return foundNone("s3", "out")
 	}
-	var filtered []sestypes.ReceiptRule
-	for _, rule := range out.Rules {
-		if sesRuleAppliesToIdentity(rule, res.ID) {
-			filtered = append(filtered, rule)
-		}
-	}
+	filtered := sesActiveRulesFor(out.Rules, res.ID)
 	buckets := sesS3BucketsFromRules(filtered)
 	return relatedResultTrunc("s3", buckets, false)
 }
@@ -340,7 +357,7 @@ func sesS3BucketsFromRules(rules []sestypes.ReceiptRule) []string {
 func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
-		return foundNone("sns", "identityName")
+		return keyMissing("sns", "identityName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {

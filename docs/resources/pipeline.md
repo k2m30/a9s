@@ -57,7 +57,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `ecs-svc`
 
 - **Why related**: ECS services this pipeline deploys to — `docs/related-resources.md` § Per-type contract `pipeline`.
-- **How discovered**: call `GetPipeline`, walk `PipelineDeclaration.Stages[].Actions[]` and keep actions where `ActionTypeId.Category == Deploy` AND `ActionTypeId.Provider in {ECS, ECSBlueGreen, CodeDeployToECS}`; read `Configuration["ClusterName"]` and `Configuration["ServiceName"]` — a9s-devops: these two provider names cover both the stock ECS deploy action and the CodeDeploy blue/green variant. Both carry cluster and service names in the action `Configuration`. Cross-reference the loaded `ecs-svc` list by (cluster, service) tuple.
+- **How discovered**: `ECS` deploy actions' `ClusterName` + `ServiceName`. A `CodeDeployToECS` action names a CodeDeploy application, not a service, and a9s reads no CodeDeploy, so a pipeline holding one reads unknown ([action-reference-ECSbluegreen](https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-ECSbluegreen.html)).
 - **Count shown**: yes.
 
 ### `kms`

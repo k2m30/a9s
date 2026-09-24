@@ -65,7 +65,8 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 		}
 		arn = *input.StateMachineArn
 	}
-	if !f.hasStateMachine(arn) {
+	machine, ok := f.stateMachine(arn)
+	if !ok {
 		return nil, &sfntypes.StateMachineDoesNotExist{
 			Message: notFoundMessage("State Machine", arn),
 		}
@@ -81,10 +82,16 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 		level = l
 	}
 	out := &sfn.DescribeStateMachineOutput{
+		Name:                 machine.Name,
 		StateMachineArn:      &arn,
 		Definition:           &definition,
 		Status:               sfntypes.StateMachineStatusActive,
 		LoggingConfiguration: &sfntypes.LoggingConfiguration{Level: level},
+	}
+	if group, ok := f.fix.LogGroups[arn]; ok {
+		out.LoggingConfiguration.Destinations = []sfntypes.LogDestination{{
+			CloudWatchLogsLogGroup: &sfntypes.CloudWatchLogsLogGroup{LogGroupArn: aws.String(group)},
+		}}
 	}
 	if roleArn, ok := f.fix.RoleArns[arn]; ok {
 		out.RoleArn = &roleArn
@@ -115,9 +122,13 @@ func (f *SFNFake) ListTagsForResource(_ context.Context, _ *sfn.ListTagsForResou
 	return &sfn.ListTagsForResourceOutput{}, nil
 }
 
-// hasStateMachine reports whether the fixtures register this state machine ARN.
-func (f *SFNFake) hasStateMachine(arn string) bool {
-	return slices.ContainsFunc(f.fix.StateMachines, func(m sfntypes.StateMachineListItem) bool {
+// stateMachine is the fixture state machine with this ARN.
+func (f *SFNFake) stateMachine(arn string) (sfntypes.StateMachineListItem, bool) {
+	i := slices.IndexFunc(f.fix.StateMachines, func(m sfntypes.StateMachineListItem) bool {
 		return aws.ToString(m.StateMachineArn) == arn
 	})
+	if i < 0 {
+		return sfntypes.StateMachineListItem{}, false
+	}
+	return f.fix.StateMachines[i], true
 }

@@ -653,6 +653,19 @@ func apigwRefToID(ref string, rc domain.RefContext) (string, bool) {
 	return "", false
 }
 
+// apigwDomainRefToID reads an API Gateway custom domain's ARN
+// ("/domainnames/<name>") as the domain's name.
+// https://docs.aws.amazon.com/apigateway/latest/developerguide/arn-format-reference.html
+func apigwDomainRefToID(ref string) (string, bool) {
+	a, ok := ARNForService(ref, "apigateway")
+	if !ok {
+		return "", false
+	}
+	name, ok := afterPrefix(a.Resource, "/domainnames/")
+	name, _, _ = strings.Cut(name, "/")
+	return name, ok
+}
+
 // apigwID is the shape of an API ID: lower-case letters and digits. A custom
 // domain's ID ("d-…") has a hyphen, and a name is read only against the
 // loaded list.

@@ -5,7 +5,9 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -396,9 +398,20 @@ func newFakeEBWithConfigSettings(settings []ebtypes.ConfigurationOptionSetting) 
 // returns the given application versions.
 func newFakeEBWithAppVersions(versions []ebtypes.ApplicationVersionDescription) *fakeEBChecker {
 	return &fakeEBChecker{
-		describeApplicationVersionsFn: func(_ *elasticbeanstalk.DescribeApplicationVersionsInput) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error) {
+		describeApplicationVersionsFn: func(in *elasticbeanstalk.DescribeApplicationVersionsInput) (*elasticbeanstalk.DescribeApplicationVersionsOutput, error) {
+			// VersionLabels narrows the answer to those versions, as Elastic
+			// Beanstalk does.
+			out := versions
+			if len(in.VersionLabels) > 0 {
+				out = nil
+				for _, v := range versions {
+					if slices.Contains(in.VersionLabels, aws.ToString(v.VersionLabel)) {
+						out = append(out, v)
+					}
+				}
+			}
 			return &elasticbeanstalk.DescribeApplicationVersionsOutput{
-				ApplicationVersions: versions,
+				ApplicationVersions: out,
 			}, nil
 		},
 	}

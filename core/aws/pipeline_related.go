@@ -181,24 +181,30 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 
 // checkPipelineECSSvc resolves ECS services deployed by this pipeline.
 // Provider=ECS → Configuration["ServiceName"], which names a service inside
-// the deploy action's own ClusterName.
+// the deploy action's own ClusterName. A blue/green action (provider
+// CodeDeployToECS) names a CodeDeploy application and deployment group
+// (https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-ECSbluegreen.html),
+// and the service is on the deployment group, which a9s does not read: the
+// answer is short by it.
 func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
 		return pipelineRelatedOnErr("ecs-svc", err)
 	}
 	seen := map[string]struct{}{}
+	blueGreen := false
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
-		prov := actionProvider(a)
-		if prov != "ECS" && prov != "ECSBlueGreen" {
-			return
-		}
-		if name := a.Configuration["ServiceName"]; name != "" {
-			seen[ecsSvcID(a.Configuration["ClusterName"], name)] = struct{}{}
+		switch actionProvider(a) {
+		case "CodeDeployToECS":
+			blueGreen = true
+		case "ECS":
+			if name := a.Configuration["ServiceName"]; name != "" {
+				seen[ecsSvcID(a.Configuration["ClusterName"], name)] = struct{}{}
+			}
 		}
 	})
 	ids, dropped := resolveRefs("ecs-svc", mapKeys(seen), refContext(clients, cache, "ecs-svc"))
-	return relatedResultTrunc("ecs-svc", ids, dropped)
+	return relatedAnswer("ecs-svc", relatedRead{ids: ids, partial: dropped, unread: blueGreen})
 }
 
 // checkPipelineKMS resolves the artifact-store KMS key. Pipeline.ArtifactStore.EncryptionKey

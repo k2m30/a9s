@@ -140,6 +140,9 @@ func fetchECSTasksPageWithJoin(
 					"container_images":    containerImages,
 					"arn":                 taskArn,
 				}
+				if taskDefJoin.logGroupsUnread {
+					fields["log_groups_unread"] = "true"
+				}
 				if joinErr != nil {
 					fields["task_def_join_error"] = "true"
 					joinFailures = append(joinFailures, FailedCall(taskID, joinErr))
@@ -178,13 +181,17 @@ type taskDefJoinFields struct {
 	// ContainerDefinitions[].RepositoryCredentials.CredentialsParameter —
 	// required for the ecs-task:secrets related-panel pivot.
 	secretARNs string
-	// ssmParamNames is a sorted, comma-joined list of the names of the SSM
-	// parameters ContainerDefinitions[].Secrets[].ValueFrom names — required
-	// for the ecs-task:ssm related-panel pivot.
+	// ssmParamNames is a sorted, comma-joined list of the SSM parameter
+	// references (ARN or name) ecsSecretRefs classifies, as the definition
+	// writes them: the ecs-task:ssm pivot resolves them against the loaded
+	// list, which knows the session's Region and account.
 	ssmParamNames string
 	// logGroups is a sorted, comma-joined list of the awslogs-group of each
 	// container — required for the logs:ecs-task related-panel pivot.
 	logGroups string
+	// logGroupsUnread is set when a container's destination is not readable
+	// from the definition (ecsContainerLogGroups).
+	logGroupsUnread bool
 }
 
 // taskDefRead is one DescribeTaskDefinition answer, kept for every task of
@@ -278,29 +285,12 @@ func ecsJoinTaskDefinition(
 
 	secretsSeen := make(map[string]struct{})
 	ssmSeen := make(map[string]struct{})
-	for _, c := range td.ContainerDefinitions {
-		for _, s := range c.Secrets {
-			if s.ValueFrom == nil || *s.ValueFrom == "" {
-				continue
-			}
-			// A Secrets Manager secret is named by ARN; an SSM parameter by
-			// ARN, or by name when it is in the task's Region
-			// (docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-ssm-paramstore.html).
-			v := *s.ValueFrom
-			_, isSSM := ARNForService(v, "ssm")
-			switch {
-			case isSecret(v):
-				secretsSeen[v] = struct{}{}
-			case isSSM || !strings.HasPrefix(v, "arn:"):
-				if name, ok := ssmRefToID(v, domain.RefContext{}); ok {
-					ssmSeen[name] = struct{}{}
-				}
-			}
-		}
-		if c.RepositoryCredentials != nil && c.RepositoryCredentials.CredentialsParameter != nil &&
-			*c.RepositoryCredentials.CredentialsParameter != "" {
-			secretsSeen[*c.RepositoryCredentials.CredentialsParameter] = struct{}{}
-		}
+	secrets, params := ecsSecretRefs(td)
+	for _, v := range secrets {
+		secretsSeen[v] = struct{}{}
+	}
+	for _, v := range params {
+		ssmSeen[v] = struct{}{}
 	}
 	if len(secretsSeen) > 0 {
 		ids := make([]string, 0, len(secretsSeen))
@@ -318,9 +308,10 @@ func ecsJoinTaskDefinition(
 		sort.Strings(ids)
 		out.ssmParamNames = strings.Join(ids, ",")
 	}
-	groups := awslogsGroups(td, arnRegionOf(aws.ToString(task.TaskArn), "ecs"))
+	groups, whole := ecsContainerLogGroups(td, arnRegionOf(aws.ToString(task.TaskArn), "ecs"))
 	sort.Strings(groups)
 	out.logGroups = strings.Join(slices.Compact(groups), ",")
+	out.logGroupsUnread = !whole
 
 	return out, nil
 }
@@ -335,18 +326,19 @@ func taskDefJoined(res resource.Resource) bool {
 }
 
 // ecsTaskLogGroups is the log groups the task's containers write to, and
-// whether its task definition was read: the list fetcher's join when the row
-// carries it, else one read of the definition. A task whose join failed was
-// not read; the fetcher already met the failure.
+// whether every container's destination was read: the list fetcher's join
+// when the row carries it, else one read of the definition. A task whose join
+// failed was not read; the fetcher already met the failure.
 func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (groups []string, read bool, err error) {
 	if !taskDefJoined(row) {
 		return nil, false, nil
 	}
 	if joined, ok := row.Fields["log_groups"]; ok {
+		whole := row.Fields["log_groups_unread"] != "true"
 		if joined == "" {
-			return nil, true, nil
+			return nil, whole, nil
 		}
-		return strings.Split(joined, ","), true, nil
+		return strings.Split(joined, ","), whole, nil
 	}
 	taskDef, taskARN := row.Fields["task_definition"], row.Fields["arn"]
 	if task, ok := assertStruct[ecstypes.Task](row.RawStruct); ok {
@@ -362,5 +354,6 @@ func ecsTaskLogGroups(ctx context.Context, clients any, row resource.Resource) (
 	if err != nil {
 		return nil, false, err
 	}
-	return awslogsGroups(def, cmp.Or(arnRegionOf(taskARN, "ecs"), sessionRegion(clients))), true, nil
+	groups, whole := ecsContainerLogGroups(def, cmp.Or(arnRegionOf(taskARN, "ecs"), sessionRegion(clients)))
+	return groups, whole, nil
 }

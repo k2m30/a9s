@@ -5,6 +5,7 @@ package aws
 import (
 	"cmp"
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -25,16 +26,7 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if !ok {
 		return NotRead("ec2")
 	}
-	var ids []string
-	for _, inst := range asg.Instances {
-		if inst.InstanceId != nil && *inst.InstanceId != "" {
-			ids = append(ids, *inst.InstanceId)
-		}
-	}
-	if len(ids) == 0 {
-		return foundNone("ec2", "ids")
-	}
-	return relatedResultTrunc("ec2", ids, false)
+	return relatedResultTrunc("ec2", asgMembers(asg), false)
 }
 
 // checkASGAlarm searches the alarm cache for alarms with an "AutoScalingGroupName" dimension
@@ -48,7 +40,7 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgName := res.ID
 	if asgName == "" {
-		return foundNone("ng", "asgName")
+		return keyMissing("ng", "asgName")
 	}
 
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
@@ -78,49 +70,15 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedAnswer("ng", relatedRead{ids: ids, partial: truncated, atMostOne: true})
 }
 
-// checkASGAMI resolves the AMI used by the ASG's launch configuration or launch template.
-// For launch configs: autoscaling:DescribeLaunchConfigurations.ImageId.
-// For launch templates: ec2:DescribeLaunchTemplateVersions.LaunchTemplateData.ImageId.
+// checkASGAMI reports the images the group's launch sources launch from.
 func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return NotRead("ami")
 	}
-
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return NotRead("ami")
-	}
-
-	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
-		if err != nil {
-			return ReadFailed("ami", err)
-		}
-		if len(lcs) > 0 && aws.ToString(lcs[0].ImageId) != "" {
-			return relatedRefs("ami", []string{*lcs[0].ImageId}, refContext(clients, nil, "ami"))
-		}
-		return foundNone("ami", "LaunchConfiguration.ImageId")
-	}
-
-	ltSpec := asg.LaunchTemplate
-	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
-		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
-	}
-	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return foundNone("ami", "ltSpec.LaunchTemplateId")
-	}
-
-	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
-	if err != nil {
-		return ReadFailed("ami", err)
-	}
-	for _, v := range versions {
-		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
-			return relatedRefs("ami", []string{*v.LaunchTemplateData.ImageId}, refContext(clients, nil, "ami"))
-		}
-	}
-	return foundNone("ami", "LaunchTemplateData.ImageId")
+	launch, read := readASGLaunch(ctx, clients, asg)
+	ids, dropped := resolveRefs("ami", launch.images, refContext(clients, nil, "ami"))
+	return relatedAnswer("ami", joinReads(read, relatedRead{ids: ids, partial: dropped}))
 }
 
 // checkASGELB resolves the ALB/NLB behind this ASG's TargetGroupARNs via
@@ -159,106 +117,28 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("elb", ids, dropped || !complete)
 }
 
-// checkASGRole resolves IAM roles associated with this ASG.
-// Sources: ServiceLinkedRoleARN (direct), LaunchConfig.IamInstanceProfile, LaunchTemplate.IamInstanceProfile.
-// Instance profile names are resolved to role ARNs via iam:GetInstanceProfile.
+// checkASGRole reports the group's roles: its service-linked role, and the
+// roles of the instance profiles its launch sources name, read with
+// iam:GetInstanceProfile.
 func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return NotRead("role")
 	}
-
-	var refs []string
-	if asg.ServiceLinkedRoleARN != nil && *asg.ServiceLinkedRoleARN != "" {
-		refs = append(refs, *asg.ServiceLinkedRoleARN)
-	}
-	rc := refContext(clients, cache, "role")
-
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		// Without clients, the instance-profile role path was never checked —
-		// ids (if any) is a lower bound, not the exhaustive answer.
-		if ids, _ := resolveRefs("role", refs, rc); len(ids) > 0 {
-			return relatedResultTrunc("role", ids, true)
+	refs := []string{aws.ToString(asg.ServiceLinkedRoleARN)}
+	launch, read := readASGLaunch(ctx, clients, asg)
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
+		for _, profile := range slices.Compact(slices.Sorted(slices.Values(launch.profiles))) {
+			if profile == "" {
+				continue
+			}
+			roles, resolved := asgInstanceProfileToRoles(ctx, c, profile)
+			refs = append(refs, roles...)
+			read.partial = read.partial || !resolved
 		}
-		return NotRead("role")
 	}
-
-	// Resolve instance profile from launch config or launch template. A call
-	// that did not answer leaves the same gap the missing-clients branch
-	// above describes, and gets the same answer: what was found is a lower
-	// bound, and nothing found is unknown rather than none.
-	profileNameOrARN, checked := asgResolveInstanceProfile(ctx, c, asg)
-	if checked && profileNameOrARN != "" {
-		roleARNs, resolved := asgInstanceProfileToRoles(ctx, c, profileNameOrARN)
-		refs = append(refs, roleARNs...)
-		checked = resolved
-	}
-	ids, dropped := resolveRefs("role", refs, rc)
-	if !checked {
-		if len(ids) > 0 {
-			return relatedResultTrunc("role", ids, true)
-		}
-		return NotRead("role")
-	}
-
-	return relatedResultTrunc("role", ids, dropped)
-}
-
-// asgResolveInstanceProfile reads the IamInstanceProfile from the ASG's launch config or launch template.
-// Returns the profile name or ARN, or empty string if none is found.
-// checked is false when a call did not answer, which is a different fact from
-// an ASG that names no instance profile: the first leaves the role pivot's
-// count a lower bound, the second makes it exact.
-func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgtypes.AutoScalingGroup) (profile string, checked bool) {
-	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
-		// The caller turns false into a lower-bound count or UnknownRelated,
-		// so the role pivot never claims an exact number it did not read.
-		// no finding: false is the record.
-		if err != nil || len(lcs) == 0 {
-			return "", false
-		}
-		if lcs[0].IamInstanceProfile != nil {
-			return *lcs[0].IamInstanceProfile, true
-		}
-		// no finding: the launch configuration was read and names no instance
-		// profile, which is an answer.
-		return "", true
-	}
-
-	ltSpec := asg.LaunchTemplate
-	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
-		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
-	}
-	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		// no finding: the ASG names no launch template, so there is no
-		// instance profile to read and nothing went unanswered.
-		return "", true
-	}
-
-	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
-	// As in the launch-configuration arm above, the caller renders the pivot
-	// as a lower bound or as unknown.
-	// no finding: false is the record.
-	if err != nil || len(versions) == 0 {
-		return "", false
-	}
-	ltData := versions[0].LaunchTemplateData
-	if ltData == nil || ltData.IamInstanceProfile == nil {
-		// no finding: the template version was read and declares no instance
-		// profile, which is an answer.
-		return "", true
-	}
-	if ltData.IamInstanceProfile.Arn != nil && *ltData.IamInstanceProfile.Arn != "" {
-		return *ltData.IamInstanceProfile.Arn, true
-	}
-	if ltData.IamInstanceProfile.Name != nil && *ltData.IamInstanceProfile.Name != "" {
-		return *ltData.IamInstanceProfile.Name, true
-	}
-	// no finding: the profile block is present and names neither an ARN nor a
-	// name, which the template read answered for.
-	return "", true
+	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
+	return relatedAnswer("role", joinReads(read, relatedRead{ids: ids, partial: dropped}))
 }
 
 // asgInstanceProfileToRoles resolves a profile name or ARN to role ARNs via

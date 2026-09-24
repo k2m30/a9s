@@ -34,6 +34,11 @@ type CWLogsFilterLogEventsAPI interface {
 	FilterLogEvents(ctx context.Context, params *cloudwatchlogs.FilterLogEventsInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 }
 
+// CWLogsDescribeExportTasksAPI defines the interface for DescribeExportTasks.
+type CWLogsDescribeExportTasksAPI interface {
+	DescribeExportTasks(ctx context.Context, params *cloudwatchlogs.DescribeExportTasksInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeExportTasksOutput, error)
+}
+
 // CWLogsDescribeSubscriptionFiltersAPI defines the interface for DescribeSubscriptionFilters.
 type CWLogsDescribeSubscriptionFiltersAPI interface {
 	DescribeSubscriptionFilters(ctx context.Context, params *cloudwatchlogs.DescribeSubscriptionFiltersInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error)

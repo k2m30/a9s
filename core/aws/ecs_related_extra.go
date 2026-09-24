@@ -78,7 +78,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		clusterRef = *cluster.ClusterArn
 	}
 	if clusterRef == "" {
-		return foundNone("ec2", "clusterName")
+		return keyMissing("ec2", "clusterName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -112,12 +112,24 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		complete = complete && len(out.Failures) == 0
 		for _, ci := range out.ContainerInstances {
-			if id := aws.ToString(ci.Ec2InstanceId); strings.HasPrefix(id, "i-") {
+			if id := aws.ToString(ci.Ec2InstanceId); strings.HasPrefix(id, "i-") && ecsContainerInstanceMember(ci) {
 				ids = append(ids, id)
 			}
 		}
 	}
 	return listedRelated(ctx, clients, cache, "ec2", ids, !complete)
+}
+
+// ecsContainerInstanceMember is the one predicate over ContainerInstance.Status
+// for cluster membership: a REGISTRATION_FAILED instance never joined, a
+// DEREGISTERING one "is terminated" and leaving, an INACTIVE one has left
+// (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html).
+func ecsContainerInstanceMember(ci ecstypes.ContainerInstance) bool {
+	switch aws.ToString(ci.Status) {
+	case "REGISTRATION_FAILED", "DEREGISTERING", "INACTIVE":
+		return false
+	}
+	return true
 }
 
 // containerInstancesPerDescribe is DescribeContainerInstances' limit: "a list
@@ -130,7 +142,7 @@ const containerInstancesPerDescribe = 100
 func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return foundNone("ecs-task", "clusterName")
+		return keyMissing("ecs-task", "clusterName")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -164,8 +176,12 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok {
 		return NotRead("logs")
 	}
+	// Only OVERRIDE sends exec sessions to logConfiguration: NONE logs
+	// nothing and DEFAULT uses the task definition's awslogs
+	// (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ExecuteCommandConfiguration.html).
 	group := ""
-	if cfg := cluster.Configuration; cfg != nil && cfg.ExecuteCommandConfiguration != nil && cfg.ExecuteCommandConfiguration.LogConfiguration != nil {
+	if cfg := cluster.Configuration; cfg != nil && cfg.ExecuteCommandConfiguration != nil && cfg.ExecuteCommandConfiguration.LogConfiguration != nil &&
+		cfg.ExecuteCommandConfiguration.Logging == ecstypes.ExecuteCommandLoggingOverride {
 		group = aws.ToString(cfg.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName)
 	}
 	if group == "" {

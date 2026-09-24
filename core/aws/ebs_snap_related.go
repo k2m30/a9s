@@ -19,7 +19,7 @@ var ebsSnapCreateImageRe = regexp.MustCompile(`Created by CreateImage\((i-[a-zA-
 func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
-		return foundNone("ami", "snapID")
+		return keyMissing("ami", "snapID")
 	}
 
 	amiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ami")

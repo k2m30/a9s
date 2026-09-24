@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `asg`
 
 - **Why related**: ASG that owns the instance (if any) — lifecycle context.
-- **How discovered**: read field `Instance.Tags[]` for key `aws:autoscaling:groupName`; cross-reference the already-loaded `asg` list by `AutoScalingGroupName`. Fallback: scan loaded `asg` list where `Instances[].InstanceId` matches — a9s-devops: ASG-launched instances carry the reserved AWS tag, so tag lookup is the cheap-and-reliable pivot; the `Instances[]` fallback covers instances launched via the ASG API at run-time.
+- **How discovered**: read field `Instance.Tags[]` for key `aws:autoscaling:groupName`; cross-reference the already-loaded `asg` list by `AutoScalingGroupName`. Fallback: scan loaded `asg` list where `Instances[].InstanceId` matches — a9s-devops: ASG-launched instances carry the reserved AWS tag, so tag lookup is the cheap-and-reliable pivot; the `Instances[]` fallback covers instances launched via the ASG API at run-time, and leaves out a `LifecycleState` of `Terminating*`, `Terminated` or `Detached` ([API_Instance](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_Instance.html)).
 - **Count shown**: yes.
 
 ### `backup`
@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ebs-snap`
 
 - **Why related**: Instance's AMI snapshots for rollback/forensic workflows.
-- **How discovered**: derive via `Instance.ImageId` → AMI → `Image.BlockDeviceMappings[].Ebs.SnapshotId`, plus `Instance.BlockDeviceMappings[].Ebs.VolumeId` → volume → snapshots from that volume; cross-reference the already-loaded `ebs-snap` list by `Snapshot.SnapshotId` / `Snapshot.VolumeId` — a9s-devops: rollback workflows hinge on the AMI-root snapshot and the attached-volume snapshots, so the pivot must union both sources. No extra API call when `ami`, `ebs`, `ebs-snap` are already loaded.
+- **How discovered**: Snapshots of the volumes this instance has attached, by `Snapshot.VolumeId`, and the snapshots its AMI's block devices name in `Ebs.SnapshotId` ([API_EbsBlockDevice](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html)) — rollback/forensic workflows.
 - **Count shown**: yes.
 
 ### `eip`
@@ -118,8 +118,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `tg`
 
 - **Why related**: Target groups this instance is registered with — traffic routing.
-- **How discovered**: the already-loaded `tg` list, kept to instance-type target groups in the instance's VPC — the cached target groups carry no registered targets, and reading them costs `DescribeTargetHealth` per target group.
-- **Count shown**: no — the matches are candidates (heuristic coverage), rendered as a blank, navigable row.
+- **How discovered**: Instance target groups in this instance's VPC (`TargetGroup.VpcId`) whose `DescribeTargetHealth` lists this instance ([API_DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)).
+- **Count shown**: yes; a lower bound while the `tg` list, or a group's target health, was read only in part.
 
 ### `vpc`
 

@@ -121,5 +121,13 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return NotRead("backup")
 	}
 
-	return backupPivot(planList, truncated, backupTarget{arn: parentARN, unread: "ListTagsForResource"})
+	// AWS Backup protects the parent instance, so a plan selecting it by tag
+	// is read against the parent's tags.
+	target := backupTarget{arn: parentARN, unread: "ListTagsForResource"}
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
+		if api, ok := c.RDS.(RDSListTagsForResourceAPI); ok {
+			target = target.withTags(rdsTagsForARN(ctx, api, parentARN))
+		}
+	}
+	return backupPivot(planList, truncated, target)
 }

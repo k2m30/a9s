@@ -12,12 +12,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
-	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -59,13 +55,11 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 
 // checkLambdaAPIGW reads which APIs invoke this function from their
 // integrations: an HTTP or WebSocket API invokes a function through an
-// integration whose IntegrationUri is the function's ARN, and only
-// apigatewayv2:GetIntegrations per API returns them. A REST API keeps its
-// integrations per method, which this pivot does not read, so a REST API
-// leaves the count a lower bound.
+// integration whose URI is the function's ARN, read per API where its API
+// Gateway keeps them (apigwIntegrations).
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("apigw", "fnName")
+		return keyMissing("apigw", "fnName")
 	}
 	apiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "apigw")
 	if err != nil {
@@ -78,19 +72,15 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	var ids []string
 	var reads rowReads
 	for _, apiRes := range apiList {
-		if apiRes.Fields["protocol"] == "REST" {
-			reads.missed()
-			continue
-		}
-		items, complete, err := apigwListIntegrations(ctx, clients, apiRes.ID)
+		items, complete, err := apigwIntegrations(ctx, clients, apiRes)
 		if err != nil {
 			reads.fail(apiRes.ID, err)
 			continue
 		}
 		reads.read++
 		truncated = truncated || !complete
-		if slices.ContainsFunc(items, func(item apigwtypes.Integration) bool {
-			return lambdaRefNamesFunction(lambdaIntegrationARN(aws.ToString(item.IntegrationUri)), res.ID, rc)
+		if slices.ContainsFunc(items, func(item apigwIntegration) bool {
+			return lambdaRefNamesFunction(lambdaIntegrationARN(item.uri), res.ID, rc)
 		}) {
 			ids = append(ids, apiRes.ID)
 		}
@@ -143,7 +133,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return foundNone("ddb", "fnName")
+		return keyMissing("ddb", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -157,7 +147,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cac
 func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return foundNone("kinesis", "fnName")
+		return keyMissing("kinesis", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -171,7 +161,7 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
-		return foundNone("msk", "fnName")
+		return keyMissing("msk", "fnName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -187,15 +177,12 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 // return an unknown result when no live client is available and otherwise do
 // a bounded scan.
 
-// checkLambdaTG scans the tg cache for target groups whose TargetType is
-// "lambda" and, for each such TG, calls ELBv2 DescribeTargetHealth to resolve
-// its registered targets — Target.Id for a Lambda-type TG is the function
-// ARN. Only lambda-type TGs trigger a call, bounding the fan-out to the
-// number of Lambda TGs in the account (typically small). Per-TG failures are
-// aggregated per the error contract rather than silently skipped.
+// checkLambdaTG counts the lambda target groups this function is registered
+// in: a Lambda target's Id is the function ARN. Only lambda-type groups are
+// asked, which bounds the calls to the account's Lambda target groups.
 func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("tg", "res.ID")
+		return keyMissing("tg", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
@@ -205,89 +192,34 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	if tgList == nil {
 		return NotRead("tg")
 	}
-
 	var lambdaTGs []resource.Resource
 	for _, tgRes := range tgList {
 		if tgRes.Fields["target_type"] == "lambda" {
 			lambdaTGs = append(lambdaTGs, tgRes)
 		}
 	}
-	if len(lambdaTGs) == 0 {
-		if truncated {
-			return relatedResultTrunc("tg", nil, true)
-		}
-		return foundNone("tg", "lambdaTGs")
-	}
-
-	c, sok := clients.(*ServiceClients)
-	if !sok || c == nil || c.ELBv2 == nil {
-		return NotRead("tg")
-	}
-	healthAPI, hok := c.ELBv2.(ELBv2DescribeTargetHealthAPI)
-	if !hok {
-		return NotRead("tg")
-	}
-
-	var ids []string
-	var failures []Failure
-	for _, tgRes := range lambdaTGs {
-		tgArn := tgRes.Fields["target_group_arn"]
-		if tgArn == "" {
-			if tg, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct); ok && tg.TargetGroupArn != nil {
-				tgArn = *tg.TargetGroupArn
-			}
-		}
-		if tgArn == "" {
-			continue
-		}
-		out, healthErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
-			return healthAPI.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
-		})
-		if healthErr != nil {
-			failures = append(failures, FailedCall(tgRes.ID, healthErr))
-			continue
-		}
-		for _, thd := range out.TargetHealthDescriptions {
-			if thd.Target == nil || thd.Target.Id == nil {
-				continue
-			}
-			if lambdaRefNamesFunction(*thd.Target.Id, res.ID, rc) {
-				ids = append(ids, tgRes.ID)
-				break
-			}
-		}
-	}
-	if aggErr := AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs)); aggErr != nil &&
-		len(ids) == 0 && !truncated && len(failures) == len(lambdaTGs) {
-		// Every target group refused its read and the tg cache page was
-		// complete: nothing was established about any of them, which is a
-		// fetch failure rather than a lower bound over what was read.
-		return ReadFailed("tg", aggErr)
-	}
-	// Some DescribeTargetHealth calls may have failed: ids is a proven subset,
-	// not necessarily exhaustive. Truncated (not Errored) keeps the row
-	// actionable rather than discarding confirmed matches as a dead end.
-	return relatedResultTrunc("tg", ids, truncated || len(failures) > 0)
+	registered := tgsRegistering(ctx, clients, lambdaTGs, "lambda-related: DescribeTargetHealth", func(id string) bool {
+		return lambdaRefNamesFunction(id, res.ID, rc)
+	})
+	return relatedAnswer("tg", joinReads(registered, relatedRead{partial: truncated}))
 }
 
-// checkLambdaSNS scans the sns cache and surfaces topics that subscribe this
-// Lambda (i.e. where this function is a subscription endpoint).
-// DescribeTopic alone doesn't list subscriptions, so we check the sns-sub cache.
+// checkLambdaSNS counts the topics that subscribe this function (from the
+// sns-sub list: DescribeTopic lists no subscriptions) and the topic that is
+// its dead-letter target.
 func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("sns", "res.ID")
+		return keyMissing("sns", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
+	dlq := relatedRead{ids: lambdaDLQ(res, "sns")}
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
-	if err != nil {
-		return ReadFailed("sns", err)
-	}
 	if subList == nil {
-		return NotRead("sns")
+		return relatedAnswer("sns", joinReads(dlq, unreadBy(err)))
 	}
 	topicSet := make(map[string]struct{})
 	for _, subRes := range subList {
-		if subRes.Fields["protocol"] != "lambda" {
+		if subRes.Fields["protocol"] != "lambda" || !snsSubCarries(subRes) {
 			continue
 		}
 		endpoint := subRes.Fields["endpoint"]
@@ -304,14 +236,14 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 	for t := range topicSet {
 		ids = append(ids, t)
 	}
-	return relatedResultTrunc("sns", ids, truncated)
+	return relatedAnswer("sns", joinReads(dlq, relatedRead{ids: ids, partial: truncated}))
 }
 
 // checkLambdaSNSSub scans the sns-sub cache for subscriptions where this
 // Lambda is the endpoint.
 func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("sns-sub", "res.ID")
+		return keyMissing("sns-sub", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
@@ -338,7 +270,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 // Fields["notification_lambda"] if the fetcher enriched it.
 func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("s3", "res.ID")
+		return keyMissing("s3", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")

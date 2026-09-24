@@ -28,8 +28,11 @@ func checkEbRuleRole(_ context.Context, clients any, res resource.Resource, cach
 }
 
 // ebRuleTargets calls events:ListTargetsByRule(rule) and returns, as target,
-// the targets whose ARN is one of service's (e.g. "states" for sfn). A rule
-// name is unique on its own bus, so the bus goes with it.
+// the targets whose ARN is one of service's (e.g. "states" for sfn), and the
+// dead-letter queues the targets name: DeadLetterConfig.Arn is "the ARN of
+// the SQS queue specified as the target for the dead-letter queue"
+// (https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_DeadLetterConfig.html).
+// A rule name is unique on its own bus, so the bus goes with it.
 func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCache, res resource.Resource, target, service string) resource.RelatedCheckResult {
 	ruleName := res.Fields["name"]
 	if ruleName == "" {
@@ -40,17 +43,19 @@ func ebRuleTargets(ctx context.Context, clients any, cache resource.ResourceCach
 		return NotRead(target)
 	}
 	targets, complete, err := ebListTargets(ctx, c.EventBridge, res.Fields["event_bus"], ruleName)
-	// no finding: the pivot shows "?" rather than a target count nobody read.
 	if err != nil {
-		return NotRead(target)
+		return ReadFailed(target, err)
 	}
 	var arns []string
 	for _, t := range targets {
-		if t.Arn == nil {
-			continue
+		named := []string{aws.ToString(t.Arn)}
+		if t.DeadLetterConfig != nil {
+			named = append(named, aws.ToString(t.DeadLetterConfig.Arn))
 		}
-		if _, ok := ARNForService(*t.Arn, service); ok {
-			arns = append(arns, *t.Arn)
+		for _, a := range named {
+			if _, ok := ARNForService(a, service); ok {
+				arns = append(arns, a)
+			}
 		}
 	}
 	ids, dropped := resolveRefs(target, arns, refContext(clients, cache, target))
@@ -79,6 +84,39 @@ func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, cac
 
 func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return ebRuleTargets(ctx, clients, cache, res, "sqs", "sqs")
+}
+
+// ebRulesWithDLQ reads the rules of the eb-rule list one of whose targets
+// names queueARN as its dead-letter queue, with one ListTargetsByRule per rule.
+func ebRulesWithDLQ(ctx context.Context, clients any, cache resource.ResourceCache, queueARN string) relatedRead {
+	rules, truncated, err := FetchRelatedTarget(ctx, clients, cache, "eb-rule")
+	if rules == nil {
+		return unreadBy(err)
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.EventBridge == nil {
+		return relatedRead{unread: true}
+	}
+	rules, capped := fanOut(rules)
+	read := relatedRead{partial: truncated || capped}
+	var failures []Failure
+	for _, rule := range rules {
+		targets, complete, err := ebListTargets(ctx, c.EventBridge, rule.Fields["event_bus"], rule.Fields["name"])
+		if err != nil {
+			failures = append(failures, FailedCall(rule.ID, err))
+			continue
+		}
+		read.partial = read.partial || !complete
+		if slices.ContainsFunc(targets, func(t eventbridgetypes.Target) bool {
+			return t.DeadLetterConfig != nil && aws.ToString(t.DeadLetterConfig.Arn) == queueARN
+		}) {
+			read.ids = append(read.ids, rule.ID)
+		}
+	}
+	read.partial = read.partial || len(failures) > 0
+	read.unread = len(rules) > 0 && len(failures) == len(rules)
+	read.failure = AggregateFailures("eb-rule: ListTargetsByRule", failures, len(rules))
+	return read
 }
 
 // ebListTargets is events:ListTargetsByRule for the rule name on bus ("" for

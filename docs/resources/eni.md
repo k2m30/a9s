@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ec2`, `
 ### `nat`
 
 - **Why related**: NAT gateway backing ENI — when the ENI is misbehaving the fault almost always lives on the NAT gateway (FailureCode, EIP).
-- **How discovered**: read field `NetworkInterface.InterfaceType == natGateway`. The NAT gateway ID is embedded in `NetworkInterface.Description` (AWS format `Interface for NAT Gateway nat-<id>`); cross-reference the already-loaded `nat` list by `NatGateway.NatGatewayId` — a9s-devops: description-parse is the supported pivot here.
+- **How discovered**: read field `NetworkInterface.InterfaceType == natGateway`. The NAT gateway ID is embedded in `NetworkInterface.Description` (AWS format `Interface for NAT Gateway nat-<id>`); cross-reference the already-loaded `nat` list by `NatGateway.NatGatewayId` — a9s-devops: description-parse is the supported pivot here. The gateway counts while this interface is one of its live addresses, the `nat` → `eip` rule ([API_NatGatewayAddress](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html)).
 - **Count shown**: yes.
 
 ### `sg`

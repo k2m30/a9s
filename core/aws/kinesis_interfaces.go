@@ -25,6 +25,11 @@ type KinesisListTagsForStreamAPI interface {
 
 // KinesisAPI is the aggregate interface covering all Kinesis operations used by a9s fetchers.
 // *kinesis.Client structurally satisfies this interface.
+// KinesisListStreamConsumersAPI lists a stream's enhanced fan-out consumers.
+type KinesisListStreamConsumersAPI interface {
+	ListStreamConsumers(ctx context.Context, params *kinesis.ListStreamConsumersInput, optFns ...func(*kinesis.Options)) (*kinesis.ListStreamConsumersOutput, error)
+}
+
 type KinesisAPI interface {
 	KinesisListStreamsAPI
 	KinesisDescribeStreamSummaryAPI

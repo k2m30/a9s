@@ -7,6 +7,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -28,7 +29,7 @@ func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return foundNone("ec2", "sgID")
+		return keyMissing("ec2", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -60,7 +61,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return foundNone("eni", "sgID")
+		return keyMissing("eni", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -92,7 +93,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return foundNone("elb", "sgID")
+		return keyMissing("elb", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -129,37 +130,29 @@ func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResultTrunc("cfn", []string{stackName}, false)
 }
 
-// checkSGSG scans the SG cache for other security groups whose IpPermissions or
-// IpPermissionsEgress contain a UserIdGroupPair referencing the source SG's ID.
-// This answers "which other SGs reference this one?" — critical for blast-radius analysis.
-func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	sgID := res.ID
-	if sgID == "" {
-		return foundNone("sg", "sgID")
-	}
-
-	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
-	if err != nil {
-		return ReadFailed("sg", err)
-	}
-	if list == nil {
+// checkSGSG counts the security groups this group's own rules name: the
+// UserIdGroupPairs[].GroupId of its IpPermissions and IpPermissionsEgress
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_UserIdGroupPair.html).
+func checkSGSG(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	sg, ok := assertStruct[ec2types.SecurityGroup](res.RawStruct)
+	if !ok {
 		return NotRead("sg")
 	}
-
-	var ids []string
-	for _, r := range list {
-		if r.ID == sgID {
-			continue // skip self
-		}
-		candidate, ok := assertStruct[ec2types.SecurityGroup](r.RawStruct)
-		if !ok {
-			continue
-		}
-		if sgReferencedInPermissions(candidate.IpPermissions, sgID) || sgReferencedInPermissions(candidate.IpPermissionsEgress, sgID) {
-			ids = append(ids, r.ID)
+	// A pair whose UserId is another account's names a group of that
+	// account, which no row of this list is.
+	var refs []string
+	foreign := false
+	for _, p := range append(slices.Clone(sg.IpPermissions), sg.IpPermissionsEgress...) {
+		for _, pair := range p.UserIdGroupPairs {
+			switch id := aws.ToString(pair.GroupId); {
+			case pair.UserId != nil && sg.OwnerId != nil && *pair.UserId != *sg.OwnerId:
+				foreign = true
+			case id != res.ID:
+				refs = append(refs, id)
+			}
 		}
 	}
-	return relatedResultTrunc("sg", ids, truncated)
+	return alsoPartial(relatedRefs("sg", refs, refContext(clients, cache, "sg")), foreign)
 }
 
 // checkSGLambda scans the Lambda cache for functions whose VpcConfig.SecurityGroupIds
@@ -167,7 +160,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sgID := res.ID
 	if sgID == "" {
-		return foundNone("lambda", "sgID")
+		return keyMissing("lambda", "sgID")
 	}
 
 	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
@@ -192,17 +185,4 @@ func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	return relatedResultTrunc("lambda", ids, truncated)
-}
-
-// sgReferencedInPermissions returns true if any IpPermission in the slice contains
-// a UserIdGroupPair whose GroupId matches the given sgID.
-func sgReferencedInPermissions(perms []ec2types.IpPermission, sgID string) bool {
-	for _, perm := range perms {
-		for _, pair := range perm.UserIdGroupPairs {
-			if pair.GroupId != nil && *pair.GroupId == sgID {
-				return true
-			}
-		}
-	}
-	return false
 }

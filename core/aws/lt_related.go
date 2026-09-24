@@ -121,25 +121,12 @@ func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.
 	return relatedResultTrunc("asg", ids, truncated)
 }
 
-// ltReferencedByASG reports whether asg's plain LaunchTemplate, its
-// MixedInstancesPolicy launch template, or any of its per-instance-type
-// Overrides[] name the template with ltID / ltName.
+// ltReferencedByASG reports whether one of asg's launch sources names the
+// template with ltID / ltName.
 func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID, ltName string) bool {
-	names := func(spec *asgtypes.LaunchTemplateSpecification) bool {
-		return spec != nil && namesLaunchTemplate(aws.ToString(spec.LaunchTemplateId), aws.ToString(spec.LaunchTemplateName), ltID, ltName)
-	}
-	if names(asg.LaunchTemplate) {
-		return true
-	}
-	if asg.MixedInstancesPolicy == nil || asg.MixedInstancesPolicy.LaunchTemplate == nil {
-		return false
-	}
-	mip := asg.MixedInstancesPolicy.LaunchTemplate
-	if names(mip.LaunchTemplateSpecification) {
-		return true
-	}
-	return slices.ContainsFunc(mip.Overrides, func(o asgtypes.LaunchTemplateOverrides) bool {
-		return names(o.LaunchTemplateSpecification)
+	templates, _, _ := asgLaunchSources(asg)
+	return slices.ContainsFunc(templates, func(spec asgtypes.LaunchTemplateSpecification) bool {
+		return namesLaunchTemplate(aws.ToString(spec.LaunchTemplateId), aws.ToString(spec.LaunchTemplateName), ltID, ltName)
 	})
 }
 

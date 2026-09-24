@@ -66,7 +66,7 @@ func r53RelatedResult(target string, ids []string, recordsTruncated, targetTrunc
 func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("elb", "zoneID")
+		return keyMissing("elb", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -109,7 +109,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("cf", "zoneID")
+		return keyMissing("cf", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -152,7 +152,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("apigw", "zoneID")
+		return keyMissing("apigw", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -179,7 +179,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("s3", "zoneID")
+		return keyMissing("s3", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -224,7 +224,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("acm", "zoneID")
+		return keyMissing("acm", "zoneID")
 	}
 	sets, recordsTruncated, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
@@ -276,7 +276,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("logs", "zoneID")
+		return keyMissing("logs", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
@@ -335,7 +335,7 @@ func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	zoneID := res.ID
 	if zoneID == "" {
-		return foundNone("vpc", "zoneID")
+		return keyMissing("vpc", "zoneID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {

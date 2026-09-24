@@ -9,6 +9,8 @@ import (
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/apigateway"
+	apigwv1types "github.com/aws/aws-sdk-go-v2/service/apigateway/types"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
@@ -19,14 +21,14 @@ import (
 
 // checkApigwKMS resolves KMS keys referenced by this API's Lambda integrations.
 // API Gateway has no direct KMS field; Lambda integrations are followed as a
-// best effort: one GetIntegrations call + per-Lambda-target GetFunction call.
+// best effort: the integrations read once, then one GetFunction per function.
 // Extracts KMSKeyArn from each Lambda integration's FunctionConfiguration.
 func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return foundNone("kms", "apiID")
+		return keyMissing("kms", "apiID")
 	}
-	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwIntegrations(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("kms")
@@ -46,7 +48,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 	total := 0
 	lambdaRC := refContext(clients, cache, "lambda")
 	for _, item := range items {
-		fn, ok := resource.ResolveRef("lambda", lambdaIntegrationARN(aws.ToString(item.IntegrationUri)), lambdaRC)
+		fn, ok := resource.ResolveRef("lambda", lambdaIntegrationARN(item.uri), lambdaRC)
 		if !ok {
 			continue
 		}
@@ -94,7 +96,7 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		apiName = res.Fields["name"]
 	}
 	if apiID == "" && apiName == "" {
-		return foundNone("logs", "apiName")
+		return keyMissing("logs", "apiName")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -115,9 +117,26 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("logs", logGroupsUnder(logList, executionLogs, accessLogs), truncated)
 }
 
-// apigwListIntegrations walks apigatewayv2:GetIntegrations for the given
-// API. complete is false when the walk stopped at the page cap.
-func apigwListIntegrations(ctx context.Context, clients any, apiID string) (items []apigwtypes.Integration, complete bool, err error) {
+// apigwIntegration is one integration of an API, whichever API Gateway
+// holds it: the backend it calls, the role it calls it as, and, for a private
+// integration, the load balancers the VPC link reaches.
+type apigwIntegration struct {
+	uri, credentials, vpcLink string
+	loadBalancers             []string
+}
+
+// apigwIntegrations reads the API's integrations where AWS keeps them. A REST
+// API's live in API Gateway v1, on each method of each resource
+// (GetResources with the "methods" embed,
+// https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html),
+// and a private one reaches the targetArns of its VPC link. An HTTP or
+// WebSocket API's are apigatewayv2:GetIntegrations, and a private one's
+// IntegrationUri is the listener it forwards to. complete is false when a walk
+// stopped at its cap.
+func apigwIntegrations(ctx context.Context, clients any, res resource.Resource) ([]apigwIntegration, bool, error) {
+	if res.Fields["protocol"] == "REST" {
+		return apigwRESTIntegrations(ctx, clients, res.ID)
+	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
 		return nil, false, errClientMissing
@@ -126,24 +145,95 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) (item
 	if !ok {
 		return nil, false, errClientMissing
 	}
-	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Integration, *string, error) {
-		out, err := api.GetIntegrations(ctx, &apigatewayv2.GetIntegrationsInput{ApiId: &apiID, NextToken: token})
+	v2, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Integration, *string, error) {
+		out, err := api.GetIntegrations(ctx, &apigatewayv2.GetIntegrationsInput{ApiId: aws.String(res.ID), NextToken: token})
 		if err != nil {
 			return nil, nil, err
 		}
 		return out.Items, out.NextToken, nil
 	})
+	var items []apigwIntegration
+	for _, i := range v2 {
+		item := apigwIntegration{uri: aws.ToString(i.IntegrationUri), credentials: aws.ToString(i.CredentialsArn)}
+		if i.ConnectionType == apigwtypes.ConnectionTypeVpcLink {
+			item.loadBalancers = []string{item.uri}
+		}
+		items = append(items, item)
+	}
+	return items, complete, err
 }
 
-// checkApigwLambda reports Lambda integration targets of this API Gateway.
-// One apigatewayv2:GetIntegrations call, filter to AWS_PROXY /
-// AWS integrations whose IntegrationUri points at a Lambda invoke ARN.
+// apigwRESTIntegrations reads a REST API's method integrations, each private
+// one's load balancers from its VPC link's targetArns
+// (https://docs.aws.amazon.com/apigateway/latest/api/API_VpcLink.html).
+func apigwRESTIntegrations(ctx context.Context, clients any, apiID string) ([]apigwIntegration, bool, error) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.APIGatewayV1 == nil {
+		return nil, false, errClientMissing
+	}
+	api, ok := c.APIGatewayV1.(APIGatewayV1GetResourcesAPI)
+	if !ok {
+		return nil, false, errClientMissing
+	}
+	resources, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.Resource, *string, error) {
+		out, err := api.GetResources(ctx, &apigateway.GetResourcesInput{RestApiId: aws.String(apiID), Embed: []string{"methods"}, Position: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.Position, nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	var items []apigwIntegration
+	links := false
+	for _, r := range resources {
+		for _, m := range r.ResourceMethods {
+			i := m.MethodIntegration
+			if i == nil {
+				continue
+			}
+			item := apigwIntegration{uri: aws.ToString(i.Uri), credentials: aws.ToString(i.Credentials)}
+			if i.ConnectionType == apigwv1types.ConnectionTypeVpcLink {
+				item.vpcLink = aws.ToString(i.ConnectionId)
+				links = true
+			}
+			items = append(items, item)
+		}
+	}
+	if !links {
+		return items, complete, nil
+	}
+	linkAPI, ok := c.APIGatewayV1.(APIGatewayV1GetVpcLinksAPI)
+	if !ok {
+		return nil, false, errClientMissing
+	}
+	vpcLinks, linksComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.VpcLink, *string, error) {
+		out, linkErr := linkAPI.GetVpcLinks(ctx, &apigateway.GetVpcLinksInput{Position: token})
+		if linkErr != nil {
+			return nil, nil, linkErr
+		}
+		return out.Items, out.Position, nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	for i := range items {
+		if l := slices.IndexFunc(vpcLinks, func(l apigwv1types.VpcLink) bool { return aws.ToString(l.Id) == items[i].vpcLink }); items[i].vpcLink != "" && l >= 0 {
+			items[i].loadBalancers = vpcLinks[l].TargetArns
+		}
+	}
+	return items, complete && linksComplete, nil
+}
+
+// checkApigwLambda reports the functions this API's integrations invoke:
+// integration URIs that are a Lambda invoke ARN.
 func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return foundNone("lambda", "apiID")
+		return keyMissing("lambda", "apiID")
 	}
-	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwIntegrations(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("lambda")
@@ -152,7 +242,7 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 	}
 	var arns []string
 	for _, item := range items {
-		arns = append(arns, lambdaIntegrationARN(aws.ToString(item.IntegrationUri)))
+		arns = append(arns, lambdaIntegrationARN(item.uri))
 	}
 	return listedRelated(ctx, clients, cache, "lambda", arns, !complete)
 }
@@ -164,17 +254,13 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, c
 func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return foundNone("acm", "apiID")
+		return keyMissing("acm", "apiID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
 		return NotRead("acm")
 	}
 	dnAPI, ok := c.APIGatewayV2.(APIGatewayV2GetDomainNamesAPI)
-	if !ok {
-		return NotRead("acm")
-	}
-	mapAPI, ok := c.APIGatewayV2.(APIGatewayV2GetApiMappingsAPI)
 	if !ok {
 		return NotRead("acm")
 	}
@@ -196,20 +282,13 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 			continue
 		}
 		total++
-		mappings, mappingsComplete, merr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.ApiMapping, *string, error) {
-			out, err := mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName, NextToken: token})
-			if err != nil {
-				return nil, nil, err
+		mapped := apigwDomainAPIs(ctx, c, *d.DomainName, d.RoutingMode)
+		if !slices.Contains(mapped.ids, apiID) {
+			if mapped.failed {
+				failures = append(failures, FailedCall(*d.DomainName, mapped.failure))
+				continue
 			}
-			return out.Items, out.NextToken, nil
-		})
-		if merr != nil {
-			failures = append(failures, FailedCall(*d.DomainName, merr))
-			continue
-		}
-		matched := slices.ContainsFunc(mappings, func(am apigwtypes.ApiMapping) bool { return aws.ToString(am.ApiId) == apiID })
-		if !matched {
-			complete = complete && mappingsComplete
+			complete = complete && !mapped.partial && !mapped.unread
 			continue
 		}
 		for _, dcfg := range d.DomainNameConfigurations {
@@ -233,6 +312,111 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("acm", ids, dropped || len(failures) > 0 || !complete)
 }
 
+// apigwDomainAPIs is the one reader of the APIs a custom domain sends
+// traffic to, in the places its routing mode reads: routing rules, API
+// mappings, or both, rules first
+// (https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-routing-mode.html).
+// A mode left empty reads both.
+func apigwDomainAPIs(ctx context.Context, clients any, domain string, mode apigwtypes.RoutingMode) relatedRead {
+	var reads []relatedRead
+	if mode != apigwtypes.RoutingModeApiMappingOnly {
+		reads = append(reads, apigwDomainRoutingRules(ctx, clients, domain))
+	}
+	if mode != apigwtypes.RoutingModeRoutingRuleOnly {
+		reads = append(reads, apigwDomainMappings(ctx, clients, domain))
+	}
+	return joinReads(reads...)
+}
+
+// apigwDomainRoutingRules reads the APIs a domain's routing rules invoke:
+// each rule's actions invoke a REST API stage by InvokeApi.ApiId
+// (https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-routingrules.html).
+func apigwDomainRoutingRules(ctx context.Context, clients any, domain string) relatedRead {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return unreadBy(errClientMissing)
+	}
+	api, ok := c.APIGatewayV2.(APIGatewayV2ListRoutingRulesAPI)
+	if !ok {
+		return unreadBy(errClientMissing)
+	}
+	rules, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.RoutingRule, *string, error) {
+		out, pageErr := api.ListRoutingRules(ctx, &apigatewayv2.ListRoutingRulesInput{DomainName: aws.String(domain), NextToken: token})
+		if pageErr != nil {
+			return nil, nil, pageErr
+		}
+		return out.RoutingRules, out.NextToken, nil
+	})
+	if err != nil {
+		return unreadBy(err)
+	}
+	read := relatedRead{partial: !complete}
+	for _, rule := range rules {
+		for _, action := range rule.Actions {
+			if action.InvokeApi != nil {
+				read.ids = append(read.ids, aws.ToString(action.InvokeApi.ApiId))
+			}
+		}
+	}
+	return read
+}
+
+// apigwDomainMappings reads the APIs a domain's API mappings name. API
+// mappings connect HTTP and REST API stages to a domain
+// (https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-mappings.html,
+// https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-apimappings.html).
+// An edge-optimized domain maps REST APIs by base path mapping
+// (https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-edge-optimized-custom-domain-name.html,
+// https://docs.aws.amazon.com/apigateway/latest/api/API_GetBasePathMappings.html),
+// which no page says GetApiMappings returns, so a domain the v2 read maps
+// nothing on is read again through them.
+func apigwDomainMappings(ctx context.Context, clients any, domain string) relatedRead {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return unreadBy(errClientMissing)
+	}
+	mapAPI, ok := c.APIGatewayV2.(APIGatewayV2GetApiMappingsAPI)
+	if !ok {
+		return unreadBy(errClientMissing)
+	}
+	mappings, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.ApiMapping, *string, error) {
+		out, err := mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: aws.String(domain), NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Items, out.NextToken, nil
+	})
+	if err != nil {
+		return unreadBy(err)
+	}
+	read := relatedRead{partial: !complete}
+	for _, m := range mappings {
+		read.ids = append(read.ids, aws.ToString(m.ApiId))
+	}
+	if len(mappings) > 0 {
+		return read
+	}
+	baseAPI, ok := c.APIGatewayV1.(APIGatewayV1GetBasePathMappingsAPI)
+	if !ok {
+		return unreadBy(errClientMissing)
+	}
+	bases, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.BasePathMapping, *string, error) {
+		out, pageErr := baseAPI.GetBasePathMappings(ctx, &apigateway.GetBasePathMappingsInput{DomainName: aws.String(domain), Position: token})
+		if pageErr != nil {
+			return nil, nil, pageErr
+		}
+		return out.Items, out.Position, nil
+	})
+	if err != nil {
+		return unreadBy(err)
+	}
+	read = relatedRead{partial: !complete}
+	for _, b := range bases {
+		read.ids = append(read.ids, aws.ToString(b.RestApiId))
+	}
+	return read
+}
+
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
 // use dimension "ApiId". Scans the alarm cache.
 func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -246,7 +430,7 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return foundNone("cf", "apiID")
+		return keyMissing("cf", "apiID")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -277,14 +461,15 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 // Application Load Balancer listener, Network Load Balancer listener, or AWS
 // Cloud Map service" in IntegrationUri; a listener belongs to one load
 // balancer, and a Cloud Map service names none, which leaves the count a
-// lower bound.
+// lower bound. A REST API's private integration reaches the load balancers
+// of its VPC link.
 // https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html
 func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	if apiID == "" {
-		return foundNone("elb", "apiID")
+		return keyMissing("elb", "apiID")
 	}
-	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
+	items, complete, err := apigwIntegrations(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
 			return NotRead("elb")
@@ -293,78 +478,75 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var refs []string
 	for _, item := range items {
-		if item.ConnectionType == apigwtypes.ConnectionTypeVpcLink {
-			refs = append(refs, aws.ToString(item.IntegrationUri))
-		}
+		refs = append(refs, item.loadBalancers...)
 	}
 	return listedRelated(ctx, clients, cache, "elb", refs, !complete)
 }
 
-// checkApigwRole reports IAM roles this API assumes to call the integration
-// target or to run a request authorizer. Reuses the
-// apigatewayv2:GetIntegrations call (Integration.CredentialsArn) already
-// made by the lambda/kms/sfn/sns pivots, plus one apigatewayv2:GetAuthorizers
-// call (Authorizer.AuthorizerCredentialsArn) — role ARNs reduced to bare
-// RoleName so the role cache's FetchByIDs resolves them.
+// checkApigwRole reports IAM roles this API assumes to call an integration's
+// backend (the integration's credentials) or to run an authorizer (the
+// authorizer's credentials), read from the API Gateway that holds the API.
 func checkApigwRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	apiID := res.ID
-	if apiID == "" {
-		return foundNone("role", "apiID")
+	if res.ID == "" {
+		return keyMissing("role", "apiID")
 	}
-
-	var refs []string
-	rc := refContext(clients, cache, "role")
-
-	items, complete, err := apigwListIntegrations(ctx, clients, apiID)
-	if err != nil && !errors.Is(err, errClientMissing) {
-		return ReadFailed("role", err)
+	items, complete, err := apigwIntegrations(ctx, clients, res)
+	integrations := relatedRead{partial: !complete}
+	if err != nil {
+		integrations = unreadBy(err)
+	}
+	refs, authComplete, err := apigwAuthorizerRoles(ctx, clients, res)
+	authorizers := relatedRead{partial: !authComplete}
+	if err != nil {
+		authorizers = unreadBy(err)
 	}
 	for _, item := range items {
-		if item.CredentialsArn != nil && *item.CredentialsArn != "" {
-			refs = append(refs, *item.CredentialsArn)
-		}
+		refs = append(refs, item.credentials)
 	}
+	ids, dropped := resolveRefs("role", refs, refContext(clients, cache, "role"))
+	return relatedAnswer("role", joinReads(integrations, authorizers, relatedRead{ids: ids, partial: dropped}))
+}
 
-	// Every branch below that bails out with only the CredentialsArn-derived
-	// refs (never having reached GetAuthorizers) reports it as a
-	// truncated lower bound, not an exact count: authorizer-credential roles
-	// may still exist and were never checked.
+// apigwAuthorizerRoles reads the roles the API's authorizers run as: a REST
+// API's from API Gateway v1 GetAuthorizers (authorizerCredentials), an HTTP
+// or WebSocket API's from apigatewayv2 GetAuthorizers
+// (AuthorizerCredentialsArn).
+func apigwAuthorizerRoles(ctx context.Context, clients any, res resource.Resource) ([]string, bool, error) {
 	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.APIGatewayV2 == nil {
-		if len(refs) > 0 {
-			ids, _ := resolveRefs("role", refs, rc)
-			return relatedResultTrunc("role", ids, true)
-		}
-		return NotRead("role")
+	if !ok || c == nil {
+		return nil, false, errClientMissing
 	}
-	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
+	var roles []string
+	if res.Fields["protocol"] == "REST" {
+		v1, isV1 := c.APIGatewayV1.(APIGatewayV1GetAuthorizersAPI)
+		if !isV1 {
+			return nil, false, errClientMissing
+		}
+		auths, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwv1types.Authorizer, *string, error) {
+			out, err := v1.GetAuthorizers(ctx, &apigateway.GetAuthorizersInput{RestApiId: aws.String(res.ID), Position: token})
+			if err != nil {
+				return nil, nil, err
+			}
+			return out.Items, out.Position, nil
+		})
+		for _, a := range auths {
+			roles = append(roles, aws.ToString(a.AuthorizerCredentials))
+		}
+		return roles, complete, err
+	}
+	api, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
 	if !ok {
-		if len(refs) > 0 {
-			ids, _ := resolveRefs("role", refs, rc)
-			return relatedResultTrunc("role", ids, true)
-		}
-		return NotRead("role")
+		return nil, false, errClientMissing
 	}
-	authorizers, authComplete, authErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Authorizer, *string, error) {
-		out, err := authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID, NextToken: token})
+	auths, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]apigwtypes.Authorizer, *string, error) {
+		out, err := api.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: aws.String(res.ID), NextToken: token})
 		if err != nil {
 			return nil, nil, err
 		}
 		return out.Items, out.NextToken, nil
 	})
-	if authErr != nil {
-		if len(refs) > 0 {
-			ids, _ := resolveRefs("role", refs, rc)
-			return relatedResultTrunc("role", ids, true)
-		}
-		return ReadFailed("role", authErr)
+	for _, a := range auths {
+		roles = append(roles, aws.ToString(a.AuthorizerCredentialsArn))
 	}
-	for _, a := range authorizers {
-		if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {
-			refs = append(refs, *a.AuthorizerCredentialsArn)
-		}
-	}
-
-	ids, dropped := resolveRefs("role", refs, rc)
-	return relatedResultTrunc("role", ids, dropped || !complete || !authComplete)
+	return roles, complete, err
 }

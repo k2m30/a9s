@@ -24,6 +24,9 @@ type APIGWFixtures struct {
 	DomainNames []apigwtypes.DomainName
 	// ApiMappings maps DomainName -> mappings, served by GetApiMappings.
 	ApiMappings map[string][]apigwtypes.ApiMapping
+	// RoutingRules maps DomainName -> routing rules, served by
+	// ListRoutingRules.
+	RoutingRules map[string][]apigwtypes.RoutingRule
 	// Authorizers maps ApiId -> authorizers, served by GetAuthorizers.
 	// Required for the apigw:role related-panel pivot (checkApigwRole).
 	Authorizers map[string][]apigwtypes.Authorizer
@@ -40,6 +43,10 @@ const (
 	// PublicAPIGWDomainName is the custom domain mapped to PublicAPIGWID,
 	// required for the apigw:acm pivot (checkApigwACM).
 	PublicAPIGWDomainName = "api.acme-corp.com"
+	// RoutedAPIGWDomainName is a custom domain in ROUTING_RULE_ONLY mode: its
+	// one routing rule invokes APIGWRESTTracingOff, and it has no API
+	// mappings.
+	RoutedAPIGWDomainName = "orders.acme-corp.com"
 	// APIGWVpcLinkID is the VPC link ID bound to PublicAPIGWID's VPC_LINK
 	// integration.
 	APIGWVpcLinkID = "vpcl-0aaa111111111111a"
@@ -167,11 +174,36 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 		// The referenced cert is a real acm.go fixture for api.acme-corp.com.
 		DomainNames: []apigwtypes.DomainName{
 			{
-				DomainName: aws.String(PublicAPIGWDomainName),
+				DomainName:  aws.String(PublicAPIGWDomainName),
+				RoutingMode: apigwtypes.RoutingModeApiMappingOnly,
 				DomainNameConfigurations: []apigwtypes.DomainNameConfiguration{
 					{
 						CertificateArn: aws.String(ProdACMCertARN2),
 						EndpointType:   apigwtypes.EndpointTypeRegional,
+					},
+				},
+			},
+			{
+				DomainName:  aws.String(RoutedAPIGWDomainName),
+				RoutingMode: apigwtypes.RoutingModeRoutingRuleOnly,
+				DomainNameConfigurations: []apigwtypes.DomainNameConfiguration{
+					{
+						CertificateArn: aws.String(ProdACMCertARN2),
+						EndpointType:   apigwtypes.EndpointTypeRegional,
+					},
+				},
+			},
+		},
+		RoutingRules: map[string][]apigwtypes.RoutingRule{
+			RoutedAPIGWDomainName: {
+				{
+					RoutingRuleId: aws.String("rr0orders01"),
+					Priority:      aws.Int32(100),
+					Conditions: []apigwtypes.RoutingRuleCondition{
+						{MatchBasePaths: &apigwtypes.RoutingRuleMatchBasePaths{AnyOf: []string{"orders"}}},
+					},
+					Actions: []apigwtypes.RoutingRuleAction{
+						{InvokeApi: &apigwtypes.RoutingRuleActionInvokeApi{ApiId: aws.String(APIGWRESTTracingOff), Stage: aws.String("prod"), StripBasePath: aws.Bool(true)}},
 					},
 				},
 			},
@@ -253,6 +285,9 @@ type APIGWV1Fixtures struct {
 	Authorizers map[string][]apigwv1types.Authorizer
 	// Stages maps RestApiId -> stages, served by GetStages.
 	Stages map[string][]apigwv1types.Stage
+	// Resources maps RestApiId -> the resources below the root, each with its
+	// methods embedded, served by GetResources.
+	Resources map[string][]apigwv1types.Resource
 }
 
 // apigwV1RestAPI builds one REST API row with the given endpoint type.
@@ -326,6 +361,27 @@ var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:go
 			APIGWRESTNoAccessLogs: {noLogs},
 			APIGWRESTTracingOff:   {untraced},
 			APIGWRESTStageSecret:  {leaky},
+		},
+		// acme-orders-rest's POST /orders proxies to the orders Lambda: the
+		// REST API's Lambda row reads it from GetResources.
+		Resources: map[string][]apigwv1types.Resource{
+			APIGWRESTNoAuthorizer: {{
+				Id:       aws.String("ord001"),
+				ParentId: aws.String(APIGWRESTNoAuthorizer + "-root"),
+				Path:     aws.String("/orders"),
+				PathPart: aws.String("orders"),
+				ResourceMethods: map[string]apigwv1types.Method{
+					"POST": {
+						HttpMethod:        aws.String("POST"),
+						AuthorizationType: aws.String("NONE"),
+						MethodIntegration: &apigwv1types.Integration{
+							Type:       apigwv1types.IntegrationTypeAwsProxy,
+							HttpMethod: aws.String("POST"),
+							Uri:        aws.String("arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:" + lambdaProcessOrders + "/invocations"),
+						},
+					},
+				},
+			}},
 		},
 	}
 })

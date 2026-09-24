@@ -10,6 +10,7 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -19,18 +20,55 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 	return alarmIDsByDimension(ctx, clients, cache, "kinesis", res)
 }
 
-// checkKinesisLambda calls lambda:ListEventSourceMappings with the
-// EventSourceArn filter set to this stream's ARN (one call per open stream —
-// the per-open call budget in docs/related-resources.md) and maps the returned
-// FunctionArn entries against the lambda cache. Secondary event sources on a
-// given mapping are not relevant here — every mapping returned by the
-// EventSourceArn-filtered call already belongs to this stream.
+// checkKinesisLambda reports the functions reading this stream: the event
+// source mappings on the stream's ARN, and those on each of its enhanced
+// fan-out consumers, which a mapping names by the consumer's own ARN
+// ("stream/<name>/consumer/<consumer>:<timestamp>",
+// https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html). The
+// consumers are kinesis:ListStreamConsumers.
 func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return foundNone("lambda", "streamARN")
+		return keyMissing("lambda", "streamARN")
 	}
-	return lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
+	stream := lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
+	if stream.Err() != nil {
+		return stream
+	}
+	consumers, read := kinesisConsumerARNs(ctx, clients, streamARN)
+	reads := []relatedRead{read, readOf(stream)}
+	for _, arn := range consumers {
+		reads = append(reads, readOf(lambdaEventSourceMappingLambdaCheck(ctx, clients, arn, cache)))
+	}
+	return relatedAnswer("lambda", joinReads(reads...))
+}
+
+// kinesisConsumerARNs lists the ARNs of the stream's enhanced fan-out
+// consumers, and what the listing read.
+func kinesisConsumerARNs(ctx context.Context, clients any, streamARN string) ([]string, relatedRead) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Kinesis == nil {
+		return nil, relatedRead{unread: true}
+	}
+	api, ok := c.Kinesis.(KinesisListStreamConsumersAPI)
+	if !ok {
+		return nil, relatedRead{unread: true}
+	}
+	consumers, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]kinesistypes.Consumer, *string, error) {
+		out, err := api.ListStreamConsumers(ctx, &kinesis.ListStreamConsumersInput{StreamARN: aws.String(streamARN), NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Consumers, out.NextToken, nil
+	})
+	if err != nil {
+		return nil, unreadBy(err)
+	}
+	arns := make([]string, 0, len(consumers))
+	for _, cons := range consumers {
+		arns = append(arns, aws.ToString(cons.ConsumerARN))
+	}
+	return arns, relatedRead{partial: !complete}
 }
 
 // checkKinesisCFN calls kinesis:ListTagsForStream and looks up the
@@ -38,7 +76,7 @@ func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource,
 func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return foundNone("cfn", "streamName")
+		return keyMissing("cfn", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -90,7 +128,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
-		return foundNone("kms", "streamName")
+		return keyMissing("kms", "streamName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
@@ -120,7 +158,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
-		return foundNone("ddb", "streamARN")
+		return keyMissing("ddb", "streamARN")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -156,7 +194,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		reads.read++
 		for _, dest := range out.KinesisDataStreamDestinations {
-			if dest.StreamArn != nil && *dest.StreamArn == streamARN {
+			if aws.ToString(dest.StreamArn) == streamARN && ddbDestinationLive(dest) {
 				ids = append(ids, tableName)
 				break
 			}

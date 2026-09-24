@@ -566,18 +566,10 @@ func (c *Core) AllRegions() []awsclient.AWSRegion {
 	return awsclient.AllRegions()
 }
 
-// ResetRuleSets swaps Session.RuleSets to a fresh store and rewires the
-// retained ServiceClients transport so any in-flight blocked
-// DescribeActiveReceiptRuleSet calls write to the orphaned old store on
-// completion. Called by the SES refresh paths in handleRefresh (detail
-// view and resource list view, when ResourceType == "ses"). Exposed on
-// Core so the adapter does not need to import core/session for the
-// NewRuleSetStore call.
-func (c *Core) ResetRuleSets() {
-	c.session.RuleSets = session.NewRuleSetStore()
-	if c.session.Clients != nil {
-		c.session.Clients.SetRuleSets(c.session.RuleSets)
-	}
+// RefreshTypeStores drops what the session remembers of rt beside its rows,
+// so a refresh of its list or of one of its details reads it again.
+func (c *Core) RefreshTypeStores(rt string) {
+	c.session.RefreshStores(rt)
 }
 
 // domainCallerIdentityFrom converts an *awsclient.CallerIdentity to the

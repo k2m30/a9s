@@ -252,6 +252,9 @@ func TestRelated_Eb_Role_WrongRawStruct(t *testing.T) {
 	}
 }
 
+// An environment's bucket is the source bundle of the version it runs
+// (EnvironmentDescription.VersionLabel); the application's other versions are
+// not deployed to it.
 func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -266,6 +269,14 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 				S3Key:    aws.String("my-app/v1.0.0.zip"),
 			},
 		},
+		{
+			ApplicationName: aws.String(appName),
+			VersionLabel:    aws.String("v0.9.0"),
+			SourceBundle: &ebtypes.S3Location{
+				S3Bucket: aws.String("acme-old-bundles"),
+				S3Key:    aws.String("my-app/v0.9.0.zip"),
+			},
+		},
 	})
 	clients := &awsclient.ServiceClients{
 		ElasticBeanstalk: fakeEB,
@@ -278,24 +289,15 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
 			ApplicationName: aws.String(appName),
+			VersionLabel:    aws.String("v1.0.0"),
 		},
 	}
 
 	checker := ebCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count() < 1 {
-		t.Errorf("Count = %d, want >= 1 (S3 bucket from SourceBundle)", result.Count())
-	}
-	found := false
-	for _, id := range result.ResourceIDs() {
-		if id == s3Bucket {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs(), s3Bucket)
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != s3Bucket {
+		t.Errorf("ResourceIDs = %v, want [%s] (the running version's bundle only)", ids, s3Bucket)
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
@@ -318,6 +320,7 @@ func TestRelated_Eb_S3_NoApplicationVersions(t *testing.T) {
 		RawStruct: ebtypes.EnvironmentDescription{
 			EnvironmentName: aws.String(envName),
 			ApplicationName: aws.String(appName),
+			VersionLabel:    aws.String("v1.0.0"),
 		},
 	}
 

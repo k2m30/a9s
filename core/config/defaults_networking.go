@@ -89,7 +89,7 @@ func networkingDefaultViews() map[string]ViewDef {
 			Detail: []DetailField{
 				{Path: "NetworkInterfaceId"}, {Path: "Status"}, {Path: "InterfaceType"},
 				{Path: "VpcId"}, {Path: "SubnetId"}, {Path: "AvailabilityZone"},
-				{Path: "PrivateIpAddress"}, {Path: "PrivateDnsName"},
+				{Path: "PrivateIpAddress"}, {Path: "PrivateDnsName"}, {Path: "PrivateIpAddresses"},
 				{Path: "MacAddress"}, {Path: "Description"}, {Path: "OwnerId"},
 				{Path: "RequesterId"}, {Path: "RequesterManaged"},
 				{Path: "SourceDestCheck"}, {Path: "Groups"}, {Path: "Attachment"},

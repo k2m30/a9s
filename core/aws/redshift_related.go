@@ -170,7 +170,7 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 	}
 	clusterID := res.ID
 	if clusterID == "" {
-		return foundNone("logs", "clusterID")
+		return keyMissing("logs", "clusterID")
 	}
 	if len(status.LogExports) == 0 {
 		// CloudWatch logging enabled but no specific exports configured.

@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -16,34 +17,43 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkLogsLambda parses the log group name for the /aws/lambda/{name} pattern.
-// If matched, it searches the lambda cache for a function with that name.
+// checkLogsLambda counts the functions that log to this group — each
+// function's LoggingConfig.LogGroup, "/aws/lambda/<function name>" by default
+// (https://docs.aws.amazon.com/lambda/latest/api/API_LoggingConfig.html), which
+// the lambda row carries as log_group — and the functions its subscription
+// filters deliver to.
 func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	logGroupName := res.ID
-	if logGroupName == "" {
-		logGroupName = res.Name
+	group := cmp.Or(res.ID, res.Name)
+	if group == "" {
+		return keyMissing("lambda", "group")
 	}
-
-	functionName := logGroupOwner(logGroupName, "/aws/lambda/")
-	if functionName == "" {
-		return foundNone("lambda", "functionName")
-	}
-
-	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
+	logging := relatedRead{unread: true}
+	fns, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
-		return ReadFailed("lambda", err)
-	}
-	if lambdaList == nil {
-		return NotRead("lambda")
-	}
-
-	var ids []string
-	for _, lambdaRes := range lambdaList {
-		if lambdaRes.ID == functionName || lambdaRes.Name == functionName {
-			ids = append(ids, lambdaRes.ID)
+		logging.failure = err
+	} else if fns != nil {
+		logging = relatedRead{partial: truncated}
+		for _, fn := range fns {
+			if cmp.Or(fn.Fields["log_group"], "/aws/lambda/"+fn.ID) == group {
+				logging.ids = append(logging.ids, fn.ID)
+			}
 		}
 	}
-	return relatedResultTrunc("lambda", ids, truncated)
+	return relatedAnswer("lambda", joinReads(logging, subscribedRead(ctx, clients, cache, group, "lambda", "lambda")))
+}
+
+// subscribedRead reads the target rows this group's subscription filters
+// deliver to: the destinations that are ARNs of service.
+func subscribedRead(ctx context.Context, clients any, cache resource.ResourceCache, group, target, service string) relatedRead {
+	filters, complete, err := logsSubscriptionFilters(ctx, clients, group)
+	if err != nil {
+		if errors.Is(err, errClientMissing) {
+			return relatedRead{unread: true}
+		}
+		return relatedRead{unread: true, failure: err}
+	}
+	ids, dropped := resolveRefs(target, destinationARNs(filters, service), refContext(clients, cache, target))
+	return relatedRead{ids: ids, partial: dropped || !complete}
 }
 
 // checkLogsAlarms reports the alarms watching this log group: the ones
@@ -52,21 +62,20 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 // them, so the filters are read once and the loaded alarms matched on the
 // metric they publish.
 func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	emitted, partial := logGroupFilterMetrics(ctx, clients, res.ID)
+	emitted, filters := logGroupFilterMetrics(ctx, clients, res.ID)
 	result := alarmIDsByDimension(ctx, clients, cache, "logs", res, func(a cwtypes.MetricAlarm) bool {
 		m, ok := AlarmMetricWatched(a)
 		return ok && emitted[m]
 	})
-	return alsoPartial(result, partial)
+	return alsoRead(result, filters)
 }
 
-// logGroupFilterMetrics returns the metrics the group's metric filters emit.
-// partial is true when the filters could not be read in full, which leaves
-// whatever matched a lower bound rather than a proven count.
-func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string) (emitted map[AlarmMetric]bool, partial bool) {
+// logGroupFilterMetrics returns the metrics the group's metric filters emit,
+// and what reading the filters established.
+func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string) (map[AlarmMetric]bool, relatedRead) {
 	api := metricFiltersAPI(clients)
 	if api == nil || logGroupName == "" {
-		return nil, false
+		return nil, relatedRead{}
 	}
 	filters, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.MetricFilter, *string, error) {
 		out, err := api.DescribeMetricFilters(ctx, &cloudwatchlogs.DescribeMetricFiltersInput{
@@ -79,9 +88,9 @@ func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string
 		return out.MetricFilters, out.NextToken, nil
 	})
 	if err != nil {
-		return nil, true
+		return nil, unreadBy(err)
 	}
-	emitted = map[AlarmMetric]bool{}
+	emitted := map[AlarmMetric]bool{}
 	for _, f := range filters {
 		for _, t := range f.MetricTransformations {
 			m := AlarmMetric{Namespace: aws.ToString(t.MetricNamespace), Name: aws.ToString(t.MetricName)}
@@ -90,15 +99,16 @@ func logGroupFilterMetrics(ctx context.Context, clients any, logGroupName string
 			}
 		}
 	}
-	return emitted, !complete
+	return emitted, relatedRead{partial: !complete}
 }
 
 // alarmMetricLogGroups returns the log groups whose metric filters emit the
-// metric, which is how a metric-filter alarm names the group it watches.
-func alarmMetricLogGroups(ctx context.Context, clients any, m AlarmMetric) (groups map[string]bool, partial bool) {
+// metric, which is how a metric-filter alarm names the group it watches, and
+// what reading the filters established.
+func alarmMetricLogGroups(ctx context.Context, clients any, m AlarmMetric) (map[string]bool, relatedRead) {
 	api := metricFiltersAPI(clients)
 	if api == nil {
-		return nil, false
+		return nil, relatedRead{}
 	}
 	filters, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.MetricFilter, *string, error) {
 		out, err := api.DescribeMetricFilters(ctx, &cloudwatchlogs.DescribeMetricFiltersInput{
@@ -112,15 +122,15 @@ func alarmMetricLogGroups(ctx context.Context, clients any, m AlarmMetric) (grou
 		return out.MetricFilters, out.NextToken, nil
 	})
 	if err != nil {
-		return nil, true
+		return nil, unreadBy(err)
 	}
-	groups = map[string]bool{}
+	groups := map[string]bool{}
 	for _, f := range filters {
 		if name := aws.ToString(f.LogGroupName); name != "" {
 			groups[name] = true
 		}
 	}
-	return groups, !complete
+	return groups, relatedRead{partial: !complete}
 }
 
 // metricFiltersAPI is the session's CloudWatch Logs client, or nil for a
@@ -156,7 +166,7 @@ func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache
 func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
-		return foundNone("apigw", "logGroupName")
+		return keyMissing("apigw", "logGroupName")
 	}
 	apiID := logGroupOwner(logGroupName, "API-Gateway-Execution-Logs_")
 	if apiID == "" {
@@ -186,7 +196,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	group := res.ID
 	if group == "" {
-		return foundNone("ecs-task", "logGroupName")
+		return keyMissing("ecs-task", "logGroupName")
 	}
 	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
@@ -203,13 +213,13 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 		case err != nil:
 			reads.fail(taskRes.ID, err)
 			continue
+		case slices.Contains(groups, group):
+			reads.read++
+			ids = append(ids, taskRes.ID)
 		case !read:
 			reads.missed()
-			continue
-		}
-		reads.read++
-		if slices.Contains(groups, group) {
-			ids = append(ids, taskRes.ID)
+		default:
+			reads.read++
 		}
 	}
 	return reads.answer("ecs-task", "logs-related: DescribeTaskDefinition", ids, truncated)
@@ -248,31 +258,58 @@ func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName stri
 // returns the Kinesis stream names whose ARNs appear as subscription-filter
 // destinations on this log group.
 func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("kinesis")
-		}
-		return ReadFailed("kinesis", err)
-	}
-	ids, dropped := resolveRefs("kinesis", destinationARNs(filters, "kinesis"), refContext(clients, cache, "kinesis"))
-	return relatedResultTrunc("kinesis", ids, dropped || !complete)
+	return relatedAnswer("kinesis", subscribedRead(ctx, clients, cache, res.ID, "kinesis", "kinesis"))
 }
 
-// checkLogsS3 calls cloudwatchlogs:DescribeSubscriptionFilters and returns S3
-// bucket names whose ARNs appear as subscription-filter destinations (via a
-// Firehose delivery stream that fans out to S3, or direct S3 destination for
-// newer filter features).
+// checkLogsS3 counts the buckets this group's export tasks wrote to: each
+// ExportTask names its logGroupName and "the name of the S3 bucket to which
+// the log data was exported"
+// (https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTask.html).
+// DescribeExportTasks filters by task id or status only, so every task is read.
+// A subscription filter delivers to Kinesis, Firehose, Lambda or OpenSearch,
+// never to a bucket.
 func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	filters, complete, err := logsSubscriptionFilters(ctx, clients, res.ID)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return NotRead("s3")
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudWatchLogs == nil || res.ID == "" {
+		return NotRead("s3")
+	}
+	api, ok := c.CloudWatchLogs.(CWLogsDescribeExportTasksAPI)
+	if !ok {
+		return NotRead("s3")
+	}
+	tasks, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cloudwatchlogstypes.ExportTask, *string, error) {
+		out, err := api.DescribeExportTasks(ctx, &cloudwatchlogs.DescribeExportTasksInput{NextToken: token})
+		if err != nil {
+			return nil, nil, err
 		}
+		return out.ExportTasks, out.NextToken, nil
+	})
+	if err != nil {
 		return ReadFailed("s3", err)
 	}
-	ids, dropped := resolveRefs("s3", destinationARNs(filters, "s3"), refContext(clients, cache, "s3"))
+	var buckets []string
+	for _, t := range tasks {
+		if aws.ToString(t.LogGroupName) == res.ID && exportTaskWrites(t) {
+			buckets = append(buckets, aws.ToString(t.Destination))
+		}
+	}
+	ids, dropped := resolveRefs("s3", buckets, refContext(clients, cache, "s3"))
 	return relatedResultTrunc("s3", ids, dropped || !complete)
+}
+
+// exportTaskWrites is the one predicate over ExportTaskStatus.code: a
+// COMPLETED task wrote to its bucket and a PENDING or RUNNING one is writing;
+// a FAILED, CANCELLED or PENDING_CANCEL one wrote nothing to count
+// (https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTaskStatus.html).
+func exportTaskWrites(t cloudwatchlogstypes.ExportTask) bool {
+	if t.Status == nil {
+		return true
+	}
+	switch t.Status.Code {
+	case cloudwatchlogstypes.ExportTaskStatusCodeFailed, cloudwatchlogstypes.ExportTaskStatusCodeCancelled, cloudwatchlogstypes.ExportTaskStatusCodePendingCancel:
+		return false
+	}
+	return true
 }
 
 // destinationARNs returns the subscription-filter destinations that are ARNs

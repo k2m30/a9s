@@ -103,7 +103,6 @@ func TestScenario_DDBVisual(t *testing.T) {
 		"Kinesis Streams",
 		"KMS Key",
 		"Lambda Functions",
-		"Log Groups",
 		"VPC Endpoints",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)

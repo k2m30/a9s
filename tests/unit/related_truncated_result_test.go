@@ -29,6 +29,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
@@ -327,11 +328,18 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			},
 		},
 		"elb": {
-			ID:   "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/0000000000000001",
+			ID:   "test-lb",
 			Name: "test-lb",
 			Fields: map[string]string{
-				"vpc_id": "vpc-00000001",
-				"state":  "active",
+				"name":              "test-lb",
+				"vpc_id":            "vpc-00000001",
+				"state":             "active",
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/0000000000000001",
+			},
+			RawStruct: elbv2types.LoadBalancer{
+				LoadBalancerName: aws.String("test-lb"),
+				LoadBalancerArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/0000000000000001"),
+				VpcId:            aws.String("vpc-00000001"),
 			},
 		},
 		"rds": {
@@ -549,7 +557,8 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 			// redisMemberCluster's DescribeCacheClusters hop at all (see
 			// clientsOverride["redis"] below for the matching fake).
 			RawStruct: elasticachetypes.ReplicationGroup{
-				MemberClusters: []string{"test-redis-member-1"},
+				ReplicationGroupId: aws.String("test-redis"),
+				MemberClusters:     []string{"test-redis-member-1"},
 			},
 		},
 		"docdb": {
@@ -825,6 +834,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T
 // truncation rule has nothing to apply to.
 var reverseScanExpectsUnknown = map[string]string{
 	"ec2→kms":          "reads the ebs list to find the volumes whose keys answer",
+	"ec2→ebs-snap":     "reads the ami list to find the snapshots the instance's image was registered from",
 	"lambda→sns":       "reads the sns-subscription list to find the topics that answer",
 	"efs→vpc":          "reads the eni list to find the mount targets whose VPC answers",
 	"ecs-svc→elb":      "reads the tg list to find the load balancers the service's target groups belong to",

@@ -80,7 +80,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB, NeedsTargetCache: true, Truncated: true, Mirror: true},
-			{TargetType: "codeartifact", DisplayName: "CodeArtifact Domains", Checker: checkSecretsCodeArtifact},
+			{TargetType: "codeartifact", DisplayName: "CodeArtifact Repositories", Checker: checkSecretsCodeArtifact},
 			{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs, Truncated: true},

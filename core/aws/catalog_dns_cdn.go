@@ -218,7 +218,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		IssueEnricherFieldKeys: []string{"stages_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true, Truncated: true, Distinct: "groups named for this API by convention, API-Gateway-Execution-Logs_<id>/ or /aws/apigateway/<name>"},
-			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda, Truncated: true, Distinct: "the functions this API's integrations invoke, from GetIntegrations IntegrationUri"},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda, Truncated: true, Distinct: "the functions this API's integrations invoke, from each integration's URI"},
 			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkApigwACM, Truncated: true, Distinct: "the certificates on this API's mapped custom domains, from DomainNameConfigurations"},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkApigwAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkApigwCF, Truncated: true},

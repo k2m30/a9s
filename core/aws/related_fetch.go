@@ -5,6 +5,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -191,19 +192,66 @@ type relatedRead struct {
 	atMostOne bool
 	// failure is why a place went unread; it reaches the flash, not the row.
 	failure error
+	// failed: a place's one call failed, rather than a scan over many rows
+	// each refusing its own read: with nothing found the row is that error.
+	failed bool
+	// noClient: a place went unread because the session has no client for
+	// it, so no call was made; what the other places found is not the
+	// answer a connected session gives, and the row reads unknown.
+	noClient bool
+}
+
+// readOf is what answer r says was read, so a checker whose relation lives
+// in several places folds each place's answer into one relatedAnswer.
+func readOf(r resource.RelatedCheckResult) relatedRead {
+	if r.State() == domain.RelatedResolved {
+		return relatedRead{ids: r.ResourceIDs(), partial: r.Truncated(), failure: r.Failure()}
+	}
+	return relatedRead{unread: true, failure: cmp.Or(r.Err(), r.Failure()), failed: r.State() == domain.RelatedError}
+}
+
+// unreadBy is the read of a place a failed read left unread: err reaches the
+// flash, except a missing client, which made no call.
+func unreadBy(err error) relatedRead {
+	if errors.Is(err, errClientMissing) {
+		return relatedRead{unread: true, noClient: true}
+	}
+	return relatedRead{unread: true, failure: err, failed: err != nil}
+}
+
+// joinReads is the read of a relation that lives in several places: every id
+// any place found, partial or unread when any place was.
+func joinReads(reads ...relatedRead) relatedRead {
+	var out relatedRead
+	var failures []error
+	for _, r := range reads {
+		out.ids = append(out.ids, r.ids...)
+		out.partial = out.partial || r.partial
+		out.unread = out.unread || r.unread
+		out.failed = out.failed || r.failed
+		out.noClient = out.noClient || r.noClient
+		if r.failure != nil {
+			failures = append(failures, r.failure)
+		}
+	}
+	out.failure = errors.Join(failures...)
+	return out
 }
 
 // relatedAnswer is the rule: exact when every place was read over a whole
 // list; a lower bound when something was read only in part, or a place could
 // not be read beside rows found elsewhere; unknown when a place could not be
-// read and nothing was found; a proven 0 only when everything was read and
-// held nothing.
+// read and nothing was found, that place's error when its one call failed; a
+// proven 0 only when everything was read and held nothing.
 func relatedAnswer(target string, r relatedRead) resource.RelatedCheckResult {
 	res := relatedState(target, r)
-	if r.failure != nil {
-		return res.WithFailure(r.failure)
+	if r.failure == nil {
+		return res
 	}
-	return res
+	if r.failed && res.State() == domain.RelatedUnknown {
+		return ReadFailed(target, r.failure)
+	}
+	return res.WithFailure(r.failure)
 }
 
 func relatedState(target string, r relatedRead) resource.RelatedCheckResult {
@@ -218,7 +266,7 @@ func relatedState(target string, r relatedRead) resource.RelatedCheckResult {
 	switch {
 	case r.atMostOne && len(ids) == 1:
 		return resource.KnownRelated(target, ids, false)
-	case r.unread && len(ids) == 0:
+	case r.unread && (len(ids) == 0 || r.noClient):
 		return resource.UnknownRelated(target)
 	case r.unread || r.partial:
 		return resource.KnownRelated(target, ids, true)
@@ -282,6 +330,14 @@ func foundNone(target, place string) resource.RelatedCheckResult {
 	return relatedAnswer(target, relatedRead{})
 }
 
+// keyMissing is the answer of a checker whose source row lacks key, the id,
+// ARN or name it would ask AWS with: nothing was read, so the answer is
+// unknown, never a proven 0.
+func keyMissing(target, key string) resource.RelatedCheckResult {
+	_ = key
+	return NotRead(target)
+}
+
 // NotRead is the answer of a checker that could not read where its relation
 // lives and found nothing: unknown.
 func NotRead(target string) resource.RelatedCheckResult {
@@ -302,6 +358,29 @@ func alsoPartial(r resource.RelatedCheckResult, partial bool) resource.RelatedCh
 		return r
 	}
 	return r.PartialScan()
+}
+
+// alsoRead is r once a second place the checker read is folded in: a partial
+// place makes a count a lower bound, an unread one a lower bound or, with
+// nothing found, unknown or its error, and its failure reaches the flash.
+func alsoRead(r resource.RelatedCheckResult, place relatedRead) resource.RelatedCheckResult {
+	if !place.partial && !place.unread && place.failure == nil {
+		return r
+	}
+	return relatedAnswer(r.TargetType(), joinReads(readOf(r), place))
+}
+
+// relatedFanOutCap bounds the calls a checker makes one per target row, for
+// a relation AWS offers no reverse read of (docs/related-resources.md rule 7).
+const relatedFanOutCap = EnrichmentCap
+
+// fanOut is the part of rows a checker reads one call each for, and whether
+// the cap left rows unread: a walk the cap stopped is a lower bound.
+func fanOut[T any](rows []T) ([]T, bool) {
+	if len(rows) > relatedFanOutCap {
+		return rows[:relatedFanOutCap], true
+	}
+	return rows, false
 }
 
 // heuristicResult is the answer of a pivot that matches by a property every

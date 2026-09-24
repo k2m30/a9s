@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: awslogs-driver log groups receive the container's stdout/stderr — when a task died from `EssentialContainerExited` the next step is almost always "tail the log group".
-- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].LogConfiguration` where `LogDriver=="awslogs"`, read `Options["awslogs-group"]`, and cross-reference the already-loaded `logs` list by log-group name. A definition that cannot be read (the call refused, or no ECS client) proves nothing either way, so the row falls back to the log groups whose name carries the family, as candidates without a count.
+- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)` and read each container's log group: `Options["awslogs-group"]` for the `awslogs` driver, and for `awsfirelens` the Fluent Bit CloudWatch output's `log_group_name` ([firelens-taskdef](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/firelens-taskdef.html), [Fluent Bit cloudwatch_logs](https://docs.fluentbit.io/manual/data-pipeline/outputs/cloudwatch)); cross-reference the already-loaded `logs` list by log-group name. A FireLens container routed by a config file or a `log_group_template` names no group in the definition, so the count is a lower bound. A definition that cannot be read (the call refused, or no ECS client) proves nothing either way, so the row falls back to the log groups whose name carries the family, as candidates without a count.
 - **Count shown**: yes.
 
 ### `role`
@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `secrets`
 
 - **Why related**: Task definitions inject Secrets Manager secrets as environment variables via `ContainerDefinitions[].Secrets[].ValueFrom`. When a task fails to start with "unable to pull secret", the secret itself is the next click — a9s-devops: secret-injection failures are a common Fargate startup failure mode, and the link is deterministic from the task definition.
-- **How discovered**: call `ecs:DescribeTaskDefinition(taskDefinition=Task.TaskDefinitionArn)`, iterate `ContainerDefinitions[].Secrets[]` and `ContainerDefinitions[].RepositoryCredentials.CredentialsParameter`, filter `ValueFrom` values whose ARN service prefix is `secretsmanager`, and cross-reference the already-loaded `secrets` list. Also covered by the reverse-scan documented in `docs/related-resources.md` § `secrets` (`TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN`).
+- **How discovered**: Secrets Manager secrets the task definition references: container `secrets[].valueFrom` and `logConfiguration.secretOptions[].valueFrom` by ARN, a bare name there being an SSM parameter ([API_Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html)), and `repositoryCredentials.credentialsParameter` by ARN or, in the task's Region, by name ([API_RepositoryCredentials](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RepositoryCredentials.html)).
 - **Count shown**: yes.
 
 ### `sg`
@@ -94,7 +94,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ssm`
 
 - **Why related**: Parallel to `secrets`, task definitions inject SSM Parameter Store values (including SecureString parameters) via `ContainerDefinitions[].Secrets[].ValueFrom`. Config drift from a parameter rotation is a frequent "worked yesterday, broken today" cause — a9s-devops: SSM-mediated config is cheaper than Secrets Manager and shows up especially in non-prod environments.
-- **How discovered**: same call as `secrets` — `ecs:DescribeTaskDefinition`, iterate `ContainerDefinitions[].Secrets[]`, filter `ValueFrom` values whose ARN service prefix is `ssm` (or a bare parameter name, resolved to the account/region SSM namespace), and cross-reference the already-loaded `ssm` list.
+- **How discovered**: same call as `secrets` — `ecs:DescribeTaskDefinition`, iterate `ContainerDefinitions[].Secrets[]`, and resolve each `ValueFrom` that is an SSM parameter ARN or a bare parameter name against the already-loaded `ssm` list at check time, so a parameter ARN in another region or account never matches a local parameter of the same name ([API_Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html)).
 - **Count shown**: yes.
 
 ### `subnet`

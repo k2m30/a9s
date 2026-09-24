@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `eb-rule`
 
 - **Why related**: EventBridge rules whose targets deliver events into this queue — an EB-rule target's `Arn` is the queue's ARN (docs/related-resources.md § `sqs`; `docs/related-resources.md` § Per-type contract, row `eb-rule`, lists `sqs` as an expected target).
-- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. The authoritative mapping lives on `ListTargetsByRule` (per-rule fan-out, Wave 2) — but the `eb-rule` resource already calls `ListTargetsByRule` as part of its own Wave 2 enrichment, so a9s can piggy-back: for each loaded `eb-rule`, scan its cached targets for `Arn == <queue-arn>` and collect matching rule IDs. No additional API calls. Operator workflow: "what's producing traffic into this queue?" is a standard messaging-triage question.
+- **How discovered**: Rules with a target that is this queue, or whose target's `DeadLetterConfig.Arn` is this queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_DeadLetterConfig.html)).
 - **Count shown**: yes — a9s-devops (2026-04-21): number of rules feeding a queue is meaningful (e.g. fan-in from multiple scheduled rules vs a single event-driven rule).
 
 ### `kms`
@@ -52,13 +52,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `lambda`
 
 - **Why related**: Lambda functions that either (a) consume this queue via event-source mapping, or (b) route failures to this queue via DLQ. Both are core "who owns this queue?" pivots (docs/related-resources.md §`sqs` — "Lambda event-source mappings consuming this queue").
-- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Two discovery paths, both cross-referencing the already-loaded `lambda` list: (1) DLQ path — scan each function's `DeadLetterConfig.TargetArn` field from `FunctionConfiguration` (already on the Wave 1 response) for a match on the queue's ARN; (2) consumer path — Lambda event-source mappings are NOT on `FunctionConfiguration` and require `ListEventSourceMappings(EventSourceArn=<queue-arn>)` as a dedicated call. The consumer path is a Wave 2 fan-out; the DLQ path is zero extra cost. Operator workflow: during an incident on a Lambda, "is this the DLQ?" and "who's reading this queue?" are the two first questions.
+- **How discovered**: Lambda event-source mappings consuming this queue, and functions whose `DeadLetterConfig.TargetArn` is this queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)).
 - **Count shown**: yes for the combined set — a9s-devops (2026-04-21): the operator cares about the total number of Lambda associations (consumers + DLQ users), so a single count is decision-useful at a glance.
 
 ### `sns`
 
 - **Why related**: SNS topics that fan out into this queue via an SNS→SQS subscription — the producer side of pub/sub (docs/related-resources.md §`sqs` — "SQS subscribed to SNS topic"; mirrored in `docs/related-resources.md` § `sns-sub`, which lists `sqs` as the endpoint).
-- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Cross-reference the already-loaded `sns-sub` list, filtering by `Protocol=="sqs" && Endpoint==<queue-arn>`, then group by `TopicArn` — the resulting set of topic ARNs is the list to cross-match against the loaded `sns` list. Alternative: parse `Attributes["Policy"]` JSON (SQS queue policy) for statements whose `Principal.Service=="sns.amazonaws.com"` and extract `Condition.ArnLike."aws:SourceArn"` topic ARNs; this is a fallback when the subscription list wasn't loaded in this sweep. Operator workflow: "who is publishing into this queue?" during fan-out debugging.
+- **How discovered**: a9s-devops (2026-04-21): possible=yes, worth=yes. Cross-reference the already-loaded `sns-sub` list, filtering by `Protocol=="sqs" && Endpoint==<queue-arn>` over confirmed subscriptions (one pending confirmation delivers nothing, [API_Subscribe](https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html)), then group by `TopicArn` — the resulting set of topic ARNs is the list to cross-match against the loaded `sns` list. Alternative: parse `Attributes["Policy"]` JSON (SQS queue policy) for statements whose `Principal.Service=="sns.amazonaws.com"` and extract `Condition.ArnLike."aws:SourceArn"` topic ARNs; this is a fallback when the subscription list wasn't loaded in this sweep. Operator workflow: "who is publishing into this queue?" during fan-out debugging.
 - **Count shown**: yes — a9s-devops (2026-04-21): number of SNS topics feeding a queue is a primary pub/sub topology signal.
 
 ### `sns-sub`

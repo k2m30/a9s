@@ -53,6 +53,15 @@ func (f *APIGWFake) GetApiMappings(_ context.Context, input *apigatewayv2.GetApi
 	return &apigatewayv2.GetApiMappingsOutput{Items: f.fix.ApiMappings[*input.DomainName]}, nil
 }
 
+// ListRoutingRules returns the fixture-registered routing rules for the
+// requested domain.
+func (f *APIGWFake) ListRoutingRules(_ context.Context, input *apigatewayv2.ListRoutingRulesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.ListRoutingRulesOutput, error) {
+	if input == nil || input.DomainName == nil {
+		return &apigatewayv2.ListRoutingRulesOutput{}, nil
+	}
+	return &apigatewayv2.ListRoutingRulesOutput{RoutingRules: f.fix.RoutingRules[*input.DomainName]}, nil
+}
+
 // GetIntegrations returns the fixture-registered integrations for the requested API.
 func (f *APIGWFake) GetIntegrations(_ context.Context, input *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
 	if input == nil || input.ApiId == nil {

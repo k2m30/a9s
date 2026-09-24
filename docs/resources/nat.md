@@ -34,13 +34,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `eip`
 
 - **Why related**: NAT gateway consuming this EIP — operators pivot to check EIP association health, billing, and allocation ownership.
-- **How discovered**: read `NatGatewayAddresses[].AllocationId` on the NAT and cross-reference the already-loaded `eip` list by `Address.AllocationId`.
+- **How discovered**: read `NatGatewayAddresses[].AllocationId` on the NAT and cross-reference the already-loaded `eip` list by `Address.AllocationId`. A `failed` or `deleted` gateway holds no address, and an address whose status is `disassociating`, `unassigning` or `failed` is leaving the gateway ([API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html), [API_NatGatewayAddress](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html)).
 - **Count shown**: unknown.
 
 ### `eni`
 
 - **Why related**: NAT backing ENI — the requester-managed ENI that carries NAT traffic; operators need this to trace flow-log entries, inspect private IPs, and confirm AZ placement.
-- **How discovered**: read `NatGatewayAddresses[].NetworkInterfaceId` on the NAT and cross-reference the already-loaded `eni` list by `NetworkInterface.NetworkInterfaceId`.
+- **How discovered**: read `NatGatewayAddresses[].NetworkInterfaceId` on the NAT and cross-reference the already-loaded `eni` list by `NetworkInterface.NetworkInterfaceId`, over the same live addresses as `eip`.
 - **Count shown**: unknown.
 
 ### `rtb`

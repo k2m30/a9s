@@ -45,7 +45,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		allocationID = *raw.AllocationId
 	}
 	if allocationID == "" {
-		return foundNone("nat", "allocationID")
+		return keyMissing("nat", "allocationID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -60,7 +60,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 	for _, natRes := range natList {
 		natRaw, natOk := assertStruct[ec2types.NatGateway](natRes.RawStruct)
 		if natOk {
-			for _, addr := range natRaw.NatGatewayAddresses {
+			for _, addr := range natLiveAddresses(natRaw) {
 				if addr.AllocationId != nil && *addr.AllocationId == allocationID {
 					ids = append(ids, natRes.ID)
 					break

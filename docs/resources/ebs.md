@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: Which AWS Backup plan(s) cover this volume — answers "is this volume protected before we touch it?". Cited in `docs/related-resources.md` §`ebs` as "Volumes covered by AWS Backup".
-- **How discovered**: Reverse-scan the already-loaded `backup` list with the volume's ARN (built from the session's Region and account) and its `Volume.Tags[]`. A plan covers the volume iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. A plan whose selections were not all read makes the count a lower bound, or unknown when no plan is known to cover the volume.
+- **How discovered**: Backup plans selecting the volume, or the instance it is attached to, by ARN or by tags: an EC2 backup includes its attached volumes ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **Count shown**: yes.
 
 ### `cfn`

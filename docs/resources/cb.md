@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: Build log group — first place an operator opens when a build fails, to read the compiler / shell error (`docs/related-resources.md § cb`: "Build log group").
-- **How discovered**: read `Project.LogsConfig.CloudWatchLogs.GroupName` if set; otherwise the default is `/aws/codebuild/<projectName>` — a9s-devops: possible=yes, worth=yes. `LogsConfig.CloudWatchLogs` (AWS SDK Go v2 — `codebuild/types.LogsConfig § CloudWatchLogs`) holds the explicit override; when it is nil or `CloudWatchLogsConfig.Status!="ENABLED"`, CodeBuild writes to the conventional default group name.
+- **How discovered**: read `Project.LogsConfig.CloudWatchLogs.GroupName` if set; otherwise the default is `/aws/codebuild/<projectName>` — a9s-devops: possible=yes, worth=yes. A `CloudWatchLogsConfig.Status` of `DISABLED` means the project writes no CloudWatch logs, a proven 0 ([API_CloudWatchLogsConfig](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_CloudWatchLogsConfig.html)).
 - **Count shown**: yes.
 
 ### `pipeline`
@@ -64,7 +64,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `s3`
 
 - **Why related**: Source / artifact buckets — the build pulls source from S3 and/or publishes build artifacts to S3, so operators pivot here to check object versions, ACLs, or retention (`docs/related-resources.md § cb`: "Source/artifact buckets").
-- **How discovered**: read `Project.Source.Location` when `Project.Source.Type=="S3"`, `Project.SecondarySources[].Location` for the same, `Project.Artifacts.Location` when `Project.Artifacts.Type=="S3"`, `Project.SecondaryArtifacts[].Location`, and `Project.LogsConfig.S3Logs.Location` — a9s-devops: possible=yes, worth=yes. `ProjectSource.Location` is documented in AWS SDK Go v2 — `codebuild/types.ProjectSource § Type` (S3 case); the Location string for S3 sources/artifacts is `bucket/key`, from which the bucket name is the pivot key.
+- **How discovered**: Source, secondary-source and artifact buckets, and the `LogsConfig.S3Logs` bucket when its status is ENABLED ([API_ProjectSource](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_ProjectSource.html), [API_S3LogsConfig](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_S3LogsConfig.html)).
 - **Count shown**: yes.
 
 ### `secrets`

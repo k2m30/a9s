@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -19,7 +20,7 @@ import (
 func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.Fields["cluster"]
 	if clusterName == "" {
-		return foundNone("ecs", "clusterName")
+		return keyMissing("ecs", "clusterName")
 	}
 	return relatedResultTrunc("ecs", []string{clusterName}, false)
 }
@@ -212,14 +213,26 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return relatedResultTrunc("sg", ids, false)
 }
 
-// checkECSSvcRole returns the IAM role in the ECS Service's RoleArn field.
-func checkECSSvcRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+// checkECSSvcRole counts the service's roles: Service.RoleArn, and its task
+// definition's taskRoleArn (what the containers call AWS as) and
+// executionRoleArn (what the container agent calls AWS as)
+// (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_TaskDefinition.html).
+func checkECSSvcRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
-	if !ok || raw.RoleArn == nil || *raw.RoleArn == "" {
-		if res.RawStruct == nil {
-			return NotRead("role")
-		}
-		return foundNone("role", "raw.RoleArn")
+	if !ok {
+		return NotRead("role")
 	}
-	return relatedRefs("role", []string{*raw.RoleArn}, refContext(clients, cache, "role"))
+	refs := []string{aws.ToString(raw.RoleArn)}
+	var def relatedRead
+	if td := aws.ToString(raw.TaskDefinition); td != "" {
+		switch taskDef, err := ecsTaskDefinition(ctx, clients, td); {
+		case errors.Is(err, errClientMissing):
+			return NotRead("role")
+		case err != nil || taskDef == nil:
+			def = unreadBy(err)
+		default:
+			refs = append(refs, aws.ToString(taskDef.TaskRoleArn), aws.ToString(taskDef.ExecutionRoleArn))
+		}
+	}
+	return relatedAnswer("role", joinReads(def, readOf(relatedRefs("role", refs, refContext(clients, cache, "role")))))
 }

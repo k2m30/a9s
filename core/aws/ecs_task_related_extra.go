@@ -121,11 +121,12 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 	return relatedResultTrunc("secrets", ids, lowerBound)
 }
 
-// checkECSTaskSSM reads Fields["ssm_param_names"] (a comma-joined list of SSM
-// parameter names emitted by the fetcher's ecsJoinTaskDefinition join —
-// ContainerDefinitions[].Secrets[].ValueFrom filtered to the ssm ARN prefix
-// or a bare "/"-prefixed parameter name) and cross-references the
-// already-loaded ssm cache by name, per docs/resources/ecs-task.md.
+// checkECSTaskSSM resolves the SSM parameter references the task definition
+// makes (Fields["ssm_param_names"], ARN or name as written) against the loaded
+// ssm list: a parameter "in the same Region as the task" may be named by its
+// name alone, and one elsewhere needs its full ARN
+// (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html),
+// which only a resolver that knows the session's Region and account can read.
 func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if !taskDefJoined(res) {
 		return NotRead("ssm")
@@ -134,35 +135,15 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 	if joined == "" {
 		return foundNone("ssm", "joined")
 	}
-	nameSet := make(map[string]struct{})
-	for name := range strings.SplitSeq(joined, ",") {
-		if name != "" {
-			nameSet[name] = struct{}{}
-		}
-	}
-	if len(nameSet) == 0 {
-		return foundNone("ssm", "nameSet")
-	}
-
-	ssmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ssm")
+	ssmList, _, err := relatedResourcesFor(ctx, clients, cache, "ssm")
 	if err != nil {
 		return ReadFailed("ssm", err)
 	}
 	if ssmList == nil {
 		return NotRead("ssm")
 	}
-
-	var ids []string
-	for _, pRes := range ssmList {
-		if _, match := nameSet[pRes.ID]; match {
-			ids = append(ids, pRes.ID)
-			continue
-		}
-		if _, match := nameSet[pRes.Name]; match {
-			ids = append(ids, pRes.ID)
-		}
-	}
-	return relatedResultTrunc("ssm", ids, truncated)
+	ids, lowerBound := listedRefs("ssm", strings.Split(joined, ","), refContext(clients, cache, "ssm"), ssmList)
+	return relatedResultTrunc("ssm", ids, lowerBound)
 }
 
 // checkECSTaskSG chains Task -> ENI -> SG per docs/resources/ecs-task.md:

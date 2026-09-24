@@ -21,7 +21,7 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return foundNone("iam-user", "groupName")
+		return keyMissing("iam-user", "groupName")
 	}
 	users, complete, err := iamGroupUsers(ctx, c.IAM, groupName)
 	if err != nil {
@@ -42,7 +42,7 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	}
 	groupName := res.ID
 	if groupName == "" {
-		return foundNone("policy", "groupName")
+		return keyMissing("policy", "groupName")
 	}
 	attached, attachedComplete, err := iamGroupAttachedPolicies(ctx, c.IAM, groupName)
 	inline, inlineComplete, err2 := iamGroupInlinePolicies(ctx, c.IAM, groupName)

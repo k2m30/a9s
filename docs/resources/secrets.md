@@ -52,13 +52,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cb`, `c
 ### `eb`
 
 - **Why related**: Elastic Beanstalk environments inject secrets via configuration placeholders — operators want to find every environment whose runtime config references the secret.
-- **How discovered**: Reverse-scan Beanstalk environments; call `elasticbeanstalk:DescribeConfigurationSettings` and match `OptionSettings[].Value` containing `{{resolve:secretsmanager:<ARN>`.
+- **How discovered**: Reverse-scan: elasticbeanstalk:DescribeConfigurationSettings OptionSettings[].Value contains `{{resolve:secretsmanager:<ARN>`, or an `aws:elasticbeanstalk:application:environmentsecrets` option names this secret ([AWSHowTo.secrets.env-vars](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.secrets.env-vars.html)).
 - **Count shown**: yes.
 
 ### `ecs-task`
 
 - **Why related**: ECS task definitions mount secrets as container environment variables or registry credentials — operators chasing a rotation impact need every task definition that pulls from this secret.
-- **How discovered**: Reverse-scan task definitions; match `TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom == this.ARN` or `RepositoryCredentials.CredentialsParameter == this.ARN`.
+- **How discovered**: Reverse-scan: task definitions referencing this secret in container `secrets[].valueFrom`, `logConfiguration.secretOptions[].valueFrom` or `repositoryCredentials.credentialsParameter`, by ARN (a JSON-key or version suffix included) or by name ([secrets-envvar-secrets-manager](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html)).
 - **Count shown**: yes.
 
 ### `kms`
@@ -243,7 +243,7 @@ secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell r
 | cfn | CloudFormation | yes |
 | dbi | RDS Instances | yes |
 | cb | CodeBuild Projects | yes |
-| codeartifact | CodeArtifact Domains | no |
+| codeartifact | CodeArtifact Repositories | no |
 | eb | Elastic Beanstalk | yes |
 | ecs-task | ECS Tasks | yes |
 | logs | Log Groups | yes |

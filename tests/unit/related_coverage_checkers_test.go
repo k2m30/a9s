@@ -207,13 +207,12 @@ func TestRelatedCoverage_DegradedTargetRowsMakeResultPartial(t *testing.T) {
 }
 
 // Each of these pivots matches by a shared property rather than a link AWS
-// records: an instance target group in the same VPC, an RDS-managed ENI on a
-// shared security group, the account-wide service-linked role, a secret whose
-// name or tags mention CodeArtifact. Every match it offers on the demo bench
+// records: an RDS-managed ENI on a shared security group, the account-wide
+// service-linked role, a secret whose name or tags mention CodeArtifact. Every match it offers on the demo bench
 // is a heuristic match.
 func TestRelatedCoverage_HeuristicPivotsOnDemoBench(t *testing.T) {
 	b := newRefBench(t)
-	for _, p := range []struct{ source, target string }{{"ec2", "tg"}, {"dbi", "eni"}, {"tgw", "role"}, {"secrets", "codeartifact"}} {
+	for _, p := range []struct{ source, target string }{{"dbi", "eni"}, {"tgw", "role"}, {"secrets", "codeartifact"}} {
 		t.Run(p.source+"/"+p.target, func(t *testing.T) {
 			check := refChecker(t, p.source, p.target)
 			var matched, wrong []string
@@ -353,7 +352,7 @@ func TestRelatedCoverage_HeuristicPivotWithNoCandidatesIsAProvenZero(t *testing.
 	})
 
 	t.Run("every demo row with no candidate", func(t *testing.T) {
-		for _, p := range []struct{ source, target string }{{"ec2", "tg"}, {"dbi", "eni"}, {"tgw", "role"}, {"secrets", "codeartifact"}} {
+		for _, p := range []struct{ source, target string }{{"dbi", "eni"}, {"tgw", "role"}, {"secrets", "codeartifact"}} {
 			check := refChecker(t, p.source, p.target)
 			var wrong []string
 			for _, row := range b.byType[p.source] {

@@ -97,6 +97,15 @@ type backupTarget struct {
 	unread string
 }
 
+// withTags is t once its tags were read: a read that failed leaves t
+// missing them.
+func (t backupTarget) withTags(tags map[string]string, err error) backupTarget {
+	if err == nil {
+		t.tags, t.unread = tags, ""
+	}
+	return t
+}
+
 // backupPlanVerdict reports whether the plan covers the target and, when it
 // does not, the check that could still change the answer ("" when none
 // could).

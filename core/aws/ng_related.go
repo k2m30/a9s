@@ -23,7 +23,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if clusterName == "" {
-		return foundNone("eks", "clusterName")
+		return keyMissing("eks", "clusterName")
 	}
 
 	eksList, truncated, err := relatedRowsByID(ctx, clients, cache, "eks")
@@ -149,7 +149,7 @@ func ngIdentity(res resource.Resource) (nodegroupName, clusterName string) {
 func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, clusterName string) []typedRow[ec2types.Instance] {
 	var matches []typedRow[ec2types.Instance]
 	for _, row := range ec2List {
-		if ngOwnsInstance(row.Raw.Tags, nodegroupName, clusterName) {
+		if ec2InstanceLive(row.Raw) && ngOwnsInstance(row.Raw.Tags, nodegroupName, clusterName) {
 			matches = append(matches, row)
 		}
 	}
@@ -173,16 +173,17 @@ func checkNGSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		ids = append(ids, ng.RemoteAccess.SourceSecurityGroups...)
 	}
 	data, err := ngLaunchTemplateData(ctx, ngTemplateAPI(clients), ng.LaunchTemplate)
-	if err != nil && !isAWSRefusal(err) {
-		return ReadFailed("sg", err)
+	template := relatedRead{}
+	if err != nil {
+		template = unreadBy(err)
 	}
 	if data != nil {
-		ids = append(ids, data.SecurityGroupIds...)
+		template.ids = append(template.ids, data.SecurityGroupIds...)
 		for _, ni := range data.NetworkInterfaces {
-			ids = append(ids, ni.Groups...)
+			template.ids = append(template.ids, ni.Groups...)
 		}
 	}
-	return relatedAnswer("sg", relatedRead{ids: ids, unread: err != nil})
+	return relatedAnswer("sg", joinReads(relatedRead{ids: ids}, template))
 }
 
 // checkNGAMI resolves the AMI of the launch template the node group names,

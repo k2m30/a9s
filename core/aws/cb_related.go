@@ -31,13 +31,18 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 // checkCbLogs searches the logs cache for the CloudWatch log group associated
 // with this CodeBuild project.
 // Uses explicit LogsConfig.CloudWatchLogs.GroupName if set, otherwise the
-// naming convention /aws/codebuild/{projectName}.
+// naming convention /aws/codebuild/{projectName}. With status DISABLED
+// "CloudWatch Logs are not enabled for this build project"
+// (https://docs.aws.amazon.com/codebuild/latest/APIReference/API_CloudWatchLogsConfig.html).
 func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return NotRead("logs")
 	}
 
+	if project.LogsConfig != nil && project.LogsConfig.CloudWatchLogs != nil && project.LogsConfig.CloudWatchLogs.Status == cbtypes.LogsConfigStatusTypeDisabled {
+		return foundNone("logs", "LogsConfig.CloudWatchLogs.Status")
+	}
 	expectedLogGroup := "/aws/codebuild/" + res.ID
 	if project.LogsConfig != nil &&
 		project.LogsConfig.CloudWatchLogs != nil &&
@@ -147,8 +152,12 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 	return ecrWorkloadRepos(ctx, clients, cache, []string{*project.Environment.Image})
 }
 
-// checkCbS3 scans Artifacts/SecondaryArtifacts/Source for S3 bucket locations and
-// matches against the S3 cache.
+// checkCbS3 counts the buckets the project reads and writes: its S3 source
+// and secondary sources ("<bucket-name>/<path>",
+// https://docs.aws.amazon.com/codebuild/latest/APIReference/API_ProjectSource.html),
+// its S3 artifacts, and the bucket its S3 build logs go to while enabled
+// ("my-bucket/build-log" or the bucket ARN,
+// https://docs.aws.amazon.com/codebuild/latest/APIReference/API_S3LogsConfig.html).
 func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -165,8 +174,17 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 			locations = append(locations, *a.Location)
 		}
 	}
-	if s := project.Source; s != nil && s.Type == cbtypes.SourceTypeS3 && s.Location != nil {
-		locations = append(locations, *s.Location)
+	sources := project.SecondarySources
+	if project.Source != nil {
+		sources = append([]cbtypes.ProjectSource{*project.Source}, sources...)
+	}
+	for _, src := range sources {
+		if src.Type == cbtypes.SourceTypeS3 && src.Location != nil {
+			locations = append(locations, *src.Location)
+		}
+	}
+	if l := project.LogsConfig; l != nil && l.S3Logs != nil && l.S3Logs.Status == cbtypes.LogsConfigStatusTypeEnabled && l.S3Logs.Location != nil {
+		locations = append(locations, *l.S3Logs.Location)
 	}
 
 	if len(locations) == 0 {

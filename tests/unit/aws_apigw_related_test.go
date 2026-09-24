@@ -295,6 +295,12 @@ func (f *fakeAPIGWV2ACM) GetApiMappings(_ context.Context, params *apigatewayv2.
 	return &apigatewayv2.GetApiMappingsOutput{Items: f.mappings[domain]}, nil
 }
 
+// ListRoutingRules answers no rules: every domain this fake lists routes by
+// its API mappings alone.
+func (f *fakeAPIGWV2ACM) ListRoutingRules(_ context.Context, _ *apigatewayv2.ListRoutingRulesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.ListRoutingRulesOutput, error) {
+	return &apigatewayv2.ListRoutingRulesOutput{}, nil
+}
+
 func (f *fakeAPIGWV2ACM) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
 	return &apigatewayv2.GetVpcLinksOutput{}, nil
 }

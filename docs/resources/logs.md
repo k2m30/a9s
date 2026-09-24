@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `kinesis`
 
 - **Why related**: Subscription filters fan log events out to Kinesis Data Streams or Firehose — understanding where a log group's data is being consumed downstream matters for pipeline debugging. Cited in `docs/related-resources.md` §`logs` → "Subscription filter → Kinesis/Firehose."
-- **How discovered**: Call `DescribeSubscriptionFilters(logGroupName=…)` per log group, read each filter's `destinationArn`; when the ARN is `arn:aws:kinesis:…:stream/<name>`, match against the already-loaded `kinesis` list by stream name. Firehose destinations are a different service and surface in a dedicated pivot if registered. — a9s-devops: subscription filters are the canonical fan-out mechanism and the only read path from log group to stream. possible=yes, worth=yes (required for "where does this log data end up?").
+- **How discovered**: Subscription filters whose `destinationArn` is a Kinesis stream.
 - **Count shown**: yes.
 
 ### `kms`
@@ -58,13 +58,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `lambda`
 
 - **Why related**: Lambda functions write to log groups named `/aws/lambda/<function-name>` — the single most common operator pivot is "whose function logs am I looking at?" Subscription-filter consumers (Lambda target of a filter) are a second, rarer case. Cited in `docs/related-resources.md` §`logs` → "Lambdas whose logs land here OR subscription-filter consumers."
-- **How discovered**: (a) Match `logGroupName` against the `/aws/lambda/<name>` convention and cross-reference the already-loaded `lambda` list by function name; (b) call `DescribeSubscriptionFilters(logGroupName=…)` and cross-reference filters whose `destinationArn` is `arn:aws:lambda:…:function:<name>`. — a9s-devops: the naming convention is stable and unambiguous for function-owned log groups; the subscription-filter case is additive. possible=yes, worth=yes (this is the #1 Lambda debugging pivot).
+- **How discovered**: Functions whose `LoggingConfig.LogGroup` is this group, `/aws/lambda/<function name>` when unset ([API_LoggingConfig](https://docs.aws.amazon.com/lambda/latest/api/API_LoggingConfig.html)), and subscription filters whose `destinationArn` is a function.
 - **Count shown**: yes.
 
 ### `s3`
 
 - **Why related**: Export tasks archive a log group's events into an S3 bucket for long-term retention or downstream analytics — operator auditing archival posture or investigating export failures pivots here. Cited in `docs/related-resources.md` §`logs` → "Export tasks to S3."
-- **How discovered**: Call `DescribeExportTasks` and filter by `logGroupName`, then cross-reference each task's `destination` bucket name against the already-loaded `s3` list. — a9s-devops: DescribeExportTasks is the only read-only surface that links a log group to an S3 archive target; there is no reverse field on the bucket. possible=yes (per-group call, bounded), worth=yes (archive posture is a compliance/cost workflow).
+- **How discovered**: The buckets this group's export tasks wrote to, from `DescribeExportTasks` `ExportTask.destination` ([API_ExportTask](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTask.html)); a `FAILED`, `CANCELLED` or `PENDING_CANCEL` task wrote nothing ([API_ExportTaskStatus](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTaskStatus.html)). A subscription filter never delivers to a bucket.
 - **Count shown**: yes.
 
 ### `ct-events`

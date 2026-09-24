@@ -18,11 +18,6 @@ type OpenSearchDescribeDomainsAPI interface {
 	DescribeDomains(ctx context.Context, params *opensearch.DescribeDomainsInput, optFns ...func(*opensearch.Options)) (*opensearch.DescribeDomainsOutput, error)
 }
 
-// OpenSearchDescribeDomainConfigAPI defines the interface for DescribeDomainConfig.
-type OpenSearchDescribeDomainConfigAPI interface {
-	DescribeDomainConfig(ctx context.Context, params *opensearch.DescribeDomainConfigInput, optFns ...func(*opensearch.Options)) (*opensearch.DescribeDomainConfigOutput, error)
-}
-
 // OpenSearchListTagsAPI defines the interface for the OpenSearch ListTags operation.
 type OpenSearchListTagsAPI interface {
 	ListTags(ctx context.Context, params *opensearch.ListTagsInput, optFns ...func(*opensearch.Options)) (*opensearch.ListTagsOutput, error)

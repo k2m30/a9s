@@ -157,7 +157,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return foundNone("nat", "eniID")
+		return keyMissing("nat", "eniID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -174,7 +174,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		if !nOk {
 			continue
 		}
-		for _, addr := range natRaw.NatGatewayAddresses {
+		for _, addr := range natLiveAddresses(natRaw) {
 			if addr.NetworkInterfaceId != nil && *addr.NetworkInterfaceId == eniID {
 				ids = append(ids, natRes.ID)
 				break
@@ -193,7 +193,7 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		eniID = *raw.NetworkInterfaceId
 	}
 	if eniID == "" {
-		return foundNone("vpce", "eniID")
+		return keyMissing("vpce", "eniID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

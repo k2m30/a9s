@@ -21,16 +21,18 @@ const CtEventDeletedBucket = "evt-0a1b2c3d4e5f60009"
 // ("prod/api/stripe-key"); its Secrets pivot must resolve.
 const CtEventPathNamedSecret = "evt-0a1b2c3d4e5f60010"
 
-// CtEventPathNamedRole names a role by an ARN carrying its IAM path; the role
-// exists, so its pivot resolves once the role list confirms it.
+// CtEventPathNamedRole is performed under a role its session issuer names by
+// an ARN carrying the role's IAM path; the role exists, so its pivot resolves
+// once the role list confirms it.
 const CtEventPathNamedRole = "evt-0a1b2c3d4e5f60011"
 
-// CtEventSecondPathNamedRole names the second path-filed role by an ARN
-// carrying its IAM path.
+// CtEventSecondPathNamedRole is performed under the second path-filed role,
+// its session issuer named by an ARN carrying its IAM path.
 const CtEventSecondPathNamedRole = "evt-0a1b2c3d4e5f60012"
 
-// CtEventDeletedRole names a role no demo IAM fixture carries; its pivot stays
-// at zero rather than answering with a role that merely shares a name segment.
+// CtEventDeletedRole is performed under a role no demo IAM fixture carries;
+// its pivot stays at zero rather than answering with a role that merely shares
+// a name segment.
 const CtEventDeletedRole = "evt-0a1b2c3d4e5f60013"
 
 // CtEventPathedUserTarget acts on ci-service-account, which is filed under an
@@ -377,37 +379,31 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 		},
 		{
-			EventId:     aws.String(CtEventPathNamedRole),
-			EventName:   aws.String("AssumeRole"),
-			EventTime:   aws.Time(t2),
-			EventSource: aws.String("sts.amazonaws.com"),
-			Username:    aws.String("alice.johnson"),
-			ReadOnly:    aws.String("true"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceType: aws.String("AWS::IAM::Role"), ResourceName: aws.String("arn:aws:iam::123456789012:role/acme/platform/" + RolePathNamed)},
-			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:45:00Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme/platform/` + RolePathNamed + `","roleSessionName":"audit-run"},"responseElements":null,"requestID":"req-sts-assume-011","eventID":"` + CtEventPathNamedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[]}`),
+			EventId:         aws.String(CtEventPathNamedRole),
+			EventName:       aws.String("GetCallerIdentity"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("sts.amazonaws.com"),
+			Username:        aws.String("audit-run"),
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE444444444:audit-run","arn":"arn:aws:sts::123456789012:assumed-role/` + RolePathNamed + `/audit-run","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE444444444","arn":"arn:aws:iam::123456789012:role/acme/platform/` + RolePathNamed + `","accountId":"123456789012","userName":"` + RolePathNamed + `"}}},"eventTime":"2026-03-28T13:45:00Z","eventSource":"sts.amazonaws.com","eventName":"GetCallerIdentity","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":null,"responseElements":null,"requestID":"req-sts-gci-011","eventID":"` + CtEventPathNamedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management"}`),
 		},
 		{
-			EventId:     aws.String(CtEventSecondPathNamedRole),
-			EventName:   aws.String("AssumeRole"),
-			EventTime:   aws.Time(t2),
-			EventSource: aws.String("sts.amazonaws.com"),
-			Username:    aws.String("alice.johnson"),
-			ReadOnly:    aws.String("true"),
-			Resources: []cloudtrailtypes.Resource{
-				{ResourceType: aws.String("AWS::IAM::Role"), ResourceName: aws.String("arn:aws:iam::123456789012:role/acme/partners/" + RoleScopedWildcardTrust)},
-			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:47:00Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme/partners/` + RoleScopedWildcardTrust + `","roleSessionName":"partner-sync"},"responseElements":null,"requestID":"req-sts-assume-013","eventID":"` + CtEventSecondPathNamedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[]}`),
+			EventId:         aws.String(CtEventSecondPathNamedRole),
+			EventName:       aws.String("GetCallerIdentity"),
+			EventTime:       aws.Time(t2),
+			EventSource:     aws.String("sts.amazonaws.com"),
+			Username:        aws.String("partner-sync"),
+			ReadOnly:        aws.String("true"),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE444444444:partner-sync","arn":"arn:aws:sts::123456789012:assumed-role/` + RoleScopedWildcardTrust + `/partner-sync","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE444444444","arn":"arn:aws:iam::123456789012:role/acme/partners/` + RoleScopedWildcardTrust + `","accountId":"123456789012","userName":"` + RoleScopedWildcardTrust + `"}}},"eventTime":"2026-03-28T13:47:00Z","eventSource":"sts.amazonaws.com","eventName":"GetCallerIdentity","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":null,"responseElements":null,"requestID":"req-sts-gci-013","eventID":"` + CtEventSecondPathNamedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management"}`),
 		},
 		{
 			EventId:         aws.String(CtEventDeletedRole),
-			EventName:       aws.String("AssumeRole"),
+			EventName:       aws.String("GetCallerIdentity"),
 			EventTime:       aws.Time(t2),
 			EventSource:     aws.String("sts.amazonaws.com"),
-			Username:        aws.String("alice.johnson"),
+			Username:        aws.String("stale-run"),
 			ReadOnly:        aws.String("true"),
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","principalId":"AIDAEXAMPLE111111111","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventTime":"2026-03-28T13:40:00Z","eventSource":"sts.amazonaws.com","eventName":"AssumeRole","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/acme/retired/acme-legacy-sync","roleSessionName":"stale-run"},"responseElements":null,"requestID":"req-sts-assume-012","eventID":"` + CtEventDeletedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[]}`),
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE555555555:stale-run","arn":"arn:aws:sts::123456789012:assumed-role/acme-legacy-sync/stale-run","accountId":"123456789012","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE555555555","arn":"arn:aws:iam::123456789012:role/acme/retired/acme-legacy-sync","accountId":"123456789012","userName":"acme-legacy-sync"}}},"eventTime":"2026-03-28T13:40:00Z","eventSource":"sts.amazonaws.com","eventName":"GetCallerIdentity","awsRegion":"us-east-1","sourceIPAddress":"198.51.100.30","userAgent":"aws-cli/2.15.0","requestParameters":null,"responseElements":null,"requestID":"req-sts-gci-012","eventID":"` + CtEventDeletedRole + `","readOnly":true,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management"}`),
 		},
 		{
 			EventId:         aws.String("evt-0a1b2c3d4e5f60002"),

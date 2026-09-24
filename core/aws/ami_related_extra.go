@@ -47,20 +47,26 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return unreadZeroScanned(res, len(cfnList), relatedResultTrunc("cfn", ids, truncated))
 }
 
-// checkAMIKMS extracts KMS key IDs from the AMI's block device mappings
-// (where EBS.KmsKeyId is set).
+// checkAMIKMS counts the keys the AMI's snapshots are encrypted with
+// (Snapshot.KmsKeyId). DescribeImages returns no key on a block device: an
+// EbsBlockDevice's KmsKeyId "is only supported on BlockDeviceMapping objects
+// called by RunInstances, RequestSpotFleet, and RequestSpotInstances"
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html).
 func checkAMIKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
 		return NotRead("kms")
 	}
+	snaps, read := amiSnapshotRows(ctx, clients, cache, img)
 	var refs []string
-	for _, bdm := range img.BlockDeviceMappings {
-		if bdm.Ebs != nil && bdm.Ebs.KmsKeyId != nil {
-			refs = append(refs, *bdm.Ebs.KmsKeyId)
+	for _, s := range snaps {
+		if snap, ok := assertStruct[ec2types.Snapshot](s.RawStruct); ok {
+			refs = append(refs, aws.ToString(snap.KmsKeyId))
+		} else {
+			read.partial = true
 		}
 	}
-	return kmsRelated(ctx, clients, cache, refs)
+	return relatedAnswer("kms", joinReads(read, readOf(kmsRelated(ctx, clients, cache, refs))))
 }
 
 // checkAMING scans the node-group list for node groups using this AMI:
@@ -70,7 +76,7 @@ func checkAMIKMS(ctx context.Context, clients any, res resource.Resource, cache 
 func checkAMING(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return foundNone("ng", "amiID")
+		return keyMissing("ng", "amiID")
 	}
 	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {

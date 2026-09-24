@@ -1119,7 +1119,21 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 			{
 				Name:  aws.String("worker"),
 				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/order-worker:1.4.0"),
-				Cpu:   1024,
+				Cpu:   896,
+			},
+			{
+				// Routes the worker's logs by a Fluent Bit config file, so
+				// where they land is not in the task definition.
+				Name:  aws.String("log_router"),
+				Image: aws.String("public.ecr.aws/aws-observability/aws-for-fluent-bit:stable"),
+				Cpu:   128,
+				FirelensConfiguration: &ecstypes.FirelensConfiguration{
+					Type: ecstypes.FirelensConfigurationTypeFluentbit,
+					Options: map[string]string{
+						"config-file-type":  "file",
+						"config-file-value": "/fluent-bit/configs/order-worker.conf",
+					},
+				},
 			},
 		},
 	}
@@ -1207,12 +1221,14 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 // applyECSContainerDefaults gives every container a read-only root filesystem
 // and an awslogs driver, leaving exactly one definition without each:
 // web-frontend:6 keeps a writable root, batch-etl-runner:2 keeps a container
-// with no log driver. Applied here rather than inline so the healthy default
-// can never be forgotten on a definition added later.
+// with no log driver. order-worker:4's app container logs through its FireLens
+// router instead. Applied here rather than inline so the healthy default can
+// never be forgotten on a definition added later.
 func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 	const (
 		writableRootDef = ecsDefWebFrontendOld
 		noLoggingDef    = ecsDefBatchETLOld
+		fireLensDef     = ecsDefOrderWorkerOld
 	)
 	for arn, def := range defs {
 		for i := range def.ContainerDefinitions {
@@ -1229,6 +1245,9 @@ func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 						"awslogs-stream-prefix": "ecs",
 					},
 				}
+			}
+			if arn == fireLensDef && c.FirelensConfiguration == nil {
+				c.LogConfiguration = &ecstypes.LogConfiguration{LogDriver: ecstypes.LogDriverAwsfirelens}
 			}
 		}
 	}

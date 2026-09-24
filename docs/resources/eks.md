@@ -76,8 +76,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `role`
 
 - **Why related**: EKS service role — the IAM role the Kubernetes control plane assumes to call AWS APIs (create ENIs, load balancers, etc.).
-- **How discovered**: read `Cluster.RoleArn`; cross-reference the loaded `role` list by ARN — a9s-devops: `RoleArn` is a required field on every EKS cluster; the pivot is always present.
-- **Count shown**: yes (always 1).
+- **How discovered**: Cluster.RoleArn — EKS service role — and an Auto Mode cluster's `ComputeConfig.NodeRoleArn`, the role its nodes run as ([API_ComputeConfigResponse](https://docs.aws.amazon.com/eks/latest/APIReference/API_ComputeConfigResponse.html)).
+- **Count shown**: yes (1, or 2 on an Auto Mode cluster).
 
 ### `sg`
 

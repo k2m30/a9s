@@ -476,73 +476,6 @@ func TestDDB_Related_Lambda_NoStream_ZeroCount(t *testing.T) {
 	}
 }
 
-// A sibling table name can extend this one ("orders-prod" vs
-// "orders-prod-sessions"), so matching is on the full
-// /aws/dynamodb/tables/<name>/ prefix.
-func TestDDB_Related_Logs_PrefixMatchOnly(t *testing.T) {
-	res := ddbOrdersProdResource(t)
-	checker := ddbCheckerByTarget(t, "logs")
-
-	matchingLG := resource.Resource{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "/insights/default"}
-	lambdaDecoy := resource.Resource{ID: "/aws/lambda/" + fixtures.OrdersProdID}
-	siblingDecoy := resource.Resource{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "-sessions/insights/default"}
-
-	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{matchingLG, lambdaDecoy, siblingDecoy},
-		},
-	}
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
-
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (only exact-prefix match)", result.Count())
-	}
-	for _, id := range result.ResourceIDs() {
-		if !strings.HasPrefix(id, "/aws/dynamodb/tables/"+fixtures.OrdersProdID+"/") {
-			t.Errorf("ResourceIDs contains non-prefix-match entry %q", id)
-		}
-	}
-}
-
-func TestDDB_Related_Logs_LambdaDecoy_CountZero(t *testing.T) {
-	res := ddbOrdersProdResource(t)
-	checker := ddbCheckerByTarget(t, "logs")
-
-	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{
-				{ID: "/aws/lambda/" + fixtures.OrdersProdID},
-			},
-		},
-	}
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (/aws/lambda/ must not match DDB log prefix)", result.Count())
-	}
-}
-
-func TestDDB_Related_Logs_SiblingSubstringTrap_CountZero(t *testing.T) {
-	res := ddbOrdersProdResource(t)
-	checker := ddbCheckerByTarget(t, "logs")
-
-	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{
-				{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "-sessions/insights/default"},
-			},
-		},
-	}
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
-
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (sibling-table substring trap must not match prefix)", result.Count())
-	}
-}
-
 func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "vpce")
@@ -646,7 +579,7 @@ func TestDDB_Related_RegistrationSmoke(t *testing.T) {
 		t.Fatal("GetRelated(ddb) returned empty — ddb related-resource definitions are not registered")
 	}
 
-	required := []string{"alarm", "backup", "kinesis", "kms", "lambda", "logs", "vpce"}
+	required := []string{"alarm", "backup", "kinesis", "kms", "lambda", "vpce"}
 	registered := make(map[string]bool, len(defs))
 	for _, def := range defs {
 		registered[def.TargetType] = true

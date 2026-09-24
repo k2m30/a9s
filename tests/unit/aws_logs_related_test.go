@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -489,19 +490,39 @@ func TestRelated_Logs_Kinesis_EmptyFilterListReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_Logs_S3_FoundViaSubscriptionFilter verifies that a subscription
-// filter whose DestinationArn is an S3 bucket ARN returns the bucket name.
+// logsExportClients answers DescribeExportTasks with tasks; subscription
+// filters, which deliver to Kinesis, Firehose, Lambda or OpenSearch and never
+// to S3, are none.
+func logsExportClients(tasks ...cloudwatchlogstypes.ExportTask) *awsclient.ServiceClients {
+	return &awsclient.ServiceClients{CloudWatchLogs: &t570CWLogs{
+		CWLogsAPI: newFakeCWLogsWithSubFilters(nil),
+		exports:   tasks,
+	}}
+}
+
+func logsExportTask(group, bucket, prefix string) cloudwatchlogstypes.ExportTask {
+	return cloudwatchlogstypes.ExportTask{
+		TaskId:            aws.String("0f1e2d3c-0000-4000-8000-" + fmt.Sprintf("%012d", len(group))),
+		TaskName:          aws.String("archive"),
+		LogGroupName:      aws.String(group),
+		Destination:       aws.String(bucket),
+		DestinationPrefix: aws.String(prefix),
+		From:              aws.Int64(1785542400000),
+		To:                aws.Int64(1788220800000),
+		Status:            &cloudwatchlogstypes.ExportTaskStatus{Code: cloudwatchlogstypes.ExportTaskStatusCodeCompleted},
+	}
+}
+
+// TestRelated_Logs_S3_FoundViaSubscriptionFilter: a log group's S3 archive is
+// the bucket its export tasks wrote to (DescribeExportTasks
+// ExportTask.Destination); another group's export is not this group's.
 func TestRelated_Logs_S3_FoundViaSubscriptionFilter(t *testing.T) {
 	const logGroupName = "/aws/lambda/my-function"
 	const bucketName = "acme-audit-logs-bucket"
-	const s3ARN = "arn:aws:s3:::" + bucketName
-	dest := s3ARN
-	filters := []cloudwatchlogstypes.SubscriptionFilter{
-		{DestinationArn: &dest},
-	}
-	clients := &awsclient.ServiceClients{
-		CloudWatchLogs: newFakeCWLogsWithSubFilters(filters),
-	}
+	clients := logsExportClients(
+		logsExportTask(logGroupName, bucketName, "exports"),
+		logsExportTask("/aws/lambda/other-function", "acme-other-archive", "exports"),
+	)
 	source := resource.Resource{ID: logGroupName}
 
 	checker := logsCheckerByTarget(t, "s3")
@@ -515,17 +536,12 @@ func TestRelated_Logs_S3_FoundViaSubscriptionFilter(t *testing.T) {
 	}
 }
 
-// TestRelated_Logs_S3_BucketWithPathPrefixExtractsBucketName verifies that
-// an S3 ARN with a path suffix (bucket/prefix) extracts only the bucket name.
+// TestRelated_Logs_S3_BucketWithPathPrefixExtractsBucketName: an export's key
+// prefix (ExportTask.DestinationPrefix) is a path inside the bucket, not part
+// of its name.
 func TestRelated_Logs_S3_BucketWithPathPrefixExtractsBucketName(t *testing.T) {
 	const bucketName = "acme-audit-logs-bucket"
-	dest := "arn:aws:s3:::" + bucketName + "/logs/prefix"
-	filters := []cloudwatchlogstypes.SubscriptionFilter{
-		{DestinationArn: &dest},
-	}
-	clients := &awsclient.ServiceClients{
-		CloudWatchLogs: newFakeCWLogsWithSubFilters(filters),
-	}
+	clients := logsExportClients(logsExportTask("/aws/lambda/my-function", bucketName, "logs/prefix"))
 	source := resource.Resource{ID: "/aws/lambda/my-function"}
 
 	checker := logsCheckerByTarget(t, "s3")
@@ -539,22 +555,16 @@ func TestRelated_Logs_S3_BucketWithPathPrefixExtractsBucketName(t *testing.T) {
 	}
 }
 
-// TestRelated_Logs_S3_NonS3FilterReturnsZero verifies Count=0 when the
-// subscription filter destination is not an S3 ARN.
+// TestRelated_Logs_S3_NonS3FilterReturnsZero: a group no export task wrote
+// has no S3 archive.
 func TestRelated_Logs_S3_NonS3FilterReturnsZero(t *testing.T) {
-	dest := "arn:aws:kinesis:us-east-1:123456789012:stream/my-stream"
-	filters := []cloudwatchlogstypes.SubscriptionFilter{
-		{DestinationArn: &dest},
-	}
-	clients := &awsclient.ServiceClients{
-		CloudWatchLogs: newFakeCWLogsWithSubFilters(filters),
-	}
+	clients := logsExportClients(logsExportTask("/aws/lambda/other-function", "acme-other-archive", "exports"))
 	source := resource.Resource{ID: "/aws/lambda/my-function"}
 
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (no S3 filter)", result.Count())
+	if result.State() != domain.RelatedResolved || result.Count() != 0 {
+		t.Errorf("state = %v, Count = %d, want a resolved 0", result.State(), result.Count())
 	}
 }

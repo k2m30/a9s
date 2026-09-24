@@ -30,7 +30,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `acm`
 
 - **Why related**: Custom-domain TLS certificate — the cert that terminates TLS on the API's custom domain. If it expires the custom domain stops serving.
-- **How discovered**: call `apigatewayv2:GetDomainNames` (account-wide) and `apigatewayv2:GetApiMappings` per domain; read `DomainNameConfigurations[].CertificateArn` and match API mappings back to this `ApiId` — a9s-devops: cert→custom-domain→api is the only AWS-exposed chain for v2.
+- **How discovered**: call `apigatewayv2:GetDomainNames` (account-wide) and `apigatewayv2:GetApiMappings` per domain; read `DomainNameConfigurations[].CertificateArn` and match API mappings back to this `ApiId`; a domain `GetApiMappings` maps nothing on is read again through `apigateway:GetBasePathMappings`, how an edge-optimized domain maps REST APIs ([how-to-edge-optimized-custom-domain-name](https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-edge-optimized-custom-domain-name.html)); a domain whose `routingMode` reads routing rules counts the APIs its rules' `InvokeApi.ApiId` name (`apigatewayv2:ListRoutingRules`, [rest-api-routing-mode](https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-routing-mode.html)) — a9s-devops: cert→custom-domain→api is the only AWS-exposed chain.
 - **Count shown**: yes.
 
 ### `alarm`
@@ -48,19 +48,19 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `elb`
 
 - **Why related**: VpcLink NLB backend — HTTP APIs use a VpcLink backed by a Network Load Balancer to reach private VPC services.
-- **How discovered**: call `GetIntegrations` for the API and read each `VPC_LINK` integration's `IntegrationUri` — "for an HTTP API private integration, specify the ARN of an Application Load Balancer listener, Network Load Balancer listener, or AWS Cloud Map service" ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)); a listener names the one load balancer it belongs to, matched against the already-loaded `elb` list. A Cloud Map service names no load balancer and leaves the count a lower bound.
+- **How discovered**: Load balancers behind the API's private integrations: an HTTP API's `VPC_LINK` integration `IntegrationUri` is an ALB or NLB listener ARN, which names its load balancer (a Cloud Map service ARN names none and leaves a lower bound) ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)); a REST API's `VPC_LINK` integration reaches the `targetArns` of its VPC link ([API_VpcLink](https://docs.aws.amazon.com/apigateway/latest/api/API_VpcLink.html)).
 - **Count shown**: yes.
 
 ### `kms`
 
 - **Why related**: KMS key referenced by Lambda integrations. Golden doc notes this is a **weak pair**: API Gateway itself exposes no direct KMS field.
-- **How discovered**: for each Lambda integration URI resolved via `apigatewayv2:GetIntegrations`, follow the already-loaded `lambda` list to read `FunctionConfiguration.KMSKeyArn` — a9s-devops: yes this is a transitive pivot; keep it because operators triaging "why is this API throwing 5xx" sometimes chase a KMS key that's `PendingDeletion` on the integration target. Low-value when the Lambda panel already shows the KMS link, but acceptable for this type's audience.
+- **How discovered**: KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn); a REST API's integrations from `GetResources` ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 - **Count shown**: yes.
 
 ### `lambda`
 
 - **Why related**: Lambda integrations — the most common APIGW backend.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API, parse `IntegrationUri` for Lambda function ARNs (`arn:aws:apigateway:...functions/arn:aws:lambda:...:function:<name>/invocations`) and match against the already-loaded `lambda` list — a9s-devops: `IntegrationType==AWS_PROXY` with a Lambda ARN in `IntegrationUri` is the canonical pattern. A stage-variable placeholder (`function:${stageVariables.fn}`) names no function, a function the list does not hold is not counted, and with the `lambda` list unreadable the row is unknown.
+- **How discovered**: Lambda integrations: an HTTP or WebSocket API's `GetIntegrations`, a REST API's method integrations from `GetResources` with the `methods` embed ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 - **Count shown**: yes.
 
 ### `logs`
@@ -72,7 +72,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `role`
 
 - **Why related**: Invocation/authorizer role — the IAM role APIGW assumes to call the integration target or to run a request authorizer.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API → read `CredentialsArn`; `apigatewayv2:GetAuthorizers` per API → read `AuthorizerCredentialsArn`; match to already-loaded `role` list — a9s-devops: these are the two places APIGW records an assumed role; anything else (e.g. Lambda execution role) belongs under the Lambda pivot, not here.
+- **How discovered**: Invocation/authorizer roles: integration credentials (`CredentialsArn`, or a REST method integration's `credentials`) and authorizer credentials (`AuthorizerCredentialsArn`, or a REST authorizer's `authorizerCredentials`) matched against the loaded `role` cache ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

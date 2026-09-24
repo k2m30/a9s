@@ -245,7 +245,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSGELB, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSGLambda, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSGCFN, NeedsTargetCache: false},
-			{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true, Truncated: true},
+			{TargetType: "sg", DisplayName: "Referenced SGs", Checker: checkSGSG, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sg")},
 		},
 		Navigable: []domain.NavigableField{
@@ -680,6 +680,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Groups.GroupId", TargetType: "sg"},
 			{FieldPath: "Attachment.InstanceId", TargetType: "ec2"},
 			{FieldPath: "Association.AllocationId", TargetType: "eip"},
+			{FieldPath: "PrivateIpAddresses.Association.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance it belongs to does not have this network path yet. If it stays here, read the attachment's error: the usual causes are the interface and the instance being in different Availability Zones, the device index already in use, or the instance type having no room for another interface."},

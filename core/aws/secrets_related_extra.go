@@ -59,9 +59,11 @@ func checkSecretsCodeArtifact(ctx context.Context, clients any, res resource.Res
 
 // checkSecretsEB is a reverse-scan checker for the secrets→eb relationship.
 // Iterates cache["eb"]; for each EB environment, calls
-// elasticbeanstalk:DescribeConfigurationSettings and scans OptionSettings[].Value
-// for {{resolve:secretsmanager:<parent ARN> pattern.
-// NeedsTargetCache: true; sets Truncated and FetchFilter.
+// elasticbeanstalk:DescribeConfigurationSettings and reads its option values:
+// a {{resolve:secretsmanager:<ARN>}} dynamic reference in any namespace, and
+// the secret ARN an aws:elasticbeanstalk:application:environmentsecrets option
+// injects as an environment variable
+// (https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.secrets.env-vars.html).
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// A struct, when the row carries one, must be a SecretListEntry. A row
 	// carrying none is not the wrong shape — secretIdentifiers still reads
@@ -127,7 +129,8 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 				if opt.Value == nil {
 					continue
 				}
-				if textNames(*opt.Value, resolveRef) {
+				injected := aws.ToString(opt.Namespace) == "aws:elasticbeanstalk:application:environmentsecrets" && secretRefNames(*opt.Value, res, refContext(clients, nil, ""))
+				if injected || textNames(*opt.Value, resolveRef) {
 					ids = append(ids, ebRes.ID)
 					goto nextEB
 				}
@@ -225,26 +228,19 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	return reads.answer("ecs-task", "secrets-related: DescribeTaskDefinition", ids, truncated)
 }
 
-// secretsECSTaskRefsSecret returns true if the TaskDefinition references the
-// secret row via ContainerDefinitions[].Secrets[].ValueFrom (which may carry a
-// json-key tail) or ContainerDefinitions[].RepositoryCredentials.CredentialsParameter.
+// secretsECSTaskRefsSecret reports whether td references the secret row,
+// through any reference ecsSecretRefs reads as a Secrets Manager secret.
 func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secret resource.Resource, rc domain.RefContext) bool {
+	refs, _ := ecsSecretRefs(&td)
+	return slices.ContainsFunc(refs, func(ref string) bool { return secretRefNames(ref, secret, rc) })
+}
+
+// secretRefNames reports whether ref, read through the secrets resolver,
+// names the secret row.
+func secretRefNames(ref string, secret resource.Resource, rc domain.RefContext) bool {
 	rc.Targets = []resource.Resource{secret}
-	names := func(ref *string) bool {
-		id, ok := resource.ResolveRef("secrets", aws.ToString(ref), rc)
-		return ok && id == secret.ID
-	}
-	for _, c := range td.ContainerDefinitions {
-		for _, s := range c.Secrets {
-			if names(s.ValueFrom) {
-				return true
-			}
-		}
-		if c.RepositoryCredentials != nil && names(c.RepositoryCredentials.CredentialsParameter) {
-			return true
-		}
-	}
-	return false
+	id, ok := resource.ResolveRef("secrets", ref, rc)
+	return ok && id == secret.ID
 }
 
 // checkSecretsLogs returns the CloudWatch log group for the rotation Lambda function
@@ -324,16 +320,12 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	rc := policyRefContext(clients, cache, "role", secretID)
-	var ids []string
-	// partial tracks whether either independent path below could not be
-	// attempted or failed, so ids (whatever the other path found) is reported
-	// as a lower bound rather than an exact count.
-	partial := false
 
 	// Path 1: resource-based policy
+	policy := relatedRead{}
 	smAPI, ok := c.SecretsManager.(SecretsManagerGetResourcePolicyAPI)
 	if !ok {
-		partial = true
+		policy = unreadBy(errClientMissing)
 	} else {
 		policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*smtypes.GetResourcePolicyOutput, error) {
 			return smAPI.GetResourcePolicy(ctx, &smtypes.GetResourcePolicyInput{
@@ -341,41 +333,37 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 			})
 		})
 		if err != nil {
-			partial = true
+			policy = unreadBy(err)
 		} else if policyOut != nil && policyOut.ResourcePolicy != nil && *policyOut.ResourcePolicy != "" {
 			refs, parsed := grantedPrincipalRefs(*policyOut.ResourcePolicy, "role/")
-			partial = partial || !parsed
-			ids = append(ids, refs...)
+			policy = relatedRead{ids: refs, partial: !parsed}
 		}
 	}
 
 	// Path 2: rotation Lambda execution role
+	rotation := relatedRead{}
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if ok && secret.RotationLambdaARN != nil && *secret.RotationLambdaARN != "" {
 		lambdaAPI, lok := c.Lambda.(LambdaGetFunctionAPI)
 		if !lok {
-			partial = true
+			rotation = unreadBy(errClientMissing)
 		} else {
 			rotationARN := *secret.RotationLambdaARN
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 				return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 			})
 			if err != nil {
-				partial = true
-			} else if out != nil && out.Configuration != nil &&
-				out.Configuration.Role != nil && *out.Configuration.Role != "" {
-				ids = append(ids, *out.Configuration.Role)
+				rotation = unreadBy(err)
+			} else if out != nil && out.Configuration != nil {
+				rotation = relatedRead{ids: nonEmpty(aws.ToString(out.Configuration.Role))}
 			}
 		}
 	}
 
-	finalIDs, dropped := resolveRefs("role", ids, rc)
-	if len(finalIDs) == 0 && partial {
-		// Neither path could be checked (or both failed): nothing was
-		// confirmed, so this is unresolved, not a proven zero or a lower bound.
-		return NotRead("role")
-	}
-	return unreadZero(res, relatedResultTrunc("role", finalIDs, partial || dropped))
+	read := joinReads(policy, rotation)
+	ids, dropped := resolveRefs("role", read.ids, rc)
+	read.ids, read.partial = ids, read.partial || dropped
+	return unreadZero(res, relatedAnswer("role", read))
 }
 
 // checkSecretsSNS checks whether the rotation Lambda for this secret has an SNS
@@ -408,8 +396,12 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	// The rotation function's configuration is where the dead-letter topic is
 	// named, so a call that did not answer leaves the count unknown; reporting
 	// zero read as "checked, no topic".
-	// no finding: this arm answers with the related panel's unknown.
-	if err != nil || out == nil || out.Configuration == nil {
+	if err != nil {
+		return ReadFailed("sns", err)
+	}
+	// no finding: an answer without the function's configuration names no
+	// dead-letter topic to read.
+	if out == nil || out.Configuration == nil {
 		return NotRead("sns")
 	}
 	dlc := out.Configuration.DeadLetterConfig

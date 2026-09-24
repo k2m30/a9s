@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
@@ -182,7 +183,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		rgID = res.ID
 	}
 	if rgID == "" {
-		return foundNone("secrets", "rgID")
+		return keyMissing("secrets", "rgID")
 	}
 
 	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
@@ -271,7 +272,10 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 
 // checkRedisSNS extracts the SNS topic ARN from the member cluster's
 // NotificationConfiguration.TopicArn and matches it against the sns cache.
-// Uses the same DescribeCacheClusters call as checkRedisSG.
+// Uses the same DescribeCacheClusters call as checkRedisSG. "Notifications are
+// sent only if the status is active"
+// (https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ModifyCacheCluster.html),
+// so an inactive topic the cluster kept is not its topic.
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cc, err := redisMemberCluster(ctx, clients, res)
 	if err != nil {
@@ -280,8 +284,8 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 	if cc == nil {
 		return foundNone("sns", "cc")
 	}
-	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
-		return foundNone("sns", "cc.NotificationConfiguration.TopicArn")
+	if n := cc.NotificationConfiguration; n == nil || aws.ToString(n.TopicArn) == "" || aws.ToString(n.TopicStatus) != "active" {
+		return foundNone("sns", "cc.NotificationConfiguration")
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 

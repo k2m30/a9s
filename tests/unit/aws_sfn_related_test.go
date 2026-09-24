@@ -6,6 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -27,45 +29,66 @@ func sfnCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
+// sfnDescribeFake answers DescribeStateMachine with out.
+type sfnDescribeFake struct {
+	awsclient.SFNAPI
+	out *sfn.DescribeStateMachineOutput
+}
+
+func (f *sfnDescribeFake) DescribeStateMachine(context.Context, *sfn.DescribeStateMachineInput, ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
+	return f.out, nil
+}
+
+func sfnLoggingClients(level sfntypes.LogLevel, groupARNs ...string) *awsclient.ServiceClients {
+	lc := &sfntypes.LoggingConfiguration{Level: level}
+	for _, g := range groupARNs {
+		lc.Destinations = append(lc.Destinations, sfntypes.LogDestination{CloudWatchLogsLogGroup: &sfntypes.CloudWatchLogsLogGroup{LogGroupArn: aws.String(g)}})
+	}
+	return &awsclient.ServiceClients{SFN: &sfnDescribeFake{out: &sfn.DescribeStateMachineOutput{
+		Name:                 aws.String("order-fulfillment-workflow"),
+		StateMachineArn:      aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+		RoleArn:              aws.String("arn:aws:iam::123456789012:role/sfn-exec"),
+		LoggingConfiguration: lc,
+	}}}
+}
+
+// A state machine logs to the group its LoggingConfiguration.Destinations
+// names (DescribeStateMachine), whatever the group is called.
 func TestRelated_SFN_Logs_Found(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/aws/vendedlogs/states/order-fulfillment-workflow",
-		Fields: map[string]string{},
-	}
+	const group = "/app/orders/sfn-history"
 	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: group, Fields: map[string]string{}},
+			{ID: "/aws/vendedlogs/states/order-fulfillment-workflow", Fields: map[string]string{}},
+		}},
 	}
+	clients := sfnLoggingClients(sfntypes.LogLevelError, "arn:aws:logs:us-east-1:123456789012:log-group:"+group+":*")
 
-	src := resource.Resource{ID: "order-fulfillment-workflow"}
 	checker := sfnCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), clients, sfnSrcResource(), cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "/aws/vendedlogs/states/order-fulfillment-workflow" {
-		t.Errorf("ResourceIDs = %v, want [/aws/vendedlogs/states/order-fulfillment-workflow]", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != group {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), group)
 	}
 	if result.Err() != nil {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
 
+// At level OFF a state machine logs nothing, even with a destination left
+// configured.
 func TestRelated_SFN_Logs_NoMatch(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/aws/vendedlogs/states/other-workflow",
-		Fields: map[string]string{},
-	}
+	const group = "/aws/vendedlogs/states/order-fulfillment-workflow"
 	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: group, Fields: map[string]string{}}}},
 	}
+	clients := sfnLoggingClients(sfntypes.LogLevelOff, "arn:aws:logs:us-east-1:123456789012:log-group:"+group+":*")
 
-	src := resource.Resource{ID: "order-fulfillment-workflow"}
 	checker := sfnCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), clients, sfnSrcResource(), cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0", result.Count())
+	if result.State() != domain.RelatedResolved || result.Count() != 0 {
+		t.Errorf("state = %v, Count = %d, want a resolved 0", result.State(), result.Count())
 	}
 }
 
@@ -87,15 +110,17 @@ func TestRelated_SFN_Logs_EmptyID(t *testing.T) {
 	}
 }
 
+// A row without its state machine ARN cannot be described
+// (DescribeStateMachine takes the ARN), so every pivot that reads the
+// description answers unknown, never a proven 0.
 func TestRelated_SFN_Logs_CacheMissNoClients(t *testing.T) {
-	cache := resource.ResourceCache{}
-
-	src := resource.Resource{ID: "order-fulfillment-workflow"}
-	checker := sfnCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
+	src := resource.Resource{ID: "order-fulfillment-workflow", Fields: map[string]string{}}
+	clients := sfnLoggingClients(sfntypes.LogLevelAll, "arn:aws:logs:us-east-1:123456789012:log-group:/app/orders/sfn-history:*")
+	for _, target := range []string{"logs", "role", "kms", "lambda"} {
+		result := sfnCheckerByTarget(t, target)(context.Background(), clients, src, resource.ResourceCache{})
+		if result.State() != domain.RelatedUnknown {
+			t.Errorf("sfn -> %s on a row without its ARN: state = %v, Count = %d, want unknown", target, result.State(), result.Count())
+		}
 	}
 }
 

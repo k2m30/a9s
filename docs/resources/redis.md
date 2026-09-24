@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `sns`
 
 - **Why related**: ElastiCache publishes lifecycle events (failover, node-replacement) to an SNS topic; that topic is where the on-call pager listens.
-- **How discovered**: `NotificationConfiguration.TopicArn` is **not** on `ReplicationGroup`; it is on `CacheCluster` (AWS SDK Go v2 — `elasticache/types.CacheCluster` § `NotificationConfiguration`). Resolve by the same `DescribeCacheClusters` call used for `sg`; cross-reference the loaded `sns` list by topic ARN — a9s-devops: possible=yes via the member-cluster Describe.
+- **How discovered**: `NotificationConfiguration.TopicArn` is **not** on `ReplicationGroup`; it is on `CacheCluster` (AWS SDK Go v2 — `elasticache/types.CacheCluster` § `NotificationConfiguration`). Resolve by the same `DescribeCacheClusters` call used for `sg`; count the topic when `TopicStatus` is `active` — notifications are sent only then ([API_ModifyCacheCluster](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ModifyCacheCluster.html)) — and cross-reference the loaded `sns` list by topic ARN — a9s-devops: possible=yes via the member-cluster Describe.
 - **Count shown**: yes.
 
 ### `subnet`

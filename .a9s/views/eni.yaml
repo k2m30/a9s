@@ -33,6 +33,7 @@ detail:
   - AvailabilityZone
   - PrivateIpAddress
   - PrivateDnsName
+  - PrivateIpAddresses
   - MacAddress
   - Description
   - OwnerId

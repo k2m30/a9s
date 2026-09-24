@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -185,6 +187,20 @@ func snsSubConfirmation(subscriptionArn string) string {
 		return snsSubUnknown
 	}
 	return snsSubConfirmed
+}
+
+// snsSubCarries is the one liveness predicate over a subscription row: a
+// subscription delivers once "the subscriber calls the ConfirmSubscription
+// action", and until then AWS gives a state word in place of its ARN
+// (https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html). A row
+// restored without its SDK struct says so in its confirmed field; a row that
+// records no state is taken as delivering.
+func snsSubCarries(sub resource.Resource) bool {
+	if raw, ok := assertStruct[snstypes.Subscription](sub.RawStruct); ok {
+		return snsSubConfirmation(aws.ToString(raw.SubscriptionArn)) == snsSubConfirmed
+	}
+	word := sub.Fields["confirmed"]
+	return word == "" || word == "yes"
 }
 
 // snsSubRowID is the row identity both subscription surfaces use. A confirmed

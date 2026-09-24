@@ -79,7 +79,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 // DB instance.
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("dbi-snap", "res.ID")
+		return keyMissing("dbi-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi-snap")
@@ -108,7 +108,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
-		return foundNone("logs", "dbID")
+		return keyMissing("logs", "dbID")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")

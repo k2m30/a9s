@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `asg`, `
 ### `nat`
 
 - **Why related**: NAT gateway consuming this EIP as its public address — critical when the EIP is the egress IP for a private subnet.
-- **How discovered**: cross-reference the already-loaded `nat` list where `NatGateway.NatGatewayAddresses[].AllocationId == Address.AllocationId`.
+- **How discovered**: cross-reference the already-loaded `nat` list where `NatGateway.NatGatewayAddresses[].AllocationId == Address.AllocationId`, over the gateway's live addresses: a `failed` or `deleted` gateway holds none, and an address that is `disassociating`, `unassigning` or `failed` is leaving it ([API_NatGatewayAddress](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

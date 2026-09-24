@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `apigw`,
 ### `apigw`
 
 - **Why related**: API Gateway custom domain using this certificate for TLS.
-- **How discovered**: call `DescribeCertificate`, read `CertificateDetail.InUseBy[]`, keep entries whose ARN prefix is `arn:aws:apigateway:` — a9s-devops: `InUseBy` is the only ACM field that lists consuming resources; filter by ARN service prefix to split apigw/cf/elb without extra API calls. Cross-reference loaded `apigw` list by ARN.
+- **How discovered**: call `DescribeCertificate` and read `CertificateDetail.InUseBy[]`. ACM names an API Gateway custom domain there (`arn:aws:apigateway:<region>::/domainnames/<name>`, [arn-format-reference](https://docs.aws.amazon.com/apigateway/latest/developerguide/arn-format-reference.html)); the APIs it serves are the ones that domain's API mappings name, read with `apigatewayv2:GetApiMappings` per domain ([rest-api-mappings](https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-mappings.html), [domainnames-domainname-apimappings](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-apimappings.html)) — the same walk `apigw` → `acm` makes. A domain `GetApiMappings` maps nothing on is read again through `apigateway:GetBasePathMappings`, how an edge-optimized domain maps REST APIs ([how-to-edge-optimized-custom-domain-name](https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-edge-optimized-custom-domain-name.html), [API_GetBasePathMappings](https://docs.aws.amazon.com/apigateway/latest/api/API_GetBasePathMappings.html)). A domain's routing rules send traffic too: each rule's `InvokeApi.ApiId`, read with `apigatewayv2:ListRoutingRules`, counts beside the mappings, and the domain's `routingMode` (`API_MAPPING_ONLY`, `ROUTING_RULE_ONLY`, `ROUTING_RULE_THEN_API_MAPPING`) decides which of the two places are read; an unknown mode reads both ([rest-api-routing-mode](https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-routing-mode.html), [domainnames-domainname-routingrules](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-routingrules.html)). A `/restapis/<id>` or `/apis/<id>` entry is the API itself. A mapping read that fails keeps the APIs found elsewhere as a lower bound.
 - **Count shown**: yes.
 
 ### `cf`
@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `apigw`,
 ### `elb`
 
 - **Why related**: Load balancer listener using this certificate on an HTTPS listener.
-- **How discovered**: call `DescribeCertificate`, read `CertificateDetail.InUseBy[]`, keep entries whose ARN prefix is `arn:aws:elasticloadbalancing:` — a9s-devops: same `InUseBy` split. Cross-reference loaded `elb` list by LoadBalancer ARN (the InUseBy entry references the listener, the LB ARN is the prefix of the listener ARN).
+- **How discovered**: Application, Network and Gateway Load Balancers in the certificate's `InUseBy`; a Classic Load Balancer's ARN names no row of the `elb` list, which `DescribeLoadBalancers` (ELBv2) fills ([API_DescribeLoadBalancers](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html)). ACM's `InUseBy` lags: a load balancer can stay listed for a while after its listener drops the certificate.
 - **Count shown**: yes.
 
 ### `r53`

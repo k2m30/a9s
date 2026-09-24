@@ -362,7 +362,7 @@ func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, input 
 			TransitGatewayAttachmentId: att.TransitGatewayAttachmentId,
 			TransitGatewayId:           att.TransitGatewayId,
 			VpcId:                      att.ResourceId,
-			State:                      ec2types.TransitGatewayAttachmentStateAvailable,
+			State:                      att.State,
 			SubnetIds:                  f.fix.TGWVpcAttachmentSubnets[aws.ToString(att.TransitGatewayAttachmentId)],
 			CreationTime:               att.CreationTime,
 			Tags:                       att.Tags,

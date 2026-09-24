@@ -605,7 +605,8 @@ func (f *pagedAPIGW) GetDomainNames(_ context.Context, in *apigatewayv2.GetDomai
 	out := &apigatewayv2.GetDomainNamesOutput{NextToken: next}
 	for i := lo; i < hi; i++ {
 		out.Items = append(out.Items, apigwv2types.DomainName{
-			DomainName: aws.String(pagedDomain(i)),
+			DomainName:  aws.String(pagedDomain(i)),
+			RoutingMode: apigwv2types.RoutingModeApiMappingOnly,
 			DomainNameConfigurations: []apigwv2types.DomainNameConfiguration{{
 				CertificateArn:   aws.String(pagedCertARN(i)),
 				EndpointType:     apigwv2types.EndpointTypeRegional,

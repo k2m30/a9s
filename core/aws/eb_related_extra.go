@@ -33,7 +33,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 		envName = res.Name
 	}
 	if envName == "" {
-		return foundNone("elb", "envName")
+		return keyMissing("elb", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -77,7 +77,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		envName = res.Name
 	}
 	if envName == "" {
-		return foundNone("tg", "envName")
+		return keyMissing("tg", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -179,7 +179,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return foundNone("sg", "envName")
+		return keyMissing("sg", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -234,6 +234,9 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 // elasticbeanstalk:DescribeConfigurationSettings OptionSettings:
 //   - aws:autoscaling:launchconfiguration / IamInstanceProfile → iam:GetInstanceProfile → roles
 //   - aws:elasticbeanstalk:environment / ServiceRole → direct role ARN or name
+//
+// plus the environment's operations role, EnvironmentDescription.OperationsRole
+// (https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html).
 func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
@@ -252,7 +255,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		envName = res.Name
 	}
 	if appName == "" || envName == "" {
-		return foundNone("role", "envName")
+		return keyMissing("role", "envName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -270,7 +273,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		return ReadFailed("role", err)
 	}
 
-	var refs []string
+	refs := []string{aws.ToString(eb.OperationsRole)}
 	// resolved stays true until a profile lookup does not answer; the same
 	// rule the ASG role pivot follows, because it is the same call.
 	resolved := true
@@ -311,20 +314,21 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("role", ids, dropped)
 }
 
-// checkEbS3 resolves S3 buckets referenced by application versions for this EB environment.
-// elasticbeanstalk:DescribeApplicationVersions(ApplicationName) → ApplicationVersions[].SourceBundle.S3Bucket.
+// checkEbS3 reports the bucket of the source bundle this environment runs:
+// the version its VersionLabel names, "the application version deployed in
+// this environment"
+// (https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html),
+// read with DescribeApplicationVersions. The application's other versions are
+// not deployed here.
 func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
 		return NotRead("s3")
 	}
 
-	appName := ""
-	if eb.ApplicationName != nil {
-		appName = *eb.ApplicationName
-	}
-	if appName == "" {
-		return foundNone("s3", "appName")
+	appName, label := aws.ToString(eb.ApplicationName), aws.ToString(eb.VersionLabel)
+	if appName == "" || label == "" {
+		return foundNone("s3", "VersionLabel")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -335,6 +339,7 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 	versions, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ebtypes.ApplicationVersionDescription, *string, error) {
 		out, err := c.ElasticBeanstalk.DescribeApplicationVersions(ctx, &elasticbeanstalk.DescribeApplicationVersionsInput{
 			ApplicationName: &appName,
+			VersionLabels:   []string{label},
 			NextToken:       token,
 		})
 		if err != nil {

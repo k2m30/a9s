@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `sg`
 
 - **Why related**: Other security groups referenced in this SG's ingress/egress rules — SG-to-SG references are the normal way to chain tiers ("app SG allows from web SG"), and tracing the chain is how operators reason about reachability.
-- **How discovered**: read `IpPermissions[].UserIdGroupPairs[].GroupId` and `IpPermissionsEgress[].UserIdGroupPairs[].GroupId` on this SG.
+- **How discovered**: Security groups this group's own ingress and egress rules reference in `UserIdGroupPairs[].GroupId`; a pair in another account names a group this account cannot list ([API_UserIdGroupPair](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_UserIdGroupPair.html)).
 - **Count shown**: yes.
 
 ### `vpc`
@@ -193,6 +193,6 @@ sg — NETWORKING. Status key: `risk_summary` — the key the status cell reads,
 | elb | Load Balancers | yes |
 | lambda | Lambda Functions | yes |
 | cfn | CloudFormation | no |
-| sg | Referencing SGs | yes |
+| sg | Referenced SGs | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

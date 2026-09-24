@@ -17,7 +17,7 @@ import (
 func checkECSServices(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return foundNone("ecs-svc", "clusterName")
+		return keyMissing("ecs-svc", "clusterName")
 	}
 
 	clusterArn := ""

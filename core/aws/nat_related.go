@@ -50,7 +50,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		natID = *raw.NatGatewayId
 	}
 	if natID == "" {
-		return foundNone("rtb", "natID")
+		return keyMissing("rtb", "natID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -74,6 +74,27 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("rtb", ids, truncated)
 }
 
+// natLiveAddresses is the one liveness reading of a NAT gateway's addresses:
+// none while the gateway is failed ("could not be created") or deleted ("no
+// longer processing traffic",
+// https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html),
+// and not an address whose status is disassociating, unassigning or failed
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html).
+func natLiveAddresses(nat ec2types.NatGateway) []ec2types.NatGatewayAddress {
+	if nat.State == ec2types.NatGatewayStateFailed || nat.State == ec2types.NatGatewayStateDeleted {
+		return nil
+	}
+	var live []ec2types.NatGatewayAddress
+	for _, addr := range nat.NatGatewayAddresses {
+		switch addr.Status {
+		case ec2types.NatGatewayAddressStatusDisassociating, ec2types.NatGatewayAddressStatusUnassigning, ec2types.NatGatewayAddressStatusFailed:
+			continue
+		}
+		live = append(live, addr)
+	}
+	return live
+}
+
 // checkNATEIP extracts AllocationId values from the NAT gateway's
 // NatGatewayAddresses slice and searches the eip cache for matching EIPs.
 func checkNATEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -84,7 +105,7 @@ func checkNATEIP(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	// NatGatewayAddresses[].AllocationId is the eip resource id (eip
 	// resources are keyed by AllocationId — see eip.go).
 	var ids []string
-	for _, addr := range raw.NatGatewayAddresses {
+	for _, addr := range natLiveAddresses(raw) {
 		if addr.AllocationId != nil && *addr.AllocationId != "" {
 			ids = append(ids, *addr.AllocationId)
 		}
@@ -101,7 +122,7 @@ func checkNATENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	}
 	// NatGatewayAddresses[].NetworkInterfaceId is the eni resource id.
 	var ids []string
-	for _, addr := range raw.NatGatewayAddresses {
+	for _, addr := range natLiveAddresses(raw) {
 		if addr.NetworkInterfaceId != nil && *addr.NetworkInterfaceId != "" {
 			ids = append(ids, *addr.NetworkInterfaceId)
 		}

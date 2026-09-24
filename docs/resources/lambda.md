@@ -34,8 +34,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `apigw`
 
 - **Why related**: API Gateway integrations that invoke this function.
-- **How discovered**: call `GetIntegrations` for each loaded HTTP or WebSocket API and match each integration's `IntegrationUri` (the function ARN, or the `.../functions/<arn>/invocations` path) against this function. A REST API keeps its integrations per method, which this pivot does not read, so a REST API leaves the count a lower bound.
-- **Count shown**: no — the candidates are not a count of the APIs that invoke this function, and no candidate is no answer: the integrations were not read.
+- **How discovered**: APIs with an integration invoking this function: an HTTP or WebSocket API's `GetIntegrations` `IntegrationUri`, a REST API's method integrations from `GetResources` with the `methods` embed ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
+- **Count shown**: yes; a lower bound while the `apigw` list, or an API's integrations, were read only in part.
 
 ### `cf`
 
@@ -137,7 +137,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `sns`
 
 - **Why related**: SNS topic that publishes to this function (asynchronous event source) or is the function's async-invocation DLQ target.
-- **How discovered**: two pivots — (a) `FunctionConfiguration.DeadLetterConfig.TargetArn` when it's an SNS ARN (`arn:aws:sns:…`), and (b) SNS topic subscriptions with `Protocol==lambda` and `Endpoint==FunctionArn` (the topic-side view, collapsed into `sns-sub` below). — a9s-devops: the DLQ-SNS direction is function-side; the subscription direction is topic-side.
+- **How discovered**: The topic this function's `DeadLetterConfig.TargetArn` names, where failed asynchronous invocations go ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)), and the topics behind the confirmed lambda-protocol subscriptions whose `Endpoint` is this function; a subscription pending confirmation delivers nothing ([API_Subscribe](https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html)). A subscription list that cannot be read keeps the dead-letter topic as a lower bound.
 - **Count shown**: yes.
 
 ### `sns-sub`
@@ -149,7 +149,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `sqs`
 
 - **Why related**: SQS queue either invoking the function (event source) or used as the function's async-invocation DLQ.
-- **How discovered**: two pivots — (a) `FunctionConfiguration.DeadLetterConfig.TargetArn` when it's an SQS ARN (`arn:aws:sqs:…`); (b) `ListEventSourceMappings(FunctionName=<name>)` entries with `EventSourceArn` starting `arn:aws:sqs:…`. Cross-reference the `sqs` list by queue name.
+- **How discovered**: Queues invoking the function through an event source mapping, and the queue its `DeadLetterConfig.TargetArn` names ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)).
 - **Count shown**: yes.
 
 ### `ssm`
@@ -167,7 +167,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `tg`
 
 - **Why related**: Application Load Balancer target group with this function registered as a target.
-- **How discovered**: cross-reference the `tg` list — for each TG with `TargetType==lambda`, call `DescribeTargetHealth` and match `Targets[].Id==FunctionArn`. — a9s-devops: ALB→Lambda wiring is TG-side (`TargetType=lambda`); the function has no back-reference.
+- **How discovered**: Lambda target groups whose `DescribeTargetHealth` lists this function ([API_DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)).
 - **Count shown**: yes.
 
 ### `vpc`

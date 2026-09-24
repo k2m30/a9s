@@ -11,6 +11,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -102,7 +103,9 @@ func TestEC2RelatedCheckers_NoUnknownCounts(t *testing.T) {
 		}},
 	}
 
-	targets := []string{"tg", "asg", "alarm", "cfn", "eip", "ebs-snap"}
+	// tg is not here: membership is DescribeTargetHealth's answer, which a
+	// call without clients cannot read (TestRelated_EC2_TG_Found).
+	targets := []string{"asg", "alarm", "cfn", "eip", "ebs-snap"}
 	for _, target := range targets {
 		checker := ec2CheckerByTarget(t, target)
 		got := checker(context.Background(), nil, instance, cache)
@@ -392,6 +395,26 @@ func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
 	}
 }
 
+// ec2TargetHealthFake answers DescribeTargetHealth with the instances
+// registered in each target group, keyed by target group ARN.
+type ec2TargetHealthFake struct {
+	awsclient.ELBv2API
+	registered map[string][]string
+}
+
+func (f *ec2TargetHealthFake) DescribeTargetHealth(_ context.Context, in *elbv2.DescribeTargetHealthInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTargetHealthOutput, error) {
+	out := &elbv2.DescribeTargetHealthOutput{}
+	for _, id := range f.registered[aws.ToString(in.TargetGroupArn)] {
+		out.TargetHealthDescriptions = append(out.TargetHealthDescriptions, elbv2types.TargetHealthDescription{
+			Target:       &elbv2types.TargetDescription{Id: aws.String(id), Port: aws.Int32(80)},
+			TargetHealth: &elbv2types.TargetHealth{State: elbv2types.TargetHealthStateEnumHealthy},
+		})
+	}
+	return out, nil
+}
+
+// An instance's target groups are the ones DescribeTargetHealth reports it
+// registered in; a group in the same VPC that does not register it is not.
 func TestRelated_EC2_TG_Found(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-match",
@@ -400,23 +423,38 @@ func TestRelated_EC2_TG_Found(t *testing.T) {
 			VpcId:      aws.String("vpc-match"),
 		},
 	}
+	const registeredARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-1/1111111111111111"
+	const otherARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-3/3333333333333333"
 	cache := resource.ResourceCache{
 		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{
 				ID: "tg-1",
 				RawStruct: elbv2types.TargetGroup{
-					VpcId:      aws.String("vpc-match"),
-					TargetType: elbv2types.TargetTypeEnumInstance,
+					TargetGroupArn: aws.String(registeredARN),
+					VpcId:          aws.String("vpc-match"),
+					TargetType:     elbv2types.TargetTypeEnumInstance,
+				},
+			},
+			{
+				ID: "tg-3",
+				RawStruct: elbv2types.TargetGroup{
+					TargetGroupArn: aws.String(otherARN),
+					VpcId:          aws.String("vpc-match"),
+					TargetType:     elbv2types.TargetTypeEnumInstance,
 				},
 			},
 		}},
 	}
+	clients := &awsclient.ServiceClients{ELBv2: &ec2TargetHealthFake{registered: map[string][]string{
+		registeredARN: {"i-match"},
+		otherARN:      {"i-other"},
+	}}}
 
 	checker := ec2CheckerByTarget(t, "tg")
-	result := checker(context.Background(), nil, instance, cache)
+	result := checker(context.Background(), clients, instance, cache)
 
-	if result.Count() <= 0 {
-		t.Errorf("Count = %d, want > 0", result.Count())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "tg-1" {
+		t.Errorf("ResourceIDs = %v (state %v), want [tg-1]", ids, result.State())
 	}
 }
 

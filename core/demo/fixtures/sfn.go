@@ -29,6 +29,14 @@ const (
 	sfnDemoKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 )
 
+// SFNOrderFulfillmentLogGroup is the log group order-fulfillment-workflow
+// logs to; SFNWorkflowsLogGroup is the one group every other logging demo
+// machine shares, named after none of them.
+const (
+	SFNOrderFulfillmentLogGroup = "/aws/vendedlogs/states/order-fulfillment-workflow"
+	SFNWorkflowsLogGroup        = "/aws/vendedlogs/states/acme-workflows"
+)
+
 // SFNHealthyLogLevel is the execution logging level every demo state machine
 // runs at except the one SFNLoggingOff names.
 const SFNHealthyLogLevel = sfntypes.LogLevelAll
@@ -57,6 +65,10 @@ type SFNFixtures struct {
 	// served by DescribeStateMachine. A machine absent from this map is
 	// served SFNHealthyLogLevel, so exactly one demo row reads as unlogged.
 	LoggingLevels map[string]sfntypes.LogLevel
+	// LogGroups maps state machine ARN -> the log group ARN its
+	// LoggingConfiguration.Destinations names, served by DescribeStateMachine.
+	// A machine logging at any level but OFF names one.
+	LogGroups map[string]string
 	// History maps execution ARN -> GetExecutionHistory events, served by
 	// SFNFake.GetExecutionHistory. Required for the sfn_execution_history
 	// child view and its sfn-execution-history.broken.event_failed finding
@@ -374,6 +386,14 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 		LoggingLevels: map[string]sfntypes.LogLevel{
 			sfnARNLoggingOff: sfntypes.LogLevelOff,
 		},
+		LogGroups: map[string]string{
+			smARNOrderFulfillment:  sfnLogGroupARN(SFNOrderFulfillmentLogGroup),
+			sfnARNNoCMK:            sfnLogGroupARN(SFNWorkflowsLogGroup),
+			sfnARNDefinitionSecret: sfnLogGroupARN(SFNWorkflowsLogGroup),
+			"arn:aws:states:us-east-1:123456789012:stateMachine:data-pipeline-orchestrator": sfnLogGroupARN(SFNWorkflowsLogGroup),
+			smARNPaymentValidation: sfnLogGroupARN(SFNWorkflowsLogGroup),
+			smARNUserOnboarding:    sfnLogGroupARN(SFNWorkflowsLogGroup),
+		},
 		// exec-2026-0322-0200-b2c3d4e5's history: RunFulfillmentTask's ECS
 		// task fails to pull its container image, which fails the .sync
 		// task integration and, with no Catch, the execution itself —
@@ -455,4 +475,10 @@ func NewSFNFixtures() *SFNFixtures {
 
 func init() {
 	Register(Pin{ShortName: "sfn", Rows: 7, Issues: 0, CoverageGaps: []string{"dim"}})
+}
+
+// sfnLogGroupARN is a log group's ARN as a LoggingConfiguration destination
+// names it, ending in ":*".
+func sfnLogGroupARN(name string) string {
+	return "arn:aws:logs:us-east-1:123456789012:log-group:" + name + ":*"
 }

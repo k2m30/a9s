@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `vpc`
 
 - **Why related**: VPCs attached to this TGW — the primary operator question when tracing connectivity: "which VPCs can talk through this gateway?" (`docs/related-resources.md` § `tgw`).
-- **How discovered**: call `DescribeTransitGatewayVpcAttachments` filtered by `transit-gateway-id`, then read `TransitGatewayVpcAttachment.VpcId` for each attachment — a9s-devops: the VPC-attachment API returns `VpcId` directly, no further hop needed.
+- **How discovered**: VPCs attached to this TGW, from its `TransitGateway` VPC attachments; a `deleted`, `failing`, `failed`, `rejecting` or `rejected` attachment connects nothing ([vpc-attachment-lifecycle](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html#vpc-attachment-lifecycle)).
 - **Count shown**: yes.
 
 ### `subnet`

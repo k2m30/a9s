@@ -4,7 +4,9 @@ package aws
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -16,7 +18,7 @@ import (
 func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return foundNone("ec2", "amiID")
+		return keyMissing("ec2", "amiID")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -43,72 +45,100 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 	if !ok {
 		return NotRead("ebs-snap")
 	}
+	return relatedResultTrunc("ebs-snap", amiSnapshotIDs(img), false)
+}
 
+// amiSnapshotIDs is the snapshots the AMI's EBS block devices are created
+// from, Image.BlockDeviceMappings[].Ebs.SnapshotId
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html).
+func amiSnapshotIDs(img ec2types.Image) []string {
 	var ids []string
 	for _, bdm := range img.BlockDeviceMappings {
-		if bdm.Ebs != nil && bdm.Ebs.SnapshotId != nil && *bdm.Ebs.SnapshotId != "" {
+		if bdm.Ebs != nil && aws.ToString(bdm.Ebs.SnapshotId) != "" {
 			ids = append(ids, *bdm.Ebs.SnapshotId)
 		}
 	}
-	if len(ids) == 0 {
-		return foundNone("ebs-snap", "ids")
-	}
-	return relatedResultTrunc("ebs-snap", ids, false)
+	return ids
 }
 
-// checkAMIASG scans the asg cache for Auto Scaling Groups whose currently
-// running instances launched from this AMI. The AutoScalingGroup struct does
-// NOT embed an ImageId (it references a LaunchTemplate or LaunchConfiguration,
-// which would require a separate ec2:DescribeLaunchTemplateVersions or
-// autoscaling:DescribeLaunchConfigurations call to resolve). Instead we go via
-// the EC2 cache: for each ASG, walk Instances[].InstanceId and look them up in
-// the ec2 cache; if any instance's image_id matches this AMI, that ASG is
-// related. This is cache-only and correct for the running-fleet view.
+// amiSnapshotRows reads the snapshot rows the AMI is registered from out of
+// the ebs-snap list. A snapshot the list does not hold makes the read partial:
+// the list is the account's own snapshots, and the one missing may be on a
+// page not read, or shared from another account.
+func amiSnapshotRows(ctx context.Context, clients any, cache resource.ResourceCache, img ec2types.Image) ([]resource.Resource, relatedRead) {
+	ids := amiSnapshotIDs(img)
+	if len(ids) == 0 {
+		return nil, relatedRead{}
+	}
+	snaps, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ebs-snap")
+	if snaps == nil {
+		return nil, unreadBy(err)
+	}
+	var rows []resource.Resource
+	for _, s := range snaps {
+		if slices.Contains(ids, s.ID) {
+			rows = append(rows, s)
+		}
+	}
+	return rows, relatedRead{partial: truncated || len(rows) < len(ids), failure: err}
+}
+
+// checkAMIASG reports the groups that launch from this AMI: the groups whose
+// launch sources name it (readASGLaunch), running instances or not, since a
+// group at desired capacity 0 launches from it the moment it scales out; and
+// the groups running an instance of it, which an older template version may
+// have launched.
 func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
-		return foundNone("asg", "amiID")
+		return keyMissing("asg", "amiID")
 	}
-
-	asgList, asgTruncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return ReadFailed("asg", err)
 	}
 	if asgList == nil {
 		return NotRead("asg")
 	}
-	// The ec2 list is read only for the groups' instances: with no group
-	// there is nothing to look up.
-	var ec2List []resource.Resource
-	var ec2Truncated bool
+	ec2Image := map[string]string{}
 	if len(asgList) > 0 {
-		if ec2List, ec2Truncated, err = relatedResourcesFor(ctx, clients, cache, "ec2"); err != nil {
+		ec2List, ec2Truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
+		if err != nil {
 			return ReadFailed("asg", err)
 		}
-	}
-
-	ec2Image := make(map[string]string, len(ec2List))
-	for _, ec2Res := range ec2List {
-		if id := ec2Res.Fields["image_id"]; id != "" {
-			ec2Image[ec2Res.ID] = id
+		truncated = truncated || ec2Truncated
+		for _, ec2Res := range ec2List {
+			ec2Image[ec2Res.ID] = ec2Res.Fields["image_id"]
 		}
 	}
-
+	asgList, capped := fanOut(asgList)
+	truncated = truncated || capped
 	var ids []string
+	var reads rowReads
 	for _, asgRes := range asgList {
 		asg, ok := assertStruct[asgtypes.AutoScalingGroup](asgRes.RawStruct)
 		if !ok {
+			reads.missed()
 			continue
 		}
-		for _, inst := range asg.Instances {
-			if inst.InstanceId == nil {
-				continue
-			}
-			if ec2Image[*inst.InstanceId] == amiID {
-				ids = append(ids, asgRes.ID)
-				break
-			}
+		if slices.ContainsFunc(asgMembers(asg), func(id string) bool { return ec2Image[id] == amiID }) {
+			reads.read++
+			ids = append(ids, asgRes.ID)
+			continue
 		}
+		launch, read := readASGLaunch(ctx, clients, asg)
+		switch {
+		case slices.Contains(launch.images, amiID):
+			reads.read++
+			ids = append(ids, asgRes.ID)
+		case read.failed:
+			reads.fail(asgRes.ID, read.failure)
+		case read.unread:
+			reads.missed()
+		default:
+			reads.read++
+		}
+		truncated = truncated || read.partial
 	}
-	return relatedResultTrunc("asg", ids, (asgTruncated || ec2Truncated))
+	return reads.answer("asg", "ami-related: launch source", ids, truncated)
 }

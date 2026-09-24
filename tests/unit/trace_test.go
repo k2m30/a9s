@@ -200,13 +200,13 @@ func TestTrace_ConcurrentRelatedFanout_ProducesWellFormedNonInterleavedJSONLines
 		t.Fatalf("ExecuteTask(KindRelatedCheck) returned %T, want messages.RelatedCheckBatch", res.ev)
 	}
 
-	// checkSFNRole/checkSFNKMS/checkSFNLambda all read the identical
-	// res.Fields["arn"] and call sfnDescribe concurrently under
-	// runRelatedCheckers' fan-out, so exactly one of the three reaches the
-	// inner fake and the other two join the in-flight singleflight call —
+	// checkSFNRole/checkSFNKMS/checkSFNLambda/checkSFNLogs all read the
+	// identical res.Fields["arn"] and call sfnDescribe concurrently under
+	// runRelatedCheckers' fan-out, so exactly one of the four reaches the
+	// inner fake and the other three join the in-flight singleflight call —
 	// the real, non-synthetic concurrency this test exists to drive.
 	if got := fake.describeCalls.Load(); got != 1 {
-		t.Errorf("DescribeStateMachine reached the inner fake %d times, want 1 (role/kms/lambda checkers must share one coalesced call)", got)
+		t.Errorf("DescribeStateMachine reached the inner fake %d times, want 1 (role/kms/lambda/logs checkers must share one coalesced call)", got)
 	}
 
 	lines := nonEmptyTraceLines(t, buf.String())
@@ -234,8 +234,8 @@ func TestTrace_ConcurrentRelatedFanout_ProducesWellFormedNonInterleavedJSONLines
 			t.Errorf("line %d: Outcome = %q, want %q or %q", i, ev.Outcome, "executed", "served")
 		}
 	}
-	if executed != 1 || served != 2 {
-		t.Errorf("aws_call trace outcomes for sfn.DescribeStateMachine = (executed=%d, served=%d), want (1, 2) — role/kms/lambda each ask, only one actually calls out", executed, served)
+	if executed != 1 || served != 3 {
+		t.Errorf("aws_call trace outcomes for sfn.DescribeStateMachine = (executed=%d, served=%d), want (1, 3) — role/kms/lambda/logs each ask, only one actually calls out", executed, served)
 	}
 }
 

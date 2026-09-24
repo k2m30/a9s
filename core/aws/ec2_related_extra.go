@@ -60,7 +60,7 @@ func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
-		return foundNone("kms", "instanceID")
+		return keyMissing("kms", "instanceID")
 	}
 
 	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")

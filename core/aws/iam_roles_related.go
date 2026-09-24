@@ -41,11 +41,12 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 	var ids []string
 	for _, e := range eksList {
 		cluster, ok := assertStruct[ekstypes.Cluster](e.RawStruct)
-		if !ok || cluster.RoleArn == nil {
+		if !ok {
 			continue
 		}
-		arn := *cluster.RoleArn
-		if (roleARN != "" && arn == roleARN) || (roleName != "" && roleNameFromARN(arn) == roleName) {
+		if slices.ContainsFunc(eksClusterRoles(cluster), func(arn string) bool {
+			return arn != "" && ((roleARN != "" && arn == roleARN) || (roleName != "" && roleNameFromARN(arn) == roleName))
+		}) {
 			ids = append(ids, e.ID)
 		}
 	}
@@ -198,7 +199,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	if roleName == "" {
-		return foundNone("policy", "roleName")
+		return keyMissing("policy", "roleName")
 	}
 	attached, complete, err := listAttachedRolePolicies(ctx, c.IAM, roleName)
 	if err != nil {
@@ -218,7 +219,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	if roleName == "" {
-		return foundNone("ec2", "roleName")
+		return keyMissing("ec2", "roleName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -239,8 +240,11 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 	}
 
 	c, err := svcClients(clients)
+	if err != nil {
+		return ReadFailed("ec2", err)
+	}
 	// no finding: without the IAM client nothing was read.
-	if err != nil || c.IAM == nil {
+	if c.IAM == nil {
 		return NotRead("ec2")
 	}
 	api, ok := c.IAM.(IAMListInstanceProfilesForRoleAPI)

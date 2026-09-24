@@ -511,6 +511,8 @@ func TestRelated_EbRule_Role_NoRoleArn(t *testing.T) {
 	}
 }
 
+// A log-publishing option publishes to its group only while Enabled
+// (LogPublishingOption.Enabled).
 func TestRelated_OpenSearch_Logs_ExtractsLogGroups(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "opensearch", "logs")
 	res := resource.Resource{
@@ -519,7 +521,12 @@ func TestRelated_OpenSearch_Logs_ExtractsLogGroups(t *testing.T) {
 		RawStruct: opensearchtypes.DomainStatus{
 			LogPublishingOptions: map[string]opensearchtypes.LogPublishingOption{
 				string(opensearchtypes.LogTypeIndexSlowLogs): {
+					Enabled:                   aws.Bool(true),
 					CloudWatchLogsLogGroupArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/opensearch/domains/my-domain/index-slow-logs:*"),
+				},
+				string(opensearchtypes.LogTypeSearchSlowLogs): {
+					Enabled:                   aws.Bool(false),
+					CloudWatchLogsLogGroupArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/opensearch/domains/my-domain/search-slow-logs:*"),
 				},
 			},
 		},

@@ -566,16 +566,6 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			rcw := views.ComputeRightColWidth(rs.width, 32)
 			rs.rightCol.SetSize(rcw, rs.height)
 		}
-		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail
-		// view picks up receipt-rule changes without requiring a profile/region
-		// switch. Swap (not Clear) so that any in-flight blocked
-		// DescribeActiveReceiptRuleSet call writes to the orphaned old store on
-		// completion rather than repopulating the new active one —
-		// sesActiveReceiptRuleSet captures its store reference at entry; we
-		// replace the slot here.
-		if rt == "ses" {
-			m.core.ResetRuleSets()
-		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 		if len(tasks) == 0 {
@@ -624,11 +614,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 
 	m.core.DeleteResourceCache(rt)
-	if rt == "ses" {
-		// Swap (see detail-view path above): protects against in-flight blocked
-		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
-		m.core.ResetRuleSets()
-	}
+	m.core.RefreshTypeStores(rt)
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 	// Top-level list with a registered enricher: bump per-type gen (via the

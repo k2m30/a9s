@@ -41,54 +41,22 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 	return relatedResultTrunc("iam-user", ids, truncated)
 }
 
-// checkCtEventsRole extracts role information from the CloudTrail event's
-// Resources slice (AWS::IAM::Role) and matches against the role cache.
+// checkCtEventsRole is the role the event was performed under: the
+// sessionIssuer of an AssumedRole or Role identity, "the source (account, IAM
+// user, or role) that was used to get temporary security credentials"
+// (https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html).
+// A role an event acts on (an AssumeRole's requestParameters.roleArn, a
+// resource of the event) is not the caller.
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	ref := ctEventsRoleRef(res)
+	ref := res.Fields["role_name"]
+	if event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct); ok {
+		name, roleARN := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
+		ref = cmp.Or(roleARN, name)
+	}
 	if ref == "" {
-		return unreadZero(res, foundNone("role", "candidates"))
+		return unreadZero(res, foundNone("role", "sessionIssuer"))
 	}
 	return unreadZero(res, ctEventsMatchTarget(ctx, clients, cache, "role", res, []string{ref}))
-}
-
-// ctEventsRoleRef returns the reference to the role a CloudTrail event names,
-// from the first of four sources in the order they are trusted: the target
-// roleArn in requestParameters, an AWS::IAM::Role entry in Resources, a
-// Username carrying a service-role path, then the event JSON.
-func ctEventsRoleRef(res resource.Resource) string {
-	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
-	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
-	// TARGET role being assumed. Prefer it over Resources[]/sessionIssuer, which
-	// carry the assumed-role session ARN (trailing session name) or the CALLER's
-	// role — neither is the pivot target.
-	if ok {
-		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
-			if req, _ := parsed["requestParameters"].(map[string]any); req != nil {
-				if roleARN, _ := req["roleArn"].(string); roleARN != "" {
-					return roleARN
-				}
-			}
-		}
-		for _, r := range event.Resources {
-			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") && aws.ToString(r.ResourceName) != "" {
-				return *r.ResourceName
-			}
-		}
-	}
-
-	// Fallback: Username may encode a service role path ("AWSServiceRole/RoleName").
-	if username := res.Fields["_ct.username"]; strings.Contains(username, "/") {
-		return username
-	}
-
-	// Third path: AssumedRole events store role info in the CloudTrailEvent JSON
-	// string. The issuer's ARN is read in preference to its name: only the ARN
-	// tells another account's role from the local one of that name.
-	if ok {
-		name, roleARN := extractRoleNameFromCTEventJSON(event.CloudTrailEvent)
-		return cmp.Or(roleARN, name)
-	}
-	return ""
 }
 
 // ctEventsRelatedResources reads the target list from the session cache ONLY —
@@ -442,6 +410,30 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 	return ctEventsMatchTarget(ctx, clients, cache, "ddb", res, ids)
 }
 
+// checkCtEventsECR extracts the repository an ECR record names: its
+// AWS::ECR::Repository resource, by ARN or by name, else the request's
+// repositoryName
+// (https://docs.aws.amazon.com/AmazonECR/latest/userguide/logging-using-cloudtrail.html).
+func checkCtEventsECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
+	if !ok {
+		return NotRead("ecr")
+	}
+	ids := extractCTResourceIDs(event, "AWS::ECR::Repository")
+	if len(ids) == 0 {
+		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
+			req, _ := parsed["requestParameters"].(map[string]any)
+			if name := ctJSONString(req, "repositoryName"); name != "" {
+				ids = append(ids, name)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return foundNone("ecr", "ids")
+	}
+	return ctEventsMatchTarget(ctx, clients, cache, "ecr", res, ids)
+}
+
 // ---------------------------------------------------------------------------
 // Self-pivot checkers (ct-events → ct-events)
 // ---------------------------------------------------------------------------
@@ -497,7 +489,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 		eventName = res.Name
 	}
 	if eventName == "" {
-		return foundNone("ct-events", "eventName")
+		return keyMissing("ct-events", "eventName")
 	}
 	return ctSelfPivot(res, map[string]string{"EventName": eventName})
 }

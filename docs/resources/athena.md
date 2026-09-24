@@ -28,8 +28,8 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `kms`
 
 - **Why related**: KMS key encrypting Athena query results written to S3 (workgroup result encryption).
-- **How discovered**: call `GetWorkGroup`; read `Configuration.ResultConfiguration.EncryptionConfiguration.KmsKey` (set when `EncryptionOption` is `SSE_KMS` or `CSE_KMS`). Also read `Configuration.CustomerContentEncryptionConfiguration.KmsKey` for Spark-enabled workgroups. Cross-reference the loaded `kms` list by key ARN or ID.
-- **Count shown**: yes (0 or 1 — result-encryption is a single key per workgroup; Spark data-store encryption adds at most one more).
+- **How discovered**: The keys the workgroup configuration names: `ResultConfiguration.EncryptionConfiguration.KmsKey`, `ManagedQueryResultsConfiguration.EncryptionConfiguration.KmsKey` and `CustomerContentEncryptionConfiguration.KmsKey` ([API_WorkGroupConfiguration](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroupConfiguration.html)).
+- **Count shown**: yes (up to three keys: query results, managed query results and customer content).
 
 ### `logs`
 

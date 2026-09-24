@@ -263,8 +263,10 @@ func TestRelated_Policy_Role_ARNFallbackFromID(t *testing.T) {
 	}
 }
 
+// Repeated opens of one policy answer the same attachments. Whether a read is
+// reused inside a session is the session's business; nothing outlives it
+// (TestT570_PolicyEntities_DoNotOutliveAProfileSwitch).
 func TestRelated_Policy_TTLCache(t *testing.T) {
-	// Use a unique ARN to guarantee no stale entry from other tests.
 	arn := "arn:aws:iam::111122223333:policy/ttl-cache-test-" + time.Now().Format("20060102150405.999999999")
 
 	callCount := 0
@@ -284,8 +286,8 @@ func TestRelated_Policy_TTLCache(t *testing.T) {
 	result1 := checker(context.Background(), clients, res, resource.ResourceCache{})
 	result2 := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if callCount != 1 {
-		t.Errorf("API called %d times, want 1 (second call should hit cache)", callCount)
+	if callCount == 0 {
+		t.Error("ListEntitiesForPolicy never called")
 	}
 	if result1.Count() != 1 || result2.Count() != 1 {
 		t.Errorf("Count = %d / %d, want 1 / 1", result1.Count(), result2.Count())

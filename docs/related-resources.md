@@ -63,7 +63,15 @@
    one extra AWS API beyond reading the already-loaded sibling caches
    (`resource.ResourceCache`); per-item fan-outs over the OPEN resource's own
    sub-objects are inside the budget, fan-outs over the TARGET type's whole
-   population are not. A paginated API is walked page by page through
+   population are not — except where AWS offers no reverse read of the
+   relation, and then at most `EnrichmentCap` (50) calls, one per target row,
+   with the rows past the cap making the count a lower bound `(N+)`. Three
+   pivots read that way: `ami` → `asg` (each group's launch sources: no API
+   lists the groups that launch an image), `sqs` → `eb-rule` (`ListTargetsByRule`
+   per rule: [`ListRuleNamesByTarget`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_ListRuleNamesByTarget.html)
+   matches a target's ARN, not its `DeadLetterConfig`) and `ec2`/`lambda` →
+   `tg` ([`DescribeTargetHealth`](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)
+   requires one `TargetGroupArn`). A paginated API is walked page by page through
    `aws.PageAll`, up to `PerParentPageCap` pages; a walk the cap stopped is a
    lower bound `(N+)`, never an exact count. A mechanism that cannot resolve within that budget on
    ANY cache state is NOT REGISTERED — it is documented under
@@ -95,10 +103,10 @@
 | `cf` | [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) | `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `r53`, `s3`, `waf` |
 | `cfn` | [API_Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html) | `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns` |
 | `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `ct-events`, `kms` |
-| `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
+| `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `ecr`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
 | `dbc` | [API_DBCluster](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html) | `alarm`, `ct-events`, `dbi`, `dbc-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc` |
 | `dbi` | [API_DBInstance](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html) | `alarm`, `ct-events`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
-| `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `vpce` |
+| `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `vpce` |
 | `dbc-snap` | [API_DBClusterSnapshot](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html) | `backup`, `ct-events`, `dbc`, `kms`, `vpc` |
 | `eb` | [API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg` |
 | `eb-rule` | [API_Rule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html) | `ct-events`, `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs` |
@@ -164,10 +172,10 @@ API field (preferred) or a concrete DevOps workflow.
 
 AWS API: <https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html>
 
-- **`apigw`** — API Gateway custom domains using this cert, from `InUseBy`.
+- **`apigw`** — The APIs served with this cert: `InUseBy` names an API Gateway custom domain (`/domainnames/<name>`), and the APIs are the ones that domain's API mappings name, read with `apigatewayv2:GetApiMappings` ([rest-api-mappings](https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-mappings.html), [domainnames-domainname-apimappings](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-apimappings.html)). A domain `GetApiMappings` maps nothing on is read again through `apigateway:GetBasePathMappings`, how an edge-optimized domain maps REST APIs ([how-to-edge-optimized-custom-domain-name](https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-edge-optimized-custom-domain-name.html), [API_GetBasePathMappings](https://docs.aws.amazon.com/apigateway/latest/api/API_GetBasePathMappings.html)). A domain's routing rules send traffic too: each rule's `InvokeApi.ApiId`, read with `apigatewayv2:ListRoutingRules`, counts beside the mappings, and the domain's `routingMode` (`API_MAPPING_ONLY`, `ROUTING_RULE_ONLY`, `ROUTING_RULE_THEN_API_MAPPING`) decides which of the two places are read; an unknown mode reads both ([rest-api-routing-mode](https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-routing-mode.html), [domainnames-domainname-routingrules](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-routingrules.html)).
 - **`cf`** — CloudFront distributions using this cert.
 - **`ct-events`** — Audit trail for cert issuance/renewal.
-- **`elb`** — Load balancer listeners using this cert, from `InUseBy`. ACM's `InUseBy` lags: a load balancer can stay listed for a while after its listener drops the certificate.
+- **`elb`** — Application, Network and Gateway Load Balancers in the certificate's `InUseBy`; a Classic Load Balancer's ARN names no row of the `elb` list, which `DescribeLoadBalancers` (ELBv2) fills ([API_DescribeLoadBalancers](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html)). ACM's `InUseBy` lags: a load balancer can stay listed for a while after its listener drops the certificate.
 - **`r53`** — The hosted zone holding each DNS validation record (`DomainValidationOptions[].ResourceRecord.Name`): the innermost public zone whose name is the record's parent at a label boundary. A private zone never holds it — ACM validates against public DNS.
 
 ### `alarm`
@@ -194,40 +202,40 @@ AWS API: <https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_M
 
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html>
 
-- **`asg`** — Mentioned by 3/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`asg`** — Groups whose launch sources (launch template, launch configuration, mixed-instances policy and its overrides) launch this image, and groups running instances of it.
 - **`cfn`** — AMIs often consumed by CloudFormation templates.
 - **`ct-events`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ebs-snap`** — AMI block devices reference EBS snapshots.
 - **`ec2`** — Reverse lookup: instances using this AMI.
-- **`kms`** — AMI BlockDeviceMappings[].Ebs.KmsKeyId.
+- **`kms`** — The keys encrypting the AMI's snapshots, `Snapshot.KmsKeyId` of each snapshot its block devices name; a block device's `Ebs.KmsKeyId` "is only supported on BlockDeviceMapping objects called by RunInstances, RequestSpotFleet, and RequestSpotInstances" ([API_EbsBlockDevice](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html)).
 - **`ng`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 
 ### `apigw`
 
 AWS API: <https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html>
 
-- **`acm`** — Custom-domain TLS certificate, from `DomainNameConfigurations`.
+- **`acm`** — Custom-domain TLS certificate, from `DomainNameConfigurations`, of each domain whose API mappings, base path mappings or routing rules name this API (the `acm` → `apigw` walk).
 - **`alarm`** — Stage latency/error alarms.
 - **`cf`** — Distributions with an origin whose host is this API's own invoke host, `<api-id>.execute-api.<region>.amazonaws.com`, matched on the leading label.
 - **`ct-events`** — Audit trail for API changes.
-- **`elb`** — Load balancers behind the API's private integrations: a `VPC_LINK` integration's `IntegrationUri` is an ALB or NLB listener ARN, which names its load balancer (a Cloud Map service ARN names none and leaves a lower bound) ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)).
-- **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn).
-- **`lambda`** — Lambda integrations.
+- **`elb`** — Load balancers behind the API's private integrations: an HTTP API's `VPC_LINK` integration `IntegrationUri` is an ALB or NLB listener ARN, which names its load balancer (a Cloud Map service ARN names none and leaves a lower bound) ([apis-apiid-integrations](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-integrations.html)); a REST API's `VPC_LINK` integration reaches the `targetArns` of its VPC link ([API_VpcLink](https://docs.aws.amazon.com/apigateway/latest/api/API_VpcLink.html)).
+- **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn); a REST API's integrations from `GetResources` ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
+- **`lambda`** — Lambda integrations: an HTTP or WebSocket API's `GetIntegrations`, a REST API's method integrations from `GetResources` with the `methods` embed ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 - **`logs`** — API access log destination.
-- **`role`** — Invocation/authorizer role (`GetIntegrations` `CredentialsArn` + `GetAuthorizers` `AuthorizerCredentialsArn` matched against the loaded `role` cache).
+- **`role`** — Invocation/authorizer roles: integration credentials (`CredentialsArn`, or a REST method integration's `credentials`) and authorizer credentials (`AuthorizerCredentialsArn`, or a REST authorizer's `authorizerCredentials`) matched against the loaded `role` cache ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 
 ### `asg`
 
 AWS API: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html>
 
 - **`alarm`** — Alarms that trigger scaling policies.
-- **`ami`** — LaunchConfiguration.ImageId or LaunchTemplate.LaunchTemplateData.ImageId — AMI used by instances.
+- **`ami`** — The image of every launch source: the launch configuration's `ImageId`, `LaunchTemplateData.ImageId` of the launch template, the mixed-instances policy's template and each `Overrides[]` template, and each override's own `ImageId` ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **`ct-events`** — Audit trail for scaling events / config changes.
-- **`ec2`** — Instances the ASG currently manages.
+- **`ec2`** — Instances the ASG currently manages; an instance whose `LifecycleState` is `Terminating*`, `Terminated` or `Detached` is leaving the group ([API_Instance](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_Instance.html)).
 - **`elb`** — TargetGroupARNs → DescribeTargetGroups.LoadBalancerArns (ALB/NLB). Classic `LoadBalancerNames` are not counted: the `elb` type holds ELBv2 load balancers only.
 - **`ng`** — EKS node groups wrap ASGs; shown when parent node group exists.
-- **`role`** — AutoScalingGroup.ServiceLinkedRoleARN + LaunchConfiguration/Template IamInstanceProfile → GetInstanceProfile roles.
-- **`sg`** — LaunchConfiguration.SecurityGroups or LaunchTemplate.SecurityGroupIds / NetworkInterfaces[].Groups.
+- **`role`** — AutoScalingGroup.ServiceLinkedRoleARN + the instance profile of every launch source (launch configuration, launch template, mixed-instances policy and its `Overrides[]`) → GetInstanceProfile roles ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
+- **`sg`** — The security groups of every launch source: `LaunchConfiguration.SecurityGroups`, and `SecurityGroupIds` / `NetworkInterfaces[].Groups` of each launch template including the mixed-instances policy's and its `Overrides[]` ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **`sns`** — DescribeNotificationConfigurations.TopicARN + DescribeLifecycleHooks.NotificationTargetARN (SNS-only).
 - **`subnet`** — AutoScalingGroup.VPCZoneIdentifier — subnets the ASG launches into.
 - **`tg`** — AutoScalingGroup.TargetGroupARNs — TGs the ASG registers instances with.
@@ -238,7 +246,7 @@ AWS API: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScali
 AWS API: <https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html>
 
 - **`ct-events`** — Audit trail for workgroup changes.
-- **`kms`** — Result-encryption key.
+- **`kms`** — The keys the workgroup configuration names: `ResultConfiguration.EncryptionConfiguration.KmsKey`, `ManagedQueryResultsConfiguration.EncryptionConfiguration.KmsKey` and `CustomerContentEncryptionConfiguration.KmsKey` ([API_WorkGroupConfiguration](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroupConfiguration.html)).
 - **`logs`** — Workgroup query logs.
 - **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`s3`** — Query result output bucket.
@@ -260,10 +268,10 @@ AWS API: <https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.
 - **`ct-events`** — Audit trail for build events.
 - **`ecr`** — The repository the build environment image belongs to (registry and repository path both equal).
 - **`kms`** — EncryptionKey on artifacts.
-- **`logs`** — Build log group.
+- **`logs`** — Build log group, unless `logsConfig.cloudWatchLogs.status` is `DISABLED` ([API_CloudWatchLogsConfig](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_CloudWatchLogsConfig.html)).
 - **`pipeline`** — Pipelines consuming this project.
 - **`role`** — Project.ServiceRole.
-- **`s3`** — Source/artifact buckets.
+- **`s3`** — Source, secondary-source and artifact buckets, and the `LogsConfig.S3Logs` bucket when its status is ENABLED ([API_ProjectSource](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_ProjectSource.html), [API_S3LogsConfig](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_S3LogsConfig.html)).
 - **`secrets`** — Secrets as build env variables.
 - **`sg`** — VpcConfig.SecurityGroupIds.
 - **`ssm`** — SSM parameters as build env.
@@ -316,6 +324,7 @@ AWS API: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Look
 - **`vpce`** — `resources[].ARN` matching VPC endpoint ARNs — endpoint policy and lifecycle events.
 - **`sg`** — `resources[].ARN` matching security group ARNs — rule change and association events.
 - **`ddb`** — `resources[].ARN` matching DynamoDB table ARNs — table management events.
+- **`ecr`** — the `AWS::ECR::Repository` resource of an ECR record, by repository ARN or by name, else `requestParameters.repositoryName` — push, pull and repository events ([logging-using-cloudtrail](https://docs.aws.amazon.com/AmazonECR/latest/userguide/logging-using-cloudtrail.html)).
 - **`cfn`** — `resources[].ARN` matching CloudFormation stack ARNs — stack lifecycle events.
 - **`trail`** — `resources[].ARN` matching CloudTrail trail ARNs — trail config and status events.
 - **`ct-events` (by AccessKeyId)** — Self-pivot: convenience filter within ct-events by `userIdentity.accessKeyId`.
@@ -359,19 +368,19 @@ AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstan
 AWS API: <https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html>
 
 - **`alarm`** — Throttle/error/ReadCapacity alarms.
-- **`backup`** — AWS Backup recovery points.
+- **`backup`** — Backup plans whose selections name the table by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **`ct-events`** — Audit trail for table schema/capacity changes.
-- **`kinesis`** — Kinesis Data Streams for DDB.
+- **`kinesis`** — Kinesis Data Streams destinations from `DescribeKinesisStreamingDestination`; a `DISABLED` or `ENABLE_FAILED` destination is not counted ([API_KinesisDataStreamDestination](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html)).
 - **`kms`** — SSEDescription.KMSMasterKeyArn — table encryption key.
 - **`lambda`** — Lambdas consuming DDB Streams from this table.
-- **`logs`** — ContributorInsights / Streams logs.
+- ~~**`logs`**~~ — Removed 2026-09-24. DynamoDB writes no log group: Contributor Insights for DynamoDB delivers through CloudWatch Contributor Insights rules named `DynamoDBContributorInsights-<PKC|PKT|SKC|SKT>-<table>-<timestamp>` (<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/contributorinsights_HowItWorks.html>), so a log group carrying a table's name is not the table's.
 - **`vpce`** — Gateway endpoint for DynamoDB.
 
 ### `dbc-snap`
 
 AWS API: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html>
 
-- **`backup`** — Snapshots covered by Backup vaults.
+- **`backup`** — Backup plans whose selections name the snapshot's source cluster by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **`ct-events`** — Audit trail for snapshot events.
 - **`dbc`** — Source cluster.
 - **`kms`** — Encryption key.
@@ -385,11 +394,11 @@ AWS API: <https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_Environmen
 - **`asg`** — Environment's backing ASG (elasticbeanstalk:environment-name tag on ASG).
 - **`cfn`** — Beanstalk creates a CloudFormation stack per environment (awseb-{envId}-stack prefix).
 - **`ct-events`** — Audit trail for environment config changes.
-- **`ec2`** — Instances running the environment (elasticbeanstalk:environment-name tag on EC2 instances).
+- **`ec2`** — Instances running the environment (elasticbeanstalk:environment-name tag on EC2 instances); a `shutting-down` or `terminated` instance runs nothing ([ec2-instance-lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html)).
 - **`elb`** — DescribeEnvironmentResources.EnvironmentResources.LoadBalancers[].Name — ELB(s) fronting this environment.
 - **`logs`** — Log groups prefixed /aws/elasticbeanstalk/{envName}/.
-- **`role`** — DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/IamInstanceProfile → GetInstanceProfile roles; aws:elasticbeanstalk:environment/ServiceRole.
-- **`s3`** — DescribeApplicationVersions.ApplicationVersions[].SourceBundle.S3Bucket — buckets holding application version bundles.
+- **`role`** — DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/IamInstanceProfile → GetInstanceProfile roles; aws:elasticbeanstalk:environment/ServiceRole; and `EnvironmentDescription.OperationsRole` ([API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)).
+- **`s3`** — The bucket of the source bundle this environment runs: `SourceBundle.S3Bucket` of the application version its `VersionLabel` names ([API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html)).
 - **`sg`** — DescribeConfigurationSettings OptionSettings: aws:autoscaling:launchconfiguration/SecurityGroups and aws:elbv2:loadbalancer/SecurityGroups.
 - **`tg`** — DescribeEnvironmentResources.LoadBalancers[].Name → elbv2:DescribeListeners → DefaultActions/ForwardConfig TargetGroupArn.
 
@@ -404,14 +413,14 @@ AWS API: <https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.h
 - **`role`** — Rule.RoleArn — IAM role used for target invocation.
 - **`sfn`** — Step Functions state-machine targets.
 - **`sns`** — SNS targets of this rule.
-- **`sqs`** — SQS targets of this rule.
+- **`sqs`** — SQS targets of this rule, and each target's `DeadLetterConfig.Arn` queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_DeadLetterConfig.html)).
 
 ### `ebs`
 
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html>
 
 - **`alarm`** — Volume CW alarms (throughput/IOPS).
-- **`backup`** — Volumes covered by AWS Backup.
+- **`backup`** — Backup plans selecting the volume, or the instance it is attached to, by ARN or by tags: an EC2 backup includes its attached volumes ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **`cfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ct-events`** — Audit trail for volume changes.
 - **`ebs-snap`** — Snapshots of this volume.
@@ -435,12 +444,12 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.ht
 
 - **`alarm`** — CloudWatch alarms watching this instance — first signal of impact.
 - **`ami`** — Instance.ImageId — provenance of the running image; compare against latest approved AMI.
-- **`asg`** — ASG that owns the instance (if any) — lifecycle context.
+- **`asg`** — ASG that owns the instance (if any) — lifecycle context; a group no longer counts an instance whose `LifecycleState` is `Terminating*`, `Terminated` or `Detached` ([API_Instance](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_Instance.html)).
 - **`backup`** — Instances covered by AWS Backup.
 - **`cfn`** — CloudFormation stack that created it — infra-as-code linkage.
 - **`ct-events`** — Audit trail for all API calls touching this instance.
 - **`ebs`** — Instance.BlockDeviceMappings[].Ebs.VolumeId — attached storage; capacity/IOPS troubleshooting.
-- **`ebs-snap`** — Snapshots of the volumes this instance has attached, by `Snapshot.VolumeId` — rollback/forensic workflows.
+- **`ebs-snap`** — Snapshots of the volumes this instance has attached, by `Snapshot.VolumeId`, and the snapshots its AMI's block devices name in `Ebs.SnapshotId` ([API_EbsBlockDevice](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EbsBlockDevice.html)) — rollback/forensic workflows.
 - **`eip`** — Addresses associated with the instance; traffic attribution.
 - **`eni`** — Instance.NetworkInterfaces[] — ENIs for multi-homed or secondary interfaces.
 - **`kms`** — Instance-attached volume encryption keys.
@@ -449,7 +458,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.ht
 - **`role`** — IamInstanceProfile → role — permissions the instance operates with.
 - **`sg`** — Instance.SecurityGroups[] — ingress/egress rules; first stop for connectivity issues.
 - **`subnet`** — Instance.SubnetId — primary ENI's subnet; used when diagnosing placement/routing.
-- **`tg`** — Target groups this instance is registered with — traffic routing. Heuristic: instance-type target groups in the instance's VPC (`TargetGroup.VpcId`); the cached target groups carry no registered targets.
+- **`tg`** — Instance target groups in this instance's VPC (`TargetGroup.VpcId`) whose `DescribeTargetHealth` lists this instance ([API_DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)).
 - **`vpc`** — Instance.VpcId — network parent; pivoted to for VPC-wide troubleshooting.
 
 ### `ecr`
@@ -475,11 +484,11 @@ AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.
 - **`asg`** — The Auto Scaling groups of the cluster's capacity providers: `DescribeCapacityProviders` over `Cluster.CapacityProviders`, each one's `AutoScalingGroupProvider.AutoScalingGroupArn` ([API_AutoScalingGroupProvider](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_AutoScalingGroupProvider.html)).
 - **`cfn`** — CloudFormation stack that created the cluster.
 - **`ct-events`** — Audit trail for cluster config changes.
-- **`ec2`** — The EC2 instances registered as the cluster's container instances: `ListContainerInstances`, then `DescribeContainerInstances` for each one's `ec2InstanceId` ([API_ContainerInstance](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html)).
+- **`ec2`** — The EC2 instances registered as the cluster's container instances: `ListContainerInstances`, then `DescribeContainerInstances` for each one's `ec2InstanceId`, leaving out a `REGISTRATION_FAILED`, `DEREGISTERING` or `INACTIVE` instance ([API_ContainerInstance](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html)).
 - **`ecs-svc`** — Services running on this cluster.
 - **`ecs-task`** — Tasks running in this cluster.
 - **`kms`** — ExecuteCommandConfiguration.KmsKeyId.
-- **`logs`** — `Cluster.Configuration.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName` — the log group receiving this cluster's `ecs exec` session transcripts, the one log group a Cluster names. Counted 0 or 1.
+- **`logs`** — `Cluster.Configuration.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName` — the log group receiving this cluster's `ecs exec` session transcripts, the one log group a Cluster names, used when `ExecuteCommandConfiguration.Logging` is `OVERRIDE` ([API_ExecuteCommandConfiguration](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ExecuteCommandConfiguration.html)). Counted 0 or 1.
 
 ### `ecs-svc`
 
@@ -493,9 +502,9 @@ AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.
 - **`ecs`** — Parent cluster.
 - **`ecs-task`** — Running tasks for this service.
 - **`elb`** — Load balancer fronting the service (via TG).
-- **`logs`** — The log groups the containers of the service's task definition write to: `ContainerDefinitions[].LogConfiguration.Options["awslogs-group"]`, read with one `ecs:DescribeTaskDefinition` per family. A definition that cannot be read leaves the groups whose name carries the family as candidates, without a count.
-- **`role`** — Service.RoleArn / task-level roles.
-- **`secrets`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`logs`** — The log groups the containers of the service's task definition write to: `ContainerDefinitions[].LogConfiguration.Options["awslogs-group"]`, and for an `awsfirelens` container the Fluent Bit CloudWatch output's `log_group_name` ([firelens-taskdef](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/firelens-taskdef.html), [Fluent Bit cloudwatch_logs](https://docs.fluentbit.io/manual/data-pipeline/outputs/cloudwatch)), read with one `ecs:DescribeTaskDefinition` per family. A FireLens container routed by a config file or a `log_group_template` leaves a lower bound. A definition that cannot be read leaves the groups whose name carries the family as candidates, without a count.
+- **`role`** — `Service.RoleArn`, and the task definition's `taskRoleArn` and `executionRoleArn` ([API_TaskDefinition](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_TaskDefinition.html)).
+- **`secrets`** — Secrets Manager secrets the task definition references: container `secrets[].valueFrom` and `logConfiguration.secretOptions[].valueFrom` by ARN, a bare name there being an SSM parameter ([API_Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html)), and `repositoryCredentials.credentialsParameter` by ARN or, in the task's Region, by name ([API_RepositoryCredentials](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RepositoryCredentials.html)).
 - **`sfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sg`** — AwsvpcConfiguration.SecurityGroups.
 - **`subnet`** — AwsvpcConfiguration.Subnets.
@@ -513,11 +522,11 @@ AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.htm
 - **`ecs`** — Parent cluster.
 - **`ecs-svc`** — Owning service (Task.Group = 'service:<name>').
 - **`eni`** — Task ENI (awsvpc mode).
-- **`logs`** — The log groups the containers of the task's task definition write to: `ContainerDefinitions[].LogConfiguration.Options["awslogs-group"]`, read with one `ecs:DescribeTaskDefinition` per family. A definition that cannot be read leaves the groups whose name carries the family as candidates, without a count.
+- **`logs`** — The log groups the containers of the task's task definition write to: `ContainerDefinitions[].LogConfiguration.Options["awslogs-group"]`, and for an `awsfirelens` container the Fluent Bit CloudWatch output's `log_group_name` ([firelens-taskdef](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/firelens-taskdef.html), [Fluent Bit cloudwatch_logs](https://docs.fluentbit.io/manual/data-pipeline/outputs/cloudwatch)), read with one `ecs:DescribeTaskDefinition` per family. A FireLens container routed by a config file or a `log_group_template` leaves a lower bound. A definition that cannot be read leaves the groups whose name carries the family as candidates, without a count.
 - **`role`** — Task / execution role.
-- **`secrets`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`secrets`** — Secrets Manager secrets the task definition references: container `secrets[].valueFrom` and `logConfiguration.secretOptions[].valueFrom` by ARN, a bare name there being an SSM parameter ([API_Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html)), and `repositoryCredentials.credentialsParameter` by ARN or, in the task's Region, by name ([API_RepositoryCredentials](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RepositoryCredentials.html)).
 - **`sg`** — Task ENI SGs.
-- **`ssm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`ssm`** — SSM parameters the task definition references in `secrets[].valueFrom`, by ARN or by name, resolved against the loaded parameter list, so a parameter in another region or account is not a local one ([API_Secret](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html)).
 - **`subnet`** — Task ENI subnet.
 
 ### `efs`
@@ -555,7 +564,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.htm
 - **`ecs-svc`** — Service owning the task whose ENI carries this EIP — zero-call join via the same `ecs-task` cache match, then the task's `service:` group to the `ecs-svc` cache.
 - **`ecs-task`** — Task whose ENI carries this EIP — zero-call join: `Address.NetworkInterfaceId` matched against task ENI attachments in the already-loaded `ecs-task` cache.
 - **`eni`** — Associated ENI (`Address.NetworkInterfaceId`).
-- **`nat`** — NAT gateway consuming this EIP.
+- **`nat`** — NAT gateway consuming this EIP, through the gateway's live addresses (the `nat` → `eip` rule).
 
 ### `eks`
 
@@ -566,11 +575,11 @@ AWS API: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html>
 - **`asg`** — Backing ASG.
 - **`cfn`** — CloudFormation stack that created the cluster.
 - **`ct-events`** — Audit trail for cluster config changes.
-- **`ec2`** — Worker-node instances.
+- **`ec2`** — Worker-node instances; a `shutting-down` or `terminated` instance is no worker ([ec2-instance-lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html)).
 - **`kms`** — EncryptionConfig.Provider.KeyArn.
 - **`logs`** — Control-plane log groups /aws/eks/<cluster>/cluster.
 - **`ng`** — Node groups attached to the cluster.
-- **`role`** — Cluster.RoleArn — EKS service role.
+- **`role`** — Cluster.RoleArn — EKS service role — and an Auto Mode cluster's `ComputeConfig.NodeRoleArn`, the role its nodes run as ([API_ComputeConfigResponse](https://docs.aws.amazon.com/eks/latest/APIReference/API_ComputeConfigResponse.html)).
 - **`sg`** — Cluster.ResourcesVpcConfig.ClusterSecurityGroupId + additional SGs.
 - **`subnet`** — Cluster.ResourcesVpcConfig.SubnetIds — cluster subnets.
 - **`vpc`** — Cluster.ResourcesVpcConfig.VpcId — cluster's VPC.
@@ -585,7 +594,7 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 - **`cfn`** — CloudFormation stack that created the LB.
 - **`ct-events`** — Audit trail for LB config changes.
 - **`eni`** — LB creates ENIs per AZ.
-- **`s3`** — Access-log S3 destination.
+- **`s3`** — Access-log S3 destination, `access_logs.s3.bucket`, when `access_logs.s3.enabled` is `true` ([API_LoadBalancerAttribute](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html)).
 - **`sg`** — Attached security groups (ALB only).
 - **`subnet`** — AZ subnets the LB listens in.
 - **`tg`** — Target groups attached to this LB.
@@ -601,7 +610,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInte
 - **`eip`** — Associated Elastic IPs: the `AllocationId` of the association on the primary private address and on each secondary one.
 - **`elb`** — ELB creates ENIs.
 - **`lambda`** — The functions that use this Hyperplane ENI: `InterfaceType` `lambda`, in one of the function's subnets, with exactly the function's security groups — Lambda shares one ENI among the functions of a subnet and security-group combination ([configuration-vpc](https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html)).
-- **`nat`** — NAT gateway backing ENI.
+- **`nat`** — NAT gateway backing ENI, through the gateway's live addresses (the `nat` → `eip` rule).
 - **`sg`** — Attached security groups.
 - **`subnet`** — ENI's subnet.
 - **`vpc`** — Parent VPC.
@@ -615,10 +624,10 @@ AWS API: <https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html>
 - **`cfn`** — CloudFormation stack that created the job.
 - **`ct-events`** — Audit trail for job events.
 - **`kms`** — Data + bookmark encryption key.
-- **`logs`** — Job log destination.
+- **`logs`** — The job's output and error groups, and its continuous-logging group: `--continuous-log-logGroup`, `/aws-glue/jobs/logs-v2` when unset ([monitor-continuous-logging-enable](https://docs.aws.amazon.com/glue/latest/dg/monitor-continuous-logging-enable.html)).
 - **`role`** — Job.Role.
-- **`s3`** — Sources/sinks in S3.
-- **`secrets`** — Glue connections → Secrets Manager.
+- **`s3`** — The bucket of the job's script, `Command.ScriptLocation` ([API_JobCommand](https://docs.aws.amazon.com/glue/latest/webapi/API_JobCommand.html)).
+- **`secrets`** — The secret each of the job's connections names in `ConnectionProperties.SECRET_ID`, read with `GetConnection` ([API_Connection](https://docs.aws.amazon.com/glue/latest/webapi/API_Connection.html)).
 
 ### `iam-group`
 
@@ -651,9 +660,9 @@ AWS API: <https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDesc
 - **`alarm`** — IteratorAge / IncomingRecords alarms.
 - **`cfn`** — CloudFormation stack that created the stream.
 - **`ct-events`** — Audit trail for stream changes.
-- **`ddb`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`ddb`** — Tables whose `DescribeKinesisStreamingDestination` names this stream in `KinesisDataStreamDestinations[].StreamArn`; a `DISABLED` or `ENABLE_FAILED` destination is not counted ([API_KinesisDataStreamDestination](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html)).
 - **`kms`** — StreamDescription.KeyId — stream-encryption key.
-- **`lambda`** — Lambda consumers of the stream.
+- **`lambda`** — Lambda consumers of the stream: event source mappings on the stream ARN and on each enhanced fan-out consumer's `ConsumerARN` from `ListStreamConsumers` ([with-kinesis](https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html)).
 
 ### `kms`
 
@@ -670,7 +679,7 @@ AWS API: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.ht
 AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
 
 - **`alarm`** — Errors/Throttles/Duration alarms watching the function.
-- **`apigw`** — HTTP and WebSocket APIs with an integration whose `IntegrationUri` is this function (`GetIntegrations` per API). A REST API keeps its integrations per method, which is not read, so a REST API leaves the count a lower bound.
+- **`apigw`** — APIs with an integration invoking this function: an HTTP or WebSocket API's `GetIntegrations` `IntegrationUri`, a REST API's method integrations from `GetResources` with the `methods` embed ([API_GetResources](https://docs.aws.amazon.com/apigateway/latest/api/API_GetResources.html)).
 - **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — CloudFormation stack that created the function.
 - **`ct-events`** — Audit trail for function config changes.
@@ -687,12 +696,12 @@ AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguratio
 - **`s3`** — S3 event-source mapping.
 - **`secrets`** — Secrets accessed at runtime.
 - **`sg`** — FunctionConfiguration.VpcConfig.SecurityGroupIds — function ENI SGs.
-- **`sns`** — SNS event source mapping.
+- **`sns`** — The topic this function's `DeadLetterConfig.TargetArn` names, where failed asynchronous invocations go ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)), and the topics behind the confirmed lambda-protocol subscriptions whose `Endpoint` is this function ([API_Subscribe](https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html)).
 - **`sns-sub`** — SNS subscriptions delivering to the function.
-- **`sqs`** — SQS queues invoking the function or used as DLQ.
+- **`sqs`** — Queues invoking the function through an event source mapping, and the queue its `DeadLetterConfig.TargetArn` names ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)).
 - **`ssm`** — Parameters as config.
 - **`subnet`** — FunctionConfiguration.VpcConfig.SubnetIds — function ENI subnets.
-- **`tg`** — TargetGroup registration.
+- **`tg`** — Lambda target groups whose `DescribeTargetHealth` lists this function ([API_DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html)).
 - **`vpc`** — FunctionConfiguration.VpcConfig.VpcId — VPC the function runs in.
 
 ### `logs`
@@ -703,10 +712,10 @@ AWS API: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 - **`apigw`** — APIGW access logs.
 - **`ct-events`** — Audit trail for log group changes.
 - **`ecs-task`** — Tasks whose task definition names this group in a container's `awslogs-group` option, the field `ecs-task` → `logs` reads ([using_awslogs](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html)).
-- **`kinesis`** — Subscription filter → Kinesis/Firehose.
+- **`kinesis`** — Subscription filters whose `destinationArn` is a Kinesis stream.
 - **`kms`** — LogGroup.KmsKeyId.
-- **`lambda`** — Lambdas whose logs land here OR subscription-filter consumers.
-- **`s3`** — Export tasks to S3.
+- **`lambda`** — Functions whose `LoggingConfig.LogGroup` is this group, `/aws/lambda/<function name>` when unset ([API_LoggingConfig](https://docs.aws.amazon.com/lambda/latest/api/API_LoggingConfig.html)), and subscription filters whose `destinationArn` is a function.
+- **`s3`** — The buckets this group's export tasks wrote to, from `DescribeExportTasks` `ExportTask.destination` ([API_ExportTask](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTask.html)); a `FAILED`, `CANCELLED` or `PENDING_CANCEL` task wrote nothing ([API_ExportTaskStatus](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_ExportTaskStatus.html)). A subscription filter never delivers to a bucket.
 
 ### `lt`
 
@@ -753,7 +762,7 @@ AWS API: <https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html>
 - **`alarm`** — CloudWatch alarms in the `AWS/MWAA` namespace carry the `EnvironmentName` dimension; first triage stop during an incident (workflow pivot — join key is the environment name, no ARN field).
 - **`ct-events`** — Audit trail for environment changes ("who ran UpdateEnvironment").
 - **`kms`** — `KmsKey` — encrypts the metadata database, logs, and queue.
-- **`logs`** — `LoggingConfiguration.{DagProcessingLogs,SchedulerLogs,WebserverLogs,WorkerLogs,TaskLogs}.CloudWatchLogGroupArn` — five per-component log groups; a failed DAG run sends the operator straight to TaskLogs/SchedulerLogs.
+- **`logs`** — `LoggingConfiguration.{DagProcessingLogs,SchedulerLogs,WebserverLogs,WorkerLogs,TaskLogs}.CloudWatchLogGroupArn` — five per-component log groups, each counted when its module is `Enabled` ([API_ModuleLoggingConfiguration](https://docs.aws.amazon.com/mwaa/latest/API/API_ModuleLoggingConfiguration.html)); a failed DAG run sends the operator straight to TaskLogs/SchedulerLogs.
 - **`role`** — `ExecutionRoleArn` — the role Airflow tasks assume for AWS access ("why can't my DAG write to S3").
 - **`s3`** — `SourceBucketArn` — holds DAGs, requirements.txt, and plugins ("why isn't my DAG showing up").
 - **`sg`** — `NetworkConfiguration.SecurityGroupIds` ("why can't Airflow reach RDS / my internal API").
@@ -771,8 +780,8 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.
 
 - **`alarm`** — NAT bandwidth/error alarms.
 - **`ct-events`** — Audit trail for NAT changes.
-- **`eip`** — NatGatewayAddresses[].AllocationId — attached EIPs.
-- **`eni`** — NAT backing ENI.
+- **`eip`** — NatGatewayAddresses[].AllocationId — attached EIPs. A `failed` or `deleted` gateway holds none, and an address that is `disassociating`, `unassigning` or `failed` is leaving it ([API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html), [API_NatGatewayAddress](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html)).
+- **`eni`** — NAT backing ENI, from the same live addresses as `eip`.
 - **`rtb`** — Route tables with a live route to this NAT gateway; a blackhole route names no live gateway.
 - **`subnet`** — Subnet the NAT lives in (must be public).
 - **`vpc`** — Parent VPC.
@@ -785,7 +794,7 @@ AWS API: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html
 - **`asg`** — Nodegroup.Resources.AutoScalingGroups — backing ASG.
 - **`ct-events`** — Audit trail for nodegroup changes.
 - **`ebs`** — ASG → instances → ec2:DescribeInstances BlockDeviceMappings.Ebs.VolumeId.
-- **`ec2`** — Worker-node instances.
+- **`ec2`** — Worker-node instances; a `shutting-down` or `terminated` instance is no worker ([ec2-instance-lifecycle](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html)).
 - **`eks`** — Parent EKS cluster.
 - **`role`** — Nodegroup.NodeRole — IAM role nodes assume.
 - **`sg`** — RemoteAccess.SourceSecurityGroups.
@@ -795,12 +804,12 @@ AWS API: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html
 
 AWS API: <https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html>
 
-- **`acm`** — Custom endpoint TLS cert.
+- **`acm`** — `DomainEndpointOptions.CustomEndpointCertificateArn`, when `CustomEndpointEnabled` ([API_DomainEndpointOptions](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainEndpointOptions.html)).
 - **`alarm`** — Cluster health alarms.
 - **`cfn`** — CloudFormation stack that created the domain.
 - **`ct-events`** — Audit trail for domain config changes.
 - **`kms`** — EncryptionAtRestOptions.KmsKeyId.
-- **`logs`** — Slow/index/audit log destinations.
+- **`logs`** — `LogPublishingOptions` groups whose option is `Enabled` ([API_LogPublishingOption](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_LogPublishingOption.html)).
 - **`sg`** — VPCOptions.SecurityGroupIds — domain ENI SGs.
 - **`subnet`** — VPCOptions.SubnetIds — domain ENI subnets.
 - **`vpc`** — VPCOptions.VPCId — attached VPC (if any).
@@ -814,7 +823,7 @@ AWS API: <https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_Pipel
 - **`ct-events`** — Audit trail for pipeline state changes.
 - **`eb-rule`** — Triggered by EventBridge.
 - **`ecr`** — Push/pull images.
-- **`ecs-svc`** — Deploy to ECS.
+- **`ecs-svc`** — `ECS` deploy actions' `ClusterName` + `ServiceName`. A `CodeDeployToECS` action names a CodeDeploy application, not a service, and a9s reads no CodeDeploy, so a pipeline holding one reads unknown ([action-reference-ECSbluegreen](https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-ECSbluegreen.html)).
 - **`kms`** — Artifact-store encryption key.
 - **`lambda`** — Invoke Lambda action.
 - **`role`** — Pipeline service role.
@@ -847,7 +856,7 @@ AWS API: <https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone
 
 AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html>
 
-- **`backup`** — Snapshots covered by AWS Backup.
+- **`backup`** — Backup plans whose selections name the snapshot's source instance by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **`ct-events`** — Audit trail for snapshot create/restore/copy.
 - **`dbi`** — Source DB instance.
 - **`kms`** — Encryption key.
@@ -869,7 +878,7 @@ AWS API: <https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_
 - **`logs`** — LogDeliveryConfigurations.
 - **`secrets`** — AuthTokenSecret.
 - **`sg`** — Attached security groups.
-- **`sns`** — NotificationTopicArn.
+- **`sns`** — NotificationTopicArn, when `TopicStatus` is `active`: notifications are sent only then ([API_ModifyCacheCluster](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ModifyCacheCluster.html)).
 - **`subnet`** — CacheSubnetGroup.Subnets.
 - **`vpc`** — CacheSubnetGroup.VpcId.
 
@@ -922,12 +931,12 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.
 AWS API: <https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html>
 
 - **`athena`** — Athena queries over S3 data.
-- **`backup`** — S3 covered by AWS Backup.
+- **`backup`** — Backup plans whose selections name the bucket by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **`cf`** — CloudFront distributions whose `Origins.Items` address this bucket.
 - **`cfn`** — The stack this bucket's `aws:cloudformation:stack-name` tag names.
 - **`ct-events`** — Audit trail for bucket-level events.
 - **`eb-rule`** — EB rules on S3 object events.
-- **`glue`** — Glue crawlers over S3 data.
+- **`glue`** — Glue jobs whose script, `Command.ScriptLocation`, is in this bucket ([API_JobCommand](https://docs.aws.amazon.com/glue/latest/webapi/API_JobCommand.html)). A crawler is not a row of the `glue` list, which holds jobs.
 - **`kms`** — Bucket SSE-KMS key.
 - **`lambda`** — Lambdas with this bucket as event source.
 - **`s3`** — Server access-log destination bucket (`GetBucketLogging.LoggingEnabled.TargetBucket`). S3 server-access logs go to another S3 bucket, not CloudWatch Logs — registered as `s3` (DisplayName "Access Log Bucket"), not `logs`.
@@ -948,8 +957,8 @@ AWS API: <https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_Sec
 - **`codeartifact`** — Heuristic: secret Name or Tags contain "codeartifact" (no direct AWS API). A secret that names none has no candidates, which is a proven zero.
 - **`ct-events`** — Audit trail for secret rotation/access.
 - **`dbi`** — Reverse-scan: DBInstance.MasterUserSecret.SecretArn == this secret's ARN.
-- **`eb`** — Reverse-scan: elasticbeanstalk:DescribeConfigurationSettings OptionSettings[].Value contains `{{resolve:secretsmanager:<ARN>`.
-- **`ecs-task`** — Reverse-scan: TaskDefinition.ContainerDefinitions[].Secrets[].ValueFrom==ARN or RepositoryCredentials.CredentialsParameter==ARN.
+- **`eb`** — Reverse-scan: elasticbeanstalk:DescribeConfigurationSettings OptionSettings[].Value contains `{{resolve:secretsmanager:<ARN>`, or an `aws:elasticbeanstalk:application:environmentsecrets` option names this secret ([AWSHowTo.secrets.env-vars](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.secrets.env-vars.html)).
+- **`ecs-task`** — Reverse-scan: task definitions referencing this secret in container `secrets[].valueFrom`, `logConfiguration.secretOptions[].valueFrom` or `repositoryCredentials.credentialsParameter`, by ARN (a JSON-key or version suffix included) or by name ([secrets-envvar-secrets-manager](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html)).
 - **`kms`** — SecretListEntry.KmsKeyId — UUID suffix matched against KMS key cache.
 - **`lambda`** — SecretListEntry.RotationLambdaARN — function name suffix matched against Lambda cache.
 - **`logs`** — RotationLambdaARN → lambda:GetFunction → FunctionConfiguration.LoggingConfig.LogGroup. When GetFunction does not answer, the default /aws/lambda/<name> is a heuristic candidate: a function with a custom LoggingConfig logs elsewhere.
@@ -962,10 +971,10 @@ AWS API: <https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInf
 
 - **`ct-events`** — Audit trail for identity changes.
 - **`eb-rule`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → EventBridgeDestination.EventBusArn; extract bus name and cross-reference the eb-rule cache on `EventBusName`. Returns rule names (not bus ARNs) so drilling filters correctly.
-- **`lambda`** — ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn (SES v1 only; not available via SESv2 SDK — returns 0). Function names extracted from ARNs to match the lambda cache's IDs.
+- **`lambda`** — ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn of the enabled rules; a rule with `Enabled` false or unset processes no mail ([API_ReceiptRule](https://docs.aws.amazon.com/ses/latest/APIReference/API_ReceiptRule.html)). Function names extracted from ARNs to match the lambda cache's IDs.
 - **`r53`** — Identity domain (or domain portion of email address) matched against Route 53 hosted zone names.
-- **`s3`** — ses:DescribeActiveReceiptRuleSet → S3Action.BucketName (SES v1 only; not available via SESv2 SDK — returns 0).
-- **`sns`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn.
+- **`s3`** — ses:DescribeActiveReceiptRuleSet → S3Action.BucketName of the enabled rules ([API_ReceiptRule](https://docs.aws.amazon.com/ses/latest/APIReference/API_ReceiptRule.html)).
+- **`sns`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn of the enabled destinations ([API_EventDestination](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_EventDestination.html)).
 
 ### `sfn`
 
@@ -976,7 +985,7 @@ AWS API: <https://docs.aws.amazon.com/step-functions/latest/apireference/API_Sta
 - **`eb-rule`** — EventBridge rules with this state machine as target.
 - **`kms`** — Execution-data encryption.
 - **`lambda`** — Lambda integrations invoked by the state machine.
-- **`logs`** — Execution log groups.
+- **`logs`** — The log group `LoggingConfiguration.Destinations[].CloudWatchLogsLogGroup.LogGroupArn` names, unless the level is `OFF` ([API_LoggingConfiguration](https://docs.aws.amazon.com/step-functions/latest/apireference/API_LoggingConfiguration.html)).
 - **`role`** — StateMachine.RoleArn — execution role.
 
 ### `sg`
@@ -989,7 +998,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGro
 - **`elb`** — Load balancers with this SG attached (ALBs only).
 - **`eni`** — ENIs with this SG attached (covers Lambda, RDS, etc.).
 - **`lambda`** — Lambda VPC ENIs reference SGs.
-- **`sg`** — Other SGs referenced in this SG's ingress/egress rules.
+- **`sg`** — Security groups this group's own ingress and egress rules reference in `UserIdGroupPairs[].GroupId`; a pair in another account names a group this account cannot list ([API_UserIdGroupPair](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_UserIdGroupPair.html)).
 - **`vpc`** — Parent VPC.
 
 ### `sns`
@@ -1017,10 +1026,10 @@ AWS API: <https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/
 
 - **`alarm`** — ApproximateAgeOfOldestMessage / MessagesVisible alarms.
 - **`ct-events`** — Audit trail for queue attribute changes.
-- **`eb-rule`** — EB-rule target queue.
+- **`eb-rule`** — Rules with a target that is this queue, or whose target's `DeadLetterConfig.Arn` is this queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_DeadLetterConfig.html)).
 - **`kms`** — KmsMasterKeyId (SSE-KMS).
-- **`lambda`** — Lambda event-source mappings consuming this queue.
-- **`sns`** — Topics behind the sqs-protocol subscriptions whose `Endpoint` is this queue's ARN, whole.
+- **`lambda`** — Lambda event-source mappings consuming this queue, and functions whose `DeadLetterConfig.TargetArn` is this queue ([API_DeadLetterConfig](https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html)).
+- **`sns`** — Topics behind the confirmed sqs-protocol subscriptions whose `Endpoint` is this queue's ARN, whole; a subscription pending confirmation delivers nothing ([API_Subscribe](https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html)).
 - **`sns-sub`** — Subscriptions whose `Endpoint` is this queue's ARN, whole; one queue's ARN is the prefix of another's.
 - **`sqs`** — DLQ reference / RedriveTarget.
 
@@ -1070,7 +1079,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGate
 - **`role`** — Cross-account RAM share roles. Heuristic: the account-wide `AWSServiceRoleForVPCTransitGateway` service-linked role, which no one gateway names.
 - **`rtb`** — VPC route tables with a live route to this transit gateway; a blackhole route names no live gateway.
 - **`subnet`** — VPC attachment subnets.
-- **`vpc`** — VPCs attached to this TGW, from its `TransitGateway` VPC attachments.
+- **`vpc`** — VPCs attached to this TGW, from its `TransitGateway` VPC attachments; a `deleted`, `failing`, `failed`, `rejecting` or `rejected` attachment connects nothing ([vpc-attachment-lifecycle](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html#vpc-attachment-lifecycle)).
 
 ### `trail`
 
@@ -1117,7 +1126,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 - **`rtb`** — Route tables in this VPC.
 - **`sg`** — Security groups scoped to this VPC.
 - **`subnet`** — Subnets in this VPC (`Subnet.VpcId`).
-- **`tgw`** — Transit gateways this VPC is attached to, from the same `TransitGateway` attachments.
+- **`tgw`** — Transit gateways this VPC is attached to, from the same `TransitGateway` attachments and the same liveness rule ([vpc-attachment-lifecycle](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html#vpc-attachment-lifecycle)).
 - **`vpce`** — VPC endpoints in this VPC.
 
 ### `vpc-peer`
@@ -1141,7 +1150,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint
 - **`alarm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ct-events`** — Audit trail for endpoint changes.
 - **`eni`** — ENIs backing interface endpoints.
-- **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`logs`** — Flow logs on the endpoint's VPC or subnets, from `DescribeFlowLogs` by `resource-id`, that deliver to CloudWatch Logs ([API_CreateFlowLogs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html)).
 - **`r53`** — Private DNS → R53 private zones (`route53:ListHostedZonesByVPC` per endpoint, keyed by the endpoint's `VpcId`; results matched against the loaded `r53` cache).
 - **`rtb`** — Route tables for gateway endpoints.
 - **`sg`** — SGs attached to interface endpoints.
@@ -1157,7 +1166,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 - **`cf`** — CloudFront distributions with this WebACL attached.
 - **`ct-events`** — Audit trail for ACL rule changes.
 - **`elb`** — ALBs with this WebACL attached.
-- **`logs`** — Logging configuration → CW Logs.
+- **`logs`** — `GetLoggingConfiguration` for every `LogScope` (CUSTOMER, SECURITY_LAKE, CLOUDWATCH_TELEMETRY_RULE_MANAGED) → CW Logs destinations ([API_GetLoggingConfiguration](https://docs.aws.amazon.com/waf/latest/APIReference/API_GetLoggingConfiguration.html)).
 
 ## Explicitly excluded
 
@@ -1447,7 +1456,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | sg | elb | Load Balancers | yes |
 | sg | lambda | Lambda Functions | yes |
 | sg | cfn | CloudFormation | no |
-| sg | sg | Referencing SGs | yes |
+| sg | sg | Referenced SGs | no |
 | sg | ct-events | CloudTrail Events | no |
 | vpc | subnet | Subnets | yes |
 | vpc | sg | Security Groups | yes |
@@ -1589,7 +1598,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ddb | lambda | Lambda Functions | no |
 | ddb | kinesis | Kinesis Streams | no |
 | ddb | backup | Backup Plans | no |
-| ddb | logs | Log Groups | yes |
 | ddb | vpce | VPC Endpoints | yes |
 | ddb | ct-events | CloudTrail Events | no |
 | opensearch | alarm | CW Alarms | yes |
@@ -1672,6 +1680,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ct-events | vpce | VPC Endpoints | no |
 | ct-events | sg | Security Groups | no |
 | ct-events | ddb | DynamoDB Tables | no |
+| ct-events | ecr | ECR Repositories | no |
 | ct-events | cfn | CloudFormation Stacks | no |
 | ct-events | trail | CloudTrail Trails | no |
 | ct-events | ct-events | CT events by AccessKeyId | no |
@@ -1731,7 +1740,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | msk | secrets | Secrets Manager | no |
 | msk | ct-events | CloudTrail Events | no |
 | sfn | alarm | CloudWatch Alarms | no |
-| sfn | logs | Log Groups | yes |
+| sfn | logs | Log Groups | no |
 | sfn | role | IAM Role | no |
 | sfn | eb-rule | EventBridge Rules | yes |
 | sfn | kms | KMS Key | no |
@@ -1748,7 +1757,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | secrets | cfn | CloudFormation | yes |
 | secrets | dbi | RDS Instances | yes |
 | secrets | cb | CodeBuild Projects | yes |
-| secrets | codeartifact | CodeArtifact Domains | no |
+| secrets | codeartifact | CodeArtifact Repositories | no |
 | secrets | eb | Elastic Beanstalk | yes |
 | secrets | ecs-task | ECS Tasks | yes |
 | secrets | logs | Log Groups | no |

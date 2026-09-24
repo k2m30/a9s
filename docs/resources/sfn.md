@@ -54,7 +54,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: Execution log groups — `docs/related-resources.md` § Per-type contract `sfn` → "Execution log groups."
-- **How discovered**: call `DescribeStateMachine`, read `LoggingConfiguration.Destinations[].CloudWatchLogsLogGroup.LogGroupArn` (`AWS SDK Go v2 — service/sfn.DescribeStateMachineOutput § LoggingConfiguration`); strip the ARN to log-group name and cross-reference the loaded `logs` list — a9s-devops: SFN logging is opt-in per-state-machine and is the primary channel for debugging STANDARD-type workflows. EXPRESS workflows require logging for any post-hoc debugging at all (history is not retained). When `LoggingConfiguration == nil` or `Destinations` is empty, the target shows 0; that itself is a useful observation for STANDARD workflows where logging is usually expected.
+- **How discovered**: The log group `LoggingConfiguration.Destinations[].CloudWatchLogsLogGroup.LogGroupArn` names, unless the level is `OFF` ([API_LoggingConfiguration](https://docs.aws.amazon.com/step-functions/latest/apireference/API_LoggingConfiguration.html)).
 - **Count shown**: yes.
 
 ### `role`
@@ -188,7 +188,7 @@ sfn — MESSAGING. Status key: `state` — the column naming it is the status co
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CloudWatch Alarms | yes |
-| logs | Log Groups | yes |
+| logs | Log Groups | no |
 | role | IAM Role | no |
 | eb-rule | EventBridge Rules | yes |
 | kms | KMS Key | no |

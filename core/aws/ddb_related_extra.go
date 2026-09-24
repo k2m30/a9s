@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkDdbLogs scans the logs cache for log groups that are part of the
-// ContributorInsights convention: /aws/dynamodb/tables/<table-name>/
-// Uses a strict prefix match to avoid false positives from Lambda or other
-// services whose log group names may contain the table name as a substring.
-func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	name := res.ID
-	if name == "" {
-		return foundNone("logs", "name")
-	}
-	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if err != nil {
-		return ReadFailed("logs", err)
-	}
-	if logList == nil {
-		return NotRead("logs")
-	}
-	return relatedResultTrunc("logs", logGroupsUnder(logList, "/aws/dynamodb/tables/"+name), truncated)
-}
-
 // checkDdbVPCE scans the vpce cache for DynamoDB endpoints in this region.
 // DynamoDB endpoints are service-scoped (not per-table), so every matching
 // endpoint is surfaced. Matching is on service_name ending in ".dynamodb"

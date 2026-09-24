@@ -40,7 +40,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: five per-component log groups; a failed DAG run sends the operator straight to TaskLogs/SchedulerLogs.
-- **How discovered**: read fields `LoggingConfiguration.{DagProcessingLogs,SchedulerLogs,WebserverLogs,WorkerLogs,TaskLogs}.CloudWatchLogGroupArn` on the environment.
+- **How discovered**: read fields `LoggingConfiguration.{DagProcessingLogs,SchedulerLogs,WebserverLogs,WorkerLogs,TaskLogs}.CloudWatchLogGroupArn` on the environment, each when its module's `Enabled` is true ([API_ModuleLoggingConfiguration](https://docs.aws.amazon.com/mwaa/latest/API/API_ModuleLoggingConfiguration.html)).
 - **Count shown**: yes.
 
 ### `role`

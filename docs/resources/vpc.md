@@ -82,7 +82,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `
 ### `tgw`
 
 - **Why related**: Transit gateways this VPC is attached to — operator pivots here when inter-VPC or hybrid-network connectivity is broken, or when auditing what networks this VPC can reach.
-- **How discovered**: TGW list responses do not carry child VPC IDs. Call `DescribeTransitGatewayAttachments` and filter client-side where `ResourceType == vpc` and `ResourceId == this.VpcId`; the matching entries' `TransitGatewayId` values are the TGWs this VPC attaches to. Open each one in the already-loaded `tgw` list. — a9s-devops (2026-04-20): possible=yes, worth=yes. Most VPCs have 0 or 1 TGW attachment, so the extra call is cheap and the operational value is high (TGW debugging is one of the harder incident paths).
+- **How discovered**: Transit gateways this VPC is attached to, from the same `TransitGateway` attachments and the same liveness rule ([vpc-attachment-lifecycle](https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html#vpc-attachment-lifecycle)).
 - **Count shown**: yes (typically 0 or 1).
 
 ### `vpce`

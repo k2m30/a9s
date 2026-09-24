@@ -440,7 +440,7 @@ type Session struct {
 // always stale, so synthetic test messages or early-return paths that leave
 // Gen at its zero value are rejected by the gen guards.
 func New() *Session {
-	return &Session{
+	s := &Session{
 		cacheRoot: cache.Root(),
 		// A navigation issued before the first connect must trigger the
 		// active-list re-fetch once connected, exactly like a post-switch
@@ -464,10 +464,9 @@ func New() *Session {
 		PendingDetailRefresh:   make(map[string]domain.Gen),
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		DetailDocCache:         &awsclient.DetailDocCache{},
-		IAMPolicies:            NewPolicyStore(),
-		IdentityStore:          NewIdentityStore(),
-		RuleSets:               NewRuleSetStore(),
 	}
+	s.resetClientStores()
+	return s
 }
 
 // CurrentPair returns the live Profile/Region pair while holding pairMu, so a
@@ -1023,18 +1022,9 @@ func (s *Session) Rotate() {
 	// the previous account cannot leak into the next.
 	s.DetailDocCache = &awsclient.DetailDocCache{}
 
-	// IAMPolicies: reset to a fresh store so managed/inline entries from the
-	// prior account/profile cannot leak into the next session.
-	s.IAMPolicies = NewPolicyStore()
-
-	// IdentityStore: reset to a fresh store so the cached account ID + sticky
-	// failure (if any) from the prior session cannot leak into the next.
-	s.IdentityStore = NewIdentityStore()
-
-	// RuleSets: reset to a fresh store so the cached SES rule set from the
-	// prior session cannot leak into the next.
-	s.RuleSets = NewRuleSetStore()
-
+	// Fresh stores, so what the prior account or region cached cannot leak
+	// into the next.
+	s.resetClientStores()
 }
 
 // AcceptTypeSave reports whether a save carrying observation generation gen

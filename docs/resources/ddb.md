@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `backup`, `kinesis`, `kms`, `lambda`, `logs`, `vpce`, `ct-events`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`, `backup`, `kinesis`, `kms`, `lambda`, `vpce`, `ct-events`.
 
 ### `alarm`
 
@@ -34,13 +34,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `backup`
 
 - **Why related**: AWS Backup recovery points — the restore surface when PITR isn't enough or the table has been deleted.
-- **How discovered**: Reverse-scan the already-loaded `backup` list. A plan covers the table's ARN iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics (e.g. `arn:aws:dynamodb:*:*:table/*`). The table row carries no tags, so a plan whose verdict turns on a tag clause, or whose selections were not all read, makes the count unknown. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. — a9s-devops: Backup coverage lives on the plan's selection, not on the table; reverse-scan against the already-loaded `backup` list is the cheapest approach. AWS Backup's `ListRecoveryPointsByResource(ResourceArn=<table ARN>)` is a per-table Wave 2 call and is out of scope for the panel.
+- **How discovered**: Backup plans whose selections name the table by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **Count shown**: yes.
 
 ### `kinesis`
 
 - **Why related**: Kinesis Data Streams destination for DDB change data — common pipeline pattern (DDB → KDS → Firehose/analytics) that operators want to follow from the table.
-- **How discovered**: Call `DescribeKinesisStreamingDestination(TableName=<name>)` and read `KinesisDataStreamDestinations[].StreamArn`; look each ARN up in the already-loaded `kinesis` list. — a9s-devops: `DescribeKinesisStreamingDestination` is the canonical field; `TableDescription` itself does not expose KDS destinations. This is the only AWS surface that links a table to its KDS destinations.
+- **How discovered**: Kinesis Data Streams destinations from `DescribeKinesisStreamingDestination`; a `DISABLED` or `ENABLE_FAILED` destination is not counted ([API_KinesisDataStreamDestination](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html)).
 - **Count shown**: yes.
 
 ### `kms`
@@ -53,12 +53,6 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 - **Why related**: Lambdas consuming DDB Streams from this table — the write-side app tier an operator jumps to when tracing downstream effects of a table change.
 - **How discovered**: Read `TableDescription.LatestStreamArn` and call `lambda:ListEventSourceMappings(EventSourceArn=<stream ARN>)`; resolve each mapping's `FunctionArn` against the already-loaded `lambda` list. — a9s-devops: DDB Streams is the canonical wiring; reverse-scanning every Lambda's event-source-mappings would work but is more expensive than one ListEventSourceMappings call scoped to this table's stream ARN. Tables without streams contribute zero Lambda pivots.
-- **Count shown**: yes.
-
-### `logs`
-
-- **Why related**: ContributorInsights / Streams logs — the diagnostic tail when investigating hot keys or throttled partitions.
-- **How discovered**: Cross-reference the already-loaded `logs` list by name prefix. ContributorInsights rules emit to log groups named `/aws/dynamodb/tables/<table-name>/*` (e.g. `.../insights/...`); match this table's `TableName` against the prefix segment. — a9s-devops: the DDB ContributorInsights log-group naming convention is stable and documented in the DynamoDB Developer Guide; prefix match is zero extra API calls. Export-to-S3 and Streams-to-Firehose pipelines have their own log groups named by the consumer, not the table, and are out of scope.
 - **Count shown**: yes.
 
 ### `vpce`
@@ -195,12 +189,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - DynamoDB Streams consumer-lag metrics (CloudWatch only).
 - TTL misconfiguration (`DescribeTimeToLive` is a separate per-table call; not currently in the attention contract).
 - `backup` discovery via `ListRecoveryPointsByResource` (per-table call, exceeds Wave 2 budget for the panel).
+- `logs` — DynamoDB writes no log group: Contributor Insights for DynamoDB delivers through CloudWatch Contributor Insights rules, not log groups, so a log group carrying a table's name is not the table's; `docs/related-resources.md` § `ddb`.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
 ## 6. Citations
 
-- a9s golden doc — `ddb` related targets are `alarm, backup, ct-events, kinesis, kms, lambda, logs, vpce` — `docs/related-resources.md` § Per-type contract row `ddb` and § `ddb` subsection.
+- a9s golden doc — `ddb` related targets are `alarm, backup, ct-events, kinesis, kms, lambda, vpce` — `docs/related-resources.md` § Per-type contract row `ddb` and § `ddb` subsection.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy bullet 4.
 - a9s golden doc — the `ddb` signals — `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`; the deferred CloudWatch metrics — `docs/attention-signals.md § Not yet implemented`.
 - AWS Go SDK v2 — `TableStatus` enum values and field on `TableDescription` — `AWS SDK Go v2 — dynamodb/types.TableDescription § TableStatus` (`CREATING`/`UPDATING`/`DELETING`/`ACTIVE`/`INACCESSIBLE_ENCRYPTION_CREDENTIALS`/`ARCHIVING`/`ARCHIVED`).
@@ -212,7 +207,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `backup` discovery via `GetBackupSelection.Resources[]` reverse-scan with wildcard + NotResources matching — a9s-devops persona (2026-04-20): possible=yes, worth=yes. Backup coverage lives on the plan's selection, not on the table; plans may use wildcard ARNs (e.g. `arn:aws:dynamodb:*:*:table/*`) and NotResources exclusions. The table itself has no field pointing at its backup plans.
 - a9s-devops consultation — `kinesis` discovery via `DescribeKinesisStreamingDestination` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. This is the only AWS API linking a table to its KDS destinations; `TableDescription` does not expose them.
 - a9s-devops consultation — `lambda` discovery via `ListEventSourceMappings(EventSourceArn=<stream ARN>)` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. DDB Streams → Lambda is the canonical wiring; scoping the ESM call by the table's `LatestStreamArn` is cheaper than reverse-scanning every Lambda.
-- a9s-devops consultation — `logs` discovery via `/aws/dynamodb/tables/<name>/` name-prefix match — a9s-devops persona (2026-04-20): possible=yes, worth=yes. ContributorInsights log-group naming is a stable convention; prefix match is zero extra API calls.
+- AWS DynamoDB Developer Guide — Contributor Insights rules, cited for `logs` in §5 — <https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/contributorinsights_HowItWorks.html>.
 - a9s-devops consultation — `vpce` discovery via `ServiceName == com.amazonaws.<region>.dynamodb` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. DDB gateway-endpoint service name is region-scoped and canonical; per-table endpoint binding does not exist on the AWS surface.
 - a9s-devops consultation — global-table `Replicas[].ReplicaStatus` deferred — a9s-devops persona (2026-04-20): possible=yes, worth=yes but not in today's attention contract; recorded in §5 Out of Scope so it isn't lost.
 - a9s golden doc — a9s is read-only — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
@@ -247,7 +242,6 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | lambda | Lambda Functions | yes |
 | kinesis | Kinesis Streams | no |
 | backup | Backup Plans | yes |
-| logs | Log Groups | yes |
 | vpce | VPC Endpoints | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -34,7 +34,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `lambda`
 
 - **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature; a9s wires a dedicated SES v1 SDK client to surface this pivot.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn` of the rules whose recipient conditions match the identity, label by label as SES matches them: an address (and its `+label` variants), a domain's own addresses "but not those within its subdomains", `.domain` for the subdomains only, and no condition for every verified domain ([receipt rules](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-receipt-rules-console-walkthrough.html)); extract the function name after `:function:` for cross-referencing the lambda list. Accounts with no active receipt rule set (pure outbound SES) render 0 — operator-honest absence.
+- **How discovered**: ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn of the enabled rules; a rule with `Enabled` false or unset processes no mail ([API_ReceiptRule](https://docs.aws.amazon.com/ses/latest/APIReference/API_ReceiptRule.html)). Function names extracted from ARNs to match the lambda cache's IDs.
 - **Count shown**: yes.
 
 ### `r53`
@@ -46,13 +46,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ct-even
 ### `s3`
 
 - **Why related**: S3 buckets where SES **inbound** receipt rules deposit received mail (`S3Action`). SES v1 feature; a9s wires the SES v1 SDK client to surface this pivot.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].S3Action.BucketName`. Accounts with no active receipt rule set render 0 — operator-honest absence.
+- **How discovered**: ses:DescribeActiveReceiptRuleSet → S3Action.BucketName of the enabled rules ([API_ReceiptRule](https://docs.aws.amazon.com/ses/latest/APIReference/API_ReceiptRule.html)).
 - **Count shown**: yes.
 
 ### `sns`
 
 - **Why related**: SNS topics that receive SES event-destination notifications (bounce/complaint/delivery feedback).
-- **How discovered**: call `sesv2:GetEmailIdentity` → `ConfigurationSetName` → `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`.
+- **How discovered**: sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn of the enabled destinations ([API_EventDestination](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_EventDestination.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `acm`
 
 - **Why related**: A custom domain endpoint (e.g. `search.example.com`) is terminated by an ACM certificate — operator chasing a TLS expiry, a browser handshake error, or a cert-rotation lands on the cert from the domain.
-- **How discovered**: Read `DomainStatus.DomainEndpointOptions.CustomEndpointCertificateArn` (set only when `CustomEndpointEnabled==true`); look the ARN up in the already-loaded `acm` list.
+- **How discovered**: `DomainEndpointOptions.CustomEndpointCertificateArn`, when `CustomEndpointEnabled` ([API_DomainEndpointOptions](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainEndpointOptions.html)).
 - **Count shown**: yes.
 
 ### `alarm`
@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `acm`, `
 ### `logs`
 
 - **Why related**: Slow, index-slow, error, and audit logs publish to CloudWatch Logs groups — an operator chasing a slow query or a cluster restart reads the groups listed here.
-- **How discovered**: Read `DomainStatus.LogPublishingOptions` map entries (keys `SEARCH_SLOW_LOGS`, `INDEX_SLOW_LOGS`, `ES_APPLICATION_LOGS`, `AUDIT_LOGS`); for each entry with `Enabled==true` take `CloudWatchLogsLogGroupArn` and look it up in the already-loaded `logs` list.
+- **How discovered**: `LogPublishingOptions` groups whose option is `Enabled` ([API_LogPublishingOption](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_LogPublishingOption.html)).
 - **Count shown**: yes.
 
 ### `sg`

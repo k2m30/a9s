@@ -35,7 +35,7 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		igwID = *raw.InternetGatewayId
 	}
 	if igwID == "" {
-		return foundNone("rtb", "igwID")
+		return keyMissing("rtb", "igwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")

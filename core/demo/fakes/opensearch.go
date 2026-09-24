@@ -85,43 +85,17 @@ func (f *OpenSearchFake) ListTags(_ context.Context, in *opensearch.ListTagsInpu
 	return &opensearch.ListTagsOutput{}, nil
 }
 
-// DescribeDomainConfig returns demo domain config for the given domain name.
-// For acme-logs it returns a CustomEndpointCertificateArn
-// so that checkOpenSearchACM resolves the acme-logs.internal.com ACM certificate.
+// DescribeDomainConfig returns the named domain's endpoint options as its
+// fixture DomainStatus carries them.
 func (f *OpenSearchFake) DescribeDomainConfig(_ context.Context, in *opensearch.DescribeDomainConfigInput, _ ...func(*opensearch.Options)) (*opensearch.DescribeDomainConfigOutput, error) {
-	if in == nil || in.DomainName == nil {
-		return &opensearch.DescribeDomainConfigOutput{
-			DomainConfig: &ostypes.DomainConfig{},
-		}, nil
+	name := aws.ToString(in.DomainName)
+	i := slices.IndexFunc(f.fix.Domains, func(d ostypes.DomainStatus) bool { return aws.ToString(d.DomainName) == name })
+	if i < 0 {
+		return nil, &ostypes.ResourceNotFoundException{Message: notFoundMessage("Domain", name)}
 	}
-	if *in.DomainName == fixtures.GraphRootDomain {
-		return &opensearch.DescribeDomainConfigOutput{
-			DomainConfig: &ostypes.DomainConfig{
-				DomainEndpointOptions: &ostypes.DomainEndpointOptionsStatus{
-					Options: &ostypes.DomainEndpointOptions{
-						EnforceHTTPS:                 aws.Bool(true),
-						CustomEndpointEnabled:        aws.Bool(true),
-						CustomEndpoint:               aws.String("acme-logs.internal.com"),
-						CustomEndpointCertificateArn: aws.String(fixtures.OpenSearchACMCertARN),
-					},
-				},
-			},
-		}, nil
+	config := &ostypes.DomainConfig{}
+	if opts := f.fix.Domains[i].DomainEndpointOptions; opts != nil {
+		config.DomainEndpointOptions = &ostypes.DomainEndpointOptionsStatus{Options: opts}
 	}
-	if !f.hasDomain(*in.DomainName) {
-		return nil, &ostypes.ResourceNotFoundException{
-			Message: notFoundMessage("Domain", *in.DomainName),
-		}
-	}
-	return &opensearch.DescribeDomainConfigOutput{
-		DomainConfig: &ostypes.DomainConfig{},
-	}, nil
-}
-
-// hasDomain reports whether the fixtures register this domain. A registered
-// domain with no custom endpoint config still answers an empty config.
-func (f *OpenSearchFake) hasDomain(name string) bool {
-	return slices.ContainsFunc(f.fix.Domains, func(d ostypes.DomainStatus) bool {
-		return aws.ToString(d.DomainName) == name
-	})
+	return &opensearch.DescribeDomainConfigOutput{DomainConfig: config}, nil
 }

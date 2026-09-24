@@ -5,8 +5,6 @@ package aws
 
 import (
 	"context"
-	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -14,33 +12,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// policyEntitiesCache is a request-scoped, TTL-based cache for ListEntitiesForPolicy results.
-// Each entry stores the output and the time it was fetched. Entries older than
-// policyEntitiesTTL are evicted on the next read.
-var (
-	policyEntitiesCache       sync.Map
-	policyEntitiesTTL         = 5 * time.Second
-	iamListEntitiesAPIForTest IAMListEntitiesForPolicyAPI
-)
-
-type policyEntitiesCacheEntry struct {
-	out       *iam.ListEntitiesForPolicyOutput
-	err       error
-	fetchedAt time.Time
-}
+var iamListEntitiesAPIForTest IAMListEntitiesForPolicyAPI
 
 // listAllPolicyEntities walks the unfiltered ListEntitiesForPolicy pages and
 // returns them merged into one output, IsTruncated when the walk stopped at
-// the page cap. Results are cached per policyARN for policyEntitiesTTL.
+// the page cap.
 func listAllPolicyEntities(ctx context.Context, api IAMListEntitiesForPolicyAPI, policyARN string) (*iam.ListEntitiesForPolicyOutput, error) {
-	if v, ok := policyEntitiesCache.Load(policyARN); ok {
-		entry := v.(policyEntitiesCacheEntry)
-		if time.Since(entry.fetchedAt) < policyEntitiesTTL {
-			return entry.out, entry.err
-		}
-		policyEntitiesCache.Delete(policyARN)
-	}
-
 	out := &iam.ListEntitiesForPolicyOutput{}
 	pages, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]*iam.ListEntitiesForPolicyOutput, *string, error) {
 		page, err := api.ListEntitiesForPolicy(ctx, &iam.ListEntitiesForPolicyInput{
@@ -58,11 +35,6 @@ func listAllPolicyEntities(ctx context.Context, api IAMListEntitiesForPolicyAPI,
 		out.PolicyGroups = append(out.PolicyGroups, page.PolicyGroups...)
 	}
 	out.IsTruncated = !complete
-	policyEntitiesCache.Store(policyARN, policyEntitiesCacheEntry{
-		out:       out,
-		err:       err,
-		fetchedAt: time.Now(),
-	})
 	return out, err
 }
 

@@ -86,7 +86,7 @@ func efsCFNStackName(res resource.Resource) string {
 func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("sg", "fsID")
+		return keyMissing("sg", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -125,7 +125,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("subnet", "fsID")
+		return keyMissing("subnet", "fsID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -167,7 +167,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("lambda", "fsID")
+		return keyMissing("lambda", "fsID")
 	}
 
 	c, cok := clients.(*ServiceClients)
@@ -235,7 +235,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkEFSECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("ecs-task", "fsID")
+		return keyMissing("ecs-task", "fsID")
 	}
 
 	ecsTaskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")

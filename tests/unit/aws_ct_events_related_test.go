@@ -166,28 +166,36 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 
 // --- IAM Role checker tests (match by RawStruct Resources list — AWS::IAM::Role) ---
 
-func TestRelated_CtEvents_Role_MatchByResource(t *testing.T) {
-	roleRes := resource.Resource{
-		ID:     "my-role",
-		Name:   "my-role",
-		Fields: map[string]string{},
+// ctRoleSessionEvent is an event made by a session of roleName: the caller
+// is userIdentity.sessionContext.sessionIssuer.arn of an AssumedRole identity.
+// requestParameters, when given, is the call's own JSON body.
+func ctRoleSessionEvent(id, roleName, session, eventName, requestParameters string) resource.Resource {
+	if requestParameters == "" {
+		requestParameters = "{}"
 	}
-	cache := resource.ResourceCache{
-		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{roleRes}},
-	}
-
-	res := resource.Resource{
-		ID:     "evt-0a1b2c3d4e5f60005",
-		Fields: map[string]string{},
+	body := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE0000000001:` + session + `",` +
+		`"arn":"arn:aws:sts::123456789012:assumed-role/` + roleName + `/` + session + `","accountId":"123456789012",` +
+		`"sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE0000000001","arn":"arn:aws:iam::123456789012:role/` + roleName + `","accountId":"123456789012","userName":"` + roleName + `"}}},` +
+		`"eventName":"` + eventName + `","awsRegion":"us-east-1","requestParameters":` + requestParameters + `,"recipientAccountId":"123456789012"}`
+	return resource.Resource{
+		ID:     id,
+		Fields: map[string]string{"_ct.recipient_account": "123456789012", "_ct.username": session},
 		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::IAM::Role"),
-					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
-				},
-			},
+			EventId:         aws.String(id),
+			EventName:       aws.String(eventName),
+			Username:        aws.String(session),
+			CloudTrailEvent: aws.String(body),
 		},
 	}
+}
+
+// The ct-events -> role contract is the caller:
+// userIdentity.sessionContext.sessionIssuer.arn (docs/related-resources.md § ct-events).
+func TestRelated_CtEvents_Role_MatchByResource(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: "my-role", Name: "my-role", Fields: map[string]string{}}}},
+	}
+	res := ctRoleSessionEvent("evt-0a1b2c3d4e5f60005", "my-role", "deploy", "PutObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
@@ -201,27 +209,10 @@ func TestRelated_CtEvents_Role_MatchByResource(t *testing.T) {
 }
 
 func TestRelated_CtEvents_Role_NoMatch(t *testing.T) {
-	roleRes := resource.Resource{
-		ID:     "other-role",
-		Name:   "other-role",
-		Fields: map[string]string{},
-	}
 	cache := resource.ResourceCache{
-		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{roleRes}},
+		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: "other-role", Name: "other-role", Fields: map[string]string{}}}},
 	}
-
-	res := resource.Resource{
-		ID:     "evt-0a1b2c3d4e5f60006",
-		Fields: map[string]string{},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::IAM::Role"),
-					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
-				},
-			},
-		},
-	}
+	res := ctRoleSessionEvent("evt-0a1b2c3d4e5f60006", "my-role", "deploy", "PutObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
@@ -232,23 +223,10 @@ func TestRelated_CtEvents_Role_NoMatch(t *testing.T) {
 }
 
 func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
-	cache := resource.ResourceCache{}
-
-	res := resource.Resource{
-		ID:     "evt-0a1b2c3d4e5f60007",
-		Fields: map[string]string{},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::IAM::Role"),
-					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
-				},
-			},
-		},
-	}
+	res := ctRoleSessionEvent("evt-0a1b2c3d4e5f60007", "my-role", "deploy", "PutObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
-	result := checker(context.Background(), nil, res, cache)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	// An id in an event body is a claim about the past; a cold cache cannot
 	// confirm the role still exists, so the row is Unknown rather than a
@@ -535,18 +513,7 @@ func TestRelated_CtEvents_Role_TruncatedCacheWithoutTheRoleIsALowerBound(t *test
 			IsTruncated: true,
 		},
 	}
-	res := resource.Resource{
-		ID:     "evt-truncated-role-001",
-		Fields: map[string]string{},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::IAM::Role"),
-					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
-				},
-			},
-		},
-	}
+	res := ctRoleSessionEvent("evt-truncated-role-001", "my-role", "deploy", "PutObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
@@ -578,18 +545,7 @@ func TestRelated_CtEvents_Role_MatchInTruncatedCacheCounts(t *testing.T) {
 			IsTruncated: true,
 		},
 	}
-	res := resource.Resource{
-		ID:     "evt-truncated-role-002",
-		Fields: map[string]string{},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::IAM::Role"),
-					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
-				},
-			},
-		},
-	}
+	res := ctRoleSessionEvent("evt-truncated-role-002", "my-role", "deploy", "PutObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
@@ -801,30 +757,27 @@ func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 	}
 }
 
+// An AssumeRole call names the role it assumes in requestParameters.roleArn;
+// that role is the call's target, not its caller, so the pivot lists the
+// session's issuer.
 func TestRelated_CtEvents_Role_ExtractsTargetFromRequestRoleArn(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
+				{ID: "caller-role", Name: "caller-role"},
 				{ID: "target-role", Name: "target-role"},
 				{ID: "some-session-name", Name: "some-session-name"},
 			},
 		},
 	}
-	// AssumeRole event: requestParameters.roleArn is the TARGET role; the
-	// roleSessionName must NOT leak through as the resolved id, even when a role
-	// by that name exists.
-	cte := `{"eventName":"AssumeRole","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/target-role","roleSessionName":"some-session-name"}}`
-	res := resource.Resource{
-		ID:        "evt-assume-role-arn-001",
-		Fields:    map[string]string{},
-		RawStruct: cloudtrailtypes.Event{CloudTrailEvent: aws.String(cte)},
-	}
+	res := ctRoleSessionEvent("evt-assume-role-arn-001", "caller-role", "ci", "AssumeRole",
+		`{"roleArn":"arn:aws:iam::123456789012:role/target-role","roleSessionName":"some-session-name"}`)
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "target-role" {
-		t.Errorf("ResourceIDs = %v, want [target-role] (target roleArn, not the session name)", result.ResourceIDs())
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "caller-role" {
+		t.Errorf("ResourceIDs = %v, want [caller-role] (the caller, not the assumed role or the session name)", result.ResourceIDs())
 	}
 }
 
@@ -837,27 +790,15 @@ func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T
 			},
 		},
 	}
-	// No requestParameters; the role identity is an STS assumed-role ARN in
-	// Resources[]. The role name is the middle segment, NOT the trailing session,
-	// even when a role by the session name exists.
-	res := resource.Resource{
-		ID:     "evt-assumed-role-arn-002",
-		Fields: map[string]string{},
-		RawStruct: cloudtrailtypes.Event{
-			Resources: []cloudtrailtypes.Resource{
-				{
-					ResourceType: aws.String("AWS::STS::AssumedRole"),
-					ResourceName: aws.String("arn:aws:sts::123456789012:assumed-role/my-role/session-abc123"),
-				},
-			},
-		},
-	}
+	// The session's issuer is the role; the session name is not a role, even
+	// when a role by that name exists.
+	res := ctRoleSessionEvent("evt-assumed-role-arn-002", "my-role", "session-abc123", "GetObject", "")
 
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-role" {
-		t.Errorf("ResourceIDs = %v, want [my-role] (role segment of the assumed-role ARN, not the session name)", result.ResourceIDs())
+		t.Errorf("ResourceIDs = %v, want [my-role] (the session issuer, not the session name)", result.ResourceIDs())
 	}
 }
 
@@ -933,7 +874,7 @@ func TestRelated_CtEvents_RDS_DBInstanceEventResolves(t *testing.T) {
 func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	expected := []string{
 		"role", "iam-user", "ec2", "s3", "lambda",
-		"dbi", "kms", "secrets", "vpce", "sg", "ddb", "cfn", "trail",
+		"dbi", "kms", "secrets", "vpce", "sg", "ddb", "ecr", "cfn", "trail",
 	}
 
 	defs := resource.GetRelated("ct-events")

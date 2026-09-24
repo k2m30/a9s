@@ -179,6 +179,7 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 	if ds := c.topDetailState(); ds != nil {
 		rt := ds.ResourceType
 		srcRes := ds.Resource
+		c.core.RefreshTypeStores(rt)
 		c.resetDetailRelatedRowsLocked(rt)
 		// forceRelated deletes the RelatedCache entry before
 		// beginDetailWorkloadLocked's own cache-replay attempt, so a
@@ -197,6 +198,7 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 			return c.snapshot(), nil
 		}
 		c.core.DeleteResourceCache(typeName)
+		c.core.RefreshTypeStores(typeName)
 		// Cached content stays visible under the refreshing marker while
 		// the refetch runs — only blank Loading/Rows when there is nothing to
 		// show yet (the empty-list case never had a marker to keep rows under).

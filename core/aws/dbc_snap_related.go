@@ -137,7 +137,15 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return NotRead("backup")
 	}
 
-	return unreadZeroScanned(res, len(planList), backupPivot(planList, truncated, backupTarget{arn: parentARN, engine: res.Fields["engine"], unread: "ListTagsForResource"}))
+	// AWS Backup protects the parent cluster, so a plan selecting it by tag
+	// is read against the parent's tags.
+	target := backupTarget{arn: parentARN, engine: res.Fields["engine"], unread: "ListTagsForResource"}
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
+		if api, ok := c.DocDB.(DocDBListTagsForResourceAPI); ok {
+			target = target.withTags(docdbTagsForARN(ctx, api, parentARN))
+		}
+	}
+	return unreadZeroScanned(res, len(planList), backupPivot(planList, truncated, target))
 }
 
 // dbcResourceARN extracts DBClusterArn from a dbc Resource's RawStruct.

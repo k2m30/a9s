@@ -7,6 +7,7 @@ package unit_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -529,12 +530,13 @@ func TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceTy
 	}
 }
 
-// TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker:
+// TestRunRelatedDef_TotalPrefetchFailure_IsTheFailedReadWithoutRunningChecker:
 // a NeedsTargetCache def whose prefetch fails completely (an error with zero
-// rows — e.g. access denied) must short-circuit to UnknownRelated before the
-// checker runs, rather than letting the checker read the missing/stale
-// target cache as a confirmed zero.
-func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(t *testing.T) {
+// rows, e.g. access denied) has failed to read the one list its answer comes
+// from, so the row is that failed read and carries the error to the flash,
+// as a failed FetchRelatedTarget does. The checker never runs, since it would
+// read the missing target cache as a confirmed zero.
+func TestRunRelatedDef_TotalPrefetchFailure_IsTheFailedReadWithoutRunningChecker(t *testing.T) {
 	const targetType = "test-prefetch-failure-target"
 	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
 		return domain.FetchResult{}, errors.New("access denied")
@@ -560,11 +562,14 @@ func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(
 	if checkerCalls != 0 {
 		t.Errorf("checker invoked %d time(s), want 0 — a total prefetch failure must short-circuit before the checker ever reads the missing target cache", checkerCalls)
 	}
-	if result.Result.State() != domain.RelatedUnknown {
-		t.Errorf("Result.State = %v, want RelatedUnknown", result.Result.State())
+	if result.Result.State() != domain.RelatedError {
+		t.Errorf("Result.State = %v, want RelatedError (the prefetch is this pivot's failed read)", result.Result.State())
+	}
+	if err := result.Result.Err(); err == nil || !strings.Contains(err.Error(), "access denied") {
+		t.Errorf("Result.Err = %v, want the prefetch's \"access denied\" error", err)
 	}
 	if result.Result.Count() != 0 {
-		t.Errorf("Result.Count = %d, want 0 (Unknown, not a false confirmed zero)", result.Result.Count())
+		t.Errorf("Result.Count = %d, want 0 (a failed read, not a confirmed zero)", result.Result.Count())
 	}
 }
 

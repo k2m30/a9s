@@ -14,7 +14,7 @@ import (
 func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
-		return foundNone("sns", "topicARN")
+		return keyMissing("sns", "topicARN")
 	}
 
 	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")

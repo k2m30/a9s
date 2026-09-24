@@ -2,13 +2,19 @@ package unit_test
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -100,8 +106,10 @@ func TestRelated_ACM_ELB_NLBShape(t *testing.T) {
 	}
 }
 
-// TestRelated_ACM_ELB_ClassicShape: a Classic ELB ARN
-// (:loadbalancer/<name>, no /app/ or /net/ segment) produces the name.
+// TestRelated_ACM_ELB_ClassicShape: a Classic Load Balancer ARN
+// (:loadbalancer/<name>, no /app/ or /net/ segment) names no row of the elb
+// list, which holds ELBv2 load balancers only (DescribeLoadBalancers of
+// elasticloadbalancingv2), so the certificate's ELB row is 0.
 func TestRelated_ACM_ELB_ClassicShape(t *testing.T) {
 	const certARN = "arn:aws:acm:us-east-1:111122223333:certificate/abc-classic"
 	source := resource.Resource{
@@ -119,11 +127,8 @@ func TestRelated_ACM_ELB_ClassicShape(t *testing.T) {
 	checker := acmCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1 (classic ELB in InUseBy)", result.Count())
-	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-classic-elb" {
-		t.Errorf("ResourceIDs = %v, want [my-classic-elb]", result.ResourceIDs())
+	if result.Count() != 0 || len(result.ResourceIDs()) != 0 {
+		t.Errorf("Count = %d, ResourceIDs = %v, want none (a Classic Load Balancer is not an elb row)", result.Count(), result.ResourceIDs())
 	}
 }
 
@@ -150,30 +155,86 @@ func TestRelated_ACM_ELB_NonLBARNSkipped(t *testing.T) {
 	}
 }
 
-// TestRelated_ACM_APIGW_DomainnamesARN: an InUseBy ARN naming an API
-// Gateway custom domain is not counted — a domain name is no apigw row — and
-// the count says it left one out.
-func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
-	const certARN = "arn:aws:acm:us-east-1:111122223333:certificate/abc-apigw"
+// acmAPIGWDomainSource is a certificate whose InUseBy names one API Gateway
+// custom domain, with the clients the acm -> apigw checker reads through.
+func acmAPIGWDomainSource(v2 awsclient.APIGatewayV2API) (resource.Resource, *awsclient.ServiceClients) {
+	const certARN = "arn:aws:acm:us-east-1:123456789012:certificate/abc-apigw"
 	source := resource.Resource{
 		ID: certARN,
 		RawStruct: acmtypes.CertificateSummary{
 			CertificateArn: aws.String(certARN),
 		},
 	}
+	clients := acmRelatedClients(&acmDescribeCertMock{inUseBy: []string{"arn:aws:apigateway:us-east-1::/domainnames/api.example.com"}})
+	clients.APIGatewayV2 = v2
+	return source, clients
+}
 
-	domainARN := "arn:aws:apigateway:us-east-1::/domainnames/api.example.com"
-	mock := &acmDescribeCertMock{inUseBy: []string{domainARN}}
-	clients := acmRelatedClients(mock)
+// acmAPIGWMappingsDenied refuses GetApiMappings the way IAM does for a role
+// without apigateway:GET on the domain.
+type acmAPIGWMappingsDenied struct{ *fakeAPIGWV2ACM }
 
-	checker := acmCheckerByTarget(t, "apigw")
-	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+func (acmAPIGWMappingsDenied) GetApiMappings(context.Context, *apigatewayv2.GetApiMappingsInput, ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "User is not authorized to perform: apigateway:GET"}
+}
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d (IDs %v), want 0 (a custom domain is no apigw row)", result.Count(), result.ResourceIDs())
+// TestRelated_ACM_APIGW_DomainnamesARN: InUseBy names a custom domain, not an
+// API; the APIs served with the certificate are the ones the domain's API
+// mappings name
+// (https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/domainnames-domainname-apimappings.html).
+func TestRelated_ACM_APIGW_DomainnamesARN(t *testing.T) {
+	v2 := &fakeAPIGWV2ACM{mappings: map[string][]apigwv2types.ApiMapping{
+		"api.example.com": {
+			{ApiId: aws.String("a1b2c3d4e5"), ApiMappingKey: aws.String("orders"), Stage: aws.String("prod")},
+			{ApiId: aws.String("f6g7h8i9j0"), ApiMappingKey: aws.String("users"), Stage: aws.String("prod")},
+		},
+		"other.example.com": {
+			{ApiId: aws.String("zzzzzzzzzz"), Stage: aws.String("prod")},
+		},
+	}}
+	source, clients := acmAPIGWDomainSource(v2)
+
+	result := acmCheckerByTarget(t, "apigw")(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedResolved || result.Err() != nil {
+		t.Fatalf("State = %v, Err = %v, want resolved with no error", result.State(), result.Err())
 	}
-	if !result.Truncated() {
-		t.Error("Truncated = false, want true: the domain reference was left out")
+	got := result.ResourceIDs()
+	sort.Strings(got)
+	if strings.Join(got, ",") != "a1b2c3d4e5,f6g7h8i9j0" {
+		t.Errorf("ResourceIDs = %v, want [a1b2c3d4e5 f6g7h8i9j0] (the APIs mapped on api.example.com)", got)
+	}
+	if result.Truncated() {
+		t.Error("Truncated = true, want false: every mapping page was read")
+	}
+}
+
+// TestRelated_ACM_APIGW_DomainnamesARN_NoAPIGatewayClient: without an API
+// Gateway client the domain's mappings are not read, so the APIs it serves are
+// unknown, not a proven 0.
+func TestRelated_ACM_APIGW_DomainnamesARN_NoAPIGatewayClient(t *testing.T) {
+	source, clients := acmAPIGWDomainSource(nil)
+
+	result := acmCheckerByTarget(t, "apigw")(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedUnknown {
+		t.Errorf("State = %v (IDs %v), want RelatedUnknown: the domain's mappings were not read", result.State(), result.ResourceIDs())
+	}
+}
+
+// TestRelated_ACM_APIGW_DomainnamesARN_MappingsRefused: a refused
+// GetApiMappings is a failed read of the only place the APIs are named, so the
+// row is an error carrying AWS's error.
+func TestRelated_ACM_APIGW_DomainnamesARN_MappingsRefused(t *testing.T) {
+	source, clients := acmAPIGWDomainSource(acmAPIGWMappingsDenied{&fakeAPIGWV2ACM{}})
+
+	result := acmCheckerByTarget(t, "apigw")(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.State() != domain.RelatedError {
+		t.Errorf("State = %v (IDs %v), want RelatedError", result.State(), result.ResourceIDs())
+	}
+	if result.Err() == nil || !strings.Contains(result.Err().Error(), "AccessDeniedException") {
+		t.Errorf("Err = %v, want the AccessDeniedException from GetApiMappings", result.Err())
 	}
 }
 

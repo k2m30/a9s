@@ -327,23 +327,6 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
-		// AMI EBS boot-volume encryption key — required for ami→kms related-panel
-		// pivot (the AMI's BlockDeviceMappings[].Ebs.KmsKeyId is its ARN). See
-		// the AMIEBSKmsKeyID doc comment in ec2.go for why this key cannot
-		// share the widely-reused "primary" KMS key.
-		{
-			KeyId:                aws.String(AMIEBSKmsKeyID),
-			Arn:                  aws.String(AMIEBSKmsKeyARN),
-			Description:          aws.String("Boot volume encryption key for acme-app-server AMI"),
-			KeyState:             kmstypes.KeyStateEnabled,
-			KeyManager:           kmstypes.KeyManagerTypeCustomer,
-			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
-			CreationDate:         aws.Time(time.Date(2025, 2, 15, 10, 0, 0, 0, time.UTC)),
-			Enabled:              true,
-			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
-			MultiRegion:          aws.Bool(false),
-			Origin:               kmstypes.OriginTypeAwsKms,
-		},
 		{
 			KeyId:                aws.String(SSMDefaultKeyID),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + SSMDefaultKeyID),
@@ -519,12 +502,6 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/aws/ssm"),
 			TargetKeyId: aws.String(SSMDefaultKeyID),
 		},
-		// AMI EBS boot-volume encryption key alias.
-		{
-			AliasName:   aws.String("alias/acme-ami-ebs-boot-key"),
-			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-ami-ebs-boot-key"),
-			TargetKeyId: aws.String(AMIEBSKmsKeyID),
-		},
 	}
 	for _, a := range aliases {
 		keys[*a.AliasName] = keys[*a.TargetKeyId]
@@ -557,5 +534,5 @@ func init() {
 	// dim: colorKMS (core/aws/catalog_secrets.go) has exactly three branches —
 	// Enabled→Healthy, Disabled→Warning, Pending*/Unavailable→Broken — and
 	// docs/resources/kms.md documents no Dim-producing signal.
-	Register(Pin{ShortName: "kms", Rows: 22, Issues: 8, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "kms", Rows: 21, Issues: 8, CoverageGaps: []string{"dim"}})
 }

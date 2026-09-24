@@ -423,9 +423,12 @@ func sesBucketName(name string) string {
 	return "ses-inbound-" + name
 }
 
+// Receipt rules are built enabled: a rule with Enabled false (the
+// API_ReceiptRule default) processes no mail.
 func buildLambdaReceiptRule(name string, recipients []string, lambdaARN string) sestypes.ReceiptRule {
 	return sestypes.ReceiptRule{
 		Name:       aws.String(name),
+		Enabled:    true,
 		Recipients: recipients,
 		Actions: []sestypes.ReceiptAction{
 			{LambdaAction: &sestypes.LambdaAction{FunctionArn: aws.String(lambdaARN)}},
@@ -436,6 +439,7 @@ func buildLambdaReceiptRule(name string, recipients []string, lambdaARN string) 
 func buildS3ReceiptRule(name string, recipients []string, bucketName string) sestypes.ReceiptRule {
 	return sestypes.ReceiptRule{
 		Name:       aws.String(name),
+		Enabled:    true,
 		Recipients: recipients,
 		Actions: []sestypes.ReceiptAction{
 			{S3Action: &sestypes.S3Action{BucketName: aws.String(bucketName)}},
@@ -551,6 +555,7 @@ func TestCheckSESLambda_ExtractsFunctionNameFromARN(t *testing.T) {
 		Rules: []sestypes.ReceiptRule{
 			{
 				Name:       aws.String("billing-rule"),
+				Enabled:    true,
 				Recipients: nil, // global — applies to any identity
 				Actions: []sestypes.ReceiptAction{
 					{LambdaAction: &sestypes.LambdaAction{

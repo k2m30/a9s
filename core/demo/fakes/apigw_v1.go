@@ -50,6 +50,28 @@ func (f *APIGWV1Fake) GetStages(_ context.Context, input *apigateway.GetStagesIn
 	return &apigateway.GetStagesOutput{Item: stages}, nil
 }
 
+// GetResources answers a REST API's root resource and the fixture resources
+// below it, their methods embedded as the "methods" embed asks.
+func (f *APIGWV1Fake) GetResources(_ context.Context, input *apigateway.GetResourcesInput, _ ...func(*apigateway.Options)) (*apigateway.GetResourcesOutput, error) {
+	id := aws.ToString(input.RestApiId)
+	if !f.hasRestAPI(id) {
+		return nil, &apigwv1types.NotFoundException{Message: notFoundMessage("RestApi", id)}
+	}
+	root := apigwv1types.Resource{Id: aws.String(id + "-root"), Path: aws.String("/")}
+	return &apigateway.GetResourcesOutput{Items: append([]apigwv1types.Resource{root}, f.fix.Resources[id]...)}, nil
+}
+
+// GetVpcLinks answers the account's REST VPC links: none in the demo.
+func (f *APIGWV1Fake) GetVpcLinks(_ context.Context, _ *apigateway.GetVpcLinksInput, _ ...func(*apigateway.Options)) (*apigateway.GetVpcLinksOutput, error) {
+	return &apigateway.GetVpcLinksOutput{Items: []apigwv1types.VpcLink{}}, nil
+}
+
+// GetBasePathMappings serves no base path mappings: the demo's custom
+// domains are Regional and route through GetApiMappings or routing rules.
+func (f *APIGWV1Fake) GetBasePathMappings(_ context.Context, _ *apigateway.GetBasePathMappingsInput, _ ...func(*apigateway.Options)) (*apigateway.GetBasePathMappingsOutput, error) {
+	return &apigateway.GetBasePathMappingsOutput{}, nil
+}
+
 // hasRestAPI reports whether the fixtures register this REST API id.
 func (f *APIGWV1Fake) hasRestAPI(id string) bool {
 	return slices.ContainsFunc(f.fix.RestApis, func(a apigwv1types.RestApi) bool {

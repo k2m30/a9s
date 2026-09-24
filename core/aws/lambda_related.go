@@ -45,7 +45,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return foundNone("logs", "functionName")
+		return keyMissing("logs", "functionName")
 	}
 
 	expectedLogGroup := "/aws/lambda/" + functionName
@@ -119,24 +119,53 @@ func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cac
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkLambdaSQS finds SQS queues wired to this Lambda as event sources.
-// Calls lambda:ListEventSourceMappings scoped to the
-// function and extracts SQS queue names from the returned EventSourceArn values.
-// Returns an unknown result when no live clients are available, since the
-// Lambda FunctionConfiguration struct does not embed event source mappings.
+// checkLambdaSQS counts the queues that trigger this function
+// (lambda:ListEventSourceMappings: FunctionConfiguration embeds no mappings)
+// and its dead-letter queue.
 func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	functionName := res.ID
 	if functionName == "" {
 		functionName = res.Name
 	}
 	if functionName == "" {
-		return foundNone("sqs", "functionName")
+		return keyMissing("sqs", "functionName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
 		return NotRead("sqs")
 	}
-	return lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", "sqs", refContext(clients, cache, "sqs"))
+	rc := refContext(clients, cache, "sqs")
+	return relatedAnswer("sqs", joinReads(
+		readOf(lambdaEventSourceRefs(ctx, c.Lambda, functionName, "sqs", "sqs", rc)),
+		readOf(listedRelated(ctx, clients, cache, "sqs", lambdaDLQ(res, "sqs"), false)),
+	))
+}
+
+// lambdaDLQ is the function's dead-letter queue or topic when it is an ARN of
+// service: DeadLetterConfig.TargetArn names "an Amazon SQS queue or Amazon SNS
+// topic" (https://docs.aws.amazon.com/lambda/latest/api/API_DeadLetterConfig.html).
+func lambdaDLQ(res resource.Resource, service string) []string {
+	arn := res.Fields["dlq_target_arn"]
+	if _, ok := ARNForService(arn, service); !ok {
+		return nil
+	}
+	return []string{arn}
+}
+
+// lambdaDLQUsers reads the functions whose dead-letter target is arn, from
+// the lambda list's dlq_target_arn.
+func lambdaDLQUsers(ctx context.Context, clients any, cache resource.ResourceCache, arn string) relatedRead {
+	fns, truncated, err := FetchRelatedTarget(ctx, clients, cache, "lambda")
+	if fns == nil {
+		return unreadBy(err)
+	}
+	read := relatedRead{partial: truncated, failure: err}
+	for _, fn := range fns {
+		if fn.Fields["dlq_target_arn"] == arn {
+			read.ids = append(read.ids, fn.ID)
+		}
+	}
+	return read
 }
 
 // lambdaEventSourceRefs is the result of an event-source pivot of a function:
@@ -271,7 +300,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		return NotRead("eb-rule")
 	}
 	if res.ID == "" {
-		return foundNone("eb-rule", "res.ID")
+		return keyMissing("eb-rule", "res.ID")
 	}
 	rc := refContext(clients, cache, "lambda")
 	c, sok := clients.(*ServiceClients)

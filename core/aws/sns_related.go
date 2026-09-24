@@ -76,7 +76,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, cache 
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return foundNone("kms", "topicARN")
+		return keyMissing("kms", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
@@ -97,7 +97,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, cache
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return foundNone("role", "topicARN")
+		return keyMissing("role", "topicARN")
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // handlers_resources_test.go — Core-direct unit tests for the resource/detail
-// Handle* methods, AllRegions and ResetRuleSets.
+// Handle* methods, AllRegions and RefreshTypeStores.
 //
 // Tests live in package runtime so they can exercise private fields
 // (canonShortName, deriveFindingsForType internal helpers) without going
@@ -339,18 +339,41 @@ func TestHandleIdentityError_ClearsFetching(t *testing.T) {
 	}
 }
 
-func TestResetRuleSets_SwapsStoreAndRewiresClients(t *testing.T) {
-	sess := session.New()
-	oldStore := sess.RuleSets
-	c := New(sess, catalog.All())
+func TestRefreshTypeStores_SwapsStoreAndRewiresClients(t *testing.T) {
+	for _, tc := range []struct {
+		rt       string
+		policies bool
+		ruleSets bool
+	}{
+		{rt: "ses", ruleSets: true},
+		{rt: "policy", policies: true},
+		{rt: "role", policies: true},
+		{rt: "iam-user", policies: true},
+		{rt: "iam-group", policies: true},
+		{rt: "ec2"},
+	} {
+		t.Run(tc.rt, func(t *testing.T) {
+			sess := session.New()
+			sess.Clients = &awsclient.ServiceClients{}
+			sess.WireStores(sess.Clients)
+			oldPolicies, oldRuleSets, oldIdentity := sess.IAMPolicies, sess.RuleSets, sess.IdentityStore
+			c := New(sess, catalog.All())
 
-	c.ResetRuleSets()
+			c.RefreshTypeStores(tc.rt)
 
-	if sess.RuleSets == oldStore {
-		t.Errorf("ResetRuleSets did not swap session.RuleSets")
-	}
-	if sess.RuleSets == nil {
-		t.Errorf("ResetRuleSets left session.RuleSets nil")
+			if (sess.IAMPolicies != oldPolicies) != tc.policies {
+				t.Errorf("IAMPolicies swapped = %v, want %v", sess.IAMPolicies != oldPolicies, tc.policies)
+			}
+			if (sess.RuleSets != oldRuleSets) != tc.ruleSets {
+				t.Errorf("RuleSets swapped = %v, want %v", sess.RuleSets != oldRuleSets, tc.ruleSets)
+			}
+			if sess.IdentityStore != oldIdentity {
+				t.Errorf("IdentityStore swapped on a %s refresh", tc.rt)
+			}
+			if sess.Clients.IAMPolicies() != sess.IAMPolicies || sess.Clients.RuleSets() != sess.RuleSets {
+				t.Errorf("clients not rewired to the session stores")
+			}
+		})
 	}
 }
 

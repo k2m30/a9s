@@ -26,6 +26,10 @@ const sqsPublicPolicyQueueURL = "https://sqs.us-east-1.amazonaws.com/12345678901
 // ones with neither are the finding's failing rows.
 const SQSManagedSSE = "sqs-managed-sse"
 
+// LambdaDLQueueName is the dead-letter queue the demo functions name in
+// DeadLetterConfig.TargetArn.
+const LambdaDLQueueName = "dead-letter-queue"
+
 // SQSFixtures holds typed fixture data for SQS.
 type SQSFixtures struct {
 	// Queues maps queue URL to its attributes row.
@@ -130,6 +134,19 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"SqsManagedSseEnabled":                  "true",
 				},
 			},
+			// The dead-letter queue the demo functions send failed
+			// asynchronous invocations to (lambda.go DeadLetterConfig).
+			{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + LambdaDLQueueName,
+				QueueName: LambdaDLQueueName,
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "0",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"MessageRetentionPeriod":                "1209600",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + LambdaDLQueueName,
+					"SqsManagedSseEnabled":                  "true",
+				},
+			},
 			// S3 healthy-bucket dead-letter queue (checkS3SQS pivot).
 			{
 				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + S3DLQueueName,
@@ -150,5 +167,5 @@ func NewSQSFixtures() *SQSFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "sqs", Rows: 8, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sqs", Rows: 9, Issues: 0, CoverageGaps: []string{"dim"}})
 }

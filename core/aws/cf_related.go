@@ -185,7 +185,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 		domainName = *dist.DomainName
 	}
 	if domainName == "" {
-		return foundNone("r53", "domain_name")
+		return keyMissing("r53", "domain_name")
 	}
 
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")

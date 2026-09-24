@@ -22,9 +22,11 @@ type CWLogsFixtures struct {
 	// LogEvents maps log group name to its events (for GetLogEvents / FilterLogEvents).
 	LogEvents map[string][]cwlogstypes.OutputLogEvent
 	// SubscriptionFilters maps log group name to its subscription filters —
-	// backs logs:DescribeSubscriptionFilters for the logs:kinesis and
-	// logs:s3 related-panel pivots.
+	// backs logs:DescribeSubscriptionFilters for the logs:kinesis pivot.
 	SubscriptionFilters map[string][]cwlogstypes.SubscriptionFilter
+	// ExportTasks are the account's export tasks, served by
+	// DescribeExportTasks for the logs:s3 pivot.
+	ExportTasks []cwlogstypes.ExportTask
 	// MetricFilters maps log group name to its metric filters — backs
 	// logs:DescribeMetricFilters for the logs↔alarm bridge, where the alarm
 	// watches the metric a filter emits and names no log group at all.
@@ -202,9 +204,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
 		},
-		// orders-prod DynamoDB Contributor Insights log group — DDB→logs pivot.
-		// checkDdbLogs matches log groups whose ID contains the table name.
-		// Naming convention: /aws/dynamodb/tables/<name>/insights/default.
+		// A log group named after the orders-prod table; DynamoDB writes no
+		// log group, so it is not the table's.
 		{
 			LogGroupName:    aws.String("/aws/dynamodb/tables/" + OrdersProdID + "/insights/default"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/dynamodb/tables/" + OrdersProdID + "/insights/default:*"),
@@ -342,13 +343,18 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(14),
 			CreationTime:    aws.Int64(1750300000000),
 		},
-		// order-fulfillment-workflow vendedlogs log group — required for
-		// sfn:logs related-panel pivot. checkSFNLogs matches log groups
-		// whose ID is exactly "/aws/vendedlogs/states/{sfnName}".
+		// The groups the demo state machines' LoggingConfiguration names.
 		{
-			LogGroupName:    aws.String("/aws/vendedlogs/states/order-fulfillment-workflow"),
-			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vendedlogs/states/order-fulfillment-workflow:*"),
+			LogGroupName:    aws.String(SFNOrderFulfillmentLogGroup),
+			Arn:             aws.String(sfnLogGroupARN(SFNOrderFulfillmentLogGroup)),
 			StoredBytes:     aws.Int64(15728640),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750400000000),
+		},
+		{
+			LogGroupName:    aws.String(SFNWorkflowsLogGroup),
+			Arn:             aws.String(sfnLogGroupARN(SFNWorkflowsLogGroup)),
+			StoredBytes:     aws.Int64(31457280),
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1750400000000),
 		},
@@ -372,13 +378,18 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1750600000000),
 		},
-		// VPC endpoint flow-log destination — required for vpce:logs
-		// related-panel pivot. checkVPCELogs reads the LogGroupName off the
-		// matching ec2:DescribeFlowLogs entry (see EC2Fixtures.FlowLogsByResourceID).
+		// The flow-log destinations EC2Fixtures.FlowLogsByResourceID names.
 		{
 			LogGroupName:    aws.String("/aws/vpc/flowlogs/vpce-s3-endpoint"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc/flowlogs/vpce-s3-endpoint:*"),
 			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750700000000),
+		},
+		{
+			LogGroupName:    aws.String("/aws/vpc/flowlogs/acme-staging"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc/flowlogs/acme-staging:*"),
+			StoredBytes:     aws.Int64(41943040),
 			RetentionInDays: aws.Int32(14),
 			CreationTime:    aws.Int64(1750700000000),
 		},
@@ -906,10 +917,7 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			`"durationMs":1873.40,"billedDurationMs":1874,"memorySizeMB":512,"maxMemoryUsedMB":230`),
 	)
 
-	// SubscriptionFilters — required for the logs:kinesis and logs:s3
-	// related-panel pivots (checkLogsKinesis / checkLogsS3 via
-	// DescribeSubscriptionFilters). /aws-glue/jobs/output streams to Kinesis
-	// for real-time monitoring; /aws-glue/jobs/error archives to S3.
+	// /aws-glue/jobs/output streams to Kinesis for real-time monitoring.
 	subscriptionFilters := map[string][]cwlogstypes.SubscriptionFilter{
 		"/aws-glue/jobs/output": {
 			{
@@ -921,17 +929,20 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				CreationTime:   aws.Int64(1715731200000),
 			},
 		},
-		"/aws-glue/jobs/error": {
-			{
-				FilterName:     aws.String("archive-errors-to-s3"),
-				LogGroupName:   aws.String("/aws-glue/jobs/error"),
-				FilterPattern:  aws.String("ERROR"),
-				DestinationArn: aws.String("arn:aws:s3:::" + LogsBucketName),
-				Distribution:   cwlogstypes.DistributionByLogStream,
-				CreationTime:   aws.Int64(1715731200000),
-			},
-		},
 	}
+
+	// /aws-glue/jobs/error was exported to the logs bucket.
+	exportTasks := []cwlogstypes.ExportTask{{
+		TaskId:            aws.String("e570a1b2-0000-4000-8000-000000000001"),
+		TaskName:          aws.String("glue-errors-2026-03"),
+		LogGroupName:      aws.String("/aws-glue/jobs/error"),
+		From:              aws.Int64(1772323200000),
+		To:                aws.Int64(1774915200000),
+		Destination:       aws.String(LogsBucketName),
+		DestinationPrefix: aws.String("exports/glue-errors"),
+		Status:            &cwlogstypes.ExportTaskStatus{Code: cwlogstypes.ExportTaskStatusCodeCompleted, Message: aws.String("Completed successfully")},
+		ExecutionInfo:     &cwlogstypes.ExportTaskExecutionInfo{CreationTime: aws.Int64(1774915260000), CompletionTime: aws.Int64(1774915500000)},
+	}}
 
 	metricFilters := map[string][]cwlogstypes.MetricFilter{
 		OrphanOldLogGroupName: {
@@ -954,6 +965,7 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		LogStreams:          logStreams,
 		LogEvents:           logEvents,
 		SubscriptionFilters: subscriptionFilters,
+		ExportTasks:         exportTasks,
 		MetricFilters:       metricFilters,
 		EventStreams: map[string]string{
 			"/aws/lambda/api-gateway-authorizer": "2026/03/22/[$LATEST]abc123",
@@ -975,7 +987,7 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 180
+const LogGroupsPageSize = 182
 
 // derivedLogGroups returns a log group for every one the other demo fixtures
 // name and have does not hold yet: each MWAA environment's component groups,
@@ -1061,5 +1073,5 @@ const ECSExecLogGroup = "/ecs/exec/acme-services"
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 180, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 182, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

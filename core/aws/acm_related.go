@@ -29,7 +29,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if certARN == "" {
-		return foundNone("cf", "certARN")
+		return keyMissing("cf", "certARN")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -84,7 +84,11 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 }
 
 // checkACMELB reports load balancers using this certificate via
-// acm:DescribeCertificate.InUseBy filtered to elbv2:loadbalancer ARNs.
+// acm:DescribeCertificate.InUseBy, kept to the ELBv2 load balancers the elb
+// list holds: an ELBv2 ARN names its type, name and id,
+// "loadbalancer/app/my-load-balancer/50dc6c495c0c9188"
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html),
+// where a Classic Load Balancer's is "loadbalancer/<name>".
 func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
 		return NotRead("elb")
@@ -98,15 +102,16 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	var refs []string
 	for _, arn := range arns {
-		if a, ok := ARNForService(arn, "elasticloadbalancing"); ok && strings.HasPrefix(a.Resource, "loadbalancer/") {
+		if a, ok := ARNForService(arn, "elasticloadbalancing"); ok && strings.HasPrefix(a.Resource, "loadbalancer/") && strings.Count(a.Resource, "/") == 3 {
 			refs = append(refs, arn)
 		}
 	}
 	return unreadZero(res, relatedRefs("elb", refs, refContext(clients, cache, "elb")))
 }
 
-// checkACMAPIGW reports API Gateway custom domains using this certificate
-// via acm:DescribeCertificate.InUseBy filtered to apigateway domain ARNs.
+// checkACMAPIGW reports the APIs served with this certificate. InUseBy names
+// an API Gateway custom domain ("/domainnames/<name>"), and the APIs are the
+// ones that domain's API mappings name.
 func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" && res.Name == "" {
 		return NotRead("apigw")
@@ -119,12 +124,17 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 		return ReadFailed("apigw", err)
 	}
 	var refs []string
+	var mapped relatedRead
 	for _, arn := range arns {
-		if _, ok := ARNForService(arn, "apigateway"); ok {
+		if domain, ok := apigwDomainRefToID(arn); ok {
+			mapped = joinReads(mapped, apigwDomainAPIs(ctx, clients, domain, ""))
+		} else if _, ok := ARNForService(arn, "apigateway"); ok {
 			refs = append(refs, arn)
 		}
 	}
-	return unreadZero(res, relatedRefs("apigw", refs, refContext(clients, cache, "apigw")))
+	ids, dropped := resolveRefs("apigw", append(refs, mapped.ids...), refContext(clients, cache, "apigw"))
+	mapped.ids, mapped.partial = ids, mapped.partial || dropped
+	return unreadZero(res, relatedAnswer("apigw", mapped))
 }
 
 // checkACMR53 reports Route 53 hosted zones containing DNS validation

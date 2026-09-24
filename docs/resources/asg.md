@@ -34,13 +34,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ami`
 
 - **Why related**: AMI the group's instances boot from — rollback target and vulnerability-scan pivot.
-- **How discovered**: Read `LaunchConfiguration.ImageId` (legacy) or resolve `LaunchTemplate.LaunchTemplateData.ImageId` for the version the ASG references, then cross-reference the already-loaded `ami` list by ImageId. An `ImageId` of `resolve:ssm:<parameter>` names a parameter, not an image, and makes the count a lower bound. — a9s-devops: possible=yes (`AutoScalingGroup.LaunchConfigurationName` / `AutoScalingGroup.LaunchTemplate`), worth=yes (AMI drift and deprecation are common ASG failure causes).
+- **How discovered**: The image of every launch source: the launch configuration's `ImageId`, `LaunchTemplateData.ImageId` of the launch template, the mixed-instances policy's template and each `Overrides[]` template, and each override's own `ImageId` ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **Count shown**: yes.
 
 ### `ec2`
 
 - **Why related**: Instances the ASG currently manages — the operator's primary drill-down when instance count is wrong or a subset is unhealthy.
-- **How discovered**: Read `AutoScalingGroup.Instances[].InstanceId` and cross-reference the already-loaded `ec2` list by InstanceId.
+- **How discovered**: Read `AutoScalingGroup.Instances[].InstanceId` and cross-reference the already-loaded `ec2` list by InstanceId. An instance whose `LifecycleState` is `Terminating*`, `Terminated` or `Detached` is leaving the group and is not counted ([API_Instance](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_Instance.html)).
 - **Count shown**: yes.
 
 ### `elb`
@@ -58,13 +58,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `role`
 
 - **Why related**: Service-linked role used by the ASG for EC2 calls, plus the instance profile role the launched instances assume.
-- **How discovered**: Read `AutoScalingGroup.ServiceLinkedRoleARN` directly, and resolve `LaunchConfiguration.IamInstanceProfile` / `LaunchTemplate.LaunchTemplateData.IamInstanceProfile` → `GetInstanceProfile` → role name; cross-reference the already-loaded `role` list. — a9s-devops: possible=yes (`ServiceLinkedRoleARN` is on the list response; instance-profile role requires one extra IAM call), worth=yes (permission troubleshooting when scaling or health checks fail).
+- **How discovered**: AutoScalingGroup.ServiceLinkedRoleARN + the instance profile of every launch source (launch configuration, launch template, mixed-instances policy and its `Overrides[]`) → GetInstanceProfile roles ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **Count shown**: yes.
 
 ### `sg`
 
 - **Why related**: Security groups attached to the instances the ASG launches — the "why can't new instances reach the DB?" pivot.
-- **How discovered**: Read `LaunchConfiguration.SecurityGroups[]` or `LaunchTemplate.LaunchTemplateData.SecurityGroupIds[]` / `NetworkInterfaces[].Groups[]`, then cross-reference the already-loaded `sg` list by GroupId. — a9s-devops: possible=yes (via LaunchConfig/LaunchTemplate), worth=yes (SGs are the single most common cause of "ASG scaled but app is offline").
+- **How discovered**: The security groups of every launch source: `LaunchConfiguration.SecurityGroups`, and `SecurityGroupIds` / `NetworkInterfaces[].Groups` of each launch template including the mixed-instances policy's and its `Overrides[]` ([API_LaunchTemplateOverrides](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_LaunchTemplateOverrides.html)).
 - **Count shown**: yes.
 
 ### `sns`

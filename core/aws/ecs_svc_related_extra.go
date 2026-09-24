@@ -233,26 +233,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		return ReadFailed("secrets", err)
 	}
 
-	var refs []string
-	for _, cd := range out.TaskDefinition.ContainerDefinitions {
-		for _, s := range cd.Secrets {
-			if s.ValueFrom == nil || *s.ValueFrom == "" {
-				continue
-			}
-			v := *s.ValueFrom
-			if isSecret(v) {
-				refs = append(refs, v)
-			}
-		}
-		// RepositoryCredentials.CredentialsParameter — may be a Secrets Manager ARN
-		if cd.RepositoryCredentials != nil && cd.RepositoryCredentials.CredentialsParameter != nil {
-			cp := *cd.RepositoryCredentials.CredentialsParameter
-			if isSecret(cp) {
-				refs = append(refs, cp)
-			}
-		}
-	}
-
+	refs, _ := ecsSecretRefs(out.TaskDefinition)
 	return listedRelated(ctx, clients, cache, "secrets", refs, false)
 }
 

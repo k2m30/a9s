@@ -46,9 +46,9 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 
 ### `ddb`
 
-- **Why related**: DynamoDB tables that stream change data into this Kinesis stream via `EnableKinesisStreamingDestination` — when a DDB table has a Kinesis destination, this stream is the sink.
-- **How discovered**: reverse scan of the already-loaded `ddb` list calling `DescribeKinesisStreamingDestination` per table and matching `KinesisDataStreamDestinations[].StreamArn` — a9s-devops: possible=yes, worth=no for the daily driver. Operators almost always pivot DDB→Kinesis (the DDB detail page naturally shows where its stream goes), not the reverse. Recording the reverse pivot here would add an N-table API cost on every stream detail view for a workflow that fires rarely. See §5 Out of Scope.
-- **Count shown**: n/a (pivot not implemented).
+- **Why related**: DynamoDB tables that stream change data into this Kinesis stream through a Kinesis Data Streams destination — when a table has one, this stream is the sink.
+- **How discovered**: reverse scan of the already-loaded `ddb` list calling `DescribeKinesisStreamingDestination` per table and keeping each `KinesisDataStreamDestinations[]` entry whose `StreamArn` is this stream's ARN. A destination whose `DestinationStatus` is `DISABLED` no longer receives the table's changes and an `ENABLE_FAILED` one never did, so neither counts ([API_KinesisDataStreamDestination](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html)); the table side of the pair reads the same status.
+- **Count shown**: yes; a lower bound while the `ddb` list is partly read.
 
 ### `kms`
 
@@ -59,7 +59,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `lambda`
 
 - **Why related**: Lambda functions consuming records from this stream via event-source mappings — the first question an operator asks about a lagging stream is "who's reading this, and are they keeping up?"
-- **How discovered**: reverse scan of the already-loaded Lambda event-source-mapping set; keep entries where `EventSourceMappingConfiguration.EventSourceArn == <this stream's StreamARN>` — a9s-devops: ESM is the authoritative link (documented on the SDK shape as `(Kinesis, DynamoDB Streams, Amazon MSK, ...)`); scanning an already-loaded ESM list is zero-cost and is the canonical way to surface consumers.
+- **How discovered**: `ListEventSourceMappings` for this stream's `StreamARN`, and for each enhanced fan-out consumer `ListStreamConsumers` returns, the mappings for that consumer's `ConsumerARN`: a function reading through a consumer is mapped to the consumer, not the stream ([with-kinesis](https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html)). — a9s-devops: ESM is the authoritative link (documented on the SDK shape as `(Kinesis, DynamoDB Streams, Amazon MSK, ...)`).
 - **Count shown**: yes.
 
 ## 3. Attention / Issues Algorithm
@@ -136,7 +136,6 @@ At 3am, glancing at the list, a yellow Kinesis row reads `creating` / `updating`
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): CloudWatch `IteratorAgeMilliseconds`, `WriteProvisionedThroughputExceeded`, `ReadProvisionedThroughputExceeded`. These are the metrics that actually answer "is this stream healthy in production" — they are excluded from a9s because they exceed the Wave 2 cost budget, not because they are low value.
-- **`ddb` reverse pivot** — listing DDB tables that stream into this Kinesis stream via `EnableKinesisStreamingDestination`. Possible via per-table `DescribeKinesisStreamingDestination`, but worth=no: operators pivot DDB→Kinesis in practice, not the reverse; the N-table cost on every stream detail view is not justified by daily workflow. See §2 `ddb`.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
@@ -160,7 +159,8 @@ One bullet per claim in §§2–4.1.
 - a9s-devops consultation — `cfn` discovery via `ListTagsForStream` + `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every managed resource; tags are not on ListStreams/DescribeStreamSummary so a per-stream call is unavoidable but cheap.`
 - a9s-devops consultation — `kms` discovery requires Wave-2 `DescribeStreamSummary` to read `KeyId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. KeyId is absent from StreamSummary; the describe call is justified because CMK audit is a standard security review step operators repeat.`
 - a9s-devops consultation — `lambda` discovery via reverse scan of ESM by `EventSourceArn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ESM is the canonical consumer link; scanning an already-loaded ESM set is zero-cost and answers "who is reading this stream?" the first question operators ask about a lagging stream.`
-- a9s-devops consultation — `ddb` reverse pivot omitted — `a9s-devops (2026-04-20): possible=yes, worth=no. DescribeKinesisStreamingDestination would be required per DDB table in the loaded list; operators pivot DDB→Kinesis in practice, not the reverse, so the N-table cost is unjustified for a rare workflow. Recorded in §5 Out of Scope.`
+- AWS DynamoDB API reference — `KinesisDataStreamDestination.DestinationStatus` values, cited for `ddb` in §2 — <https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html>.
+- AWS Lambda Developer Guide — a function mapped to an enhanced fan-out consumer, cited for `lambda` in §2 — <https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html>.
 
 <!-- BEGIN GENERATED: header -->
 kinesis — MESSAGING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.

@@ -229,11 +229,12 @@ func osGraphRoot() ostypes.DomainStatus {
 		KmsKeyId: aws.String(OpenSearchKMSKeyARN),
 	}
 
-	// Custom endpoint (ACM cert wired via DescribeDomainConfig).
+	// Custom endpoint, served by OpenSearchACMCertARN.
 	d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{
-		EnforceHTTPS:          aws.Bool(true),
-		CustomEndpointEnabled: aws.Bool(true),
-		CustomEndpoint:        aws.String("acme-logs.internal.com"),
+		EnforceHTTPS:                 aws.Bool(true),
+		CustomEndpointEnabled:        aws.Bool(true),
+		CustomEndpoint:               aws.String("acme-logs.internal.com"),
+		CustomEndpointCertificateArn: aws.String(OpenSearchACMCertARN),
 	}
 
 	// VPC attachment — drives sg / subnet / vpc pivots.

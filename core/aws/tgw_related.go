@@ -28,7 +28,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		tgwID = *raw.TransitGatewayId
 	}
 	if tgwID == "" {
-		return foundNone("vpc", "tgwID")
+		return keyMissing("vpc", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -51,9 +51,9 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResultTrunc("vpc", ids, !complete)
 }
 
-// tgwVpcAttachments walks the VPC attachments of one transit gateway.
+// tgwVpcAttachments walks the live VPC attachments of one transit gateway.
 func tgwVpcAttachments(ctx context.Context, api EC2DescribeTransitGatewayVpcAttachmentsAPI, tgwID string) ([]ec2types.TransitGatewayVpcAttachment, bool, error) {
-	return PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayVpcAttachment, *string, error) {
+	atts, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.TransitGatewayVpcAttachment, *string, error) {
 		out, err := api.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 			Filters:   []ec2types.Filter{{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}}},
 			NextToken: token,
@@ -63,6 +63,35 @@ func tgwVpcAttachments(ctx context.Context, api EC2DescribeTransitGatewayVpcAtta
 		}
 		return out.TransitGatewayVpcAttachments, out.NextToken, nil
 	})
+	var live []ec2types.TransitGatewayVpcAttachment
+	for _, a := range atts {
+		if tgwAttachmentLive(a) {
+			live = append(live, a)
+		}
+	}
+	return live, complete, err
+}
+
+// tgwAttachmentLive is the one liveness predicate over an attachment's
+// TransitGatewayAttachmentState. A failing or failed attachment never carried
+// traffic, a rejecting or rejected one was refused, and a deleted one is gone;
+// each stays listed for a while all the same
+// (https://docs.aws.amazon.com/vpc/latest/tgw/tgw-vpc-attachments.html#vpc-attachment-lifecycle).
+func tgwAttachmentLive(att any) bool {
+	var state ec2types.TransitGatewayAttachmentState
+	switch a := att.(type) {
+	case ec2types.TransitGatewayVpcAttachment:
+		state = a.State
+	case ec2types.TransitGatewayAttachment:
+		state = a.State
+	}
+	switch state {
+	case ec2types.TransitGatewayAttachmentStateDeleted,
+		ec2types.TransitGatewayAttachmentStateFailing, ec2types.TransitGatewayAttachmentStateFailed,
+		ec2types.TransitGatewayAttachmentStateRejecting, ec2types.TransitGatewayAttachmentStateRejected:
+		return false
+	}
+	return true
 }
 
 // checkTGWRTB checks the rtb cache for route tables that have routes
@@ -70,7 +99,7 @@ func tgwVpcAttachments(ctx context.Context, api EC2DescribeTransitGatewayVpcAtta
 func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return foundNone("rtb", "tgwID")
+		return keyMissing("rtb", "tgwID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -137,7 +166,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	tgwID := res.ID
 	if tgwID == "" {
-		return foundNone("subnet", "tgwID")
+		return keyMissing("subnet", "tgwID")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {

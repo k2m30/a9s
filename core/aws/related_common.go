@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -149,40 +151,94 @@ func ecsTaskDefLogGroups(ctx context.Context, clients any, cache resource.Resour
 	if err != nil || def == nil {
 		return logGroupsNaming(ctx, clients, cache, family)
 	}
-	groups := awslogsGroups(def, sessionRegion(clients))
+	groups, whole := ecsContainerLogGroups(def, sessionRegion(clients))
+	containers := relatedRead{unread: !whole}
 	if len(groups) == 0 {
-		return foundNone("logs", "the definition's awslogs-group options")
+		return relatedAnswer("logs", containers)
 	}
 	logList, _, err := relatedResourcesFor(ctx, clients, cache, "logs")
-	if err != nil {
-		return ReadFailed("logs", err)
-	}
 	if logList == nil {
-		return NotRead("logs")
+		return relatedAnswer("logs", joinReads(containers, unreadBy(err)))
 	}
 	ids, lowerBound := listedRefs("logs", groups, refContext(clients, cache, "logs"), logList)
-	return relatedResultTrunc("logs", ids, lowerBound)
+	return relatedAnswer("logs", joinReads(containers, relatedRead{ids: ids, partial: lowerBound}))
 }
 
-// awslogsGroups is the log groups the containers of def write to: the
-// awslogs-group option of each container on the awslogs driver, in region
-// unless its awslogs-region option names another.
-// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html
-func awslogsGroups(def *ecstypes.TaskDefinition, region string) []string {
-	var groups []string
+// ecsContainerLogGroups is the one reader of the log groups the containers of
+// def write to, in region, and whether every container's destination could
+// be read from def:
+//   - the awslogs driver's awslogs-group, unless its awslogs-region names
+//     another Region (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html);
+//   - FireLens (awsfirelens), whose options become the log router's output
+//     configuration (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/firelens-taskdef.html):
+//     Fluent Bit's cloudwatch_logs output sends to its log_group_name
+//     (https://docs.fluentbit.io/manual/data-pipeline/outputs/cloudwatch), and
+//     other outputs to no log group. A log_group_template names its group
+//     per record, and a container with no options routes through a
+//     configuration file def does not hold: neither is readable here.
+func ecsContainerLogGroups(def *ecstypes.TaskDefinition, region string) (groups []string, whole bool) {
+	whole = true
 	for _, container := range def.ContainerDefinitions {
 		logs := container.LogConfiguration
-		if logs == nil || logs.LogDriver != ecstypes.LogDriverAwslogs {
+		if logs == nil {
 			continue
 		}
-		if r := logs.Options["awslogs-region"]; r != "" && region != "" && r != region {
-			continue
-		}
-		if g := logs.Options["awslogs-group"]; g != "" {
-			groups = append(groups, g)
+		switch logs.LogDriver {
+		case ecstypes.LogDriverAwslogs:
+			if r := logs.Options["awslogs-region"]; r != "" && region != "" && r != region {
+				continue
+			}
+			if g := logs.Options["awslogs-group"]; g != "" {
+				groups = append(groups, g)
+			}
+		case ecstypes.LogDriverAwsfirelens:
+			name := logs.Options["Name"]
+			switch {
+			case len(logs.Options) == 0:
+				whole = false
+			case name != "cloudwatch_logs" && name != "cloudwatch":
+			case logs.Options["log_group_template"] != "" || logs.Options["log_group_name"] == "":
+				whole = false
+			case logs.Options["region"] != "" && region != "" && logs.Options["region"] != region:
+			default:
+				groups = append(groups, logs.Options["log_group_name"])
+			}
 		}
 	}
-	return groups
+	return groups, whole
+}
+
+// ecsSecretRefs is the one classifier of the secret references def makes:
+// every container's secrets and its log driver's secretOptions
+// (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Secret.html),
+// and its private-registry credentials secret. A valueFrom is "either the full
+// ARN of the AWS Secrets Manager secret or the full ARN of the parameter in
+// the SSM Parameter Store", and a parameter in the task's Region may be named
+// by its name alone; a Secrets Manager ARN may carry
+// ":json-key:version-stage:version-id"
+// (https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html),
+// which the secrets resolver reads past.
+func ecsSecretRefs(def *ecstypes.TaskDefinition) (secrets, params []string) {
+	for _, c := range def.ContainerDefinitions {
+		refs := slices.Clone(c.Secrets)
+		if c.LogConfiguration != nil {
+			refs = append(refs, c.LogConfiguration.SecretOptions...)
+		}
+		for _, s := range refs {
+			v := aws.ToString(s.ValueFrom)
+			_, isSSM := ARNForService(v, "ssm")
+			switch {
+			case isSecret(v):
+				secrets = append(secrets, v)
+			case isSSM || v != "" && !strings.HasPrefix(v, "arn:"):
+				params = append(params, v)
+			}
+		}
+		if c.RepositoryCredentials != nil && aws.ToString(c.RepositoryCredentials.CredentialsParameter) != "" {
+			secrets = append(secrets, *c.RepositoryCredentials.CredentialsParameter)
+		}
+	}
+	return secrets, params
 }
 
 // ecsTaskDefinition reads one task definition. errClientMissing stands for a

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -26,6 +27,43 @@ func tgARN(res resource.Resource) string {
 		return *raw.TargetGroupArn
 	}
 	return ""
+}
+
+// tgsRegistering reads the target groups in tgs a target is registered in:
+// one elbv2:DescribeTargetHealth per group, which lists every registered
+// target (https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html),
+// kept to the ones names accepts. A group whose read failed leaves the answer
+// short; none read leaves it unread.
+func tgsRegistering(ctx context.Context, clients any, tgs []resource.Resource, op string, names func(targetID string) bool) relatedRead {
+	if len(tgs) == 0 {
+		return relatedRead{}
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.ELBv2 == nil {
+		return relatedRead{unread: true}
+	}
+	tgs, capped := fanOut(tgs)
+	var read relatedRead
+	var failures []Failure
+	for _, tg := range tgs {
+		arn := tgARN(tg)
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
+			return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &arn})
+		})
+		if err != nil {
+			failures = append(failures, FailedCall(tg.ID, err))
+			continue
+		}
+		if slices.ContainsFunc(out.TargetHealthDescriptions, func(d elbv2types.TargetHealthDescription) bool {
+			return d.Target != nil && names(aws.ToString(d.Target.Id))
+		}) {
+			read.ids = append(read.ids, tg.ID)
+		}
+	}
+	read.partial = capped || len(failures) > 0
+	read.unread = len(failures) == len(tgs)
+	read.failure = AggregateFailures(op, failures, len(tgs))
+	return read
 }
 
 // checkTGELB counts the load balancers the TG's LoadBalancerArns name, a

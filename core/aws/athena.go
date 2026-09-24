@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -61,12 +62,13 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 
 		outputLocation := ""
 		costCap := ""
-		configRead := false
+		row := AthenaWorkGroupRow{WorkGroupSummary: wg}
 		if getAPI != nil && wgName != "" {
 			wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)})
-			configRead = wgErr == nil && wgOut != nil && wgOut.WorkGroup != nil
-			if configRead && wgOut.WorkGroup.Configuration != nil {
+			row.configRead = wgErr == nil && wgOut != nil && wgOut.WorkGroup != nil
+			if row.configRead && wgOut.WorkGroup.Configuration != nil {
 				cfg := wgOut.WorkGroup.Configuration
+				row.Configuration = cfg
 				if cfg.ResultConfiguration != nil && cfg.ResultConfiguration.OutputLocation != nil {
 					outputLocation = *cfg.ResultConfiguration.OutputLocation
 				}
@@ -90,14 +92,14 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 				"result_output_location": outputLocation,
 				"cost_cap":               costCap,
 			},
-			RawStruct: wg,
+			RawStruct: row,
 		}
 		// The result location and the cost cap live on the workgroup's
 		// configuration, which ListWorkGroups does not carry: a row whose
 		// GetWorkGroup did not answer holds neither, and a reader that takes
 		// the empty cell for "none configured" states it about a
 		// configuration nobody read.
-		if !configRead {
+		if !row.configRead {
 			r.Fields[athenaConfigUnreadField] = "true"
 		}
 
@@ -127,6 +129,16 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// AthenaWorkGroupRow is a workgroup row's RawStruct: the workgroup as listed,
+// plus the configuration its GetWorkGroup returned, which every pivot of the
+// workgroup reads instead of asking again.
+type AthenaWorkGroupRow struct {
+	athenatypes.WorkGroupSummary
+	Configuration *athenatypes.WorkGroupConfiguration
+
+	configRead bool
 }
 
 // athenaStateFindings is the one predicate for a workgroup's state, which is

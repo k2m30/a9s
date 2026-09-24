@@ -281,19 +281,22 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 		},
 		// InUseBy — backs the acm→elb and acm→apigw related-panel pivots.
 		// ProdACMCertARN1 (acme-corp.com) is attached to the prod ALB
-		// (elb.go fixtProdELBARN) and to the public API Gateway custom
-		// domain (apigw.go PublicAPIGWID) via a realistic InUseBy ARN set.
+		// (elb.go fixtProdELBARN).
 		InUseBy: map[string][]string{
 			ProdACMCertARN1: {
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef",
 				// ELBWeakTLS terminates both its HTTPS listeners on this
 				// certificate (elb.go), so ACM records it as a user of it.
 				lbARNByName(NewELBFixtures().LoadBalancers, ELBWeakTLS),
-				"arn:aws:apigateway:us-east-1::/restapis/abc123def4",
 			},
 			// The prod ALB's HTTPS listener serves this wildcard by SNI
-			// (elb.go ListenerSNICerts).
-			ProdACMCertARN2: {fixtProdELBARN},
+			// (elb.go ListenerSNICerts), and the two API Gateway custom domains
+			// (apigw.go) terminate TLS on it; ACM names each domain, not an API.
+			ProdACMCertARN2: {
+				fixtProdELBARN,
+				"arn:aws:apigateway:us-east-1::/domainnames/" + PublicAPIGWDomainName,
+				"arn:aws:apigateway:us-east-1::/domainnames/" + RoutedAPIGWDomainName,
+			},
 		},
 		// DomainValidationOptions — backs the acm→r53 related-panel pivot.
 		// The validation CNAME for ProdACMCertARN1 lives under

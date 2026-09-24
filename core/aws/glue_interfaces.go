@@ -23,6 +23,11 @@ type GlueGetSecurityConfigurationAPI interface {
 	GetSecurityConfiguration(ctx context.Context, params *glue.GetSecurityConfigurationInput, optFns ...func(*glue.Options)) (*glue.GetSecurityConfigurationOutput, error)
 }
 
+// GlueGetConnectionAPI defines the interface for the Glue GetConnection operation.
+type GlueGetConnectionAPI interface {
+	GetConnection(ctx context.Context, params *glue.GetConnectionInput, optFns ...func(*glue.Options)) (*glue.GetConnectionOutput, error)
+}
+
 // GlueGetTagsAPI defines the interface for the Glue GetTags operation.
 type GlueGetTagsAPI interface {
 	GetTags(ctx context.Context, params *glue.GetTagsInput, optFns ...func(*glue.Options)) (*glue.GetTagsOutput, error)

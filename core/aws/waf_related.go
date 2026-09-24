@@ -47,12 +47,14 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 // checkWAFLogs reports the CloudWatch log groups among the log destinations
 // configured for this Web ACL (a Firehose stream or S3 bucket destination is
-// no log group). Pattern C: one wafv2:GetLoggingConfiguration call returning
-// LogDestinationConfigs (ARNs of the log destinations).
+// no log group), in every LogScope: a configuration is owned by the customer,
+// by Security Lake or by a CloudWatch telemetry rule, and GetLoggingConfiguration
+// answers for one scope at a time
+// (https://docs.aws.amazon.com/waf/latest/APIReference/API_GetLoggingConfiguration.html).
 func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return foundNone("logs", "webACLArn")
+		return keyMissing("logs", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
@@ -60,26 +62,34 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	region := wafRegionOf(res.Fields["scope"])
 	api := c.wafIn(res.Fields["scope"])
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetLoggingConfigurationOutput, error) {
-		return api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn})
-	})
-	if err != nil {
-		// WAFNonexistentItemException = no logging configured → real 0.
-		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-			return foundNone("logs", "the API answered that none is configured")
-		}
-		return ReadFailed("logs", err)
-	}
-	if out.LoggingConfiguration == nil {
-		return foundNone("logs", "out.LoggingConfiguration")
-	}
 	var groups []string
-	for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
-		if _, ok := ARNForService(d, "logs"); ok {
-			groups = append(groups, d)
+	var failures []Failure
+	scopes := wafv2types.LogScope("").Values()
+	for _, scope := range scopes {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetLoggingConfigurationOutput, error) {
+			return api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn, LogScope: scope})
+		})
+		if _, none := errors.AsType[*wafv2types.WAFNonexistentItemException](err); none {
+			continue
+		}
+		if err != nil {
+			failures = append(failures, FailedCall(string(scope), err))
+			continue
+		}
+		if out.LoggingConfiguration == nil {
+			continue
+		}
+		for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
+			if _, ok := ARNForService(d, "logs"); ok {
+				groups = append(groups, d)
+			}
 		}
 	}
-	return inRegion(clients, region, relatedRefs("logs", groups, refContext(c.InRegion(region), cache, "logs")))
+	read := readOf(relatedRefs("logs", groups, refContext(c.InRegion(region), cache, "logs")))
+	read.partial = read.partial || len(failures) > 0
+	read.unread = len(failures) == len(scopes)
+	read.failure = AggregateFailures("waf-related: GetLoggingConfiguration", failures, len(scopes))
+	return inRegion(clients, region, relatedAnswer("logs", read))
 }
 
 // checkWAFCF reports CloudFront distributions associated with this Web ACL.
@@ -99,7 +109,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		webACLArn = res.ID
 	}
 	if webACLArn == "" {
-		return foundNone("cf", "webACLArn")
+		return keyMissing("cf", "webACLArn")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {

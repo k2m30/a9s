@@ -92,7 +92,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"sg", "eni"}: "Network Interfaces",
 		{"sg", "elb"}: "Load Balancers",
 		{"sg", "cfn"}: "CloudFormation",
-		{"sg", "sg"}:  "Referencing SGs",
+		{"sg", "sg"}:  "Referenced SGs",
 
 		{"elb", "tg"}:    "Target Groups",
 		{"elb", "alarm"}: "CW Alarms",

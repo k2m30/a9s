@@ -31,12 +31,13 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 // checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
 // reverse-scanning the already-loaded backup list cache through
-// BackupPlanCovers. The row carries no tags, so a plan whose verdict turns on
-// a tag clause leaves the answer undecided. No live API call is made.
+// BackupPlanCovers, with the table's tags read by ListTagsOfResource: a plan
+// can select by tag. Tags that could not be read leave a tag clause
+// undecided.
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
-		return foundNone("backup", "tableARN")
+		return keyMissing("backup", "tableARN")
 	}
 	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
@@ -45,7 +46,13 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	if backupList == nil {
 		return NotRead("backup")
 	}
-	return backupPivot(backupList, truncated, backupTarget{arn: tableARN, unread: "ListTagsOfResource"})
+	target := backupTarget{arn: tableARN, unread: "ListTagsOfResource"}
+	if c, ok := clients.(*ServiceClients); ok && c != nil {
+		if api, ok := c.DynamoDB.(DynamoDBListTagsOfResourceAPI); ok {
+			target = target.withTags(dynamoDBTagsForARN(ctx, api, tableARN))
+		}
+	}
+	return backupPivot(backupList, truncated, target)
 }
 
 // checkDdbKinesis resolves Kinesis Data Streams connected to this DynamoDB table
@@ -54,7 +61,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
-		return foundNone("kinesis", "tableName")
+		return keyMissing("kinesis", "tableName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
@@ -72,9 +79,19 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	var arns []string
 	for _, dest := range out.KinesisDataStreamDestinations {
-		arns = append(arns, aws.ToString(dest.StreamArn))
+		if ddbDestinationLive(dest) {
+			arns = append(arns, aws.ToString(dest.StreamArn))
+		}
 	}
 	return relatedRefs("kinesis", arns, refContext(clients, cache, "kinesis"))
+}
+
+// ddbDestinationLive is the one liveness predicate over a streaming
+// destination's DestinationStatus: a DISABLED destination no longer receives
+// the table's changes and an ENABLE_FAILED one never did
+// (https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KinesisDataStreamDestination.html).
+func ddbDestinationLive(dest ddbtypes.KinesisDataStreamDestination) bool {
+	return dest.DestinationStatus != ddbtypes.DestinationStatusDisabled && dest.DestinationStatus != ddbtypes.DestinationStatusEnableFailed
 }
 
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream

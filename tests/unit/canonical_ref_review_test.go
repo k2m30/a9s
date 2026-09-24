@@ -365,12 +365,17 @@ func TestCtEventsPrincipals_AnotherAccountIsNotTheLocalNamesake(t *testing.T) {
 		bySession("evt-session-local", refAccount), bySession("evt-session-foreign", refForeignAccount),
 		byUser("evt-user-local", refAccount), byUser("evt-user-foreign", refForeignAccount),
 	)
+	// The IAM Roles pivot is the caller's role:
+	// userIdentity.sessionContext.sessionIssuer.arn of an AssumedRole identity.
 	roles := refChecker(t, "ct-events", "role")
-	if ids := sortedIDs(roles(context.Background(), refClients(), rows["evt-assume-local"], b.cache)); !slices.Equal(ids, []string{role}) {
-		t.Errorf("AssumeRole of the local role → IAM Roles = %v, want [%s]", ids, role)
+	if ids := sortedIDs(roles(context.Background(), refClients(), rows["evt-session-local"], b.cache)); !slices.Equal(ids, []string{role}) {
+		t.Errorf("session of the local role → IAM Roles = %v, want [%s]", ids, role)
 	}
-	if got := roles(context.Background(), refClients(), rows["evt-assume-foreign"], b.cache); got.Count() != 0 {
-		t.Errorf("AssumeRole of another account's role → IAM Roles = %v, want none", got.ResourceIDs())
+	if got := roles(context.Background(), refClients(), rows["evt-session-foreign"], b.cache); got.Count() != 0 {
+		t.Errorf("session of another account's role → IAM Roles = %v, want none", got.ResourceIDs())
+	}
+	if got := roles(context.Background(), refClients(), rows["evt-assume-local"], b.cache); got.Count() != 0 {
+		t.Errorf("AssumeRole called by an IAM user → IAM Roles = %v, want none: the caller is a user", got.ResourceIDs())
 	}
 
 	fields := []struct{ id, key, want string }{
@@ -440,7 +445,7 @@ func (f *refLambdaKeyFake) GetFunction(_ context.Context, in *lambdapkg.GetFunct
 }
 
 // refKMSPivotRun runs the three KMS pivots that read several references at
-// once — an AMI's block devices, an instance's attached volumes, an API's
+// once — an AMI's snapshots, an instance's attached volumes, an API's
 // Lambda integrations — with refs as their key references, against f.
 func refKMSPivotRun(t *testing.T, b refBench, f *refKMSLookupFake, refs []string) map[string]resource.RelatedCheckResult {
 	t.Helper()
@@ -449,14 +454,26 @@ func refKMSPivotRun(t *testing.T, b refBench, f *refKMSLookupFake, refs []string
 	clients.KMS = f
 	out := map[string]resource.RelatedCheckResult{}
 
+	// An AMI's key is its snapshots' (Snapshot.KmsKeyId); DescribeImages
+	// returns no KmsKeyId on a block device.
 	img := ec2types.Image{ImageId: aws.String("ami-0a1b2c3d4e5f60001")}
+	var snaps []resource.Resource
 	for i, ref := range refs {
+		snap := "snap-0e1f2a3b4c5d6e7f" + string(rune('a'+i))
 		img.BlockDeviceMappings = append(img.BlockDeviceMappings, ec2types.BlockDeviceMapping{
 			DeviceName: aws.String("/dev/xvd" + string(rune('a'+i))),
-			Ebs:        &ec2types.EbsBlockDevice{KmsKeyId: aws.String(ref), Encrypted: aws.Bool(true)},
+			Ebs:        &ec2types.EbsBlockDevice{SnapshotId: aws.String(snap), Encrypted: aws.Bool(true)},
 		})
+		snaps = append(snaps, resource.Resource{ID: snap, Type: "ebs-snap", RawStruct: ec2types.Snapshot{
+			SnapshotId: aws.String(snap),
+			KmsKeyId:   aws.String(ref),
+			Encrypted:  aws.Bool(true),
+			State:      ec2types.SnapshotStateCompleted,
+		}})
 	}
-	out["ami"] = refChecker(t, "ami", "kms")(ctx, clients, resource.Resource{ID: "ami-0a1b2c3d4e5f60001", Type: "ami", RawStruct: img}, b.cache)
+	amiCache := maps.Clone(b.cache)
+	amiCache["ebs-snap"] = resource.ResourceCacheEntry{Resources: snaps}
+	out["ami"] = refChecker(t, "ami", "kms")(ctx, clients, resource.Resource{ID: "ami-0a1b2c3d4e5f60001", Type: "ami", RawStruct: img}, amiCache)
 
 	const inst = "i-0a1b2c3d4e5f60001"
 	var vols []resource.Resource

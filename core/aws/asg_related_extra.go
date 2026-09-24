@@ -74,54 +74,17 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 	return relatedResultTrunc("tg", ids, truncated)
 }
 
-// checkASGSG resolves security groups associated with this ASG's launch configuration or template.
-// LaunchConfig.SecurityGroups[] or LaunchTemplate.SecurityGroupIds[] / NetworkInterfaces[].Groups[].
+// checkASGSG reports the security groups the group's launch sources launch
+// with: a launch configuration's SecurityGroups, a template's
+// SecurityGroupIds and its network interfaces' Groups.
 func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
 		return NotRead("sg")
 	}
-
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return NotRead("sg")
-	}
-
-	var ids []string
-
-	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-		lcs, err := launchConfigurations(ctx, c.AutoScaling, *asg.LaunchConfigurationName)
-		if err != nil {
-			return ReadFailed("sg", err)
-		}
-		if len(lcs) > 0 {
-			ids = append(ids, lcs[0].SecurityGroups...)
-		}
-		return relatedResultTrunc("sg", ids, false)
-	}
-
-	ltSpec := asg.LaunchTemplate
-	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
-		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
-	}
-	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return foundNone("sg", "ltSpec.LaunchTemplateId")
-	}
-
-	versions, err := launchTemplateVersions(ctx, c.EC2, ltSpec.LaunchTemplateId, ltSpec.Version)
-	if err != nil {
-		return ReadFailed("sg", err)
-	}
-	for _, v := range versions {
-		if v.LaunchTemplateData == nil {
-			continue
-		}
-		ids = append(ids, v.LaunchTemplateData.SecurityGroupIds...)
-		for _, ni := range v.LaunchTemplateData.NetworkInterfaces {
-			ids = append(ids, ni.Groups...)
-		}
-	}
-	return relatedResultTrunc("sg", ids, false)
+	launch, read := readASGLaunch(ctx, clients, asg)
+	read.ids = launch.securityGroups
+	return relatedAnswer("sg", read)
 }
 
 // checkASGSNS resolves SNS topics associated with this ASG via notification and lifecycle hook configurations.
@@ -140,7 +103,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		asgName = res.ID
 	}
 	if asgName == "" {
-		return foundNone("sns", "asgName")
+		return keyMissing("sns", "asgName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -175,7 +138,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return ReadFailed("sns", err)
+		return relatedAnswer("sns", joinReads(relatedRead{ids: ids, partial: !complete}, unreadBy(err)))
 	}
 	for _, h := range hookOut.LifecycleHooks {
 		if h.NotificationTargetARN == nil {

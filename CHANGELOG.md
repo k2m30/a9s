@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Related rows count every place AWS records the link. A Lambda function's
+  dead-letter queue or topic counts on both ends, and so does an EventBridge
+  target's dead-letter queue; a log group counts the functions that log to it
+  through `LoggingConfig`, the buckets its export tasks wrote to and its
+  subscription consumers; an Athena workgroup counts all three of its keys; a
+  CodeBuild project its secondary sources and S3 build-log bucket; an ECS
+  service its task and execution roles; a Glue job its continuous-logging
+  group and its connections' secrets; a Beanstalk environment its operations
+  role and only the bucket of the version it runs; an EKS Auto Mode cluster
+  its node role; a state machine the log group its logging configuration
+  names; a Kinesis stream the functions reading it through an enhanced
+  fan-out consumer; an instance the target groups whose target health lists
+  it and its AMI's snapshots; an AMI the keys of its snapshots; a security
+  group the groups its own rules reference; a REST API its Lambda, KMS, role
+  and load-balancer rows from its method integrations and authorizers; a
+  CloudTrail event the role it ran under and the ECR repository it names.
+  Backup plans that select by tag count on DynamoDB tables, buckets and RDS
+  and DocumentDB snapshots, and an EBS volume counts the plans covering the
+  instance it is attached to.
+- ECS task-definition secret references (`secrets` and log-driver
+  `secretOptions` by ARN, registry credentials by ARN or name) and Auto Scaling
+  launch sources (launch template, launch configuration, mixed-instances
+  policy and its overrides) are each read by one function, so every pivot
+  over them agrees.
+- A deleted, failed or rejected Transit Gateway attachment, a disabled SES
+  receipt rule or event destination, a disabled DynamoDB streaming
+  destination and a disabled OpenSearch log-publishing option are no longer
+  counted.
+- The ENI detail shows every private address the interface holds, and an
+  Elastic IP on a secondary address links to its address row.
+- A DynamoDB table no longer has a Log Groups row: DynamoDB writes no log
+  group. The secrets → CodeArtifact row is labelled "CodeArtifact
+  Repositories", and the security-group row "Referenced SGs".
+- Who an IAM policy is attached to is read again on every open, so a profile
+  switch or a cancelled read never shows another account's or a stale answer;
+  a web refresh of the SES list re-reads the active receipt rule set, as the
+  terminal's does.
+
 - EventBridge rules are counted on an ECR repository, S3 bucket or ECS
   service when their event pattern can match an event about it, read the way
   EventBridge reads a pattern: every content filter it documents (`prefix`,
@@ -132,6 +170,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads unknown with no error flash naming a call that was never made.
 - A related check that fails unexpectedly shows as that row's error, not as a
   failed by-ID fetch.
+- Related rows count only what carries the link. An SNS subscription pending
+  confirmation, a terminated or shutting-down instance, an instance leaving
+  its Auto Scaling group, a failed NAT gateway or an address leaving one, a
+  failed or cancelled log export, and a deregistered ECS container instance
+  no longer count. A load balancer's access-log bucket, an ElastiCache
+  notification topic, an MWAA module's log group, a CodeBuild project's log
+  group and an ECS cluster's exec log group count only while that logging is
+  on.
+- ACM → API Gateway lists the APIs a certificate's custom domain maps to,
+  including an edge-optimized domain's base path mappings and a domain's
+  routing rules, and
+  an Auto Scaling group's AMI row includes the images its instance-type
+  overrides set.
+- ECS task and service log groups include the CloudWatch group a FireLens
+  container names, and a FireLens config file makes the count a lower bound.
+  An ECS task's SSM parameters are matched against the loaded parameter list,
+  so a parameter in another Region is not a local one of the same name.
+- A related row whose link lives in two places keeps what the first place
+  found, and the error, when the second cannot be read. A related row whose
+  target list fails to load shows that error instead of reading unknown.
+- Refreshing an IAM policy, role, user or group reads the attached policies
+  again instead of drilling into the ones cached earlier.
 
 ## [3.58.1] - 2026-09-23
 

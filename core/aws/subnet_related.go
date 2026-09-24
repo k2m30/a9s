@@ -20,7 +20,7 @@ import (
 func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("ec2", "subnetID")
+		return keyMissing("ec2", "subnetID")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -50,7 +50,7 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("eni", "subnetID")
+		return keyMissing("eni", "subnetID")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -80,7 +80,7 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("nat", "subnetID")
+		return keyMissing("nat", "subnetID")
 	}
 
 	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
@@ -105,7 +105,7 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("elb", "subnetID")
+		return keyMissing("elb", "subnetID")
 	}
 
 	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
@@ -173,7 +173,7 @@ func subnetRouteTableIDs(subnetID, vpcID string, rtbList []resource.Resource, rt
 func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("rtb", "subnetID")
+		return keyMissing("rtb", "subnetID")
 	}
 
 	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
@@ -214,7 +214,7 @@ func checkSubnetVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("asg", "subnetID")
+		return keyMissing("asg", "subnetID")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -248,7 +248,7 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("efs", "subnetID")
+		return keyMissing("efs", "subnetID")
 	}
 
 	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -301,7 +301,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("eks", "subnetID")
+		return keyMissing("eks", "subnetID")
 	}
 
 	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
@@ -333,7 +333,7 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	subnetID := res.ID
 	if subnetID == "" {
-		return foundNone("vpce", "subnetID")
+		return keyMissing("vpce", "subnetID")
 	}
 
 	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")

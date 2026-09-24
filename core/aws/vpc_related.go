@@ -291,7 +291,9 @@ func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	var ids []string
 	for _, att := range atts {
-		ids = append(ids, aws.ToString(att.TransitGatewayId))
+		if tgwAttachmentLive(att) {
+			ids = append(ids, aws.ToString(att.TransitGatewayId))
+		}
 	}
 	return relatedResultTrunc("tgw", ids, !complete)
 }

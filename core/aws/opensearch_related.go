@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
@@ -20,7 +19,10 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 	return alarmIDsByDimension(ctx, clients, cache, "opensearch", res)
 }
 
-// checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.
+// checkOpenSearchLogs extracts the CloudWatch log groups of the domain's
+// enabled LogPublishingOptions: Enabled is "whether the log should be
+// published"
+// (https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_LogPublishingOption.html).
 func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
@@ -32,7 +34,7 @@ func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, 
 
 	var arns []string
 	for _, opt := range domain.LogPublishingOptions {
-		if opt.CloudWatchLogsLogGroupArn != nil {
+		if aws.ToBool(opt.Enabled) && opt.CloudWatchLogsLogGroupArn != nil {
 			arns = append(arns, *opt.CloudWatchLogsLogGroupArn)
 		}
 	}
@@ -167,63 +169,20 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 	return relatedResultTrunc("subnet", ids, false)
 }
 
-// checkOpenSearchACM calls opensearch:DescribeDomainConfig and returns the
-// ACM certificate attached to the domain's custom endpoint
-// (DomainEndpointOptions.Options.CustomEndpointCertificateArn).
-//
-// The ACM fetcher (acm.go) indexes Resource.ID by DomainName. So this
-// checker looks up the cert ARN against the acm cache and returns the
-// matching Resource.ID (DomainName) so drill-through lands on it.
+// checkOpenSearchACM reports the certificate on the domain's custom endpoint,
+// DomainEndpointOptions.CustomEndpointCertificateArn "for your security
+// certificate, managed in AWS Certificate Manager", which DescribeDomains puts
+// on the row
+// (https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainEndpointOptions.html).
+// With the custom endpoint disabled the certificate terminates nothing.
 func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	domainName := res.ID
-	if domainName == "" {
-		return foundNone("acm", "domainName")
-	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.OpenSearch == nil {
-		return NotRead("acm")
-	}
-	cfgAPI, ok := c.OpenSearch.(OpenSearchDescribeDomainConfigAPI)
+	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
 		return NotRead("acm")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainConfigOutput, error) {
-		return cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
-	})
-	if err != nil {
-		return ReadFailed("acm", err)
+	opts := domain.DomainEndpointOptions
+	if opts == nil || !aws.ToBool(opts.CustomEndpointEnabled) {
+		return foundNone("acm", "DomainEndpointOptions.CustomEndpointEnabled")
 	}
-	if out.DomainConfig == nil ||
-		out.DomainConfig.DomainEndpointOptions == nil ||
-		out.DomainConfig.DomainEndpointOptions.Options == nil ||
-		out.DomainConfig.DomainEndpointOptions.Options.CustomEndpointCertificateArn == nil {
-		return foundNone("acm", "the API answered that none is configured")
-	}
-	arn := *out.DomainConfig.DomainEndpointOptions.Options.CustomEndpointCertificateArn
-	if arn == "" {
-		return foundNone("acm", "arn")
-	}
-
-	// Reverse-scan the acm cache for a cert whose RawStruct.CertificateArn
-	// matches. Return the target Resource.ID (DomainName) so drill lands.
-	acmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
-	if err != nil {
-		return ReadFailed("acm", err)
-	}
-	if acmList == nil {
-		return NotRead("acm")
-	}
-	for _, acmRes := range acmList {
-		cert, ok := assertStruct[acmtypes.CertificateSummary](acmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if cert.CertificateArn != nil && *cert.CertificateArn == arn {
-			return relatedResultTrunc("acm", []string{acmRes.ID}, false)
-		}
-	}
-	if truncated {
-		return relatedResultTrunc("acm", nil, true)
-	}
-	return foundNone("acm", "the complete acm list")
+	return listedRelated(ctx, clients, cache, "acm", []string{aws.ToString(opts.CustomEndpointCertificateArn)}, false)
 }

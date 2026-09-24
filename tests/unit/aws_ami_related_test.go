@@ -322,22 +322,39 @@ func TestRelated_AMI_CFN_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- checkAMIKMS tests (Pattern F — reads EBS.KmsKeyId from block device mappings) ---
+// --- checkAMIKMS tests (the key its block devices' snapshots are encrypted with) ---
 
-// TestRelated_AMI_KMS_MatchByARN verifies that KMS key ARNs from EBS block
-// device mappings are extracted and returned.
+// amiSnapCache is an ebs-snap list holding the given snapshots, each
+// encrypted with keyARN, as DescribeSnapshots reports them.
+func amiSnapCache(keyARN string, snapIDs ...string) resource.ResourceCache {
+	var rows []resource.Resource
+	for _, id := range snapIDs {
+		rows = append(rows, resource.Resource{ID: id, RawStruct: ec2types.Snapshot{
+			SnapshotId: aws.String(id),
+			VolumeId:   aws.String("vol-0" + id[5:]),
+			Encrypted:  aws.Bool(true),
+			KmsKeyId:   aws.String(keyARN),
+			State:      ec2types.SnapshotStateCompleted,
+		}})
+	}
+	return resource.ResourceCache{"ebs-snap": {Resources: rows}}
+}
+
+// TestRelated_AMI_KMS_MatchByARN: DescribeImages returns no KmsKeyId on a
+// block device (EbsBlockDevice: supported only on RunInstances and Spot
+// requests); the AMI's key is its snapshot's Snapshot.KmsKeyId.
 func TestRelated_AMI_KMS_MatchByARN(t *testing.T) {
 	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abcd1234"
 	img := ec2types.Image{
 		ImageId: aws.String("ami-0abc1234def56789"),
 		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
-			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
+			{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{SnapshotId: aws.String("snap-0aaa1111bbbb2222c"), Encrypted: aws.Bool(true)}},
 		},
 	}
 	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
 
 	checker := amiCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, amiSnapCache(keyARN, "snap-0aaa1111bbbb2222c"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
@@ -348,21 +365,21 @@ func TestRelated_AMI_KMS_MatchByARN(t *testing.T) {
 	}
 }
 
-// TestRelated_AMI_KMS_Deduplicated verifies that duplicate KMS key IDs (same
-// key on multiple EBS volumes) are returned only once.
+// TestRelated_AMI_KMS_Deduplicated verifies that one key encrypting the
+// snapshots of several block devices is returned once.
 func TestRelated_AMI_KMS_Deduplicated(t *testing.T) {
 	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abcd1234"
 	img := ec2types.Image{
 		ImageId: aws.String("ami-0abc1234def56789"),
 		BlockDeviceMappings: []ec2types.BlockDeviceMapping{
-			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
-			{Ebs: &ec2types.EbsBlockDevice{KmsKeyId: aws.String(keyARN)}},
+			{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{SnapshotId: aws.String("snap-0aaa1111bbbb2222c")}},
+			{DeviceName: aws.String("/dev/xvdb"), Ebs: &ec2types.EbsBlockDevice{SnapshotId: aws.String("snap-0ddd3333eeee4444f")}},
 		},
 	}
 	source := resource.Resource{ID: "ami-0abc1234def56789", RawStruct: img}
 
 	checker := amiCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, amiSnapCache(keyARN, "snap-0aaa1111bbbb2222c", "snap-0ddd3333eeee4444f"))
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (deduplicated)", result.Count())

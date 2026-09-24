@@ -346,14 +346,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			"launch_time":  "LaunchTime",
 		},
 		Related: []domain.RelatedDef{
-			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups, NeedsTargetCache: true, Truncated: true, Distinct: "instance-type target groups sharing this instance's VPC, by TargetGroup.VpcId"},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups, NeedsTargetCache: true, Truncated: true, Distinct: "the instance target groups in its VPC (TargetGroup.VpcId) whose DescribeTargetHealth lists this instance"},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkEC2NodeGroups, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS, Mirror: true},
-			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true, Truncated: true, Distinct: "snapshots of the volumes this instance has attached, by Snapshot.VolumeId"},
+			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true, Truncated: true, Distinct: "snapshots of the volumes this instance has attached, by Snapshot.VolumeId, and of its AMI, by BlockDeviceMappings[].Ebs.SnapshotId"},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ec2")},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG, Mirror: true},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC, Mirror: true},
@@ -568,7 +568,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "log_groups", "container_images", "arn", "task_def_join_error"},
+		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "log_groups", "log_groups_unread", "container_images", "arn", "task_def_join_error"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService, Mirror: true},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster, Mirror: true},
@@ -660,7 +660,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEBRule, NeedsTargetCache: false, Truncated: true, Mirror: true},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLambdaSubnet},
 			{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkLambdaEFS, Mirror: true},
-			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "APIs with an integration whose IntegrationUri is this function"},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true, Truncated: true, Distinct: "APIs with an integration whose URI is this function"},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkLambdaCF, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkLambdaDDB, Truncated: true, Mirror: true},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLambdaKinesis, Truncated: true, Mirror: true},
@@ -917,7 +917,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true, Truncated: true, Distinct: "groups running an instance whose Instance.ImageId is this image"},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN, NeedsTargetCache: true, Truncated: true},
-			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS, Truncated: true},
 			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkAMING, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ami")},
 		},

@@ -25,7 +25,7 @@ Note on resource shape: a ct-events row is one CloudTrail **event** (a point-in-
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ct-events` (self-pivot — four facets), `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce`.
+Expected targets from `docs/related-resources.md` § Per-type contract: `cfn`, `ct-events` (self-pivot — four facets), `dbi`, `ddb`, `ec2`, `ecr`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce`.
 
 The detail view of a ct-events row is "who did what to which AWS resource?" — so the related panel is the set of principals and target resources extracted from the event payload.
 
@@ -93,6 +93,12 @@ The detail view of a ct-events row is "who did what to which AWS resource?" — 
 
 - **Why related**: a DynamoDB table whose schema or capacity was changed.
 - **How discovered**: iterate `Event.Resources[]` and keep entries whose `ResourceType == "AWS::DynamoDB::Table"`; cross-reference the already-loaded `ddb` list.
+- **Count shown**: yes.
+
+### `ecr`
+
+- **Why related**: an ECR repository an image was pushed to or pulled from, or whose policy or settings changed.
+- **How discovered**: iterate `Event.Resources[]` and keep entries whose `ResourceType == "AWS::ECR::Repository"`, which name the repository by ARN or by bare name; with none, `requestParameters.repositoryName` ([logging-using-cloudtrail](https://docs.aws.amazon.com/AmazonECR/latest/userguide/logging-using-cloudtrail.html)). Both shapes resolve to the repository row.
 - **Count shown**: yes.
 
 ### `cfn`
@@ -206,7 +212,8 @@ At 3am, glancing at a ct-events list filtered by an anxious operator, can they t
 ## 6. Citations
 
 - a9s golden doc — the `ct-events` findings — `docs/attention-signals.md § Signals § MONITORING` row `ct-events`.
-- a9s golden doc — per-type contract lists `cfn, ct-events, dbi, ddb, ec2, iam-user, kms, lambda, role, s3, secrets, sg, trail, vpce` — `docs/related-resources.md` § `Per-type contract`, row `ct-events`.
+- a9s golden doc — per-type contract lists `cfn, ct-events, dbi, ddb, ec2, ecr, iam-user, kms, lambda, role, s3, secrets, sg, trail, vpce` — `docs/related-resources.md` § `Per-type contract`, row `ct-events`.
+- AWS ECR User Guide — CloudTrail log entries name the repository in `resources[]` by ARN and in `requestParameters.repositoryName`, cited for `ecr` in §2 — <https://docs.aws.amazon.com/AmazonECR/latest/userguide/logging-using-cloudtrail.html>.
 - a9s golden doc — three self-pivot facets (AccessKeyId / Username / EventName) — `docs/related-resources.md` § `Per-target reasoning` → `### ct-events`.
 - a9s golden doc — universal-pivot rule (ct-events applies to every registered type) — `docs/related-resources.md` § `Policy`, rule 4.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § `What is a9s?`.
@@ -251,6 +258,7 @@ ct-events — MONITORING. Status key: `status` — the key the status cell reads
 | vpce | VPC Endpoints | yes |
 | sg | Security Groups | yes |
 | ddb | DynamoDB Tables | yes |
+| ecr | ECR Repositories | yes |
 | cfn | CloudFormation Stacks | yes |
 | trail | CloudTrail Trails | yes |
 | ct-events | CT events by AccessKeyId | no |

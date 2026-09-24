@@ -24,6 +24,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		Rules: []sestypes.ReceiptRule{
 			{
 				Name:       aws.String("global-rule"),
+				Enabled:    true,
 				Recipients: nil, // applies to all identities
 				Actions: []sestypes.ReceiptAction{
 					{LambdaAction: &sestypes.LambdaAction{
@@ -94,6 +95,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		Rules: []sestypes.ReceiptRule{
 			{
 				Name:       aws.String("global-rule"),
+				Enabled:    true,
 				Recipients: nil, // global — applies to all identities
 				Actions: []sestypes.ReceiptAction{
 					{LambdaAction: &sestypes.LambdaAction{
@@ -210,6 +212,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 	staleOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{{
 			Name:       aws.String("stale-rule"),
+			Enabled:    true,
 			Recipients: nil,
 			Actions: []sestypes.ReceiptAction{
 				{LambdaAction: &sestypes.LambdaAction{
@@ -290,6 +293,7 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 		Rules: []sestypes.ReceiptRule{
 			{
 				Name:       aws.String("coalesced-rule"),
+				Enabled:    true,
 				Recipients: nil, // global — applies to all identities
 				Actions: []sestypes.ReceiptAction{
 					{LambdaAction: &sestypes.LambdaAction{
@@ -405,6 +409,7 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 		Rules: []sestypes.ReceiptRule{
 			{
 				Name:       aws.String("follower-rule"),
+				Enabled:    true,
 				Recipients: nil, // global — applies to all identities
 				Actions: []sestypes.ReceiptAction{
 					{LambdaAction: &sestypes.LambdaAction{

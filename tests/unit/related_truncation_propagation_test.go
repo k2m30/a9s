@@ -230,9 +230,6 @@ func TestRelatedTruncation_HeuristicPivotStaysHeuristicWhenScanIsPartial(t *test
 		source, target, row string
 		result              func(t *testing.T, src resource.Resource) resource.RelatedCheckResult
 	}{
-		{"ec2", "tg", "i-0a1b2c3d4e5f60001", func(t *testing.T, src resource.Resource) resource.RelatedCheckResult {
-			return refChecker(t, "ec2", "tg")(context.Background(), refClients(), src, cacheWithTruncatedEntry(b.cache, "tg"))
-		}},
 		{"secrets", "codeartifact", "prod/codeartifact/npm-publish-token", func(t *testing.T, src resource.Resource) resource.RelatedCheckResult {
 			return refChecker(t, "secrets", "codeartifact")(context.Background(), refClients(), src, cacheWithTruncatedEntry(b.cache, "codeartifact"))
 		}},

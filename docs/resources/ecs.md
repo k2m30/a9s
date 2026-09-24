@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ec2`
 
 - **Why related**: Container instances (EC2 launch type) — operator pivot for host-level problems (agent disconnect, instance impaired).
-- **How discovered**: call `ListContainerInstances(cluster=<arn>)` + `DescribeContainerInstances` → `Ec2InstanceId` per instance; cross-reference the already-loaded `ec2` list by instance ID. Fargate-only clusters return zero.
+- **How discovered**: call `ListContainerInstances(cluster=<arn>)` + `DescribeContainerInstances` → `Ec2InstanceId` per instance; cross-reference the already-loaded `ec2` list by instance ID. A container instance whose status is `REGISTRATION_FAILED`, `DEREGISTERING` or `INACTIVE` is no member ([API_ContainerInstance](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerInstance.html)). Fargate-only clusters return zero.
 - **Count shown**: yes.
 
 ### `ecs-svc`
@@ -70,7 +70,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: `ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName` — the log group receiving `ecs exec` session transcripts.
-- **How discovered**: read `Cluster.Configuration.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName`; cross-reference the already-loaded `logs` list by name.
+- **How discovered**: read `Cluster.Configuration.ExecuteCommandConfiguration.LogConfiguration.CloudWatchLogGroupName` when `ExecuteCommandConfiguration.Logging` is `OVERRIDE`, the only setting that uses it ([API_ExecuteCommandConfiguration](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ExecuteCommandConfiguration.html)); cross-reference the already-loaded `logs` list by name.
 - **Count shown**: yes (0 or 1).
 
 ### `ct-events`

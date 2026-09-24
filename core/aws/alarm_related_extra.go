@@ -49,16 +49,16 @@ func checkAlarmLambda(ctx context.Context, clients any, res resource.Resource, c
 // metric it is over, read with one DescribeMetricFilters on that metric.
 func checkAlarmLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var groups map[string]bool
-	var partial bool
+	var filters relatedRead
 	if alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct); ok {
 		if m, named := AlarmMetricWatched(alarm); named {
-			groups, partial = alarmMetricLogGroups(ctx, clients, m)
+			groups, filters = alarmMetricLogGroups(ctx, clients, m)
 		}
 	}
 	result := alarmRowsNaming(ctx, clients, cache, "logs", res, func(row resource.Resource) bool {
 		return groups[row.ID]
 	})
-	return alsoPartial(result, partial)
+	return alsoRead(result, filters)
 }
 
 func checkAlarmS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

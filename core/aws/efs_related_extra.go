@@ -22,7 +22,7 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("eni", "fsID")
+		return keyMissing("eni", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
@@ -48,7 +48,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
-		return foundNone("vpc", "fsID")
+		return keyMissing("vpc", "fsID")
 	}
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {

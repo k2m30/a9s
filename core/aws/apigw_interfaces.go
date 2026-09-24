@@ -69,6 +69,29 @@ type APIGatewayV1GetStagesAPI interface {
 	GetStages(ctx context.Context, params *apigateway.GetStagesInput, optFns ...func(*apigateway.Options)) (*apigateway.GetStagesOutput, error)
 }
 
+// APIGatewayV1GetResourcesAPI lists a REST API's resources; with the
+// "methods" embed each carries its methods and their integrations.
+type APIGatewayV1GetResourcesAPI interface {
+	GetResources(ctx context.Context, params *apigateway.GetResourcesInput, optFns ...func(*apigateway.Options)) (*apigateway.GetResourcesOutput, error)
+}
+
+// APIGatewayV1GetVpcLinksAPI lists the account's REST API VPC links.
+type APIGatewayV1GetVpcLinksAPI interface {
+	GetVpcLinks(ctx context.Context, params *apigateway.GetVpcLinksInput, optFns ...func(*apigateway.Options)) (*apigateway.GetVpcLinksOutput, error)
+}
+
+// APIGatewayV1GetBasePathMappingsAPI lists a custom domain's base path
+// mappings, how an edge-optimized domain maps REST APIs.
+type APIGatewayV1GetBasePathMappingsAPI interface {
+	GetBasePathMappings(ctx context.Context, params *apigateway.GetBasePathMappingsInput, optFns ...func(*apigateway.Options)) (*apigateway.GetBasePathMappingsOutput, error)
+}
+
+// APIGatewayV2ListRoutingRulesAPI lists a custom domain's routing rules,
+// each of which invokes a REST API stage.
+type APIGatewayV2ListRoutingRulesAPI interface {
+	ListRoutingRules(ctx context.Context, params *apigatewayv2.ListRoutingRulesInput, optFns ...func(*apigatewayv2.Options)) (*apigatewayv2.ListRoutingRulesOutput, error)
+}
+
 // APIGatewayV1API is the aggregate interface covering APIGateway v1 (REST) operations used by a9s fetchers.
 // *apigateway.Client structurally satisfies this interface.
 type APIGatewayV1API interface {

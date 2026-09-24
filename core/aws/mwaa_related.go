@@ -10,6 +10,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -37,7 +38,8 @@ func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkMWAALogs reads the five LoggingConfiguration CloudWatchLogGroupArn
-// fields directly.
+// fields directly, each while its module's Enabled says the log type "is
+// enabled" (https://docs.aws.amazon.com/mwaa/latest/API/API_ModuleLoggingConfiguration.html).
 func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -54,7 +56,7 @@ func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache 
 		env.LoggingConfiguration.WorkerLogs,
 		env.LoggingConfiguration.TaskLogs,
 	} {
-		if m != nil && m.CloudWatchLogGroupArn != nil {
+		if m != nil && aws.ToBool(m.Enabled) && m.CloudWatchLogGroupArn != nil {
 			ids = append(ids, *m.CloudWatchLogGroupArn)
 		}
 	}

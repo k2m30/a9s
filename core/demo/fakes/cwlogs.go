@@ -144,9 +144,24 @@ func (f *CWLogsFake) DescribeMetricFilters(_ context.Context, input *cloudwatchl
 	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
 }
 
+// DescribeExportTasks returns the account's export tasks; the API filters
+// only by task id or status.
+func (f *CWLogsFake) DescribeExportTasks(_ context.Context, input *cloudwatchlogs.DescribeExportTasksInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeExportTasksOutput, error) {
+	var out []cwlogstypes.ExportTask
+	for _, t := range f.fix.ExportTasks {
+		if input.TaskId != nil && aws.ToString(t.TaskId) != *input.TaskId {
+			continue
+		}
+		if input.StatusCode != "" && (t.Status == nil || t.Status.Code != input.StatusCode) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return &cloudwatchlogs.DescribeExportTasksOutput{ExportTasks: out}, nil
+}
+
 // DescribeSubscriptionFilters returns subscription filters for the named log
-// group from fixture data. Backs the logs:kinesis and logs:s3 related-panel
-// pivots (checkLogsKinesis / checkLogsS3).
+// group from fixture data.
 func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloudwatchlogs.DescribeSubscriptionFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error) {
 	var logGroupName string
 	if input != nil && input.LogGroupName != nil {

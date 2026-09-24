@@ -169,14 +169,10 @@ const (
 	// attachment left in the Available state — the only demo TGW in the tgw
 	// Healthy color bucket.
 	HealthyTGWID = "tgw-0healthy11111111h"
-)
 
-// AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot: the
-// AMI's BlockDeviceMappings[].Ebs.KmsKeyId is the ARN, and the kms row is
-// keyed by the ID. See kms.go for the corresponding fixture entry.
-const (
-	AMIEBSKmsKeyID  = "ami-ebs-boot-volume-key"
-	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID
+	// TGWDeletedAttachmentID is HealthyTGWID's deleted attachment to the prod
+	// VPC: tgw -> vpc and vpc -> tgw count neither end of it.
+	TGWDeletedAttachmentID = "tgw-attach-0deleted111111d"
 )
 
 // Posture carriers for the networking types. Each names the ONE demo
@@ -2725,7 +2721,22 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 				{Key: aws.String("Name"), Value: aws.String("hub-tgw-vpn-modifying")},
 			},
 		},
-		// HealthyTGWID's only attachment → staging VPC, left Available.
+		// HealthyTGWID's former attachment to the prod VPC, deleted: AWS keeps
+		// listing it for a while, and neither side counts it.
+		{
+			TransitGatewayAttachmentId: aws.String(TGWDeletedAttachmentID),
+			TransitGatewayId:           aws.String(HealthyTGWID),
+			ResourceType:               ec2types.TransitGatewayAttachmentResourceTypeVpc,
+			ResourceId:                 aws.String(fixtProdVPCID),
+			State:                      ec2types.TransitGatewayAttachmentStateDeleted,
+			TransitGatewayOwnerId:      aws.String("123456789012"),
+			ResourceOwnerId:            aws.String("123456789012"),
+			CreationTime:               aws.Time(time.Date(2025, 10, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("spoke-tgw-prod-vpc-retired")},
+			},
+		},
+		// HealthyTGWID's live attachment → staging VPC, left Available.
 		{
 			TransitGatewayAttachmentId: aws.String("tgw-attach-0healthy1111h"),
 			TransitGatewayId:           aws.String(HealthyTGWID),
@@ -3005,6 +3016,17 @@ func buildNetworkInterfaces(sgs []ec2types.SecurityGroup, vpces []ec2types.VpcEn
 			},
 			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String(name + "-eni")}},
 		})
+	}
+	// PrivateIpAddresses holds every private IPv4 address of the interface,
+	// its primary one marked Primary
+	// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html).
+	for i, eni := range enis {
+		if len(eni.PrivateIpAddresses) == 0 && eni.PrivateIpAddress != nil {
+			enis[i].PrivateIpAddresses = []ec2types.NetworkInterfacePrivateIpAddress{{
+				Primary: aws.Bool(true), PrivateIpAddress: eni.PrivateIpAddress,
+				PrivateDnsName: eni.PrivateDnsName, Association: eni.Association,
+			}}
+		}
 	}
 	return enis
 }
@@ -3717,13 +3739,12 @@ func buildImages() []ec2types.Image {
 			CreationDate: aws.String("2026-02-15T10:30:00.000Z"), Public: aws.Bool(false),
 			OwnerId: aws.String("123456789012"), Description: aws.String("Production app server image x86_64 v2.3.1"),
 			EnaSupport: aws.Bool(true),
-			// SnapshotId/KmsKeyId — required for ami→ebs-snap and ami→kms related-panel
-			// pivots. snap-0a1b2c3d4e5f60001 is a real snapshot fixture (ec2.go buildSnapshots).
+			// snap-0a1b2c3d4e5f60001 is a snapshot fixture (buildSnapshots): the
+			// ami→ebs-snap pivot, and ami→kms through the snapshot's own key.
 			BlockDeviceMappings: []ec2types.BlockDeviceMapping{
 				{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{
 					VolumeSize: aws.Int32(20), VolumeType: ec2types.VolumeTypeGp3, DeleteOnTermination: aws.Bool(true),
 					SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"),
-					KmsKeyId:   aws.String(AMIEBSKmsKeyARN),
 				}},
 			},
 			BootMode: ec2types.BootModeValuesUefi, DeprecationTime: aws.String("2028-01-01T00:00:00Z"),

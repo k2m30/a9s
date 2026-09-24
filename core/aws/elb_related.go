@@ -28,7 +28,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 		}
 	}
 	if elbARN == "" {
-		return foundNone("tg", "elbARN")
+		return keyMissing("tg", "elbARN")
 	}
 
 	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
@@ -97,7 +97,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return foundNone("cfn", "elbARN")
+		return keyMissing("cfn", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -139,7 +139,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return foundNone("acm", "elbARN")
+		return keyMissing("acm", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -212,7 +212,7 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dnsName := res.Fields["dns_name"]
 	if dnsName == "" {
-		return foundNone("cf", "dnsName")
+		return keyMissing("cf", "dnsName")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
@@ -247,7 +247,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 		lbName = res.Name
 	}
 	if lbName == "" {
-		return foundNone("eni", "lbName")
+		return keyMissing("eni", "lbName")
 	}
 
 	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
@@ -277,9 +277,11 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("eni", ids, truncated)
 }
 
-// checkELBS3 reports the S3 bucket receiving ELB access logs.
-// Pattern C: one elbv2:DescribeLoadBalancerAttributes call; read the
-// "access_logs.s3.bucket" attribute.
+// checkELBS3 reports the S3 bucket receiving ELB access logs, read from
+// DescribeLoadBalancerAttributes: "access_logs.s3.bucket", which "is required
+// if access logs are enabled" and so can outlive them, counts only while
+// "access_logs.s3.enabled" is true
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html).
 func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	elbARN := res.Fields["load_balancer_arn"]
 	if elbARN == "" {
@@ -289,7 +291,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	if elbARN == "" {
-		return foundNone("s3", "elbARN")
+		return keyMissing("s3", "elbARN")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
@@ -301,13 +303,14 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	if err != nil {
 		return ReadFailed("s3", err)
 	}
-	var ids []string
+	attrs := map[string]string{}
 	for _, a := range out.Attributes {
-		if a.Key != nil && *a.Key == "access_logs.s3.bucket" && a.Value != nil && *a.Value != "" {
-			ids = append(ids, *a.Value)
-		}
+		attrs[aws.ToString(a.Key)] = aws.ToString(a.Value)
 	}
-	return relatedResultTrunc("s3", ids, false)
+	if attrs["access_logs.s3.enabled"] != "true" {
+		return foundNone("s3", "access_logs.s3.enabled")
+	}
+	return relatedResultTrunc("s3", nonEmpty(attrs["access_logs.s3.bucket"]), false)
 }
 
 // checkELBSubnet extracts subnet IDs from the LB's AvailabilityZones slice.
@@ -351,7 +354,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
-		return foundNone("waf", "elbARN")
+		return keyMissing("waf", "elbARN")
 	}
 	lbType := res.Fields["type"]
 	if lbType == "" {

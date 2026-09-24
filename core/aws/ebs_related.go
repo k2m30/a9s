@@ -4,7 +4,9 @@ package aws
 
 import (
 	"context"
+	"slices"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
@@ -24,7 +26,7 @@ func checkEBSEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
-		return foundNone("ebs-snap", "volID")
+		return keyMissing("ebs-snap", "volID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
@@ -103,10 +105,12 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("cfn", ids, truncated)
 }
 
-// checkEBSBackup scans the backup cache for backup plans that cover this
-// volume through BackupPlanCovers, with the ARN the coverage join builds and
-// the volume's own tags. Zero extra calls — a pure cross-reference of the
-// already-loaded backup cache, per docs/resources/ebs.md.
+// checkEBSBackup reports the backup plans that cover this volume, through
+// BackupPlanCovers with the ARN the coverage join builds and the volume's own
+// tags, and the plans that cover an instance it is attached to: "when backing
+// up an Amazon EC2 instance, AWS Backup takes a snapshot of the root Amazon
+// EBS storage volume, the launch configurations, and all associated EBS
+// volumes" (https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html).
 func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
@@ -126,5 +130,39 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 	if !tagsKnown {
 		target.unread = "DescribeVolumes"
 	}
-	return unreadZeroScanned(res, len(backupList), backupPivot(backupList, truncated, target))
+	reads := []relatedRead{readOf(backupPivot(backupList, truncated, target))}
+	for _, inst := range ebsAttachedInstanceTargets(ctx, clients, cache, res) {
+		reads = append(reads, readOf(backupPivot(backupList, truncated, inst)))
+	}
+	return unreadZeroScanned(res, len(backupList), relatedAnswer("backup", joinReads(reads...)))
+}
+
+// ebsAttachedInstanceTargets is each instance the volume is attached to, as a
+// backup selection is evaluated against it: its ARN and the tags the ec2 list
+// holds for it.
+func ebsAttachedInstanceTargets(ctx context.Context, clients any, cache resource.ResourceCache, res resource.Resource) []backupTarget {
+	vol, _ := assertStruct[ec2types.Volume](res.RawStruct)
+	if len(vol.Attachments) == 0 {
+		return nil
+	}
+	instances, _, _ := FetchRelatedTarget(ctx, clients, cache, "ec2")
+	var targets []backupTarget
+	for _, a := range vol.Attachments {
+		id := aws.ToString(a.InstanceId)
+		if id == "" {
+			continue
+		}
+		t := backupTarget{arn: sessionEC2ARN(ctx, clients, "instance", id), unread: "DescribeInstances"}
+		if i := slices.IndexFunc(instances, func(r resource.Resource) bool { return r.ID == id }); i >= 0 {
+			if inst, ok := assertStruct[ec2types.Instance](instances[i].RawStruct); ok {
+				tags := make(map[string]string, len(inst.Tags))
+				for _, tag := range inst.Tags {
+					tags[aws.ToString(tag.Key)] = aws.ToString(tag.Value)
+				}
+				t = t.withTags(tags, nil)
+			}
+		}
+		targets = append(targets, t)
+	}
+	return targets
 }

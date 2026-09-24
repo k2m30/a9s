@@ -42,7 +42,7 @@ Explicitly excluded: `dbc` (Aurora cluster snapshots live in `dbc-snap`) — `do
 ### `backup`
 
 - **Why related**: AWS Backup can create RDS snapshots on behalf of a backup plan; knowing whether a snapshot was produced by AWS Backup (vs automated by the DB instance or manual) tells the operator which retention policy governs its lifecycle and which audit trail applies. Citation: `docs/related-resources.md § dbi-snap` ("Snapshots covered by AWS Backup").
-- **How discovered**: AWS Backup selects the parent DB instance, not each snapshot, so the snapshot's `DBInstanceIdentifier` is resolved to the instance ARN through the loaded `dbi` list and evaluated against the already-loaded `backup` list: a plan counts iff any one of its selections does, each applied as AWS does: `(Resources match OR ListOfTags match) AND every Conditions clause AND NOT NotResources match`, with AWS wildcard semantics. A match on `*`, a service name (`arn:aws:<service>:*`) or tags alone counts only when the Region has the resource's type opted in to AWS Backup (`DescribeRegionSettings`, read with the backup list); a pattern naming the resource type or the exact ARN counts regardless. When the opt-in could not be read and a match rests on it, the count is unknown. The snapshot row carries no tags, so a plan whose verdict turns on a tag clause makes the count unknown or a lower bound.
+- **How discovered**: Backup plans whose selections name the snapshot's source instance by ARN or select it by its tags ([working-with-supported-services](https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-supported-services.html)).
 - **Count shown**: yes (the number of plans that select the parent instance).
 
 ### `ct-events`

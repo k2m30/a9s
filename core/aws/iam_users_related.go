@@ -22,7 +22,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	userName := res.ID
 	if userName == "" {
-		return foundNone("iam-group", "userName")
+		return keyMissing("iam-group", "userName")
 	}
 	groups, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Group, *string, error) {
 		out, err := c.IAM.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
@@ -53,7 +53,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	userName := res.ID
 	if userName == "" {
-		return foundNone("policy", "userName")
+		return keyMissing("policy", "userName")
 	}
 	attached, complete, err := listAttachedUserPolicies(ctx, c.IAM, userName)
 	if err != nil {

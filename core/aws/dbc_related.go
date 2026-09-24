@@ -140,7 +140,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if clusterID == "" {
-		return foundNone("logs", "clusterID")
+		return keyMissing("logs", "clusterID")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -168,7 +168,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		clusterID = id
 	}
 	if clusterID == "" {
-		return foundNone("dbi", "clusterID")
+		return keyMissing("dbi", "clusterID")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
@@ -196,7 +196,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 // cluster (dbcSnapTakenFrom).
 func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
-		return foundNone("dbc-snap", "res.ID")
+		return keyMissing("dbc-snap", "res.ID")
 	}
 
 	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc-snap")

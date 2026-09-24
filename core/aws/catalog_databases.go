@@ -458,7 +458,6 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda, Truncated: true, Mirror: true},
 			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis, Mirror: true},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDdbBackup, Truncated: true},
-			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkDdbVPCE, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ddb")},
 		},

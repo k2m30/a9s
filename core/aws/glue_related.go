@@ -4,7 +4,9 @@
 package aws
 
 import (
+	"cmp"
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -35,10 +37,16 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 	return alarmIDsByDimension(ctx, clients, cache, "glue", res)
 }
 
-// checkGlueLogs searches the logs cache for the shared Glue job log groups.
-// Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
-// regardless of job name (shared log groups across all Glue jobs in the account).
-func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+// checkGlueLogs counts the log groups the job writes to: the shared
+// /aws-glue/jobs/output and /aws-glue/jobs/error, and, with continuous logging
+// on (--enable-continuous-cloudwatch-log), the --continuous-log-logGroup it
+// names, "/aws-glue/jobs/logs-v2" when it names none
+// (https://docs.aws.amazon.com/glue/latest/dg/monitor-continuous-logging-enable.html).
+func checkGlueLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	groups := []string{"/aws-glue/jobs/output", "/aws-glue/jobs/error"}
+	if job, ok := assertStruct[gluetypes.Job](res.RawStruct); ok && job.DefaultArguments["--enable-continuous-cloudwatch-log"] == "true" {
+		groups = append(groups, cmp.Or(job.DefaultArguments["--continuous-log-logGroup"], "/aws-glue/jobs/logs-v2"))
+	}
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return ReadFailed("logs", err)
@@ -46,10 +54,9 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 	if logList == nil {
 		return NotRead("logs")
 	}
-
 	var ids []string
 	for _, logRes := range logList {
-		if logRes.ID == "/aws-glue/jobs/output" || logRes.ID == "/aws-glue/jobs/error" {
+		if slices.Contains(groups, logRes.ID) {
 			ids = append(ids, logRes.ID)
 		}
 	}
@@ -62,7 +69,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
-		return foundNone("cfn", "jobName")
+		return keyMissing("cfn", "jobName")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
@@ -172,16 +179,15 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 	return kmsRelated(ctx, clients, cache, refs)
 }
 
-// checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
-// values that look like Secrets Manager references (arn:aws:secretsmanager:
-// prefix).
+// checkGlueSecrets counts the secrets the job names: Secrets Manager ARNs
+// among its DefaultArguments, and the SECRET_ID of each connection it uses,
+// "the secret ID used for the secret manager of credentials"
+// (https://docs.aws.amazon.com/glue/latest/webapi/API_Connection.html), read
+// with GetConnection and HidePassword set so no password leaves Glue.
 func checkGlueSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
 		return NotRead("secrets")
-	}
-	if len(job.DefaultArguments) == 0 {
-		return foundNone("secrets", "job.DefaultArguments")
 	}
 	var refs []string
 	for _, v := range job.DefaultArguments {
@@ -189,5 +195,42 @@ func checkGlueSecrets(ctx context.Context, clients any, res resource.Resource, c
 			refs = append(refs, v)
 		}
 	}
-	return listedRelated(ctx, clients, cache, "secrets", refs, false)
+	conns, connRefs := glueConnectionSecrets(ctx, clients, job)
+	return relatedAnswer("secrets", joinReads(conns, readOf(listedRelated(ctx, clients, cache, "secrets", append(refs, connRefs...), false))))
+}
+
+// glueConnectionSecrets reads the SECRET_ID of every connection job uses, and
+// what was read: a connection that could not be read leaves the answer short.
+func glueConnectionSecrets(ctx context.Context, clients any, job gluetypes.Job) (relatedRead, []string) {
+	if job.Connections == nil || len(job.Connections.Connections) == 0 {
+		return relatedRead{}, nil
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Glue == nil {
+		return relatedRead{unread: true}, nil
+	}
+	api, ok := c.Glue.(GlueGetConnectionAPI)
+	if !ok {
+		return relatedRead{unread: true}, nil
+	}
+	var refs []string
+	var failures []Failure
+	for _, name := range job.Connections.Connections {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*glue.GetConnectionOutput, error) {
+			return api.GetConnection(ctx, &glue.GetConnectionInput{Name: aws.String(name), HidePassword: true})
+		})
+		if err != nil {
+			failures = append(failures, FailedCall(name, err))
+			continue
+		}
+		if out.Connection != nil {
+			refs = append(refs, out.Connection.ConnectionProperties["SECRET_ID"])
+		}
+	}
+	n := len(job.Connections.Connections)
+	return relatedRead{
+		partial: len(failures) > 0,
+		unread:  len(failures) == n,
+		failure: AggregateFailures("glue-related: GetConnection", failures, n),
+	}, refs
 }

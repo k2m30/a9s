@@ -85,13 +85,38 @@ func checkS3SQS(_ context.Context, clients any, res resource.Resource, cache res
 	return s3NotificationRelated("sqs", "notification_sqs", clients, res, cache)
 }
 
+// s3BucketTags reads a bucket's tags; NoSuchTagSet is a bucket with none.
+func s3BucketTags(ctx context.Context, c *ServiceClients, bucket string) (map[string]string, error) {
+	if c == nil || c.S3 == nil {
+		return nil, errClientMissing
+	}
+	api, ok := c.s3For(ctx, bucket).(S3GetBucketTaggingAPI)
+	if !ok {
+		return nil, errClientMissing
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
+		return api.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
+	})
+	if s3BenignAbsenceErr(err, "NoSuchTagSet") {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	tags := make(map[string]string, len(out.TagSet))
+	for _, t := range out.TagSet {
+		tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+	}
+	return tags, nil
+}
+
 // checkS3CFN calls s3:GetBucketTagging to read the bucket's tags and looks up
 // the aws:cloudformation:stack-name value in the cfn cache. Pattern C —
 // single per-bucket API call on detail-view open.
 func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("cfn", "bucket")
+		return keyMissing("cfn", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -154,7 +179,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("kms", "bucket")
+		return keyMissing("kms", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -217,7 +242,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("s3", "bucket")
+		return keyMissing("s3", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -255,7 +280,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("athena", "bucket")
+		return keyMissing("athena", "bucket")
 	}
 	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
@@ -291,7 +316,7 @@ func s3URINames(uri, bucket string) bool {
 func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("glue", "bucket")
+		return keyMissing("glue", "bucket")
 	}
 	jobList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
@@ -319,7 +344,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("backup", "bucket")
+		return keyMissing("backup", "bucket")
 	}
 	// An S3 bucket ARN names no region, but it does name a partition, and the
 	// partition comes from the session's region. Without one there is no ARN
@@ -347,7 +372,8 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	case bucketRegion != region:
 		return relatedResultTrunc("backup", nil, false)
 	}
-	return backupPivot(bkList, truncated, backupTarget{arn: bucketARN, unread: "GetBucketTagging"})
+	c, _ := clients.(*ServiceClients)
+	return backupPivot(bkList, truncated, backupTarget{arn: bucketARN, unread: "GetBucketTagging"}.withTags(s3BucketTags(ctx, c, bucket)))
 }
 
 // checkS3EBRule counts the eb-rule rows whose event pattern matches an event
@@ -356,7 +382,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("eb-rule", "bucket")
+		return keyMissing("eb-rule", "bucket")
 	}
 	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
@@ -381,7 +407,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("r53", "bucket")
+		return keyMissing("r53", "bucket")
 	}
 	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
@@ -421,7 +447,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return foundNone("role", "bucket")
+		return keyMissing("role", "bucket")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
@@ -481,7 +507,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return foundNone("trail", "bucketName")
+		return keyMissing("trail", "bucketName")
 	}
 
 	trailList, truncated, err := relatedResourcesFor(ctx, clients, cache, "trail")
@@ -515,7 +541,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
-		return foundNone("cf", "bucketName")
+		return keyMissing("cf", "bucketName")
 	}
 
 	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")

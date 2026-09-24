@@ -109,34 +109,35 @@ func osGraphRootResource() resource.Resource {
 	panic("GraphRootDomain fixture not found — check fixtures.NewOpenSearchFixtures()")
 }
 
-func TestRelated_OpenSearch_ACM(t *testing.T) {
-	clients := &awsclient.ServiceClients{
-		OpenSearch: &mockOSFullAPI{
-			describeDomainConfigOutput: &opensearch.DescribeDomainConfigOutput{
-				DomainConfig: &ostypes.DomainConfig{
-					DomainEndpointOptions: &ostypes.DomainEndpointOptionsStatus{
-						Options: &ostypes.DomainEndpointOptions{
-							CustomEndpointEnabled:        aws.Bool(true),
-							CustomEndpoint:               aws.String("acme-logs.internal.com"),
-							CustomEndpointCertificateArn: aws.String(fixtures.OpenSearchACMCertARN),
-						},
-					},
-				},
-			},
-		},
+// osRootWithCustomEndpoint is the graph-root domain serving a custom
+// endpoint with the ACM certificate certARN, as DescribeDomains reports it
+// (DomainStatus.DomainEndpointOptions).
+func osRootWithCustomEndpoint(enabled bool, certARN string) resource.Resource {
+	root := osGraphRootResource()
+	d := root.RawStruct.(ostypes.DomainStatus)
+	d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{
+		EnforceHTTPS:                 aws.Bool(true),
+		CustomEndpointEnabled:        aws.Bool(enabled),
+		CustomEndpoint:               aws.String("acme-logs.internal.com"),
+		CustomEndpointCertificateArn: aws.String(certARN),
 	}
+	root.RawStruct = d
+	return root
+}
 
-	// The ACM fetcher keys Resource.ID by DomainName, so the checker maps the
-	// certificate ARN back to its DomainName for drill-through to land.
-	acmDomainName := "acme-logs.internal.com"
+// A domain's custom-endpoint certificate is on its own row
+// (DomainStatus.DomainEndpointOptions.CustomEndpointCertificateArn, set when
+// CustomEndpointEnabled).
+func TestRelated_OpenSearch_ACM(t *testing.T) {
+	clients := &awsclient.ServiceClients{OpenSearch: &mockOSFullAPI{}}
+
+	// The acm list keys its rows by certificate ARN.
 	acmRes := resource.Resource{
-		ID:   acmDomainName,
-		Name: acmDomainName,
-		Fields: map[string]string{
-			"domain_name": acmDomainName,
-		},
+		ID:     fixtures.OpenSearchACMCertARN,
+		Name:   "acme-logs.internal.com",
+		Fields: map[string]string{"domain_name": "acme-logs.internal.com", "certificate_arn": fixtures.OpenSearchACMCertARN},
 		RawStruct: acmtypes.CertificateSummary{
-			DomainName:     aws.String(acmDomainName),
+			DomainName:     aws.String("acme-logs.internal.com"),
 			CertificateArn: aws.String(fixtures.OpenSearchACMCertARN),
 		},
 	}
@@ -145,13 +146,18 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 	}
 
 	checker := opensearchCheckerByTarget(t, "acm")
-	result := checker(context.Background(), clients, osGraphRootResource(), cache)
+	result := checker(context.Background(), clients, osRootWithCustomEndpoint(true, fixtures.OpenSearchACMCertARN), cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != acmDomainName {
-		t.Errorf("ResourceIDs = %v, want [%s] (ACM fetcher indexes by DomainName, not bare cert ID)", result.ResourceIDs(), acmDomainName)
+	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchACMCertARN {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchACMCertARN)
+	}
+
+	disabled := checker(context.Background(), clients, osRootWithCustomEndpoint(false, fixtures.OpenSearchACMCertARN), cache)
+	if disabled.State() != domain.RelatedResolved || disabled.Count() != 0 {
+		t.Errorf("custom endpoint disabled: state = %v, Count = %d, want a resolved 0", disabled.State(), disabled.Count())
 	}
 }
 
@@ -451,18 +457,25 @@ func TestRelated_OpenSearch_Adversarial_ListTagsError(t *testing.T) {
 	}
 }
 
+// The certificate is read from the row, so a role refused
+// es:DescribeDomainConfig still sees it.
 func TestRelated_OpenSearch_Adversarial_DescribeDomainConfigError(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		OpenSearch: &mockOSFullAPI{
-			describeDomainConfigErr: errors.New("simulated DescribeDomainConfig API error"),
+			describeDomainConfigErr: errors.New("AccessDeniedException: not authorized to perform es:DescribeDomainConfig"),
 		},
 	}
-	cache := resource.ResourceCache{}
+	cache := resource.ResourceCache{
+		"acm": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID:        fixtures.OpenSearchACMCertARN,
+			RawStruct: acmtypes.CertificateSummary{DomainName: aws.String("acme-logs.internal.com"), CertificateArn: aws.String(fixtures.OpenSearchACMCertARN)},
+		}}},
+	}
 
 	checker := opensearchCheckerByTarget(t, "acm")
-	result := checker(context.Background(), clients, osGraphRootResource(), cache)
+	result := checker(context.Background(), clients, osRootWithCustomEndpoint(true, fixtures.OpenSearchACMCertARN), cache)
 
-	if result.State() != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (DescribeDomainConfig error)", result.State())
+	if result.State() != domain.RelatedResolved || len(result.ResourceIDs()) != 1 {
+		t.Errorf("state = %v, ids = %v, err = %v; want the certificate read from the row", result.State(), result.ResourceIDs(), result.Err())
 	}
 }

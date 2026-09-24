@@ -23,7 +23,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envID == "" {
-		return foundNone("cfn", "envID")
+		return keyMissing("cfn", "envID")
 	}
 
 	envIDPrefix := "awseb-" + envID
@@ -57,7 +57,7 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if envName == "" {
-		return foundNone("logs", "envName")
+		return keyMissing("logs", "envName")
 	}
 
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -81,7 +81,7 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return foundNone("asg", "envName")
+		return keyMissing("asg", "envName")
 	}
 
 	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
@@ -120,7 +120,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 	}
 	if envName == "" {
-		return foundNone("ec2", "envName")
+		return keyMissing("ec2", "envName")
 	}
 
 	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
@@ -137,7 +137,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		if !ok {
 			continue
 		}
-		if tagValue(inst.Tags, "elasticbeanstalk:environment-name") == envName {
+		if ec2InstanceLive(inst) && tagValue(inst.Tags, "elasticbeanstalk:environment-name") == envName {
 			ids = append(ids, ec2Res.ID)
 		}
 	}

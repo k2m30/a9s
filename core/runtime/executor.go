@@ -943,12 +943,13 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					// missing/stale target-cache entry as "confirmed zero
 					// related resources" when the true answer is "could not
 					// check" — a denied ListX must not read as "none". Report
-					// unknown directly instead of letting the checker guess.
+					// the failed call directly, as FetchRelatedTarget's
+					// callers do, instead of letting the checker guess.
 					return messages.RelatedCheckResult{
 						ResourceType:     op.ResourceType,
 						SourceResourceID: op.Resource.ID,
 						DefDisplayName:   def.DisplayName,
-						Result:           awsclient.NotRead(def.TargetType),
+						Result:           awsclient.ReadFailed(def.TargetType, err),
 						OperationID:      op.ID,
 					}
 				}

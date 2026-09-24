@@ -31,7 +31,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 		projectName = res.ID
 	}
 	if projectName == "" {
-		return foundNone("pipeline", "projectName")
+		return keyMissing("pipeline", "projectName")
 	}
 
 	pipelineList, truncated, err := relatedResourcesFor(ctx, clients, cache, "pipeline")

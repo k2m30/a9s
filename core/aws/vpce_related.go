@@ -90,14 +90,20 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 	return alarmIDsByDimension(ctx, clients, cache, "vpce", res)
 }
 
-// checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for
-// this endpoint's network interfaces. Pattern C: one ec2:DescribeFlowLogs
-// call filtered by resource-id; each flow log's LogGroupName, or its
-// LogDestination when that is a log group ARN.
+// checkVPCELogs reports the CloudWatch Logs groups the flow logs of the
+// endpoint's VPC and subnets deliver to: an endpoint owns no flow log, and a
+// flow log monitors a VPC, a subnet, a network interface or a transit gateway
+// (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFlowLogs.html).
+// One ec2:DescribeFlowLogs filtered by those resource ids; each flow log's
+// LogGroupName, or its LogDestination when that is a log group ARN.
 func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	vpceID := res.ID
-	if vpceID == "" {
-		return foundNone("logs", "vpceID")
+	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
+	if !ok {
+		return NotRead("logs")
+	}
+	scope := nonEmpty(append([]string{aws.ToString(vpce.VpcId)}, vpce.SubnetIds...)...)
+	if len(scope) == 0 {
+		return foundNone("logs", "VpcId")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
@@ -105,7 +111,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	flowLogs, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.FlowLog, *string, error) {
 		out, err := c.EC2.DescribeFlowLogs(ctx, &ec2.DescribeFlowLogsInput{
-			Filter:    []ec2types.Filter{{Name: aws.String("resource-id"), Values: []string{vpceID}}},
+			Filter:    []ec2types.Filter{{Name: aws.String("resource-id"), Values: scope}},
 			NextToken: token,
 		})
 		if err != nil {

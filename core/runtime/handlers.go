@@ -243,9 +243,7 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		// checks (Glue tags, EBS Backup) and IAM lazy-add would read
 		// sticky state until the next successful reconnect. Rewire on
 		// rollback so the retained transport sees the post-rotate stores.
-		s.Clients.SetIAMPolicies(s.IAMPolicies)
-		s.Clients.SetIdentityStore(s.IdentityStore)
-		s.Clients.SetRuleSets(s.RuleSets)
+		s.WireStores(s.Clients)
 
 		s.IdentityFetching = true
 		tasks = append(tasks, TaskRequest{
@@ -297,15 +295,11 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 
 	if ev.Clients == nil {
 		if s.Clients == nil && s.PreSuppliedClients != nil {
-			s.PreSuppliedClients.SetIAMPolicies(s.IAMPolicies)
-			s.PreSuppliedClients.SetIdentityStore(s.IdentityStore)
-			s.PreSuppliedClients.SetRuleSets(s.RuleSets)
+			s.WireStores(s.PreSuppliedClients)
 			s.Clients = s.PreSuppliedClients
 		}
 	} else if clients, ok := ev.Clients.(*awsclient.ServiceClients); ok {
-		clients.SetIAMPolicies(s.IAMPolicies)
-		clients.SetIdentityStore(s.IdentityStore)
-		clients.SetRuleSets(s.RuleSets)
+		s.WireStores(clients)
 		s.Clients = clients
 	} else {
 		// Wrong concrete type — surface as APIErrorMsg via the adapter so

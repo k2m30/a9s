@@ -322,119 +322,118 @@ func TestRelated_SG_CFN_NoTag(t *testing.T) {
 	}
 }
 
+// The sg -> sg pivot lists the groups this group's own rules name
+// (IpPermissions[].UserIdGroupPairs[].GroupId), per docs/related-resources.md
+// § sg.
 func TestRelated_SG_SG_Found(t *testing.T) {
-	source := resource.Resource{ID: "sg-source"}
+	source := resource.Resource{ID: "sg-source", RawStruct: ec2types.SecurityGroup{
+		GroupId: aws.String("sg-source"),
+		OwnerId: aws.String("123456789012"),
+		IpPermissions: []ec2types.IpPermission{{
+			IpProtocol:       aws.String("tcp"),
+			FromPort:         aws.Int32(443),
+			ToPort:           aws.Int32(443),
+			UserIdGroupPairs: []ec2types.UserIdGroupPair{{GroupId: aws.String("sg-other"), UserId: aws.String("123456789012")}},
+		}},
+	}}
 	cache := resource.ResourceCache{
 		"sg": {Resources: []resource.Resource{
-			{
-				ID: "sg-other",
-				RawStruct: ec2types.SecurityGroup{
-					GroupId: aws.String("sg-other"),
-					IpPermissions: []ec2types.IpPermission{
-						{
-							IpProtocol: aws.String("tcp"),
-							FromPort:   aws.Int32(443),
-							ToPort:     aws.Int32(443),
-							UserIdGroupPairs: []ec2types.UserIdGroupPair{
-								{GroupId: aws.String("sg-source")},
-							},
-						},
-					},
-				},
-			},
+			{ID: "sg-other", RawStruct: ec2types.SecurityGroup{GroupId: aws.String("sg-other"), OwnerId: aws.String("123456789012")}},
+			{ID: "sg-referencing", RawStruct: ec2types.SecurityGroup{
+				GroupId: aws.String("sg-referencing"),
+				OwnerId: aws.String("123456789012"),
+				IpPermissions: []ec2types.IpPermission{{
+					IpProtocol:       aws.String("tcp"),
+					UserIdGroupPairs: []ec2types.UserIdGroupPair{{GroupId: aws.String("sg-source")}},
+				}},
+			}},
 		}},
 	}
 
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "sg-other" {
+		t.Errorf("ResourceIDs = %v, want [sg-other]", ids)
 	}
 }
 
+// Egress rules name groups too (IpPermissionsEgress[].UserIdGroupPairs).
 func TestRelated_SG_SG_FoundInEgress(t *testing.T) {
-	source := resource.Resource{ID: "sg-source"}
+	source := resource.Resource{ID: "sg-source", RawStruct: ec2types.SecurityGroup{
+		GroupId: aws.String("sg-source"),
+		OwnerId: aws.String("123456789012"),
+		IpPermissionsEgress: []ec2types.IpPermission{{
+			IpProtocol:       aws.String("-1"),
+			UserIdGroupPairs: []ec2types.UserIdGroupPair{{GroupId: aws.String("sg-egress")}},
+		}},
+	}}
 	cache := resource.ResourceCache{
 		"sg": {Resources: []resource.Resource{
-			{
-				ID: "sg-egress",
-				RawStruct: ec2types.SecurityGroup{
-					GroupId: aws.String("sg-egress"),
-					IpPermissionsEgress: []ec2types.IpPermission{
-						{
-							IpProtocol: aws.String("-1"),
-							UserIdGroupPairs: []ec2types.UserIdGroupPair{
-								{GroupId: aws.String("sg-source")},
-							},
-						},
-					},
-				},
-			},
+			{ID: "sg-egress", RawStruct: ec2types.SecurityGroup{GroupId: aws.String("sg-egress"), OwnerId: aws.String("123456789012")}},
 		}},
 	}
 
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 1 {
-		t.Errorf("Count = %d, want 1", result.Count())
+	if ids := result.ResourceIDs(); len(ids) != 1 || ids[0] != "sg-egress" {
+		t.Errorf("ResourceIDs = %v, want [sg-egress]", ids)
 	}
 }
 
+// A rule naming the group itself (a self-referencing rule) is not another
+// group.
 func TestRelated_SG_SG_SkipsSelf(t *testing.T) {
-	source := resource.Resource{ID: "sg-source"}
-	cache := resource.ResourceCache{
-		"sg": {Resources: []resource.Resource{
-			{
-				ID: "sg-source",
-				RawStruct: ec2types.SecurityGroup{
-					GroupId: aws.String("sg-source"),
-					IpPermissions: []ec2types.IpPermission{
-						{
-							UserIdGroupPairs: []ec2types.UserIdGroupPair{
-								{GroupId: aws.String("sg-source")},
-							},
-						},
-					},
-				},
-			},
+	self := ec2types.SecurityGroup{
+		GroupId: aws.String("sg-source"),
+		OwnerId: aws.String("123456789012"),
+		IpPermissions: []ec2types.IpPermission{{
+			IpProtocol:       aws.String("-1"),
+			UserIdGroupPairs: []ec2types.UserIdGroupPair{{GroupId: aws.String("sg-source")}},
 		}},
 	}
+	source := resource.Resource{ID: "sg-source", RawStruct: self}
+	cache := resource.ResourceCache{"sg": {Resources: []resource.Resource{source}}}
 
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0 (self-reference must be excluded)", result.Count())
+	if result.State() != domain.RelatedResolved || result.Count() != 0 {
+		t.Errorf("state = %v, Count = %d, want a resolved 0 (self-reference excluded)", result.State(), result.Count())
 	}
 }
 
+// A group whose rules name no other group has none, whatever other groups'
+// rules say about it.
 func TestRelated_SG_SG_NotFound(t *testing.T) {
-	source := resource.Resource{ID: "sg-source"}
-	cache := resource.ResourceCache{
-		"sg": {Resources: []resource.Resource{
-			{
-				ID: "sg-unrelated",
-				RawStruct: ec2types.SecurityGroup{
-					GroupId: aws.String("sg-unrelated"),
-					IpPermissions: []ec2types.IpPermission{
-						{
-							UserIdGroupPairs: []ec2types.UserIdGroupPair{
-								{GroupId: aws.String("sg-other-entirely")},
-							},
-						},
-					},
-				},
-			},
+	source := resource.Resource{ID: "sg-source", RawStruct: ec2types.SecurityGroup{
+		GroupId: aws.String("sg-source"),
+		OwnerId: aws.String("123456789012"),
+		IpPermissions: []ec2types.IpPermission{{
+			IpProtocol: aws.String("tcp"),
+			FromPort:   aws.Int32(22),
+			ToPort:     aws.Int32(22),
+			IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.0.0.0/16")}},
 		}},
+	}}
+	cache := resource.ResourceCache{
+		"sg": {Resources: []resource.Resource{{
+			ID: "sg-referencing",
+			RawStruct: ec2types.SecurityGroup{
+				GroupId: aws.String("sg-referencing"),
+				IpPermissions: []ec2types.IpPermission{{
+					UserIdGroupPairs: []ec2types.UserIdGroupPair{{GroupId: aws.String("sg-source")}},
+				}},
+			},
+		}}},
 	}
 
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0", result.Count())
+	if result.State() != domain.RelatedResolved || result.Count() != 0 {
+		t.Errorf("state = %v, Count = %d, want a resolved 0", result.State(), result.Count())
 	}
 }
 

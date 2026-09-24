@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `logs`
 
 - **Why related**: Logging configuration → CloudWatch Logs destination (docs/related-resources.md §`waf`).
-- **How discovered**: call `GetLoggingConfiguration` per Web ACL — `LoggingConfiguration.LogDestinationConfigs[]` contains ARNs; filter for ARNs beginning with `arn:aws:logs:` (CloudWatch Logs destinations) and match against the already-loaded `logs` list — a9s-devops: WAF also supports Kinesis Firehose and S3 destinations, but only the CW Logs variants bind to the `logs` panel; others are not the target's scope.
+- **How discovered**: `GetLoggingConfiguration` for every `LogScope` (CUSTOMER, SECURITY_LAKE, CLOUDWATCH_TELEMETRY_RULE_MANAGED) → CW Logs destinations ([API_GetLoggingConfiguration](https://docs.aws.amazon.com/waf/latest/APIReference/API_GetLoggingConfiguration.html)).
 - **Count shown**: yes.
 
 ### `ct-events`

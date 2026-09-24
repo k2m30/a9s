@@ -47,7 +47,7 @@ func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID
 	if clusterName == "" {
-		return foundNone("asg", "clusterName")
+		return keyMissing("asg", "clusterName")
 	}
 	seen := make(map[string]struct{})
 	nodes, partial, err := clusterTaggedNodes(ctx, clients, clusterName)
@@ -79,10 +79,6 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	return nodeSourcesResult("asg", seen, partial || ngPartial, errors.Join(err, ngErr))
 }
-
-// liveInstanceStates leaves out shutting-down and terminated instances, which
-// keep their tags for up to an hour after they stop being nodes.
-var liveInstanceStates = []string{"pending", "running", "stopping", "stopped"}
 
 // clusterTaggedNodes returns the EC2 instances whose tags name clusterName —
 // self-managed, Karpenter and Auto Mode nodes, and managed node group nodes
@@ -123,7 +119,7 @@ func clusterTaggedNodes(ctx context.Context, clients any, clusterName string) (n
 			out, err := c.EC2.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
 				Filters: []ec2types.Filter{
 					{Name: aws.String("tag:" + key), Values: []string{value}},
-					{Name: aws.String("instance-state-name"), Values: liveInstanceStates},
+					{Name: aws.String("instance-state-name"), Values: liveInstanceStates()},
 				},
 				IncludeManagedResources: aws.Bool(true),
 				NextToken:               token,
@@ -197,7 +193,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return foundNone("ami", "clusterName")
+		return keyMissing("ami", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -317,7 +313,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		clusterName = *cluster.Name
 	}
 	if clusterName == "" {
-		return foundNone("ec2", "clusterName")
+		return keyMissing("ec2", "clusterName")
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -362,10 +358,8 @@ func asgInstances(ctx context.Context, c *ServiceClients, asgNames []string, see
 		}
 		partial = partial || !batchComplete
 		for _, asg := range asgs {
-			for _, inst := range asg.Instances {
-				if inst.InstanceId != nil && *inst.InstanceId != "" {
-					seen[*inst.InstanceId] = struct{}{}
-				}
+			for _, id := range asgMembers(asg) {
+				seen[id] = struct{}{}
 			}
 		}
 	}

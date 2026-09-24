@@ -73,6 +73,27 @@ func ec2InstanceGone(state string) bool {
 	return state == "terminated" || state == "shutting-down"
 }
 
+// ec2InstanceLive is ec2InstanceGone over the SDK struct, for the pivots
+// that count an instance as a node or member: a shutting-down instance "is
+// preparing to be terminated", and a terminated one "remains visible ... for a
+// short while" with its tags
+// (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html).
+func ec2InstanceLive(inst ec2types.Instance) bool {
+	return inst.State == nil || !ec2InstanceGone(string(inst.State.Name))
+}
+
+// liveInstanceStates is every instance-state-name ec2InstanceGone keeps, for
+// a DescribeInstances filter.
+func liveInstanceStates() []string {
+	var live []string
+	for _, s := range ec2types.InstanceStateName("").Values() {
+		if !ec2InstanceGone(string(s)) {
+			live = append(live, string(s))
+		}
+	}
+	return live
+}
+
 // ec2InstanceToResource builds the canonical EC2 instance Resource (same
 // Fields keys, Findings rules) from one SDK Instance — shared by
 // FetchEC2InstancesPage and FetchEC2InstancesByIDs so the two paths can

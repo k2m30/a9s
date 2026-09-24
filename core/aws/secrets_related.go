@@ -106,7 +106,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		secretARN = res.Fields["arn"]
 	}
 	if secretARN == "" {
-		return foundNone("dbi", "secretARN")
+		return keyMissing("dbi", "secretARN")
 	}
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
