@@ -61,7 +61,7 @@ require (
 	github.com/aws/smithy-go v1.28.2
 	github.com/charmbracelet/x/ansi v0.11.8
 	golang.org/x/sync v0.23.0
-	golang.org/x/tools v0.50.0
+	golang.org/x/tools v0.51.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
