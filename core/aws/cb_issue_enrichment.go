@@ -77,8 +77,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	if len(buildIDs) == 0 {
 		return result, listErr
 	}
-	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
-		Ids: buildIDs,
+	builds, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codebuild.BatchGetBuildsOutput, error) {
+		return clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
+			Ids: buildIDs,
+		})
 	})
 	if err != nil {
 		var batchFailures []Failure

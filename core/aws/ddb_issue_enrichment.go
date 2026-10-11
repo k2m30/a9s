@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -66,8 +65,10 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		if name == "" {
 			return
 		}
-		out, err := clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
-			TableName: aws.String(name),
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeContinuousBackupsOutput, error) {
+			return clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
+				TableName: aws.String(name),
+			})
 		})
 		mu.Lock()
 		defer mu.Unlock()
@@ -196,7 +197,7 @@ func dynamoDBTagsForARN(ctx context.Context, api DynamoDBListTagsOfResourceAPI, 
 		return nil, err
 	}
 	if !complete {
-		return nil, fmt.Errorf("ListTagsOfResource: more than %d pages of tags for %s", PerParentPageCap, arn)
+		return nil, errPageCap
 	}
 	tags := make(map[string]string, len(list))
 	for _, t := range list {

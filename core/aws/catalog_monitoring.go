@@ -197,17 +197,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
 		}),
-		// In-fetcher Wave 2: the trail fetcher already issues GetTrailStatus
-		// per-trail and populates is_logging / latest_delivery_error /
-		// log_file_validation_enabled at fetch time. The wave2-source
-		// FindingDefs below feed the generated table in
-		// docs/attention-signals.md, kept in sync by `make check-catalogen` and
-		// tests/unit/docs_attention_signals_sync_test.go.
-		//
-		// EnrichTrailLogBucket carries the log-bucket signals on top of that
-		// in-fetcher work. It is cache-only, so Priority 200 lets the s3
-		// enricher (100) populate the bucket findings it reads.
-		Wave2:     IssueEnricher{Fn: EnrichTrailLogBucket, Priority: 200},
+		Wave2:     IssueEnricher{Fn: EnrichTrail, Priority: 200},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn", "latest_delivery_time", "org_trail"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true, Mirror: true},

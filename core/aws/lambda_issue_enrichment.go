@@ -6,10 +6,8 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -95,12 +93,12 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		if urlPublic {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 		}
-		var unusable UnusableAnswerErr
-		switch err := cmp.Or(getErr, lambdaRealErr(policyErr, urlErr)); {
-		case errors.As(err, &unusable):
-			MarkUnusable(&result, r.ID, &failures, unusable.Error())
-		case err != nil:
-			MarkSkipped(&result, r.ID, &failures, err)
+		// Each read that failed is recorded: two calls refused for two
+		// different actions are two grants the operator needs.
+		for _, err := range []error{getErr, policyErr, urlErr} {
+			if err != nil && !isLambdaNoPolicy(err) {
+				MarkSkipped(&result, r.ID, &failures, err)
+			}
 		}
 	})
 
@@ -184,7 +182,7 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 		return nil, false, err
 	}
 	if !complete {
-		return nil, false, fmt.Errorf("ListFunctionUrlConfigs: more than %d pages for %s", PerParentPageCap, name)
+		return nil, false, errPageCap
 	}
 	for _, cfg := range configs {
 		if cfg.AuthType != lambdatypes.FunctionUrlAuthTypeNone {
@@ -205,17 +203,4 @@ func lambdaFunctionURLExposure(ctx context.Context, api LambdaListFunctionUrlCon
 // GetFunction.
 func isLambdaNoPolicy(err error) bool {
 	return ErrCodeIs(err, "ResourceNotFoundException")
-}
-
-// lambdaRealErr returns the first error that is an actual failure, skipping
-// the absent-resource answers isLambdaNoPolicy names. Taking cmp.Or of the two
-// raw errors instead would let a healthy "no policy" hide a genuine
-// ListFunctionUrlConfigs failure behind it.
-func lambdaRealErr(errs ...error) error {
-	for _, err := range errs {
-		if err != nil && !isLambdaNoPolicy(err) {
-			return err
-		}
-	}
-	return nil
 }

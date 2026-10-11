@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"net/netip"
@@ -132,8 +131,9 @@ func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]st
 	return out
 }
 
-// EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
-// for private zones that have no VPC associations (orphaned private zone).
+// EnrichRoute53Zone calls GetHostedZone per zone the list row does not name
+// public (cap EnrichmentCap) and raises a finding for private zones that have
+// no VPC associations (orphaned private zone).
 //
 // Findings:
 //   - HostedZone.Config.PrivateZone == true AND VPCs[] empty → "~" finding
@@ -178,6 +178,13 @@ func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resourc
 	row := newRowResult()
 	var rowFailures []Failure
 
+	// GetHostedZone answers the private-zone orphan check alone. The list row
+	// already says whether the zone is public, so a public zone is not asked,
+	// and a refusal of that call cannot leave its public-zone checks unread.
+	if r.Fields["private_zone"] == "false" {
+		r53PublicZoneFindings(ctx, clients, &row, &rowFailures, r, zoneID, held)
+		return row, rowFailures
+	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
 		return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
 			Id: aws.String(zoneID),
@@ -263,7 +270,7 @@ func r53QueryLoggingFinding(ctx context.Context, clients *ServiceClients, result
 		return out.QueryLoggingConfigs, out.NextToken, nil
 	})
 	if err == nil && len(configs) == 0 && !complete {
-		err = fmt.Errorf("ListQueryLoggingConfigs: more than %d pages for %s", PerParentPageCap, zoneID)
+		err = errPageCap
 	}
 	switch {
 	case err != nil:

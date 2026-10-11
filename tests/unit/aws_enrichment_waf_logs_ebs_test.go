@@ -424,7 +424,8 @@ func TestEnrichLogsMetricFilters_GroupWithoutStreamsHasNoLastEventAt(t *testing.
 
 // TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt verifies that when
 // DescribeLogStreams returns an error the enricher continues without setting
-// last_event_at (no truncation for log-stream errors).
+// last_event_at, marks the group not inspected and records the failure. The
+// issue badge is not lowered: last_event_at decides no finding.
 func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/streams-err"
 	fake := &cwLogsFullFake{
@@ -437,13 +438,15 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	resources := []resource.Resource{logsGroupResource(auditGroup)}
 
 	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Error("a failed DescribeLogStreams must reach the operator through the composite error")
+	}
+	if _, ok := result.TruncatedIDs[auditGroup]; !ok {
+		t.Error("TruncatedIDs must contain the group whose last event could not be read")
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
-	// No truncation for log-stream errors — the enricher only truncates on DescribeMetricFilters errors.
 	if result.Truncated {
 		t.Error("Truncated must be false for DescribeLogStreams errors — only DescribeMetricFilters triggers truncation")
 	}

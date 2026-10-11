@@ -282,12 +282,24 @@ func TestW7Coverage_EveryTypeReportsItsOwnCode(t *testing.T) {
 	}
 }
 
-// TestW7Coverage_ResourceWithNoARNReportsNothing pins the unknown case one
-// level down: a row the fetcher gave no ARN cannot be matched against any
-// selection, so it is not evidence of anything.
-func TestW7Coverage_ResourceWithNoARNReportsNothing(t *testing.T) {
-	res := w7EnrichDDB(t, []resource.Resource{{ID: "acme-orders", Fields: map[string]string{}}}, w7CacheWith())
+// TestW7Coverage_ResourceWithNoARN pins the unknown case one level down: a
+// row the fetcher gave no ARN cannot be matched against any selection, so
+// against a plan list it is not inspected rather than uncovered. Against a
+// complete, empty plan list there is no selection to match, and the row is
+// uncovered whether or not its ARN is known.
+func TestW7Coverage_ResourceWithNoARN(t *testing.T) {
+	row := []resource.Resource{{ID: "acme-orders", Fields: map[string]string{}}}
+
+	res := w7EnrichDDB(t, row, w7CacheWith(w7Plan("*", "", "")))
 	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
+	if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
+		t.Error("a row with no ARN against a plan list must be marked not inspected")
+	}
+
+	res = w7EnrichDDB(t, row, w7CacheWith())
+	if !slices.ContainsFunc(res.Findings["acme-orders"], func(f domain.Finding) bool { return f.Code == awsclient.CodeDDBNotInBackupPlan }) {
+		t.Errorf("findings %v: a complete, empty plan list covers nothing", res.Findings["acme-orders"])
+	}
 }
 
 // w7Volume builds an EC2 volume row the way FetchEBSVolumesPage does, tagged

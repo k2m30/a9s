@@ -51,14 +51,13 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		// all three write the same records, so asking only about the VPC's own
 		// id reports a VPC whose subnets are fully covered as capturing
 		// nothing. The subnet ids come off the row the fetcher built; a row
-		// whose subnets were not read cannot be asked about them.
-		if r.Fields["subnet_ids_unread"] == "true" {
-			mu.Lock()
-			markUninspected(&result, r.ID, checkListIncomplete("subnet"))
-			mu.Unlock()
-			return
+		// whose subnets were not read is asked about the VPC alone, which can
+		// prove a flow log but never its absence.
+		subnetsUnread := r.Fields["subnet_ids_unread"] == "true"
+		scopes := []string{vpcID}
+		if !subnetsUnread {
+			scopes = append(scopes, splitCSV(r.Fields["subnet_ids"])...)
 		}
-		scopes := append([]string{vpcID}, splitCSV(r.Fields["subnet_ids"])...)
 
 		allFlowLogs, complete, flErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ec2types.FlowLog, *string, error) {
 			out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
@@ -89,6 +88,10 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 				hasActive = true
 				break
 			}
+		}
+		if !hasActive && subnetsUnread {
+			markUninspected(&result, r.ID, checkListIncomplete("subnet"))
+			return
 		}
 		flowLogsVal := "yes"
 		if !hasActive {

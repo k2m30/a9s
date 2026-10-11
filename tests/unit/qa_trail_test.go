@@ -203,8 +203,9 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 // (silent delivery)." A trail that is actively logging (IsLogging==true) but
 // whose most recent successful S3 delivery is more than an hour old must be
 // classified Broken — CloudTrail is silently failing to ship log files even
-// though it reports itself as "logging"; trail.go reads
-// GetTrailStatusOutput.LatestDeliveryTime so colorTrail can see it.
+// though it reports itself as "logging". The list's Wave-2 pass, EnrichTrail,
+// reads GetTrailStatusOutput.LatestDeliveryTime and raises the finding
+// colorTrail colors from.
 func TestFetchCloudTrailTrails_StaleDeliveryIsBroken(t *testing.T) {
 	staleDelivery := time.Now().Add(-2 * time.Hour)
 
@@ -239,6 +240,15 @@ func TestFetchCloudTrailTrails_StaleDeliveryIsBroken(t *testing.T) {
 	}
 
 	r := resources[0]
+	clients := &awsclient.ServiceClients{CloudTrail: struct {
+		*mockCloudTrailClient
+		awsclient.CloudTrailLookupEventsAPI
+	}{mock, nil}}
+	res, err := awsclient.EnrichTrail(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichTrail: %v", err)
+	}
+	r.Findings = append(r.Findings, res.Findings[r.ID]...)
 
 	foundBroken := false
 	for _, f := range r.Findings {

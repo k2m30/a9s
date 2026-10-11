@@ -78,17 +78,19 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				}
 				return out.Packages, out.NextToken, nil
 			})
-			if pkgErr == nil {
+			mu.Lock()
+			if pkgErr != nil {
+				MarkSkipped(&result, r.ID, &failures, pkgErr)
+			} else {
 				count := resource.FormatExact(len(pkgs))
 				if !complete {
 					// A page cap on an informational count, not a failed call:
 					// the "+" is where the cap is reported.
 					count = resource.FormatTruncated(len(pkgs))
 				}
-				mu.Lock()
 				result.FieldUpdates[key] = map[string]string{"package_count": count}
-				mu.Unlock()
 			}
+			mu.Unlock()
 		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
 			Domain:     aws.String(domainName),
@@ -97,7 +99,9 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if domainOwner != "" {
 			input.DomainOwner = aws.String(domainOwner)
 		}
-		out, err := clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
+			return clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
+		})
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -125,5 +129,5 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, errors.Join(loopErr, AggregateFailures("GetRepositoryPermissionsPolicy", failures, n))
+	return result, errors.Join(loopErr, AggregateFailures("repository packages and policy", failures, n))
 }

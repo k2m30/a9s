@@ -135,7 +135,7 @@ One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` 
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: no backup plan selection matches this table. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a table whose ARN was not returned — is marked not inspected, naming the check that stopped it.
+- **Signal**: no backup plan selection matches this table. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a table whose ARN was not returned — is marked not inspected, naming the check that stopped it. A backup plan list read to the end and empty covers nothing, so the table is reported uncovered whether or not its ARN was returned.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

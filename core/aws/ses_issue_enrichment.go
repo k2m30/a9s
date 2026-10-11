@@ -38,20 +38,17 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 		return result, nil
 	}
 
-	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
-	if err != nil {
-		// Symmetric with the no-error paths below — always return fully
-		// initialized maps so a caller that writes into result.Findings or
-		// result.FieldUpdates cannot panic on a nil map. Range over nil is
-		// safe, but writes would not be.
-		return result, err
-	}
-
-	// Decide the single account-level finding by precedence, then
-	// replicate it onto every identity row.
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetAccountOutput, error) {
+		return clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
+	})
+	// The account read is one answer every identity shares, so a refused one
+	// is one failure, and the account signal is unread on every identity.
 	code, rows, hasFinding := sesAccountFinding(out)
-	if hasFinding {
-		for _, res := range resources {
+	for _, res := range resources {
+		switch {
+		case err != nil:
+			markUninspected(&result, res.ID, checkOf(err))
+		case hasFinding:
 			setWave2Finding(&result, res.ID, code, rows)
 		}
 	}
@@ -62,7 +59,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	dkimErr := sesIdentityDKIM(ctx, clients, &result, resources)
 
 	MarkInformationalOnly(&result)
-	return result, dkimErr
+	return result, errors.Join(err, dkimErr)
 }
 
 // sesIdentityDKIM calls GetEmailIdentity per identity (cap EnrichmentCap) and

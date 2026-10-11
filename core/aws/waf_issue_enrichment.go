@@ -61,6 +61,9 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		total++
 		mu.Unlock()
+		// The logging, association and rule reads answer separate questions:
+		// one that fails leaves its own row unread and the others evaluated.
+		var readErrs []error
 		var loggingRows, orphanRows []domain.DetailRow
 		scope := cmp.Or(r.Fields["scope"], string(wafv2types.ScopeRegional))
 		api := clients.wafIn(scope)
@@ -78,22 +81,14 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 					Tier:  "~",
 				})
 			} else {
-				// Unexpected error — skip this ACL.
-				mu.Lock()
-				MarkSkipped(&result, r.ID, &failures, err)
-				mu.Unlock()
-				return
+				readErrs = append(readErrs, err)
 			}
 		}
 
 		associations, err := wafAssociations(ctx, clients, scope, arn)
 		if err != nil {
-			mu.Lock()
-			MarkSkipped(&result, r.ID, &failures, err)
-			mu.Unlock()
-			return
-		}
-		if len(associations) == 0 {
+			readErrs = append(readErrs, err)
+		} else if len(associations) == 0 {
 			orphanRows = append(orphanRows, domain.DetailRow{
 				Label: "Associations",
 				Value: "none",
@@ -105,8 +100,10 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		// implements WAFv2GetWebACLAPI.
 		rulesSummary := "0 rules"
 		noRules := false
+		var gerr error
 		if getACLAPI, ok := api.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
-			getOut, gerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetWebACLOutput, error) {
+			var getOut *wafv2svc.GetWebACLOutput
+			getOut, gerr = RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetWebACLOutput, error) {
 				return getACLAPI.GetWebACL(ctx, &wafv2svc.GetWebACLInput{
 					Name:  aws.String(r.Fields["name"]),
 					Id:    aws.String(r.Fields["id"]),
@@ -114,12 +111,8 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				})
 			})
 			if gerr != nil {
-				mu.Lock()
-				MarkSkipped(&result, r.ID, &failures, gerr)
-				mu.Unlock()
-				return
-			}
-			if getOut.WebACL != nil {
+				readErrs = append(readErrs, gerr)
+			} else if getOut.WebACL != nil {
 				blockCount := 0
 				for _, rule := range getOut.WebACL.Rules {
 					if rule.Action != nil && rule.Action.Block != nil {
@@ -138,8 +131,13 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 
 		mu.Lock()
 		defer mu.Unlock()
-		result.FieldUpdates[r.ID] = map[string]string{
-			"rules_summary": rulesSummary,
+		for _, err := range readErrs {
+			MarkSkipped(&result, r.ID, &failures, err)
+		}
+		if gerr == nil {
+			result.FieldUpdates[r.ID] = map[string]string{
+				"rules_summary": rulesSummary,
+			}
 		}
 
 		if noRules {

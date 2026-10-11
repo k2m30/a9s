@@ -4,6 +4,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -155,7 +156,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 // cap or behind a failed page, so both lists are partial and the pivots
 // joining on them owe the operator a lower bound rather than a zero.
 func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (aliasTargets, s3WebsiteNames string, unread bool, _ error) {
-	sets, complete, err := r53ZoneRecords(ctx, api, zoneID)
+	sets, complete, err := r53RecordsUnread(ctx, api, zoneID)
 	var aliases []string
 	for _, rr := range sets {
 		if rr.AliasTarget == nil || rr.AliasTarget.DNSName == nil {
@@ -173,9 +174,10 @@ func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecord
 // by IsTruncated; the next request starts at NextRecordName, NextRecordType
 // and NextRecordIdentifier
 // (https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListResourceRecordSets.html).
-// A truncated page with no next record is read as a scan that stopped, not a
-// whole zone. The cursor joins the three Start* values on a newline, which no
-// record name holds.
+// A truncated page with no next record is an answer that came back short: the
+// records read so far are returned with an UnusableAnswerErr, never as a whole
+// zone and never as a9s's own page cap. The cursor joins the three Start*
+// values on a newline, which no record name holds.
 func r53ZoneRecords(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) ([]r53types.ResourceRecordSet, bool, error) {
 	stuck := false
 	sets, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, cursor *string) ([]r53types.ResourceRecordSet, *string, error) {
@@ -205,7 +207,26 @@ func r53ZoneRecords(ctx context.Context, api Route53ListResourceRecordSetsAPI, z
 		next := aws.ToString(out.NextRecordName) + "\n" + string(out.NextRecordType) + "\n" + aws.ToString(out.NextRecordIdentifier)
 		return out.ResourceRecordSets, &next, nil
 	})
+	if stuck && err == nil {
+		err = errR53RecordsStuck
+	}
 	return sets, complete && !stuck && err == nil, err
+}
+
+// errR53RecordsStuck is r53ZoneRecords' answer for a truncated page with no
+// next record. The list enricher records it as an unusable answer; the fetcher
+// and the related checkers read it as record sets left unread, the lower bound
+// it is for a join.
+var errR53RecordsStuck = UnusableAnswerErr{Call: "ListResourceRecordSets", Field: "next record name"}
+
+// r53RecordsUnread is r53ZoneRecords for a caller that reads a stuck page as
+// record sets left unread rather than as an error.
+func r53RecordsUnread(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) ([]r53types.ResourceRecordSet, bool, error) {
+	sets, complete, err := r53ZoneRecords(ctx, api, zoneID)
+	if errors.Is(err, errR53RecordsStuck) {
+		err = nil
+	}
+	return sets, complete, err
 }
 
 // r53S3WebsiteBucketNames returns the bucket each S3-website alias record in

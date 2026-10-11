@@ -495,6 +495,9 @@ var nonPaginatedAPIs = []string{
 	"GetHostedZone",
 	// GetDistributionConfig — single CloudFront distribution config.
 	"GetDistributionConfig",
+	// GetTrailStatus — one trail's logging status; GetTrailStatusOutput
+	// carries no token field.
+	"GetTrailStatus",
 	// DescribeClusterV2 — MSK single-cluster describe.
 	"DescribeClusterV2",
 	// DescribeCertificate — single ACM certificate details.

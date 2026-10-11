@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -93,9 +92,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 func apigwRESTRow(ctx context.Context, v1 apigwV1API, r resource.Resource, ownAccount string) (IssueEnricherResult, []Failure) {
 	row := newRowResult()
 	var rowFailures []Failure
-	if restErr := apigwRESTFindings(ctx, v1, &row, r, ownAccount); restErr != nil {
-		MarkSkipped(&row, r.ID, &rowFailures, restErr)
-	}
+	apigwRESTFindings(ctx, v1, &row, &rowFailures, r, ownAccount)
 	return row, rowFailures
 }
 
@@ -165,13 +162,18 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 		MarkSkipped(&row, r.ID, &rowFailures, authErr)
 	}
 
+	// A stage-count page cap is not a coverage gap on the row: the "+" on
+	// stages_count is where it is reported, and the authorizer verdict above
+	// is a separate call the stage walk says nothing about. A walk refused on
+	// a later page keeps the stages it read as a lower bound; one refused
+	// before any stage answered has no count to state, and "0+" would only
+	// restate the row's mark.
 	if fetchErr != nil {
 		MarkSkipped(&row, r.ID, &rowFailures, fetchErr)
 	}
-	// A stage-count page cap is not a coverage gap on the row: the "+" on
-	// stages_count is where it is reported, and the authorizer verdict above
-	// is a separate call the stage walk says nothing about.
-	row.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
+	if fetchErr == nil || len(stages) > 0 {
+		row.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
+	}
 
 	stagesCount := len(stages)
 	if stagesCount == 0 && !stagesTruncated && fetchErr == nil {
@@ -201,15 +203,47 @@ type apigwV1API interface {
 	APIGatewayV1GetStagesAPI
 }
 
-// apigwRESTFindings evaluates the REST posture rules for one API. It returns
-// the error of a call that failed or of a resource policy that does not
-// parse, so the caller marks the row truncated rather than reporting an API
-// whose posture it could not read as clean.
-func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
+// apigwRESTFindings evaluates the REST posture rules for one API. A call that
+// failed or a resource policy that does not parse marks the row rather than
+// reporting an API whose posture it could not read as clean, and leaves the
+// rules the other call answers running.
+func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, ownAccount string) {
 	apiID := r.ID
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
 		setWave2Finding(result, apiID, code, rows)
 	}
+	apigwRESTAuthorizerFindings(ctx, api, result, failures, r, ownAccount)
+
+	stages, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetStagesOutput, error) {
+		return api.GetStages(ctx, &apigateway.GetStagesInput{RestApiId: aws.String(apiID)})
+	})
+	if err != nil {
+		MarkSkipped(result, apiID, failures, err)
+		return
+	}
+	for _, st := range stages.Item {
+		name := aws.ToString(st.StageName)
+		if st.AccessLogSettings == nil {
+			emit(CodeAPIGWNoAccessLogs,
+				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
+		}
+		if !st.TracingEnabled {
+			emit(CodeAPIGWTracingOff,
+				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
+		}
+		// Rows carry where and what kind, never the value itself.
+		if rows := secretScanRows(st.Variables); len(rows) > 0 {
+			emit(CodeAPIGWStageVariableSecret,
+				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
+		}
+	}
+}
+
+// apigwRESTAuthorizerFindings is the no-authorizer rule for one REST API. It
+// stands apart from apigwRESTFindings so a refused authorizer read can return
+// early without taking the stage checks with it.
+func apigwRESTAuthorizerFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, ownAccount string) {
+	apiID := r.ID
 
 	// GetAuthorizers pages by Position
 	// (https://docs.aws.amazon.com/apigateway/latest/api/API_GetAuthorizers.html).
@@ -220,11 +254,12 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 		}
 		return out.Items, out.Position, nil
 	})
-	if err != nil {
-		return err
+	if err == nil && len(authorizers) == 0 && !complete {
+		err = errPageCap
 	}
-	if len(authorizers) == 0 && !complete {
-		return fmt.Errorf("GetAuthorizers: more than %d pages for %s", PerParentPageCap, apiID)
+	if err != nil {
+		MarkSkipped(result, apiID, failures, err)
+		return
 	}
 	var policyErr error
 	if len(authorizers) == 0 {
@@ -248,39 +283,18 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 			// The endpoint type is unknown, and the common contract's nil rule
 			// makes an unread field unknown rather than misconfigured.
 		case endpoint == "private":
-			emit(CodeAPIGWNoAuthorizer,
-				domain.DetailRow{Label: "Authorizers", Value: "0", Tier: "~"},
-				domain.DetailRow{Label: "Endpoint", Value: endpoint, Tier: "~"})
+			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{
+				{Label: "Authorizers", Value: "0", Tier: "~"},
+				{Label: "Endpoint", Value: endpoint, Tier: "~"}})
 		default:
-			emit(CodeAPIGWNoAuthorizerPublic,
-				domain.DetailRow{Label: "Authorizers", Value: "0", Tier: "!"},
-				domain.DetailRow{Label: "Endpoint", Value: endpoint, Tier: "!"})
+			setWave2Finding(result, apiID, CodeAPIGWNoAuthorizerPublic, []domain.DetailRow{
+				{Label: "Authorizers", Value: "0", Tier: "!"},
+				{Label: "Endpoint", Value: endpoint, Tier: "!"}})
 		}
 	}
-
-	stages, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetStagesOutput, error) {
-		return api.GetStages(ctx, &apigateway.GetStagesInput{RestApiId: aws.String(apiID)})
-	})
-	if err != nil {
-		return err
+	if policyErr != nil {
+		MarkSkipped(result, apiID, failures, policyErr)
 	}
-	for _, st := range stages.Item {
-		name := aws.ToString(st.StageName)
-		if st.AccessLogSettings == nil {
-			emit(CodeAPIGWNoAccessLogs,
-				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
-		}
-		if !st.TracingEnabled {
-			emit(CodeAPIGWTracingOff,
-				domain.DetailRow{Label: "Stage", Value: name, Tier: "~"})
-		}
-		// Rows carry where and what kind, never the value itself.
-		if rows := secretScanRows(st.Variables); len(rows) > 0 {
-			emit(CodeAPIGWStageVariableSecret,
-				append([]domain.DetailRow{{Label: "Stage", Value: name, Tier: "!"}}, rows...)...)
-		}
-	}
-	return policyErr
 }
 
 // apigwRESTPolicy returns the API's resource policy document, which the
@@ -315,7 +329,7 @@ func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result 
 	case len(authorizers) > 0:
 		return nil
 	case !complete:
-		return fmt.Errorf("GetAuthorizers: more than %d pages for %s", PerParentPageCap, apiID)
+		return errPageCap
 	}
 	setWave2Finding(result, apiID, CodeAPIGWNoAuthorizer, []domain.DetailRow{{Label: "Authorizers", Value: "0", Tier: tierOf(CodeAPIGWNoAuthorizer)}})
 	return nil

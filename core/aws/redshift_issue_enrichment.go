@@ -8,7 +8,7 @@ package aws
 import (
 	"context"
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -104,8 +104,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 // errRedshiftParamsCutShort is the answer a parameter walk gives when it ran
 // out of pages before require_ssl appeared: the setting is unread, which the
 // caller marks as a coverage gap on the cluster rather than a value.
-var errRedshiftParamsCutShort = errors.New("require_ssl not found within " +
-	strconv.Itoa(PerParentPageCap) + " pages of parameters")
+var errRedshiftParamsCutShort = fmt.Errorf("%w: require_ssl not found within %d pages of parameters", errPageCap, PerParentPageCap)
 
 // redshiftParamGroupCache reads each parameter group at most once per run.
 // singleflight collapses the clusters that share a group into one call

@@ -80,16 +80,19 @@ var errS3ListIncomplete = errors.New(checkListIncomplete("s3"))
 // but never that one does not: an origin in another account is absent from it
 // while working perfectly. Only HeadBucket can say gone, and only when it says
 // not-found. A denial, or a redirect to the bucket's own region, is AWS
-// answering about a bucket it found. A throttled, failing or timed-out call
-// answers nothing and is returned, as is errS3ListIncomplete when the cache
-// cannot confirm anything.
+// answering about a bucket it found (s3HeadBucketSaysExists). Any other error
+// — a 400 such as an expired token, a server fault past its retries, a
+// timeout — answers nothing: the first is returned beside the buckets the
+// other origins proved gone, as is errS3ListIncomplete when the cache cannot
+// confirm anything.
 // api is nil when the session has no S3 client, and the question is not asked.
-func cfOriginBucketsGone(ctx context.Context, api S3HeadBucketAPI, cfg *cftypes.DistributionConfig, knownBuckets map[string]bool) (map[string]bool, error) {
-	if api == nil || cfg.Origins == nil {
+func cfOriginBucketsGone(ctx context.Context, api S3HeadBucketAPI, origins []cftypes.Origin, knownBuckets map[string]bool) (map[string]bool, error) {
+	if api == nil {
 		return nil, nil
 	}
 	var gone map[string]bool
-	for _, origin := range cfg.Origins.Items {
+	var unread error
+	for _, origin := range origins {
 		bucket, isS3 := S3OriginBucket(aws.ToString(origin.DomainName))
 		if !isS3 {
 			continue
@@ -110,18 +113,45 @@ func cfOriginBucketsGone(ctx context.Context, api S3HeadBucketAPI, cfg *cftypes.
 			gone[bucket] = true
 			continue
 		}
-		if _, _, retryable := ClassifyAWSError(err); retryable || checkOf(err) == CheckDeadline {
-			return nil, err
+		if err != nil && !s3HeadBucketSaysExists(err) && unread == nil {
+			unread = err
 		}
 	}
-	return gone, nil
+	return gone, unread
+}
+
+// cfOrigins is the distribution's origin list: from its config when that was
+// read, otherwise from the list row's DistributionSummary, which carries the
+// same Origins.
+func cfOrigins(r resource.Resource, cfg *cftypes.DistributionConfig) []cftypes.Origin {
+	var origins *cftypes.Origins
+	if cfg != nil {
+		origins = cfg.Origins
+	} else {
+		summary, _ := assertStruct[cftypes.DistributionSummary](r.RawStruct)
+		origins = summary.Origins
+	}
+	if origins == nil {
+		return nil
+	}
+	return origins.Items
+}
+
+// cfMissingOriginFindings stands apart from cfConfigFindings because its
+// origins may come from the list row: it runs when the config read failed.
+func cfMissingOriginFindings(result *IssueEnricherResult, distID string, origins []cftypes.Origin, goneBuckets map[string]bool) {
+	for _, origin := range origins {
+		domainName := aws.ToString(origin.DomainName)
+		if bucket, isS3 := S3OriginBucket(domainName); isS3 && goneBuckets[bucket] {
+			setWave2Finding(result, distID, CodeCFOriginBucketMissing, []domain.DetailRow{{Label: "Origin", Value: domainName, Tier: "!"}})
+		}
+	}
 }
 
 // cfConfigFindings evaluates every config-derived posture row for one
 // distribution. Each condition is independent: a distribution failing all of
 // them carries one finding per condition, with its own supporting rows.
-// goneBuckets is cfOriginBucketsGone's answer for the distribution.
-func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, goneBuckets map[string]bool) {
+func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig) {
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
 		setWave2Finding(result, distID, code, rows)
 	}
@@ -132,13 +162,8 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 	}
 	for _, origin := range origins {
 		domainName := aws.ToString(origin.DomainName)
-		bucket, isS3 := S3OriginBucket(domainName)
-		if !isS3 {
+		if _, isS3 := S3OriginBucket(domainName); !isS3 {
 			continue
-		}
-		if goneBuckets[bucket] {
-			emit(CodeCFOriginBucketMissing,
-				domain.DetailRow{Label: "Origin", Value: domainName, Tier: "!"})
 		}
 		// An origin access identity is deprecated, not absent: a distribution
 		// already restricting its bucket through one is not exposed.
@@ -231,22 +256,21 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		if distID == "" {
 			return
 		}
-		out, err := clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
-			Id: aws.String(distID),
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
+			return clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
+				Id: aws.String(distID),
+			})
 		})
-		var gone map[string]bool
-		var goneErr error
-		if err == nil && out.DistributionConfig != nil {
-			gone, goneErr = cfOriginBucketsGone(ctx, headAPI, out.DistributionConfig, knownBuckets)
+		var cfg *cftypes.DistributionConfig
+		if err == nil {
+			cfg = out.DistributionConfig
 		}
+		origins := cfOrigins(r, cfg)
+		gone, goneErr := cfOriginBucketsGone(ctx, headAPI, origins, knownBuckets)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
-			return
-		}
-		if out.DistributionConfig == nil {
-			return
 		}
 		switch {
 		case errors.Is(goneErr, errS3ListIncomplete):
@@ -254,7 +278,10 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		case goneErr != nil:
 			MarkSkipped(&result, r.ID, &failures, goneErr)
 		}
-		cfg := out.DistributionConfig
+		cfMissingOriginFindings(&result, distID, origins, gone)
+		if cfg == nil {
+			return
+		}
 		var rows []domain.DetailRow
 
 		// A request matching an ordered behaviour's path is served by that
@@ -309,12 +336,12 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			}
 		}
 
-		cfConfigFindings(&result, distID, cfg, gone)
+		cfConfigFindings(&result, distID, cfg)
 
 		if len(rows) == 0 {
 			return
 		}
 		setWave2Finding(&result, distID, cfCodeInsecureProtocol, rows)
 	})
-	return result, errors.Join(loopErr, AggregateFailures("GetDistributionConfig", failures, n))
+	return result, errors.Join(loopErr, AggregateFailures("distribution config and origin buckets", failures, n))
 }

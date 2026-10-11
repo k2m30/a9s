@@ -1096,10 +1096,11 @@ func TestSubnet_Related_EFS_MatchesViaMountTargetENIScan(t *testing.T) {
 	}
 }
 
-// FetchCloudTrailTrails emits findings for LogFileValidationEnabled==false
-// (Warning), IsLogging==false (Broken) and a non-empty LatestDeliveryError
-// (Broken), per docs/resources/trail.md. The demo fixtures
-// security-audit-trail and data-events-trail carry the Broken signals.
+// The trail list emits findings for LogFileValidationEnabled==false
+// (Warning) at fetch, and for IsLogging==false (Broken) and a non-empty
+// LatestDeliveryError (Broken) from EnrichTrail's GetTrailStatus read, per
+// docs/resources/trail.md. The demo fixtures security-audit-trail and
+// data-events-trail carry the Broken signals.
 
 func TestTrail_Fetcher_EmitsFindingsForDocumentedWave1And2Signals(t *testing.T) {
 	clients := demo.NewServiceClients()
@@ -1108,9 +1109,14 @@ func TestTrail_Fetcher_EmitsFindingsForDocumentedWave1And2Signals(t *testing.T) 
 	if err != nil {
 		t.Fatalf("FetchCloudTrailTrails returned error: %v", err)
 	}
+	res, err := awsclient.EnrichTrail(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichTrail returned error: %v", err)
+	}
 
 	byName := make(map[string]resource.Resource, len(resources))
 	for _, r := range resources {
+		r.Findings = append(r.Findings, res.Findings[r.ID]...)
 		byName[r.Name] = r
 	}
 

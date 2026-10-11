@@ -259,8 +259,14 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if errStr := err.Error(); !strings.Contains(errStr, wafACLARN1) {
 		t.Errorf("composite error must contain the failing WebACL ARN %q, got: %q", wafACLARN1, errStr)
 	}
-	if len(result.Findings) != 0 {
-		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
+	// A refused logging read leaves only the logging signal unread; the
+	// association and rule reads answered and still report.
+	for _, arn := range []string{wafACLARN1, wafACLARN2} {
+		for _, f := range result.Findings[arn] {
+			if f.Code == "waf.no-logging" {
+				t.Errorf("%s: logging finding raised though GetLoggingConfiguration failed", arn)
+			}
+		}
 	}
 	if result.Truncated {
 		t.Error("Truncated must stay false: waf only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")

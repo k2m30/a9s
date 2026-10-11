@@ -4,7 +4,6 @@
 package aws
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"sync"
@@ -66,25 +65,35 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		mu.Lock()
 		defer mu.Unlock()
 
-		switch walkErr := cmp.Or(memberErr, attachedErr, inlineErr); {
-		case walkErr != nil:
-			MarkSkipped(&result, r.ID, &failures, walkErr)
-		case memberTruncated || attachedTruncated || inlineTruncated:
+		// Each walk answers its own question: a failed one leaves only the
+		// signals that read it unevaluated, through its truncated flag, since
+		// PageAll reports an errored walk incomplete.
+		for _, err := range []error{memberErr, attachedErr, inlineErr} {
+			if err != nil {
+				MarkSkipped(&result, r.ID, &failures, err)
+			}
+		}
+		// A walk stopped at the page cap leaves a check open only when the
+		// pages read did not already decide it: one member rules out an
+		// orphan, one policy rules out a no-op group, and an administrator
+		// policy seen is the admin finding.
+		adminPolicy := adminAttachedPolicyName(allAttached)
+		membersOpen := memberTruncated && len(allUsers) == 0
+		policiesOpen := (attachedTruncated || inlineTruncated) && len(allAttached) == 0 && len(allInline) == 0
+		adminOpen := attachedTruncated && adminPolicy == ""
+		if membersOpen || policiesOpen || adminOpen {
 			markUninspected(&result, r.ID, CheckCap)
 		}
 
-		// A walk that failed before reading anything left no data — skip findings for this group.
-		if (memberErr != nil && len(allUsers) == 0) || (attachedErr != nil && len(allAttached) == 0) || (inlineErr != nil && len(allInline) == 0) {
-			return
-		}
-
 		memberCount := len(allUsers)
-		memberCountStr := resource.FormatExact(memberCount)
-		if memberTruncated {
-			memberCountStr = resource.FormatTruncated(memberCount)
-		}
-		result.FieldUpdates[r.ID] = map[string]string{
-			"member_count": memberCountStr,
+		if memberErr == nil || memberCount > 0 {
+			memberCountStr := resource.FormatExact(memberCount)
+			if memberTruncated {
+				memberCountStr = resource.FormatTruncated(memberCount)
+			}
+			result.FieldUpdates[r.ID] = map[string]string{
+				"member_count": memberCountStr,
+			}
 		}
 
 		var rows []domain.DetailRow
@@ -110,9 +119,8 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 		}
 
-		if adminPolicy := adminAttachedPolicyName(allAttached); adminPolicy != "" {
+		if adminPolicy != "" {
 			setWave2Finding(&result, r.ID, iamGroupCodeAdminAttached, adminAttachedRows(adminPolicy))
-
 		}
 
 		if len(rows) == 0 {

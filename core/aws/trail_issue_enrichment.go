@@ -6,14 +6,67 @@ package aws
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// EnrichTrail reads each trail's logging health and the posture of the bucket
+// it delivers to. The two are independent reads, so a refused one leaves only
+// its own signals unread.
+func EnrichTrail(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
+	result, bucketErr := EnrichTrailLogBucket(ctx, clients, resources, cache)
+	statusErr := enrichTrailStatus(ctx, clients, resources, &result)
+	return result, errors.Join(statusErr, bucketErr)
+}
+
+// enrichTrailStatus calls GetTrailStatus per trail (capped at EnrichmentCap),
+// the only source of a trail's logging health, and writes is_logging,
+// latest_delivery_error and latest_delivery_time with the findings they raise.
+func enrichTrailStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
+	if clients.CloudTrail == nil {
+		return nil
+	}
+	if result.FieldUpdates == nil {
+		result.FieldUpdates = make(map[string]map[string]string)
+	}
+	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
+		return r.Fields["trail_arn"] != ""
+	}, resourceIDsOf)
+	var failures []Failure
+	var mu sync.Mutex
+	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
+		r := resources[i]
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudtrail.GetTrailStatusOutput, error) {
+			return clients.CloudTrail.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: aws.String(r.Fields["trail_arn"])})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			MarkSkipped(result, r.ID, &failures, err)
+			return
+		}
+		fields := map[string]string{"is_logging": "", "latest_delivery_error": aws.ToString(out.LatestDeliveryError), "latest_delivery_time": ""}
+		if out.IsLogging != nil {
+			fields["is_logging"] = strconv.FormatBool(*out.IsLogging)
+		}
+		if out.LatestDeliveryTime != nil {
+			fields["latest_delivery_time"] = out.LatestDeliveryTime.Format(time.RFC3339)
+		}
+		result.FieldUpdates[r.ID] = fields
+		for _, f := range trailStatusFindings(fields["is_logging"], fields["latest_delivery_error"], fields["latest_delivery_time"]) {
+			addWave2Finding(result, r.ID, f, nil)
+		}
+	})
+	return errors.Join(loopErr, Finish(result, failures, len(resources), "GetTrailStatus"))
+}
 
 // trailLogBucketAPI is the read-only S3 calls the log-bucket rows need: the
 // public verdict's reads and the access-logging read. Asserted off the
@@ -69,9 +122,12 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		mu.Lock()
 		defer mu.Unlock()
 
-		// A read that failed leaves the trail's posture unknown, not clean.
+		// A read that failed leaves the trail's posture unknown, not clean. A
+		// deleted bucket is an answer about the trail rather than a row that
+		// went away: there is no bucket posture to report, and
+		// GetTrailStatus's delivery error says what it costs the trail.
 		for _, err := range append(pub.failures, pub.unreachable) {
-			if err != nil {
+			if err != nil && !IsNotFoundErr(err) {
 				MarkSkipped(&result, r.ID, &failures, err)
 			}
 		}
@@ -80,6 +136,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		}
 
 		switch {
+		case IsNotFoundErr(loggingErr):
 		case loggingErr != nil:
 			MarkSkipped(&result, r.ID, &failures, loggingErr)
 		case logging.LoggingEnabled == nil:

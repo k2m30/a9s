@@ -90,7 +90,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		total++
 		mu.Unlock()
 
-		images, imagesComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ecrtypes.ImageDetail, *string, error) {
+		images, imagesComplete, imagesErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]ecrtypes.ImageDetail, *string, error) {
 			out, err := describeAPI.DescribeImages(ctx, &ecr.DescribeImagesInput{
 				RepositoryName: aws.String(repoName),
 				MaxResults:     aws.Int32(ecrPageSize),
@@ -101,13 +101,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			}
 			return out.ImageDetails, out.NextToken, nil
 		})
-		if err != nil {
-			mu.Lock()
-			MarkSkipped(&result, r.ID, &failures, err)
-			truncated = true
-			mu.Unlock()
-			return
-		}
 		// An image with no push time sorts oldest.
 		var latest *ecrtypes.ImageDetail
 		for j := range images {
@@ -149,6 +142,10 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 
 		switch {
+		case imagesErr != nil:
+			truncated = true
+			MarkSkipped(&result, r.ID, &failures, imagesErr)
+			return
 		case scanErr != nil:
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, scanErr)

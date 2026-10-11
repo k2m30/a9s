@@ -82,7 +82,7 @@ One bullet per distinct signal.
 
 - **Signal**: `GetLoginProfile(UserName)` returns a profile (console login enabled) AND `ListMFADevices(UserName)` returns `MFADevices==[]` → console login without MFA.
   - **State bucket**: Broken.
-  - **API call**: `GetLoginProfile(UserName)` — one per user; `ListMFADevices(UserName)` — one per user. Two calls per user total (short-circuit: skip `ListMFADevices` if `GetLoginProfile` throws `NoSuchEntity`).
+  - **API call**: `GetLoginProfile(UserName)` — one per user; `ListMFADevices(UserName)` — one per user. Two calls per user total (short-circuit: skip `ListMFADevices` if `GetLoginProfile` throws `NoSuchEntity`). A `GetLoginProfile` that fails marks the user not inspected; its MFA devices, access keys and attached policies are still read, and their findings still raised.
   - **Cost shape**: per-resource.
 
 - **Signal**: an access key created more than 90 days ago.

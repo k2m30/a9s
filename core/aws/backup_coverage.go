@@ -45,10 +45,10 @@ func addBackupCoverage(
 			continue
 		}
 		t := targetOf(r)
-		if t.arn == "" {
-			if len(entry.Resources) > 0 {
-				markUninspected(result, r.ID, t.unread)
-			}
+		// An empty ARN decides nothing unless there is no plan to decide
+		// against, the same rule backupPivot applies.
+		if t.arn == "" && len(entry.Resources) > 0 {
+			markUninspected(result, r.ID, t.unread)
 			continue
 		}
 		ids, undecided := backupPlansCovering(entry.Resources, t)

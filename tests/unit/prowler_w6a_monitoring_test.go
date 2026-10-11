@@ -487,7 +487,10 @@ func w6aAssertRow(t *testing.T, r resource.Resource, code, label, value string) 
 // TestW6ATrailLogBucket_MissingBucketIsSkippedNotUnlogged pins the one answer
 // the demo fake cannot give: a bucket that does not exist.
 //
-// S3 returns NoSuchBucket, and the enricher has to mark the trail unknown. The
+// S3 returns NoSuchBucket, which answers the posture questions: a deleted
+// bucket is neither public nor unlogged, so the trail carries neither finding
+// and no not-inspected mark, and its GetTrailStatus delivery error is what
+// reports the missing bucket. The
 // demo fake answers every bucket name it is handed — an absent logging config
 // reads as an empty GetBucketLogging output, which is indistinguishable from
 // "logging is off" — so a trail pointing at an unfixtured bucket would show a
@@ -502,8 +505,8 @@ func TestW6ATrailLogBucket_MissingBucketIsSkippedNotUnlogged(t *testing.T) {
 		w6aTrailRes("acme-orphan-bucket-trail", "acme-deleted-audit-logs"),
 	)
 
-	if _, marked := res.TruncatedIDs["acme-orphan-bucket-trail"]; !marked {
-		t.Error("a trail whose log bucket does not exist was not marked truncated")
+	if check, marked := res.TruncatedIDs["acme-orphan-bucket-trail"]; marked {
+		t.Errorf("a trail whose log bucket does not exist was marked %q", check)
 	}
 	w2AssertNoCode(t, res.Findings["acme-orphan-bucket-trail"], w6aTrailBucketNoAccess)
 	w2AssertNoCode(t, res.Findings["acme-orphan-bucket-trail"], w6aTrailBucketPublic)

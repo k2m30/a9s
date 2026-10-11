@@ -11,20 +11,19 @@ import (
 
 // SNSPublicPolicy names the one demo topic whose access policy grants
 // publish or subscribe to every principal (sns.public-policy), and SNSNoKMS
-// the one topic with no KmsMasterKeyId (sns.no-kms). Every other topic
-// carries an account-scoped policy and a KMS key.
-// The sns rows are keyed by topic ARN, which is what the list renders.
+// the one topic with no KmsMasterKeyId (sns.no-kms). They are the same topic,
+// so the public witness carries a second finding that does not depend on its
+// subscription walk. Every other topic carries an account-scoped policy and a
+// KMS key. The sns rows are keyed by topic ARN, which is what the list renders.
 const (
 	SNSPublicPolicy = SNSPublicPolicyARN
-	SNSNoKMS        = SNSNoKMSARN
+	SNSNoKMS        = SNSPublicPolicyARN
 )
 
 const (
 	snsPublicPolicyTopicName = "sns-public-policy"
-	snsNoKMSTopicName        = "sns-unencrypted"
 
 	SNSPublicPolicyARN = "arn:aws:sns:us-east-1:123456789012:" + snsPublicPolicyTopicName
-	SNSNoKMSARN        = "arn:aws:sns:us-east-1:123456789012:" + snsNoKMSTopicName
 )
 
 // SNSDemoKMSKeyID is the at-rest key every demo topic but SNSNoKMS carries.
@@ -80,11 +79,10 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		// (sns.all-pending-confirmation). Required for EnrichSNSSubscriptions's
 		// Wave-2 all-pending check.
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending")},
-		// SNSPublicPolicy: the only topic whose access policy names a
-		// wildcard principal. Also the topic SNSSubPlainHTTP hangs off.
+		// SNSPublicPolicy and SNSNoKMS: the only topic whose access policy
+		// names a wildcard principal and the only one served without a
+		// KmsMasterKeyId. Also the topic SNSSubPlainHTTP hangs off.
 		{TopicArn: aws.String(SNSPublicPolicyARN)},
-		// SNSNoKMS: the only topic served without a KmsMasterKeyId.
-		{TopicArn: aws.String(SNSNoKMSARN)},
 		// The on-call topics the demo alarms, ASG, stack, pipeline and secret
 		// rotation notify (cloudwatch.go and siblings).
 		{TopicArn: aws.String(OpsAlertsTopicARN)},
@@ -175,7 +173,6 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 	subsByTopic[ProdRedisSNSTopicARN] = minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com")
 	subsByTopic["arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName] = minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler")
 	subsByTopic[BackupAlertsSNSTopicARN] = minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com")
-	subsByTopic[SNSNoKMSARN] = minimalSubscriptions(SNSNoKMSARN, "sqs", "arn:aws:sqs:us-east-1:123456789012:acme-alerts-queue")
 	subsByTopic[OpsAlertsTopicARN] = minimalSubscriptions(OpsAlertsTopicARN, "email", "ops@acme-corp.com")
 	subsByTopic[OpsCriticalTopicARN] = minimalSubscriptions(OpsCriticalTopicARN, "email", "oncall@acme-corp.com")
 
@@ -211,7 +208,6 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		"arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts":       "Staging Deploy Alerts",
 		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": "Webhook Integration (Pending)",
 		SNSPublicPolicyARN:  "Public Order Events",
-		SNSNoKMSARN:         "Unencrypted Alerts",
 		OpsAlertsTopicARN:   "Ops Alerts",
 		OpsCriticalTopicARN: "Ops Critical",
 	}
@@ -233,7 +229,7 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		if attrs == nil {
 			attrs = map[string]string{}
 		}
-		if arn != SNSNoKMSARN {
+		if arn != SNSNoKMS {
 			attrs["KmsMasterKeyId"] = SNSDemoKMSKeyID
 		}
 		attrs["TopicArn"] = arn
@@ -274,6 +270,6 @@ func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscr
 }
 
 func init() {
-	Register(Pin{ShortName: "sns", Rows: 13, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sns", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "sns-sub", Rows: 7, Issues: 2, CoverageGaps: []string{"broken"}})
 }

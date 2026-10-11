@@ -89,7 +89,7 @@ One bullet per distinct signal.
 
 - **Signal**: `IsLogging==false` → Broken (trail stopped capturing).
   - **State bucket**: Broken.
-  - **API call**: `GetTrailStatus(Name=<trailARN>)` — one per trail.
+  - **API call**: `GetTrailStatus(Name=<trailARN>)` — one per trail, retried when throttled. A trail whose call still fails is marked not inspected, naming `GetTrailStatus`, and none of the three `GetTrailStatus` signals — this one and the two that follow — is raised.
   - **Cost shape**: per-resource.
 
 - **Signal**: `LatestDeliveryError` non-empty → Broken (S3 delivery failing).

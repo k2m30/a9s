@@ -107,7 +107,7 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
   - **API call**: `DescribeVolumeStatus` — same call.
   - **Cost shape**: account-wide.
 
-- **Signal**: no backup plan selection matches this volume. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a session whose own account is unknown, so the volume ARN cannot be built — is marked not inspected, naming the check that stopped it.
+- **Signal**: no backup plan selection matches this volume. Coverage follows the rule in §2 `backup`. A row the check cannot decide — a plan whose selections were not all read, tags or the Region opt-in that were not read, a selection tag clause returned without its value, or a session whose own account is unknown, so the volume ARN cannot be built — is marked not inspected, naming the check that stopped it. A backup plan list read to the end and empty covers nothing, so the volume is reported uncovered whether or not its ARN can be built.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

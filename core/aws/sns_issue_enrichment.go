@@ -27,7 +27,6 @@ const (
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
-// Per-topic errors are treated as truncated (skip silently).
 func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -76,8 +75,13 @@ func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resour
 	})
 	pageCapped := !complete
 
+	// Posture is read for every topic, including one with no subscribers
+	// and one whose subscription walk was capped or refused: the access
+	// policy and the encryption key come from GetTopicAttributes, which the
+	// subscription walk has no bearing on.
 	if pagedErr != nil {
 		MarkSkipped(&row, r.ID, &rowFailures, pagedErr)
+		snsTopicPosture(ctx, clients, &row, &rowFailures, r.ID, ownAccount)
 		return row, rowFailures
 	}
 	count := resource.FormatExact(len(subs))
@@ -88,10 +92,6 @@ func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resour
 		count = resource.FormatTruncated(len(subs))
 	}
 	row.FieldUpdates[r.ID] = map[string]string{"subs_count": count}
-	// Posture is read for every topic, including one with no
-	// subscribers and one whose subscription walk was capped: the access
-	// policy and the encryption key come from GetTopicAttributes, which
-	// the subscription walk's completeness has no bearing on.
 	snsTopicPosture(ctx, clients, &row, &rowFailures, r.ID, ownAccount)
 	if pageCapped {
 		// A capped walk can never rule out a confirmed subscriber sitting

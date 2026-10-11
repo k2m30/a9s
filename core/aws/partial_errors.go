@@ -116,8 +116,12 @@ var notFoundCodes = map[string][]string{ //nolint:gochecknoglobals // static AWS
 	"ClusterNotFound":               nil, // redshift — the wire code; the SDK type is named ClusterNotFoundFault
 	"StateMachineDoesNotExist":      nil, // sfn
 	"QueueDoesNotExist":             nil, // sqs
-	"ParameterNotFound":             nil, // ssm
-	"WAFNonexistentItemException":   nil, // waf
+	// SQS speaks JSON with the legacy query error header, and the SDK takes
+	// the code from that header, so a gone queue answers this one.
+	"AWS.SimpleQueueService.NonExistentQueue": nil, // sqs
+	"TableNotFoundException":                  nil, // dynamodb
+	"ParameterNotFound":                       nil, // ssm
+	"WAFNonexistentItemException":             nil, // waf
 
 	// The ambiguous three. asg writes "AutoScalingGroup name not found -
 	// AutoScalingGroup: <name> not found", cfn "Stack with id <name> does not

@@ -153,7 +153,14 @@ func setWave2Finding(
 	rows []domain.DetailRow,
 	values ...string,
 ) {
-	f := wave2Finding(code, values...)
+	addWave2Finding(r, resourceID, wave2Finding(code, values...), rows)
+}
+
+// addWave2Finding is setWave2Finding for a Finding a shared predicate already
+// built with wave2Finding — the one the row colorer also runs — so the
+// condition is written once.
+func addWave2Finding(r *IssueEnricherResult, resourceID string, f domain.Finding, rows []domain.DetailRow) {
+	code := f.Code
 	if Wave2EmissionObserver != nil {
 		Wave2EmissionObserver(resourceID, f)
 	}
@@ -209,13 +216,31 @@ func wave2Finding(code domain.FindingCode, values ...string) domain.Finding {
 // failed, so it is not a failure the operator has to account for. That is
 // IsNotFoundErr's contract, and putting it at one site is what keeps every
 // enricher's aggregate honest without each of them remembering the rule.
+//
+// Two more errors name no refused call, and are decided here for the same
+// reason. errPageCap is a9s's own bound: the row reads CheckCap and nothing
+// failed. An UnusableAnswerErr is an answer that came back short, recorded
+// through MarkUnusable so the row names the call and the missing field.
 func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, err error) {
+	if errors.Is(err, errPageCap) {
+		markUninspected(result, id, CheckCap)
+		return
+	}
+	if unusable, ok := errors.AsType[UnusableAnswerErr](err); ok {
+		MarkUnusable(result, id, failures, unusable.Error())
+		return
+	}
 	markUninspected(result, id, checkOf(err))
 	if IsNotFoundErr(err) {
 		return
 	}
 	*failures = append(*failures, FailedCall(id, err))
 }
+
+// errPageCap is what a per-row walk returns when it stopped at
+// PerParentPageCap before the page that decides its check: a9s's own bound,
+// which MarkSkipped records as CheckCap and never as a failed call.
+var errPageCap = errors.New(CheckCap)
 
 // mergeRowResult folds one row's result and its failures into the shared ones
 // under mu. A parallel enricher evaluates each row into a result of its own

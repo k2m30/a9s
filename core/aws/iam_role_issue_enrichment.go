@@ -63,8 +63,10 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			MarkSkipped(&result, r.ID, &failures, aerr)
 			mu.Unlock()
 		}
-		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
-			RoleName: aws.String(roleName),
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetRoleOutput, error) {
+			return getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
+				RoleName: aws.String(roleName),
+			})
 		})
 		mu.Lock()
 		defer mu.Unlock()

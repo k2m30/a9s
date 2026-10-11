@@ -28,6 +28,15 @@ func S3HeadBucketSaysMissing(err error) bool {
 	return errors.As(err, &notFound)
 }
 
+// s3HeadBucketSaysExists reports whether a HeadBucket error is S3 answering
+// about a bucket that exists: a 403 for a bucket that is not the caller's, or
+// a redirect to the bucket's own region. HeadBucket carries no body, so the
+// SDK names the code after the HTTP status ("Forbidden", "MovedPermanently");
+// the modeled codes are matched as well.
+func s3HeadBucketSaysExists(err error) bool {
+	return ErrCodeIs(err, "Forbidden", "AccessDenied", "AccessDeniedException", "MovedPermanently", "PermanentRedirect")
+}
+
 // FetchS3BucketsPageWithNotifications returns one page of buckets and, when
 // available, enriches each bucket with notification targets.
 func FetchS3BucketsPageWithNotifications(

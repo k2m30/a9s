@@ -32,6 +32,7 @@ import (
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -482,7 +483,9 @@ func (f *parseHeadBucketFake) HeadBucket(_ context.Context, in *s3.HeadBucketInp
 		return nil, &s3types.NotFound{}
 	}
 	if f.denied[name] {
-		return nil, errors.New("AccessDenied: User is not authorized to perform s3:ListBucket")
+		// HeadBucket has no response body, so S3's 403 reaches the SDK as a
+		// code named after the HTTP status.
+		return nil, &smithy.GenericAPIError{Code: "Forbidden", Message: "Forbidden", Fault: smithy.FaultClient}
 	}
 	return &s3.HeadBucketOutput{}, nil
 }

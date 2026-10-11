@@ -50,9 +50,11 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		end := min(i+descBatch, len(clusterNames))
 		batch := clusterNames[i:end]
 
-		out, err := clients.ECS.DescribeClusters(ctx, &ecs.DescribeClustersInput{
-			Clusters: batch,
-			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldStatistics},
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeClustersOutput, error) {
+			return clients.ECS.DescribeClusters(ctx, &ecs.DescribeClustersInput{
+				Clusters: batch,
+				Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldStatistics},
+			})
 		})
 		if err != nil {
 			// The whole batch was skipped — mark each cluster so its row shows a

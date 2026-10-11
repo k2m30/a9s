@@ -71,28 +71,35 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 
-		hasConsolePassword := false
-		_, err := loginProfileAPI.GetLoginProfile(ctx, &iam.GetLoginProfileInput{
-			UserName: aws.String(userName),
+		// The login profile, the MFA devices, the access keys and the attached
+		// policies are separate reads: one that fails leaves its own signals
+		// unread and the others evaluated.
+		var rowErrs []error
+		consoleKnown, hasConsolePassword := true, false
+		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetLoginProfileOutput, error) {
+			return loginProfileAPI.GetLoginProfile(ctx, &iam.GetLoginProfileInput{
+				UserName: aws.String(userName),
+			})
 		})
-		if err != nil {
-			if !isNoSuchEntity(err) {
-				mu.Lock()
-				truncated = true
-				MarkSkipped(&result, r.ID, &failures, err)
-				mu.Unlock()
-				return
-			}
-			// NoSuchEntityException means the user has no console password.
-		} else {
+		switch {
+		case err == nil:
 			hasConsolePassword = true
+		case isNoSuchEntity(err):
+			// NoSuchEntityException means the user has no console password.
+		default:
+			consoleKnown = false
+			rowErrs = append(rowErrs, err)
 		}
 
+		// A user whose login profile could not be read may be a console user,
+		// so its MFA devices are read too.
 		hasMFA := false
-		if hasConsolePassword {
+		var mfaErr error
+		if hasConsolePassword || !consoleKnown {
 			// ListMFADevices pages by IsTruncated and Marker
 			// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListMFADevices.html).
-			devices, _, mfaErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.MFADevice, *string, error) {
+			var devices []iamtypes.MFADevice
+			devices, _, mfaErr = PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.MFADevice, *string, error) {
 				out, err := mfaAPI.ListMFADevices(ctx, &iam.ListMFADevicesInput{UserName: aws.String(userName), Marker: marker})
 				if err != nil {
 					return nil, nil, err
@@ -100,11 +107,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				return out.MFADevices, iamNextMarker(out.IsTruncated, out.Marker), nil
 			})
 			if mfaErr != nil {
-				mu.Lock()
-				truncated = true
-				MarkSkipped(&result, r.ID, &failures, mfaErr)
-				mu.Unlock()
-				return
+				rowErrs = append(rowErrs, mfaErr)
 			}
 			hasMFA = len(devices) > 0
 		}
@@ -119,23 +122,15 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			return out.AccessKeyMetadata, iamNextMarker(out.IsTruncated, out.Marker), nil
 		})
 		if keysErr == nil && !keysComplete {
-			keysErr = fmt.Errorf("ListAccessKeys: more than %d pages for %s", PerParentPageCap, userName)
+			keysErr = errPageCap
 		}
 		if keysErr != nil {
-			mu.Lock()
-			truncated = true
-			MarkSkipped(&result, r.ID, &failures, keysErr)
-			mu.Unlock()
-			return
+			keys = nil
+			rowErrs = append(rowErrs, keysErr)
 		}
 
 		attachedUser, _, aerr := listAttachedUserPolicies(ctx, clients.IAM, userName)
 		adminPolicy := adminAttachedPolicyName(attachedUser)
-		if aerr != nil {
-			mu.Lock()
-			MarkSkipped(&result, r.ID, &failures, aerr)
-			mu.Unlock()
-		}
 
 		activeKeys := activeAccessKeys(keys)
 		unusedKeys, keyUseErr := unusedAccessKeys(ctx, keyLastUsedAPI, activeKeys)
@@ -143,19 +138,26 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		defer mu.Unlock()
 
-		if keyUseErr != nil {
-			MarkSkipped(&result, r.ID, &failures, keyUseErr)
+		if len(rowErrs) > 0 {
+			truncated = true
 		}
-
-		// ListMFADevices is only called for console users, so for a
-		// programmatic-only user MFA was never looked at — "true" would
-		// claim coverage nobody checked.
-		mfaVal := "n/a"
-		if hasConsolePassword {
-			mfaVal = "false"
-			if hasMFA {
-				mfaVal = "true"
+		for _, err := range append(rowErrs, aerr, keyUseErr) {
+			if err != nil {
+				MarkSkipped(&result, r.ID, &failures, err)
 			}
+		}
+		// ListMFADevices is not called for a programmatic-only user, so MFA
+		// was never looked at there — "true" would claim coverage nobody
+		// checked. An unread read leaves the column empty.
+		mfaVal := ""
+		switch {
+		case consoleKnown && !hasConsolePassword:
+			mfaVal = "n/a"
+		case mfaErr != nil:
+		case hasMFA:
+			mfaVal = "true"
+		case consoleKnown:
+			mfaVal = "false"
 		}
 		consolePasswordVal := "false"
 		if hasConsolePassword {
@@ -163,7 +165,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 		riskLabel := ""
 
-		if hasConsolePassword && !hasMFA {
+		if hasConsolePassword && mfaErr == nil && !hasMFA {
 			riskLabel = riskNoMFA
 			setWave2Finding(&result, r.ID, iamUserCodeNoMFA, []domain.DetailRow{{Label: "MFA device", Value: "none registered", Tier: tierOf(iamUserCodeNoMFA)}})
 
@@ -225,11 +227,14 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		}
 
-		result.FieldUpdates[r.ID] = map[string]string{
-			"mfa":                  mfaVal,
-			"risk":                 riskLabel,
-			"has_console_password": consolePasswordVal, //nolint:gosec // not a credential, display field key
+		fields := map[string]string{"risk": riskLabel}
+		if consoleKnown {
+			fields["has_console_password"] = consolePasswordVal //nolint:gosec // not a credential, display field key
 		}
+		if mfaVal != "" {
+			fields["mfa"] = mfaVal
+		}
+		result.FieldUpdates[r.ID] = fields
 	})
 	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("user credentials", failures, n))

@@ -75,6 +75,9 @@ func (f *r53GetHostedZoneFake) GetHostedZone(
 
 var _ awsclient.Route53API = (*r53GetHostedZoneFake)(nil)
 
+// The rows carry no private_zone: each zone's privacy comes from the
+// GetHostedZone answer the test serves, which a row naming the zone public
+// would never be asked for.
 func r53ZoneResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
@@ -85,7 +88,6 @@ func r53ZoneResources(ids ...string) []resource.Resource {
 				"zone_id":      id,
 				"name":         id + ".example.com.",
 				"record_count": "5",
-				"private_zone": "false",
 				"comment":      "",
 			},
 		})

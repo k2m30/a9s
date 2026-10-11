@@ -110,7 +110,7 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
 
 - **Signal**: an S3 origin naming a bucket absent from the account.
   - **State bucket**: Broken.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type. A bucket the loaded `s3` list does not hold is asked about with `HeadBucket`: a 404 raises the signal, and a 403 or a redirect means the bucket exists in another account or Region. Any other error, such as a 400 for an expired token or a server fault, leaves the distribution not inspected, naming `HeadBucket`.
 
 - **Signal**: `DefaultRootObject` empty.
   - **State bucket**: Warning.

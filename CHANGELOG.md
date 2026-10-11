@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A list check whose AWS read fails marks the row `not inspected` and
+  reports the failure, instead of leaving a blank cell or a row that reads
+  clean: CodeArtifact package counts, log group last-event times, and
+  CloudTrail logging health. CloudTrail status reads and the SES account,
+  CloudFront config and IAM login-profile reads now retry when throttled.
+- A failed read no longer hides the checks that do not depend on it: an
+  IAM group keeps its member count and administrator finding, an SNS topic
+  its public-policy and encryption findings, every SES identity its DKIM
+  finding, and API Gateway, CloudFront, ECR, IAM user, Route 53 and WAF rows
+  keep the findings their other reads answered.
+- A CloudFront distribution whose origin bucket check fails with an error
+  other than 404 or 403 (an expired token, a server fault) is marked
+  `not inspected` instead of reading as an origin bucket that exists.
+- Athena, CodeBuild, CodeArtifact policy, DynamoDB backup, ECS cluster and
+  IAM role reads retry when throttled, like the other reads of their checks.
+- A list check that stops at a9s's own page limit reads `not inspected:
+  stopped at the inspection cap` and is no longer reported as a failed AWS
+  call. A Route 53 record page that comes back truncated with no next record
+  names the missing field instead of the page limit.
+- A Lambda function whose reads are refused for two different actions
+  reports both, so granting one does not leave the row failing again.
+- An SQS queue or DynamoDB table deleted while the list was loading is no
+  longer reported as a failed read.
+- A public Route 53 zone is no longer asked for `GetHostedZone`, which only
+  private zones need, so a role without that action keeps every public
+  zone inspected. An IAM group whose member list stops at the page limit
+  after members were read is not marked `not inspected`.
+- A CloudTrail trail delivering to a deleted bucket is not marked `not
+  inspected` for the bucket's posture; its delivery error is the finding.
+- An HTTP API whose stages could not be read shows no stage count instead
+  of `0+`. A VPC whose subnets were not listed is still checked for a flow
+  log on the VPC itself.
+- An EBS volume, or any resource whose ARN is unknown, is reported as not
+  covered by a backup plan when the backup plan list was read in full and is
+  empty.
+
 ## [3.59.0] - 2026-09-24
 
 ### Changed

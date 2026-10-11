@@ -1104,7 +1104,7 @@ const (
 )
 
 func init() {
-	Register(Pin{ShortName: "trail", Rows: 14, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "trail", Rows: 14, Issues: 3, CoverageGaps: []string{"dim"}})
 	// healthy: colorCTEvents (core/aws/catalog_monitoring.go) colors only
 	// ct-danger→Broken and ct-attention→Warning and defaults everything else
 	// to Dim, so Healthy is not a return value of this classifier.

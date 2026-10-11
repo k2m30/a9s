@@ -28,7 +28,7 @@ func r53ListRecords(ctx context.Context, clients any, zoneID string) (sets []r53
 	if !ok || c == nil || c.Route53 == nil {
 		return nil, false, errClientMissing
 	}
-	sets, complete, err := r53ZoneRecords(ctx, c.Route53, zoneID)
+	sets, complete, err := r53RecordsUnread(ctx, c.Route53, zoneID)
 	return sets, !complete, err
 }
 

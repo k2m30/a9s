@@ -50,8 +50,9 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	var mu sync.Mutex
 
 	var streamsErr error
+	var streamFailures []Failure
+	groups := fieldOnlyCap(resources)
 	if hasStreams {
-		groups := fieldOnlyCap(resources)
 		streamsErr = ForEachParallel(ctx, len(groups), EnrichmentParallelism, func(i int) {
 			r := groups[i]
 			name := logGroupNameOf(r)
@@ -66,8 +67,14 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 					Limit:        aws.Int32(1),
 				})
 			})
-			// no finding: last_event_at is a column, left empty when the read fails or the group has no stream.
-			if err != nil || len(out.LogStreams) == 0 || out.LogStreams[0].LastEventTimestamp == nil {
+			if err != nil {
+				mu.Lock()
+				MarkSkipped(&result, r.ID, &streamFailures, err)
+				mu.Unlock()
+				return
+			}
+			// no finding: last_event_at is a column, left empty when the group has no stream.
+			if len(out.LogStreams) == 0 || out.LogStreams[0].LastEventTimestamp == nil {
 				return
 			}
 			t := time.UnixMilli(*out.LogStreams[0].LastEventTimestamp)
@@ -110,7 +117,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			return out.MetricFilters, out.NextToken, nil
 		})
 		if err == nil && len(filters) == 0 && !complete {
-			err = fmt.Errorf("DescribeMetricFilters: more than %d pages for %s", PerParentPageCap, logGroupName)
+			err = errPageCap
 		}
 		mu.Lock()
 		defer mu.Unlock()
@@ -130,7 +137,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	})
 
 	MarkInformationalOnly(&result)
-	return result, errors.Join(streamsErr, loopErr, AggregateFailures("DescribeMetricFilters", failures, len(audit)))
+	return result, errors.Join(streamsErr, AggregateFailures("DescribeLogStreams", streamFailures, len(groups)), loopErr, AggregateFailures("DescribeMetricFilters", failures, len(audit)))
 }
 
 // logGroupNameOf is the name the CloudWatch Logs calls take for a row.

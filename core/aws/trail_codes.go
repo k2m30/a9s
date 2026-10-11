@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // trail_codes.go — canonical FindingCode constants for the trail resource
-// type. The fetcher writes Findings using these codes; colorTrail
-// (catalog_monitoring.go) reads the same underlying Fields to color rows —
-// both derive from the identical DescribeTrails/GetTrailStatus conditions so
-// the Findings list and the row color never disagree.
+// type. The fetcher and EnrichTrail write Findings using these codes;
+// colorTrail (catalog_monitoring.go) reads the same underlying Fields to color
+// rows — both derive from the identical DescribeTrails/GetTrailStatus
+// conditions so the Findings list and the row color never disagree.
 package aws
 
 import (
@@ -95,6 +95,16 @@ func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 // conditions checked before the warning condition) so the two never disagree
 // about a trail's health.
 func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logFileValidationEnabled string) []domain.Finding {
+	findings := trailStatusFindings(isLogging, latestDeliveryError, latestDeliveryTime)
+	if logFileValidationEnabled == "false" {
+		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled))
+	}
+	return findings
+}
+
+// trailStatusFindings is the GetTrailStatus half of trailWave1Wave2Findings:
+// the logging-health findings EnrichTrail raises from the fields it reads.
+func trailStatusFindings(isLogging, latestDeliveryError, latestDeliveryTime string) []domain.Finding {
 	var findings []domain.Finding
 	if isLogging == "false" {
 		findings = append(findings, wave2Finding(CodeTrailNotLogging))
@@ -104,9 +114,6 @@ func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime,
 	}
 	if trailDeliveryIsStale(isLogging, latestDeliveryTime) {
 		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, latestDeliveryTime))
-	}
-	if logFileValidationEnabled == "false" {
-		findings = append(findings, wave1Finding(CodeTrailLogFileValidationDisabled))
 	}
 	return findings
 }

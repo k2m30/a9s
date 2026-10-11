@@ -346,8 +346,9 @@ func (f *t571VPCEC2) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogs
 	return &ec2.DescribeFlowLogsOutput{}, nil
 }
 
-// A VPC whose subnets could not be read is not inspected for flow logs: the
-// VPC id alone cannot say whether its subnets are covered.
+// A VPC whose subnets could not be read is asked about its own id, which can
+// prove a flow log but never its absence: with none found there, the VPC is
+// not inspected and carries no finding, since its subnets may be covered.
 func TestT571_VPCWithUnreadSubnetsIsNotInspected(t *testing.T) {
 	api := &t571VPCEC2{subnetsErr: errors.New("UnauthorizedOperation")}
 	page, err := awsclient.FetchVPCsPage(context.Background(), api, "")
@@ -361,8 +362,8 @@ func TestT571_VPCWithUnreadSubnetsIsNotInspected(t *testing.T) {
 	if len(res.Findings["vpc-0a1b2c3d"]) != 0 {
 		t.Errorf("findings = %v on a VPC whose subnets were not read", res.Findings["vpc-0a1b2c3d"])
 	}
-	if api.flowCalls != 0 {
-		t.Errorf("DescribeFlowLogs called %d times about the VPC id alone", api.flowCalls)
+	if api.flowCalls != 1 {
+		t.Errorf("DescribeFlowLogs called %d times, want 1 about the VPC id alone", api.flowCalls)
 	}
 }
 

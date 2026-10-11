@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -404,11 +405,12 @@ func (f *iamGroupErrorFake) ListGroupPolicies(
 var _ awsclient.IAMAPI = (*iamGroupErrorFake)(nil)
 
 // TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge verifies
-// that when GetGroup returns an error for a group, that group is skipped (no
-// finding produced), TruncatedIDs marks its row, and processing continues
-// for the next group. iam-group is a "~"-only enricher (IssueCount always
-// 0), so the aggregate Truncated flag must stay false — the coverage gap
-// never lower-bounds the issue badge.
+// that when GetGroup returns an error for a group, that group's membership is
+// left unread (no member count, no member-derived row), TruncatedIDs marks its
+// row, the policy walks that answered still report on it, and processing
+// continues for the next group. iam-group is a "~"-only enricher (IssueCount
+// always 0), so the aggregate Truncated flag must stay false — the coverage
+// gap never lower-bounds the issue badge.
 func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *testing.T) {
 	fake := &iamGroupErrorFake{
 		getGroupErrFor: "broken-group",
@@ -436,9 +438,18 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *te
 	if _, ok := result.TruncatedIDs["broken-group"]; !ok {
 		t.Error("TruncatedIDs must contain broken-group")
 	}
-	// broken-group errored on first call → memberFirstCallErrd=true → skipped from findings.
-	if _, ok := result.Findings["broken-group"]; ok {
-		t.Error("broken-group must NOT appear in Findings when GetGroup errored")
+	// GetGroup answers membership alone; the policy walks answered, so
+	// broken-group's empty policy lists still make it a no-op group.
+	if _, ok := result.FieldUpdates["broken-group"]["member_count"]; ok {
+		t.Error("broken-group must carry no member_count when GetGroup errored")
+	}
+	for _, row := range result.AttentionDetails["broken-group"]["iam-group.orphan-or-noop"].Rows {
+		if row.Label == "Members" {
+			t.Errorf("broken-group carries a member-derived row %q though GetGroup errored", row.Value)
+		}
+	}
+	if !slices.ContainsFunc(result.Findings["broken-group"], func(f domain.Finding) bool { return f.Code == "iam-group.orphan-or-noop" }) {
+		t.Errorf("broken-group findings %v: the policy walks answered empty, so it is a no-op group", result.Findings["broken-group"])
 	}
 	// ok-group has 0 users → a "no members" finding.
 	if _, ok := result.Findings["ok-group"]; !ok {
