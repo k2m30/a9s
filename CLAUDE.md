@@ -19,7 +19,6 @@ Quick reference:
 
 ## Active Technologies
 
-- Go 1.26+, Bubble Tea v2.0.6, Lipgloss v2.0.3, Bubbles v2.1.0 (all under `charm.land/*/v2`), AWS SDK Go v2 (one service module per supported AWS service), yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk, per-type layout: `~/.a9s/cache/<profile>--<region>/<shortName>.yaml` (TypeFile schema v2, no TTL)
 - Session-scoped in-memory state owned by `core/session.Session` (RowStore, capability stores, generation counters; cleared on profile/region `Rotate()`)
 - In-process demo fixture store (per resource type, typed fakes in `core/demo/fixtures/` + `fakes/`, loaded at startup)
@@ -38,24 +37,10 @@ Applies to every defect — one you found, one a review reported, one a test cau
 
 ## External Review Protocol
 
-**Nothing merges to `main` without an external pass resolved.** Local gates prove the code runs; they do not prove it is right. Three independent reviewers are available and they find different classes of defect. The area review dispatches a `general-purpose` agent on model `opus` per concern the task changed, reviewing all code in that area across every resource type, with the prompt in [`docs/review-prompt.md`](docs/review-prompt.md) — not a diff review; CodeRabbit runs from the shell:
+- **Nothing merges to `main` without an external pass resolved** (Opus area review, CodeRabbit, `/ponytail-review`).
+- **Never tag a release without CodeRabbit and the area review resolved on the range.**
 
-```bash
-coderabbit review --committed --base-commit <base>
-```
-
-Plus `/ponytail-review` for over-engineering (delete/simplify only — it does not hunt correctness).
-
-Rules:
-
-- **Once per task, before its commits fast-forward into main.** The area review is expensive: one pass per task, over every concern the task changed, never per fix, and only when the task's production diff (`core/`, `internal/`, `cmd/`, `scripts/`, tests excluded) is at least 100 changed lines or touches 3 or more production files. One-liners, wording, docs and test-only changes are not reviewed.
-- **Code review only.** The prompt forbids tests, fixtures, fakes, demos, gates and state changes; the loop has already run the gates.
-- **Review the committed tree**, not the working tree — `--base-commit <base>` for CodeRabbit; the area review runs on the task's committed tip.
-- **A reviewer's suggested patch is a proposal, not verified code.** Read every snippet against the actual file before applying it; patches routinely reference helpers that do not exist in that file's package. The finding can be correct while the patch does not compile.
-- **Point reviewers at production code.** A large mechanical test migration will drown the signal otherwise.
-- Never tag a release without CodeRabbit and the area review resolved on the range.
-
-On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` for trivial follow-ups; reviews trigger per-push, so batch small fixes into one push.
+How and when to run each reviewer: the `a9s-external-review` skill.
 
 ## Gate Results Are Samples, Not Verdicts
 
@@ -76,19 +61,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 
 ## Skills and Subagents — in-session tooling
 
-> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. Work runs as the team loop, whose round order is defined once in `.claude/skills/a9s-team-loop/SKILL.md` — read it there. The main session orchestrates only. Three roles per task: `a9s-qa` writes the failing tests for every spec row from the spec and the stories, blind to the implementation, before the implementer starts; `a9s-dev` makes every one of them pass and runs the whole suite itself until green, with no hand-back rounds; `a9s-acceptance` is the independent check on the finished tree. A dev never alters or inverts a QA test — an inversion goes to the orchestrator with evidence and QA rewrites it.
-
-## Skills
-
-| Skill | Scope | Usage |
-|-------|-------|-------|
-| `a9s-common` | All work | Shell rules, package access rules, build/test commands |
-| `a9s-bt-v2` | TUI-touching work | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
-| `a9s-add-attention-column` | impl + tests | Add a list-view attention column (Tier A/B decision tree) |
-| `a9s-implement-issue` | Orchestrator | Interview → `spec.md` → one approval → autonomous through the team loop to acceptance |
-| `a9s-resource-spec` | Main session | Generate `docs/resources/<shortName>.md` implementation-blind from the four golden docs |
-| `a9s-implement-resource` | Main session (orchestrator) | Implement resource from its spec: TBDs → impl-plan → fixtures → dev/QA handoff |
-| `a9s-create-demo-fixture` | Fixtures | Build the single-source fixture file at `core/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
+> **The table below describes Claude Code subagents; skills are described by their own `SKILL.md` frontmatter.** They are tools invoked from within the Claude Code session. Work runs as the team loop, whose round order is defined once in `.claude/skills/a9s-team-loop/SKILL.md` — read it there. The main session orchestrates only. Three roles per task: `a9s-qa` writes the failing tests for every spec row from the spec and the stories, blind to the implementation, before the implementer starts; `a9s-dev` makes every one of them pass and runs the whole suite itself until green, with no hand-back rounds; `a9s-acceptance` is the independent check on the finished tree. A dev never alters or inverts a QA test — an inversion goes to the orchestrator with evidence and QA rewrites it.
 
 ## Agents
 
