@@ -328,7 +328,7 @@ func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 // self-bounds its one AWS list-or-describe call at 10s internally
 // (Core.ProbeResourceAvailability / Core.ProbeEnrichment both wrap the call
 // in their own context.WithTimeout(ctx, 10*time.Second), inclusive of
-// RetryOnThrottle's up-to-3-attempt backoff), so 30s gives that inner
+// the SDK retryer's backoff), so 30s gives that inner
 // deadline comfortable headroom to fire first in the normal case while still
 // acting as a real backstop against a task that ignores ctx internally or
 // blocks on something other than the AWS call (e.g. a lock wait). It bounds

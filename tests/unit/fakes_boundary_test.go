@@ -13,7 +13,6 @@ import (
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/smithy-go"
 
@@ -116,96 +115,6 @@ func (f fakeEC2BoundaryAccessDenied) DescribeLaunchTemplates(_ context.Context, 
 	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
 func (f fakeEC2BoundaryAccessDenied) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
-	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
-}
-
-// ---------------------------------------------------------------------------
-// fakeEC2BoundaryThrottle — EC2 fake whose DescribeSubnets returns a throttle
-// error on the first call and succeeds with the given VPC IDs on subsequent
-// calls. Implements EC2API. The call counter is atomic for goroutine-safety.
-// ---------------------------------------------------------------------------
-
-type fakeEC2BoundaryThrottle struct {
-	calls  atomic.Int32
-	vpcIDs []string // returned on the successful (2nd+) call
-}
-
-func (f *fakeEC2BoundaryThrottle) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
-	return &ec2.DescribeInstancesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeInstanceStatus(_ context.Context, _ *ec2.DescribeInstanceStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error) {
-	return &ec2.DescribeInstanceStatusOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeVpcs(_ context.Context, _ *ec2.DescribeVpcsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcsOutput, error) {
-	return &ec2.DescribeVpcsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeSecurityGroups(_ context.Context, _ *ec2.DescribeSecurityGroupsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSecurityGroupsOutput, error) {
-	return &ec2.DescribeSecurityGroupsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeSubnets(_ context.Context, _ *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
-	n := f.calls.Add(1)
-	if n == 1 {
-		return nil, newThrottleError()
-	}
-	subnets := make([]ec2types.Subnet, 0, len(f.vpcIDs))
-	for _, vid := range f.vpcIDs {
-		vid := vid
-		subnets = append(subnets, ec2types.Subnet{VpcId: &vid})
-	}
-	return &ec2.DescribeSubnetsOutput{Subnets: subnets}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeRouteTables(_ context.Context, _ *ec2.DescribeRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
-	return &ec2.DescribeRouteTablesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeNatGateways(_ context.Context, _ *ec2.DescribeNatGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error) {
-	return &ec2.DescribeNatGatewaysOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeInternetGateways(_ context.Context, _ *ec2.DescribeInternetGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeInternetGatewaysOutput, error) {
-	return &ec2.DescribeInternetGatewaysOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeAddresses(_ context.Context, _ *ec2.DescribeAddressesInput, _ ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error) {
-	return &ec2.DescribeAddressesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeTransitGateways(_ context.Context, _ *ec2.DescribeTransitGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
-	return &ec2.DescribeTransitGatewaysOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeTransitGatewayAttachments(_ context.Context, _ *ec2.DescribeTransitGatewayAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
-	return &ec2.DescribeTransitGatewayAttachmentsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeVpcEndpoints(_ context.Context, _ *ec2.DescribeVpcEndpointsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcEndpointsOutput, error) {
-	return &ec2.DescribeVpcEndpointsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeNetworkInterfaces(_ context.Context, _ *ec2.DescribeNetworkInterfacesInput, _ ...func(*ec2.Options)) (*ec2.DescribeNetworkInterfacesOutput, error) {
-	return &ec2.DescribeNetworkInterfacesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeVolumes(_ context.Context, _ *ec2.DescribeVolumesInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error) {
-	return &ec2.DescribeVolumesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeSnapshots(_ context.Context, _ *ec2.DescribeSnapshotsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error) {
-	return &ec2.DescribeSnapshotsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeImages(_ context.Context, _ *ec2.DescribeImagesInput, _ ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
-	return &ec2.DescribeImagesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error) {
-	return &ec2.DescribeVolumeStatusOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInput, _ ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error) {
-	return &ec2.DescribeFlowLogsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeTransitGatewayVpcAttachments(_ context.Context, _ *ec2.DescribeTransitGatewayVpcAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
-	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeTransitGatewayRouteTables(_ context.Context, _ *ec2.DescribeTransitGatewayRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayRouteTablesOutput, error) {
-	return &ec2.DescribeTransitGatewayRouteTablesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplateVersions(_ context.Context, _ *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
-	return &ec2.DescribeLaunchTemplatesOutput{}, nil
-}
-func (f *fakeEC2BoundaryThrottle) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
 	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
 }
 

@@ -76,9 +76,7 @@ func sesConfigSetName(ctx context.Context, c *ServiceClients, identityName strin
 	if !ok {
 		return "", errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetEmailIdentityOutput, error) {
-		return api.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{EmailIdentity: &identityName})
-	})
+	out, err := api.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{EmailIdentity: &identityName})
 	if err != nil {
 		return "", err
 	}
@@ -98,10 +96,8 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 	if !ok {
 		return nil, nil //nolint:nilnil // nil,nil signals "interface not satisfied" — caller treats it as 0 results
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
-		return api.GetConfigurationSetEventDestinations(ctx, &sesv2.GetConfigurationSetEventDestinationsInput{
-			ConfigurationSetName: &configSetName,
-		})
+	out, err := api.GetConfigurationSetEventDestinations(ctx, &sesv2.GetConfigurationSetEventDestinationsInput{
+		ConfigurationSetName: &configSetName,
 	})
 	if out == nil {
 		return nil, err

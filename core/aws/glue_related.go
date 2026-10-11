@@ -216,9 +216,7 @@ func glueConnectionSecrets(ctx context.Context, clients any, job gluetypes.Job) 
 	var refs []string
 	var failures []Failure
 	for _, name := range job.Connections.Connections {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*glue.GetConnectionOutput, error) {
-			return api.GetConnection(ctx, &glue.GetConnectionInput{Name: aws.String(name), HidePassword: true})
-		})
+		out, err := api.GetConnection(ctx, &glue.GetConnectionInput{Name: aws.String(name), HidePassword: true})
 		if err != nil {
 			failures = append(failures, FailedCall(name, err))
 			continue

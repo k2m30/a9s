@@ -3,7 +3,6 @@ package unit_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -78,50 +77,6 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
 		}
 	})
-}
-
-// DefaultRetryConfig() uses a 500ms base delay with jitter; SetRetryConfigForTest
-// drops it to 1ms so the retry path runs without taking ~500ms per sub-test.
-
-func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
-	restore := awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
-		MaxAttempts: 3,
-		BaseDelay:   1 * time.Millisecond,
-		MaxDelay:    10 * time.Millisecond,
-		Jitter:      false,
-	})
-	t.Cleanup(restore)
-
-	t.Run("asg_vpc", func(t *testing.T) {
-		fakeEC2 := &fakeEC2BoundaryThrottle{
-			vpcIDs: []string{"vpc-0abc1234567890000"},
-		}
-		parent := resource.Resource{
-			ID:     "my-asg",
-			Fields: map[string]string{},
-			RawStruct: asgtypes.AutoScalingGroup{
-				AutoScalingGroupName: aws.String("my-asg"),
-				VPCZoneIdentifier:    aws.String("subnet-0aaa111111111111a"),
-			},
-		}
-		clients := &awsclient.ServiceClients{
-			EC2: fakeEC2,
-		}
-		checker := boundaryCheckerByTarget(t, "asg", "vpc")
-		got := checker(context.Background(), clients, parent, nil)
-
-		calls := fakeEC2.calls.Load()
-		if calls < 2 {
-			t.Errorf("DescribeSubnets call count = %d, want >= 2 (retry must have fired)", calls)
-		}
-		if got.Count() != 1 {
-			t.Errorf("Count = %d, want 1 (successful retry returned one VPC)", got.Count())
-		}
-		if got.Err() != nil {
-			t.Errorf("Err = %v, want nil (successful retry should clear error)", got.Err())
-		}
-	})
-
 }
 
 func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {

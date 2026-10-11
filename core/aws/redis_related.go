@@ -51,10 +51,8 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return NotRead("cfn")
 	}
 	arn := *rg.ARN
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.ListTagsForResourceOutput, error) {
-		return c.ElastiCache.ListTagsForResource(ctx, &elasticache.ListTagsForResourceInput{
-			ResourceName: &arn,
-		})
+	out, err := c.ElastiCache.ListTagsForResource(ctx, &elasticache.ListTagsForResourceInput{
+		ResourceName: &arn,
 	})
 	if err != nil {
 		return ReadFailed("cfn", err)

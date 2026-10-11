@@ -220,9 +220,7 @@ func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount
 	if !ok {
 		return iampolicy.Exposure{}, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
-		return policyAPI.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
-	})
+	out, err := policyAPI.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
 	if err != nil {
 		if _, notFound := errors.AsType[*ecrtypes.RepositoryPolicyNotFoundException](err); notFound {
 			return iampolicy.Exposure{}, nil
@@ -254,9 +252,7 @@ func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string)
 	if !ok {
 		return false, nil
 	}
-	_, err = RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetLifecyclePolicyOutput, error) {
-		return lifecycleAPI.GetLifecyclePolicy(ctx, &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)})
-	})
+	_, err = lifecycleAPI.GetLifecyclePolicy(ctx, &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)})
 	if err == nil {
 		return false, nil
 	}

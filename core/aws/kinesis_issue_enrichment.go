@@ -65,10 +65,8 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesissvc.DescribeStreamSummaryOutput, error) {
-			return api.DescribeStreamSummary(ctx, &kinesissvc.DescribeStreamSummaryInput{
-				StreamName: aws.String(name),
-			})
+		out, err := api.DescribeStreamSummary(ctx, &kinesissvc.DescribeStreamSummaryInput{
+			StreamName: aws.String(name),
 		})
 		mu.Lock()
 		defer mu.Unlock()

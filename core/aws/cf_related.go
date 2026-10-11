@@ -64,9 +64,7 @@ func cfDistributionConfig(ctx context.Context, clients any, distID string) (*cft
 	if !ok || c == nil || c.CloudFront == nil {
 		return nil, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
-		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
-	})
+	out, err := c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
 	if err != nil {
 		return nil, err
 	}

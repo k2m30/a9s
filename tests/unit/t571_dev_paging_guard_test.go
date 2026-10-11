@@ -425,57 +425,6 @@ func TestT571_RelatedWalkErrorKeepsTheItemsRead(t *testing.T) {
 	}
 }
 
-// PageAll, walkAccountPages and firstPage retry every call they make through
-// RetryOnThrottle; a callback that retries again multiplies the attempts and
-// wraps the error twice.
-func TestT571_NoRetryInsideAPager(t *testing.T) {
-	var found []string
-	t570EachFunc(t, func(pkg *packages.Package, path string, fn *ast.FuncDecl) {
-		ast.Inspect(fn.Body, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			fun := call.Fun
-			if ix, isIndex := fun.(*ast.IndexListExpr); isIndex {
-				fun = ix.X
-			}
-			if ix, isIndex := fun.(*ast.IndexExpr); isIndex {
-				fun = ix.X
-			}
-			id, ok := fun.(*ast.Ident)
-			if !ok || (id.Name != "PageAll" && id.Name != "walkAccountPages" && id.Name != "firstPage") {
-				return true
-			}
-			for _, arg := range call.Args {
-				lit, ok := arg.(*ast.FuncLit)
-				if !ok {
-					continue
-				}
-				ast.Inspect(lit.Body, func(m ast.Node) bool {
-					inner, ok := m.(*ast.CallExpr)
-					if !ok {
-						return true
-					}
-					fn2 := inner.Fun
-					if ix, isIndex := fn2.(*ast.IndexExpr); isIndex {
-						fn2 = ix.X
-					}
-					if rid, ok := fn2.(*ast.Ident); ok && rid.Name == "RetryOnThrottle" {
-						found = append(found, filepath.Base(path)+":"+strconv.Itoa(pkg.Fset.Position(inner.Pos()).Line)+" "+fn.Name.Name)
-					}
-					return true
-				})
-			}
-			return true
-		})
-	})
-	sort.Strings(found)
-	for _, f := range found {
-		t.Errorf("%s retries inside a pager that already retries every call", f)
-	}
-}
-
 // Every EC2 by-ID fetch goes through fetchEC2ByIDs, the one owner of the
 // 1,000-ID batch and of dropping the IDs a NotFound error names: a fetch
 // that describes EC2 resources by ID any other way fails one drill whole for

@@ -38,11 +38,9 @@ func checkECSTaskEC2(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return NotRead("ec2")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
-		return api.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
-			Cluster:            task.ClusterArn,
-			ContainerInstances: []string{*task.ContainerInstanceArn},
-		})
+	out, err := api.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
+		Cluster:            task.ClusterArn,
+		ContainerInstances: []string{*task.ContainerInstanceArn},
 	})
 	if err != nil {
 		return ReadFailed("ec2", err)

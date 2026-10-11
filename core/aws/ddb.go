@@ -61,9 +61,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		input.ExclusiveStartTableName = &continuationToken
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.ListTablesOutput, error) {
-		return listAPI.ListTables(ctx, input)
-	})
+	listOutput, err := listAPI.ListTables(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing DynamoDB tables: %w", err)
 	}
@@ -71,10 +69,8 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 	var failures []Failure
 	var resources []resource.Resource
 	for _, tableName := range listOutput.TableNames {
-		descOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeTableOutput, error) {
-			return describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-				TableName: aws.String(tableName),
-			})
+		descOutput, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+			TableName: aws.String(tableName),
 		})
 		if err != nil {
 			// Surface per-table failures to the error log AND keep the row —

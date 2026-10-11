@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// snsGetTopicAttrs wraps GetTopicAttributes in RetryOnThrottle. Returns nil on
+// snsGetTopicAttrs calls GetTopicAttributes. Returns nil on
 // any failure (unsupported client, API error, empty output).
 func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[string]string {
 	c, ok := clients.(*ServiceClients)
@@ -22,9 +22,7 @@ func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[str
 	if !ok {
 		return nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sns.GetTopicAttributesOutput, error) {
-		return api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &topicARN})
-	})
+	out, err := api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &topicARN})
 	// Both callers render this nil as UnknownRelated, so the pivot shows "?"
 	// rather than "no key" or "no subscriptions".
 	// no finding: nil is this helper's unknown.

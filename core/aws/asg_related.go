@@ -145,10 +145,8 @@ func asgInstanceProfileToRoles(ctx context.Context, clients any, profileNameOrAR
 		return nil, false
 	}
 	profileName := instanceProfileName(profileNameOrARN)
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
-		return api.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName),
-		})
+	out, err := api.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
+		InstanceProfileName: aws.String(profileName),
 	})
 	// The caller marks its role count a lower bound rather than reporting the
 	// roles it did read as all of them.

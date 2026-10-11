@@ -44,9 +44,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 	if repo.DomainOwner != nil && *repo.DomainOwner != "" {
 		input.DomainOwner = repo.DomainOwner
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codeartifact.DescribeDomainOutput, error) {
-		return api.DescribeDomain(ctx, input)
-	})
+	out, err := api.DescribeDomain(ctx, input)
 	if err != nil {
 		return ReadFailed("kms", err)
 	}

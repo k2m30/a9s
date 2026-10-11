@@ -46,10 +46,8 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codepipeline.GetPipelineStateOutput, error) {
-			return clients.CodePipeline.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
-				Name: aws.String(r.Name),
-			})
+		out, err := clients.CodePipeline.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
+			Name: aws.String(r.Name),
 		})
 		mu.Lock()
 		defer mu.Unlock()

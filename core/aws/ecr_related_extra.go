@@ -125,10 +125,8 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, cache
 		return NotRead("role")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
-		return api.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{
-			RepositoryName: &repoName,
-		})
+	out, err := api.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{
+		RepositoryName: &repoName,
 	})
 	if err != nil {
 		// RepositoryPolicyNotFoundException means no policy exists → 0

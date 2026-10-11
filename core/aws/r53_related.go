@@ -308,9 +308,7 @@ func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok || c == nil || c.Route53 == nil {
 		return NotRead("vpc")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.GetHostedZoneOutput, error) {
-		return c.Route53.GetHostedZone(ctx, &route53.GetHostedZoneInput{Id: &zoneID})
-	})
+	out, err := c.Route53.GetHostedZone(ctx, &route53.GetHostedZoneInput{Id: &zoneID})
 	if err != nil {
 		return ReadFailed("vpc", err)
 	}

@@ -295,7 +295,7 @@ func awsCallers(t *testing.T) map[string]bool {
 			switch f := call.Fun.(type) {
 			case *ast.Ident:
 				callers[f.Name] = append(callers[f.Name], fn.Name.Name)
-				if f.Name == "RetryOnThrottle" || f.Name == "PageAll" || f.Name == "firstPage" {
+				if f.Name == "PageAll" || f.Name == "firstPage" {
 					direct[fn.Name.Name] = true
 				}
 			case *ast.IndexExpr:

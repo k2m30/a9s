@@ -41,7 +41,7 @@ const (
 const transferCertExpiringWindow = 30 * 24 * time.Hour
 
 // FetchTransferAgreements fetches one server's agreements: ListAgreements +
-// DescribeAgreement N+1 (both RetryOnThrottle), the same in-fetcher N+1
+// DescribeAgreement N+1, the same in-fetcher N+1
 // shape as FetchTransferServersPage. Only the agreement's own Status drives
 // a Wave-1 finding here — LocalProfileId/PartnerProfileId and their
 // certificates are account-scoped lookups with no server link, resolved on
@@ -59,9 +59,7 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.ListAgreementsOutput, error) {
-		return api.ListAgreements(ctx, input)
-	})
+	listOutput, err := api.ListAgreements(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing Transfer agreements for %s: %w", serverID, err)
 	}
@@ -73,11 +71,9 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 		listed := listOutput.Agreements[i]
 		id := aws.ToString(listed.AgreementId)
 
-		describeOutput, describeErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeAgreementOutput, error) {
-			return api.DescribeAgreement(ctx, &transfer.DescribeAgreementInput{
-				AgreementId: aws.String(id),
-				ServerId:    aws.String(serverID),
-			})
+		describeOutput, describeErr := api.DescribeAgreement(ctx, &transfer.DescribeAgreementInput{
+			AgreementId: aws.String(id),
+			ServerId:    aws.String(serverID),
 		})
 		if describeErr != nil || describeOutput.Agreement == nil {
 			if describeErr == nil {
@@ -209,9 +205,7 @@ func resolveTransferProfile(ctx context.Context, api TransferAPI, profileID stri
 	if profileID == "" {
 		return "", nil, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeProfileOutput, error) {
-		return api.DescribeProfile(ctx, &transfer.DescribeProfileInput{ProfileId: aws.String(profileID)})
-	})
+	out, err := api.DescribeProfile(ctx, &transfer.DescribeProfileInput{ProfileId: aws.String(profileID)})
 	if err != nil {
 		return "", nil, err
 	}
@@ -243,9 +237,7 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 	if certID == "" {
 		return domain.Finding{}, false, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeCertificateOutput, error) {
-		return api.DescribeCertificate(ctx, &transfer.DescribeCertificateInput{CertificateId: aws.String(certID)})
-	})
+	out, err := api.DescribeCertificate(ctx, &transfer.DescribeCertificateInput{CertificateId: aws.String(certID)})
 	if err != nil {
 		return domain.Finding{}, false, err
 	}

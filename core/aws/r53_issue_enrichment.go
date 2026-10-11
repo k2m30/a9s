@@ -185,10 +185,8 @@ func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resourc
 		r53PublicZoneFindings(ctx, clients, &row, &rowFailures, r, zoneID, held)
 		return row, rowFailures
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
-		return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
-			Id: aws.String(zoneID),
-		})
+	out, err := clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
+		Id: aws.String(zoneID),
 	})
 	if err != nil {
 		MarkSkipped(&row, r.ID, &rowFailures, err)

@@ -47,9 +47,7 @@ func tgsRegistering(ctx context.Context, clients any, tgs []resource.Resource, o
 	var failures []Failure
 	for _, tg := range tgs {
 		arn := tgARN(tg)
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
-			return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &arn})
-		})
+		out, err := c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &arn})
 		if err != nil {
 			failures = append(failures, FailedCall(tg.ID, err))
 			continue
@@ -167,9 +165,7 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !ok {
 		return NotRead("cfn")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTagsOutput, error) {
-		return api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{arn}})
-	})
+	out, err := api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{arn}})
 	if err != nil {
 		return ReadFailed("cfn", err)
 	}
@@ -201,9 +197,7 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !cok || c == nil || c.ELBv2 == nil {
 		return NotRead("ec2")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
-		return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
-	})
+	out, err := c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
 	if err != nil {
 		return ReadFailed("ec2", err)
 	}
@@ -242,9 +236,7 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, cach
 	if !cok || c == nil || c.ELBv2 == nil {
 		return NotRead("lambda")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
-		return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
-	})
+	out, err := c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
 	if err != nil {
 		return ReadFailed("lambda", err)
 	}

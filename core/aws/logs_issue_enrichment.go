@@ -59,7 +59,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			if name == "" {
 				return
 			}
-			out, err := firstPage(ctx, func() (*cwlogssvc.DescribeLogStreamsOutput, error) {
+			out, err := firstPage(func() (*cwlogssvc.DescribeLogStreamsOutput, error) {
 				return logStreamsAPI.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
 					LogGroupName: aws.String(name),
 					OrderBy:      "LastEventTime",

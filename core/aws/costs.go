@@ -258,9 +258,7 @@ func FetchCostAndUsage(ctx context.Context, api CostsGetCostAndUsageAPI, q costs
 	}
 	return drainCostUsagePages(invoiceMetricKey(q.Filter), func(token *string) (costUsagePage, error) {
 		input.NextPageToken = token
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*costexplorer.GetCostAndUsageOutput, error) {
-			return api.GetCostAndUsage(ctx, input)
-		})
+		out, err := api.GetCostAndUsage(ctx, input)
 		if err != nil {
 			return costUsagePage{}, err
 		}
@@ -281,9 +279,7 @@ func FetchCostAndUsageWithResources(ctx context.Context, api CostsGetCostAndUsag
 	}
 	return drainCostUsagePages(invoiceMetricKey(q.Filter), func(token *string) (costUsagePage, error) {
 		input.NextPageToken = token
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*costexplorer.GetCostAndUsageWithResourcesOutput, error) {
-			return api.GetCostAndUsageWithResources(ctx, input)
-		})
+		out, err := api.GetCostAndUsageWithResources(ctx, input)
 		if err != nil {
 			return costUsagePage{}, err
 		}
@@ -317,9 +313,7 @@ func FetchCostAnomalies(ctx context.Context, api CostsGetAnomaliesAPI, window co
 	}
 
 	for pages := 0; ; pages++ {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*costexplorer.GetAnomaliesOutput, error) {
-			return api.GetAnomalies(ctx, input)
-		})
+		out, err := api.GetAnomalies(ctx, input)
 		result.Requests++
 		if err != nil {
 			return result, classifyCostsError(err)

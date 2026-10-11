@@ -70,9 +70,7 @@ func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]
 	if !cok || c == nil || c.ACM == nil {
 		return nil, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
-		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
-	})
+	out, err := c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
 	if err != nil {
 		return nil, err
 	}
@@ -151,9 +149,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	if !cok || c == nil || c.ACM == nil {
 		return NotRead("r53")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
-		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
-	})
+	out, err := c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
 	if err != nil {
 		return ReadFailed("r53", err)
 	}

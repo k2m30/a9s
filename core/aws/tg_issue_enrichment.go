@@ -61,10 +61,8 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
-			return clients.ELBv2.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
-				TargetGroupArn: aws.String(tgARN),
-			})
+		out, err := clients.ELBv2.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
+			TargetGroupArn: aws.String(tgARN),
 		})
 		mu.Lock()
 		defer mu.Unlock()

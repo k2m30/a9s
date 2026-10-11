@@ -180,22 +180,6 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 	}
 }
 
-func Test_LA_025_ThrottlingRetry_NotInLazyAddFetchers(t *testing.T) {
-	t.Skip("lazy-add FetchByIDs functions (FetchKMSKeysByIDs, " +
-		"FetchIAMPoliciesByIDsFull) do not currently invoke RetryOnThrottle; " +
-		"throttling is a concern for paginated top-level fetchers only. " +
-		"Known RetryOnThrottle callers: acm_related.go, apigw_related.go, " +
-		"asg_related.go, asg_related_extra.go, backup_related.go, cf_related.go, " +
-		"codeartifact_related.go, dbc_related.go, dbi_related.go, ddb_related.go, " +
-		"docdb_snap_related.go, eb_related_extra.go, ec2_related.go, " +
-		"ecr_related_extra.go, ecs_svc_related_extra.go, ecs_task.go, " +
-		"eks_related_extra.go, elb_related.go, kinesis_related.go, kms_related.go, " +
-		"ng_related.go, pipeline_related.go, r53_related.go, rds_snap_related.go, " +
-		"redis_related.go, redshift_related.go, secrets_related_extra.go, " +
-		"ses_related.go, sfn_related.go, sns_related.go, sqs_related.go, " +
-		"tg_related.go, tgw_related.go, vpc_related.go, vpce_related.go, waf_related.go.")
-}
-
 func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 	const (
 		srcType    = "test-la060-source"

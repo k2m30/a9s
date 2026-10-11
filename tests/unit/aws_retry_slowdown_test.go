@@ -1,13 +1,11 @@
 package unit
 
-// "SlowDown" is an S3 (and DynamoDB) throttle error code, retried like
+// "SlowDown" is an S3 (and DynamoDB) throttle error code, classed like
 // Throttling / ThrottlingException / TooManyRequestsException /
 // RequestLimitExceeded.
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/aws/smithy-go"
 
@@ -16,40 +14,11 @@ import (
 
 func TestClassifyAWSError_SlowDown(t *testing.T) {
 	err := &MockAPIError{Code: "SlowDown", Message: "Please reduce your request rate.", Fault: smithy.FaultClient}
-	code, message, retryable := awsclient.ClassifyAWSError(err)
+	code, message := awsclient.ClassifyAWSError(err)
 	if code != "SlowDown" {
 		t.Errorf("expected code %q, got %q", "SlowDown", code)
 	}
 	if message != "Please reduce your request rate." {
 		t.Errorf("expected message %q, got %q", "Please reduce your request rate.", message)
-	}
-	if !retryable {
-		t.Error("expected retryable=true for SlowDown (S3/DynamoDB throttle code)")
-	}
-}
-
-func TestRetryOnThrottle_RetriesSlowDownThenSucceeds(t *testing.T) {
-	slowDownErr := &smithy.GenericAPIError{Code: "SlowDown", Message: "Please reduce your request rate."}
-	calls := 0
-	result, err := awsclient.RetryOnThrottle(context.Background(), awsclient.RetryConfig{
-		MaxAttempts: 3,
-		BaseDelay:   1 * time.Millisecond,
-		MaxDelay:    10 * time.Millisecond,
-		Jitter:      false,
-	}, func() (int, error) {
-		calls++
-		if calls == 1 {
-			return 0, slowDownErr
-		}
-		return 42, nil
-	})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if result != 42 {
-		t.Errorf("expected result 42, got %d", result)
-	}
-	if calls != 2 {
-		t.Errorf("expected 2 calls (retry after SlowDown), got %d", calls)
 	}
 }

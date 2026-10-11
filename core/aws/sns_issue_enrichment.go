@@ -128,10 +128,8 @@ func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resour
 // the encryption key — and records what they expose, into the calling
 // worker's own result.
 func snsTopicPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, topicARN, ownAccount string) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*snssvc.GetTopicAttributesOutput, error) {
-		return clients.SNS.GetTopicAttributes(ctx, &snssvc.GetTopicAttributesInput{
-			TopicArn: aws.String(topicARN),
-		})
+	out, err := clients.SNS.GetTopicAttributes(ctx, &snssvc.GetTopicAttributesInput{
+		TopicArn: aws.String(topicARN),
 	})
 	if err != nil {
 		MarkSkipped(result, topicARN, failures, err)

@@ -47,9 +47,7 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 			continue
 		}
 		total++
-		out, lerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambdapkg.GetFunctionOutput, error) {
-			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &fn})
-		})
+		out, lerr := lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &fn})
 		if lerr != nil {
 			failures = append(failures, FailedCall(fn, lerr))
 			continue

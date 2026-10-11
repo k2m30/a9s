@@ -15,7 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// sfnDescribe wraps DescribeStateMachine in RetryOnThrottle. Returns (nil, nil)
+// sfnDescribe calls DescribeStateMachine. Returns (nil, nil)
 // when the client is unsupported or absent (no API call attempted — the caller
 // renders an UnknownRelated result without a FlashMsg). Returns (nil, err) on API failure so
 // callers can surface the underlying error via Result.Err → FlashMsg → error log.
@@ -28,9 +28,7 @@ func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn
 	if !ok {
 		return nil, nil
 	}
-	return RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
-		return api.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: &stateMachineARN})
-	})
+	return api.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: &stateMachineARN})
 }
 
 // checkSFNLogs resolves the log group a state machine's LoggingConfiguration

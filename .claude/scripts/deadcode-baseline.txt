@@ -1,5 +1,5 @@
 core/aws/iam_policies_related_testhelper.go: SetIAMListEntitiesAPIForTest
-core/aws/retry_testhelper.go: SetRetryConfigForTest
+core/aws/retry_testhelper.go: SetRetryMaxBackoffForTest
 core/aws/ses_related_export.go: SESActiveReceiptRuleSetForTest
 core/aws/wave2.go: DeleteWave2EnricherForTest
 core/aws/wave2.go: SetWave2EnricherForTest

@@ -61,9 +61,7 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 		input.Marker = &continuationToken
 	}
 
-	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBClusterSnapshotsOutput, error) {
-		return api.DescribeDBClusterSnapshots(ctx, input)
-	})
+	output, err := api.DescribeDBClusterSnapshots(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching RDS cluster snapshots: %w", err)
 	}

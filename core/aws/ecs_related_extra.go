@@ -99,9 +99,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 	var ids []string
 	var batchErrs []error
 	for batch := range slices.Chunk(arns, containerInstancesPerDescribe) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeContainerInstancesOutput, error) {
-			return describer.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{Cluster: &clusterRef, ContainerInstances: batch})
-		})
+		out, err := describer.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{Cluster: &clusterRef, ContainerInstances: batch})
 		if err != nil {
 			batchErrs = append(batchErrs, err)
 			continue

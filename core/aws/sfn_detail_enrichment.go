@@ -54,9 +54,7 @@ func enrichSfn(ctx context.Context, clients any, res resource.Resource) (resourc
 			if !ok {
 				return sfnDetailPayload{}, fmt.Errorf("SFN client does not support DescribeStateMachine")
 			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
-				return api.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: &id})
-			})
+			out, err := api.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: &id})
 			if err != nil {
 				return sfnDetailPayload{}, err
 			}

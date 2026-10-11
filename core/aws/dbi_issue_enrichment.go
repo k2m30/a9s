@@ -157,7 +157,7 @@ func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resou
 		}
 		deprecated, known := deprecatedByPair[pair]
 		if !known {
-			out, err := firstPage(ctx, func() (*rds.DescribeDBEngineVersionsOutput, error) {
+			out, err := firstPage(func() (*rds.DescribeDBEngineVersionsOutput, error) {
 				return clients.RDS.DescribeDBEngineVersions(ctx, &rds.DescribeDBEngineVersionsInput{
 					Engine:        aws.String(pair.engine),
 					EngineVersion: aws.String(pair.version),

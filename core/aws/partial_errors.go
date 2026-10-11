@@ -49,7 +49,7 @@ import (
 // read them say so in their own words. Folding them in here would mark a
 // healthy row data-incomplete.
 func IsNotFoundErr(err error) bool {
-	code, message, _ := ClassifyAWSError(err)
+	code, message := ClassifyAWSError(err)
 	shapes, known := notFoundCodes[code]
 	if !known {
 		return false
@@ -391,27 +391,21 @@ func deniedAction(message string) (string, bool) {
 const classUnknown = "Unknown"
 
 // ClassifyAWSError inspects an error for a smithy.APIError and returns the
-// error code, message, and whether the operation is retryable. It and
-// isAWSRefusal are the reads of the SDK's error type in a9s: every other site
+// error code and message. It, isAWSRefusal and isThrottle are the reads of
+// the SDK's error type in a9s: every other site
 // asks ErrClass for the class, ErrCodeIs for a code it names itself, or
 // MessageOf for the message.
-func ClassifyAWSError(err error) (code string, message string, retryable bool) {
+func ClassifyAWSError(err error) (code string, message string) {
 	if err == nil {
-		return "", "", false
+		return "", ""
 	}
 
 	apiErr, ok := errors.AsType[smithy.APIError](err)
 	if !ok {
-		return classUnknown, err.Error(), false
+		return classUnknown, err.Error()
 	}
 
-	code = apiErr.ErrorCode()
-	message = apiErr.ErrorMessage()
-
-	// Retryable is not a second opinion about the code: it is what the one
-	// table already says, read here so a code cannot be worth retrying and
-	// classify as a generic error at the same time.
-	return code, message, awsCodeClass[code] == ClassThrottled
+	return apiErr.ErrorCode(), apiErr.ErrorMessage()
 }
 
 // isAWSRefusal reports whether err is AWS answering the request with a
@@ -425,24 +419,16 @@ func isAWSRefusal(err error) bool {
 	if !ok {
 		return false
 	}
-	class := awsCodeClass[apiErr.ErrorCode()]
-	return class == ClassAccessDenied || apiErr.ErrorFault() == smithy.FaultClient && class != ClassThrottled
+	return awsCodeClass[apiErr.ErrorCode()] == ClassAccessDenied || apiErr.ErrorFault() == smithy.FaultClient && !isThrottle(err)
 }
 
-// awsCodeClass is the one AWS-error-code table in a9s: which class each code
-// a9s recognises belongs to. ErrClass reads it for the word every surface
-// phrases, ClassifyAWSError reads it for the retry decision.
+// awsCodeClass is the AWS-error-code table ErrClass reads for the word every
+// surface phrases. Throttles are not in it: isThrottle, the definition the
+// retryer reads, classes them.
 //
 // A code outside this table is passed through by ErrClass as itself: a9s says
 // nothing about it beyond the code AWS wrote.
 var awsCodeClass = map[string]string{ //nolint:gochecknoglobals // static AWS error-code table
-	"Throttling":               ClassThrottled,
-	"ThrottlingException":      ClassThrottled,
-	"TooManyRequestsException": ClassThrottled,
-	"RequestLimitExceeded":     ClassThrottled,
-	// S3's spelling of throttling.
-	"SlowDown": ClassThrottled,
-
 	"AccessDenied":          ClassAccessDenied,
 	"AccessDeniedException": ClassAccessDenied,
 	// EC2 refuses an unauthorized caller under its own code rather than the
@@ -464,7 +450,7 @@ var awsCodeClass = map[string]string{ //nolint:gochecknoglobals // static AWS er
 // so they are asked for by code, through the one classifier, rather than by
 // each site unwrapping the SDK's error type for itself.
 func ErrCodeIs(err error, codes ...string) bool {
-	code, _, _ := ClassifyAWSError(err)
+	code, _ := ClassifyAWSError(err)
 	if code == "" || code == classUnknown {
 		return false
 	}
@@ -540,7 +526,10 @@ func ErrClass(err error) string {
 	if errors.As(err, &opErr) || errors.As(err, &addrErr) || errors.As(err, &urlErr) {
 		return "transport"
 	}
-	code, _, _ := ClassifyAWSError(err)
+	if isThrottle(err) {
+		return ClassThrottled
+	}
+	code, _ := ClassifyAWSError(err)
 	if class, ok := awsCodeClass[code]; ok {
 		return class
 	}

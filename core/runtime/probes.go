@@ -828,9 +828,7 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	result, err := awsclient.RetryOnThrottle(probeCtx, awsclient.DefaultRetryConfig(), func() (resource.FetchResult, error) {
-		return pf(probeCtx, clients, "")
-	})
+	result, err := pf(probeCtx, clients, "")
 
 	truncated := result.Pagination != nil && result.Pagination.IsTruncated
 	// Count issue-status resources (red/yellow only, not green/dim).
@@ -1057,19 +1055,7 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 		}
 	}
 
-	// RetryOnThrottle hands back a zero result once its retries run out or the
-	// deadline passes in a backoff; the last attempt's partial answer — the
-	// findings it did establish and the rows it marked — is what the runtime
-	// is owed instead.
-	var last awsclient.IssueEnricherResult
-	result, err := awsclient.RetryOnThrottle(probeCtx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
-		r, err := e.Fn(probeCtx, clients, resources, cacheSnap)
-		last = r
-		return r, err
-	})
-	if err != nil {
-		result = last
-	}
+	result, err := e.Fn(probeCtx, clients, resources, cacheSnap)
 	return ProbeEnrichmentResult{
 		ResourceType:     shortName,
 		Truncated:        result.Truncated,

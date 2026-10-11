@@ -482,45 +482,6 @@ func (s *selfReviewErroringCostsAPI) GetCostAndUsage(_ context.Context, _ *coste
 	return nil, s.err
 }
 
-func TestCostsSelfReview_C10b_GetCostAndUsage_RetriesOnThrottle_ThenSucceeds(t *testing.T) {
-	stub := &selfReviewFlakyThrottleCostsAPI{
-		throttleErr: &selfReviewAPIError{Code: "Throttling", Message: "rate exceeded"},
-		successOut: &costexplorer.GetCostAndUsageOutput{
-			ResultsByTime: []cetypes.ResultByTime{
-				{
-					TimePeriod: &cetypes.DateInterval{Start: strPtrSelfReview("2026-06-01"), End: strPtrSelfReview("2026-07-01")},
-					Groups: []cetypes.Group{
-						{Keys: []string{"Amazon Elastic Compute Cloud - Compute"}, Metrics: map[string]cetypes.MetricValue{"UnblendedCost": {Amount: strPtrSelfReview("50.0"), Unit: strPtrSelfReview("USD")}}},
-					},
-				},
-			},
-		},
-	}
-	q := costs.Query{Granularity: "MONTHLY", GroupBy: []costs.Dimension{costs.DimensionService}, Range: costs.Period{Start: "2026-06-01", End: "2026-07-01"}}
-	result, err := a9saws.FetchCostAndUsage(context.Background(), stub, q)
-	if err != nil {
-		t.Fatalf("FetchCostAndUsage() error = %v, want nil (the first page's throttle must be retried, not propagated)", err)
-	}
-	if len(result.Records) != 1 {
-		t.Fatalf("len(Records) = %d, want 1 (the retried, successful page's data)", len(result.Records))
-	}
-	t.Logf("RequestCount after one throttle + one success = %d (informational: report to the coder to confirm this matches the existing counting semantics)", result.RequestCount)
-}
-
-type selfReviewFlakyThrottleCostsAPI struct {
-	calls       int
-	throttleErr error
-	successOut  *costexplorer.GetCostAndUsageOutput
-}
-
-func (s *selfReviewFlakyThrottleCostsAPI) GetCostAndUsage(_ context.Context, _ *costexplorer.GetCostAndUsageInput, _ ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
-	s.calls++
-	if s.calls == 1 {
-		return nil, s.throttleErr
-	}
-	return s.successOut, nil
-}
-
 // A delivery after the costs screen was popped is billed CE data; it
 // still reaches the session store.
 

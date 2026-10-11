@@ -38,9 +38,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 		return result, nil
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetAccountOutput, error) {
-		return clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
-	})
+	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
 	// The account read is one answer every identity shares, so a refused one
 	// is one failure, and the account signal is unread on every identity.
 	code, rows, hasFinding := sesAccountFinding(out)
@@ -77,10 +75,8 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		if r.ID == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sesv2.GetEmailIdentityOutput, error) {
-			return clients.SESv2.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{
-				EmailIdentity: aws.String(r.ID),
-			})
+		out, err := clients.SESv2.GetEmailIdentity(ctx, &sesv2.GetEmailIdentityInput{
+			EmailIdentity: aws.String(r.ID),
 		})
 		mu.Lock()
 		defer mu.Unlock()

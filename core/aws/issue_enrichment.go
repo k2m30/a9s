@@ -63,8 +63,8 @@ const EnrichmentCap = 50
 
 // EnrichmentParallelism bounds concurrent per-resource API calls in Wave-2
 // enrichers that fan out via aws.ForEachParallel. Kept well under typical AWS
-// service-side throttling limits (RetryOnThrottle still wraps each call as a
-// second line of defense against bursts); 8 gives a meaningful wall-clock
+// service-side throttling limits (the SDK retryer still retries a throttled
+// call as a second line of defense against bursts); 8 gives a meaningful wall-clock
 // speedup over a sequential loop without materially increasing the odds of
 // tripping per-second rate limits on accounts with default quotas.
 const EnrichmentParallelism = 8

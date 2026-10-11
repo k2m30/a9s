@@ -3,7 +3,7 @@
 // pipeline_related.go contains CodePipeline pipeline related-resource checker functions.
 //
 // All pipeline→* checkers here make a single GetPipeline call per checker
-// (wrapped in RetryOnThrottle) resolves the full stage/action structure for the
+// that resolves the full stage/action structure for the
 // pipeline. Action configuration maps (key-value strings) are mined for the relevant
 // target resource identifiers based on the action Provider. Bare names (not ARNs) are
 // used where possible since CodePipeline stores action targets by name.
@@ -26,7 +26,7 @@ import (
 // to attempt the call at all.
 var errPipelineNotConfigured = errors.New("codepipeline client not configured")
 
-// pipelineGetDeclaration wraps GetPipeline in RetryOnThrottle. A nil error
+// pipelineGetDeclaration calls GetPipeline. A nil error
 // means the declaration was resolved; any non-nil error means it was not, and
 // the caller must not treat that the same as a definitive "not found". Per
 // docs/related-resources.md, the error must be
@@ -34,7 +34,7 @@ var errPipelineNotConfigured = errors.New("codepipeline client not configured")
 // errPipelineNotConfigured means no CodePipeline client was even wired to
 // attempt the call (structurally can't look, ever — UnknownRelated, still
 // navigable); any other error means GetPipeline was actually attempted and
-// failed (AccessDenied, exhausted RetryOnThrottle retries, or a malformed
+// failed (AccessDenied, exhausted throttle retries, or a malformed
 // empty response) — a real operational failure that must surface via
 // ErrorRelated (Flash + the "!" error log), never a silent Unknown. A checker
 // looping over many pipelines must instead count failures across the loop:
@@ -50,9 +50,7 @@ func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName strin
 	if !ok {
 		return nil, errPipelineNotConfigured
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codepipeline.GetPipelineOutput, error) {
-		return api.GetPipeline(ctx, &codepipeline.GetPipelineInput{Name: &pipelineName})
-	})
+	out, err := api.GetPipeline(ctx, &codepipeline.GetPipelineInput{Name: &pipelineName})
 	if err != nil {
 		return nil, err
 	}

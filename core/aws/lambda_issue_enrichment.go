@@ -126,9 +126,7 @@ func lambdaLifecycleCode(cfg *lambdatypes.FunctionConfiguration) domain.FindingC
 // lambdaGetConfiguration reads the function's configuration through
 // GetFunction. An answer without one is an error, never an empty state.
 func lambdaGetConfiguration(ctx context.Context, api LambdaGetFunctionAPI, name string) (*lambdatypes.FunctionConfiguration, error) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-		return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
-	})
+	out, err := api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(name)})
 	if err != nil {
 		return nil, err
 	}
@@ -141,9 +139,7 @@ func lambdaGetConfiguration(ctx context.Context, api LambdaGetFunctionAPI, name 
 // lambdaPolicyExposure evaluates the function's resource policy through the
 // shared iampolicy engine. A missing policy is the healthy answer.
 func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, ownAccount string) ([]domain.DetailRow, bool, error) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetPolicyOutput, error) {
-		return api.GetPolicy(ctx, &lambda.GetPolicyInput{FunctionName: aws.String(name)})
-	})
+	out, err := api.GetPolicy(ctx, &lambda.GetPolicyInput{FunctionName: aws.String(name)})
 	if err != nil {
 		return nil, false, err
 	}

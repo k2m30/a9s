@@ -4,7 +4,7 @@ Derived from [`docs/resources/mwaa.md`](mwaa.md). Spec has zero TBDs; deliberate
 
 ## 0. Architecture decision — in-fetcher N+1 (the EKS pattern)
 
-`ListEnvironments` returns names only; every signal AND every related-panel field comes from the same `GetEnvironment` call. Accounts run 1–5 environments. Therefore the fetcher does `ListEnvironments` + `GetEnvironment` per name (both wrapped in `RetryOnThrottle`, partial failure aggregated per rules E3/E5) and emits ALL findings fetcher-side (`Source: "wave1"`). There is NO `mwaa_issue_enrichment.go` and NO `mwaa_detail_enrichment.go` — same shape as `eks` ("types without a `Wave2` enricher still perform in-fetcher Wave 2 work"). The spec's §3.2 "Wave 2" labels the *cost class* (per-resource describe), not a separate enricher artifact.
+`ListEnvironments` returns names only; every signal AND every related-panel field comes from the same `GetEnvironment` call. Accounts run 1–5 environments. Therefore the fetcher does `ListEnvironments` + `GetEnvironment` per name (partial failure aggregated per rules E3/E5; throttle retry is the SDK retryer `CreateServiceClients` sets) and emits ALL findings fetcher-side (`Source: "wave1"`). There is NO `mwaa_issue_enrichment.go` and NO `mwaa_detail_enrichment.go` — same shape as `eks` ("types without a `Wave2` enricher still perform in-fetcher Wave 2 work"). The spec's §3.2 "Wave 2" labels the *cost class* (per-resource describe), not a separate enricher artifact.
 
 `Resource.ID` = environment **name** (bare, display-friendly). MWAA APIs address environments by name — no ARN params exist in the API surface (rule E7 trivially satisfied; `Fields["arn"]` still populated from `Environment.Arn` for ct-events).
 
@@ -173,7 +173,7 @@ Full file scope union (supersedes the skill's default list — new-service wirin
 | `core/demo/fixtures/{alarm,logs,kms,role,s3,sg/vpc-graph}` siblings | targeted adds so every §2 pivot resolves | 6a coder |
 | `core/demo/fakes/mwaa.go` | create — typed fake over the two APIs; validates unknown names with ResourceNotFoundException; permissive-free (rule U15 spirit; MWAA has no ARN params) | 6a coder |
 | `core/demo/client.go` | `clients.MWAA = fakes.NewMWAA()` | 6a coder |
-| `core/aws/mwaa.go` | create — `FetchMWAAEnvironmentsPage` (ListEnvironments + GetEnvironment N+1, RetryOnThrottle both, E3/E5 aggregation, findings per §1, fields incl. arn/airflow_version/environment_class/workers/schedulers/webserver_access_mode/endpoint_management/weekly_maintenance_window/webserver_url/source_bucket/kms_key/execution_role/log-group ARNs/subnets/sgs/celery_queue) | 7 coder |
+| `core/aws/mwaa.go` | create — `FetchMWAAEnvironmentsPage` (ListEnvironments + GetEnvironment N+1, E3/E5 aggregation, findings per §1, fields incl. arn/airflow_version/environment_class/workers/schedulers/webserver_access_mode/endpoint_management/weekly_maintenance_window/webserver_url/source_bucket/kms_key/execution_role/log-group ARNs/subnets/sgs/celery_queue) | 7 coder |
 | `core/aws/mwaa_interfaces.go` | create — `MWAAAPI` narrow interface (ListEnvironments, GetEnvironment) | 7 coder |
 | `core/aws/mwaa_related.go` | create — checkers per §2: kms/logs/role/s3/sg/subnet field-driven, alarm via sibling-cache dimension match, ct-events via `ctEventsCheckerFor("mwaa")` | 7 coder |
 | `core/aws/client.go` | `MWAA MWAAAPI` field + `mwaa.NewFromConfig(cfg)` | 7 coder |

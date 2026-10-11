@@ -20,15 +20,10 @@ func TestMain(m *testing.M) {
 	// flash still fires and still clears — only the wall-clock shrinks — so no
 	// assertion changes, only ~30-40s of suite time is reclaimed.
 	runtime.SetFlashDurationsForTest(time.Millisecond, time.Millisecond)
-	// Same idea for AWS retry backoff: keep MaxAttempts so retry LOGIC is still
-	// exercised, but shrink the 500ms BaseDelay that throttle/server-error tests
-	// would otherwise wait out.
-	awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
-		MaxAttempts: 3,
-		BaseDelay:   time.Millisecond,
-		MaxDelay:    10 * time.Millisecond,
-		Jitter:      false,
-	})
+	// Same idea for the SDK retryer's backoff: the attempt budget and the
+	// retry decision stay, only the wait a throttle/server-error test would
+	// sit through shrinks.
+	awsclient.SetRetryMaxBackoffForTest(time.Millisecond)
 	// styles holds package-level vars rebuilt by styles.ReinitForTest(), which reads
 	// NO_COLOR at call time. The invoking shell's NO_COLOR must not change
 	// which SGR assertions pass in this binary, so the baseline is normalized

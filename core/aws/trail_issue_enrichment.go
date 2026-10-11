@@ -44,9 +44,7 @@ func enrichTrailStatus(ctx context.Context, clients *ServiceClients, resources [
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudtrail.GetTrailStatusOutput, error) {
-			return clients.CloudTrail.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: aws.String(r.Fields["trail_arn"])})
-		})
+		out, err := clients.CloudTrail.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: aws.String(r.Fields["trail_arn"])})
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -115,9 +113,7 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		}
 
 		pub := s3PublicVerdict(ctx, api, bucket)
-		logging, loggingErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
-			return api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
-		})
+		logging, loggingErr := api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 
 		mu.Lock()
 		defer mu.Unlock()

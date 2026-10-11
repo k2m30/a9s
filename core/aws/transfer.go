@@ -65,9 +65,7 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.ListServersOutput, error) {
-		return c.Transfer.ListServers(ctx, input)
-	})
+	listOutput, err := c.Transfer.ListServers(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing Transfer Family servers: %w", err)
 	}
@@ -79,9 +77,7 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		listed := listOutput.Servers[i]
 		id := aws.ToString(listed.ServerId)
 
-		describeOutput, describeErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeServerOutput, error) {
-			return c.Transfer.DescribeServer(ctx, &transfer.DescribeServerInput{ServerId: aws.String(id)})
-		})
+		describeOutput, describeErr := c.Transfer.DescribeServer(ctx, &transfer.DescribeServerInput{ServerId: aws.String(id)})
 		switch {
 		case describeErr != nil:
 			failures = append(failures, FailedCall(id, describeErr))

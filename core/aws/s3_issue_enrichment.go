@@ -193,9 +193,7 @@ func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3Publ
 	// principals and the owner's own account.
 	ignorePublicACLs, restrictPublicBuckets := false, false
 
-	pabOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
-		return api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
-	})
+	pabOut, err := api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
 		v.pabRead = true
@@ -213,9 +211,7 @@ func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3Publ
 		v.failures = append(v.failures, err)
 	}
 
-	statusOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyStatusOutput, error) {
-		return api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
-	})
+	statusOut, err := api.GetBucketPolicyStatus(ctx, &s3.GetBucketPolicyStatusInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil:
 		if v.pabRead && !restrictPublicBuckets && statusOut.PolicyStatus != nil && aws.ToBool(statusOut.PolicyStatus.IsPublic) {
@@ -230,9 +226,7 @@ func s3PublicVerdict(ctx context.Context, api s3PublicAPI, bucket string) s3Publ
 		v.failures = append(v.failures, err)
 	}
 
-	aclOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketAclOutput, error) {
-		return api.GetBucketAcl(ctx, &s3.GetBucketAclInput{Bucket: aws.String(bucket)})
-	})
+	aclOut, err := api.GetBucketAcl(ctx, &s3.GetBucketAclInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil:
 		// One bucket reachable from the internet is one condition, however
@@ -276,9 +270,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		add(s3CodePublic, pub.rows)
 	}
 
-	versioningOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketVersioningOutput, error) {
-		return api.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
-	})
+	versioningOut, err := api.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil:
 		switch {
@@ -299,9 +291,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		p.failures = append(p.failures, err)
 	}
 
-	loggingOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
-		return api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
-	})
+	loggingOut, err := api.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil:
 		if loggingOut.LoggingEnabled == nil {
@@ -314,9 +304,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		p.failures = append(p.failures, err)
 	}
 
-	lifecycleOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLifecycleConfigurationOutput, error) {
-		return api.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(bucket)})
-	})
+	lifecycleOut, err := api.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil, isS3APIErrCode(err, "NoSuchLifecycleConfiguration"):
 		enabled := 0
@@ -338,9 +326,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		p.failures = append(p.failures, err)
 	}
 
-	lockOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetObjectLockConfigurationOutput, error) {
-		return api.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{Bucket: aws.String(bucket)})
-	})
+	lockOut, err := api.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{Bucket: aws.String(bucket)})
 	switch {
 	case err == nil, isS3APIErrCode(err, "ObjectLockConfigurationNotFoundError"):
 		locked := lockOut != nil && lockOut.ObjectLockConfiguration != nil &&

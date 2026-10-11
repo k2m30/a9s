@@ -6,12 +6,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/docdb"
-	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
-	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -55,35 +52,6 @@ func TestDDB_BillingMode_AbsentSummaryReadsProvisioned(t *testing.T) {
 func b2Ago(d time.Duration) *time.Time {
 	t := time.Now().Add(-d)
 	return &t
-}
-
-// A throttled first call is a transient answer, not an empty snapshot list.
-func TestDocDBClusterSnapshots_ThrottleIsRetried(t *testing.T) {
-	fake := &fakeDocDBDescribeDBClusterSnapshots{
-		PageFunc: func(call int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
-			if call == 1 {
-				return nil, &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded"}
-			}
-			return &docdb.DescribeDBClusterSnapshotsOutput{
-				DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{{
-					DBClusterSnapshotIdentifier: aws.String("acme-docdb-snap-1"),
-					DBClusterIdentifier:         aws.String("acme-docdb"),
-					Status:                      aws.String("available"),
-				}},
-			}, nil
-		},
-	}
-
-	out, err := awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), fake, "")
-	if err != nil {
-		t.Fatalf("FetchDocDBClusterSnapshotsPage: %v", err)
-	}
-	if len(out.Resources) != 1 {
-		t.Fatalf("got %d snapshots, want 1", len(out.Resources))
-	}
-	if fake.Calls < 2 {
-		t.Errorf("DescribeDBClusterSnapshots called %d times; a throttle must be retried", fake.Calls)
-	}
 }
 
 // StorageEncryptionType carries the effective at-rest state; the bool is false

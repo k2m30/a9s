@@ -64,10 +64,8 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		if secretID == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*secretsmanager.GetResourcePolicyOutput, error) {
-			return policyAPI.GetResourcePolicy(ctx, &secretsmanager.GetResourcePolicyInput{
-				SecretId: aws.String(secretID),
-			})
+		out, err := policyAPI.GetResourcePolicy(ctx, &secretsmanager.GetResourcePolicyInput{
+			SecretId: aws.String(secretID),
 		})
 		mu.Lock()
 		defer mu.Unlock()

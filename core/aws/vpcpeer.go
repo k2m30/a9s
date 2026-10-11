@@ -57,9 +57,7 @@ func FetchVpcPeeringConnectionsPage(ctx context.Context, api EC2DescribeVpcPeeri
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
-		return api.DescribeVpcPeeringConnections(ctx, input)
-	})
+	output, err := api.DescribeVpcPeeringConnections(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing VPC peering connections: %w", err)
 	}

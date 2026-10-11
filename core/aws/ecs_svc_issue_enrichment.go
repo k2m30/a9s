@@ -109,11 +109,9 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			batch := svcNames[i:end]
 			total += len(batch)
 
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeServicesOutput, error) {
-				return clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
-					Cluster:  aws.String(clusterName),
-					Services: batch,
-				})
+			out, err := clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
+				Cluster:  aws.String(clusterName),
+				Services: batch,
 			})
 			if err != nil {
 				for _, svcName := range batch {

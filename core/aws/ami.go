@@ -25,12 +25,10 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 		// IncludeDeprecated / IncludeDisabled: DescribeImages omits both by
 		// default, so without them a deprecated or disabled AMI a pivot
 		// names silently vanishes.
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
-			return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
-				ImageIds:          ids,
-				IncludeDeprecated: aws.Bool(true),
-				IncludeDisabled:   aws.Bool(true),
-			})
+		out, err := api.DescribeImages(ctx, &ec2.DescribeImagesInput{
+			ImageIds:          ids,
+			IncludeDeprecated: aws.Bool(true),
+			IncludeDisabled:   aws.Bool(true),
 		})
 		if err != nil {
 			return nil, err

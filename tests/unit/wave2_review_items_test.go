@@ -191,7 +191,6 @@ func (rvThrottledRDS) DescribeDBEngineVersions(context.Context, *rds.DescribeDBE
 // the walk's call — rather than an empty result the runtime reads as
 // "answered nobody", which keeps stale rows for another sweep.
 func TestProbe_ThrottledAccountWalkKeepsThePartialAnswer(t *testing.T) {
-	defer awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{MaxAttempts: 3, BaseDelay: time.Millisecond, MaxDelay: 2 * time.Millisecond})()
 
 	cases := []struct {
 		short   string

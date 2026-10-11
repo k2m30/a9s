@@ -67,9 +67,7 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 // are handled by fetchEC2ByIDs.
 func FetchNetworkInterfacesByIDs(ctx context.Context, api EC2DescribeNetworkInterfacesAPI, ids []string) ([]resource.Resource, error) {
 	return fetchEC2ByIDs(ctx, "eni FetchByIDs", "InvalidNetworkInterfaceID.NotFound", "eni-", ids, func(ids []string) ([]resource.Resource, error) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeNetworkInterfacesOutput, error) {
-			return api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: ids, IncludeManagedResources: aws.Bool(true)})
-		})
+		out, err := api.DescribeNetworkInterfaces(ctx, &ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: ids, IncludeManagedResources: aws.Bool(true)})
 		if err != nil {
 			return nil, err
 		}

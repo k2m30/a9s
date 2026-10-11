@@ -214,9 +214,7 @@ func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnriche
 	}
 	apigwRESTAuthorizerFindings(ctx, api, result, failures, r, ownAccount)
 
-	stages, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigateway.GetStagesOutput, error) {
-		return api.GetStages(ctx, &apigateway.GetStagesInput{RestApiId: aws.String(apiID)})
-	})
+	stages, err := api.GetStages(ctx, &apigateway.GetStagesInput{RestApiId: aws.String(apiID)})
 	if err != nil {
 		MarkSkipped(result, apiID, failures, err)
 		return

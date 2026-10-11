@@ -63,10 +63,8 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 	var refs []string
 	for _, v := range vaults {
 		name := v
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.DescribeBackupVaultOutput, error) {
-			return c.Backup.DescribeBackupVault(ctx, &backup.DescribeBackupVaultInput{
-				BackupVaultName: &name,
-			})
+		out, err := c.Backup.DescribeBackupVault(ctx, &backup.DescribeBackupVaultInput{
+			BackupVaultName: &name,
 		})
 		if err != nil {
 			return ReadFailed("kms", err)
@@ -99,10 +97,8 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	var reads rowReads
 	for _, v := range vaults {
 		name := v
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupVaultNotificationsOutput, error) {
-			return c.Backup.GetBackupVaultNotifications(ctx, &backup.GetBackupVaultNotificationsInput{
-				BackupVaultName: &name,
-			})
+		out, err := c.Backup.GetBackupVaultNotifications(ctx, &backup.GetBackupVaultNotificationsInput{
+			BackupVaultName: &name,
 		})
 		if err != nil {
 			// ResourceNotFoundException means the vault has no notifications configured — treat as empty.
@@ -140,10 +136,8 @@ func backupPlanVaults(ctx context.Context, clients any, res resource.Resource) [
 	if !cok || c == nil || c.Backup == nil {
 		return nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupPlanOutput, error) {
-		return c.Backup.GetBackupPlan(ctx, &backup.GetBackupPlanInput{
-			BackupPlanId: &planID,
-		})
+	out, err := c.Backup.GetBackupPlan(ctx, &backup.GetBackupPlanInput{
+		BackupPlanId: &planID,
 	})
 	// checkBackupKMS and checkBackupSNS both turn this nil into
 	// UnknownRelated.

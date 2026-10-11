@@ -134,7 +134,7 @@ func redirectsToHTTPS(listener elbtypes.Listener) bool {
 // Per-LB API failures aggregate into a composite error returned alongside
 // the partial findings. LoadBalancerArn is read from
 // r.Fields["load_balancer_arn"] — the elb fetcher emits ID = bare LB name
-// and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
+// and stores the ARN in Fields.
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -166,10 +166,8 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeLoadBalancerAttributesOutput, error) {
-			return clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
-				LoadBalancerArn: aws.String(lbARN),
-			})
+		out, err := clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
+			LoadBalancerArn: aws.String(lbARN),
 		})
 		mu.Lock()
 		defer mu.Unlock()

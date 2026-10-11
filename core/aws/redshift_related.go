@@ -243,7 +243,7 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 }
 
 // redshiftLoggingStatus performs a single DescribeLoggingStatus call for this
-// cluster's identifier, wrapped in RetryOnThrottle. Returns (nil, nil) when
+// cluster's identifier. Returns (nil, nil) when
 // the client is unavailable or the cluster ID is empty (no API call
 // attempted — callers render an UnknownRelated result without a FlashMsg).
 // Returns (nil, err) on API failure so callers can surface the underlying
@@ -257,9 +257,7 @@ func redshiftLoggingStatus(ctx context.Context, clients any, res resource.Resour
 	if !cok || c == nil || c.Redshift == nil {
 		return nil, nil
 	}
-	return RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeLoggingStatusOutput, error) {
-		return c.Redshift.DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{
-			ClusterIdentifier: &clusterID,
-		})
+	return c.Redshift.DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{
+		ClusterIdentifier: &clusterID,
 	})
 }

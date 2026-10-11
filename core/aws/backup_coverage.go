@@ -115,9 +115,7 @@ func backupTagsAccessor(
 	var failures []Failure
 	walkErr := ForEachRow(ctx, result, resourceIDs(pending), EnrichmentParallelism, func(i int) {
 		r := pending[i]
-		t, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (map[string]string, error) {
-			return read(ctx, targetOf(r).arn)
-		})
+		t, err := read(ctx, targetOf(r).arn)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {

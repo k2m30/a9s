@@ -176,7 +176,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 
 // fetchNodeGroupsPage is the registered Wave 1 fetcher for the ng resource
 // type: ListClusters → ListNodegroups → DescribeNodegroup through
-// parentChildWalk, with per-call retry-on-throttle. A node group whose
+// parentChildWalk. A node group whose
 // DescribeNodegroup fails is kept as a degraded row, and a cluster whose
 // ListNodegroups fails is skipped; both are recorded through
 // AggregateFailures rather than failing the page.
@@ -189,21 +189,17 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 	totalAttempted := 0
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
-			out, callErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
-				return c.EKS.ListClusters(ctx, &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize), NextToken: token})
-			})
+			out, callErr := c.EKS.ListClusters(ctx, &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize), NextToken: token})
 			if callErr != nil {
 				return nil, nil, fmt.Errorf("listing EKS clusters: %w", callErr)
 			}
 			return out.Clusters, out.NextToken, nil
 		},
 		listChildren: func(ctx context.Context, cluster string, token *string) ([]string, *string, error) {
-			out, callErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
-				return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-					ClusterName: aws.String(cluster),
-					MaxResults:  aws.Int32(DefaultPageSize),
-					NextToken:   token,
-				})
+			out, callErr := c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+				ClusterName: aws.String(cluster),
+				MaxResults:  aws.Int32(DefaultPageSize),
+				NextToken:   token,
 			})
 			if callErr != nil {
 				failures = append(failures, FailedCall(cluster, callErr))
@@ -214,11 +210,9 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 		describe: func(ctx context.Context, cluster string, names []string) ([]resource.Resource, error) {
 			ngName := names[0]
 			totalAttempted++
-			descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
-				return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-					ClusterName:   aws.String(cluster),
-					NodegroupName: aws.String(ngName),
-				})
+			descOutput, descErr := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+				ClusterName:   aws.String(cluster),
+				NodegroupName: aws.String(ngName),
 			})
 			if descErr != nil {
 				failures = append(failures, FailedCall(cluster+"/"+ngName, descErr))

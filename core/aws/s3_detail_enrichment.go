@@ -60,9 +60,7 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketPolicy")
 			}
-			policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
-				return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(id)})
-			})
+			policyOut, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(id)})
 			switch {
 			case err != nil && !s3BenignAbsenceErr(err, "NoSuchBucketPolicy") && !isS3CrossRegionErr(err):
 				return s3DetailPayload{}, err
@@ -74,9 +72,7 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketCors")
 			}
-			corsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketCorsOutput, error) {
-				return corsAPI.GetBucketCors(ctx, &s3.GetBucketCorsInput{Bucket: aws.String(id)})
-			})
+			corsOut, err := corsAPI.GetBucketCors(ctx, &s3.GetBucketCorsInput{Bucket: aws.String(id)})
 			switch {
 			case err != nil && !s3BenignAbsenceErr(err, "NoSuchCORSConfiguration") && !isS3CrossRegionErr(err):
 				return s3DetailPayload{}, err
@@ -88,9 +84,7 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketLifecycleConfiguration")
 			}
-			lifecycleOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLifecycleConfigurationOutput, error) {
-				return lifecycleAPI.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(id)})
-			})
+			lifecycleOut, err := lifecycleAPI.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(id)})
 			switch {
 			case err != nil && !s3BenignAbsenceErr(err, "NoSuchLifecycleConfiguration") && !isS3CrossRegionErr(err):
 				return s3DetailPayload{}, err

@@ -107,9 +107,7 @@ func FetchOpenSearchDomainsAt(
 	describeAPI OpenSearchDescribeDomainsAPI,
 	now time.Time,
 ) ([]resource.Resource, error) {
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.ListDomainNamesOutput, error) {
-		return listAPI.ListDomainNames(ctx, &opensearch.ListDomainNamesInput{})
-	})
+	listOutput, err := listAPI.ListDomainNames(ctx, &opensearch.ListDomainNamesInput{})
 	if err != nil {
 		return nil, fmt.Errorf("listing OpenSearch domains: %w", err)
 	}
@@ -130,9 +128,7 @@ func FetchOpenSearchDomainsAt(
 	var statuses []opensearchtypes.DomainStatus
 	describeErrs := map[string]error{}
 	for batch := range slices.Chunk(domainNames, 5) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainsOutput, error) {
-			return describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
-		})
+		out, err := describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
 		if err != nil {
 			for _, name := range batch {
 				describeErrs[name] = err

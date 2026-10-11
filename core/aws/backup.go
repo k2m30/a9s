@@ -28,9 +28,7 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 		input.NextToken = &continuationToken
 	}
 
-	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupPlansOutput, error) {
-		return api.ListBackupPlans(ctx, input)
-	})
+	output, err := api.ListBackupPlans(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching Backup plans: %w", err)
 	}
@@ -120,9 +118,7 @@ func backupRegionOptIn(ctx context.Context, api BackupListBackupPlansAPI) map[st
 	if !ok {
 		return nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.DescribeRegionSettingsOutput, error) {
-		return settingsAPI.DescribeRegionSettings(ctx, &backup.DescribeRegionSettingsInput{})
-	})
+	out, err := settingsAPI.DescribeRegionSettings(ctx, &backup.DescribeRegionSettingsInput{})
 	// Every coverage reader turns a nil map into "cannot tell" where the opt-in
 	// decides.
 	// no finding: the nil return is the recorder.
@@ -161,11 +157,9 @@ func enumerateBackupSelections(
 		if sel.SelectionId == nil {
 			continue
 		}
-		selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
-			return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
-				BackupPlanId: aws.String(planID),
-				SelectionId:  sel.SelectionId,
-			})
+		selOut, selErr := getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
+			BackupPlanId: aws.String(planID),
+			SelectionId:  sel.SelectionId,
 		})
 		// Every coverage reader turns the false return into "cannot tell".
 		// no finding: the false return is the recorder.

@@ -107,9 +107,7 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return NotRead("cfn")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTagsOutput, error) {
-		return api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{elbARN}})
-	})
+	out, err := api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{elbARN}})
 	if err != nil {
 		return ReadFailed("cfn", err)
 	}
@@ -295,9 +293,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !ok || c == nil || c.ELBv2 == nil {
 		return NotRead("s3")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
-		return c.ELBv2.DescribeLoadBalancerAttributes(ctx, &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: &elbARN})
-	})
+	out, err := c.ELBv2.DescribeLoadBalancerAttributes(ctx, &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: &elbARN})
 	if err != nil {
 		return ReadFailed("s3", err)
 	}
@@ -371,9 +367,7 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return NotRead("waf")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetWebACLForResourceOutput, error) {
-		return api.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{ResourceArn: &elbARN})
-	})
+	out, err := api.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{ResourceArn: &elbARN})
 	if err != nil {
 		return ReadFailed("waf", err)
 	}

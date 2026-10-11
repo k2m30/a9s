@@ -94,11 +94,9 @@ func enrichEc2(ctx context.Context, clients any, res resource.Resource) (resourc
 			if !ok {
 				return "", fmt.Errorf("EC2 client does not support DescribeInstanceAttribute")
 			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeInstanceAttributeOutput, error) {
-				return api.DescribeInstanceAttribute(ctx, &ec2.DescribeInstanceAttributeInput{
-					InstanceId: &id,
-					Attribute:  ec2types.InstanceAttributeNameUserData,
-				})
+			out, err := api.DescribeInstanceAttribute(ctx, &ec2.DescribeInstanceAttributeInput{
+				InstanceId: &id,
+				Attribute:  ec2types.InstanceAttributeNameUserData,
 			})
 			if err != nil {
 				return "", err

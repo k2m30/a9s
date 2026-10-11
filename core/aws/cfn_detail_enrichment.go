@@ -60,9 +60,7 @@ func enrichCfn(ctx context.Context, clients any, res resource.Resource) (resourc
 			if !ok {
 				return nil, fmt.Errorf("CloudFormation client does not support GetTemplate")
 			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.GetTemplateOutput, error) {
-				return api.GetTemplate(ctx, &cloudformation.GetTemplateInput{StackName: &id})
-			})
+			out, err := api.GetTemplate(ctx, &cloudformation.GetTemplateInput{StackName: &id})
 			if err != nil {
 				return nil, err
 			}

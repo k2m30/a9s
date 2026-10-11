@@ -75,9 +75,7 @@ func (c *ServiceClients) bucketRegion(ctx context.Context, bucket string) string
 	if !ok {
 		return ""
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLocationOutput, error) {
-		return api.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: aws.String(bucket)})
-	})
+	out, err := api.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		// A call that did not answer is no answer to remember: memoising it
 		// would send every later read of this bucket to an endpoint that

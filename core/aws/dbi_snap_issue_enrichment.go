@@ -92,10 +92,8 @@ func dbiSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 	if clients.RDS == nil {
 		return nil, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBSnapshotAttributesOutput, error) {
-		return clients.RDS.DescribeDBSnapshotAttributes(ctx, &rds.DescribeDBSnapshotAttributesInput{
-			DBSnapshotIdentifier: aws.String(snap.ID),
-		})
+	out, err := clients.RDS.DescribeDBSnapshotAttributes(ctx, &rds.DescribeDBSnapshotAttributesInput{
+		DBSnapshotIdentifier: aws.String(snap.ID),
 	})
 	if err != nil {
 		return nil, err

@@ -54,17 +54,15 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqssvc.GetQueueAttributesOutput, error) {
-			return clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
-				QueueUrl: aws.String(queueURL),
-				AttributeNames: []sqstypes.QueueAttributeName{
-					sqstypes.QueueAttributeNameRedrivePolicy,
-					sqstypes.QueueAttributeNameVisibilityTimeout,
-					sqstypes.QueueAttributeNameKmsMasterKeyId,
-					sqstypes.QueueAttributeNameSqsManagedSseEnabled,
-					sqstypes.QueueAttributeNamePolicy,
-				},
-			})
+		out, err := clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
+			QueueUrl: aws.String(queueURL),
+			AttributeNames: []sqstypes.QueueAttributeName{
+				sqstypes.QueueAttributeNameRedrivePolicy,
+				sqstypes.QueueAttributeNameVisibilityTimeout,
+				sqstypes.QueueAttributeNameKmsMasterKeyId,
+				sqstypes.QueueAttributeNameSqsManagedSseEnabled,
+				sqstypes.QueueAttributeNamePolicy,
+			},
 		})
 		mu.Lock()
 		defer mu.Unlock()

@@ -56,10 +56,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kafkasvc.DescribeClusterV2Output, error) {
-			return clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
-				ClusterArn: aws.String(clusterARN),
-			})
+		out, err := clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
+			ClusterArn: aws.String(clusterARN),
 		})
 		mu.Lock()
 		defer mu.Unlock()

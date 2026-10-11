@@ -145,9 +145,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return NotRead("kms")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.DescribeStreamSummaryOutput, error) {
-		return descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
-	})
+	out, err := descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
 	if err != nil {
 		return ReadFailed("kms", err)
 	}
@@ -192,10 +190,8 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			reads.missed()
 			continue
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
-			return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{
-				TableName: aws.String(tableName),
-			})
+		out, err := api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{
+			TableName: aws.String(tableName),
 		})
 		if err != nil {
 			reads.fail(tableName, err)

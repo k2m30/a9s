@@ -71,9 +71,7 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return NotRead("kinesis")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
-		return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{TableName: &tableName})
-	})
+	out, err := api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{TableName: &tableName})
 	if err != nil {
 		return ReadFailed("kinesis", err)
 	}

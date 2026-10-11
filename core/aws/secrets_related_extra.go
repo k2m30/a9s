@@ -115,11 +115,9 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			reads.missed()
 			continue
 		}
-		cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-			return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
-				ApplicationName: &appName,
-				EnvironmentName: &envName,
-			})
+		cfgOut, err := ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+			ApplicationName: &appName,
+			EnvironmentName: &envName,
 		})
 		if err != nil {
 			reads.fail(ebRes.ID, err)
@@ -216,10 +214,8 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 			reads.missed()
 			continue
 		}
-		tdOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecspkg.DescribeTaskDefinitionOutput, error) {
-			return ecsAPI.DescribeTaskDefinition(ctx, &ecspkg.DescribeTaskDefinitionInput{
-				TaskDefinition: &taskDefARN,
-			})
+		tdOut, err := ecsAPI.DescribeTaskDefinition(ctx, &ecspkg.DescribeTaskDefinitionInput{
+			TaskDefinition: &taskDefARN,
 		})
 		if err != nil {
 			// "Task definition does not exist" (ClientException) is definitive
@@ -294,9 +290,7 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 		return heuristicResult("logs", []string{defaultLogGroup}, false)
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
-	})
+	out, err := lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	// no finding: the row carries the default log group as a candidate.
 	if err != nil || out == nil || out.Configuration == nil {
 		return heuristicResult("logs", []string{defaultLogGroup}, false)
@@ -343,10 +337,8 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 	if !ok {
 		policy = unreadBy(errClientMissing)
 	} else {
-		policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*smtypes.GetResourcePolicyOutput, error) {
-			return smAPI.GetResourcePolicy(ctx, &smtypes.GetResourcePolicyInput{
-				SecretId: &secretID,
-			})
+		policyOut, err := smAPI.GetResourcePolicy(ctx, &smtypes.GetResourcePolicyInput{
+			SecretId: &secretID,
 		})
 		if err != nil {
 			policy = unreadBy(err)
@@ -365,9 +357,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, c
 			rotation = unreadBy(errClientMissing)
 		} else {
 			rotationARN := *secret.RotationLambdaARN
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-				return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
-			})
+			out, err := lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 			if err != nil {
 				rotation = unreadBy(err)
 			} else if out != nil && out.Configuration != nil {
@@ -406,9 +396,7 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 		return NotRead("sns")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
-	})
+	out, err := lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	// The rotation function's configuration is where the dead-letter topic is
 	// named, so a call that did not answer leaves the count unknown; reporting
 	// zero read as "checked, no topic".

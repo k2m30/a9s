@@ -347,9 +347,7 @@ func wafWithMetricName(ctx context.Context, clients any, row resource.Resource) 
 	if row.Fields["scope"] == wafScopeCloudFront {
 		scope = wafv2types.ScopeCloudfront
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetWebACLOutput, error) {
-		return api.GetWebACL(ctx, &wafv2.GetWebACLInput{Name: &name, Id: &id, Scope: scope})
-	})
+	out, err := api.GetWebACL(ctx, &wafv2.GetWebACLInput{Name: &name, Id: &id, Scope: scope})
 	if err != nil {
 		return row, err
 	}

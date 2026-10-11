@@ -76,10 +76,8 @@ func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 		if clients.DocDB == nil {
 			return nil, nil
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
-			return clients.DocDB.DescribeDBClusterSnapshotAttributes(ctx, &docdb.DescribeDBClusterSnapshotAttributesInput{
-				DBClusterSnapshotIdentifier: aws.String(snap.ID),
-			})
+		out, err := clients.DocDB.DescribeDBClusterSnapshotAttributes(ctx, &docdb.DescribeDBClusterSnapshotAttributesInput{
+			DBClusterSnapshotIdentifier: aws.String(snap.ID),
 		})
 		if err != nil {
 			return nil, err
@@ -96,10 +94,8 @@ func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 	if clients.RDS == nil {
 		return nil, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBClusterSnapshotAttributesOutput, error) {
-		return clients.RDS.DescribeDBClusterSnapshotAttributes(ctx, &rds.DescribeDBClusterSnapshotAttributesInput{
-			DBClusterSnapshotIdentifier: aws.String(snap.ID),
-		})
+	out, err := clients.RDS.DescribeDBClusterSnapshotAttributes(ctx, &rds.DescribeDBClusterSnapshotAttributesInput{
+		DBClusterSnapshotIdentifier: aws.String(snap.ID),
 	})
 	if err != nil {
 		return nil, err

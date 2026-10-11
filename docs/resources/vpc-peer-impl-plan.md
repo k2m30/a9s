@@ -4,7 +4,7 @@ Derived from [`docs/resources/vpc-peer.md`](vpc-peer.md). Spec has zero TBDs; tw
 
 ## 0. Architecture decisions
 
-**Single-call fetcher — NO N+1.** DescribeVpcPeeringConnections returns full detail (Status, ExpirationTime, both VpcInfo sides) in the list call. core/aws/vpcpeer.go: one paginated call (RetryOnThrottle, DefaultPageSize), RawStruct = the ec2types.VpcPeeringConnection (value/pointer per transfer convention), Resource.ID = VpcPeeringConnectionId. NO describe, NO details-denied path (no per-item call to be denied) — the ONLY type of the four without a degraded-row story; a DescribeVpcPeeringConnections denial is a whole-list error (menu shows the error state, never 0).
+**Single-call fetcher — NO N+1.** DescribeVpcPeeringConnections returns full detail (Status, ExpirationTime, both VpcInfo sides) in the list call. core/aws/vpcpeer.go: one paginated call (DefaultPageSize; throttle retry is the SDK retryer `CreateServiceClients` sets), RawStruct = the ec2types.VpcPeeringConnection (value/pointer per transfer convention), Resource.ID = VpcPeeringConnectionId. NO describe, NO details-denied path (no per-item call to be denied) — the ONLY type of the four without a degraded-row story; a DescribeVpcPeeringConnections denial is a whole-list error (menu shows the error state, never 0).
 
 **Nil-safe CIDR (load-bearing SDK fact).** CidrBlock/CidrBlockSet on Requester/AccepterVpcInfo are nil unless Status.Code == active. The overlap check runs active-only; rendering never dereferences without checks.
 

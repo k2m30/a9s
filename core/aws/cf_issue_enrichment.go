@@ -103,9 +103,7 @@ func cfOriginBucketsGone(ctx context.Context, api S3HeadBucketAPI, origins []cft
 		if knownBuckets[bucket] {
 			continue
 		}
-		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.HeadBucketOutput, error) {
-			return api.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
-		})
+		_, err := api.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
 		if S3HeadBucketSaysMissing(err) {
 			if gone == nil {
 				gone = make(map[string]bool)
@@ -256,10 +254,8 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		if distID == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
-			return clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
-				Id: aws.String(distID),
-			})
+		out, err := clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
+			Id: aws.String(distID),
 		})
 		var cfg *cftypes.DistributionConfig
 		if err == nil {

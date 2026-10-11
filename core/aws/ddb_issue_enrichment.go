@@ -65,10 +65,8 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		if name == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeContinuousBackupsOutput, error) {
-			return clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
-				TableName: aws.String(name),
-			})
+		out, err := clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
+			TableName: aws.String(name),
 		})
 		mu.Lock()
 		defer mu.Unlock()
@@ -120,10 +118,8 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		if name == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.GetResourcePolicyOutput, error) {
-			return clients.DynamoDB.GetResourcePolicy(ctx, &dynamodb.GetResourcePolicyInput{
-				ResourceArn: aws.String(r.Fields["arn"]),
-			})
+		out, err := clients.DynamoDB.GetResourcePolicy(ctx, &dynamodb.GetResourcePolicyInput{
+			ResourceArn: aws.String(r.Fields["arn"]),
 		})
 		mu.Lock()
 		defer mu.Unlock()

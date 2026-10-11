@@ -128,10 +128,8 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 
-	hookOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLifecycleHooksOutput, error) {
-		return asgAPI.DescribeLifecycleHooks(ctx, &autoscaling.DescribeLifecycleHooksInput{
-			AutoScalingGroupName: aws.String(asgName),
-		})
+	hookOut, err := asgAPI.DescribeLifecycleHooks(ctx, &autoscaling.DescribeLifecycleHooksInput{
+		AutoScalingGroupName: aws.String(asgName),
 	})
 	if err != nil {
 		return relatedAnswer("sns", joinReads(notifications, unreadBy(err)))

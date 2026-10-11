@@ -208,9 +208,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	if !sok || c == nil || c.Lambda == nil {
 		return NotRead("cfn")
 	}
-	tagsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListTagsOutput, error) {
-		return c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
-	})
+	tagsOut, err := c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
 	if err != nil {
 		return ReadFailed("cfn", err)
 	}
@@ -252,9 +250,7 @@ func lambdaImageURI(ctx context.Context, clients any, fnName string) (string, er
 	if !ok || c == nil || c.Lambda == nil || fnName == "" {
 		return "", errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-		return c.Lambda.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &fnName})
-	})
+	out, err := c.Lambda.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &fnName})
 	if err != nil {
 		return "", err
 	}

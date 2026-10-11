@@ -30,9 +30,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		input.Marker = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListKeysOutput, error) {
-		return c.KMS.ListKeys(ctx, input)
-	})
+	listOutput, err := c.KMS.ListKeys(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing KMS keys: %w", err)
 	}
@@ -61,10 +59,8 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		if key.KeyId == nil {
 			continue
 		}
-		descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.DescribeKeyOutput, error) {
-			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
-				KeyId: aws.String(*key.KeyId),
-			})
+		descOutput, descErr := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
+			KeyId: aws.String(*key.KeyId),
 		})
 		if descErr != nil {
 			if IsAccessDenied(descErr) {
@@ -137,8 +133,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 // plus any failures encountered (a ListAliases error, or
 // a Truncated=true response with no NextMarker — which would otherwise
 // restart the page-1 fetch forever). Shared by FetchKMSKeysPage and
-// FetchKMSKeysByIDs so both apply the same retry policy and no-marker
-// guard.
+// FetchKMSKeysByIDs so both apply the same no-marker guard.
 func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string][]string, []Failure) {
 	var failures []Failure
 	stuck := false
@@ -186,7 +181,7 @@ func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string][]stri
 // returned Resources use the bare KeyId as the ID (matching FetchKMSKeysPage)
 // and populate an alias when one is known.
 //
-// Per-ID failures (after RetryOnThrottle exhaustion) are collected into a
+// Per-ID failures (after throttle retries run out) are collected into a
 // composite error returned alongside the partial success list. The caller must
 // check both return values: non-nil error indicates some IDs could not be
 // resolved but the slice may still contain valid results.
@@ -205,9 +200,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		if id == "" {
 			continue
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.DescribeKeyOutput, error) {
-			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
-		})
+		out, err := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
 		if err != nil {
 			if IsAccessDenied(err) {
 				resources = append(resources, kmsAccessDeniedResource(id, ""))

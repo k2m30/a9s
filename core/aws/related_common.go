@@ -244,9 +244,7 @@ func ecsTaskDefinition(ctx context.Context, clients any, taskDefARN string) (*ec
 	if !ok {
 		return nil, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: &taskDefARN})
-	})
+	out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: &taskDefARN})
 	if err != nil {
 		return nil, err
 	}

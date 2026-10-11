@@ -39,9 +39,7 @@ func enrichSns(ctx context.Context, clients any, res resource.Resource) (resourc
 			if !ok {
 				return nil, fmt.Errorf("SNS client does not support GetTopicAttributes")
 			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sns.GetTopicAttributesOutput, error) {
-				return api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &id})
-			})
+			out, err := api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &id})
 			if err != nil {
 				return nil, err
 			}

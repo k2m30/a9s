@@ -190,9 +190,7 @@ func FetchEBSSnapshotsPage(ctx context.Context, api EC2DescribeSnapshotsAPI, con
 // fetchEC2ByIDs.
 func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, ids []string) ([]resource.Resource, error) {
 	return fetchEC2ByIDs(ctx, "ebs-snap FetchByIDs", "InvalidSnapshot.NotFound", "snap-", ids, func(ids []string) ([]resource.Resource, error) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSnapshotsOutput, error) {
-			return api.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{SnapshotIds: ids})
-		})
+		out, err := api.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{SnapshotIds: ids})
 		if err != nil {
 			return nil, err
 		}

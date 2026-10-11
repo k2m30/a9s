@@ -95,11 +95,9 @@ func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resourc
 	if api == nil || kmsKeyIsAWSManaged(r) || kmsKeyIsGoingAway(r) {
 		return ex, false, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.GetKeyPolicyOutput, error) {
-		return api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
-			KeyId:      aws.String(r.ID),
-			PolicyName: aws.String("default"),
-		})
+	out, err := api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
+		KeyId:      aws.String(r.ID),
+		PolicyName: aws.String("default"),
 	})
 	if err != nil {
 		return ex, false, err

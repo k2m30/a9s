@@ -54,9 +54,7 @@ func enrichLambda(ctx context.Context, clients any, res resource.Resource) (reso
 			if !ok {
 				return lambdaDetailPayload{}, fmt.Errorf("AWS Lambda client does not support GetFunction")
 			}
-			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
-				return api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &id})
-			})
+			out, err := api.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &id})
 			if err != nil {
 				return lambdaDetailPayload{}, err
 			}

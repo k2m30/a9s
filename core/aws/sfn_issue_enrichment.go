@@ -71,7 +71,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if r.Fields["type"] == "EXPRESS" {
 			return
 		}
-		out, err := firstPage(ctx, func() (*sfn.ListExecutionsOutput, error) {
+		out, err := firstPage(func() (*sfn.ListExecutionsOutput, error) {
 			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
 				StateMachineArn: aws.String(smARN),
 				MaxResults:      1,
@@ -136,10 +136,8 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 // and whether a credential is pasted into the definition. Takes the
 // enricher's mutex itself, so it can be called from the parallel body.
 func sfnConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, mu *sync.Mutex, failures *[]Failure, id, smARN string) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
-		return clients.SFN.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{
-			StateMachineArn: aws.String(smARN),
-		})
+	out, err := clients.SFN.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{
+		StateMachineArn: aws.String(smARN),
 	})
 	mu.Lock()
 	defer mu.Unlock()

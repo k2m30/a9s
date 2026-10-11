@@ -141,19 +141,15 @@ Phase 6b QA must include a test per enricher that asserts both `Phrase == <short
 
 These rules are universal — every fetcher, checker, enricher, and FetchByIDs function in `core/aws/` must comply. Violating them produces silent operator-invisible failures: pivot counts go wrong, Attention sections go blank, drill-throughs return empty lists. The operator has no way to know an API call failed.
 
-### Rule E1 — Every AWS call is wrapped in `RetryOnThrottle`
+### Rule E1 — Throttle retry has one owner: the SDK retryer
 
-**Every** call to an AWS SDK method (`Describe*`, `Get*`, `List*`, `ListPoliciesForUser`, etc.) goes through:
+Throttle retry belongs to the SDK retryer `newRetryer` (`core/aws/retry.go`), which `NewAWSSessionContext` and `CreateServiceClients` set on every client. A call site calls the SDK method directly:
 
 ```go
-out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*svc.DescribeXOutput, error) {
-    return api.DescribeX(ctx, &svc.DescribeXInput{...})
-})
+out, err := api.DescribeX(ctx, &svc.DescribeXInput{...})
 ```
 
-No exceptions. Paginated top-level fetchers, per-item describes inside a checker loop, enrichment probes, FetchByIDs batches — all wrapped. The canonical examples are in `core/aws/kms_related.go:238-255`, `core/aws/pipeline_related.go:32`, `core/aws/r53_related.go:43`. Copy one of those call sites verbatim.
-
-Phase 7.5 scope-diff gate greps new code for unwrapped SDK calls. Any `api.Describe*` / `api.Get*` / `api.List*` call not enclosed in a `RetryOnThrottle(...)` closure is a coder reject.
+No call site wraps a call in a retry of its own: no wrapper, no loop that sleeps or waits on `ctx.Done()` between attempts. `TestT582_NoPerCallRetryInSource` and `TestT582Dev_NoRetryLoopWaitsAroundACall` fail on one, and so does the phase 7.5 gate.
 
 ### Rule E2 — Errors are never silently dropped
 
@@ -216,9 +212,9 @@ When 3 of 5 describe calls succeed and 2 fail:
 
 Returning `(nil, err)` on partial failure erases the 3 successful results — do not. Returning `(resources, nil)` silently hides the 2 failures — do not.
 
-### Rule E6 — `RetryOnThrottle` exhaustion is a terminal error
+### Rule E6 — An error from an SDK call is terminal
 
-If `RetryOnThrottle` returns an error, the throttle-retry budget is exhausted. Do not re-wrap or retry again. Propagate per E3/E4.
+An error returned by an SDK call has already been through the SDK retryer's attempt budget. Do not retry it again. Propagate per E3/E4.
 
 ### Rule E7 — ID is ARN IFF the fetcher makes it so, and the contract is explicit
 
@@ -274,7 +270,7 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | U10 | No jargon columns | all fixtures | `ExpectViewNotContains("CIS", "Flags", …)` |
 | **U11** | **Phrase ≠ Rows content (Wave-2 enricher output contract)** | **every fixture with a Wave-2 finding that has AttentionDetails rows** | **unit test: `finding.Phrase == <short-phrase>` AND `!strings.Contains(finding.Phrase, row.Value)` for every Row** |
 | **U12** | **Partial AWS failure surfaces a FlashMsg with `IsError=true`** | **1 fixture: N items total; describe/get call errors on 2 of them (AccessDenied / NotFound)** | **scenario test: (a) list renders N−2 rows, (b) `FlashMsg` with `IsError=true` was emitted, (c) `errorHistory` contains a composite error naming the 2 failed IDs and reasons** |
-| **U13** | **Every SDK call is wrapped in `RetryOnThrottle`** | **n/a — static audit** | **phase-5 + phase-7.5 grep: zero matches of unwrapped `api.Describe*` / `api.Get*` / `api.List*` in new code** |
+| **U13** | **No per-call retry: every SDK call relies on the SDK retryer** | **n/a — static audit** | **`go test ./tests/unit/ -run 'TestT582_NoPerCallRetryInSource\|TestT582Dev_NoRetryLoopWaitsAroundACall'` green after the change** |
 | **U14** | **No enricher / related checker passes `r.ID` as an ARN-typed param when the fetcher emits `ID = bare name`** | **1 fixture in real fetcher shape** | **unit test: `qa_<short>_uses_arn_from_fields_test.go` with a strict fake that rejects non-ARN input; PLUS `TestNoIDAsARN_StaticGuard` must stay green after adding the enricher/checker** |
 | **U15** | **Demo fake for every AWS operation accepting `*Arn` rejects non-ARN input** | **fake implementation** | **any test that constructs a `Resource` with the wrong ID shape (e.g. ID = bare name where fetcher actually emits ID = ARN) sees a `ValidationError` from the fake instead of silent success; new fakes must follow the pattern in `core/demo/fakes/sfn.go` `validateSFNArn` / `core/demo/fakes/elb.go` / etc.** |
 | **U16** | **Scenario test for the resource type asserts `AssertNoEnrichmentErrors` after draining wave-2** | **1 scenario file `tests/integration/scenario_<short>_visual_test.go`** | **scenario calls `sc.AssertNoEnrichmentErrors()` before returning; this is the integration-level guard that makes `make test` fail if any enricher emits an error against real demo fakes** |
@@ -848,7 +844,7 @@ Report format:
 
 If any expected phrase is missing from the rendered detail frame (even with green unit tests) — FAIL. The rendered frame from 8.4 is the authority.
 
-#### 9.6 Throttle wrap + no silent error skip (Rule E gate — MANDATORY)
+#### 9.6 No per-call retry + no silent error skip (Rule E gate — MANDATORY)
 
 This is the closeout audit for Rules E1–E6 (`## Error handling and throttle rules` above) and U12/U13 (universal coverage matrix). Every shipped resource has lost operator visibility to silent-skip regressions; this gate is the dam. Run all four checks against the resource's new files (fetcher + related + enricher + detail-enricher + lazy-add). FAIL on any non-clean output — DO NOT release.
 
@@ -862,30 +858,20 @@ core/aws/<short>_issue_enrichment.go      (if not NoOp)
 core/aws/<short>_detail_enrichment.go     (if present)
 ```
 
-##### 9.6.a Static throttle-wrap audit (E1 + U13)
+##### 9.6.a Static no-per-call-retry audit (E1 + U13)
 
-Every `api.Describe*` / `api.Get*` / `api.List*` / `api.Lookup*` call MUST be inside a `RetryOnThrottle(ctx, DefaultRetryConfig(), func() (...) { ... })` closure. Run:
+SDK calls are made directly; the SDK retryer owns throttle retry. Run:
 
 ```bash
-# Inside any of the in-scope files: lines that name an SDK method but do NOT
-# already sit inside a RetryOnThrottle closure body.
-for f in core/aws/<short>.go core/aws/<short>_related*.go \
-         core/aws/<short>_*_enrichment.go; do
-  [ -f "$f" ] || continue
-  awk '
-    /RetryOnThrottle\(/ { in_retry = 1; depth = 0 }
-    in_retry { depth += gsub(/\{/, "{") - gsub(/\}/, "}"); if (depth <= 0 && /\}\)/) in_retry = 0; next }
-    /api\.(Describe|Get|List|Lookup)[A-Z]/ { print FILENAME":"NR": "$0 }
-  ' "$f"
-done
+go test ./tests/unit/ -run 'TestT582_NoPerCallRetryInSource|TestT582Dev_NoRetryLoopWaitsAroundACall' -count=1
 ```
 
-Expected output: **empty**. Any line printed is an unwrapped SDK call → coder reject; loop back to phase 7. Add the `RetryOnThrottle(...)` closure verbatim from `core/aws/kms_related.go:238-255`.
+Expected: **ok**. A failure names a per-call retry wrapper or a loop that waits between attempts → coder reject; loop back to phase 7 and call the SDK directly.
 
 Report:
 
 ```text
-9.6.a throttle wrap: PASS — 0 unwrapped SDK calls in <N> files
+9.6.a no per-call retry: PASS
 ```
 
 ##### 9.6.b Static silent-skip audit (E2)
@@ -972,8 +958,8 @@ Report:
 ##### 9.6 aggregate result
 
 ```text
-9.6 throttle wrap + no silent error skip:
-    9.6.a throttle wrap (E1/U13):       PASS — 0 unwrapped SDK calls
+9.6 no per-call retry + no silent error skip:
+    9.6.a no per-call retry (E1/U13): PASS
     9.6.b silent skip (E2):             PASS — 0 banned patterns
     9.6.c surfacing path (E4):          PASS — per-category table above
     9.6.d partial-failure scenario (U12): PASS — TestScenario_<short>_PartialFailure
@@ -995,12 +981,12 @@ Aggregate the six check items plus any skipped ones under a dedicated header in 
 9.3 graph-root pivot counts: PASS (<fixture>, N/N non-zero, M/total ≥ 2)
 9.4 drill-through: PASS (related: <pass|N/A>, navigable: <pass|skipped>)
 9.5 detail-view completeness: PASS (test: <name>, rendered frame logged)
-9.6 throttle wrap + no silent error skip: PASS (E1/E2/E4/U12/U13)
+9.6 no per-call retry + no silent error skip: PASS (E1/E2/E4/U12/U13)
 
 Implementation: DONE.
 ```
 
-If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7; drill-through gaps → phase 7 coder + one `drillThroughFixtures` row; **silent-skip / unwrapped-SDK / missing-partial-scenario gaps → phase 7 coder for the fix and phase 8 QA for the scenario test**).
+If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7; drill-through gaps → phase 7 coder + one `drillThroughFixtures` row; **silent-skip / per-call-retry / missing-partial-scenario gaps → phase 7 coder for the fix and phase 8 QA for the scenario test**).
 
 ### Phase 10 — Post-push review loop (runs AFTER user-approved push)
 

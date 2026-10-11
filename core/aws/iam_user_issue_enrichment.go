@@ -76,10 +76,8 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		// unread and the others evaluated.
 		var rowErrs []error
 		consoleKnown, hasConsolePassword := true, false
-		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetLoginProfileOutput, error) {
-			return loginProfileAPI.GetLoginProfile(ctx, &iam.GetLoginProfileInput{
-				UserName: aws.String(userName),
-			})
+		_, err := loginProfileAPI.GetLoginProfile(ctx, &iam.GetLoginProfileInput{
+			UserName: aws.String(userName),
 		})
 		switch {
 		case err == nil:
@@ -293,9 +291,7 @@ func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys 
 		if keyID == "" {
 			continue
 		}
-		lastUsedOut, keyErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetAccessKeyLastUsedOutput, error) {
-			return api.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: aws.String(keyID)})
-		})
+		lastUsedOut, keyErr := api.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: aws.String(keyID)})
 		if keyErr != nil {
 			err = keyErr
 			continue

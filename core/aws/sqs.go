@@ -33,9 +33,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		input.NextToken = &continuationToken
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqs.ListQueuesOutput, error) {
-		return listAPI.ListQueues(ctx, input)
-	})
+	listOutput, err := listAPI.ListQueues(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing SQS queues: %w", err)
 	}
@@ -44,13 +42,11 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 	var resources []resource.Resource
 	var failures []Failure
 	for _, queueURL := range listOutput.QueueUrls {
-		attrOutput, attrErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqs.GetQueueAttributesOutput, error) {
-			return attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-				QueueUrl: &queueURL,
-				AttributeNames: []sqstypes.QueueAttributeName{
-					sqstypes.QueueAttributeNameAll,
-				},
-			})
+		attrOutput, attrErr := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+			QueueUrl: &queueURL,
+			AttributeNames: []sqstypes.QueueAttributeName{
+				sqstypes.QueueAttributeNameAll,
+			},
 		})
 		if attrErr != nil {
 			failures = append(failures, FailedCall(queueURL, attrErr))

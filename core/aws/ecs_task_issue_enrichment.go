@@ -196,10 +196,8 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 	unstarted := newRowResult()
 	loopErr := ForEachRow(ctx, &unstarted, defARNs, EnrichmentParallelism, func(i int) {
 		defARN := defARNs[i]
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-			return clients.ECS.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-				TaskDefinition: aws.String(defARN),
-			})
+		out, err := clients.ECS.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+			TaskDefinition: aws.String(defARN),
 		})
 		mu.Lock()
 		defer mu.Unlock()

@@ -59,10 +59,8 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		if r.ID == "" {
 			return
 		}
-		logging, logErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeLoggingStatusOutput, error) {
-			return clients.Redshift.DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{
-				ClusterIdentifier: aws.String(r.ID),
-			})
+		logging, logErr := clients.Redshift.DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{
+			ClusterIdentifier: aws.String(r.ID),
 		})
 
 		sslValue, sslKnown, sslErr := redshiftRequireSSL(ctx, clients, r, &requireSSLByGroup)

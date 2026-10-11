@@ -41,10 +41,8 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return NotRead("elb")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
-		return ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
-			EnvironmentName: &envName,
-		})
+	out, err := ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
+		EnvironmentName: &envName,
 	})
 	if err != nil {
 		return ReadFailed("elb", err)
@@ -86,10 +84,8 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		return NotRead("tg")
 	}
 
-	resOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
-		return ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
-			EnvironmentName: &envName,
-		})
+	resOut, err := ebAPI.DescribeEnvironmentResources(ctx, &elasticbeanstalk.DescribeEnvironmentResourcesInput{
+		EnvironmentName: &envName,
 	})
 	if err != nil {
 		return ReadFailed("tg", err)
@@ -188,11 +184,9 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		return NotRead("sg")
 	}
 
-	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-		return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
-			ApplicationName: &appName,
-			EnvironmentName: &envName,
-		})
+	cfgOut, err := ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+		ApplicationName: &appName,
+		EnvironmentName: &envName,
 	})
 	if err != nil {
 		return ReadFailed("sg", err)
@@ -264,11 +258,9 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 		return NotRead("role")
 	}
 
-	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-		return ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
-			ApplicationName: &appName,
-			EnvironmentName: &envName,
-		})
+	cfgOut, err := ebAPI.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+		ApplicationName: &appName,
+		EnvironmentName: &envName,
 	})
 	if err != nil {
 		return ReadFailed("role", err)

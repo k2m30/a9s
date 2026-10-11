@@ -117,7 +117,7 @@ func TestRelatedCheckers_EveryPaginatedCallGoesThroughPageAll(t *testing.T) {
 				return true
 			}
 			// Only the SDK method call itself is a read; a wrapper such as
-			// RetryOnThrottle returning its output is the same call again.
+			// firstPage returning its output is the same call again.
 			sel, ok := call.Fun.(*ast.SelectorExpr)
 			if !ok {
 				return true

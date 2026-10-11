@@ -7,8 +7,8 @@
 // every signal lives on the "$Default" version, so this fetcher does
 // DescribeLaunchTemplates (paginated) +
 // DescribeLaunchTemplateVersions(Versions=["$Default"]) per template
-// (in-fetcher N+1, as transfer.go and mwaa.go do), both under
-// RetryOnThrottle with per-item failures aggregated. IMDSv1/unencrypted/
+// (in-fetcher N+1, as transfer.go and mwaa.go do), with per-item failures
+// aggregated. IMDSv1/unencrypted/
 // details-denied findings are fetcher-written (Source: "wave1"); the
 // deprecated-ami finding alone lives in lt_issue_enrichment.go's cache-scan
 // enricher, because the fetcher has no sibling caches to cross-reference
@@ -76,9 +76,7 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplatesOutput, error) {
-		return api.DescribeLaunchTemplates(ctx, input)
-	})
+	listOutput, err := api.DescribeLaunchTemplates(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing launch templates: %w", err)
 	}
@@ -90,11 +88,9 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		tpl := listOutput.LaunchTemplates[i]
 		id := aws.ToString(tpl.LaunchTemplateId)
 
-		versionOutput, versionErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-			return api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-				LaunchTemplateId: aws.String(id),
-				Versions:         []string{"$Default"},
-			})
+		versionOutput, versionErr := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+			LaunchTemplateId: aws.String(id),
+			Versions:         []string{"$Default"},
 		})
 		switch {
 		case versionErr != nil:

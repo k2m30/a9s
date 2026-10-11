@@ -175,10 +175,8 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, cac
 		return NotRead("ecr")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-			TaskDefinition: &taskDefARN,
-		})
+	out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: &taskDefARN,
 	})
 	// The related panel's error result carries the refusal to the pivot.
 	// no finding: this arm already answers with it.
@@ -219,10 +217,8 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		return NotRead("secrets")
 	}
 
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-			TaskDefinition: &taskDefARN,
-		})
+	out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: &taskDefARN,
 	})
 	// As in checkECSSvcECR above, the pivot is told the call refused rather
 	// than shown a count.

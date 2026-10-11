@@ -172,9 +172,7 @@ func getAWSManagedPolicy(ctx context.Context, api IAMGetPolicyAPI, partition, re
 		if name == "" {
 			arn = ref
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetPolicyOutput, error) {
-			return api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(arn)})
-		})
+		out, err := api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(arn)})
 		if err != nil {
 			lastErr = err
 			continue
@@ -342,10 +340,9 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 }
 
 // fetchInlineGroupPolicies enumerates all groups via ListGroups and collects
-// their inline policy names via ListGroupPolicies. Both API calls are wrapped
-// in RetryOnThrottle. Per-group ListGroupPolicies failures are collected and
-// returned as a composite error alongside any partial results — callers must
-// check both return values.
+// their inline policy names via ListGroupPolicies. Per-group
+// ListGroupPolicies failures are collected and returned as a composite error
+// alongside any partial results — callers must check both return values.
 // iamInlineGroupSweepParallelism bounds the per-group ListGroupPolicies
 // fan-out fetchInlineGroupPolicies runs, distinct from the general
 // EnrichmentParallelism: IAM's global per-account API rate limit is shared
@@ -382,8 +379,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 	// mechanism issue-enrichment fetchers use): sequential per-group calls
 	// cannot finish a wide account (49+ groups) inside any shared deadline
 	// (the probe's 10s budget, or a real list-open's own timeout); unbounded
-	// fan-out risks IAM throttling instead. RetryOnThrottle still wraps each
-	// individual ListGroupPolicies call. sweepErr is ForEachParallel's own
+	// fan-out risks IAM throttling instead. sweepErr is ForEachParallel's own
 	// return value (a ctx error when the sweep's deadline expired before
 	// every group was even scheduled) — captured, not discarded: a group
 	// whose turn never comes contributes nothing to groupFailures (only a

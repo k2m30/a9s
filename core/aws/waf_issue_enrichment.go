@@ -68,10 +68,8 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		scope := cmp.Or(r.Fields["scope"], string(wafv2types.ScopeRegional))
 		api := clients.wafIn(scope)
 
-		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetLoggingConfigurationOutput, error) {
-			return api.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
-				ResourceArn: aws.String(arn),
-			})
+		_, err := api.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
+			ResourceArn: aws.String(arn),
 		})
 		if err != nil {
 			if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
@@ -103,12 +101,10 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		var gerr error
 		if getACLAPI, ok := api.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {
 			var getOut *wafv2svc.GetWebACLOutput
-			getOut, gerr = RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetWebACLOutput, error) {
-				return getACLAPI.GetWebACL(ctx, &wafv2svc.GetWebACLInput{
-					Name:  aws.String(r.Fields["name"]),
-					Id:    aws.String(r.Fields["id"]),
-					Scope: wafv2types.Scope(scope),
-				})
+			getOut, gerr = getACLAPI.GetWebACL(ctx, &wafv2svc.GetWebACLInput{
+				Name:  aws.String(r.Fields["name"]),
+				Id:    aws.String(r.Fields["id"]),
+				Scope: wafv2types.Scope(scope),
 			})
 			if gerr != nil {
 				readErrs = append(readErrs, gerr)
@@ -195,11 +191,9 @@ func wafAssociations(ctx context.Context, clients *ServiceClients, scope, arn st
 // protects. ResourceType is always named: omitted, it means
 // APPLICATION_LOAD_BALANCER.
 func wafResourcesOfType(ctx context.Context, api WAFv2ListResourcesForWebACLAPI, arn string, rt wafv2types.ResourceType) ([]string, error) {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.ListResourcesForWebACLOutput, error) {
-		return api.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
-			WebACLArn:    aws.String(arn),
-			ResourceType: rt,
-		})
+	out, err := api.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
+		WebACLArn:    aws.String(arn),
+		ResourceType: rt,
 	})
 	if err != nil {
 		return nil, err

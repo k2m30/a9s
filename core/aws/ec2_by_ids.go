@@ -21,9 +21,7 @@ import (
 // missing IDs are handled by fetchEC2ByIDs.
 func FetchEC2InstancesByIDs(ctx context.Context, api EC2DescribeInstancesAPI, ids []string) ([]resource.Resource, error) {
 	return fetchEC2ByIDs(ctx, "ec2 FetchByIDs", "InvalidInstanceID.NotFound", "i-", ids, func(ids []string) ([]resource.Resource, error) {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeInstancesOutput, error) {
-			return api.DescribeInstances(ctx, &ec2.DescribeInstancesInput{InstanceIds: ids})
-		})
+		out, err := api.DescribeInstances(ctx, &ec2.DescribeInstancesInput{InstanceIds: ids})
 		if err != nil {
 			return nil, err
 		}

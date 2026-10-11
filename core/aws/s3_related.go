@@ -94,9 +94,7 @@ func s3BucketTags(ctx context.Context, c *ServiceClients, bucket string) (map[st
 	if !ok {
 		return nil, errClientMissing
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
-		return api.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
-	})
+	out, err := api.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
 	if s3BenignAbsenceErr(err, "NoSuchTagSet") {
 		return map[string]string{}, nil
 	}
@@ -126,9 +124,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	if !ok {
 		return NotRead("cfn")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
-		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
-	})
+	out, err := tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		// NoSuchTagSet is a "no tags" response, and a deleted bucket is a
 		// resolved zero — both are a benign absence, not a hard failure.
@@ -192,9 +188,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 	if !ok {
 		return NotRead("kms")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketEncryptionOutput, error) {
-		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
-	})
+	out, err := encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		// ServerSideEncryptionConfigurationNotFoundError means no encryption,
 		// and a deleted bucket is a resolved zero — both are honest 0s.
@@ -251,9 +245,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return NotRead("s3")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
-		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
-	})
+	out, err := logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		// A deleted bucket is a resolved zero, not a hard failure.
 		if s3BenignAbsenceErr(err, "") {
@@ -456,9 +448,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	if !ok {
 		return NotRead("role")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
-		return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
-	})
+	out, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		// NoSuchBucketPolicy is a legitimate "no policy configured"
 		// response, and a deleted bucket is a resolved zero — both are

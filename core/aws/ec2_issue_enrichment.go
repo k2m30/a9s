@@ -480,11 +480,9 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 	var failures []Failure
 	loopErr := ForEachRow(ctx, result, resourceIDs(targets), EnrichmentParallelism, func(i int) {
 		r := targets[i]
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeInstanceAttributeOutput, error) {
-			return api.DescribeInstanceAttribute(ctx, &ec2svc.DescribeInstanceAttributeInput{
-				InstanceId: aws.String(r.ID),
-				Attribute:  ec2types.InstanceAttributeNameUserData,
-			})
+		out, err := api.DescribeInstanceAttribute(ctx, &ec2svc.DescribeInstanceAttributeInput{
+			InstanceId: aws.String(r.ID),
+			Attribute:  ec2types.InstanceAttributeNameUserData,
 		})
 		mu.Lock()
 		defer mu.Unlock()

@@ -140,10 +140,8 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, cache
 	}
 
 	const slrName = "AWSServiceRoleForVPCTransitGateway"
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetRoleOutput, error) {
-		return getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
-			RoleName: aws.String(slrName),
-		})
+	out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
+		RoleName: aws.String(slrName),
 	})
 	if err != nil {
 		if ErrCodeIs(err, "NoSuchEntity") {

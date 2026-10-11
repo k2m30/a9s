@@ -2,9 +2,6 @@ package unit
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -408,66 +405,6 @@ func TestDBISnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 		if r.ID == "" {
 			t.Errorf("resource[%d].ID is empty", i)
 		}
-	}
-}
-
-func TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
-	root := findRepoFile(t, "core/aws")
-
-	var violations []string
-
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		name := info.Name()
-		if !strings.HasPrefix(name, "dbi_snap") || !strings.HasSuffix(name, ".go") {
-			return nil
-		}
-		body, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return fmt.Errorf("reading %s: %w", path, readErr)
-		}
-		lines := strings.Split(string(body), "\n")
-
-		// Track whether we are inside a RetryOnThrottle closure. A simple heuristic:
-		// when we see `RetryOnThrottle(`, we enter a protected block; we exit when
-		// we see the matching `})` at the same nesting depth. For a single-function
-		// closure this is sufficient.
-		inThrottle := 0
-		for ln, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "//") {
-				continue
-			}
-			if strings.Contains(line, "RetryOnThrottle(") {
-				inThrottle++
-			}
-			if inThrottle > 0 && strings.Contains(line, "})") {
-				inThrottle--
-				continue
-			}
-			if inThrottle == 0 {
-				isDirectCall := (strings.Contains(line, ".DescribeDBSnapshots(") ||
-					strings.Contains(line, ".ListRecoveryPointsByResource(")) &&
-					!strings.Contains(line, "RetryOnThrottle")
-				if isDirectCall {
-					violations = append(violations, fmt.Sprintf("%s:%d: %s", path, ln+1, strings.TrimSpace(line)))
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walking core/aws: %v", err)
-	}
-
-	if len(violations) > 0 {
-		t.Errorf("U13: direct SDK calls found outside RetryOnThrottle in dbi_snap files (%d):\n  %s",
-			len(violations), strings.Join(violations, "\n  "))
 	}
 }
 

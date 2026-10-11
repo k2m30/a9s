@@ -4,73 +4,95 @@ package aws
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
+	"errors"
+	"net/http"
+	"sync/atomic"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/smithy-go"
 )
 
-// RetryConfig controls retry behavior for AWS API calls.
-type RetryConfig struct {
-	MaxAttempts int
-	BaseDelay   time.Duration
-	MaxDelay    time.Duration
-	Jitter      bool
+// retryMaxAttempts is the attempt budget of every AWS call a9s makes. A sweep
+// or an enrichment fans out many reads at once against per-account API rate
+// limits, so a throttled read gets more tries than the SDK's default 3.
+const retryMaxAttempts = 5
+
+// retryMaxBackoff caps the wait between two attempts so that every attempt
+// fits the shortest deadline a9s puts on a read (5 s): four waits of at most
+// 1 s each.
+const retryMaxBackoff = time.Second
+
+// retryMaxBackoffForTest, when non-zero, replaces retryMaxBackoff. Set only
+// through SetRetryMaxBackoffForTest.
+var retryMaxBackoffForTest atomic.Int64
+
+// errNoTimeForRetry ends the retries of a read whose deadline is closer than
+// the longest next wait. It deliberately wraps no context error: the read
+// ends as the throttle it got, not as a timeout.
+var errNoTimeForRetry = errors.New("no time left before the deadline for another attempt")
+
+// isThrottle is the one definition of a throttle in a9s, read by the retryer
+// and by ErrClass: an error code the SDK lists as a throttle, or an HTTP 429
+// whose code no protocol models as one.
+func isThrottle(err error) bool {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
+		if _, listed := retry.DefaultThrottleErrorCodes[apiErr.ErrorCode()]; listed {
+			return true
+		}
+	}
+	respErr, ok := errors.AsType[interface {
+		error
+		HTTPStatusCode() int
+	}](err)
+	return ok && respErr.HTTPStatusCode() == http.StatusTooManyRequests
 }
 
-// retryConfigOverrideForTest, when non-nil, overrides DefaultRetryConfig.
-// Populated only via SetRetryConfigForTest (see retry_testhelper.go) so
-// retry-exercising tests can run with a small BaseDelay.
-var retryConfigOverrideForTest *RetryConfig
-
-// DefaultRetryConfig returns the standard retry configuration.
-func DefaultRetryConfig() RetryConfig {
-	if retryConfigOverrideForTest != nil {
-		return *retryConfigOverrideForTest
+// newRetryer is the one retry policy of a9s, set on the session config by
+// NewAWSSessionContext (so the credential clients the SDK builds from it use
+// it) and on every service client by CreateServiceClients. It retries what the
+// SDK's standard retryer does (5xx, transport failures) and every isThrottle
+// error.
+//
+// The client-side retry quota is off: under a burst of parallel throttles it
+// would end retries early, the moment they are needed most. Load on a
+// throttled API is bounded by a9s's fan-out caps (EnrichmentParallelism and
+// the sweep's window), not by the quota.
+func newRetryer() aws.Retryer {
+	maxBackoff := retryMaxBackoff
+	if d := retryMaxBackoffForTest.Load(); d > 0 {
+		maxBackoff = time.Duration(d)
 	}
-	return RetryConfig{
-		MaxAttempts: 3,
-		BaseDelay:   500 * time.Millisecond,
-		MaxDelay:    10 * time.Second,
-		Jitter:      true,
+	return deadlineRetryer{
+		RetryerV2: retry.NewStandard(func(o *retry.StandardOptions) {
+			o.MaxAttempts = retryMaxAttempts
+			o.MaxBackoff = maxBackoff
+			o.RateLimiter = ratelimit.None
+			o.Retryables = append(o.Retryables, retry.IsErrorRetryableFunc(func(err error) aws.Ternary {
+				if isThrottle(err) {
+					return aws.TrueTernary
+				}
+				return aws.UnknownTernary
+			}))
+		}),
+		maxBackoff: maxBackoff,
 	}
 }
 
-// RetryOnThrottle wraps an API call with exponential backoff for throttling errors.
-// Only retries on errors where ClassifyAWSError returns retryable=true.
-func RetryOnThrottle[T any](ctx context.Context, cfg RetryConfig, fn func() (T, error)) (T, error) {
-	var lastErr error
-	for attempt := range cfg.MaxAttempts {
-		result, err := fn()
-		if err == nil {
-			return result, nil
-		}
+// deadlineRetryer declines a retry the caller's deadline would cut short. The
+// SDK sleeps into the deadline and then returns only the context error, so a
+// throttled read would read as a timeout; a declined retry token instead
+// returns the throttle joined with errNoTimeForRetry.
+type deadlineRetryer struct {
+	aws.RetryerV2
+	maxBackoff time.Duration
+}
 
-		_, _, retryable := ClassifyAWSError(err)
-		if !retryable {
-			return result, err
-		}
-
-		lastErr = err
-
-		// A backoff spaces one attempt from the next; after the last permitted
-		// attempt there is none to space it from.
-		if attempt == cfg.MaxAttempts-1 {
-			break
-		}
-
-		delay := min(cfg.BaseDelay*time.Duration(1<<attempt), cfg.MaxDelay)
-		if cfg.Jitter {
-			delay = delay/2 + time.Duration(rand.Int63n(int64(delay/2))) //nolint:gosec // jitter does not need crypto rand
-		}
-
-		select {
-		case <-ctx.Done():
-			var zero T
-			return zero, ctx.Err()
-		case <-time.After(delay):
-		}
+func (r deadlineRetryer) GetRetryToken(ctx context.Context, opErr error) (func(error) error, error) {
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < r.maxBackoff {
+		return nil, errNoTimeForRetry
 	}
-
-	var zero T
-	return zero, fmt.Errorf("max retries (%d) exceeded: %w", cfg.MaxAttempts, lastErr)
+	return r.RetryerV2.GetRetryToken(ctx, opErr)
 }

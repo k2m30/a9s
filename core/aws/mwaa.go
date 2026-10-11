@@ -59,9 +59,7 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*mwaa.ListEnvironmentsOutput, error) {
-		return c.MWAA.ListEnvironments(ctx, input)
-	})
+	listOutput, err := c.MWAA.ListEnvironments(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing MWAA environments: %w", err)
 	}
@@ -70,9 +68,7 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 	var resources []resource.Resource
 	var failures []Failure
 	for _, name := range listOutput.Environments {
-		getOutput, getErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*mwaa.GetEnvironmentOutput, error) {
-			return c.MWAA.GetEnvironment(ctx, &mwaa.GetEnvironmentInput{Name: aws.String(name)})
-		})
+		getOutput, getErr := c.MWAA.GetEnvironment(ctx, &mwaa.GetEnvironmentInput{Name: aws.String(name)})
 		if getErr != nil {
 			failures = append(failures, FailedCall(name, getErr))
 			resources = append(resources, buildMWAADegradedResource(name, getErr))

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/smithy-go"
@@ -165,33 +164,5 @@ func TestPageAll_FailedPageReturnsItemsReadSoFar(t *testing.T) {
 	}
 	if n := s.callsFor("tok-3"); n != 0 {
 		t.Errorf("page after the failure requested %d times, want 0", n)
-	}
-}
-
-func TestPageAll_RetriesAThrottledPage(t *testing.T) {
-	restore := awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
-		MaxAttempts: 3,
-		BaseDelay:   time.Millisecond,
-		MaxDelay:    2 * time.Millisecond,
-	})
-	defer restore()
-
-	throttled := &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded"}
-	s := &pageAllScript{pages: map[string]pageAllPage{
-		"":      {items: []string{"a"}, next: aws.String("tok-2")},
-		"tok-2": {errs: []error{throttled}, items: []string{"b"}},
-	}}
-	items, complete, err := awsclient.PageAll(context.Background(), 10, s.next)
-	if err != nil {
-		t.Fatalf("err = %v, want nil after the retry succeeded", err)
-	}
-	if !complete {
-		t.Error("complete = false, want true")
-	}
-	if !slices.Equal(items, []string{"a", "b"}) {
-		t.Errorf("items = %v, want [a b]", items)
-	}
-	if n := s.callsFor("tok-2"); n != 2 {
-		t.Errorf("throttled page requested %d times, want 2 (one throttled, one served)", n)
 	}
 }

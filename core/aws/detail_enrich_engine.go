@@ -122,7 +122,7 @@ type detailEnrichSpec[R any, P any] struct {
 	cacheKey func(id string, r R, res resource.Resource) string
 
 	// fetch is the only genuinely per-resource logic: narrow-interface
-	// client capability asserts, RetryOnThrottle-wrapped API calls, and
+	// client capability asserts, API calls, and
 	// payload transforms. id is the value id() already validated —
 	// role_policies ignores it where its branching needs row fields instead.
 	fetch func(ctx context.Context, c *ServiceClients, id string, r R, res resource.Resource) (P, error)

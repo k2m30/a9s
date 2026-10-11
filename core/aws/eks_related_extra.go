@@ -225,11 +225,9 @@ func clusterNodegroups(ctx context.Context, c *ServiceClients, clusterName strin
 	}
 	var failures []Failure
 	for _, ngName := range ngNames {
-		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
-			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-				ClusterName:   aws.String(clusterName),
-				NodegroupName: aws.String(ngName),
-			})
+		descOut, descErr := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+			ClusterName:   aws.String(clusterName),
+			NodegroupName: aws.String(ngName),
 		})
 		if descErr != nil {
 			failures = append(failures, FailedCall(ngName, descErr))

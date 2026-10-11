@@ -65,9 +65,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	var failures []Failure
 	scopes := wafv2types.LogScope("").Values()
 	for _, scope := range scopes {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetLoggingConfigurationOutput, error) {
-			return api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn, LogScope: scope})
-		})
+		out, err := api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn, LogScope: scope})
 		if _, none := errors.AsType[*wafv2types.WAFNonexistentItemException](err); none {
 			continue
 		}

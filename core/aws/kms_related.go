@@ -179,11 +179,9 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 	var refs []string
 	policyName := "default"
 
-	policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.GetKeyPolicyOutput, error) {
-		return policyAPI.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
-			KeyId:      &keyID,
-			PolicyName: &policyName,
-		})
+	policyOut, err := policyAPI.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
+		KeyId:      &keyID,
+		PolicyName: &policyName,
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.

@@ -57,18 +57,6 @@ func (i *t576Injector) after(service, op string, in, out any) {
 	i.calls = append(i.calls, t576Call{Service: service, Op: op, In: in, Out: out})
 }
 
-func (i *t576Injector) callsOf(op string) []t576Call {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	var out []t576Call
-	for _, c := range i.calls {
-		if c.Op == op {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
 // t576APIError is the error the SDK hands back for a refused call: the
 // operation's name on the outside, the service's code inside.
 func t576APIError(service, op, code, message string) error {
@@ -98,24 +86,9 @@ func t576DenyOp(op string) func(service, o string, in any) error {
 	}
 }
 
-// t576ThrottleFirst throttles the first call of op for each distinct input and
-// answers every retry from the fakes.
-func t576ThrottleFirst(op string) func(service, o string, in any) error {
-	seen := map[string]bool{}
-	return func(service, o string, in any) error {
-		if o != op {
-			return nil
-		}
-		key := strings.Join(t576Leaves(in), "\x00")
-		if seen[key] {
-			return nil
-		}
-		seen[key] = true
-		return t576Throttled(service, o)
-	}
-}
-
-// t576ThrottleAlways throttles every call of op, past any retry budget.
+// t576ThrottleAlways throttles every call of op. A wrapped fake has no SDK
+// retryer, so each call ends as the throttle, as a real read does once the
+// retryer's attempts run out.
 func t576ThrottleAlways(op string) func(service, o string, in any) error {
 	return func(service, o string, _ any) error {
 		if o == op {

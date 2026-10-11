@@ -99,9 +99,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if domainOwner != "" {
 			input.DomainOwner = aws.String(domainOwner)
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
-			return clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
-		})
+		out, err := clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {

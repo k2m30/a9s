@@ -413,22 +413,6 @@ func TestErrClass_ReadsTheSameCodeTableAsTheRetryClassifier(t *testing.T) {
 	}
 }
 
-// A class of "throttled" and a retryable verdict are the same fact.
-func TestErrClass_RetryClassifierAgreesOnSlowDown(t *testing.T) {
-	for _, code := range []string{"SlowDown", "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded"} {
-		_, _, retryable := awsclient.ClassifyAWSError(codex2APIErr(code))
-		if !retryable {
-			t.Errorf("ClassifyAWSError(%s) retryable = false, want true", code)
-		}
-		if got := awsclient.ErrClass(codex2APIErr(code)); got != awsclient.ClassThrottled {
-			t.Errorf("ErrClass(%s) = %q, want %q", code, got, awsclient.ClassThrottled)
-		}
-	}
-	if _, _, retryable := awsclient.ClassifyAWSError(codex2APIErr("UnauthorizedOperation")); retryable {
-		t.Error("ClassifyAWSError(UnauthorizedOperation) retryable = true, want false")
-	}
-}
-
 func TestSweepTitle_AllDeniedReadsAsAccessDenied(t *testing.T) {
 	word := awsclient.RowWord(awsclient.ErrClass(codex2APIErr("UnauthorizedOperation")))
 	if got := awsclient.SweepTitleForWord(word); got != "sweep: access denied" {

@@ -341,10 +341,8 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 	if c.IAM == nil {
 		return NotRead("role")
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
-		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName),
-		})
+	out, err := c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
+		InstanceProfileName: aws.String(profileName),
 	})
 	if err != nil {
 		return ReadFailed("role", err)

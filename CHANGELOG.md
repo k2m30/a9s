@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Every AWS read retries when throttled, with one retry policy for all
+  services: up to 5 attempts, a bare HTTP 429 counts as a throttle, and a
+  burst of throttles during a wide sweep no longer stops retries early. A
+  read that used to be retried twice over (up to 9 attempts) now makes at
+  most 5; a denied or invalid request is still answered on the first
+  attempt. Credential refreshes (assumed roles, SSO) retry the same way.
+- A read still throttled when its time runs out shows `throttled`, not
+  `timeout`, and every throttle AWS reports (including Cost Explorer's,
+  Kinesis's and SQS's own codes, and a bare HTTP 429) shows `throttled`
+  instead of the raw error code.
 - A list check whose AWS read fails marks the row `not inspected` and
   reports the failure, instead of leaving a blank cell or a row that reads
   clean: CodeArtifact package counts, log group last-event times, and

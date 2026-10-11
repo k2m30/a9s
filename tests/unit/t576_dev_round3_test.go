@@ -84,43 +84,6 @@ func TestT576Dev_IAMGroupCappedMemberWalkWithMembersIsInspected(t *testing.T) {
 	}
 }
 
-// Each read below is retried on a throttle like its sibling reads: one
-// throttle answers on the retry, with no failure and no mark.
-func TestT576Dev_ReadsRetryAThrottle(t *testing.T) {
-	t576FastRetries(t)
-	for _, c := range []struct{ short, op string }{
-		{"athena", "GetWorkGroup"},
-		{"cb", "BatchGetBuilds"},
-		{"codeartifact", "GetRepositoryPermissionsPolicy"},
-		{"ddb", "DescribeContinuousBackups"},
-		{"ecs", "DescribeClusters"},
-		{"role", "GetRole"},
-	} {
-		t.Run(c.short+"/"+c.op, func(t *testing.T) {
-			_, rows, cache := t576Bench(t, c.short)
-			clean := t576EnrichType(t, c.short, rows, cache, nil)
-			got := t576EnrichType(t, c.short, rows, cache, t576ThrottleFirst(c.op))
-			sent := 0
-			for _, call := range got.calls {
-				if call.Op == c.op {
-					sent++
-				}
-			}
-			if sent == 0 {
-				t.Fatalf("the %s bench never calls %s", c.short, c.op)
-			}
-			if got.err != nil {
-				t.Errorf("one throttle surfaced as a failure: %v", got.err)
-			}
-			for id, check := range got.res.TruncatedIDs {
-				if _, ok := clean.res.TruncatedIDs[id]; !ok {
-					t.Errorf("%s marked %q after a retried throttle", id, check)
-				}
-			}
-		})
-	}
-}
-
 // capKeysIAM answers ListAccessKeys with a next page, forever.
 type capKeysIAM struct{ awsclient.IAMAPI }
 

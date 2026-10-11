@@ -58,10 +58,8 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if wgName == "" {
 			return
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*athena.GetWorkGroupOutput, error) {
-			return clients.Athena.GetWorkGroup(ctx, &athena.GetWorkGroupInput{
-				WorkGroup: aws.String(wgName),
-			})
+		out, err := clients.Athena.GetWorkGroup(ctx, &athena.GetWorkGroupInput{
+			WorkGroup: aws.String(wgName),
 		})
 		mu.Lock()
 		defer mu.Unlock()

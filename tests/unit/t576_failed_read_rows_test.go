@@ -5,7 +5,6 @@ import (
 	"errors"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -49,13 +48,6 @@ func t576EnrichType(t *testing.T, shortName string, rows []resource.Resource, ca
 
 func t576HasCode(fs []domain.Finding, code domain.FindingCode) bool {
 	return slices.ContainsFunc(fs, func(f domain.Finding) bool { return f.Code == code })
-}
-
-// t576FastRetries makes RetryOnThrottle's backoff negligible for the test.
-func t576FastRetries(t *testing.T) {
-	t.Helper()
-	restore := awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{MaxAttempts: 3, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond})
-	t.Cleanup(restore)
 }
 
 // t576RenderList loads rows into a list screen and delivers run's result the
@@ -138,7 +130,6 @@ func TestT576_LogsFailedLastEventReadMarksTheGroup(t *testing.T) {
 		t.Fatal("clean run set last_event_at on no log group; the bench has no witness")
 	}
 
-	t576FastRetries(t)
 	for name, fail := range map[string]func(string, string, any) error{
 		"denied":               t576DenyOp("DescribeLogStreams"),
 		"throttled past retry": t576ThrottleAlways("DescribeLogStreams"),
@@ -163,7 +154,6 @@ type t576TrailLoad struct {
 	rows     []resource.Resource
 	fetchErr error
 	run      t576Run
-	statuses map[string]int
 }
 
 func t576LoadTrails(t *testing.T, fail func(service, op string, in any) error) t576TrailLoad {
@@ -183,77 +173,13 @@ func t576LoadTrails(t *testing.T, fail func(service, op string, in any) error) t
 	e := t576Enricher(t, "trail")
 	_, cache := buildVisibilityTypeCache(t)
 	res, err := e.Fn(context.Background(), clients, rows, t576ReadsOf(cache, e.Reads))
-	statuses := map[string]int{}
-	for _, c := range inj.callsOf("GetTrailStatus") {
-		for _, l := range t576Leaves(c.In) {
-			statuses[l]++
-		}
-	}
-	return t576TrailLoad{rows: rows, fetchErr: fetchErr, run: t576Run{res: res, err: err, calls: inj.calls}, statuses: statuses}
+	return t576TrailLoad{rows: rows, fetchErr: fetchErr, run: t576Run{res: res, err: err, calls: inj.calls}}
 }
 
-// isLogging and codes are what the loaded list knows about trail id, from
-// the fetch and the enricher together.
-func (l t576TrailLoad) isLogging(id string) string {
-	if v, ok := l.run.res.FieldUpdates[id]["is_logging"]; ok {
-		return v
-	}
-	for _, r := range l.rows {
-		if r.ID == id {
-			return r.Fields["is_logging"]
-		}
-	}
-	return ""
-}
-
-func (l t576TrailLoad) codes(id string) []string {
-	var out []string
-	for _, r := range l.rows {
-		if r.ID == id {
-			for _, f := range r.Findings {
-				out = append(out, string(f.Code))
-			}
-		}
-	}
-	for _, f := range l.run.res.Findings[id] {
-		out = append(out, string(f.Code))
-	}
-	slices.Sort(out)
-	return slices.Compact(out)
-}
-
-// GetTrailStatus is the only source of a trail's logging health. A throttle
-// is retried like every sibling read; a final failure leaves the trail
-// unknown, which the row says, never a trail that reads as logging fine.
+// GetTrailStatus is the only source of a trail's logging health. A failed
+// read leaves the trail unknown, which the row says, never a trail that
+// reads as logging fine.
 func TestT576_TrailStatusFailureMarksTheTrail(t *testing.T) {
-	t576FastRetries(t)
-	clean := t576LoadTrails(t, nil)
-
-	t.Run("throttled once", func(t *testing.T) {
-		got := t576LoadTrails(t, t576ThrottleFirst("GetTrailStatus"))
-		if got.fetchErr != nil || got.run.err != nil {
-			t.Errorf("one throttle per trail surfaced as a failure: fetch %v, enrich %v", got.fetchErr, got.run.err)
-		}
-		for _, r := range clean.rows {
-			arn := r.Fields["trail_arn"]
-			if arn == "" {
-				continue
-			}
-			if n := got.statuses[arn]; n != 2 {
-				t.Errorf("%s: GetTrailStatus sent %d times after one throttle, want 2 (one retry)", r.ID, n)
-			}
-			if a, b := got.isLogging(r.ID), clean.isLogging(r.ID); a != b {
-				t.Errorf("%s: is_logging = %q after a retried throttle, want %q", r.ID, a, b)
-			}
-			if a, b := got.codes(r.ID), clean.codes(r.ID); !slices.Equal(a, b) {
-				t.Errorf("%s: findings %v after a retried throttle, want %v", r.ID, a, b)
-			}
-			if check, ok := got.run.res.TruncatedIDs[r.ID]; ok {
-				t.Errorf("%s: marked not inspected (%q) though the retry answered", r.ID, check)
-			}
-		}
-	})
-
 	for name, fail := range map[string]func(string, string, any) error{
 		"denied":               t576DenyOp("GetTrailStatus"),
 		"throttled past retry": t576ThrottleAlways("GetTrailStatus"),
@@ -321,28 +247,6 @@ func TestT576_SESAccountFailureKeepsIdentityDKIM(t *testing.T) {
 	if len(dkimOff) == 0 {
 		t.Fatal("clean run: no identity reports DKIM off; the bench has no witness")
 	}
-
-	t576FastRetries(t)
-	t.Run("throttled once", func(t *testing.T) {
-		inj := t576EnrichType(t, "ses", rows, cache, t576ThrottleFirst("GetAccount"))
-		if inj.err != nil {
-			t.Errorf("one GetAccount throttle surfaced as a failure: %v", inj.err)
-		}
-		n := 0
-		for _, c := range inj.calls {
-			if c.Op == "GetAccount" {
-				n++
-			}
-		}
-		if n != 2 {
-			t.Errorf("GetAccount sent %d times after one throttle, want 2 (one retry)", n)
-		}
-		for _, r := range rows {
-			if check, ok := inj.res.TruncatedIDs[r.ID]; ok && check == "GetAccount" {
-				t.Errorf("%s marked not inspected for GetAccount though the retry answered", r.ID)
-			}
-		}
-	})
 
 	t.Run("denied", func(t *testing.T) {
 		got := t576EnrichType(t, "ses", rows, cache, t576DenyOp("GetAccount"))

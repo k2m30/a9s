@@ -208,10 +208,8 @@ type taskDefRead struct {
 // (access denied, throttled, transient) is kept so the task is marked
 // unjoined and reverse-scan checkers report Truncated.
 func readTaskDefinition(ctx context.Context, api ECSDescribeTaskDefinitionAPI, arn string) taskDefRead {
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
-		return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-			TaskDefinition: &arn,
-		})
+	out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: &arn,
 	})
 	switch {
 	case ErrCodeIs(err, "ClientException"):

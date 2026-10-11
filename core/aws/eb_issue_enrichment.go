@@ -122,11 +122,9 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 		if key == "" {
 			key = name
 		}
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
-			return api.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
-				ApplicationName: aws.String(app),
-				EnvironmentName: aws.String(name),
-			})
+		out, err := api.DescribeConfigurationSettings(ctx, &elasticbeanstalk.DescribeConfigurationSettingsInput{
+			ApplicationName: aws.String(app),
+			EnvironmentName: aws.String(name),
 		})
 		mu.Lock()
 		defer mu.Unlock()

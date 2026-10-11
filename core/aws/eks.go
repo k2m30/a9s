@@ -29,9 +29,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
-		return c.EKS.ListClusters(ctx, input)
-	})
+	listOutput, err := c.EKS.ListClusters(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
 	}
@@ -45,10 +43,8 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 	var resources []resource.Resource
 	var failures []Failure
 	for _, name := range listOutput.Clusters {
-		descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeClusterOutput, error) {
-			return c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
-				Name: aws.String(name),
-			})
+		descOutput, descErr := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
+			Name: aws.String(name),
 		})
 		if descErr != nil {
 			failures = append(failures, FailedCall(name, descErr))

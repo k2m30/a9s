@@ -166,7 +166,7 @@ type ServiceClients struct {
 // empty, the default region from the config/environment is used.
 // The provided context is forwarded to the AWS SDK config loader.
 func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Config, error) {
-	var opts []func(*config.LoadOptions) error
+	opts := []func(*config.LoadOptions) error{config.WithRetryer(newRetryer)}
 
 	if profile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(profile))
@@ -178,8 +178,10 @@ func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Conf
 	return config.LoadDefaultConfig(ctx, opts...)
 }
 
-// CreateServiceClients creates all service clients from the given AWS config.
+// CreateServiceClients creates all service clients from the given AWS config,
+// each retrying through newRetryer.
 func CreateServiceClients(cfg aws.Config) *ServiceClients {
+	cfg.Retryer = newRetryer
 	return &ServiceClients{
 		cfg:    cfg,
 		Region: cfg.Region,

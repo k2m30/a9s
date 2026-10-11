@@ -124,7 +124,7 @@ func launchTemplateData(ctx context.Context, api EC2DescribeLaunchTemplateVersio
 	} else {
 		in.LaunchTemplateName = spec.LaunchTemplateName
 	}
-	out, err := firstPage(ctx, func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+	out, err := firstPage(func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 		return api.DescribeLaunchTemplateVersions(ctx, in)
 	})
 	if err != nil {

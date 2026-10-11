@@ -171,9 +171,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 		input.Marker = &continuationToken
 	}
 
-	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribeDBClustersOutput, error) {
-		return api.DescribeDBClusters(ctx, input)
-	})
+	output, err := api.DescribeDBClusters(ctx, input)
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching DocumentDB clusters: %w", err)
 	}

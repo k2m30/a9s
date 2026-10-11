@@ -169,9 +169,7 @@ func ecrCFNStackName(ctx context.Context, clients any, res resource.Resource) (s
 	if !ok {
 		return "", nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.ListTagsForResourceOutput, error) {
-		return api.ListTagsForResource(ctx, &ecr.ListTagsForResourceInput{ResourceArn: repo.RepositoryArn})
-	})
+	out, err := api.ListTagsForResource(ctx, &ecr.ListTagsForResourceInput{ResourceArn: repo.RepositoryArn})
 	if err != nil {
 		return "", err
 	}

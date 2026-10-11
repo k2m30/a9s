@@ -150,12 +150,8 @@ func enrichEFSPolicies(
 	failures *[]Failure,
 	mu *sync.Mutex,
 ) {
-	policyOut, policyErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeFileSystemPolicyOutput, error) {
-		return clients.EFS.DescribeFileSystemPolicy(ctx, &efs.DescribeFileSystemPolicyInput{FileSystemId: aws.String(fsID)})
-	})
-	backupOut, backupErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeBackupPolicyOutput, error) {
-		return clients.EFS.DescribeBackupPolicy(ctx, &efs.DescribeBackupPolicyInput{FileSystemId: aws.String(fsID)})
-	})
+	policyOut, policyErr := clients.EFS.DescribeFileSystemPolicy(ctx, &efs.DescribeFileSystemPolicyInput{FileSystemId: aws.String(fsID)})
+	backupOut, backupErr := clients.EFS.DescribeBackupPolicy(ctx, &efs.DescribeBackupPolicyInput{FileSystemId: aws.String(fsID)})
 
 	mu.Lock()
 	defer mu.Unlock()
