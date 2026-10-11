@@ -53,7 +53,7 @@ func TestT569Dev_EveryResourceIdentityCarriesItsRegion(t *testing.T) {
 	fset, files := t569ParseProd(t, "core", "internal", "cmd")
 	identity := map[string]bool{}
 	for path, f := range files {
-		switch filepath.Dir(path) {
+		switch filepath.ToSlash(filepath.Dir(path)) {
 		case "core/runtime", "core/runtime/messages", "core/app":
 		default:
 			continue
@@ -190,7 +190,7 @@ func t569DevAWSFuncs(t *testing.T) (map[string]*ast.FuncDecl, map[string]string)
 	_, files := t569ParseProd(t, "core/aws")
 	funcs, fileOf := map[string]*ast.FuncDecl{}, map[string]string{}
 	for path, f := range files {
-		if filepath.Dir(path) != "core/aws" {
+		if filepath.ToSlash(filepath.Dir(path)) != "core/aws" {
 			continue
 		}
 		for _, decl := range f.Decls {
