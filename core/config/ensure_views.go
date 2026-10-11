@@ -182,6 +182,9 @@ var viewColumnChanges = []viewColumnChange{
 	// key move carries no key beside the path.
 	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Width: 20}},
 	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Key: "attached_to", Width: 20}},
+	{Version: 11, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	{Version: 11, View: "ecr", Was: ListColumn{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6}},
+	{Version: 11, View: "ecr", Was: ListColumn{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Key: "scan_on_push", Width: 6}},
 }
 
 // keyMoveVersion is the stamp at which every built-in column took the key its

@@ -41,13 +41,17 @@ const (
 	// eks.go's "general-pool" nodegroup (Nodegroup.LaunchTemplate.Id) and the
 	// EC2 fake's ImageId resolution for that nodegroup.
 	EKSNodeLTID = "lt-0eks111111111111a"
+	// LTAMIRequiresIMDSv2 sets no metadata options and launches from an AMI
+	// registered with ImdsSupport v2.0, which makes IMDSv2 the default. It
+	// must carry NO IMDSv1 finding.
+	LTAMIRequiresIMDSv2 = EKSNodeLTID
 	// SSMAmiLTID raises no pivot and no finding: ImageId is a
 	// resolve:ssm: reference, not an ami- id.
 	SSMAmiLTID = "lt-0ssmami11111111a"
 	// WarnLTIMDSv1ID sets HttpTokens=optional explicitly.
 	WarnLTIMDSv1ID = "lt-0warnimdsv11111a"
-	// WarnLTIMDSv1DefaultID leaves MetadataOptions nil entirely — the
-	// unset-defaults-to-optional trap (docs/resources/lt.md).
+	// WarnLTIMDSv1DefaultID leaves MetadataOptions nil entirely on an AMI
+	// with no ImdsSupport, so IMDSv1 stays allowed (docs/resources/lt.md).
 	WarnLTIMDSv1DefaultID = "lt-0warnimdsvdef111a"
 	// WarnLTUnencryptedID sets one BlockDeviceMappings[].Ebs.Encrypted=false explicitly.
 	WarnLTUnencryptedID = "lt-0warnunencrypt1a"
@@ -199,7 +203,8 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 		// eks-node-lt: NetworkInterfaces[] (Groups ∪ SubnetId) instead of the
 		// top-level SecurityGroupIds/subnet fields — mutually exclusive by API
 		// design, so this template exercises the NI union. ImageId matches the
-		// EC2 fake response for this exact LT id.
+		// EC2 fake response for this exact LT id. No metadata options: the
+		// AMI's ImdsSupport v2.0 makes IMDSv2 the default (LTAMIRequiresIMDSv2).
 		EKSNodeLTID: version(EKSNodeLTID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:      aws.String("ami-0eks111111111111a"),
 			InstanceType: ec2types.InstanceTypeM5Large,
@@ -210,7 +215,6 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 					SubnetId:    aws.String(fixtProdPublicSubnetA),
 				},
 			},
-			MetadataOptions: ltHealthyMetadataOptions(),
 		}, "2025-03-05T12:00:00Z"),
 
 		// ssm-ami-lt: healthy; ImageId is a resolve:ssm: reference, a display
@@ -234,8 +238,8 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 			},
 		}, "2025-05-01T08:00:00Z"),
 
-		// warn-lt-imdsv1-def: MetadataOptions entirely nil — unset defaults to
-		// optional (SDK-confirmed); the same finding fires on absence alone.
+		// warn-lt-imdsv1-def: MetadataOptions entirely nil on an AMI with no
+		// ImdsSupport, whose default leaves IMDSv1 allowed.
 		WarnLTIMDSv1DefaultID: version(WarnLTIMDSv1DefaultID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:             aws.String(fixtProdAMIID1),
 			InstanceType:        ec2types.InstanceTypeT3Medium,
@@ -290,5 +294,5 @@ func init() {
 	// dim: colorLT (core/aws/catalog_compute.go) is colorFromAnyFinding-only
 	// and no registered lt.* FindingDef is SevDim; docs/resources/lt.md
 	// documents no Dim-producing signal.
-	Register(Pin{ShortName: "lt", Rows: 11, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "lt", Rows: 11, Issues: 2, CoverageGaps: []string{"dim"}})
 }

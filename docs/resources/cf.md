@@ -103,10 +103,10 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config.
+- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config, and no standard logging (v2) delivery for the distribution: no CloudWatch Logs delivery source naming the distribution ARN in `resourceArns` has a delivery attached. A delivery source with no delivery sends nothing. A failed or capped v2 read leaves a distribution with legacy logging off not inspected, never "access logging off".
   - **State bucket**: Warning.
-  - **API call**: `GetDistributionConfig` — one call per distribution.
-  - **Cost shape**: per-resource.
+  - **API call**: `GetDistributionConfig` — one call per distribution; `logs:DescribeDeliveries` and `logs:DescribeDeliverySources` in `us-east-1`, where CloudFront keeps standard logging (v2), once per enrichment and only when a distribution has legacy logging off.
+  - **Cost shape**: per-resource, plus one account-wide read.
 
 - **Signal**: an S3 origin naming a bucket absent from the account.
   - **State bucket**: Broken.
@@ -149,7 +149,7 @@ One row per signal from §3:
 | `Enabled == false` | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
 | Weak TLS policy on aliased distribution | 2 | Warning | `~` | S2, S3, S4, S5 | `minimum TLS below 1.2` |
 | a cache behaviour (default or ordered) allows plain HTTP / origin `http-only`, S3 website endpoints excluded (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
-| `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `access logging off` |
+| `LoggingConfig.Enabled == false` and no standard logging (v2) delivery | 2 | Warning | `~` | S2, S3, S4, S5 | `access logging off` |
 | an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `S3 origin bucket does not exist` |
 | `DefaultRootObject` empty | 2 | Warning | `~` | S2, S3, S4, S5 | `no default root object` |
 | an S3 origin with neither an origin access control nor a legacy origin access identity | 2 | Warning | `~` | S2, S3, S4, S5 | `S3 origin without origin access control` |

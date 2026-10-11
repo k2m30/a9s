@@ -153,7 +153,7 @@ func pw1EnrichASG(t *testing.T, fake *pw1ASGEnrichFake, groups ...asgtypes.AutoS
 	t.Helper()
 	rs := pw1FetchASGs(t, groups...)
 	res, err := awsclient.EnrichASGScalingActivities(context.Background(),
-		&awsclient.ServiceClients{AutoScaling: fake}, rs, nil)
+		&awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}, rs, nil)
 	if err != nil && fake.lcErr == nil && len(fake.actErr) == 0 {
 		t.Fatalf("EnrichASGScalingActivities: %v", err)
 	}
@@ -280,10 +280,10 @@ func TestASG_LaunchConfigIMDSv1_Optional(t *testing.T) {
 }
 
 // TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset pins the one asg rule
-// where an absent block does trigger: a launch configuration with
-// no MetadataOptions runs with tokens optional, so the machines it launches
-// really do accept IMDSv1. The row says "unset" rather than "optional" so the
-// operator knows nothing was configured.
+// where an absent block does trigger: a launch configuration with no
+// MetadataOptions takes its AMI's default, and on an AMI with no ImdsSupport
+// the machines it launches really do accept IMDSv1. The row says "unset"
+// rather than "optional" so the operator knows nothing was configured.
 func TestASG_LaunchConfigIMDSv1_NilMetadataOptionsIsUnset(t *testing.T) {
 	const lcName = "acme-web-lc-unset"
 	lc := pw1LaunchConfig(lcName)
@@ -487,7 +487,7 @@ func TestASG_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
 	}
 
 	res, eerr := awsclient.EnrichASGScalingActivities(context.Background(),
-		&awsclient.ServiceClients{AutoScaling: fakes.NewASG()}, out.Resources, nil)
+		&awsclient.ServiceClients{AutoScaling: fakes.NewASG(), EC2: fakes.NewEC2()}, out.Resources, nil)
 	if eerr != nil {
 		t.Fatalf("EnrichASGScalingActivities(demo): %v", eerr)
 	}

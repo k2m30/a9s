@@ -3857,6 +3857,7 @@ func buildImages() []ec2types.Image {
 		{
 			ImageId: aws.String("ami-0eks111111111111a"), Name: aws.String("acme-eks-worker-al2-1.29"),
 			State: ec2types.ImageStateAvailable, Architecture: ec2types.ArchitectureValuesX8664,
+			ImdsSupport:     ec2types.ImdsSupportValuesV20,
 			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
 			RootDeviceName: aws.String("/dev/xvda"), Hypervisor: ec2types.HypervisorTypeXen,
 			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,

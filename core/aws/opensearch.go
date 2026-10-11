@@ -62,7 +62,7 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if openSearchUpdateForcedSoon(d, now) {
 		findings = append(findings, wave1Finding(opensearchCodeUpdateForced))
 	}
-	if d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled {
+	if openSearchEncryptionAtRestOff(d) {
 		findings = append(findings, wave1Finding(opensearchCodeEncryptionOff))
 	}
 	// Reachable outside a VPC only counts when the access policy also lets
@@ -71,13 +71,30 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if d.VPCOptions == nil && openSearchPolicyIsPublic(d) {
 		findings = append(findings, wave1Finding(opensearchCodePublic))
 	}
-	if d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS) {
+	if openSearchHTTPSNotEnforced(d) {
 		findings = append(findings, wave1Finding(opensearchCodeHTTPSNotForced))
 	}
-	if d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled) {
+	if openSearchNodeToNodeOff(d) {
 		findings = append(findings, wave1Finding(opensearchCodeN2NOff))
 	}
 	return findings
+}
+
+// openSearchEncryptionAtRestOff, openSearchHTTPSNotEnforced and
+// openSearchNodeToNodeOff are the one reading of each setting: the findings
+// and the Fields the list and the Wave 2 enricher show both come from here.
+// Encryption at rest counts as off only when AWS states it is; HTTPS and
+// node-to-node encryption count as off unless AWS states they are on.
+func openSearchEncryptionAtRestOff(d opensearchtypes.DomainStatus) bool {
+	return d.EncryptionAtRestOptions != nil && d.EncryptionAtRestOptions.Enabled != nil && !*d.EncryptionAtRestOptions.Enabled
+}
+
+func openSearchHTTPSNotEnforced(d opensearchtypes.DomainStatus) bool {
+	return d.DomainEndpointOptions == nil || !aws.ToBool(d.DomainEndpointOptions.EnforceHTTPS)
+}
+
+func openSearchNodeToNodeOff(d opensearchtypes.DomainStatus) bool {
+	return d.NodeToNodeEncryptionOptions == nil || !aws.ToBool(d.NodeToNodeEncryptionOptions.Enabled)
 }
 
 // openSearchPolicyIsPublic reports whether the domain's access policy lets any
@@ -184,12 +201,7 @@ func FetchOpenSearchDomainsAt(
 			newVersion = aws.ToString(sso.NewVersion)
 		}
 
-		encEnabled := "true"
-		if domain.EncryptionAtRestOptions != nil &&
-			domain.EncryptionAtRestOptions.Enabled != nil &&
-			!*domain.EncryptionAtRestOptions.Enabled {
-			encEnabled = "false"
-		}
+		encEnabled := strconv.FormatBool(!openSearchEncryptionAtRestOff(domain))
 
 		// VPC placement and the access policy verdict are read here, at
 		// the one point that holds the DomainStatus, and handed to the
@@ -197,14 +209,8 @@ func FetchOpenSearchDomainsAt(
 		// its own and must not re-derive them from RawStruct.
 		vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
 		accessPolicyPublic := strconv.FormatBool(openSearchPolicyIsPublic(domain))
-		enforceHTTPS := "true"
-		if domain.DomainEndpointOptions == nil || !aws.ToBool(domain.DomainEndpointOptions.EnforceHTTPS) {
-			enforceHTTPS = "false"
-		}
-		nodeToNode := "true"
-		if domain.NodeToNodeEncryptionOptions == nil || !aws.ToBool(domain.NodeToNodeEncryptionOptions.Enabled) {
-			nodeToNode = "false"
-		}
+		enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
+		nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
 
 		findings := computeOpenSearchFindings(domain, now)
 		statusPhrase := domainpkg.StatusPhrase(findings)

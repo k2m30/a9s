@@ -195,7 +195,7 @@ Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type regi
 | `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shard <shard id>: <status>` |
 | `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `multi-AZ without auto-failover` |
 | `StorageEncryptionType == none`, else `AtRestEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption at rest off` |
-| `TransitEncryptionEnabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption in transit off` |
+| `TransitEncryptionEnabled` not true, or `TransitEncryptionMode == preferred` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption in transit not enforced` |
 | `AuthTokenEnabled` not true while in-transit encryption is on and no user group is attached | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no authentication token` |
 | `SnapshotRetentionLimit` 0 or absent | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automatic backups off` |
 
@@ -273,7 +273,7 @@ redis — DATABASES & STORAGE. Status key: `status` — the key the status cell 
 | redis.warn.shard\_issue | shard <shard id>: <status> | warn | wave1 | One shard of this group is not in a normal state, so the keys that hash to it may be unavailable or served without a replica. Check that shard's nodes and its failover history before treating the whole group as healthy. |
 | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | The group has replicas in more than one Availability Zone but will not promote them by itself, so losing the primary means downtime until somebody fails it over by hand. Turn automatic failover on — the replicas are already being paid for. |
 | redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate. |
-| redis.encryption-in-transit-off | encryption in transit off | warn | wave1 | Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group. |
+| redis.encryption-in-transit-off | encryption in transit not enforced | warn | wave1 | Clients can reach this group in cleartext — in-transit encryption is off, or its mode is preferred, which accepts unencrypted connections — so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group and set its mode to required. |
 | redis.no-auth | no authentication token | broken | wave1 | The group accepts any client that can reach it — encryption in transit is on but no authentication token is required. Set one, so a network-level reachability mistake is not immediately a data breach. |
 | redis.no-backup | automatic backups off | warn | wave1 | Automatic backups are off, so a failed replication group takes its data with it. Set a snapshot retention limit of at least one day. |
 <!-- END GENERATED: findings -->

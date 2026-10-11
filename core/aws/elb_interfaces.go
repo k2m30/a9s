@@ -35,6 +35,15 @@ type ELBv2DescribeListenerCertificatesAPI interface {
 	DescribeListenerCertificates(ctx context.Context, params *elbv2.DescribeListenerCertificatesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeListenerCertificatesOutput, error)
 }
 
+// ELBv2DescribeSSLPoliciesAPI defines the interface for the ELBv2
+// DescribeSSLPolicies operation, which states the protocols each security
+// policy negotiates. Standalone rather than part of the aggregate: the elb
+// enricher type-asserts for it, and a partial client that lacks it reads no
+// policy instead of panicking on an inherited nil method.
+type ELBv2DescribeSSLPoliciesAPI interface {
+	DescribeSSLPolicies(ctx context.Context, params *elbv2.DescribeSSLPoliciesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeSSLPoliciesOutput, error)
+}
+
 // ELBv2DescribeRulesAPI defines the interface for the ELBv2 DescribeRules operation.
 type ELBv2DescribeRulesAPI interface {
 	DescribeRules(ctx context.Context, params *elbv2.DescribeRulesInput, optFns ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error)

@@ -11,7 +11,8 @@ const (
 	// CodeGlueNoSecurityConfiguration — Job.SecurityConfiguration is empty.
 	// One finding covers the S3, CloudWatch-logs and job-bookmark encryption
 	// settings, because all three live on the security configuration a job
-	// either names or does not.
+	// either names or does not. What a named configuration sets is judged in
+	// Wave 2 (glueCodeSecurityConfigEncryptionOff).
 	CodeGlueNoSecurityConfiguration domain.FindingCode = "glue.no-security-configuration"
 
 	// CodeGlueContinuousLoggingOff — the job's default arguments do not turn

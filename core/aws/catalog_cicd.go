@@ -251,7 +251,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "state", Title: "Status", Width: 12},
 			{Key: "uri", Title: "URI", Path: "RepositoryUri", Width: 60},
 			{Key: "tag_mutability", Title: "Tag Mutability", Path: "ImageTagMutability", Width: 16},
-			{Key: "scan_on_push", Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6},
+			{Key: "scanning", Title: "Scan", Width: 12},
 			{Key: "critical_vulns", Title: "Critical", Width: 8},
 			{Key: "high_vulns", Title: "High", Width: 6},
 			{Key: "images_scanned", Title: "Scanned", Width: 8},
@@ -272,7 +272,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		FieldKeys: []string{
 			"repository_name", "arn", "uri", "tag_mutability", "scan_on_push", "created_at",
 		},
-		IssueEnricherFieldKeys: []string{"critical_vulns", "high_vulns", "images_scanned"},
+		IssueEnricherFieldKeys: []string{"critical_vulns", "high_vulns", "images_scanned", "scanning"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true, Truncated: true, Mirror: true},
@@ -292,7 +292,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: ecrCodeHighVulnerabilities, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave2", Detail: "Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment."},
 			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2", Detail: "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."},
-			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1", Detail: "This repository does not scan an image as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Check the registry's scanning configuration first, because enhanced scanning is set there and covers repositories continuously; if the registry uses basic scanning, turn scan on push on for this repository."},
+			{Code: CodeECRScanOnPushOff, Phrase: "pushed images not scanned", Severity: domain.SevWarn, Source: "wave2", Detail: "No registry scanning rule matches this repository; once the registry has rules, a repository no rule matches is not scanned on push whatever its own setting says, and without rules its own scan on push is off. An image is not scanned as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Add a scan-on-push or continuous rule whose filter matches this repository to the registry's scanning configuration."},
 			{Code: CodeECRMutableTags, Phrase: "tags are mutable", Severity: domain.SevWarn, Source: "wave1", Detail: "An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from."},
 		},
 	},

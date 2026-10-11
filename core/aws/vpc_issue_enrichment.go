@@ -4,8 +4,10 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,10 +24,7 @@ const (
 )
 
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (capped at EnrichmentCap) and
-// raises a finding when no ACTIVE flow log exists.
-//
-// Findings:
-//   - No ACTIVE flow log for the VPC → "~" finding "no active VPC flow logs"
+// raises a finding when the VPC's traffic is not all logged (vpcFlowLogCoverage).
 //
 // Skip when clients.EC2 == nil.
 func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -82,21 +81,15 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			markUninspected(&result, r.ID, CheckCap)
 			return
 		}
-		hasActive := false
-		for _, fl := range allFlowLogs {
-			if fl.FlowLogStatus != nil && *fl.FlowLogStatus == "ACTIVE" {
-				hasActive = true
-				break
-			}
-		}
-		if !hasActive && subnetsUnread {
+		covered, rows := vpcFlowLogCoverage(vpcID, splitCSV(r.Fields["subnet_ids"]), allFlowLogs)
+		if !covered && subnetsUnread {
 			markUninspected(&result, r.ID, checkListIncomplete("subnet"))
 			return
 		}
 		flowLogsVal := "yes"
-		if !hasActive {
+		if !covered {
 			flowLogsVal = "no"
-			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, nil)
+			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, rows)
 		}
 		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,
@@ -104,4 +97,41 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	})
 	MarkInformationalOnly(&result)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeFlowLogs", failures, n))
+}
+
+// vpcFlowLogCoverage reports whether the VPC's traffic is logged: by a
+// delivering flow log on the VPC itself, or by one on every subnet. A flow
+// log delivers when it is ACTIVE and its DeliverLogsStatus is not FAILED; an
+// ACTIVE one whose delivery fails writes nothing. When not covered, rows name
+// what is missing: the subnets without one, and each failing delivery's
+// error.
+func vpcFlowLogCoverage(vpcID string, subnetIDs []string, flowLogs []ec2types.FlowLog) (bool, []domain.DetailRow) {
+	delivering := map[string]bool{}
+	var rows []domain.DetailRow
+	for _, fl := range flowLogs {
+		if aws.ToString(fl.FlowLogStatus) != "ACTIVE" {
+			continue
+		}
+		if aws.ToString(fl.DeliverLogsStatus) == "FAILED" {
+			rows = append(rows, domain.DetailRow{Label: "Delivery failing", Value: aws.ToString(fl.ResourceId) + ": " + cmp.Or(aws.ToString(fl.DeliverLogsErrorMessage), "no error message"), Tier: tierOf(vpcCodeNoFlowLogs)})
+			continue
+		}
+		delivering[aws.ToString(fl.ResourceId)] = true
+	}
+	if delivering[vpcID] {
+		return true, nil
+	}
+	logged := 0
+	for _, id := range subnetIDs {
+		if delivering[id] {
+			logged++
+		}
+	}
+	if len(subnetIDs) > 0 && logged == len(subnetIDs) {
+		return true, nil
+	}
+	if logged > 0 {
+		rows = append(rows, domain.DetailRow{Label: "Subnets logged", Value: fmt.Sprintf("%d of %d", logged, len(subnetIDs)), Tier: tierOf(vpcCodeNoFlowLogs)})
+	}
+	return false, rows
 }

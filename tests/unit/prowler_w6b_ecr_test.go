@@ -3,10 +3,10 @@ package unit
 // The four ecr posture signals, split by what DescribeRepositories already
 // answers.
 //
-// scan-on-push and tag mutability are on the repository record the fetcher
-// holds, so they are wave 1. The repository policy and the lifecycle policy
-// each need their own call, so they belong to EnrichECRRepository — the type's
-// single enricher.
+// Tag mutability is on the repository record the fetcher holds, so it is
+// wave 1. Scan on push also depends on the registry scanning configuration,
+// and the repository policy and the lifecycle policy each need their own call,
+// so they belong to EnrichECRRepository — the type's single enricher.
 
 import (
 	"context"
@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	w6bECRPhraseScanOnPushOff = "scan on push off"
+	w6bECRPhraseScanOnPushOff = "pushed images not scanned"
 	w6bECRPhraseMutableTags   = "tags are mutable"
 	w6bECRPhrasePublicPolicy  = "repository policy open to anyone"
 	w6bECRPhraseNoLifecycle   = "no lifecycle policy"
@@ -70,18 +70,31 @@ func w6bFetchECR(t *testing.T, repos ...ecrtypes.Repository) []resource.Resource
 	return out.Resources
 }
 
+// w6bECREnrichFetched runs EnrichECRRepository over rows the fetcher built,
+// so the enricher sees each repository's own scanning configuration. The fake
+// answers no registry scanning rule, so the repository's setting decides.
+func w6bECREnrichFetched(t *testing.T, rs []resource.Resource) awsclient.IssueEnricherResult {
+	t.Helper()
+	res, err := awsclient.EnrichECRRepository(context.Background(), &awsclient.ServiceClients{ECR: &w6bECRFake{}}, rs, nil)
+	if err != nil {
+		t.Fatalf("EnrichECRRepository: %v", err)
+	}
+	return res
+}
+
 // Without scan on push, a vulnerable image is only discovered when someone
-// asks — and nobody asks.
+// asks — and nobody asks. Whether a registry rule scans the repository anyway
+// is the enricher's to read, so the fetcher raises nothing.
 func TestW6BECR_ScanOnPushOff_Disabled(t *testing.T) {
 	const name = "acme/base-images"
 	repo := w6bECRRepo(name)
 	repo.ImageScanningConfiguration = &ecrtypes.ImageScanningConfiguration{ScanOnPush: false}
 	rs := w6bFetchECR(t, repo)
-	r := pw1ResourceByID(t, rs, name)
+	pw1RequireNoFinding(t, pw1ResourceByID(t, rs, name).Findings, w6bECRCodeScanOnPushOff)
 
-	pw1RequireFinding(t, r.Findings, w6bECRCodeScanOnPushOff,
-		w6bECRPhraseScanOnPushOff, domain.SevWarn, "wave1")
-	w6bRequireNoRows(t, w6bWave1Rows(r, w6bECRCodeScanOnPushOff))
+	res := w6bECREnrichFetched(t, rs)
+	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeScanOnPushOff), w6bECRPhraseScanOnPushOff, domain.SevWarn, w6bECRSource)
+	w6bRequireNoRows(t, res.AttentionDetails[name][w6bECRCodeScanOnPushOff].Rows)
 }
 
 // An absent scanning configuration is the same exposure as an explicit false:
@@ -90,9 +103,8 @@ func TestW6BECR_ScanOnPushOff_ConfigurationAbsent(t *testing.T) {
 	const name = "acme/legacy-images"
 	repo := w6bECRRepo(name)
 	repo.ImageScanningConfiguration = nil
-	rs := w6bFetchECR(t, repo)
-	pw1RequireFinding(t, pw1ResourceByID(t, rs, name).Findings,
-		w6bECRCodeScanOnPushOff, w6bECRPhraseScanOnPushOff, domain.SevWarn, "wave1")
+	res := w6bECREnrichFetched(t, w6bFetchECR(t, repo))
+	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeScanOnPushOff), w6bECRPhraseScanOnPushOff, domain.SevWarn, w6bECRSource)
 }
 
 func TestW6BECR_ScanOnPushOn_IsHealthy(t *testing.T) {
@@ -393,11 +405,14 @@ func TestW6BECR_AllFourConditions_ProduceFourFindings(t *testing.T) {
 
 	rs := w6bFetchECR(t, repo)
 	r := pw1ResourceByID(t, rs, name)
-	pw1RequireFinding(t, r.Findings, w6bECRCodeScanOnPushOff, w6bECRPhraseScanOnPushOff, domain.SevWarn, "wave1")
 	pw1RequireFinding(t, r.Findings, w6bECRCodeMutableTags, w6bECRPhraseMutableTags, domain.SevWarn, "wave1")
 
 	fake := &w6bECRFake{policies: map[string]string{name: w6bECRPublicPolicyDoc}}
-	res := w6bECREnrichOK(t, fake, name)
+	res, err := awsclient.EnrichECRRepository(context.Background(), &awsclient.ServiceClients{ECR: fake}, rs, nil)
+	if err != nil {
+		t.Fatalf("EnrichECRRepository: %v", err)
+	}
+	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeScanOnPushOff), w6bECRPhraseScanOnPushOff, domain.SevWarn, w6bECRSource)
 	w2AssertFinding(t, res.Findings[name], string(w6bECRCodePublicPolicy), w6bECRPhrasePublicPolicy, domain.SevBroken, w6bECRSource)
 	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeNoLifecycle), w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
 }

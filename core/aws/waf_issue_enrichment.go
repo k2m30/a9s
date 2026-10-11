@@ -25,10 +25,43 @@ const (
 	wafCodeOrphan    domain.FindingCode = "waf.orphan"
 )
 
+// wafScopeErr is a GetLoggingConfiguration read that failed for one log scope
+// with anything but "not found".
+type wafScopeErr struct {
+	scope wafv2types.LogScope
+	err   error
+}
+
+// wafLoggingConfigurations is the one reader of a web ACL's logging
+// configurations. WAF keeps one per log scope — the customer's own, and the
+// ones Security Lake and a CloudWatch telemetry rule manage — and
+// GetLoggingConfiguration answers for one scope at a time
+// (https://docs.aws.amazon.com/waf/latest/APIReference/API_GetLoggingConfiguration.html),
+// so every scope the SDK knows is asked. A scope answering "not found" has
+// none; any other failure is returned with its scope.
+func wafLoggingConfigurations(ctx context.Context, api WAFv2API, arn string) ([]wafv2types.LoggingConfiguration, []wafScopeErr) {
+	var configs []wafv2types.LoggingConfiguration
+	var errs []wafScopeErr
+	for _, scope := range wafv2types.LogScope("").Values() {
+		out, err := api.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{ResourceArn: aws.String(arn), LogScope: scope})
+		if _, none := errors.AsType[*wafv2types.WAFNonexistentItemException](err); none {
+			continue
+		}
+		if err != nil {
+			errs = append(errs, wafScopeErr{scope, err})
+			continue
+		}
+		if out.LoggingConfiguration != nil {
+			configs = append(configs, *out.LoggingConfiguration)
+		}
+	}
+	return configs, errs
+}
+
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
 // (cap EnrichmentCap) and raises findings for:
-//   - GetLoggingConfiguration returns WAFNonexistentItemException → "~" finding
-//     "no logging configuration"
+//   - GetLoggingConfiguration returns WAFNonexistentItemException under every
+//     log scope → "~" finding "no logging configuration"
 //   - ListResourcesForWebACL returns empty ResourceArns → "~" finding
 //     "not associated with any resource" (waf.orphan — a separate condition
 //     from the logging one, and separately worded)
@@ -68,19 +101,20 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		scope := cmp.Or(r.Fields["scope"], string(wafv2types.ScopeRegional))
 		api := clients.wafIn(scope)
 
-		_, err := api.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
-			ResourceArn: aws.String(arn),
-		})
-		if err != nil {
-			if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-				loggingRows = append(loggingRows, domain.DetailRow{
-					Label: "Logging",
-					Value: "off",
-					Tier:  "~",
-				})
-			} else {
-				readErrs = append(readErrs, err)
-			}
+		// One configuration under any scope is logging, whatever the other
+		// scopes answered. No configuration while a scope failed is unknown,
+		// not off.
+		configs, scopeErrs := wafLoggingConfigurations(ctx, api, arn)
+		switch {
+		case len(configs) > 0:
+		case len(scopeErrs) > 0:
+			readErrs = append(readErrs, scopeErrs[0].err)
+		default:
+			loggingRows = append(loggingRows, domain.DetailRow{
+				Label: "Logging",
+				Value: "off",
+				Tier:  "~",
+			})
 		}
 
 		associations, err := wafAssociations(ctx, clients, scope, arn)

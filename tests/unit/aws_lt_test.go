@@ -4,10 +4,11 @@ package unit
 // Templates (docs/resources/lt.md).
 //
 // lt is an in-fetcher N+1 (DescribeLaunchTemplates + DescribeLaunchTemplate-
-// Versions per template, Versions=["$Default"]): imdsv1, unencrypted, and
-// details-denied are fetcher-written (Source "wave1"). The deprecated-ami
-// signal alone lives in the cache-scan enricher EnrichLTDeprecatedAMI (zero
-// SDK calls, scans the loaded "ami" ResourceCache). RawStruct is
+// Versions per template, Versions=["$Default"]): details-denied is
+// fetcher-written (Source "wave1"). The imdsv1 signal, which takes an unset
+// HttpTokens from the AMI's ImdsSupport, the unencrypted signal, which needs
+// the Region's EBS encryption-by-default setting, and the deprecated-ami
+// signal live in the enricher EnrichLTDeprecatedAMI. RawStruct is
 // *awsclient.LTRaw{Template, DefaultVersion} — the same type on healthy and
 // degraded (details-denied) rows, with DefaultVersion zero-valued on the latter.
 
@@ -154,14 +155,27 @@ func TestFetchLaunchTemplatesPage_ResourceIDAndNameMapping(t *testing.T) {
 	}
 }
 
+// enrichLTDemoPage runs the lt Wave 2 enricher over the demo page against the
+// demo EC2 fake, which answers DescribeImages for the templates' AMIs.
+func enrichLTDemoPage(t *testing.T, result resource.FetchResult) awsclient.IssueEnricherResult {
+	t.Helper()
+	res, err := awsclient.EnrichLTDeprecatedAMI(context.Background(), &awsclient.ServiceClients{EC2: fakes.NewEC2()}, result.Resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichLTDeprecatedAMI: %v", err)
+	}
+	return res
+}
+
+// An explicit HttpTokens=optional allows IMDSv1 whatever the AMI says; the
+// Wave 2 enricher, which owns the IMDSv1 signal, raises it.
 func TestFetchLaunchTemplatesPage_IMDSv1Explicit(t *testing.T) {
 	result := fetchLTDemoPage(t)
-	r := mustFindLTResource(t, result.Resources, fixtures.WarnLTIMDSv1ID)
+	findings := enrichLTDemoPage(t, result).Findings[fixtures.WarnLTIMDSv1ID]
 
-	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: expected exactly 1, got %d: %+v", len(r.Findings), r.Findings)
+	if len(findings) != 1 {
+		t.Fatalf("Findings: expected exactly 1, got %d: %+v", len(findings), findings)
 	}
-	f := r.Findings[0]
+	f := findings[0]
 	if f.Code != "lt.warn.imdsv1" {
 		t.Errorf("Code = %q, want %q", f.Code, "lt.warn.imdsv1")
 	}
@@ -177,17 +191,18 @@ func TestFetchLaunchTemplatesPage_IMDSv1Explicit(t *testing.T) {
 	}
 }
 
-// MetadataOptions nil defaults to HttpTokens=optional, so it fires the same
-// finding as an explicit optional.
+// MetadataOptions nil takes the AMI's default, and an AMI with no
+// ImdsSupport leaves IMDSv1 allowed, so it fires the same finding as an
+// explicit optional.
 
 func TestFetchLaunchTemplatesPage_IMDSv1DefaultTrapWitness(t *testing.T) {
 	result := fetchLTDemoPage(t)
-	r := mustFindLTResource(t, result.Resources, fixtures.WarnLTIMDSv1DefaultID)
+	findings := enrichLTDemoPage(t, result).Findings[fixtures.WarnLTIMDSv1DefaultID]
 
-	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: expected exactly 1 (MetadataOptions nil == unset == optional), got %d: %+v", len(r.Findings), r.Findings)
+	if len(findings) != 1 {
+		t.Fatalf("Findings: expected exactly 1 (MetadataOptions nil on an AMI with no ImdsSupport), got %d: %+v", len(findings), findings)
 	}
-	f := r.Findings[0]
+	f := findings[0]
 	if f.Code != "lt.warn.imdsv1" {
 		t.Errorf("Code = %q, want %q (nil MetadataOptions must fire the SAME imdsv1 finding as explicit optional)", f.Code, "lt.warn.imdsv1")
 	}
@@ -199,14 +214,18 @@ func TestFetchLaunchTemplatesPage_IMDSv1DefaultTrapWitness(t *testing.T) {
 	}
 }
 
+// An explicit Encrypted=false gives an unencrypted volume only while the
+// Region does not encrypt new volumes by default, so the verdict needs
+// GetEbsEncryptionByDefault and arrives with Wave 2; the demo Region has it
+// off.
 func TestFetchLaunchTemplatesPage_UnencryptedExplicit(t *testing.T) {
 	result := fetchLTDemoPage(t)
-	r := mustFindLTResource(t, result.Resources, fixtures.WarnLTUnencryptedID)
+	findings := enrichLTDemoPage(t, result).Findings[fixtures.WarnLTUnencryptedID]
 
-	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: expected exactly 1, got %d: %+v", len(r.Findings), r.Findings)
+	if len(findings) != 1 {
+		t.Fatalf("Findings: expected exactly 1, got %d: %+v", len(findings), findings)
 	}
-	f := r.Findings[0]
+	f := findings[0]
 	if f.Code != "lt.warn.unencrypted" {
 		t.Errorf("Code = %q, want %q", f.Code, "lt.warn.unencrypted")
 	}
@@ -216,7 +235,7 @@ func TestFetchLaunchTemplatesPage_UnencryptedExplicit(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "A block device in this template sets encryption off explicitly, so every instance launched from it gets an unencrypted volume however the account default is configured. Remove the override, or set it to encrypted, and publish a new template version."
+	const wantDetail = "A block device in this template sets encryption off explicitly and the Region does not encrypt new EBS volumes by default, so every instance launched from it gets an unencrypted volume. Remove the override or set it to encrypted and publish a new template version, or turn on EBS encryption by default for the Region."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -324,23 +343,20 @@ func TestFetchLaunchTemplatesPage_IMDSv1_EndpointDisabled_NoFinding(t *testing.T
 	}
 }
 
-// IMDSv1 and unencrypted on one template produce ordered Findings and
-// "IMDSv1 allowed (+1)".
+// IMDSv1 and unencrypted on one template: the fetcher writes neither, and the
+// Wave 2 enricher raises both on the same row.
 
 func TestFetchLaunchTemplatesPage_MultiStackOrdered(t *testing.T) {
 	result := fetchLTDemoPage(t)
 	r := mustFindLTResource(t, result.Resources, fixtures.WarnLTMultiID)
-
-	got := make([]string, len(r.Findings))
-	for i, f := range r.Findings {
-		got[i] = f.Phrase
+	if len(r.Findings) != 0 {
+		t.Errorf("fetcher findings = %+v, want none: both signals need Wave 2 reads", r.Findings)
 	}
-	want := []string{"IMDSv1 allowed", "EBS encryption disabled"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("ordered Findings phrases = %v, want %v", got, want)
-	}
-	if r.Fields["status"] != "IMDSv1 allowed (+1)" {
-		t.Errorf(`Fields["status"] = %q, want %q`, r.Fields["status"], "IMDSv1 allowed (+1)")
+	findings := enrichLTDemoPage(t, result).Findings[fixtures.WarnLTMultiID]
+	for _, code := range []domain.FindingCode{"lt.warn.imdsv1", "lt.warn.unencrypted"} {
+		if !hasCode(findings, code) {
+			t.Errorf("%s: Wave 2 raised no %s: %+v", fixtures.WarnLTMultiID, code, findings)
+		}
 	}
 }
 

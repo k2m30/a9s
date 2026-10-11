@@ -110,13 +110,7 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 			snapARN = *snap.DBSnapshotArn
 		}
 
-		// encryptedStr stores the encryption state as a string field so the Color
-		// func can classify unencrypted available snapshots as ColorWarning.
-		// nil Encrypted is treated as encrypted.
-		encryptedStr := "true"
-		if snap.Encrypted != nil && !*snap.Encrypted {
-			encryptedStr = "false"
-		}
+		encryptedStr := strconv.FormatBool(!isSnapUnencrypted(snap))
 
 		findings := ComputeDBISnapStatusAndIssues(snap)
 		statusPhrase := domain.StatusPhrase(findings)

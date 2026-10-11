@@ -28,7 +28,8 @@ const (
 // surface governance and security findings.
 //
 // Findings:
-//   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false → "~",
+//   - WorkGroup.Configuration.EnforceWorkGroupConfiguration == false and
+//     EnableMinimumEncryptionConfiguration not true → "~",
 //     athenaCodeSettingsNotEnforced.
 //   - WorkGroup.Configuration.ResultConfiguration.EncryptionConfiguration == nil,
 //     on a workgroup not using Athena owned storage → "~",
@@ -75,10 +76,11 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if key == "" {
 			key = wgName
 		}
-		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
-		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
+		// EnforceWorkGroupConfiguration defaults to true; false means callers
+		// can bypass settings, unless minimum encryption pins the encryption
+		// floor every query must meet.
+		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration && !aws.ToBool(cfg.EnableMinimumEncryptionConfiguration) {
 			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced, nil)
-
 		}
 		// Results in Athena owned storage are encrypted whatever the
 		// workgroup asks for — an AWS owned key when it names none — so the

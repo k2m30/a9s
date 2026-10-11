@@ -94,7 +94,7 @@ func TestPartialFindingASG_GroupsPastTheCapAreNotInspected(t *testing.T) {
 	}
 
 	res, _ := awsclient.EnrichASGScalingActivities(context.Background(),
-		&awsclient.ServiceClients{AutoScaling: &partialASGFake{}}, rows, nil)
+		&awsclient.ServiceClients{AutoScaling: &partialASGFake{}, EC2: t581NoIMDSDefaultEC2{}}, rows, nil)
 	w2AssertEnricherShape(t, res)
 
 	w4AssertNoCode(t, res.Findings[dropped], "asg.launch-config.imdsv1")

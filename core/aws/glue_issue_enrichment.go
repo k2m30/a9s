@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,7 +20,37 @@ import (
 // glue canonical FindingCodes.
 const (
 	glueCodeLatestRunFailed domain.FindingCode = "glue.latest-run-failed"
+	// glueCodeSecurityConfigEncryptionOff — the security configuration the
+	// job names leaves S3, CloudWatch Logs or job bookmark encryption off.
+	glueCodeSecurityConfigEncryptionOff domain.FindingCode = "glue.security-configuration-encryption-off"
 )
+
+// glueSecurityConfigOffRows names each target the security configuration
+// leaves without a key the account controls: an S3 setting that is absent or
+// DISABLED, and a CloudWatch or job bookmark setting that is absent or
+// DISABLED. It returns nil when all three are on.
+func glueSecurityConfigOffRows(cfg *gluetypes.SecurityConfiguration) []domain.DetailRow {
+	var ec gluetypes.EncryptionConfiguration
+	if cfg != nil && cfg.EncryptionConfiguration != nil {
+		ec = *cfg.EncryptionConfiguration
+	}
+	tier := tierOf(glueCodeSecurityConfigEncryptionOff)
+	var rows []domain.DetailRow
+	if !slices.ContainsFunc(ec.S3Encryption, func(e gluetypes.S3Encryption) bool {
+		return e.S3EncryptionMode != "" && e.S3EncryptionMode != gluetypes.S3EncryptionModeDisabled
+	}) {
+		rows = append(rows, domain.DetailRow{Label: "S3 output", Value: "not encrypted", Tier: tier})
+	}
+	if ec.CloudWatchEncryption == nil || ec.CloudWatchEncryption.CloudWatchEncryptionMode == "" ||
+		ec.CloudWatchEncryption.CloudWatchEncryptionMode == gluetypes.CloudWatchEncryptionModeDisabled {
+		rows = append(rows, domain.DetailRow{Label: "CloudWatch logs", Value: "not encrypted", Tier: tier})
+	}
+	if ec.JobBookmarksEncryption == nil || ec.JobBookmarksEncryption.JobBookmarksEncryptionMode == "" ||
+		ec.JobBookmarksEncryption.JobBookmarksEncryptionMode == gluetypes.JobBookmarksEncryptionModeDisabled {
+		rows = append(rows, domain.DetailRow{Label: "Job bookmarks", Value: "not encrypted", Tier: tier})
+	}
+	return rows
+}
 
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
 // Returns a Finding for each job whose latest run is FAILED, ERROR, or TIMEOUT.
@@ -34,14 +65,41 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		return result, nil
 	}
 	truncated := false
+	secConfigAPI, _ := clients.Glue.(GlueGetSecurityConfigurationAPI)
+	// Many jobs name one security configuration, so each name is read once.
+	var secConfigMu sync.Mutex
+	secConfigs := map[string]func() (*gluetypes.SecurityConfiguration, error){}
+	secConfig := func(name string) (*gluetypes.SecurityConfiguration, error) {
+		secConfigMu.Lock()
+		read, ok := secConfigs[name]
+		if !ok {
+			read = sync.OnceValues(func() (*gluetypes.SecurityConfiguration, error) {
+				out, err := secConfigAPI.GetSecurityConfiguration(ctx, &glue.GetSecurityConfigurationInput{Name: aws.String(name)})
+				if err != nil {
+					return nil, err
+				}
+				if out.SecurityConfiguration == nil {
+					return nil, UnusableAnswerErr{Call: "GetSecurityConfiguration", Field: "security configuration"}
+				}
+				return out.SecurityConfiguration, nil
+			})
+			secConfigs[name] = read
+		}
+		secConfigMu.Unlock()
+		return read()
+	}
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
-	var failures []Failure
+	var failures, cfgFailures []Failure
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
 		if r.Name == "" {
 			return
+		}
+		key := r.ID
+		if key == "" {
+			key = r.Name
 		}
 		out, err := firstPage(func() (*glue.GetJobRunsOutput, error) {
 			return clients.Glue.GetJobRuns(ctx, &glue.GetJobRunsInput{
@@ -49,16 +107,28 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				MaxResults: aws.Int32(1),
 			})
 		})
+		var cfg *gluetypes.SecurityConfiguration
+		var cfgErr error
+		job, _ := assertStruct[gluetypes.Job](r.RawStruct)
+		cfgName := aws.ToString(job.SecurityConfiguration)
+		if cfgName != "" && secConfigAPI != nil {
+			cfg, cfgErr = secConfig(cfgName)
+		}
 		mu.Lock()
 		defer mu.Unlock()
+		switch {
+		case cfgName == "" || secConfigAPI == nil:
+		case cfgErr != nil:
+			MarkSkipped(&result, r.ID, &cfgFailures, cfgErr)
+		default:
+			if rows := glueSecurityConfigOffRows(cfg); len(rows) > 0 {
+				setWave2Finding(&result, key, glueCodeSecurityConfigEncryptionOff, rows)
+			}
+		}
 		if err != nil {
 			truncated = true
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
-		}
-		key := r.ID
-		if key == "" {
-			key = r.Name
 		}
 		if len(out.JobRuns) > 0 {
 			run := out.JobRuns[0]
@@ -81,5 +151,5 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		}
 	})
 	SetTruncated(&result, truncated)
-	return result, errors.Join(loopErr, AggregateFailures("GetJobRuns", failures, n))
+	return result, errors.Join(loopErr, AggregateFailures("GetJobRuns", failures, n), AggregateFailures("GetSecurityConfiguration", cfgFailures, n))
 }

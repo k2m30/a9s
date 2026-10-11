@@ -16,6 +16,11 @@ import (
 // both explicitly to the healthy value.
 const AthenaGovernanceMisconfigured = "acme-ungoverned-queries"
 
+// AthenaMinimumEncryption is the demo workgroup that lets queries override its
+// settings but sets minimum encryption, so no query can drop below the
+// encryption it configures. It must carry NO settings-not-enforced finding.
+const AthenaMinimumEncryption = "acme-etl-orders"
+
 // AthenaSparkWorkgroup is the Spark workgroup whose
 // MonitoringConfiguration.CloudWatchLoggingConfiguration writes its session
 // logs to AthenaSparkLogGroup — the one demo workgroup with a logs pivot.
@@ -181,11 +186,13 @@ var sharedAthenaFixtures = shared(func() *AthenaFixtures {
 					},
 				},
 			},
-			"acme-etl-orders": {
+			AthenaMinimumEncryption: {
 				WorkGroup: &athenatypes.WorkGroup{
-					Name:  aws.String("acme-etl-orders"),
+					Name:  aws.String(AthenaMinimumEncryption),
 					State: athenatypes.WorkGroupStateEnabled,
 					Configuration: &athenatypes.WorkGroupConfiguration{
+						EnforceWorkGroupConfiguration:        aws.Bool(false),
+						EnableMinimumEncryptionConfiguration: aws.Bool(true),
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/etl-orders-results/"),
 							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{

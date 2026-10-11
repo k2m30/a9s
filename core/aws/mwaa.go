@@ -242,7 +242,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 
 // mwaaStateFindings maps Environment.Status to its
 // state-bucket code. AVAILABLE has no entry (Healthy — no finding).
-var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table
 	mwaatypes.EnvironmentStatusCreating:         mwaaCodeCreating,
 	mwaatypes.EnvironmentStatusCreatingSnapshot: mwaaCodeCreatingSnapshot,
 	mwaatypes.EnvironmentStatusPending:          mwaaCodePending,

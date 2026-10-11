@@ -148,7 +148,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2", Detail: "The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest."},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2", Detail: "Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields."},
 			{Code: elbCodePlainHTTPListener, Phrase: "<port(s) LIST> in the clear", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener."},
-			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on <port(s) LIST>", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later."},
+			{Code: elbCodeWeakTLSPolicy, Phrase: "weak TLS policy on <port(s) LIST>", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener's security policy still negotiates TLS 1.0 or 1.1, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to a security policy whose protocols start at TLS 1.2."},
 		},
 	},
 	{
@@ -300,7 +300,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it."},
-			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No active flow log is capturing traffic for this VPC or for any of its subnets, so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3."},
+			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No delivering flow log covers this VPC — none on the VPC itself, and not one on every subnet; a flow log whose delivery fails writes nothing — so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3, and fix any failing delivery named below."},
 		},
 	},
 	{
@@ -716,6 +716,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Transfer} }),
 		Fetcher:        fetcherWithClients(FetchTransferServersPage),
+		Wave2:          IssueEnricher{Fn: EnrichTransferSecurityPolicy, Priority: 100},
 		FieldKeys: []string{
 			"server_id", "status", "domain", "endpoint_type",
 			"identity_provider_type", "user_count", "arn",
@@ -746,7 +747,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: transferCodeStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down."},
 			{Code: transferCodeStartFailed, Phrase: "start failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again."},
 			{Code: transferCodeStopFailed, Phrase: "stop failed", Severity: domain.SevWarn, Source: "wave1", Detail: "The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off."},
-			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave1", Detail: "The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy."},
+			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave2", Detail: "The server's security policy still offers key exchanges, message checks or TLS cipher suites that are no longer safe, so a client can settle on one that does not protect the session. Move the server to a current security policy."},
 			{Code: transferCodeNoLogging, Phrase: "no activity logging", Severity: domain.SevWarn, Source: "wave1", Detail: "The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination."},
 			DetailsDeniedFindingDef("transfer", "Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh."),
 			DetailsUnavailableFindingDef("transfer"),

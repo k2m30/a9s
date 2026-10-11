@@ -80,10 +80,20 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check encryption in transit — independently evaluated from the broker
 		// version check above; setWave2Finding is append-style, so both
 		// conditions surface as separate findings when both hold.
-		if prov.EncryptionInfo != nil &&
-			prov.EncryptionInfo.EncryptionInTransit != nil &&
-			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, nil)
+		// Either hop in cleartext is the same exposure: client to broker, or
+		// broker to broker (InCluster, which defaults to true when unset).
+		if prov.EncryptionInfo != nil && prov.EncryptionInfo.EncryptionInTransit != nil {
+			eit := prov.EncryptionInfo.EncryptionInTransit
+			var rows []domain.DetailRow
+			if eit.ClientBroker != kafkatypes.ClientBrokerTls {
+				rows = append(rows, domain.DetailRow{Label: "Client to broker", Value: mskClientBrokerWord(eit.ClientBroker), Tier: "~"})
+			}
+			if eit.InCluster != nil && !*eit.InCluster {
+				rows = append(rows, domain.DetailRow{Label: "Broker to broker", Value: "plaintext", Tier: "~"})
+			}
+			if len(rows) > 0 {
+				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, rows)
+			}
 		}
 		// A cluster being torn down, or already broken beyond use,
 		// has no posture worth reporting. The two checks above describe the
@@ -107,6 +117,18 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	})
 
 	return result, errors.Join(loopErr, AggregateFailures("DescribeClusterV2", failures, total))
+}
+
+// mskClientBrokerWord names a client-broker setting that is not TLS only.
+func mskClientBrokerWord(cb kafkatypes.ClientBroker) string {
+	switch cb {
+	case kafkatypes.ClientBrokerPlaintext:
+		return "plaintext"
+	case kafkatypes.ClientBrokerTlsPlaintext:
+		return "TLS or plaintext"
+	default:
+		return "not set"
+	}
 }
 
 // mskPublicAccessOn is the one PublicAccess.Type value that means the brokers

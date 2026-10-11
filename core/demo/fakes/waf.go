@@ -3,6 +3,7 @@
 package fakes
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -130,7 +131,9 @@ func (f *WAFFake) GetWebACLForResource(_ context.Context, input *wafv2.GetWebACL
 // GetLoggingConfiguration returns a stub logging configuration.
 // In demo mode the staging WAF ACL has no logging configured
 // (returns WAFNonexistentItemException), triggering the finding.
-// Other ACLs return a dummy LoggingConfiguration.
+// Other ACLs return a dummy LoggingConfiguration under the log scope
+// fixtures.LogScopes names, CUSTOMER by default, and "not found" under any
+// other scope, as WAF answers.
 func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLoggingConfigurationInput, _ ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error) {
 	if input.ResourceArn == nil {
 		return nil, fmt.Errorf("GetLoggingConfiguration: ResourceArn is required")
@@ -139,7 +142,8 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 		return nil, err
 	}
 	const stagingARN = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-staging-waf/a1b2c3d4-5678-90ab-cdef-333333333333"
-	if *input.ResourceArn == stagingARN {
+	logScope := cmp.Or(f.fix.LogScopes[*input.ResourceArn], wafv2types.LogScopeCustomer)
+	if *input.ResourceArn == stagingARN || cmp.Or(input.LogScope, wafv2types.LogScopeCustomer) != logScope {
 		return nil, &wafv2types.WAFNonexistentItemException{
 			Message: aws.String("The referenced item doesn't exist"),
 		}
@@ -151,6 +155,7 @@ func (f *WAFFake) GetLoggingConfiguration(_ context.Context, input *wafv2.GetLog
 	return &wafv2.GetLoggingConfigurationOutput{
 		LoggingConfiguration: &wafv2types.LoggingConfiguration{
 			ResourceArn:           input.ResourceArn,
+			LogScope:              logScope,
 			LogDestinationConfigs: []string{dest},
 		},
 	}, nil

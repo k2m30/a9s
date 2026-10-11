@@ -119,9 +119,9 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: No flow log capturing this VPC or any of its subnets → Warning (CIS / Well-Architected SEC — network traffic is unlogged).
+- **Signal**: The VPC's traffic is not all logged → Warning (CIS / Well-Architected SEC — network traffic is unlogged). It is logged when a delivering flow log targets the VPC itself, or one targets every subnet; a flow log delivers when its `FlowLogStatus` is `ACTIVE` and its `DeliverLogsStatus` is not `FAILED`. The finding names each failing delivery (`Delivery failing: <resource>: <DeliverLogsErrorMessage>`) and, when only some subnets are logged, how many (`Subnets logged: k of n`).
   - **State bucket**: Warning.
-  - **API call**: `DescribeFlowLogs` — one account-wide call; ask for the VPC id and every subnet id on the row with a `resource-id` filter, because a flow log attaches to a VPC or to a subnet and both write the same records. Raise the signal when no flow log targets either scope. A log scoped to a single network interface is not counted: attributing one to a VPC would need the interface list, and it records one interface rather than the VPC. A VPC whose subnets could not be listed in full is asked about by its own id alone: an ACTIVE flow log there shows flow logs on, and finding none leaves the VPC not inspected, since a subnet-level log may still cover it.
+  - **API call**: `DescribeFlowLogs` — one account-wide call; ask for the VPC id and every subnet id on the row with a `resource-id` filter, because a flow log attaches to a VPC or to a subnet and both write the same records. Raise the signal when neither the VPC nor every subnet has a delivering flow log. A log scoped to a single network interface is not counted: attributing one to a VPC would need the interface list, and it records one interface rather than the VPC. A VPC whose subnets could not be listed in full is asked about by its own id alone: a delivering flow log there shows flow logs on, and finding none leaves the VPC not inspected, since a subnet-level log may still cover it.
   - **Cost shape**: account-wide (one call covers every VPC in the region).
 
 ### 3.3 Wave 3 — OUT OF SCOPE
@@ -141,7 +141,7 @@ One row per §3 signal (Healthy case omitted per rule):
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
-| no flow logs for this VPC or its subnets | 2 | Warning | `~` | S2, S3, S4, S5 | `no active VPC flow logs` |
+| no delivering flow log on the VPC or on every subnet | 2 | Warning | `~` | S2, S3, S4, S5 | `no active VPC flow logs` |
 | no subnets in VPC — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `empty: no subnets` |
 
 ## 4.1 UX review (two sentences)
@@ -187,7 +187,7 @@ vpc — NETWORKING. Status key: `state` — the key the status cell reads, and t
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | vpc.state.pending | pending | warn | wave1 | The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it. |
-| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | No active flow log is capturing traffic for this VPC or for any of its subnets, so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3. |
+| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | No delivering flow log covers this VPC — none on the VPC itself, and not one on every subnet; a flow log whose delivery fails writes nothing — so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3, and fix any failing delivery named below. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

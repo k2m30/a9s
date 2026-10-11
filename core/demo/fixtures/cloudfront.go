@@ -361,6 +361,15 @@ const (
 	// CFLoggingOff is the distribution with access logging switched off.
 	CFLoggingOff = "E5E6F7G8H9I0J1"
 
+	// CFStandardLoggingV2 is the distribution whose legacy logging block is
+	// off and whose access logs go through a standard logging (v2) delivery
+	// (cwlogs.go). It must carry NO logging-off finding.
+	CFStandardLoggingV2 = CFCrossAccountOrigin
+
+	// CFStandardLoggingV2ARN is that distribution's ARN, which its delivery
+	// source names.
+	CFStandardLoggingV2ARN = "arn:aws:cloudfront::123456789012:distribution/" + CFStandardLoggingV2
+
 	// CFNoRootObject is the distribution with no default root object.
 	CFNoRootObject = "E4D5E6F7G8H9I0"
 
@@ -498,6 +507,13 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 		OriginProtocolPolicy: cftypes.OriginProtocolPolicyHttpOnly,
 	}
 	cfgs[CFS3WebsiteOrigin].ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
+
+	cfgs[CFStandardLoggingV2].Logging = &cftypes.LoggingConfig{
+		Enabled:        aws.Bool(false),
+		IncludeCookies: aws.Bool(false),
+		Bucket:         aws.String(""),
+		Prefix:         aws.String(""),
+	}
 
 	// Lambda@Edge association on the healthy distribution, for checkCfLambda.
 	cfgs["E1A2B3C4D5E6F7"].DefaultCacheBehavior.LambdaFunctionAssociations = &cftypes.LambdaFunctionAssociations{

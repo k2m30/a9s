@@ -141,9 +141,9 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
   - **API call**: `DescribeScalingActivities(AutoScalingGroupName=<name>, MaxRecords=1)` — one call per ASG.
   - **Cost shape**: per-resource.
 
-- **Signal**: launch configuration `MetadataOptions` absent or `HttpTokens != required`.
+- **Signal**: launch configuration `HttpTokens != required` with the metadata endpoint enabled. Each setting follows the EC2 order of precedence: the value the launch configuration sets, then the Region's account-level default (`GetInstanceMetadataDefaults`), then, for `HttpTokens` alone, the AMI's `ImdsSupport`. An account that enforces IMDSv2 produces no signal. A failed account-defaults read, or an AMI `DescribeImages` does not return, leaves the group not inspected. The rule is the launch template rule (`docs/resources/lt.md`), decided in one place for both.
   - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **How obtained**: read on the type's bounded Wave 2 pass, plus one `GetInstanceMetadataDefaults` and one batched `DescribeImages` walk (`image-id` filter) for the AMIs of configurations that leave `HttpTokens` unset.
 
 - **Signal**: launch configuration `AssociatePublicIpAddress == true`.
   - **State bucket**: Warning.
@@ -175,7 +175,7 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 | fewer than two `AvailabilityZones` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `single availability zone` |
 | behind a load balancer with `HealthCheckType != ELB` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no load balancer health check` |
 | Latest `DescribeScalingActivities.StatusCode == Failed` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest scaling activity failed` |
-| launch configuration `MetadataOptions` absent or `HttpTokens != required` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` |
+| launch configuration `HttpTokens != required`, an unset value taking the AMI's `ImdsSupport` default | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` |
 | launch configuration `AssociatePublicIpAddress == true` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration assigns public IPs` |
 | credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in launch configuration user data` |
 

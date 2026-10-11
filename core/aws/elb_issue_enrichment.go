@@ -34,33 +34,50 @@ const (
 // AWS defaults to "defensive"; "strictest" is stricter still.
 const elbDesyncMonitorMode = "monitor"
 
-// modernTLSPolicyPrefixes are the ELB security-policy families that negotiate
-// TLS 1.2 or better with forward secrecy. Anything else — including every
-// policy AWS has since superseded and any policy a future account carries —
-// is reported as weak: a prefix rule cannot silently go stale the way an
-// enumerated deny-list does.
-var modernTLSPolicyPrefixes = []string{ //nolint:gochecknoglobals // static policy table
-	"ELBSecurityPolicy-TLS13-",
-	"ELBSecurityPolicy-TLS-1-2-",
-	"ELBSecurityPolicy-FS-1-2-",
+// elbPolicyProtocols reads the protocols AWS states for every predefined
+// security policy (DescribeSSLPolicies, which answers every policy when no
+// name is given), keyed by policy name. It is the one source of the weak-TLS
+// verdict: a policy is judged by what it negotiates, never by its name. A nil
+// api reads nothing.
+func elbPolicyProtocols(ctx context.Context, api ELBv2DescribeSSLPoliciesAPI) (map[string][]string, error) {
+	if api == nil {
+		return nil, nil
+	}
+	policies, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]elbtypes.SslPolicy, *string, error) {
+		out, err := api.DescribeSSLPolicies(ctx, &elasticloadbalancingv2.DescribeSSLPoliciesInput{Marker: marker})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.SslPolicies, out.NextMarker, nil
+	})
+	if err == nil && !complete {
+		err = errPageCap
+	}
+	if err != nil {
+		return nil, err
+	}
+	protocols := make(map[string][]string, len(policies))
+	for _, p := range policies {
+		protocols[aws.ToString(p.Name)] = p.SslProtocols
+	}
+	return protocols, nil
 }
 
-// isWeakTLSPolicy reports whether an ELB SSL policy name predates the modern
-// families. An empty name is unknown, not weak.
-func isWeakTLSPolicy(policy string) bool {
-	if policy == "" {
-		return false
-	}
-	return !slices.ContainsFunc(modernTLSPolicyPrefixes, func(prefix string) bool {
-		return strings.HasPrefix(policy, prefix)
-	})
-}
+// elbProtocolsBelowTLS12 are the protocol names DescribeSSLPolicies lists for
+// versions older than TLS 1.2.
+var elbProtocolsBelowTLS12 = []string{"TLSv1", "TLSv1.1"} //nolint:gochecknoglobals // AWS protocol names
+
+// elbCheckPolicyUnknown is what a balancer records when a listener names a
+// security policy DescribeSSLPolicies did not return.
+const elbCheckPolicyUnknown = "security policy not returned by DescribeSSLPolicies"
 
 // elbListenerExposure classifies one listener of a load balancer of the given
-// type ("application" / "network"), returning the finding code and the
-// Attention row, or ok=false when the listener is fine. The phrase is the
-// caller's: both codes name every offending port of the balancer at once, so
-// no single listener knows what it will say.
+// type ("application" / "network") for cleartext exposure, returning the
+// finding code and the Attention row, or ok=false when the listener is fine.
+// The phrase is the caller's: the code names every offending port of the
+// balancer at once, so no single listener knows what it will say. The
+// security policy of an HTTPS or TLS listener is judged from the protocols
+// elbPolicyProtocols reads, through elbBelowTLS12.
 //
 // A listener carrying traffic in the clear exposes it unless its default
 // action redirects to HTTPS. The balancer type is not consulted: an
@@ -74,11 +91,6 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 	}
 	protocol := string(listener.Protocol)
 	switch listener.Protocol {
-	case elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
-		if isWeakTLSPolicy(aws.ToString(listener.SslPolicy)) {
-			return elbCodeWeakTLSPolicy,
-				domain.DetailRow{Label: "Security policy", Value: fmt.Sprintf("%d: %s", port, aws.ToString(listener.SslPolicy)), Tier: "~"}, true
-		}
 	case elbtypes.ProtocolEnumHttp, elbtypes.ProtocolEnumTcp:
 		if ELBListenerIsPlaintext(listener.Protocol, port) && !redirectsToHTTPS(listener) {
 			return elbCodePlainHTTPListener,
@@ -87,6 +99,19 @@ func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.Find
 	}
 	return "", domain.DetailRow{}, false
 }
+
+// elbListenerSecurityPolicy returns the security policy an HTTPS or TLS
+// listener terminates with, or "" for a listener that has none to judge.
+func elbListenerSecurityPolicy(listener elbtypes.Listener) string {
+	if listener.Protocol != elbtypes.ProtocolEnumHttps && listener.Protocol != elbtypes.ProtocolEnumTls {
+		return ""
+	}
+	return aws.ToString(listener.SslPolicy)
+}
+
+// elbBelowTLS12 reports whether a protocol name DescribeSSLPolicies lists is a
+// version older than TLS 1.2.
+func elbBelowTLS12(protocol string) bool { return slices.Contains(elbProtocolsBelowTLS12, protocol) }
 
 // ELBListenerIsPlaintext reports whether a listener carries traffic no one
 // encrypted. HTTP does. TCP is a byte pipe, so what it carries depends on the
@@ -150,6 +175,15 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		return r.Fields["load_balancer_arn"] != ""
 	}, resourceIDsOf)
 	ids := resourceIDs(resources)
+	policiesAPI, _ := clients.ELBv2.(ELBv2DescribeSSLPoliciesAPI)
+	// The policies are region-wide and matter only to a listener that
+	// terminates TLS, so they are read when the first such one is found.
+	policyProtocols := sync.OnceValues(func() (map[string][]string, error) {
+		return elbPolicyProtocols(ctx, policiesAPI)
+	})
+	// A Network Load Balancer writes access logs only for a TLS listener, so
+	// its access-log setting is judged once its listeners are read.
+	nlbAccessLogsOff := map[string]bool{}
 	var mu sync.Mutex
 	attrErr := ForEachRow(ctx, &result, ids, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -187,7 +221,11 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 					rows = append(rows, domain.DetailRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
 				}
 			case "access_logs.s3.enabled":
-				if *attr.Value == "false" {
+				switch {
+				case *attr.Value != "false":
+				case r.Fields["type"] == "network":
+					nlbAccessLogsOff[r.ID] = true
+				default:
 					rows = append(rows, domain.DetailRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
 				}
 			case "routing.http.desync_mitigation_mode":
@@ -215,11 +253,22 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			return
 		}
 		listeners, err := allELBListeners(ctx, clients.ELBv2, lbARN)
+		var protocols map[string][]string
+		var policiesErr error
+		if policiesAPI != nil && slices.ContainsFunc(listeners, func(l elbtypes.Listener) bool { return elbListenerSecurityPolicy(l) != "" }) {
+			protocols, policiesErr = policyProtocols()
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
+		}
+		if policiesErr != nil {
+			MarkSkipped(&result, r.ID, &failures, policiesErr)
+		}
+		if nlbAccessLogsOff[r.ID] && slices.ContainsFunc(listeners, func(l elbtypes.Listener) bool { return l.Protocol == elbtypes.ProtocolEnumTls }) {
+			setWave2Finding(&result, r.ID, elbCodeMisconfigured, []domain.DetailRow{{Label: "Access Logs", Value: "disabled", Tier: "~"}})
 		}
 		// Every offending port is a port to fix, so each finding names all of
 		// them rather than sending the operator back to the console for the
@@ -228,6 +277,17 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		// follow them: an unchanged balancer must render the same cell twice.
 		offenders := map[domain.FindingCode][]elbOffendingListener{}
 		for _, listener := range listeners {
+			if policy := elbListenerSecurityPolicy(listener); policy != "" && policiesAPI != nil && policiesErr == nil {
+				stated, known := protocols[policy]
+				switch {
+				case !known:
+					markUninspected(&result, r.ID, elbCheckPolicyUnknown)
+				case slices.ContainsFunc(stated, elbBelowTLS12):
+					port := aws.ToInt32(listener.Port)
+					offenders[elbCodeWeakTLSPolicy] = append(offenders[elbCodeWeakTLSPolicy], elbOffendingListener{port: port,
+						row: domain.DetailRow{Label: "Security policy", Value: fmt.Sprintf("%d: %s", port, policy), Tier: "~"}})
+				}
+			}
 			code, row, bad := elbListenerExposure(r.Fields["type"], listener)
 			if !bad {
 				continue

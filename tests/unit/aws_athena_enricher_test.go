@@ -187,8 +187,8 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	// Each governance finding has its own code and phrase; the exact match keeps a phrase naming the other half from passing.
-	if f.Phrase != "query results stored unencrypted" {
-		t.Errorf("phrase = %q, want %q", f.Phrase, "query results stored unencrypted")
+	if f.Phrase != "result encryption not set" {
+		t.Errorf("phrase = %q, want %q", f.Phrase, "result encryption not set")
 	}
 	if f.Code != "athena.results-unencrypted" {
 		t.Errorf("code = %q, want %q", f.Code, "athena.results-unencrypted")

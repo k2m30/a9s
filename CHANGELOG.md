@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The menu issue count for ECR, launch templates and Transfer Family no longer includes the scan-on-push, IMDSv1, volume-encryption and security-policy warnings. These checks now need an extra read, and warnings from those reads colour the row without raising the menu count, as for every other type.
+
 ### Fixed
 
 - Every AWS read retries when throttled, with one retry policy for all
@@ -19,6 +23,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `timeout`, and every throttle AWS reports (including Cost Explorer's,
   Kinesis's and SQS's own codes, and a bare HTTP 429) shows `throttled`
   instead of the raw error code.
+- Logging, scanning, encryption and TLS findings read every setting that
+  satisfies them:
+  - An Athena workgroup that lets queries override its settings but sets
+    minimum encryption no longer reads `settings can be overridden per
+    query`.
+  - A CloudFront distribution whose access logs go through standard logging
+    (v2) no longer reads `access logging off`. If the v2 delivery read fails,
+    the row reads `not inspected`.
+  - A WAF web ACL logged by Security Lake or a CloudWatch telemetry rule no
+    longer reads `no logging configuration`.
+  - An ECR repository that a registry scan-on-push or continuous scanning
+    rule covers is no longer flagged. Once the registry has scanning rules,
+    a repository that no rule covers is flagged even with its own scan on
+    push on, because ECR then sets it to manual (basic) or off (enhanced). The finding now reads
+    `pushed images not scanned`.
+  - An ECR repository set to `MUTABLE_WITH_EXCLUSION` reads `tags are
+    mutable`.
+  - A load balancer listener reads `weak TLS policy` when the protocols AWS
+    states for its security policy include TLS 1.0 or 1.1, instead of when
+    the policy name falls outside a list of families. Listeners on the
+    `TLS13-1-0` and `TLS13-1-1` policies are now flagged.
+  - A launch template or an Auto Scaling launch configuration that leaves
+    the metadata options unset takes the Region's account-level IMDS default,
+    then its AMI's `ImdsSupport`, in the order EC2 applies them. It no longer
+    reads `IMDSv1 allowed` when the account requires IMDSv2, enforces it, or
+    disables the endpoint, or when the AMI is registered with `ImdsSupport`
+    v2.0. If either read fails, the row reads `not inspected`.
+  - A launch template block device set to `Encrypted=false` no longer reads
+    `EBS encryption disabled` in a Region that encrypts new EBS volumes by
+    default, because that setting overrides it.
+  - An ECR registry scanning filter without `*` matches every repository
+    whose name contains it, as ECR applies it. The ECR `Scan` column shows
+    the scanning a repository gets (`continuous`, `on push` or `off`)
+    instead of the repository's own scan-on-push flag.
+  - A Transfer Family server's security policy is judged by the algorithms
+    AWS states for it. Servers on `TransferSecurityPolicy-2020-06` no longer
+    read `legacy security policy`; servers on
+    `TransferSecurityPolicy-Restricted-2018-11` now do.
+  - A Redis replication group in transit encryption mode `preferred` reads
+    `encryption in transit not enforced`, because it accepts cleartext
+    clients. An MSK cluster with broker-to-broker encryption off reads the
+    same, and the detail names the plaintext hop.
+  - A VPC reads `no active VPC flow logs` unless a flow log on the VPC, or
+    one on every subnet, delivers. A flow log with a failing delivery no
+    longer counts, and the detail names the error.
+  - A Network Load Balancer without a TLS listener is no longer flagged for
+    access logs being off, because it writes access logs only for TLS
+    listeners.
+  - A Glue job whose security configuration turns S3, CloudWatch Logs or
+    job bookmark encryption off reads `security configuration leaves
+    encryption off`.
+  - An Athena workgroup without result encryption reads `result encryption
+    not set`. Its results are still encrypted by the bucket's default
+    encryption.
+  - The OpenSearch encryption-at-rest and node-to-node findings say that
+    OpenSearch and Elasticsearch 6.7 or later turn them on in place. The ECS
+    task log-driver finding says where output goes on Fargate and on EC2.
+  - The CloudFront standard logging, load balancer security policy, IMDS
+    account default and EBS encryption default reads are made only when a
+    row needs them, so a role without those permissions gets no failure
+    when nothing depends on them.
 - A list check whose AWS read fails marks the row `not inspected` and
   reports the failure, instead of leaving a blank cell or a row that reads
   clean: CodeArtifact package counts, log group last-event times, and

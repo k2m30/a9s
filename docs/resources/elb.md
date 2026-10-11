@@ -135,11 +135,12 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families.
+- **Signal**: `HTTPS`/`TLS` listener whose security policy lists `TLSv1` or `TLSv1.1` in the `SslProtocols` that `DescribeSSLPolicies` states for it. The policy is judged by its protocols, never by its name: the `TLS13-1-0-` and `TLS13-1-1-` families add TLS 1.3 on top of TLS 1.0 or 1.1, so they are weak. A policy the answer does not name leaves the balancer not inspected; a failed read leaves every balancer with such a listener not inspected.
   - **State bucket**: Warning.
-  - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
+  - **API call**: `DescribeSSLPolicies` (every page, no names), once per enrichment and only when a balancer has an HTTPS or TLS listener with a policy, beside the per-balancer `DescribeListeners`.
+  - **Cost shape**: per-resource, plus one region-wide read.
 
-- **Signal**: `deletion_protection.enabled` or `access_logs.s3.enabled` is `false`.
+- **Signal**: `deletion_protection.enabled` or `access_logs.s3.enabled` is `false`. On a Network Load Balancer access logs count only when it has a TLS listener: "Access logs are created only if the load balancer has a TLS listener and they contain information only about TLS requests" (Network Load Balancers User Guide, "Access logs for your Network Load Balancer").
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -169,8 +170,8 @@ sentence would restate it. Their S5 cell reads `—`.
 | ALB `routing.http.desync_mitigation_mode == monitor` | 2 | Warning | `~` | S2, S3, S4, S5 | `HTTP desync mitigation off` |
 | ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S2, S3, S4, S5 | `invalid HTTP headers not dropped` |
 | ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S2, S3, S4, S5 | `<port(s) LIST> in the clear` |
-| `HTTPS`/`TLS` listener on a policy outside the `TLS13-`/`TLS-1-2-`/`FS-1-2-` families | 2 | Warning | `~` | S2, S3, S4, S5 | `weak TLS policy on <port(s) LIST>` |
-| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
+| `HTTPS`/`TLS` listener whose policy's `SslProtocols` lists `TLSv1` or `TLSv1.1` | 2 | Warning | `~` | S2, S3, S4, S5 | `weak TLS policy on <port(s) LIST>` |
+| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` (access logs on a Network Load Balancer only with a TLS listener) | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 
@@ -217,7 +218,7 @@ elb — NETWORKING. Status key: `state` — the key the status cell reads, and t
 | elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest. |
 | elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields. |
 | elb.plain-http-listener | <port(s) LIST> in the clear | warn | wave2 | A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener. |
-| elb.weak-tls-policy | weak TLS policy on <port(s) LIST> | warn | wave2 | A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later. |
+| elb.weak-tls-policy | weak TLS policy on <port(s) LIST> | warn | wave2 | A listener's security policy still negotiates TLS 1.0 or 1.1, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to a security policy whose protocols start at TLS 1.2. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

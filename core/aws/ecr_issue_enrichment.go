@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,6 +41,116 @@ const (
 // https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_DescribeImageScanFindings.html).
 const ecrPageSize = 1000
 
+// ecrScanOnPushFindings raises CodeECRScanOnPushOff on every repository whose
+// images are not scanned as they arrive. Once the registry has scanning
+// rules, only the rules count. Under enhanced scanning "repositories matching
+// the scan filters are scanned using enhanced scanning only. Any repositories
+// that don't match a filter will have an Off scan frequency and won't be
+// scanned" (Amazon ECR User Guide, "Considerations for enhanced scanning").
+// Under basic scanning "any repositories that don't match a scan on push
+// filter are set to the manual scan frequency" (Amazon ECR User Guide, "Scan
+// images for OS vulnerabilities in Amazon ECR"). A repository's own
+// ScanOnPush counts only in a basic registry with no rules.
+//
+// The registry configuration is one read for the whole list, so no row is
+// held to EnrichmentCap. A failed read leaves every repository not inspected,
+// since the scan type and rules it would have named decide whether the
+// repository's own setting counts. A client without the call reads basic scanning with no
+// rule.
+func ecrScanOnPushFindings(ctx context.Context, api ECRAPI, resources []resource.Resource, result *IssueEnricherResult) error {
+	repos := map[string]ecrtypes.Repository{}
+	var ids []string
+	for _, r := range resources {
+		if repo, ok := assertStruct[ecrtypes.Repository](r.RawStruct); ok {
+			repos[r.ID] = repo
+			ids = append(ids, r.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	var scanning ecrtypes.RegistryScanningConfiguration
+	if registryAPI, ok := api.(ECRGetRegistryScanningConfigurationAPI); ok {
+		out, err := registryAPI.GetRegistryScanningConfiguration(ctx, &ecr.GetRegistryScanningConfigurationInput{})
+		if err != nil {
+			var failures []Failure
+			for _, id := range ids {
+				MarkSkipped(result, id, &failures, err)
+			}
+			return AggregateFailures("GetRegistryScanningConfiguration", failures, len(ids))
+		}
+		if out.ScanningConfiguration != nil {
+			scanning = *out.ScanningConfiguration
+		}
+	}
+	enhanced := scanning.ScanType == ecrtypes.ScanTypeEnhanced
+	for _, id := range ids {
+		repo := repos[id]
+		ownScanOnPush := repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush
+		scan := ecrScanOff
+		switch frequency := ecrRegistryScanFrequency(scanning.Rules, id); {
+		case frequency == ecrtypes.ScanFrequencyContinuousScan:
+			scan = ecrScanContinuous
+		case frequency != "":
+			scan = ecrScanOnPush
+		case enhanced:
+			setWave2Finding(result, id, CodeECRScanOnPushOff, []domain.DetailRow{{Label: "Registry scanning", Value: "enhanced, no rule matches this repository", Tier: tierOf(CodeECRScanOnPushOff)}})
+		case len(scanning.Rules) > 0:
+			setWave2Finding(result, id, CodeECRScanOnPushOff, []domain.DetailRow{{Label: "Registry scanning", Value: "basic, no scan-on-push filter matches this repository", Tier: tierOf(CodeECRScanOnPushOff)}})
+		case ownScanOnPush:
+			scan = ecrScanOnPush
+		default:
+			setWave2Finding(result, id, CodeECRScanOnPushOff, nil)
+		}
+		if result.FieldUpdates[id] == nil {
+			result.FieldUpdates[id] = map[string]string{}
+		}
+		result.FieldUpdates[id]["scanning"] = scan
+	}
+	return nil
+}
+
+// The words the Scan column states for how a repository's images are
+// scanned, as ecrScanOnPushFindings decides it.
+const (
+	ecrScanContinuous = "continuous"
+	ecrScanOnPush     = "on push"
+	ecrScanOff        = "off"
+)
+
+// ecrRegistryScanFrequency returns how the registry scanning rules scan the
+// named repository as images arrive: CONTINUOUS_SCAN when a continuous rule's
+// filter matches it, which ECR enforces over a scan-on-push one, else
+// SCAN_ON_PUSH when a scan-on-push rule's does, else "". A MANUAL rule scans
+// nothing on its own.
+func ecrRegistryScanFrequency(rules []ecrtypes.RegistryScanningRule, repoName string) ecrtypes.ScanFrequency {
+	var found ecrtypes.ScanFrequency
+	for _, rule := range rules {
+		if rule.ScanFrequency == ecrtypes.ScanFrequencyManual {
+			continue
+		}
+		for _, f := range rule.RepositoryFilters {
+			if ecrFilterMatches(aws.ToString(f.Filter), repoName) && found != ecrtypes.ScanFrequencyContinuousScan {
+				found = rule.ScanFrequency
+			}
+		}
+	}
+	return found
+}
+
+// ecrFilterMatches applies a registry scanning filter to a repository name as
+// ECR does: "a filter with no wildcard will match all repository names that
+// contain the filter. A filter with a wildcard (*) matches on any repository
+// name where the wildcard replaces zero or more characters in the repository
+// name" (Amazon ECR User Guide, "Filters to choose which repositories are
+// scanned").
+func ecrFilterMatches(filter, repoName string) bool {
+	if !strings.Contains(filter, "*") {
+		return strings.Contains(repoName, filter)
+	}
+	return ebWildcard(filter, repoName)
+}
+
 // EnrichECRRepository reads every DescribeImages page of each repository,
 // picks the newest image by imagePushedAt — DescribeImages documents no order
 // and cannot sort — and reads that image's scan results
@@ -65,9 +176,10 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	if clients == nil || clients.ECR == nil {
 		return result, nil
 	}
+	registryErr := ecrScanOnPushFindings(ctx, clients.ECR, resources, &result)
 	describeAPI, ok := clients.ECR.(ECRDescribeImagesAPI)
 	if !ok {
-		return result, nil
+		return result, registryErr
 	}
 	scanAPI, _ := clients.ECR.(ECRDescribeImageScanFindingsAPI)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
@@ -173,11 +285,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			highTotal = counts[string(ecrtypes.FindingSeverityHigh)]
 		}
 
-		result.FieldUpdates[r.ID] = map[string]string{
-			"critical_vulns": strconv.FormatInt(int64(criticalTotal), 10),
-			"high_vulns":     strconv.FormatInt(int64(highTotal), 10),
-			"images_scanned": strconv.Itoa(scannedCount),
+		if result.FieldUpdates[r.ID] == nil {
+			result.FieldUpdates[r.ID] = map[string]string{}
 		}
+		result.FieldUpdates[r.ID]["critical_vulns"] = strconv.FormatInt(int64(criticalTotal), 10)
+		result.FieldUpdates[r.ID]["high_vulns"] = strconv.FormatInt(int64(highTotal), 10)
+		result.FieldUpdates[r.ID]["images_scanned"] = strconv.Itoa(scannedCount)
 
 		if criticalTotal == 0 && highTotal == 0 {
 			return
@@ -208,7 +321,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	SetTruncated(&result, truncated)
-	return result, errors.Join(loopErr, AggregateFailures("repository posture", failures, total))
+	return result, errors.Join(registryErr, loopErr, AggregateFailures("repository posture", failures, total))
 }
 
 // ecrRepositoryExposure evaluates a repository's resource policy through the

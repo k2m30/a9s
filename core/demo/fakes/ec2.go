@@ -280,11 +280,31 @@ func (f *EC2Fake) DescribeSnapshots(_ context.Context, input *ec2.DescribeSnapsh
 	return &ec2.DescribeSnapshotsOutput{Snapshots: out}, nil
 }
 
+// GetEbsEncryptionByDefault answers that the demo Region does not encrypt new
+// EBS volumes by default, so a launch template's explicit Encrypted=false
+// stands.
+func (f *EC2Fake) GetEbsEncryptionByDefault(_ context.Context, _ *ec2.GetEbsEncryptionByDefaultInput, _ ...func(*ec2.Options)) (*ec2.GetEbsEncryptionByDefaultOutput, error) {
+	return &ec2.GetEbsEncryptionByDefaultOutput{EbsEncryptionByDefault: aws.Bool(false)}, nil
+}
+
+// GetInstanceMetadataDefaults answers that the demo account states no
+// account-level instance metadata defaults, so launch settings and AMIs
+// decide.
+func (f *EC2Fake) GetInstanceMetadataDefaults(_ context.Context, _ *ec2.GetInstanceMetadataDefaultsInput, _ ...func(*ec2.Options)) (*ec2.GetInstanceMetadataDefaultsOutput, error) {
+	return &ec2.GetInstanceMetadataDefaultsOutput{AccountLevel: &ec2types.InstanceMetadataDefaultsResponse{}}, nil
+}
+
 func (f *EC2Fake) DescribeImages(_ context.Context, input *ec2.DescribeImagesInput, _ ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
-	if len(input.ImageIds) == 0 {
+	ids := input.ImageIds
+	for _, flt := range input.Filters {
+		if aws.ToString(flt.Name) == "image-id" {
+			ids = append(slices.Clone(ids), flt.Values...)
+		}
+	}
+	if len(ids) == 0 {
 		return &ec2.DescribeImagesOutput{Images: f.fix.Images}, nil
 	}
-	want := toSet(input.ImageIds)
+	want := toSet(ids)
 	var out []ec2types.Image
 	for _, img := range f.fix.Images {
 		if img.ImageId != nil && want[*img.ImageId] {

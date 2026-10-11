@@ -117,11 +117,6 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `trans
 
 Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `LoggingRole == nil` (structured logging makes nil legitimate — the gap check needs `StructuredLogDestinations`, a Describe field → Wave 2); `UserCount == 0` (AS2 and external-IdP servers legitimately 0 — column only). `Protocols` is absent from `ListedServer` — AS2-vs-SFTP is unknowable at Wave 1.
 
-- **Signal**: `SecurityPolicyName` in the known-weak legacy denylist (`TransferSecurityPolicy-2018-11`, `TransferSecurityPolicy-2020-06`) — weak ciphers / old TLS. Denylist, not latest-chasing: FIPS/PQ/restricted variants must not false-positive.
-  - **State bucket**: Warning.
-  - **API call**: `DescribeServer`, one per server (N+1; accounts run 1–5).
-  - **Cost shape**: per-resource.
-
 - **Signal**: `LoggingRole == nil` AND `len(StructuredLogDestinations) == 0` — no activity logging at all; an audit gap for a B2B endpoint.
   - **State bucket**: Warning.
   - **API call**: `DescribeServer` (same call).
@@ -142,6 +137,11 @@ Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner
 
 ### 3.2 Wave 2 — bounded extra API calls
 
+- **Signal**: the server's security policy offers a SHA-1 SSH key exchange (`diffie-hellman-group14-sha1`), a SHA-1 or 64-bit SSH MAC (`hmac-sha1`, `umac-64`), or a TLS cipher suite with RSA key exchange (`TLS_RSA_*`, no forward secrecy). The policy is judged by the algorithms `DescribeSecurityPolicy` states for it, never by its name: of the published policies, `TransferSecurityPolicy-2018-11`, `TransferSecurityPolicy-Restricted-2018-11` and `TransferSFTPConnectorSecurityPolicy-2023-07` offer them, and `TransferSecurityPolicy-2020-06` does not.
+  - **State bucket**: Warning.
+  - **API call**: `DescribeSecurityPolicy(SecurityPolicyName)` on the Wave 2 pass, one call per distinct policy name. A failed read leaves the servers naming that policy not inspected.
+  - **Cost shape**: per distinct policy.
+
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: CloudWatch `FilesIn`/`FilesOut`/`BytesIn`/`BytesOut`, AS2 `InboundMessage`/`OutboundMessage` metrics.
@@ -160,7 +160,7 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 | `State == STOPPING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopping` |
 | `State == START_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `start failed` |
 | `State == STOP_FAILED` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stop failed` |
-| legacy security policy | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `legacy security policy` |
+| legacy security policy | 2 | Warning | `~` | S2, S3, S4, S5 | `legacy security policy` |
 | no activity logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no activity logging` |
 | `DescribeServer` denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `DescribeServer` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
@@ -189,7 +189,7 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 - eip pivot + SubnetIds/AddressAllocationIds navigability — `user (2026-07-14, live acceptance testing): internet-facing server witnessed with EndpointDetails.AddressAllocationIds ×3 — the original AS2 witness had an internal endpoint, which hid this field`; `AWS SDK Go v2 — transfer/types.EndpointDetails § AddressAllocationIds`.
 - Wave-1 State mapping — `docs/attention-signals.md § Signals § NETWORKING` row `transfer`; `AWS SDK Go v2 — transfer/types.ListedServer § State`.
 - LoggingRole-nil and UserCount-zero non-signals — `a9s-devops (2026-07-14): possible=yes, worth=no. Structured logging makes nil legitimate; AS2/external-IdP servers legitimately 0 users.`
-- Security-policy denylist — `a9s-devops (2026-07-14): possible=yes, worth=yes. Denylist beats latest-chasing (FIPS/restricted variants).`
+- Security-policy algorithms — `AWS SDK Go v2 — transfer.DescribeSecurityPolicy`, `transfer/types.DescribedSecurityPolicy § SshKexs, § SshMacs, § TlsCiphers`; AWS Transfer Family User Guide, "Security policies for AWS Transfer Family servers".
 - Logging-gap Wave-2 signal — `a9s-devops (2026-07-14): possible=yes (both fields on DescribedServer), worth=yes. B2B audit gap.`
 - Agreements-only child view — `AWS SDK Go v2 — transfer/types.DescribedAgreement § ServerId` (exists) vs `ListedProfile`/`ListedCertificate` (no ServerId) + `a9s-devops (2026-07-14)`; divergence from product-goal wording flagged in §2.1.
 - Certificate expiry rules — `AWS SDK Go v2 — transfer/types.ListedCertificate § InactiveDate, § Status`.
@@ -208,7 +208,7 @@ transfer — NETWORKING. Status key: `status` — the key the status cell reads,
 | transfer.warn.stopping | stopping | warn | wave1 | The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down. |
 | transfer.broken.start\_failed | start failed | broken | wave1 | The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again. |
 | transfer.warn.stop\_failed | stop failed | warn | wave1 | The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off. |
-| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 | The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy. |
+| transfer.warn.legacy\_policy | legacy security policy | warn | wave2 | The server's security policy still offers key exchanges, message checks or TLS cipher suites that are no longer safe, so a client can settle on one that does not protect the session. Move the server to a current security policy. |
 | transfer.warn.no\_logging | no activity logging | warn | wave1 | The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination. |
 | transfer.warn.details\_denied | details denied | warn | wave1 | Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh. |
 | transfer.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |

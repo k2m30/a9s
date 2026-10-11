@@ -154,11 +154,12 @@ func TestW6BDetailAttentionNeverRepeatsItself(t *testing.T) {
 // A code belongs here when an operator reading the phrase already knows
 // everything the row would tell them. It does NOT belong here when the row
 // carries a value the phrase lacks — the CIDR ranges, the buildspec path, the
-// disabled log types, the argument name, the key that held the credential.
+// disabled log types, the argument name, the key that held the credential,
+// or the registry scanning setting that overrides a repository's own scan on
+// push.
 var w6bRowlessCodes = map[string]string{
 	"cfn.termination-protection-off": "phrase already says termination protection is off",
 	"cb.public-builds":               "phrase already says the build results are publicly visible",
-	"ecr.scan-on-push-off":           "phrase already says scan on push is off",
 	"ecr.mutable-tags":               "phrase already says the tags are mutable",
 	"ecr.no-lifecycle-policy":        "phrase already says there is no lifecycle policy",
 	"glue.no-security-configuration": "phrase already says there is no security configuration",

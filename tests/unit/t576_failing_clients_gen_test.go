@@ -326,6 +326,28 @@ func (w t576EC2) DescribeVpcs(ctx context.Context, in *ec2.DescribeVpcsInput, o 
 	return res, err
 }
 
+func (w t576EC2) GetEbsEncryptionByDefault(ctx context.Context, in *ec2.GetEbsEncryptionByDefaultInput, o ...func(*ec2.Options)) (*ec2.GetEbsEncryptionByDefaultOutput, error) {
+	if err := w.inj.before("EC2", "GetEbsEncryptionByDefault", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetEbsEncryptionByDefault(context.Context, *ec2.GetEbsEncryptionByDefaultInput, ...func(*ec2.Options)) (*ec2.GetEbsEncryptionByDefaultOutput, error)
+	}).GetEbsEncryptionByDefault(ctx, in, o...)
+	w.inj.after("EC2", "GetEbsEncryptionByDefault", in, res)
+	return res, err
+}
+
+func (w t576EC2) GetInstanceMetadataDefaults(ctx context.Context, in *ec2.GetInstanceMetadataDefaultsInput, o ...func(*ec2.Options)) (*ec2.GetInstanceMetadataDefaultsOutput, error) {
+	if err := w.inj.before("EC2", "GetInstanceMetadataDefaults", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetInstanceMetadataDefaults(context.Context, *ec2.GetInstanceMetadataDefaultsInput, ...func(*ec2.Options)) (*ec2.GetInstanceMetadataDefaultsOutput, error)
+	}).GetInstanceMetadataDefaults(ctx, in, o...)
+	w.inj.after("EC2", "GetInstanceMetadataDefaults", in, res)
+	return res, err
+}
+
 type t576S3 struct {
 	awsclient.S3API
 	fake any
@@ -1140,6 +1162,17 @@ func (w t576ELBv2) DescribeRules(ctx context.Context, in *elasticloadbalancingv2
 	return res, err
 }
 
+func (w t576ELBv2) DescribeSSLPolicies(ctx context.Context, in *elasticloadbalancingv2.DescribeSSLPoliciesInput, o ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeSSLPoliciesOutput, error) {
+	if err := w.inj.before("ELBv2", "DescribeSSLPolicies", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeSSLPolicies(context.Context, *elasticloadbalancingv2.DescribeSSLPoliciesInput, ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeSSLPoliciesOutput, error)
+	}).DescribeSSLPolicies(ctx, in, o...)
+	w.inj.after("ELBv2", "DescribeSSLPolicies", in, res)
+	return res, err
+}
+
 func (w t576ELBv2) DescribeTags(ctx context.Context, in *elasticloadbalancingv2.DescribeTagsInput, o ...func(*elasticloadbalancingv2.Options)) (*elasticloadbalancingv2.DescribeTagsOutput, error) {
 	if err := w.inj.before("ELBv2", "DescribeTags", in); err != nil {
 		return nil, err
@@ -1604,6 +1637,28 @@ type t576CloudWatchLogs struct {
 	inj  *t576Injector
 }
 
+func (w t576CloudWatchLogs) DescribeDeliveries(ctx context.Context, in *cloudwatchlogs.DescribeDeliveriesInput, o ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliveriesOutput, error) {
+	if err := w.inj.before("CloudWatchLogs", "DescribeDeliveries", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeDeliveries(context.Context, *cloudwatchlogs.DescribeDeliveriesInput, ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliveriesOutput, error)
+	}).DescribeDeliveries(ctx, in, o...)
+	w.inj.after("CloudWatchLogs", "DescribeDeliveries", in, res)
+	return res, err
+}
+
+func (w t576CloudWatchLogs) DescribeDeliverySources(ctx context.Context, in *cloudwatchlogs.DescribeDeliverySourcesInput, o ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliverySourcesOutput, error) {
+	if err := w.inj.before("CloudWatchLogs", "DescribeDeliverySources", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeDeliverySources(context.Context, *cloudwatchlogs.DescribeDeliverySourcesInput, ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliverySourcesOutput, error)
+	}).DescribeDeliverySources(ctx, in, o...)
+	w.inj.after("CloudWatchLogs", "DescribeDeliverySources", in, res)
+	return res, err
+}
+
 func (w t576CloudWatchLogs) DescribeExportTasks(ctx context.Context, in *cloudwatchlogs.DescribeExportTasksInput, o ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeExportTasksOutput, error) {
 	if err := w.inj.before("CloudWatchLogs", "DescribeExportTasks", in); err != nil {
 		return nil, err
@@ -1667,6 +1722,17 @@ func (w t576CloudWatchLogs) FilterLogEvents(ctx context.Context, in *cloudwatchl
 		FilterLogEvents(context.Context, *cloudwatchlogs.FilterLogEventsInput, ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.FilterLogEventsOutput, error)
 	}).FilterLogEvents(ctx, in, o...)
 	w.inj.after("CloudWatchLogs", "FilterLogEvents", in, res)
+	return res, err
+}
+
+func (w t576CloudWatchLogs) GetDeliverySource(ctx context.Context, in *cloudwatchlogs.GetDeliverySourceInput, o ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetDeliverySourceOutput, error) {
+	if err := w.inj.before("CloudWatchLogs", "GetDeliverySource", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetDeliverySource(context.Context, *cloudwatchlogs.GetDeliverySourceInput, ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetDeliverySourceOutput, error)
+	}).GetDeliverySource(ctx, in, o...)
+	w.inj.after("CloudWatchLogs", "GetDeliverySource", in, res)
 	return res, err
 }
 
@@ -2172,6 +2238,17 @@ func (w t576ECR) GetLifecyclePolicy(ctx context.Context, in *ecr.GetLifecyclePol
 		GetLifecyclePolicy(context.Context, *ecr.GetLifecyclePolicyInput, ...func(*ecr.Options)) (*ecr.GetLifecyclePolicyOutput, error)
 	}).GetLifecyclePolicy(ctx, in, o...)
 	w.inj.after("ECR", "GetLifecyclePolicy", in, res)
+	return res, err
+}
+
+func (w t576ECR) GetRegistryScanningConfiguration(ctx context.Context, in *ecr.GetRegistryScanningConfigurationInput, o ...func(*ecr.Options)) (*ecr.GetRegistryScanningConfigurationOutput, error) {
+	if err := w.inj.before("ECR", "GetRegistryScanningConfiguration", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		GetRegistryScanningConfiguration(context.Context, *ecr.GetRegistryScanningConfigurationInput, ...func(*ecr.Options)) (*ecr.GetRegistryScanningConfigurationOutput, error)
+	}).GetRegistryScanningConfiguration(ctx, in, o...)
+	w.inj.after("ECR", "GetRegistryScanningConfiguration", in, res)
 	return res, err
 }
 
@@ -3277,6 +3354,17 @@ func (w t576Transfer) DescribeProfile(ctx context.Context, in *transfer.Describe
 		DescribeProfile(context.Context, *transfer.DescribeProfileInput, ...func(*transfer.Options)) (*transfer.DescribeProfileOutput, error)
 	}).DescribeProfile(ctx, in, o...)
 	w.inj.after("Transfer", "DescribeProfile", in, res)
+	return res, err
+}
+
+func (w t576Transfer) DescribeSecurityPolicy(ctx context.Context, in *transfer.DescribeSecurityPolicyInput, o ...func(*transfer.Options)) (*transfer.DescribeSecurityPolicyOutput, error) {
+	if err := w.inj.before("Transfer", "DescribeSecurityPolicy", in); err != nil {
+		return nil, err
+	}
+	res, err := w.fake.(interface {
+		DescribeSecurityPolicy(context.Context, *transfer.DescribeSecurityPolicyInput, ...func(*transfer.Options)) (*transfer.DescribeSecurityPolicyOutput, error)
+	}).DescribeSecurityPolicy(ctx, in, o...)
+	w.inj.after("Transfer", "DescribeSecurityPolicy", in, res)
 	return res, err
 }
 

@@ -89,17 +89,18 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `ImageScanningConfiguration` absent, or `ScanOnPush == false`.
-  - **State bucket**: Warning.
-  - **How obtained**: `DescribeRepositories` response — each `Repository` carries its `ImageScanningConfiguration.ScanOnPush` (bool). No extra call.
-
-- **Signal**: `ImageTagMutability == MUTABLE`.
+- **Signal**: `ImageTagMutability == MUTABLE` or `MUTABLE_WITH_EXCLUSION`. `MUTABLE_WITH_EXCLUSION` leaves every tag but the excluded ones movable; `IMMUTABLE_WITH_EXCLUSION` pins every tag but the excluded ones and produces no signal.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
+
+- **Signal**: images pushed to the repository are not scanned as they arrive. No registry scanning rule with `scanFrequency` `SCAN_ON_PUSH` or `CONTINUOUS_SCAN` has a `repositoryFilters` entry matching the repository name — a filter without `*` matches every name that contains it, and in one with `*` the wildcard stands for zero or more characters (Amazon ECR User Guide, "Filters to choose which repositories are scanned"), and either the registry has scanning rules, or its `scanType` is `ENHANCED`, or the repository's own `ImageScanningConfiguration` is absent or `ScanOnPush == false`. The repository setting counts only in a basic registry with no rules. Under enhanced scanning it does not count: "repositories matching the scan filters are scanned using enhanced scanning only. Any repositories that don't match a filter will have an `Off` scan frequency and won't be scanned" (Amazon ECR User Guide — Scan images for OS and programming language package vulnerabilities § Considerations for enhanced scanning). Under basic scanning "any repositories that don't match a scan on push filter are set to the manual scan frequency" (Amazon ECR User Guide — Scan images for OS vulnerabilities in Amazon ECR). A `MANUAL` rule scans nothing on its own. The enhanced case carries the row `Registry scanning: enhanced, no rule matches this repository`, and the basic case with rules the row `Registry scanning: basic, no scan-on-push filter matches this repository`. A failed registry read leaves every repository not inspected.
+  - **State bucket**: Warning.
+  - **API call**: `GetRegistryScanningConfiguration`, once per enrichment for the whole registry.
+  - **Cost shape**: per-account.
 
 - **Signal**: the newest image (largest `imagePushedAt`) has a CRITICAL finding → CRITICAL vulnerabilities present.
   - **State bucket**: Broken.
@@ -140,8 +141,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ImageScanningConfiguration` absent, or `ScanOnPush == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `scan on push off` |
-| `ImageTagMutability == MUTABLE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `tags are mutable` |
+| `ImageTagMutability == MUTABLE` or `MUTABLE_WITH_EXCLUSION` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `tags are mutable` |
+| No registry rule covers the repository, and the registry has rules, uses enhanced scanning, or `ScanOnPush == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `pushed images not scanned` |
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N> critical, <M> high vulnerabilities` |
 | latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S3, S4, S5 | `<N> high vulnerabilities` |
 | the repository policy grants a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `repository policy open to anyone` |
@@ -149,14 +150,15 @@ One row per signal from §3:
 
 Rules applied:
 
-- `scanOnPush==false` is a Wave 1 Warning and paints the row yellow; S4 carries the cause, and the Attention section carries `~` and the sentence like any other Warning finding.
+- A repository whose pushed images are not scanned (no registry rule covers it, and the registry has rules, uses enhanced scanning, or `scanOnPush==false`) is a Wave 2 Warning and paints the row yellow; S4 carries the cause, and the Attention section carries `~` and the sentence like any other Warning finding.
+- The `Scan` column states the scanning the same Wave 2 decision found: `continuous` when a continuous rule matches the repository (ECR applies it over a scan-on-push rule), `on push` when a scan-on-push rule matches or, in a basic registry with no rules, the repository's own `ScanOnPush` is on, and `off` otherwise. It is empty until the Wave 2 pass has read the registry, and stays empty on a repository that pass could not inspect.
 - `CRITICAL>0` is a Wave 2 Broken finding; the row is repainted red and the full cause appears in S4/S5. S1 counts this `!` finding.
 - `CRITICAL>0` and `HIGH>0` are two findings, because they are two tiers and a code declares one severity: `ecr.vulnerabilities` is Broken and counts both severities, `ecr.vulnerabilities-high` is a Warning naming the high count alone. Both reach the menu count.
 - When multiple signals fire on the same repo, the highest-severity bucket wins the row color (Broken > Warning) and S4 shows the Broken cause; secondary causes go to S5.
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every §4 row pairs the state with a concrete cause in the Status column (`scan on push off`, `<N> critical, <M> high vulnerabilities`, `repository policy open to anyone`), so the operator can triage which repo to block without opening detail. The detail view adds the push date and finding count so the follow-up "how bad, how old?" question is one keypress away.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every §4 row pairs the state with a concrete cause in the Status column (`pushed images not scanned`, `<N> critical, <M> high vulnerabilities`, `repository policy open to anyone`), so the operator can triage which repo to block without opening detail. The detail view adds the push date and finding count so the follow-up "how bad, how old?" question is one keypress away.
 
 ## 5. Out of Scope
 
@@ -191,7 +193,7 @@ One bullet per claim in §§2–4.1.
 - `pipeline` discovery via `ActionTypeId.Provider==ECR` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ECR source-provider action is the only first-class pipeline→ECR linkage; push-via-CodeBuild is covered by the`cb`pivot.`
 - `role` related target — `docs/related-resources.md` §`ecr` — "Pull/push IAM roles."
 - `role` discovery via `GetRepositoryPolicy` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Repository policy is the authoritative per-repo principal source; walking the role cache with per-role calls is Wave 3.`
-- Wave 1 signal `scanOnPush==false` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
+- Wave 2 signal pushed images not scanned — `docs/attention-signals.md § Signals § CI/CD` row `ecr`; registry rules — `AWS SDK Go v2 — ecr/types.RegistryScanningRule § ScanFrequency, § RepositoryFilters`, `ecr/types.RegistryScanningConfiguration § ScanType`; enhanced scanning ignores the repository setting — `Amazon ECR User Guide — Considerations for enhanced scanning`.
 - `ScanOnPush` field location — `AWS SDK Go v2 — ecr/types.ImageScanningConfiguration § ScanOnPush`.
 - Wave 2 signals `CRITICAL>0` / `HIGH>0` — `docs/attention-signals.md § Signals § CI/CD` row `ecr`.
 - `imageScanFindings.findingSeverityCounts` shape — `AWS SDK Go v2 — ecr/types.ImageScanFindings § FindingSeverityCounts`; `DescribeImages` leaves `ImageScanFindingsSummary` and `ImageScanStatus` empty under the current Basic Scanning — `AWS SDK Go v2 — ecr.DescribeImages` operation doc.
@@ -212,7 +214,7 @@ ecr — CI/CD. Status key: `state` — the column naming it is the status column
 | ecr.vulnerabilities-high | <N> high vulnerabilities | warn | wave2 | Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment. |
 | ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained. |
-| ecr.scan-on-push-off | scan on push off | warn | wave1 | This repository does not scan an image as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Check the registry's scanning configuration first, because enhanced scanning is set there and covers repositories continuously; if the registry uses basic scanning, turn scan on push on for this repository. |
+| ecr.scan-on-push-off | pushed images not scanned | warn | wave2 | No registry scanning rule matches this repository; once the registry has rules, a repository no rule matches is not scanned on push whatever its own setting says, and without rules its own scan on push is off. An image is not scanned as it arrives, so a known vulnerability in a base layer can reach production without anyone being told. Add a scan-on-push or continuous rule whose filter matches this repository to the registry's scanning configuration. |
 | ecr.mutable-tags | tags are mutable | warn | wave1 | An existing tag in this repository can be moved to different image content, so the digest behind a deployed tag can change without any deployment. Set the repository to immutable tags so a tag always names the image it was built from. |
 <!-- END GENERATED: findings -->
 

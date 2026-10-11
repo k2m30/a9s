@@ -77,7 +77,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: `GetLoggingConfiguration` reports no destination for this web ACL.
+- **Signal**: `GetLoggingConfiguration` reports no destination for this web ACL under any `LogScope` — `CUSTOMER`, `SECURITY_LAKE` and `CLOUDWATCH_TELEMETRY_RULE_MANAGED` are asked in turn, and a configuration under any of them is logging. A read that fails with anything but "not found" leaves the row not inspected.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -103,7 +103,7 @@ One row per signal from §3 that has operator-readable surface text:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `Rules==[]` (no-op ACL) | 2 | Warning | `~` | S2, S3, S4, S5 | `web ACL has no rules` |
-| `GetLoggingConfiguration` reports no destination for this web ACL | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
+| `GetLoggingConfiguration` reports no destination for this web ACL under any `LogScope` | 2 | Warning | `~` | S2, S3, S4, S5 | `no logging configuration` |
 | the web ACL protects nothing (`ListResourcesForWebACL` for `REGIONAL`, `ListDistributionsByWebACLId` for `CLOUDFRONT`) | 2 | Warning | `~` | S2, S3, S4, S5 | `not associated with any resource` |
 
 ## 4.1 UX review (two sentences)

@@ -8,11 +8,12 @@
 // DescribeLaunchTemplates (paginated) +
 // DescribeLaunchTemplateVersions(Versions=["$Default"]) per template
 // (in-fetcher N+1, as transfer.go and mwaa.go do), with per-item failures
-// aggregated. IMDSv1/unencrypted/
-// details-denied findings are fetcher-written (Source: "wave1"); the
-// deprecated-ami finding alone lives in lt_issue_enrichment.go's cache-scan
-// enricher, because the fetcher has no sibling caches to cross-reference
-// against.
+// aggregated. The details-denied
+// finding is fetcher-written (Source: "wave1"). The IMDSv1 and unencrypted
+// findings live in lt_issue_enrichment.go, because an unset metadata option
+// and an explicit Encrypted=false both answer to account-level defaults that
+// need their own reads, and so does the deprecated-ami finding, because the
+// fetcher has no sibling caches to cross-reference against.
 //
 // RawStruct is LTRaw — a composite wrapper, not either bare SDK shape alone:
 // the list LaunchTemplate has DefaultVersionNumber/LatestVersionNumber/Tags
@@ -101,7 +102,7 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil)}))
 		default:
 			ver := versionOutput.LaunchTemplateVersions[0]
-			resources = append(resources, ltResource(tpl, ver, computeLTFindings(ver)))
+			resources = append(resources, ltResource(tpl, ver, nil))
 		}
 	}
 
@@ -118,9 +119,9 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 
 // ltResource constructs a Resource from the list LaunchTemplate, its
 // "$Default" LaunchTemplateVersion, and the caller-computed findings — the
-// healthy path passes computeLTFindings(ver); the degraded path passes the
-// shared details-denied finding alongside a zero-value ver. RawStruct is
-// *LTRaw for both.
+// healthy path passes none, since its findings all come from Wave 2; the
+// degraded path passes the shared details-denied finding alongside a
+// zero-value ver. RawStruct is *LTRaw for both.
 func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion, findings []domain.Finding) resource.Resource {
 	id := aws.ToString(tpl.LaunchTemplateId)
 	name := aws.ToString(tpl.LaunchTemplateName)
@@ -140,41 +141,6 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 		RawStruct: raw,
 		Findings:  findings,
 	}
-}
-
-// computeLTFindings builds the ordered Finding slice for one "$Default"
-// version: IMDSv1 first, then unencrypted-EBS — the precedence order in
-// docs/resources/lt.md (deprecated-ami and details-denied are appended later, by
-// the Wave 2 enricher and the degraded-row builder respectively).
-func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
-	data := ver.LaunchTemplateData
-	if data == nil {
-		return nil
-	}
-
-	var findings []domain.Finding
-
-	// HttpEndpoint == disabled means the metadata service is unreachable
-	// entirely; HttpTokens is moot and produces no signal regardless of its
-	// value.
-	endpointDisabled := data.MetadataOptions != nil && data.MetadataOptions.HttpEndpoint == ec2types.LaunchTemplateInstanceMetadataEndpointStateDisabled
-
-	// Unset defaults to optional (SDK-confirmed) — absence of
-	// MetadataOptions IS the signal, not its negation.
-	if !endpointDisabled && (data.MetadataOptions == nil || data.MetadataOptions.HttpTokens != ec2types.LaunchTemplateHttpTokensStateRequired) {
-		findings = append(findings, wave1Finding(ltCodeIMDSv1))
-	}
-
-	// nil Encrypted is UNKNOWN, not unencrypted — never flag nil. Only an
-	// explicit Encrypted=false fires; one mapping is enough to flag the row.
-	for _, bdm := range data.BlockDeviceMappings {
-		if bdm.Ebs != nil && bdm.Ebs.Encrypted != nil && !*bdm.Ebs.Encrypted {
-			findings = append(findings, wave1Finding(ltCodeUnencrypted))
-			break
-		}
-	}
-
-	return findings
 }
 
 // ltFormatTime formats *time.Time as the house "Created" column format

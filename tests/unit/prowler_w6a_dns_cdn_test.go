@@ -530,7 +530,7 @@ func TestW6ACFLoggingOff(t *testing.T) {
 				"access logging off", domain.SevWarn, "wave2")
 			// The phrase says logging is off; the row names the destination that is
 			// missing.
-			w2AssertRow(t, w2Rows(t, res, "E8H9I0J1K2L3M4", w6aCFLoggingOff), "Log bucket", "none")
+			w2AssertRow(t, w2Rows(t, res, "E8H9I0J1K2L3M4", w6aCFLoggingOff), "Log destination", "no legacy bucket, no v2 delivery")
 		})
 	}
 

@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -35,7 +37,8 @@ const (
 	// CodeCFDeprecatedTLS — ViewerCertificate.MinimumProtocolVersion below
 	// TLS 1.2.
 	CodeCFDeprecatedTLS domain.FindingCode = "cf.deprecated-tls"
-	// CodeCFLoggingOff — Logging.Enabled false or absent.
+	// CodeCFLoggingOff — Logging.Enabled false or absent, and no standard
+	// logging (v2) delivery for the distribution.
 	CodeCFLoggingOff domain.FindingCode = "cf.logging-off"
 	// CodeCFNoDefaultRootObject — DefaultRootObject empty.
 	CodeCFNoDefaultRootObject domain.FindingCode = "cf.no-default-root-object"
@@ -149,7 +152,7 @@ func cfMissingOriginFindings(result *IssueEnricherResult, distID string, origins
 // cfConfigFindings evaluates every config-derived posture row for one
 // distribution. Each condition is independent: a distribution failing all of
 // them carries one finding per condition, with its own supporting rows.
-func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig) {
+func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.DistributionConfig, loggingOff bool) {
 	emit := func(code domain.FindingCode, rows ...domain.DetailRow) {
 		setWave2Finding(result, distID, code, rows)
 	}
@@ -193,11 +196,9 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 		}
 	}
 
-	// CloudFront omits the logging block entirely when logging was never
-	// configured, so absent is off rather than unknown.
-	if cfg.Logging == nil || !aws.ToBool(cfg.Logging.Enabled) {
+	if loggingOff {
 		emit(CodeCFLoggingOff,
-			domain.DetailRow{Label: "Log bucket", Value: "none", Tier: "~"})
+			domain.DetailRow{Label: "Log destination", Value: "no legacy bucket, no v2 delivery", Tier: "~"})
 	}
 
 	if aws.ToString(cfg.DefaultRootObject) == "" {
@@ -210,6 +211,57 @@ func cfConfigFindings(result *IssueEnricherResult, distID string, cfg *cftypes.D
 		emit(CodeCFNoGeoRestriction,
 			domain.DetailRow{Label: "Countries", Value: "none", Tier: "~"})
 	}
+}
+
+// cfLegacyLoggingOff reports whether the distribution's own logging block is
+// off. CloudFront omits the block entirely when logging was never configured,
+// so absent is off rather than unknown.
+func cfLegacyLoggingOff(cfg *cftypes.DistributionConfig) bool {
+	return cfg.Logging == nil || !aws.ToBool(cfg.Logging.Enabled)
+}
+
+// cfStandardLoggingARNs returns the resource ARNs a standard logging (v2)
+// delivery sends logs for: the sources named by a delivery, and the ARNs those
+// sources log. A source with no delivery sends nothing anywhere. CloudFront
+// keeps these in CloudWatch Logs in us-east-1 whatever the destination's
+// Region. A nil api reads as no v2 delivery.
+func cfStandardLoggingARNs(ctx context.Context, api CWLogsDeliveriesAPI) (map[string]bool, error) {
+	if api == nil {
+		return nil, nil
+	}
+	deliveries, deliveriesComplete, deliveriesErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cwlogstypes.Delivery, *string, error) {
+		out, err := api.DescribeDeliveries(ctx, &cloudwatchlogs.DescribeDeliveriesInput{NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.Deliveries, out.NextToken, nil
+	})
+	sources, sourcesComplete, sourcesErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]cwlogstypes.DeliverySource, *string, error) {
+		out, err := api.DescribeDeliverySources(ctx, &cloudwatchlogs.DescribeDeliverySourcesInput{NextToken: token})
+		if err != nil {
+			return nil, nil, err
+		}
+		return out.DeliverySources, out.NextToken, nil
+	})
+	if err := errors.Join(deliveriesErr, sourcesErr); err != nil {
+		return nil, err
+	}
+	if !deliveriesComplete || !sourcesComplete {
+		return nil, errPageCap
+	}
+	delivered := make(map[string]bool, len(deliveries))
+	for _, d := range deliveries {
+		delivered[aws.ToString(d.DeliverySourceName)] = true
+	}
+	logged := make(map[string]bool)
+	for _, s := range sources {
+		if delivered[aws.ToString(s.Name)] {
+			for _, arn := range s.ResourceArns {
+				logged[arn] = true
+			}
+		}
+	}
+	return logged, nil
 }
 
 // cachedBucketNames returns the set of bucket names the s3 cache holds, or nil
@@ -244,6 +296,12 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	}
 	knownBuckets := cachedBucketNames(cache)
 	headAPI, _ := clients.S3.(S3HeadBucketAPI)
+	deliveriesAPI, _ := clients.InRegion("us-east-1").CloudWatchLogs.(CWLogsDeliveriesAPI)
+	// The deliveries are account-wide and matter only to a distribution with
+	// legacy logging off, so they are read when the first such one is found.
+	standardLogging := sync.OnceValues(func() (map[string]bool, error) {
+		return cfStandardLoggingARNs(ctx, deliveriesAPI)
+	})
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -263,6 +321,11 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		}
 		origins := cfOrigins(r, cfg)
 		gone, goneErr := cfOriginBucketsGone(ctx, headAPI, origins, knownBuckets)
+		var standardLogged map[string]bool
+		var standardErr error
+		if cfg != nil && cfLegacyLoggingOff(cfg) {
+			standardLogged, standardErr = standardLogging()
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -332,7 +395,15 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			}
 		}
 
-		cfConfigFindings(&result, distID, cfg)
+		loggingOff := false
+		if cfLegacyLoggingOff(cfg) {
+			if standardErr != nil {
+				MarkSkipped(&result, r.ID, &failures, standardErr)
+			} else {
+				loggingOff = !standardLogged[r.Fields["arn"]]
+			}
+		}
+		cfConfigFindings(&result, distID, cfg, loggingOff)
 
 		if len(rows) == 0 {
 			return

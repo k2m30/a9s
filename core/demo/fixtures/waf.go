@@ -18,6 +18,12 @@ const WAFNoRules = "acme-empty-waf"
 // ResourcesByWebACL with at least one associated resource.
 const WAFOrphan = "acme-unattached-waf"
 
+// WAFSecurityLakeLogged is the Web ACL whose logs Security Lake collects: its
+// logging configuration lives under the SECURITY_LAKE log scope alone, so the
+// CUSTOMER scope answers "not found" for it. It must carry NO waf.no-logging
+// finding.
+const WAFSecurityLakeLogged = WAFOrphan
+
 // WAFProdAPILogGroup is the CloudWatch log group acme-prod-api-waf logs to;
 // every other logging ACL delivers to a Firehose stream.
 const WAFProdAPILogGroup = "aws-waf-logs-acme-prod-api"
@@ -42,6 +48,9 @@ type WAFFixtures struct {
 	// cloudfront:ListDistributionsByWebACLId, off the WebACLId each
 	// distribution carries.
 	ResourcesByWebACL map[string][]string
+	// LogScopes maps a Web ACL ARN to the log scope its logging
+	// configuration lives under; an ACL absent from it logs under CUSTOMER.
+	LogScopes map[string]wafv2types.LogScope
 }
 
 // NewWAFFixtures constructs WAFFixtures from the canonical demo data.
@@ -104,6 +113,9 @@ var sharedWAFFixtures = shared(func() *WAFFixtures {
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFNoRules + "/a1b2c3d4-5678-90ab-cdef-444444444444": {
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-internal-api/0987654321fedcba",
 			},
+		},
+		LogScopes: map[string]wafv2types.LogScope{
+			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/" + WAFSecurityLakeLogged + "/a1b2c3d4-5678-90ab-cdef-555555555555": wafv2types.LogScopeSecurityLake,
 		},
 	}
 })

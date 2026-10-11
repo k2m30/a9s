@@ -26,6 +26,14 @@ type GlueFixtures struct {
 // below, which the glue:kms related-panel pivot resolves.
 const glueSecurityConfigName = "acme-glue-security-config"
 
+// GlueSecurityConfigOff is the one demo job whose security configuration
+// (GlueLegacySecurityConfig) turns S3, CloudWatch and job bookmark
+// encryption off; every other job's configuration encrypts all three.
+const (
+	GlueSecurityConfigOff    = "acme-etl-clickstream"
+	GlueLegacySecurityConfig = "acme-glue-legacy-config"
+)
+
 func mustParseGlueTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return t
@@ -78,7 +86,7 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 				},
 				// GlueLoggingOff: without the continuous-logging argument
 				// a killed run leaves no diagnostics.
-				SecurityConfiguration: aws.String(glueSecurityConfigName),
+				SecurityConfiguration: aws.String(GlueLegacySecurityConfig),
 				DefaultArguments: map[string]string{
 					"--job-language": "python",
 				},
@@ -96,8 +104,8 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 					Name: aws.String("pythonshell"),
 				},
 				// GlueNoSecurityConfig: without a SecurityConfiguration,
-				// output, logs and bookmarks are all
-				// written unencrypted.
+				// output, logs and bookmarks are not encrypted with a key
+				// the account controls.
 				DefaultArguments: map[string]string{
 					"--enable-continuous-cloudwatch-log": "true",
 					"--job-language":                     "python",
@@ -213,10 +221,23 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 			},
 		},
 		SecurityConfigurations: map[string]gluetypes.SecurityConfiguration{
+			GlueLegacySecurityConfig: {
+				Name:             aws.String(GlueLegacySecurityConfig),
+				CreatedTimeStamp: aws.Time(mustParseGlueTime("2024-02-12T09:00:00+00:00")),
+				EncryptionConfiguration: &gluetypes.EncryptionConfiguration{
+					S3Encryption:           []gluetypes.S3Encryption{{S3EncryptionMode: gluetypes.S3EncryptionModeDisabled}},
+					CloudWatchEncryption:   &gluetypes.CloudWatchEncryption{CloudWatchEncryptionMode: gluetypes.CloudWatchEncryptionModeDisabled},
+					JobBookmarksEncryption: &gluetypes.JobBookmarksEncryption{JobBookmarksEncryptionMode: gluetypes.JobBookmarksEncryptionModeDisabled},
+				},
+			},
 			"acme-glue-security-config": {
 				Name:             aws.String("acme-glue-security-config"),
 				CreatedTimeStamp: aws.Time(mustParseGlueTime("2025-05-01T09:00:00+00:00")),
 				EncryptionConfiguration: &gluetypes.EncryptionConfiguration{
+					S3Encryption: []gluetypes.S3Encryption{{
+						S3EncryptionMode: gluetypes.S3EncryptionModeSsekms,
+						KmsKeyArn:        aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					}},
 					CloudWatchEncryption: &gluetypes.CloudWatchEncryption{
 						CloudWatchEncryptionMode: gluetypes.CloudWatchEncryptionModeSsekms,
 						KmsKeyArn:                aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),

@@ -148,7 +148,7 @@ Per-broker runtime state is not on any read-only AWS action: `ListNodes` returns
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
-- **Signal**: client-broker encryption allows plaintext.
+- **Signal**: client-broker encryption allows plaintext (`EncryptionInTransit.ClientBroker` is `PLAINTEXT` or `TLS_PLAINTEXT`), or broker-to-broker traffic is plaintext (`EncryptionInTransit.InCluster == false`; unset means on). The rows name the hop: `Client to broker: plaintext` / `TLS or plaintext`, `Broker to broker: plaintext`.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -181,7 +181,7 @@ One row per signal from §3:
 | `PublicAccess.Type` publishes the brokers | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `brokers reachable from the internet` |
 | `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `unauthenticated access allowed` |
 | the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S2, S3, S4, S5 | `broker software outdated` |
-| client-broker encryption allows plaintext | 2 | Warning | `~` | S2, S3, S4, S5 | `encryption in transit not enforced` |
+| client-broker or broker-to-broker encryption allows plaintext | 2 | Warning | `~` | S2, S3, S4, S5 | `encryption in transit not enforced` |
 
 Notes:
 
@@ -240,7 +240,7 @@ msk — MESSAGING. Status key: `state` — the key the status cell reads, and th
 | msk.warn.deleting | deleting | warn | wave1 | The cluster is being torn down, and its brokers and their data go with it. Confirm the producers and consumers have moved before the endpoints stop answering. |
 | msk.broken.failed | failed | broken | wave1 | The cluster is in a failed state and serves no Kafka traffic, so every producer and consumer behind it is stalled. Check the cluster's operations history for the failing step; a cluster in this state usually has to be recreated from a configuration you still hold. |
 | msk.broker-outdated | broker software outdated | warn | wave2 | The brokers run a Kafka version AWS no longer treats as current, so fixes and features stay out of reach and support for it eventually ends. Plan a rolling version upgrade in a maintenance window — clients keep working across it if the topics are replicated. |
-| msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | The cluster accepts plaintext client connections, so records and any credentials in the handshake cross the network readable by anything on the path. Set client-broker encryption to TLS only and move the clients over. |
+| msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | Traffic crosses the network in plaintext on the hop named below — client to broker, broker to broker, or both — so records and any credentials in the handshake are readable by anything on the path. Set client-broker encryption to TLS only and turn in-cluster encryption on; in-cluster encryption is chosen at cluster creation, so a cluster without it is replaced. |
 | msk.public-access | brokers reachable from the internet | broken | wave2 | Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network. |
 | msk.unauthenticated | unauthenticated access allowed | broken | wave2 | The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods. |
 <!-- END GENERATED: findings -->

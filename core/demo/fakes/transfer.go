@@ -103,3 +103,17 @@ func (f *TransferFake) DescribeCertificate(_ context.Context, input *transfer.De
 	}
 	return &transfer.DescribeCertificateOutput{Certificate: &cert}, nil
 }
+
+// DescribeSecurityPolicy returns the published security policy of the given
+// name from fixtures.TransferSecurityPolicies. Unknown names return
+// ResourceNotFoundException.
+func (f *TransferFake) DescribeSecurityPolicy(_ context.Context, input *transfer.DescribeSecurityPolicyInput, _ ...func(*transfer.Options)) (*transfer.DescribeSecurityPolicyOutput, error) {
+	name := aws.ToString(input.SecurityPolicyName)
+	policy, ok := fixtures.TransferSecurityPolicies[name]
+	if !ok {
+		return nil, &transfertypes.ResourceNotFoundException{
+			Message: aws.String("Security policy " + name + " not found"),
+		}
+	}
+	return &transfer.DescribeSecurityPolicyOutput{SecurityPolicy: &policy}, nil
+}

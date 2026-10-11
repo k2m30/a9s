@@ -44,6 +44,13 @@ type CWLogsDescribeSubscriptionFiltersAPI interface {
 	DescribeSubscriptionFilters(ctx context.Context, params *cloudwatchlogs.DescribeSubscriptionFiltersInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error)
 }
 
+// CWLogsDeliveriesAPI reads vended-log deliveries and their sources, where
+// standard logging (v2) for services such as CloudFront is configured.
+type CWLogsDeliveriesAPI interface {
+	DescribeDeliveries(ctx context.Context, params *cloudwatchlogs.DescribeDeliveriesInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliveriesOutput, error)
+	DescribeDeliverySources(ctx context.Context, params *cloudwatchlogs.DescribeDeliverySourcesInput, optFns ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliverySourcesOutput, error)
+}
+
 // CWLogsAPI is the aggregate interface covering all CloudWatchLogs operations used by a9s fetchers.
 // *cloudwatchlogs.Client structurally satisfies this interface.
 type CWLogsAPI interface {

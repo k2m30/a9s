@@ -6,9 +6,10 @@ package integration
 // return values) for lt against the universal UI rules and
 // docs/resources/lt.md.
 //
-// The lt list API carries no health data — IMDSv1
-// and explicit-off EBS encryption are describe-borne fetcher findings; the
-// deprecated-AMI warning is the cache-scan enricher (zero SDK calls). Every
+// The lt list API carries no health data. IMDSv1, explicit-off EBS
+// encryption and the deprecated AMI are Wave-2 findings: the first two need
+// the account defaults, the AMI and the Region's EBS default, the last scans
+// the ami cache. Every
 // issue-severity finding is color-bearing; no glyph-on-green and no
 // Broken/Dim buckets exist for this type (all findings SevWarn).
 
@@ -52,16 +53,13 @@ func TestScenario_LTVisual(t *testing.T) {
 	runDemoStartup(t, scenario)
 
 	// Menu badge — rows whose Wave-1-only colour IsIssue, plus Healthy
-	// rows carrying a Wave-2 `!`. Over the 10 lt fixtures:
-	//   Wave-1 Warning (5): lt-0warnimdsv11111a, lt-0warnimdsvdef111a,
-	//                       lt-0warnunencrypt1a, lt-0warnmulti111111a,
-	//                       lt-0warndenied11111a (degraded name-only row)
+	// rows carrying a Wave-2 `!`. IMDSv1, EBS encryption and the deprecated
+	// AMI are Wave-2 `~` findings: they colour their rows and never bump the
+	// badge. Over the 11 lt fixtures:
+	//   Wave-1 Warning (2): the details-denied and details-unavailable rows
 	//   Healthy + Wave-2 `!` (1): lt-0warnuserdata111a (lt.user-data-secret)
-	//   Not counted (4): the three clean templates, and lt-0warndeprecated1a
-	//                    whose deprecated-AMI check is Wave-2 `~` and never
-	//                    bumps the badge
-	// 5 + 1 = 6.
-	scenario.ExpectMenuIssueCount("lt", 7)
+	// 2 + 1 = 3.
+	scenario.ExpectMenuIssueCount("lt", 3)
 
 	scenario.OpenList("lt")
 

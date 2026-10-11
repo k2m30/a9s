@@ -35,6 +35,11 @@ type CWLogsFixtures struct {
 	// a Lambda execution environment writes each invocation, START to
 	// REPORT, to one stream.
 	EventStreams map[string]string
+	// DeliverySources and Deliveries are the account's vended-log
+	// deliveries, where standard logging (v2) for a CloudFront distribution
+	// is configured.
+	DeliverySources []cwlogstypes.DeliverySource
+	Deliveries      []cwlogstypes.Delivery
 }
 
 // OrphanOldLogGroupName is the log group whose metric filter bridges it to an
@@ -970,6 +975,20 @@ var sharedCWLogsFixtures = shared(func() *CWLogsFixtures {
 			"/aws/lambda/api-gateway-authorizer": "2026/03/22/[$LATEST]abc123",
 			"/aws/lambda/process-orders":         "2026/03/22/[$LATEST]ord789",
 		},
+		DeliverySources: []cwlogstypes.DeliverySource{{
+			Arn:          aws.String("arn:aws:logs:us-east-1:123456789012:delivery-source:cf-" + CFStandardLoggingV2),
+			Name:         aws.String("cf-" + CFStandardLoggingV2),
+			LogType:      aws.String("ACCESS_LOGS"),
+			Service:      aws.String("cloudfront"),
+			ResourceArns: []string{CFStandardLoggingV2ARN},
+		}},
+		Deliveries: []cwlogstypes.Delivery{{
+			Id:                      aws.String("Ab1Cd2Ef3Gh4Ij5K"),
+			Arn:                     aws.String("arn:aws:logs:us-east-1:123456789012:delivery:Ab1Cd2Ef3Gh4Ij5K"),
+			DeliverySourceName:      aws.String("cf-" + CFStandardLoggingV2),
+			DeliveryDestinationArn:  aws.String("arn:aws:logs:us-east-1:123456789012:delivery-destination:acme-cdn-logs-s3"),
+			DeliveryDestinationType: cwlogstypes.DeliveryDestinationTypeS3,
+		}},
 	}
 })
 

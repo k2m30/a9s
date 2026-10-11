@@ -25,6 +25,9 @@ type ECRFixtures struct {
 	// (for GetLifecyclePolicy). A repository absent from this map has no
 	// lifecycle policy (ECRNoLifecycle).
 	LifecyclePolicies map[string]string
+	// RegistryScanning is the registry scanning configuration (for
+	// GetRegistryScanningConfiguration).
+	RegistryScanning *ecrtypes.RegistryScanningConfiguration
 }
 
 // Repositories carrying the ecr posture findings. Each names the ONE demo
@@ -33,10 +36,19 @@ type ECRFixtures struct {
 const (
 	// ECRPublicPolicy — repository policy grants a wildcard principal.
 	ECRPublicPolicy = "acme/public-mirror"
-	// ECRScanOnPushOff — scan on push is off.
+	// ECRScanOnPushOff — no registry scan-on-push filter matches it, so its
+	// pushed images are not scanned.
 	ECRScanOnPushOff = "acme/base-images"
-	// ECRMutableTags — image tags can be overwritten.
+	// ECRMutableTags — image tags can be overwritten: MUTABLE_WITH_EXCLUSION
+	// leaves every tag but the excluded ones movable.
 	ECRMutableTags = "acme/frontend"
+	// ECRImmutableWithExclusion — IMMUTABLE_WITH_EXCLUSION pins every tag but
+	// the excluded ones, so it carries NO mutable-tags finding.
+	ECRImmutableWithExclusion = ECRHighVulnerabilities
+	// ECRRegistryScanned — scan on push is off on the repository, and a
+	// registry scan-on-push rule matching its name scans it anyway, so it
+	// carries NO scan-on-push finding.
+	ECRRegistryScanned = "acme/internal-tools"
 	// ECRNoLifecycle — no lifecycle policy is configured.
 	ECRNoLifecycle = "acme/batch-processor"
 	// ECRHighVulnerabilities — the latest image has high findings and no
@@ -81,11 +93,14 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 		{
 			// ECRMutableTags: a deployed tag can be moved to different
 			// image content without any deployment.
-			RepositoryName:             aws.String("acme/frontend"),
-			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/frontend"),
-			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/acme/frontend"),
-			RegistryId:                 aws.String("123456789012"),
-			ImageTagMutability:         ecrtypes.ImageTagMutabilityMutable,
+			RepositoryName:     aws.String("acme/frontend"),
+			RepositoryUri:      aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/frontend"),
+			RepositoryArn:      aws.String("arn:aws:ecr:us-east-1:123456789012:repository/acme/frontend"),
+			RegistryId:         aws.String("123456789012"),
+			ImageTagMutability: ecrtypes.ImageTagMutabilityMutableWithExclusion,
+			ImageTagMutabilityExclusionFilters: []ecrtypes.ImageTagMutabilityExclusionFilter{{
+				Filter: aws.String("release-*"), FilterType: ecrtypes.ImageTagMutabilityExclusionFilterTypeWildcard,
+			}},
 			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
 			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
 				EncryptionType: ecrtypes.EncryptionTypeKms,
@@ -109,11 +124,14 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 		},
 		{
 			// ECRHighVulnerabilities: high findings, no critical.
-			RepositoryName:             aws.String(ECRHighVulnerabilities),
-			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRHighVulnerabilities),
-			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRHighVulnerabilities),
-			RegistryId:                 aws.String("123456789012"),
-			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
+			RepositoryName:     aws.String(ECRHighVulnerabilities),
+			RepositoryUri:      aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRHighVulnerabilities),
+			RepositoryArn:      aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRHighVulnerabilities),
+			RegistryId:         aws.String("123456789012"),
+			ImageTagMutability: ecrtypes.ImageTagMutabilityImmutableWithExclusion,
+			ImageTagMutabilityExclusionFilters: []ecrtypes.ImageTagMutabilityExclusionFilter{{
+				Filter: aws.String("latest"), FilterType: ecrtypes.ImageTagMutabilityExclusionFilterTypeWildcard,
+			}},
 			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
 			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
 				EncryptionType: ecrtypes.EncryptionTypeKms,
@@ -151,17 +169,18 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 			},
 			CreatedAt: aws.Time(mustParseECRTime("2025-08-14T09:30:00+00:00")),
 		},
-		// The healthy repository: immutable tags, scan on push, a lifecycle
-		// policy, no resource policy and no vulnerable images. Demo mode needs
-		// one row of every type in the healthy state, and every other
-		// repository here carries a finding.
+		// The healthy repository: immutable tags, scanned on push by the
+		// registry rule rather than its own setting (ECRRegistryScanned), a
+		// lifecycle policy, no resource policy and no vulnerable images. Demo
+		// mode needs one row of every type in the healthy state, and every
+		// other repository here carries a finding.
 		{
-			RepositoryName:             aws.String("acme/internal-tools"),
-			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/internal-tools"),
-			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/acme/internal-tools"),
+			RepositoryName:             aws.String(ECRRegistryScanned),
+			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRRegistryScanned),
+			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRRegistryScanned),
 			RegistryId:                 aws.String("123456789012"),
 			ImageTagMutability:         ecrtypes.ImageTagMutabilityImmutable,
-			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: true},
+			ImageScanningConfiguration: &ecrtypes.ImageScanningConfiguration{ScanOnPush: false},
 			EncryptionConfiguration: &ecrtypes.EncryptionConfiguration{
 				EncryptionType: ecrtypes.EncryptionTypeKms,
 				KmsKey:         aws.String(prodKMSKeyID),
@@ -265,8 +284,26 @@ var sharedECRFixtures = shared(func() *ECRFixtures {
 		Tags:              tags,
 		Policies:          policies,
 		LifecyclePolicies: lifecyclePolicies,
+		RegistryScanning: &ecrtypes.RegistryScanningConfiguration{
+			ScanType: ecrtypes.ScanTypeBasic,
+			Rules: []ecrtypes.RegistryScanningRule{{
+				ScanFrequency:     ecrtypes.ScanFrequencyScanOnPush,
+				RepositoryFilters: ecrDemoScanOnPushFilters(),
+			}},
+		},
 	}
 })
+
+// ecrDemoScanOnPushFilters cover every demo repository except
+// ECRScanOnPushOff. A filter without "*" matches every name that contains it;
+// acme/internal-* is the one wildcard filter.
+func ecrDemoScanOnPushFilters() []ecrtypes.ScanningRepositoryFilter {
+	var filters []ecrtypes.ScanningRepositoryFilter
+	for _, f := range []string{"acme/internal-*", "api-service", "frontend", "reporting", "batch-", "public-mirror", "order-worker", "degraded", "stalled"} {
+		filters = append(filters, ecrtypes.ScanningRepositoryFilter{Filter: aws.String(f), FilterType: ecrtypes.ScanningRepositoryFilterTypeWildcard})
+	}
+	return filters
+}
 
 // ecsServiceRepos are the repositories only the demo ECS task definitions
 // name.
@@ -277,5 +314,5 @@ func NewECRFixtures() *ECRFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "ecr", Rows: 12, Issues: 2, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ecr", Rows: 12, Issues: 1, CoverageGaps: []string{"dim"}})
 }

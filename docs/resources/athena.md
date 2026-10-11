@@ -74,7 +74,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: `Configuration.EnforceWorkGroupConfiguration == false`.
+- **Signal**: `Configuration.EnforceWorkGroupConfiguration == false` and
+  `Configuration.EnableMinimumEncryptionConfiguration` not `true`. With minimum
+  encryption on, no query can drop below the workgroup's encryption, so the
+  workgroup is not flagged.
   - **State bucket**: Warning.
   - **API call**: `GetWorkGroup` per workgroup.
   - **Cost shape**: per-resource. A workgroup that does not force its settings leaves every setting it defines advisory — the client chooses.
@@ -103,8 +106,8 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `State == DISABLED` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
-| `EnforceWorkGroupConfiguration == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `settings can be overridden per query` |
-| `ResultConfiguration.EncryptionConfiguration == nil` without Athena owned storage | 2 | Warning | `~` | S2, S3, S4, S5 | `query results stored unencrypted` |
+| `EnforceWorkGroupConfiguration == false` without minimum encryption | 2 | Warning | `~` | S2, S3, S4, S5 | `settings can be overridden per query` |
+| `ResultConfiguration.EncryptionConfiguration == nil` without Athena owned storage | 2 | Warning | `~` | S2, S3, S4, S5 | `result encryption not set` |
 
 Rules for filling list and detail text:
 
@@ -115,7 +118,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled` tells the operator the workgroup is admin-off, and a yellow row reading `query results stored unencrypted` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still write results in the clear, and a merged cell could name only the first. Operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? All problem rows are self-explanatory in the list — a yellow row reading `disabled` tells the operator the workgroup is admin-off, and a yellow row reading `result encryption not set` names the exposure and where to fix it. The two governance settings are two rows rather than one merged phrase, because a workgroup that enforces its settings can still leave result encryption to the bucket default, and a merged cell could name only the first. Operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -151,7 +154,7 @@ athena — DATA & ANALYTICS. Status key: `state` — the key the status cell rea
 | --- | --- | --- | --- | --- |
 | athena.workgroup-disabled | disabled | warn | wave1 | Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries. |
 | athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query. |
-| athena.results-unencrypted | query results stored unencrypted | warn | wave2 | Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration. |
+| athena.results-unencrypted | result encryption not set | warn | wave2 | The workgroup sets no encryption for query results, so they take whatever default the results bucket applies (S3-managed keys at minimum), a key the workgroup neither chooses nor controls access through. Set an encryption option on the workgroup's result configuration so every result is encrypted the way the workgroup requires. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

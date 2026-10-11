@@ -147,6 +147,14 @@ func (f *ECRFake) GetLifecyclePolicy(_ context.Context, input *ecr.GetLifecycleP
 
 // hasRepository reports whether the fixtures register this repository. An
 // empty repository still answers an empty image list.
+// GetRegistryScanningConfiguration returns the registry's scanning rules.
+func (f *ECRFake) GetRegistryScanningConfiguration(_ context.Context, _ *ecr.GetRegistryScanningConfigurationInput, _ ...func(*ecr.Options)) (*ecr.GetRegistryScanningConfigurationOutput, error) {
+	return &ecr.GetRegistryScanningConfigurationOutput{
+		RegistryId:            aws.String("123456789012"),
+		ScanningConfiguration: f.fix.RegistryScanning,
+	}, nil
+}
+
 func (f *ECRFake) hasRepository(name string) bool {
 	return slices.ContainsFunc(f.fix.Repositories, func(r ecrtypes.Repository) bool {
 		return aws.ToString(r.RepositoryName) == name

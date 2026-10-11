@@ -22,6 +22,7 @@ import (
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -161,6 +162,12 @@ func (f *w3ELBv2Fake) DescribeListeners(_ context.Context, in *elbv2.DescribeLis
 		return nil, err
 	}
 	return &elbv2.DescribeListenersOutput{Listeners: f.listeners[arn]}, nil
+}
+
+// DescribeSSLPolicies answers the predefined security policies with the
+// protocols AWS states for each.
+func (f *w3ELBv2Fake) DescribeSSLPolicies(_ context.Context, _ *elbv2.DescribeSSLPoliciesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeSSLPoliciesOutput, error) {
+	return &elbv2.DescribeSSLPoliciesOutput{SslPolicies: fixtures.ELBSSLPolicies}, nil
 }
 
 func w3NewELBFake() *w3ELBv2Fake {

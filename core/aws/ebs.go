@@ -250,10 +250,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	if snap.VolumeSize != nil {
 		size = strconv.Itoa(int(*snap.VolumeSize))
 	}
-	encrypted := "false"
-	if snap.Encrypted != nil && *snap.Encrypted {
-		encrypted = "true"
-	}
+	encrypted := strconv.FormatBool(!ebsSnapUnencrypted(snap))
 	description := ""
 	if snap.Description != nil {
 		description = *snap.Description
@@ -299,6 +296,13 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	return r
 }
 
+// ebsSnapUnencrypted is the one reading of a snapshot's encryption for both
+// the encrypted field and the finding: a snapshot AWS does not state as
+// encrypted counts as unencrypted.
+func ebsSnapUnencrypted(snap ec2types.Snapshot) bool {
+	return snap.Encrypted == nil || !*snap.Encrypted
+}
+
 // ebsSnapAge is the automated-snapshot age threshold past which a completed
 // snapshot is flagged as a cost concern (no retention policy pruning it).
 const ebsSnapAge = 365 * 24 * time.Hour
@@ -314,7 +318,7 @@ const ebsSnapAge = 365 * 24 * time.Hour
 // ebs_snap_issue_enrichment.go), since it needs the full ResourceCache this
 // per-item helper does not have access to.
 func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
-	if snap.Encrypted == nil || !*snap.Encrypted {
+	if ebsSnapUnencrypted(snap) {
 		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted)}
 	}
 	if snap.StartTime != nil {

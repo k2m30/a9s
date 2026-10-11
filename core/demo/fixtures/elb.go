@@ -77,7 +77,8 @@ const (
 	// 443 is NOT that port — a TCP listener there is TLS passthrough, and the
 	// session terminates on the target.
 	ELBPlainTCPListener = "data-pipeline-nlb"
-	// ELBWeakTLS terminates TLS on a pre-TLS-1.2 security policy.
+	// ELBWeakTLS terminates TLS on security policies that still allow a
+	// protocol below TLS 1.2.
 	ELBWeakTLS = "events-alb"
 )
 
@@ -425,7 +426,8 @@ func buildListeners(f *ELBFixtures) {
 		},
 	}
 
-	// The only demo listeners on a pre-TLS-1.2 security policy. Both carry a
+	// The only demo listeners on a security policy that still allows a
+	// protocol below TLS 1.2. Both carry a
 	// certificate so the wave-1 "no certificate configured" signal stays on
 	// its own load balancer, and they are supplied 8443 before 443 for the same
 	// reason the cleartext pair is out of order.
@@ -449,7 +451,9 @@ func buildListeners(f *ELBFixtures) {
 			LoadBalancerArn: aws.String(weakTLSARN),
 			Port:            aws.Int32(443),
 			Protocol:        elbv2types.ProtocolEnumHttps,
-			SslPolicy:       aws.String("ELBSecurityPolicy-2016-08"),
+			// Adds TLS 1.3 on top of TLS 1.1 rather than replacing it, so the
+			// listener still negotiates a deprecated protocol.
+			SslPolicy: aws.String("ELBSecurityPolicy-TLS13-1-1-2021-06"),
 			Certificates: []elbv2types.Certificate{
 				{CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111")},
 			},
@@ -465,6 +469,7 @@ func buildListeners(f *ELBFixtures) {
 			LoadBalancerArn: aws.String(fixtProdELBARN),
 			Port:            aws.Int32(443),
 			Protocol:        elbv2types.ProtocolEnumHttps,
+			SslPolicy:       aws.String("ELBSecurityPolicy-TLS13-1-2-2021-06"),
 			// Certificates — required for the elb→acm related-panel pivot
 			// (checkELBACM). ProdACMCertARN1 (acm.go) is the same cert this
 			// ELB's ARN appears under in ACM's InUseBy fixture (acm→elb).

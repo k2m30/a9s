@@ -3,6 +3,7 @@ package unit_test
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -78,7 +79,10 @@ var t576FailureAllowed = map[string]string{
 //     about (or the read was account-wide);
 //   - every request the clean run made that does not carry data only the
 //     refused operation returned is still made — an enricher that stops at
-//     the first refusal skips signals that never depended on it.
+//     the first refusal skips signals that never depended on it. An
+//     account-wide read, whose request names nothing, is made only when a
+//     row needs it, so it may be skipped only when the refusal already
+//     marked every row that read's own refusal marks.
 func TestT576_FailedEnricherReadIsMarkedAndHidesNoOtherSignal(t *testing.T) {
 	byType, cache := buildVisibilityTypeCache(t)
 	parents := map[string]bool{}
@@ -115,6 +119,24 @@ func TestT576_FailedEnricherReadIsMarkedAndHidesNoOtherSignal(t *testing.T) {
 				seen[o] = true
 				ops = append(ops, o)
 			}
+		}
+
+		// needs returns the rows an operation's own refusal marks.
+		needsOf := map[op][]string{}
+		needs := func(service, name string) []string {
+			o := op{service, name}
+			if ids, ok := needsOf[o]; ok {
+				return ids
+			}
+			alone := t576Enrich(t, w.Enricher.Fn, rows, reads, func(s, n string, _ any) error {
+				if s == service && n == name {
+					return t576Denied(s, n)
+				}
+				return nil
+			})
+			ids := slices.Sorted(maps.Keys(alone.res.TruncatedIDs))
+			needsOf[o] = ids
+			return ids
 		}
 
 		for _, o := range ops {
@@ -236,6 +258,13 @@ func TestT576_FailedEnricherReadIsMarkedAndHidesNoOtherSignal(t *testing.T) {
 					continue
 				}
 				if slices.ContainsFunc(t576Leaves(c.In), func(l string) bool { return derived[l] }) {
+					continue
+				}
+				// An account-wide read names nothing and is made only when a
+				// row needs it. The rows that need it are the rows its own
+				// refusal marks; when this refusal already marked all of
+				// them, no row was left to need it.
+				if len(t576Leaves(c.In)) == 0 && !slices.ContainsFunc(needs(c.Service, c.Op), func(id string) bool { return !marked(id) }) {
 					continue
 				}
 				if key := t576CallKey(c); !made[key] {

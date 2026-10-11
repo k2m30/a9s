@@ -84,9 +84,10 @@ func asgGroupOn(id, lcName string) resource.Resource {
 }
 
 // imdsv1Config is a launch configuration that trips the IMDSv1 rule: no
-// MetadataOptions at all means tokens are optional.
+// MetadataOptions takes the AMI's default, and the EC2 client these tests
+// wire answers every AMI without ImdsSupport, so tokens are optional.
 func imdsv1Config(name string) asgtypes.LaunchConfiguration {
-	return asgtypes.LaunchConfiguration{LaunchConfigurationName: aws.String(name)}
+	return asgtypes.LaunchConfiguration{LaunchConfigurationName: aws.String(name), ImageId: aws.String("ami-0aaaa1111bbbb2222")}
 }
 
 // TestASGLaunchConfigPosture_PageErrorLeavesEveryGroupUninspected pins that a
@@ -108,7 +109,7 @@ func TestASGLaunchConfigPosture_PageErrorLeavesEveryGroupUninspected(t *testing.
 		},
 		errAt: 2,
 	}
-	clients := &awsclient.ServiceClients{AutoScaling: fake}
+	clients := &awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}
 	resources := []resource.Resource{
 		asgGroupOn("asg-first", "lc-first"),
 		asgGroupOn("asg-second", "lc-second"),
@@ -150,7 +151,7 @@ func TestASGLaunchConfigPosture_ReadsEveryPage(t *testing.T) {
 			{LaunchConfigurations: []asgtypes.LaunchConfiguration{imdsv1Config("lc-second")}},
 		},
 	}
-	clients := &awsclient.ServiceClients{AutoScaling: fake}
+	clients := &awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}
 	resources := []resource.Resource{
 		asgGroupOn("asg-first", "lc-first"),
 		asgGroupOn("asg-second", "lc-second"),
@@ -195,7 +196,7 @@ func TestASGLaunchConfigPosture_PageCapExhaustedMarksTheCountALowerBound(t *test
 		},
 		endless: true,
 	}
-	clients := &awsclient.ServiceClients{AutoScaling: fake}
+	clients := &awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}
 	resources := []resource.Resource{asgGroupOn("asg-first", "lc-first")}
 
 	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
@@ -232,7 +233,7 @@ func TestASGLaunchConfigPosture_PageCapMarksOnlyTheGroupsItNeverRead(t *testing.
 		})
 	}
 	fake := &asgLaunchConfigPagesFake{pages: pages}
-	clients := &awsclient.ServiceClients{AutoScaling: fake}
+	clients := &awsclient.ServiceClients{AutoScaling: fake, EC2: t581NoIMDSDefaultEC2{}}
 	resources := []resource.Resource{
 		asgGroupOn("asg-arrived", "lc-arrived"),
 		asgGroupOn("asg-behind-the-cap", "lc-behind-the-cap"),

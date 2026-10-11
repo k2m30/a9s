@@ -38,6 +38,14 @@ type TransferDescribeCertificateAPI interface {
 	DescribeCertificate(ctx context.Context, params *transfer.DescribeCertificateInput, optFns ...func(*transfer.Options)) (*transfer.DescribeCertificateOutput, error)
 }
 
+// TransferDescribeSecurityPolicyAPI defines the interface for the Transfer
+// DescribeSecurityPolicy operation, which states the algorithms a security
+// policy allows. Standalone rather than part of the aggregate: the Wave 2
+// enricher type-asserts for it.
+type TransferDescribeSecurityPolicyAPI interface {
+	DescribeSecurityPolicy(ctx context.Context, params *transfer.DescribeSecurityPolicyInput, optFns ...func(*transfer.Options)) (*transfer.DescribeSecurityPolicyOutput, error)
+}
+
 // TransferAPI is the aggregate interface covering all Transfer Family operations used by a9s fetchers.
 // *transfer.Client structurally satisfies this interface.
 type TransferAPI interface {

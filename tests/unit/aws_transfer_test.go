@@ -1,7 +1,8 @@
 package unit
 
 // Transfer is an in-fetcher N+1 (ListServers + DescribeServer per id); every
-// signal is emitted fetcher-side with Source "wave1". A row whose
+// signal except the security-policy verdict is emitted fetcher-side with
+// Source "wave1". A row whose
 // DescribeServer is denied stays rich: it is built from the ListedServer fields
 // with the transfer.warn.details_denied finding appended.
 
@@ -21,6 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -192,9 +194,29 @@ func TestFetchTransferServersPage_StatePhrases(t *testing.T) {
 	}
 }
 
+// transferDemoRowsWithWave2 is the demo page with the Wave 2 security-policy
+// verdict applied, the shape the list renders once enrichment lands.
+func transferDemoRowsWithWave2(t *testing.T) []resource.Resource {
+	t.Helper()
+	td := resource.FindResourceType("transfer")
+	if td == nil {
+		t.Fatal("transfer type not registered")
+	}
+	rows := fetchTransferDemoPage(t).Resources
+	result, err := awsclient.EnrichTransferSecurityPolicy(context.Background(), demo.NewServiceClients(), rows, nil)
+	if err != nil {
+		t.Fatalf("EnrichTransferSecurityPolicy: %v", err)
+	}
+	for i := range rows {
+		runtime.ApplyWave2ToRow(&rows[i], *td, result.Findings, result.AttentionDetails)
+	}
+	return rows
+}
+
+// The security policy is judged by the algorithms DescribeSecurityPolicy says
+// it offers, so the verdict arrives with Wave 2.
 func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
-	result := fetchTransferDemoPage(t)
-	r := mustFindTransferResource(t, result.Resources, fixtures.WarnTransferLegacyPolicyID)
+	r := mustFindTransferResource(t, transferDemoRowsWithWave2(t), fixtures.WarnTransferLegacyPolicyID)
 
 	var finding *domain.Finding
 	for i := range r.Findings {
@@ -212,7 +234,7 @@ func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
 	const policyName = "TransferSecurityPolicy-2018-11"
 	// Detail is the static sentence FindingDef declares for
 	// transferCodeLegacyPolicy; the policy name stays in the resource's own fields.
-	const wantDetail = "The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy."
+	const wantDetail = "The server's security policy still offers key exchanges, message checks or TLS cipher suites that are no longer safe, so a client can settle on one that does not protect the session. Move the server to a current security policy."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
@@ -249,17 +271,17 @@ func TestFetchTransferServersPage_NoLoggingFinding(t *testing.T) {
 	}
 }
 
-// Findings are ordered state, then legacy policy, then no logging.
+// Fetcher findings are ordered state, then no logging; the security-policy
+// verdict arrives with Wave 2 and follows them.
 
 func TestFetchTransferServersPage_MultiStackOrdered(t *testing.T) {
-	result := fetchTransferDemoPage(t)
-	r := mustFindTransferResource(t, result.Resources, fixtures.WarnTransferMultiID)
+	r := mustFindTransferResource(t, transferDemoRowsWithWave2(t), fixtures.WarnTransferMultiID)
 
 	got := make([]string, len(r.Findings))
 	for i, f := range r.Findings {
 		got[i] = f.Phrase
 	}
-	want := []string{"offline: not accepting transfers", "legacy security policy", "no activity logging"}
+	want := []string{"offline: not accepting transfers", "no activity logging", "legacy security policy"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ordered Findings phrases = %v, want %v", got, want)
 	}

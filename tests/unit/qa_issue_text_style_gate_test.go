@@ -192,6 +192,31 @@ func isExemptStyleToken(tok, resourceID, resourceName string) bool {
 // raw-enum-leak this gate polices.
 var angleBracketPlaceholderPattern = regexp.MustCompile(`<[^<>]*>`)
 
+// hyphenatedIdentifierPattern matches a hyphen-joined compound
+// ("ELBSecurityPolicy-TLS13-1-1-2021-06", "ami-0a1b2c3d4e5f60001").
+var hyphenatedIdentifierPattern = regexp.MustCompile(`[A-Za-z0-9]+(-[A-Za-z0-9]+)+`)
+
+// stripHyphenatedIdentifiers removes every hyphen-joined compound carrying
+// three or more digits. That is the shape of an AWS-defined identifier — a
+// policy name, a resource id, a dated version — which the operator copies
+// verbatim, so its segments ("TLS13") are not an enum left un-humanized. It is
+// the compound form of isExemptStyleToken's three-digit rule, which a
+// tokenizer splitting on "-" would otherwise apply to each segment alone.
+func stripHyphenatedIdentifiers(text string) string {
+	return hyphenatedIdentifierPattern.ReplaceAllStringFunc(text, func(word string) string {
+		digits := 0
+		for _, r := range word {
+			if r >= '0' && r <= '9' {
+				digits++
+			}
+		}
+		if digits >= 3 {
+			return ""
+		}
+		return word
+	})
+}
+
 // findRawEnumViolations scans text for whitespace/punctuation-delimited
 // tokens shaped like a raw AWS enum (rawEnumTokenPattern) that are not
 // exempt (isExemptStyleToken), and returns them. text containing ':' or '/'
@@ -208,6 +233,7 @@ func findRawEnumViolations(text, resourceID, resourceName string) []string {
 		return nil
 	}
 	text = angleBracketPlaceholderPattern.ReplaceAllString(text, "")
+	text = stripHyphenatedIdentifiers(text)
 	var violations []string
 	for _, tok := range extractTokens(text) {
 		if !rawEnumTokenPattern.MatchString(tok) {

@@ -95,9 +95,9 @@ func TestW2RedisTransitEncryptionOff(t *testing.T) {
 
 	got := w2RedisFetch(t, off, w2RedisGroup("acme-cache-healthy"))
 
-	w2AssertFinding(t, got["acme-cache-transit-off"].Findings, w2RedisCodeTransitOff, "encryption in transit off", domain.SevWarn, "wave1")
+	w2AssertFinding(t, got["acme-cache-transit-off"].Findings, w2RedisCodeTransitOff, "encryption in transit not enforced", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-cache-healthy"].Findings, w2RedisCodeTransitOff)
-	w2AssertFindingDef(t, "redis", w2RedisCodeTransitOff, "encryption in transit off", domain.SevWarn, "wave1")
+	w2AssertFindingDef(t, "redis", w2RedisCodeTransitOff, "encryption in transit not enforced", domain.SevWarn, "wave1")
 }
 
 func TestW2RedisNoAuthToken(t *testing.T) {
@@ -122,7 +122,7 @@ func TestW2RedisNoAuthSuppressedWhenTransitEncryptionOff(t *testing.T) {
 
 	got := w2RedisFetch(t, plain)
 
-	w2AssertFinding(t, got["acme-cache-plain"].Findings, w2RedisCodeTransitOff, "encryption in transit off", domain.SevWarn, "wave1")
+	w2AssertFinding(t, got["acme-cache-plain"].Findings, w2RedisCodeTransitOff, "encryption in transit not enforced", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-cache-plain"].Findings, w2RedisCodeNoAuth)
 }
 
@@ -155,7 +155,7 @@ func TestW2RedisMultipleConditionsAllSurvive(t *testing.T) {
 	got := w2RedisFetch(t, bad)
 
 	w2AssertFinding(t, got["acme-cache-bad"].Findings, w2RedisCodeAtRestOff, "encryption at rest off", domain.SevWarn, "wave1")
-	w2AssertFinding(t, got["acme-cache-bad"].Findings, w2RedisCodeTransitOff, "encryption in transit off", domain.SevWarn, "wave1")
+	w2AssertFinding(t, got["acme-cache-bad"].Findings, w2RedisCodeTransitOff, "encryption in transit not enforced", domain.SevWarn, "wave1")
 	w2AssertFinding(t, got["acme-cache-bad"].Findings, w2RedisCodeNoBackup, "automatic backups off", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-cache-bad"].Findings, w2RedisCodeNoAuth)
 }

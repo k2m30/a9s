@@ -41,15 +41,6 @@ const (
 	transferCodeNoLogging    domain.FindingCode = "transfer.warn.no_logging"
 )
 
-// transferLegacySecurityPolicies is the denylist of known-weak security
-// policy names — a denylist rather
-// than latest-chasing so FIPS/PQ/restricted policy variants never
-// false-positive.
-var transferLegacySecurityPolicies = map[string]bool{ //nolint:gochecknoglobals // static denylist
-	"TransferSecurityPolicy-2018-11": true,
-	"TransferSecurityPolicy-2020-06": true,
-}
-
 // FetchTransferServersPage fetches a single page of Transfer Family
 // servers. ListServers carries the Wave-1 State signal but none of the
 // related-panel fields, so every row gets a per-id DescribeServer call
@@ -134,17 +125,15 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 }
 
 // computeTransferFindings builds the ordered Finding slice for one server:
-// the state-bucket finding (if any), then legacy-policy, then no-logging —
-// the precedence order in docs/resources/transfer.md.
+// the state-bucket finding (if any), then no-logging — the precedence order
+// in docs/resources/transfer.md. The security policy is judged in Wave 2
+// (EnrichTransferSecurityPolicy) by what DescribeSecurityPolicy says it
+// allows.
 func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Finding {
 	var findings []domain.Finding
 
 	if f, ok := transferStateFinding(server.State); ok {
 		findings = append(findings, f)
-	}
-
-	if policy := aws.ToString(server.SecurityPolicyName); transferLegacySecurityPolicies[policy] {
-		findings = append(findings, wave1Finding(transferCodeLegacyPolicy))
 	}
 
 	if server.LoggingRole == nil && len(server.StructuredLogDestinations) == 0 {
@@ -157,7 +146,7 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 // transferStateFindings maps ListedServer/DescribedServer.State to its
 // docs/resources/transfer.md state-bucket code. ONLINE has no entry
 // (Healthy — no finding).
-var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table
 	transfertypes.StateOffline:     transferCodeOffline,
 	transfertypes.StateStarting:    transferCodeStarting,
 	transfertypes.StateStopping:    transferCodeStopping,

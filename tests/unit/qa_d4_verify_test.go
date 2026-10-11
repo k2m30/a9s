@@ -285,8 +285,8 @@ func TestD4Row22_AthenaEmitsTwoIndependentFindings(t *testing.T) {
 	}
 
 	unencrypted := d4FindingByCode(t, r, "athena.results-unencrypted")
-	if unencrypted.Phrase != "query results stored unencrypted" {
-		t.Errorf("encryption phrase = %q, want %q", unencrypted.Phrase, "query results stored unencrypted")
+	if unencrypted.Phrase != "result encryption not set" {
+		t.Errorf("encryption phrase = %q, want %q", unencrypted.Phrase, "result encryption not set")
 	}
 	if unencrypted.Detail == "" {
 		t.Error("the encryption finding renders no Detail sentence")
@@ -479,7 +479,7 @@ func TestD4Row26_ListenerPhrasesAgreeInNumber(t *testing.T) {
 		// listener(s) live in their own rows.
 		wantDetail := map[domain.FindingCode]string{
 			"elb.plain-http-listener": "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener.",
-			"elb.weak-tls-policy":     "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later.",
+			"elb.weak-tls-policy":     "A listener's security policy still negotiates TLS 1.0 or 1.1, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to a security policy whose protocols start at TLS 1.2.",
 		}[c.code]
 		if f.Detail != wantDetail {
 			t.Errorf("%s %s: Detail = %q, want %q", c.id, c.code, f.Detail, wantDetail)

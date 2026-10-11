@@ -4,6 +4,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"sort"
@@ -116,6 +117,10 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 	if len(groupsByLC) == 0 {
 		return nil
 	}
+	var imagesAPI EC2DescribeImagesAPI
+	if clients.EC2 != nil {
+		imagesAPI = clients.EC2
+	}
 	names := make([]string, 0, len(groupsByLC))
 	for name := range groupsByLC {
 		names = append(names, name)
@@ -178,32 +183,27 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 		}
 	}
 
+	var launches []imdsLaunch
 	for _, lc := range configs {
 		name := aws.ToString(lc.LaunchConfigurationName)
 		for _, id := range groupsByLC[name] {
 			applyLaunchConfigurationFindings(result, id, lc)
+			l := imdsLaunch{ID: id, ImageID: aws.ToString(lc.ImageId)}
+			if md := lc.MetadataOptions; md != nil {
+				l.Endpoint = string(md.HttpEndpoint)
+				l.Tokens = string(md.HttpTokens)
+			}
+			launches = append(launches, l)
 		}
 	}
-	return nil
+	return raiseIMDSv1(ctx, imagesAPI, launches, result, asgCodeLaunchConfigIMDSv1, func(l imdsLaunch) []domain.DetailRow {
+		return []domain.DetailRow{{Label: "Metadata tokens", Value: cmp.Or(l.Tokens, "unset"), Tier: tierOf(asgCodeLaunchConfigIMDSv1)}}
+	})
 }
 
-// applyLaunchConfigurationFindings evaluates the three launch-configuration
-// posture rules independently; one configuration can trip all three.
+// applyLaunchConfigurationFindings evaluates the public-address and user-data
+// launch-configuration rules independently; the IMDSv1 rule is raiseIMDSv1's.
 func applyLaunchConfigurationFindings(result *IssueEnricherResult, groupID string, lc asgtypes.LaunchConfiguration) {
-	// A launch configuration with no MetadataOptions defaults to optional —
-	// unlike every other nil in this batch, absence IS the signal here.
-	tokens := "unset"
-	if lc.MetadataOptions != nil {
-		tokens = string(lc.MetadataOptions.HttpTokens)
-	}
-	// HttpEndpoint == disabled means the metadata service is unreachable
-	// entirely; HttpTokens is moot and produces no signal regardless of its
-	// value.
-	endpointDisabled := lc.MetadataOptions != nil && lc.MetadataOptions.HttpEndpoint == asgtypes.InstanceMetadataEndpointStateDisabled
-	if !endpointDisabled && (lc.MetadataOptions == nil || lc.MetadataOptions.HttpTokens != asgtypes.InstanceMetadataHttpTokensStateRequired) {
-		setWave2Finding(result, groupID, asgCodeLaunchConfigIMDSv1, []domain.DetailRow{{Label: "Metadata tokens", Value: tokens, Tier: tierOf(asgCodeLaunchConfigIMDSv1)}})
-
-	}
 	if lc.AssociatePublicIpAddress != nil && *lc.AssociatePublicIpAddress {
 		setWave2Finding(result, groupID, asgCodeLaunchConfigPublicIP, []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(asgCodeLaunchConfigPublicIP)}})
 

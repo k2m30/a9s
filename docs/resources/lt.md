@@ -87,16 +87,6 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `lt`.
 
 Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber != LatestVersionNumber` is DISPLAY ONLY (live-witnessed as the healthy steady state — a pending-rollout latest version is normal working practice; flagging it is alarm fatigue). "Who references this template" is answered by the related panel (`asg`/`ng`/`ec2` pivot counts, one detail keypress) — NOT a list column: a cross-cache computed column has no existing mechanism and an unreferenced template is not a problem worth flagging (templates are free and inert). `CreatedBy`/`CreateTime` are plain columns.
 
-- **Signal**: `MetadataOptions.HttpTokens != "required"` — IMDSv1 allowed. Unset defaults to `optional` (SDK-confirmed), so absence of MetadataOptions IS the signal, not its negation. `HttpEndpoint == disabled` is NOT a risk and produces no signal.
-  - **State bucket**: Warning.
-  - **API call**: `DescribeLaunchTemplateVersions`, one per template.
-  - **Cost shape**: per-resource.
-
-- **Signal**: any `BlockDeviceMappings[].Ebs.Encrypted == false` — explicitly disabled EBS encryption. `nil` is UNKNOWN, not unencrypted (accounts with default-encryption make nil legitimate) — never flag nil.
-  - **State bucket**: Warning.
-  - **API call**: same call.
-  - **Cost shape**: per-resource.
-
 - **Signal**: per-template `DescribeLaunchTemplateVersions` denied — the row is KEPT with all its list fields (`details denied`, shared rich-degradation contract).
   - **State bucket**: Warning.
   - **API call**: the denial IS the response.
@@ -108,12 +98,22 @@ Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber !
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-All three signals ride the same single call: `DescribeLaunchTemplateVersions(Versions=["$Default"])`, one per template.
+The deprecated-AMI and user-data signals ride the fetcher's `DescribeLaunchTemplateVersions(Versions=["$Default"])` call, one per template; the IMDSv1 signal adds one batched `DescribeImages` read, and the encryption signal one `GetEbsEncryptionByDefault` read.
+
+- **Signal**: any `BlockDeviceMappings[].Ebs.Encrypted == false` — explicitly disabled EBS encryption — while the Region does not encrypt new EBS volumes by default. With encryption by default on, "you cannot disable it for individual volumes or snapshots in that Region" (Amazon EBS User Guide, "Enable Amazon EBS encryption by default"), so the explicit `false` is overridden. `nil` takes the Region default and is never flagged.
+  - **State bucket**: Warning.
+  - **API call**: `GetEbsEncryptionByDefault`, one per pass, made only when a template sets `Encrypted == false`. A failed read leaves those templates not inspected.
+  - **Cost shape**: per-account.
 
 - **Signal**: `ImageId` present in the already-loaded `ami` cache AND that AMI's `DeprecationTime` is past — new launches use a deprecated image. NOT-in-cache ≠ deregistered (public/marketplace AMIs are legitimately absent from the owner-scoped cache) — no signal then on a complete list; on an unloaded or truncated list an absent AMI may sit on an unread page, so the row reads not inspected. `resolve:ssm:` references are skipped.
   - **State bucket**: Warning.
   - **API call**: none beyond the same call (cross-ref of the loaded `ami` list).
   - **Cost shape**: per-resource.
+
+- **Signal**: `MetadataOptions.HttpTokens != "required"` — IMDSv1 allowed. Each setting follows the EC2 order of precedence: the value the template sets, then the Region's account-level default (`GetInstanceMetadataDefaults`), then, for `HttpTokens` alone, the AMI's `ImdsSupport` (`v2.0` requires IMDSv2; absent allows IMDSv1). An account with `HttpTokensEnforced = enabled` fails every launch that resolves to `optional`, so no signal. A disabled endpoint, set on the template or by the account default, is NOT a risk and produces no signal. A failed account-defaults read, an AMI `DescribeImages` does not return, or one chosen at launch (a `resolve:ssm:` reference, or no `ImageId`) leaves the row not inspected.
+  - **State bucket**: Warning.
+  - **API call**: one `GetInstanceMetadataDefaults` and one `DescribeImages` walk (`image-id` filter, up to 200 values per request) for every AMI the templates with an unset `HttpTokens` name; none when every template sets `HttpTokens = required` or disables the endpoint.
+  - **Cost shape**: per-page batch.
 
 - **Signal**: credential in the `$Default` version's `UserData`.
   - **State bucket**: Broken.
@@ -125,7 +125,7 @@ All three signals ride the same single call: `DescribeLaunchTemplateVersions(Ver
 - OUT OF SCOPE: UserData decode / secret-scan.
 - OUT OF SCOPE: `IamInstanceProfile`→role resolution (`iam:GetInstanceProfile`).
 - OUT OF SCOPE: `ssm:GetParameter` AMI-reference resolution.
-- OUT OF SCOPE: explicit `DescribeImages` existence/deprecation checks.
+- OUT OF SCOPE: `DescribeImages` existence/deprecation checks (the IMDSv1 read uses `DescribeImages` for `ImdsSupport` alone).
 - OUT OF SCOPE: dedicated `DescribeInstances`-by-tag sweep.
 - OUT OF SCOPE: spot/CPU/placement deep-config analysis.
 
@@ -135,10 +135,10 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| IMDSv1 allowed | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IMDSv1 allowed` |
-| EBS encryption off | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `EBS encryption disabled` |
+| EBS encryption off explicitly, Region EBS encryption by default off | 2 | Warning | `~` | S2, S3, S4, S5 | `EBS encryption disabled` |
 | `DescribeLaunchTemplateVersions` denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `DescribeLaunchTemplateVersions` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| IMDSv1 allowed | 2 | Warning | `~` | S2, S3, S4, S5 | `IMDSv1 allowed` |
 | deprecated AMI | 2 | Warning | `~` | S2, S3, S4, S5 | `deprecated AMI` |
 | credential in the `$Default` version's `UserData` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in user data` |
 
@@ -166,7 +166,7 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 
 - Pivot set and exclusions — `docs/related-resources.md` § `lt`; one-call `$Default` budget noted there.
 - List shape carries no data fields — `AWS SDK Go v2 — ec2/types.LaunchTemplate` (identity, `DefaultVersionNumber`/`LatestVersionNumber`, `CreatedBy`, `CreateTime`, `Tags` only).
-- IMDSv1 signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateInstanceMetadataOptions § HttpTokens` ("optional — … you receive the IMDSv1 role credentials"); unset-defaults-to-optional per the same doc; `a9s-devops (2026-07-14): possible=yes, worth=yes. dbi-PubliclyAccessible class; SSRF/credential-theft precedent.`
+- IMDSv1 signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateInstanceMetadataOptions § HttpTokens` ("optional — … you receive the IMDSv1 role credentials"); order of precedence — `Amazon EC2 User Guide — Configure the Instance Metadata Service options § Order of precedence for instance metadata options` ("Precedence 1: Instance configuration at launch … Precedence 2: Account settings – If a value is not specified at instance launch, then it is determined by the account-level settings … Precedence 3: AMI configuration – If a value is not specified at instance launch or at the account level, then it is determined by the AMI configuration. This applies only to `HttpTokens` and `HttpPutResponseHopLimit`."); `AWS SDK Go v2 — ec2/types.Image § ImdsSupport` ("Instances launched from this AMI will have HttpTokens automatically set to required"); `a9s-devops (2026-07-14): possible=yes, worth=yes. dbi-PubliclyAccessible class; SSRF/credential-theft precedent.`
 - Encryption signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateEbsBlockDevice § Encrypted, § KmsKeyId`; nil-is-unknown rule — `a9s-devops (2026-07-14): possible=yes, worth=yes. Default-encryption accounts make nil legitimate; flagging nil is a false positive.`
 - Deprecated-AMI signal — `docs/attention-signals.md § Signals § COMPUTE` row `ami`; `a9s-devops (2026-07-14): possible=yes, worth=yes. Not-in-cache ≠ deregistered — public/marketplace AMIs legitimately absent.`
 - `$Default`-not-`$Latest` read — `a9s-devops (2026-07-14): $Default is what asg/ng/ec2 resolve at launch; $Latest is staging.`
@@ -185,8 +185,8 @@ lt — COMPUTE. Status key: `status` — the key the status cell reads, and the 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 | Instances launched from this template answer metadata requests without a session token, so a request-forgery bug in anything they run can read the attached role's credentials. Set the template's metadata options to require tokens, then launch a new version. |
-| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 | A block device in this template sets encryption off explicitly, so every instance launched from it gets an unencrypted volume however the account default is configured. Remove the override, or set it to encrypted, and publish a new template version. |
+| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave2 | Instances launched from this template answer metadata requests without a session token, so a request-forgery bug in anything they run can read the attached role's credentials. Set the template's metadata options to require tokens, then launch a new version. |
+| lt.warn.unencrypted | EBS encryption disabled | warn | wave2 | A block device in this template sets encryption off explicitly and the Region does not encrypt new EBS volumes by default, so every instance launched from it gets an unencrypted volume. Remove the override or set it to encrypted and publish a new template version, or turn on EBS encryption by default for the Region. |
 | lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 | The template's default version launches an image AWS has deprecated, so every instance this template creates starts from something no longer maintained. Update the default version to a current image before the next scale-out uses it. |
 | lt.user-data-secret | credential in user data | broken | wave2 | A credential is pasted into the default version's user data, so it is readable by anyone who can call ec2:DescribeLaunchTemplateVersions and lands on every instance launched from this template. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it. |
 | lt.warn.details\_denied | details denied | warn | wave1 | Reading this template's default version was denied, so its metadata, block-device and image settings are unjudged rather than clean. Grant the role you browse with permission to read launch template versions, then refresh. |

@@ -170,6 +170,27 @@ func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloud
 	return &cloudwatchlogs.DescribeSubscriptionFiltersOutput{SubscriptionFilters: f.fix.SubscriptionFilters[logGroupName]}, nil
 }
 
+// DescribeDeliveries returns the account's vended-log deliveries.
+func (f *CWLogsFake) DescribeDeliveries(_ context.Context, _ *cloudwatchlogs.DescribeDeliveriesInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliveriesOutput, error) {
+	return &cloudwatchlogs.DescribeDeliveriesOutput{Deliveries: f.fix.Deliveries}, nil
+}
+
+// DescribeDeliverySources returns the account's vended-log delivery sources.
+func (f *CWLogsFake) DescribeDeliverySources(_ context.Context, _ *cloudwatchlogs.DescribeDeliverySourcesInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeDeliverySourcesOutput, error) {
+	return &cloudwatchlogs.DescribeDeliverySourcesOutput{DeliverySources: f.fix.DeliverySources}, nil
+}
+
+// GetDeliverySource returns the named delivery source.
+func (f *CWLogsFake) GetDeliverySource(_ context.Context, input *cloudwatchlogs.GetDeliverySourceInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.GetDeliverySourceOutput, error) {
+	name := aws.ToString(input.Name)
+	for _, s := range f.fix.DeliverySources {
+		if aws.ToString(s.Name) == name {
+			return &cloudwatchlogs.GetDeliverySourceOutput{DeliverySource: &s}, nil
+		}
+	}
+	return nil, &cwlogstypes.ResourceNotFoundException{Message: notFoundMessage("The specified delivery source", name)}
+}
+
 // filteredStreamName names the stream the i-th event of a group came from:
 // the group's EventStreams entry, or its fixture streams in turn, and "" for
 // a group the fixtures give no streams — the same empty value a real event

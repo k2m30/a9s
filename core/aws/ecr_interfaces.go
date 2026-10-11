@@ -64,6 +64,15 @@ type ECRGetLifecyclePolicyAPI interface {
 	GetLifecyclePolicy(ctx context.Context, params *ecr.GetLifecyclePolicyInput, optFns ...func(*ecr.Options)) (*ecr.GetLifecyclePolicyOutput, error)
 }
 
+// ECRGetRegistryScanningConfigurationAPI defines the interface for the ECR
+// GetRegistryScanningConfiguration operation, read once per enrichment by
+// EnrichECRRepository: a registry scanning rule scans the repositories its
+// filter matches whatever their own ScanOnPush says. Standalone for the same
+// reason as ECRGetLifecyclePolicyAPI.
+type ECRGetRegistryScanningConfigurationAPI interface {
+	GetRegistryScanningConfiguration(ctx context.Context, params *ecr.GetRegistryScanningConfigurationInput, optFns ...func(*ecr.Options)) (*ecr.GetRegistryScanningConfigurationOutput, error)
+}
+
 // ECRAPI is the aggregate interface covering all ECR operations used by a9s fetchers.
 // *ecr.Client structurally satisfies this interface.
 type ECRAPI interface {

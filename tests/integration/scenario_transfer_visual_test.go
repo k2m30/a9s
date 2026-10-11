@@ -50,10 +50,12 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	// Menu badge — issue-COLORED rows: offline, starting, stopping,
-	// stop-failed, legacy-policy, no-logging, multi, details-denied (8
-	// Warning) + start-failed (1 Broken) = 9.
-	scenario.ExpectMenuIssueCount("transfer", 10)
+	// Menu badge — Wave-1 issue-coloured rows plus Wave-2 Broken findings.
+	// The legacy-policy row is judged on the Wave-2 sweep from
+	// DescribeSecurityPolicy, and its Warning finding colours the row
+	// without bumping the badge, so the settled count is the nine Wave-1
+	// issue rows.
+	scenario.ExpectMenuIssueCount("transfer", 9)
 
 	scenario.OpenList("transfer")
 

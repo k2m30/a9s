@@ -419,7 +419,7 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 			code:     "opensearch.encryption-off",
 			phrase:   "encryption at rest off",
 			severity: domainpkg.SevWarn,
-			detail:   "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place.",
+			detail:   "Data at rest is stored unencrypted, so anyone who gets the underlying storage or a snapshot reads the indexes in the clear. On OpenSearch and on Elasticsearch 6.7 or later, turn on encryption at rest in the domain's security configuration after turning off its warm and cold storage tiers; an older Elasticsearch domain needs a new encrypted domain and a data migration.",
 		},
 	} {
 		got, ok := byCode[want.code]

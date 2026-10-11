@@ -103,22 +103,17 @@ func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAP
 	}, nil
 }
 
-// addECRPostureFindings evaluates the two posture signals that
-// DescribeRepositories already answers. Neither carries a supporting row: the
+// addECRPostureFindings evaluates the tag mutability signal that
+// DescribeRepositories already answers. It carries no supporting row: the
 // phrase states the whole fact, and a row repeating it would print that fact
 // twice one line apart.
 func addECRPostureFindings(r *resource.Resource, repo ecrtypes.Repository) {
-	// An absent scanning configuration is the same exposure as an explicit
-	// false — AWS does not scan either way — so this is one of the documented
-	// places where a missing field is a finding.
-	if repo.ImageScanningConfiguration == nil || !repo.ImageScanningConfiguration.ScanOnPush {
-		addWave1Finding(r, CodeECRScanOnPushOff)
-	}
-
-	// Only MUTABLE is the finding. IMMUTABLE_WITH_EXCLUSION still pins the
-	// tags that matter, and an empty value is unknown rather than mutable, so
-	// this must not be written as "anything that is not IMMUTABLE".
-	if repo.ImageTagMutability == ecrtypes.ImageTagMutabilityMutable {
+	// MUTABLE_WITH_EXCLUSION leaves every tag but the excluded ones movable,
+	// while IMMUTABLE_WITH_EXCLUSION still pins the tags that matter, and an
+	// empty value is unknown rather than mutable, so this must not be written
+	// as "anything that is not IMMUTABLE".
+	switch repo.ImageTagMutability {
+	case ecrtypes.ImageTagMutabilityMutable, ecrtypes.ImageTagMutabilityMutableWithExclusion:
 		addWave1Finding(r, CodeECRMutableTags)
 	}
 }

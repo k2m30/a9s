@@ -58,6 +58,21 @@ func (f *ELBFake) hasTargetGroup(arn string) bool {
 	return false
 }
 
+// DescribeSSLPolicies answers the predefined security policies with the
+// protocols AWS states for each, narrowed to Names when the request gives them.
+func (f *ELBFake) DescribeSSLPolicies(_ context.Context, input *elbv2.DescribeSSLPoliciesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeSSLPoliciesOutput, error) {
+	if len(input.Names) == 0 {
+		return &elbv2.DescribeSSLPoliciesOutput{SslPolicies: fixtures.ELBSSLPolicies}, nil
+	}
+	var out []elbv2types.SslPolicy
+	for _, p := range fixtures.ELBSSLPolicies {
+		if slices.Contains(input.Names, aws.ToString(p.Name)) {
+			out = append(out, p)
+		}
+	}
+	return &elbv2.DescribeSSLPoliciesOutput{SslPolicies: out}, nil
+}
+
 func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeListenersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error) {
 	if input.LoadBalancerArn == nil {
 		var all []elbv2types.Listener

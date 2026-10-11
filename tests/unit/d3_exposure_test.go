@@ -18,6 +18,7 @@ import (
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -62,6 +63,14 @@ func (f *d3ELBFake) DescribeLoadBalancerAttributes(
 		{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("true")},
 		{Key: aws.String("routing.http.drop_invalid_header_fields.enabled"), Value: aws.String("true")},
 	}}, nil
+}
+
+// DescribeSSLPolicies answers the predefined security policies with the
+// protocols AWS states for each.
+func (f *d3ELBFake) DescribeSSLPolicies(
+	_ context.Context, _ *elbv2.DescribeSSLPoliciesInput, _ ...func(*elbv2.Options),
+) (*elbv2.DescribeSSLPoliciesOutput, error) {
+	return &elbv2.DescribeSSLPoliciesOutput{SslPolicies: fixtures.ELBSSLPolicies}, nil
 }
 
 var _ awsclient.ELBv2API = (*d3ELBFake)(nil)

@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -60,33 +59,25 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok || c == nil || c.WAFv2 == nil {
 		return NotRead("logs")
 	}
-	api := c.wafIn(res.Fields["scope"])
+	configs, scopeErrs := wafLoggingConfigurations(ctx, c.wafIn(res.Fields["scope"]), webACLArn)
 	var groups []string
-	var failures []Failure
-	scopes := wafv2types.LogScope("").Values()
-	for _, scope := range scopes {
-		out, err := api.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn, LogScope: scope})
-		if _, none := errors.AsType[*wafv2types.WAFNonexistentItemException](err); none {
-			continue
-		}
-		if err != nil {
-			failures = append(failures, FailedCall(string(scope), err))
-			continue
-		}
-		if out.LoggingConfiguration == nil {
-			continue
-		}
-		for _, d := range out.LoggingConfiguration.LogDestinationConfigs {
+	for _, cfg := range configs {
+		for _, d := range cfg.LogDestinationConfigs {
 			if _, ok := ARNForService(d, "logs"); ok {
 				groups = append(groups, d)
 			}
 		}
 	}
+	var failures []Failure
+	for _, se := range scopeErrs {
+		failures = append(failures, FailedCall(string(se.scope), se.err))
+	}
+	scopes := len(wafv2types.LogScope("").Values())
 	reads := refReadsIn(clients, cache, "logs", refsByRegion(groups))
 	reads[""] = joinReads(reads[""], relatedRead{
 		partial: len(failures) > 0,
-		unread:  len(failures) == len(scopes),
-		failure: AggregateFailures("waf-related: GetLoggingConfiguration", failures, len(scopes)),
+		unread:  len(failures) == scopes,
+		failure: AggregateFailures("waf-related: GetLoggingConfiguration", failures, scopes),
 	})
 	return regionalAnswer(clients, "logs", reads)
 }

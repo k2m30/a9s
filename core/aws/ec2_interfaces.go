@@ -103,6 +103,23 @@ type EC2DescribeImagesAPI interface {
 	DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error)
 }
 
+// EC2GetInstanceMetadataDefaultsAPI defines the interface for the EC2
+// GetInstanceMetadataDefaults operation: the account-level instance metadata
+// defaults for the Region. Standalone rather than part of the aggregate:
+// raiseIMDSv1 type-asserts for it, and a client that lacks it reads the
+// account as stating no preference.
+type EC2GetInstanceMetadataDefaultsAPI interface {
+	GetInstanceMetadataDefaults(ctx context.Context, params *ec2.GetInstanceMetadataDefaultsInput, optFns ...func(*ec2.Options)) (*ec2.GetInstanceMetadataDefaultsOutput, error)
+}
+
+// EC2GetEbsEncryptionByDefaultAPI defines the interface for the EC2
+// GetEbsEncryptionByDefault operation: whether the Region encrypts every new
+// EBS volume. Standalone rather than part of the aggregate, for the same
+// reason as EC2GetInstanceMetadataDefaultsAPI.
+type EC2GetEbsEncryptionByDefaultAPI interface {
+	GetEbsEncryptionByDefault(ctx context.Context, params *ec2.GetEbsEncryptionByDefaultInput, optFns ...func(*ec2.Options)) (*ec2.GetEbsEncryptionByDefaultOutput, error)
+}
+
 // EC2DescribeInstanceStatusAPI defines the interface for the EC2 DescribeInstanceStatus operation.
 type EC2DescribeInstanceStatusAPI interface {
 	DescribeInstanceStatus(ctx context.Context, params *ec2.DescribeInstanceStatusInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceStatusOutput, error)

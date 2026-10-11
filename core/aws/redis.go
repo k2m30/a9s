@@ -216,9 +216,17 @@ func redisPostureFindings(rg elasticachetypes.ReplicationGroup) ([]domain.Findin
 	if atRestOff {
 		add(CodeRedisAtRestOff, domain.SevWarn, nil)
 	}
+	// In preferred mode the group accepts encrypted and cleartext client
+	// connections alike, the migration step AWS documents on the way to
+	// required; TransitEncryptionEnabled is true in both modes. An empty mode
+	// is a group from before modes existed, which encrypts every connection.
 	transitOn := aws.ToBool(rg.TransitEncryptionEnabled)
-	if !transitOn {
+	switch {
+	case !transitOn:
 		add(CodeRedisTransitOff, domain.SevWarn, nil)
+	case rg.TransitEncryptionMode == elasticachetypes.TransitEncryptionModePreferred:
+		add(CodeRedisTransitOff, domain.SevWarn,
+			[]domain.DetailRow{{Label: "Transit encryption mode", Value: "preferred (accepts cleartext)", Tier: "~"}})
 	}
 	// AWS only accepts an AUTH token on a group that also encrypts in
 	// transit, so a group without in-transit encryption is already reported
