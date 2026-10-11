@@ -1129,6 +1129,9 @@ ecs-svc:  # ecstypes.Service
   - Deployments[].VpcLatticeConfigurations[].PortName
   - Deployments[].VpcLatticeConfigurations[].RoleArn
   - Deployments[].VpcLatticeConfigurations[].TargetGroupArn
+  - Deployments[].VpcLatticeConfigurations[].AdvancedConfiguration.AlternateTargetGroupArn
+  - Deployments[].VpcLatticeConfigurations[].AdvancedConfiguration.ProductionListenerRule
+  - Deployments[].VpcLatticeConfigurations[].AdvancedConfiguration.TestListenerRule
   - DesiredCount
   - EnableECSManagedTags
   - EnableExecuteCommand
@@ -2768,6 +2771,7 @@ opensearch:  # ostypes.DomainStatus
   - EBSOptions.VolumeSize
   - EBSOptions.VolumeType
   - EncryptionAtRestOptions.Enabled
+  - EncryptionAtRestOptions.EncryptionMode
   - EncryptionAtRestOptions.KmsKeyId
   - Endpoint
   - EndpointV2
@@ -3910,6 +3914,8 @@ transfer:  # transfertypes.DescribedServer
   - ProtocolDetails.PassiveIp
   - ProtocolDetails.ProxyConfig.SftpMode
   - ProtocolDetails.SetStatOption
+  - ProtocolDetails.SftpPorts[].SftpPort
+  - ProtocolDetails.SftpPorts[].CommunicationMode
   - ProtocolDetails.TlsSessionResumptionMode
   - Protocols[]
   - S3StorageOptions.DirectoryListingOptimization
