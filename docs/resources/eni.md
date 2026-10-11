@@ -103,9 +103,9 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `NetworkInterface.Status` on the list response.
 
-- **Signal**: `Status == available` → Warning (orphan — ENI is unattached and billed while it sits idle).
+- **Signal**: `Status == available` AND `RequesterManaged == false` → Warning (orphan — ENI is unattached and billed while it sits idle).
   - **State bucket**: Warning.
-  - **How obtained**: `NetworkInterface.Status` on the list response.
+  - **How obtained**: `NetworkInterface.Status` and `NetworkInterface.RequesterManaged` on the list response. A requester-managed interface (OpenSearch, RDS and other service ENIs) sits `available` while its owner is live, so status alone does not make it an orphan; the owner-gone case is the signal below.
 
 - **Signal**: Requester-managed ENI with `Description` referencing a deleted service → Warning (zombie — AWS forgot to reap after the owning service went away). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
@@ -133,7 +133,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `Status == attaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `attaching` |
 | `Status == detaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `detaching` |
-| `Status == available` (orphan) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `available` |
+| `Status == available`, not requester-managed (orphan) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `available` |
 | Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` |
 
 ## 4.1 UX review (two sentences)
