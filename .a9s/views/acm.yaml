@@ -1,4 +1,25 @@
-generated: 11
+generated: 12
+list_hashes:
+  Domain Name: 71b1a428322b442d
+  Status: 78d294393c20d2aa
+  Days Left: b83b75c001bdfd41
+  Type: d345ea75001d91ee
+  Expires: 2c9c1c439ba6c78e
+  In Use: 9094d0a5868edf7e
+detail_hashes:
+  DomainName: dce31d3d792a5d93
+  CertificateArn: 0116d97aa9ad0cc8
+  SubjectAlternativeNameSummaries: ed969de9c3413874
+  Status: 37925f95190b7a7e
+  Type: 94b276c178bd3a02
+  NotBefore: 7e2e6a5f752a8ea7
+  NotAfter: aa9992cb48598347
+  IssuedAt: 4f872ea0a698559c
+  ImportedAt: 4d4cb5989607373b
+  InUse: 911d48e86107d7b4
+  CreatedAt: ac4f44b9064dcc14
+  RenewalEligibility: 55b9c674902c515d
+  KeyAlgorithm: 4ba0f966a391a489
 list:
   Domain Name:
     path: DomainName

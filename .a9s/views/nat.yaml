@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  NAT Gateway ID: 0ff5a83d17c67684
+  VPC ID: 51b18126b8707aee
+  Subnet ID: a0cf06052f954706
+  Status: 22256ac216898d4c
+  Failure: 1e71af8188709765
+  Public IP: 7d434bffda298c4a
+detail_hashes:
+  NatGatewayId: 3560ccce4a28c296
+  VpcId: 2f6df9d3ec6df63c
+  SubnetId: 133fe12eea3b4232
+  State: a60d7692c7b3780c
+  ConnectivityType: c60a047fdba208a2
+  NatGatewayAddresses: 00cc03e89e048172
+  CreateTime: 7363c08e808f9359
+  FailureCode: 12a907c7e9d2491c
+  FailureMessage: ffbf47f4eba2d0b0
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

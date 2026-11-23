@@ -1,4 +1,20 @@
-generated: 11
+generated: 12
+list_hashes:
+  Logical ID: 4de1aed3538f1b37
+  Physical ID: 1cea9184176bf502
+  Type: 9a995c28b9125a5b
+  Status: 46a13ebc90e10d8a
+  Drift: debc1d0ea1159ed8
+  Updated: 4753a7cd1f2cf305
+detail_hashes:
+  LogicalResourceId: 5838fad4aa37e502
+  PhysicalResourceId: b15d4e74a1bb43f0
+  ResourceType: 16d47381c924c1cb
+  ResourceStatus: 2c8cfe6734532159
+  ResourceStatusReason: 8369bdc3dc781968
+  LastUpdatedTimestamp: 4c0ccb031bee767d
+  DriftInformation: ca3c65cc9ba049ec
+  ModuleInfo: 3448d075adc46400
 list:
   Logical ID:
     path: LogicalResourceId

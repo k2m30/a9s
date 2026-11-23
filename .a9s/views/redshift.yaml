@@ -1,4 +1,24 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster ID: 9e7aa6cb9c5dcd91
+  Status: 62c0be96a8e69686
+  Pending: e960fba0d3c5fef4
+  Node Type: d17f14cf77b64332
+  Nodes: f4470ff64a013be2
+  Database: 63ee66c41b644bf8
+  Endpoint: 20a5ba5d67017c52
+detail_hashes:
+  ClusterIdentifier: 638be02d6fa022e4
+  ClusterStatus: 5fce4988f21b4d4e
+  NodeType: 2888a74b6511c2ab
+  NumberOfNodes: 4efa3b4ba6381073
+  DBName: 47535f479c616406
+  MasterUsername: 6d06a268017f9d6a
+  Endpoint: 2c68a2f6afefc792
+  ClusterCreateTime: 70fa33fe643b3089
+  ClusterNamespaceArn: 659d146cd0654176
+  VpcId: 2f6df9d3ec6df63c
+  AvailabilityZone: 498a95b163a5e4df
 list:
   Cluster ID:
     path: ClusterIdentifier

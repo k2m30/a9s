@@ -1,4 +1,24 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: d723958918589cd8
+  DNS Name: c8d68e78f57d69c6
+  Type: 2a7b5847ac3a531d
+  Scheme: c8ab6f117370c147
+  Status: 5af5e622ba19bf9c
+  VPC ID: 51b18126b8707aee
+detail_hashes:
+  LoadBalancerName: ba3e6d2ad6d07ec2
+  LoadBalancerArn: ae00a6506bb9493a
+  DNSName: fb8887c2a5d3ac93
+  Type: 94b276c178bd3a02
+  Scheme: ee0a06da56ab8cdf
+  State: a60d7692c7b3780c
+  VpcId: 2f6df9d3ec6df63c
+  AvailabilityZones: 6e756300e4e860aa
+  SecurityGroups: 4e041b64b75f6550
+  IpAddressType: 6f38806135fee103
+  CanonicalHostedZoneId: f281c45968840995
+  CreatedTime: ff6a8050019eb8c5
 list:
   Name:
     path: LoadBalancerName

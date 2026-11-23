@@ -1,4 +1,37 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 69b7c3ce9beb801b
+  Status: 567ed47cf133ae50
+  Airflow: 869a82679621010c
+  Class: 2505f2b888188137
+  Workers: aa100637f11b7aca
+  Schedulers: d0268db42e8bd0a3
+  Access: a4d59ca52a1e4169
+  Created: 7db3e78a48e36bcf
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  Status: 37925f95190b7a7e
+  AirflowVersion: a71cf8d1040fbba6
+  EnvironmentClass: dcc51ba64cd83cbe
+  Schedulers: f0e56dabbc3e9e26
+  MinWorkers: c5c418440f549954
+  MaxWorkers: 09a74a4f849399fc
+  MinWebservers: 7d5ee02b1a909722
+  MaxWebservers: cc2e5b1389aff7be
+  WebserverAccessMode: 59f3dc1096a179ce
+  EndpointManagement: 9ddc39e9bdafc3c6
+  WeeklyMaintenanceWindowStart: 81db51270f642c94
+  WebserverUrl: 9be9485245e6f012
+  Arn: fb866fb55912dfcd
+  KmsKey: 900faaacc316e758
+  SourceBucketArn: e1ceb0ec2078f196
+  DagS3Path: 734181e4db172335
+  ExecutionRoleArn: f3f81a2a0dcd9b24
+  ServiceRoleArn: a544bbe842eb66ba
+  CeleryExecutorQueue: a7441e839a521ac1
+  LoggingConfiguration: bc12eea9ae7be786
+  CreatedAt: ac4f44b9064dcc14
+  LastUpdate: 5abec777c4bced1b
 list:
   Name:
     path: Name

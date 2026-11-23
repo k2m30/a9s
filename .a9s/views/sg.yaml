@@ -1,4 +1,21 @@
-generated: 11
+generated: 12
+list_hashes:
+  Group Name: 2dd15992bef264a3
+  Group ID: 5beae91f20dfbae5
+  Status: f38f192cfc3cb359
+  VPC ID: 51b18126b8707aee
+  Description: 0022b6f6290d9419
+detail_hashes:
+  GroupId: 473858615d139f6e
+  GroupName: 7e9b2fa1ab81711a
+  VpcId: 2f6df9d3ec6df63c
+  Description: 170fb1f14fe6d129
+  OwnerId: ecd0ef57f1a859e4
+  SecurityGroupArn: d5259c9a46ed2bf5
+  IpPermissions: c47f3b3bafbd5c4f
+  IpPermissionsEgress: 4d5891d1a415e117
+  Tags: ee0396ef28e977b0
+  "key:risk_summary": f82fe0d91138183f
 list:
   Group Name:
     path: GroupName
@@ -30,4 +47,4 @@ detail:
   - IpPermissions
   - IpPermissionsEgress
   - Tags
-  - { key: risk_summary, label: "Risk Summary" }
+  - { key: risk_summary, label: Risk Summary }

@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// The file an operator edited.
-//
-// A view file is the one thing in a9s a person is invited to change, and the
-// two ways they change a status column are renaming it and writing a key by
-// hand. The cell is a status cell only by carrying the type's lifecycle key —
-// not because its title says Status, nor because its key says "status"
-// whatever the type calls its lifecycle key — so a file that says either of
-// those things silently stops having a status column — no phrase, no colour,
-// and a blank cell where the key matches nothing.
-//
-// The migration owns the first case: a key this build moved is a key the build
-// moves for the operator. Nothing owns the second, so the load says it.
+// The file an operator edited. A view file is the one thing in a9s a person is
+// invited to change, and a column key that names nothing on the type renders
+// a blank cell on every row, so the load says it.
 package unit_test
 
 import (
@@ -20,10 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -33,14 +22,6 @@ func views7WriteViewFile(t *testing.T, dir, shortName, body string) {
 	if err := os.WriteFile(filepath.Join(dir, shortName+".yaml"), []byte(body), 0o600); err != nil {
 		t.Fatalf("writing %s.yaml: %v", shortName, err)
 	}
-}
-
-// views7LifecycleKey is the key a type's status cell reads.
-func views7LifecycleKey(td *resource.ResourceTypeDef) string {
-	if td.LifecycleKey != "" {
-		return td.LifecycleKey
-	}
-	return "state"
 }
 
 // views7TypeOf resolves a view name to its type, parent or child — the two
@@ -70,76 +51,6 @@ func views7ResolvedColumn(t *testing.T, cfg *config.ViewsConfig, shortName, titl
 	return config.ListColumn{}
 }
 
-// TestOperatorsHandTypedStatusKeyMigratesToTheLifecycleKey drives the file an
-// operator wrote against the build that read "status" literally: they renamed
-// the column and typed the key the old build honoured. The key moved when the
-// column list moved, and a key this build moved is one the build moves for
-// them — not one they are asked to fix.
-func TestOperatorsHandTypedStatusKeyMigratesToTheLifecycleKey(t *testing.T) {
-	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "tgw", `generated: 6
-list:
-  Name:
-    key: name
-    width: 28
-  Health:
-    key: status
-    width: 12
-  Owner:
-    key: owner_id
-    width: 14
-
-detail:
-  - TransitGatewayId
-`)
-
-	if err := config.EnsureViewsDir(dir); err != nil {
-		t.Fatalf("EnsureViewsDir: %v", err)
-	}
-	cfg, err := config.LoadFromDirs([]string{dir})
-	if err != nil {
-		t.Fatalf("LoadFromDirs: %v", err)
-	}
-	if cfg == nil {
-		t.Fatal("LoadFromDirs returned no config for a directory holding one file")
-	}
-
-	td := resource.FindResourceType("tgw")
-	lifecycleKey := views7LifecycleKey(td)
-
-	renamed := views7ResolvedColumn(t, cfg, "tgw", "Health")
-	if renamed.Key != lifecycleKey {
-		t.Errorf("the operator's renamed status column resolves with key %q, want %q — they typed the "+
-			"key the build before this one honoured, and this build moved it",
-			renamed.Key, lifecycleKey)
-	}
-
-	// The column is only migrated if it still reads as the status column: the
-	// phrase, the colour and the widening all follow from that.
-	row := resource.Resource{
-		ID:     "tgw-0123456789abcdef0",
-		Name:   "acme-prod-tgw",
-		Fields: map[string]string{"name": "acme-prod-tgw", "state": "available", "owner_id": "123456789012"},
-		Findings: []domain.Finding{{
-			Code: "tgw-attachment-failed", Phrase: "attachment failed",
-			Severity: domain.SevBroken, Source: "wave1",
-		}},
-	}
-	col := app.ColumnDef{Key: renamed.Key, Title: renamed.Title, Width: renamed.Width, Path: renamed.Path}
-	if got := app.ExtractCellValue(col, td, row); got != "attachment failed" {
-		t.Errorf("the renamed column shows %q, want %q — a column the migration moved is the type's "+
-			"status column, and a status column shows what the row is flagged for", got, "attachment failed")
-	}
-
-	// The negative half: only the key this build moved is moved. A column the
-	// operator keyed themselves, on a fact that is not the status, is theirs.
-	owner := views7ResolvedColumn(t, cfg, "tgw", "Owner")
-	if owner.Key != "owner_id" {
-		t.Errorf("the operator's Owner column resolves with key %q, want %q — the migration moves the "+
-			"key it moved, not every key it does not recognise", owner.Key, "owner_id")
-	}
-}
-
 // TestUnknownColumnKeyIsReportedAtLoad pins the other half. A key that names
 // nothing on the type renders an empty cell forever, and the file is the one
 // place a9s asks a person to edit — so the load says which file and which key,
@@ -150,8 +61,7 @@ detail:
 func TestUnknownColumnKeyIsReportedAtLoad(t *testing.T) {
 	const unknownKey = "att_stats"
 	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "vpce", `generated: 6
-list:
+	views7WriteViewFile(t, dir, "vpce", `list:
   Endpoint ID:
     key: vpce_id
     width: 26
@@ -185,8 +95,7 @@ detail:
 
 	// The negative half: a file whose keys all name something reports nothing.
 	clean := t.TempDir()
-	views7WriteViewFile(t, clean, "vpce", `generated: 6
-list:
+	views7WriteViewFile(t, clean, "vpce", `list:
   Endpoint ID:
     key: vpce_id
     width: 26

@@ -1,4 +1,19 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster Name: 19542533eb59074a
+  Type: dbbe0fba14d347a8
+  Status: b5c0afbda83c41e6
+  Version: 09789f80355ea091
+detail_hashes:
+  ClusterName: 512427c560ea8825
+  ClusterArn: be3a87d4853b3411
+  ClusterType: 24bc9aa0c47be245
+  State: a60d7692c7b3780c
+  CurrentVersion: 1d24e40d7937261f
+  CreationTime: 74875c541e4b7e5e
+  Provisioned: bc58fc1270ff1f9e
+  Serverless: 53ba153536ae5284
+  Tags: ee0396ef28e977b0
 list:
   Cluster Name:
     path: ClusterName

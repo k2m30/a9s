@@ -1,4 +1,16 @@
-generated: 11
+generated: 12
+list_hashes:
+  Stream Name: 542136f41792481c
+  Last Event: 5f2a920d5f47956b
+  First Event: 1628ee6c8b8f4c3b
+detail_hashes:
+  LogStreamName: bc655e8b39659f68
+  Arn: fb866fb55912dfcd
+  CreationTime: 74875c541e4b7e5e
+  FirstEventTimestamp: 406a89ea2732f525
+  LastEventTimestamp: 2a9574979f74c616
+  LastIngestionTime: fecb07847436d241
+  UploadSequenceToken: 3ae3623e7c9ebbdb
 list:
   Stream Name:
     path: LogStreamName

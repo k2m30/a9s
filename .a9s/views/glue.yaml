@@ -1,4 +1,22 @@
-generated: 11
+generated: 12
+list_hashes:
+  Job Name: 808643151502d9d1
+  Status: 516e63265dd02620
+  Last Run: 7d921362d80d4570
+  Version: 262b5553cf45fd1f
+  Worker Type: 2ff979bf480e2da1
+  Workers: 28b0102f53b33b21
+  Last Modified: 73323ab015672ff6
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  Role: 5f2dc9cb822f04d0
+  GlueVersion: 75713352d1c603c2
+  WorkerType: d7e037f79c5f47d3
+  NumberOfWorkers: 38d3849256f9aeff
+  MaxRetries: 512e8c564dce54ae
+  Command: 67bd22eb11975f40
+  CreatedOn: fdc399ff9313bb7a
+  LastModifiedOn: 6b06ab70d52257a9
 list:
   Job Name:
     path: Name

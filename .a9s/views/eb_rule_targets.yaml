@@ -1,4 +1,26 @@
-generated: 11
+generated: 12
+list_hashes:
+  Target ID: da92e6295dbc69aa
+  Target ARN: ab3706c5be2cc96b
+  Resource: 3dadf65605d1fd9c
+  Input: 89a479aa0588804c
+detail_hashes:
+  Id: 75be4e070c3dd9b3
+  Arn: fb866fb55912dfcd
+  RoleArn: 53f87cbcf258bdaa
+  Input: 55a268ca8a89630a
+  InputPath: 1ccd6c877d63c181
+  InputTransformer: d0a5e5c2dc04d9a3
+  DeadLetterConfig: 561070b06de71d6a
+  RetryPolicy: ec738ee000da82d5
+  SqsParameters: 7bcd3f1b24e99c7e
+  EcsParameters: a7141d6113500d16
+  KinesisParameters: fff1fe0c6a3d2b2d
+  BatchParameters: 9a730a191e87c1cd
+  HttpParameters: 6c761c696d71124c
+  SageMakerPipelineParameters: 2676f3095f8c401f
+  RedshiftDataParameters: a914bc9afa4deb54
+  AppSyncParameters: 3b2d390b3b638146
 list:
   Target ID:
     path: Id

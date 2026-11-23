@@ -1,24 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// Operator-edited view files must be read the way they were written: an
-// explicit key, a renamed status column, a child type's file, a file whose
-// name resolves to no type, and a column whose value comes from a path. A
-// rule about what a person MEANT has to come from what the previous build
-// wrote, not from what the file happens to differ from.
+// Operator-edited view files are read the way they were written: an explicit
+// key, a file whose name resolves to no type, and a column whose value comes
+// from a path.
 package unit_test
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -33,8 +26,6 @@ type views7EC2Raw struct {
 	Placement    views7EC2Placement
 }
 
-// views7Migrate writes one view file, runs the migration over it, and returns
-// the config the next start loads.
 func views7Migrate(t *testing.T, shortName, body string) (*config.ViewsConfig, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -52,21 +43,6 @@ func views7Migrate(t *testing.T, shortName, body string) (*config.ViewsConfig, s
 	return cfg, dir
 }
 
-// views7MigratedFile is what the migration left on disk — the file the next
-// start reads, before any merge the renderer performs on top of it.
-func views7MigratedFile(t *testing.T, dir, shortName string) config.ViewDef {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(dir, shortName+".yaml")) //nolint:gosec // a temp dir this test wrote
-	if err != nil {
-		t.Fatalf("reading the migrated %s.yaml: %v", shortName, err)
-	}
-	vd, err := config.ParseSingle(raw)
-	if err != nil {
-		t.Fatalf("parsing the migrated %s.yaml: %v", shortName, err)
-	}
-	return *vd
-}
-
 // views7CellOf renders one column of one row through the cascade every surface
 // shares.
 func views7CellOf(t *testing.T, shortName string, col config.ListColumn, r resource.Resource) string {
@@ -76,16 +52,11 @@ func views7CellOf(t *testing.T, shortName string, col config.ListColumn, r resou
 		views7TypeOf(t, shortName), r)
 }
 
-// TestOperatorsExplicitKeySurvivesTheKeyMove: the key move's
-// bargain is that a column still holding what the previous build wrote takes
-// this build's key. A column holding something ELSE is the operator's, and
-// "differs from what this build declares" is not the same question.
-func TestOperatorsExplicitKeySurvivesTheKeyMove(t *testing.T) {
-	// The v5 alarm file with one edit: a key on the column the generator left
-	// key-less, which is what an operator does when they want the cell to read
-	// a field their own enricher writes.
-	cfg, _ := views7Migrate(t, "alarm", `generated: 5
-list:
+// TestOperatorsExplicitKeySurvivesTheStart: a file with no generation stamp
+// is the operator's. A key they put on a column, one the built-in column does
+// not carry, is what the cell reads after a start.
+func TestOperatorsExplicitKeySurvivesTheStart(t *testing.T) {
+	cfg, _ := views7Migrate(t, "alarm", `list:
   Alarm Name:
     path: AlarmName
     width: 36
@@ -113,128 +84,13 @@ detail:
 
 	col := views7ResolvedColumn(t, cfg, "alarm", "Actions On")
 	if col.Key != "actions_count" {
-		t.Errorf("the operator's key on Actions On resolved as %q, want %q — a column that does not "+
-			"hold what the previous build wrote was edited, and the migration moves the key it moved, "+
-			"not every key that differs from this build's", col.Key, "actions_count")
+		t.Errorf("the operator's key on Actions On resolved as %q, want %q — an unstamped file is "+
+			"never rewritten and overrides the defaults", col.Key, "actions_count")
 	}
 	row := resource.Resource{ID: "acme-cpu-alarm", Fields: map[string]string{"actions_count": "3 actions"}}
 	if got := views7CellOf(t, "alarm", col, row); got != "3 actions" {
 		t.Errorf("the column shows %q, want %q — the key they wrote is the field the cell reads",
 			got, "3 actions")
-	}
-}
-
-// TestRenamedStatusColumnMigratesToTheLifecycleKey: a file stamped below 7
-// marks the status column by its TITLE, so an operator who renamed it kept a
-// status column. The runtime picks the status column by key, and the
-// migration carries a renamed status column to the lifecycle key.
-func TestRenamedStatusColumnMigratesToTheLifecycleKey(t *testing.T) {
-	// The v5 ec2 file with two renames: the status column, which a v5 file
-	// marks by title, and an ordinary column.
-	cfg, _ := views7Migrate(t, "ec2", `generated: 5
-list:
-  Name:
-    width: 24
-  State:
-    path: State.Name
-    width: 12
-  Size:
-    path: InstanceType
-    width: 14
-  Instance ID:
-    path: InstanceId
-    width: 20
-
-detail:
-  - InstanceId
-`)
-
-	td := resource.FindResourceType("ec2")
-	statusKey := views7LifecycleKey(td)
-
-	renamed := views7ResolvedColumn(t, cfg, "ec2", "State")
-	if renamed.Key != statusKey {
-		t.Errorf("the renamed status column resolved with key %q, want %q — it was the status column "+
-			"under the rule this build replaced, and a rule this build replaced is one it migrates",
-			renamed.Key, statusKey)
-	}
-	flagged := resource.Resource{
-		ID:     "i-0123456789abcdef0",
-		Fields: map[string]string{"state": "running"},
-		Findings: []domain.Finding{{
-			Code: "ec2-public-ip", Phrase: "public ip", Severity: domain.SevWarn, Source: "wave1",
-		}},
-	}
-	if got := views7CellOf(t, "ec2", renamed, flagged); got != "public ip" {
-		t.Errorf("the renamed status column shows %q, want %q — a status column shows what the row is "+
-			"flagged for", got, "public ip")
-	}
-
-	// An ordinary renamed column is left exactly as they wrote it.
-	ordinary := views7ResolvedColumn(t, cfg, "ec2", "Size")
-	if ordinary.Key != "" {
-		t.Errorf("the renamed Type column gained key %q — only the column the replaced rule recognised "+
-			"is migrated", ordinary.Key)
-	}
-	if ordinary.Path != "InstanceType" {
-		t.Errorf("the renamed Type column resolved with path %q, want %q", ordinary.Path, "InstanceType")
-	}
-}
-
-// TestChildViewFileMigratesLikeAnyOther: a child type has a view file, a
-// lifecycle key and an operator, so the migration must resolve child types as
-// well as parent ones; a lookup limited to the parent catalog stamps a child
-// file as migrated while changing nothing in it.
-func TestChildViewFileMigratesLikeAnyOther(t *testing.T) {
-	// The status column is renamed, which is the half a title merge cannot
-	// cover: the renderer folds the catalog's key onto a column whose title
-	// still matches, so a file left unmigrated goes unnoticed until someone
-	// renames one.
-	cfg, dir := views7Migrate(t, "tg_health", `generated: 6
-list:
-  Target ID:
-    key: target_id
-    width: 24
-  Check:
-    key: status
-    width: 14
-
-detail:
-  - target_id
-`)
-
-	child := resource.GetChildType("tg_health")
-	if child == nil {
-		t.Fatal("no tg_health child type registered")
-	}
-
-	onDisk := views7MigratedFile(t, dir, "tg_health")
-	for _, col := range onDisk.List {
-		if col.Title != "Check" {
-			continue
-		}
-		if col.Key != child.StatusKey() {
-			t.Errorf("the migrated child file carries key %q on its status column, want %q — the "+
-				"migration looked the type up among the parents only, so every child file is stamped "+
-				"as migrated and migrated by nothing", col.Key, child.StatusKey())
-		}
-	}
-
-	col := views7ResolvedColumn(t, cfg, "tg_health", "Check")
-	if col.Key != child.StatusKey() {
-		t.Errorf("the child's status column resolved with key %q, want %q — a child type is a type, "+
-			"and one lookup answers for both", col.Key, child.StatusKey())
-	}
-	flagged := resource.Resource{
-		ID:     "i-0123456789abcdef0",
-		Fields: map[string]string{"health": "unhealthy"},
-		Findings: []domain.Finding{{
-			Code: "tg-health-unhealthy", Phrase: "health checks failing",
-			Severity: domain.SevBroken, Source: "wave1",
-		}},
-	}
-	if got := views7CellOf(t, "tg_health", col, flagged); got != "health checks failing" {
-		t.Errorf("the child's status column shows %q, want %q", got, "health checks failing")
 	}
 }
 
@@ -244,8 +100,7 @@ detail:
 // the operator believes their file is live.
 func TestViewFileNameResolvesOrIsReported(t *testing.T) {
 	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "EC2", `generated: 7
-list:
+	views7WriteViewFile(t, dir, "EC2", `list:
   Instance ID:
     key: instance_id
     width: 99
@@ -253,8 +108,7 @@ list:
 detail:
   - InstanceId
 `)
-	views7WriteViewFile(t, dir, "ec22", `generated: 7
-list:
+	views7WriteViewFile(t, dir, "ec22", `list:
   Instance ID:
     key: instance_id
     width: 20
@@ -297,8 +151,7 @@ detail:
 // the same key for the next start.
 func TestPathBackedCustomColumnIsAProducer(t *testing.T) {
 	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "ec2", `generated: 7
-list:
+	views7WriteViewFile(t, dir, "ec2", `list:
   Instance ID:
     key: instance_id
     width: 20
@@ -364,8 +217,7 @@ detail:
 // collision to report. "instances" is ec2's own alias.
 func TestTwoFilesForOneTypeAreReported(t *testing.T) {
 	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "instances", `generated: 7
-list:
+	views7WriteViewFile(t, dir, "instances", `list:
   Instance ID:
     key: instance_id
     width: 99
@@ -373,8 +225,7 @@ list:
 detail:
   - InstanceId
 `)
-	views7WriteViewFile(t, dir, "ec2", `generated: 7
-list:
+	views7WriteViewFile(t, dir, "ec2", `list:
   Instance ID:
     key: instance_id
     width: 20
@@ -430,161 +281,4 @@ func views7SaysWhichIsActive(report, active string) bool {
 		}
 	}
 	return false
-}
-
-// views7RenamedViewFiles returns every view file this repo has renamed, from
-// its own history. The migration needs one entry per rename; deriving the list
-// here rather than writing it out is what makes the next rename red instead of
-// silent.
-func views7RenamedViewFiles(t *testing.T) map[string]string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller(0) failed — cannot find the repo root")
-	}
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
-		t.Skipf("no .git in %s — this gate reads the repo's own rename history", root)
-	}
-	if shallow, _ := exec.CommandContext(t.Context(), "git", "-C", root, "rev-parse", "--is-shallow-repository").Output(); strings.TrimSpace(string(shallow)) == "true" { //nolint:gosec // fixed arguments
-		t.Skip("a shallow clone holds no rename history to read")
-	}
-	out, err := exec.CommandContext(t.Context(), "git", "-C", root, "log", "--diff-filter=R", "-M",
-		"--name-status", "--format=", "--", ".a9s/views").Output() //nolint:gosec // fixed arguments
-	if err != nil {
-		t.Fatalf("reading the rename history: %v", err)
-	}
-	renames := map[string]string{}
-	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 3 || !strings.HasPrefix(fields[0], "R") {
-			continue
-		}
-		from := strings.TrimSuffix(filepath.Base(fields[1]), ".yaml")
-		to := strings.TrimSuffix(filepath.Base(fields[2]), ".yaml")
-		if from != to {
-			renames[from] = to
-		}
-	}
-	if len(renames) == 0 {
-		t.Fatal("the repo's history holds no view-file rename — this gate exists because it holds two")
-	}
-	return renames
-}
-
-// views7OldGeneratorFile is a view file as the generator wrote them before
-// stamping: no `generated:` line, paths and widths only. The width is what
-// identifies it after the migration has moved it.
-const views7OldGeneratorFile = `list:
-  Snapshot ID:
-    path: DBClusterSnapshotIdentifier
-    width: 77
-
-detail:
-  - DBClusterSnapshotIdentifier
-`
-
-// TestRenamedViewFilesAreMigrated: an installation can hold docdb-snap.yaml
-// and rds-snap.yaml, written by the generator before those types were
-// renamed, naming nothing. They carry no stamp, so nothing about the file
-// itself says whose it is. The rename history does, in the same shape the
-// column migration uses: a table of renames, and a file under an old name is
-// carried to the new one.
-func TestRenamedViewFilesAreMigrated(t *testing.T) {
-	for from, to := range views7RenamedViewFiles(t) {
-		t.Run(from+" carried to "+to, func(t *testing.T) {
-			dir := t.TempDir()
-			views7WriteViewFile(t, dir, from, views7OldGeneratorFile)
-
-			if err := config.EnsureViewsDir(dir); err != nil {
-				t.Fatalf("EnsureViewsDir: %v", err)
-			}
-			if _, statErr := os.Stat(filepath.Join(dir, from+".yaml")); statErr == nil {
-				t.Errorf("%s.yaml is still in the views dir — this build renamed that type, so the "+
-					"file it wrote under the old name is its own to carry", from)
-			}
-
-			cfg, err := config.LoadFromDirs([]string{dir})
-			if err != nil {
-				t.Errorf("the load reported %v — an installation whose only fault is having run an "+
-					"older build sees this flash on every start", err)
-			}
-			if cfg == nil {
-				t.Fatal("LoadFromDirs returned no config")
-			}
-			if view := config.GetViewDef(cfg, to); len(view.List) == 0 || view.List[0].Width != 77 {
-				t.Errorf("%s renders %d columns and does not carry the operator's width — the file was "+
-					"moved to the name in use, so what it says is what the screen shows",
-					to, len(view.List))
-			}
-		})
-
-		t.Run(from+" retired when "+to+" exists", func(t *testing.T) {
-			dir := t.TempDir()
-			views7WriteViewFile(t, dir, from, views7OldGeneratorFile)
-			views7WriteViewFile(t, dir, to, `generated: 7
-list:
-  Snapshot ID:
-    key: snapshot_id
-    width: 33
-
-detail:
-  - DBClusterSnapshotIdentifier
-`)
-
-			if err := config.EnsureViewsDir(dir); err != nil {
-				t.Fatalf("EnsureViewsDir: %v", err)
-			}
-			if _, statErr := os.Stat(filepath.Join(dir, from+".yaml")); statErr == nil {
-				t.Errorf("%s.yaml survived beside %s.yaml — the name in use has a file, so the old one "+
-					"is retired rather than carried over it", from, to)
-			}
-
-			cfg, err := config.LoadFromDirs([]string{dir})
-			if err != nil {
-				t.Errorf("the load reported %v", err)
-			}
-			if cfg == nil {
-				t.Fatal("LoadFromDirs returned no config")
-			}
-			if view := config.GetViewDef(cfg, to); len(view.List) == 0 || view.List[0].Width != 33 {
-				t.Errorf("%s carries width %v — the file already under the name in use is the one the "+
-					"operator has been editing, and the retirement must not overwrite it",
-					to, view.List)
-			}
-		})
-	}
-
-	t.Run("a name in neither the catalog nor the table is reported", func(t *testing.T) {
-		dir := t.TempDir()
-		views7WriteViewFile(t, dir, "ec22", `list:
-  Instance ID:
-    key: instance_id
-    width: 20
-
-detail:
-  - InstanceId
-`)
-		if err := config.EnsureViewsDir(dir); err != nil {
-			t.Fatalf("EnsureViewsDir: %v", err)
-		}
-		if _, statErr := os.Stat(filepath.Join(dir, "ec22.yaml")); statErr != nil {
-			t.Errorf("ec22.yaml was retired: %v — this build never wrote a file under that name, so it "+
-				"is the operator's and theirs to fix", statErr)
-		}
-		_, err := config.LoadFromDirs([]string{dir})
-		if err == nil || !strings.Contains(err.Error(), "ec22.yaml") {
-			t.Errorf("the load reported %v — a name this build has never had is still the operator's typo", err)
-		}
-	})
-
-	t.Run("a views dir this build wrote reports nothing", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := config.EnsureViewsDir(dir); err != nil {
-			t.Fatalf("EnsureViewsDir: %v", err)
-		}
-		if _, err := config.LoadFromDirs([]string{dir}); err != nil {
-			t.Errorf("a freshly generated views dir reported %v", err)
-		}
-	})
 }

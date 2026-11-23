@@ -1,4 +1,31 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  ENI ID: 852eb845cabc22e4
+  Status: 2bb69a4a55078c29
+  Type: 1ee6dd6750ec5839
+  VPC ID: 51b18126b8707aee
+  Private IP: 290b8e0aa43d1dd5
+detail_hashes:
+  NetworkInterfaceId: b4dbc076d06b8a57
+  Status: 37925f95190b7a7e
+  InterfaceType: 8ca5148c7e4cb555
+  VpcId: 2f6df9d3ec6df63c
+  SubnetId: 133fe12eea3b4232
+  AvailabilityZone: 498a95b163a5e4df
+  PrivateIpAddress: 50ab61cf99f0df1a
+  PrivateDnsName: bba69a4f55409e84
+  PrivateIpAddresses: 9b55a103b6ec5f46
+  MacAddress: b36eb29c7ab6ab90
+  Description: 170fb1f14fe6d129
+  OwnerId: ecd0ef57f1a859e4
+  RequesterId: 231c6874daf59b6b
+  RequesterManaged: 4ca38b77c4634e15
+  SourceDestCheck: 71fe4224944cea86
+  Groups: f10e4420b9be3f14
+  Attachment: 57e3facf472dcbc1
+  Association: a73bce9c277dc003
+  TagSet: c2acf0b397931f79
 list:
   Name:
     key: name

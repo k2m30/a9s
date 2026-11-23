@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Log Group Name: 02e984f503f52754
+  Status: 516e63265dd02620
+  Size: f75a934835a6e211
+  Retention: 95d18d059f8241e6
+  Metric Filters: 56d4ad1ef6b26547
+  Last Event: 9b71e44bd9ceb585
+  Created: 95dcd793478faa7e
+detail_hashes:
+  LogGroupName: 9d511e6c5ff95623
+  LogGroupArn: a8597024ca73a7d7
+  LogGroupClass: fe9e86bbd9710e81
+  StoredBytes: 6f7600f61cb2e841
+  RetentionInDays: af8dc8a5dcbc8166
+  MetricFilterCount: 8f544b5e99098bf7
+  DeletionProtectionEnabled: 96d62c4fd6f7de47
+  CreationTime: 74875c541e4b7e5e
+  KmsKeyId: 63690001b224e625
+  DataProtectionStatus: e0a66f2660522550
 list:
   Log Group Name:
     path: LogGroupName

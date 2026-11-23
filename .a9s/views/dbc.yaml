@@ -1,4 +1,28 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster ID: f13937105fefa2f4
+  Version: 0d4effbddeed9778
+  Status: de81d4d25f6b3255
+  Instances: 9e7afc6adca2e8e0
+  Endpoint: c88357e86510aac5
+detail_hashes:
+  DBClusterIdentifier: 2cc43370ef5237b7
+  DBClusterArn: 4518eb586dd60f06
+  Engine: 83731104bb17fbf1
+  EngineVersion: fa03e131c10745b7
+  Status: 37925f95190b7a7e
+  Endpoint: 2c68a2f6afefc792
+  ReaderEndpoint: bc7de1042d0b5483
+  Port: 8d1b399690ddef45
+  StorageEncrypted: 7b907aabf534e972
+  KmsKeyId: 63690001b224e625
+  DeletionProtection: 39fd7d08321280db
+  DBClusterMembers: 71c5a1896e0b9238
+  DBSubnetGroup: 122cff97343b33d9
+  VpcSecurityGroups: 12d003d493563edd
+  BackupRetentionPeriod: db31923947e337ed
+  PreferredMaintenanceWindow: b63338bef49c9730
+  MasterUsername: 6d06a268017f9d6a
 list:
   Cluster ID:
     path: DBClusterIdentifier

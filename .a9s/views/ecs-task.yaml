@@ -1,4 +1,38 @@
-generated: 11
+generated: 12
+list_hashes:
+  Task ID: 64aae8b49750182a
+  Cluster: 6b632c2f7cbc5672
+  Status: e06b45a4b8bcbc54
+  Stop Code: ec61fd19d4704bbe
+  Health: 1215616905807a55
+  Task Definition: 34ec37c7b352fd5a
+  Launch: 0058ea7e4447a0e0
+  CPU: a82ee819d6f73421
+  Memory: 095cf0a18e23e87b
+detail_hashes:
+  TaskArn: a02d0e79684e1edc
+  ClusterArn: be3a87d4853b3411
+  LastStatus: 2290a8ccbfde15b1
+  DesiredStatus: c0e9f69cb97b0982
+  TaskDefinitionArn: 048e1607ec1a33be
+  LaunchType: 1cfe1b77b39d6a9e
+  Cpu: 6625cb98c3401e38
+  Memory: dca81b0753d0c851
+  Group: b1293f6b5a501e2d
+  StartedBy: f5943ab4f2ff71ef
+  StartedAt: 20b2b2ef41fef75c
+  StoppedAt: 503ede778d8a26ce
+  StoppedReason: a04ddd1618e0b88c
+  StopCode: 3f760ccb1566d480
+  HealthStatus: b0f95ff830baff4c
+  Connectivity: f35a473cc5ce4d6a
+  PlatformVersion: 291612949499faed
+  PlatformFamily: d3185240f966faec
+  AvailabilityZone: 498a95b163a5e4df
+  Containers: aee6fad92aa3c5c3
+  Attachments: e489c254170454df
+  EnableExecuteCommand: a5c485b13b688c21
+  Tags: ee0396ef28e977b0
 list:
   Task ID:
     path: TaskArn

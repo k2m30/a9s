@@ -1,4 +1,18 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 821963eee092fc8f
+  Type: c91dbfdc8f69b774
+  Status: 516e63265dd02620
+  Last Run: cfdf87e5c2120e2e
+  ARN: 49f5a2aa182dab13
+  Created: 1c65911b21c57efa
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  StateMachineArn: 2d99785285fa58ed
+  Type: 94b276c178bd3a02
+  CreationDate: 9de39562d22bb856
+  Status: 37925f95190b7a7e
+  RoleArn: 53f87cbcf258bdaa
 list:
   Name:
     path: Name

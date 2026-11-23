@@ -154,45 +154,17 @@ func views7IsListColumnLiteral(lit *ast.CompositeLit) bool {
 // TestNoPerTypeColumnLiteralInConfig: a per-type column list in core/config
 // beside the catalog is a second owner, and the next column is added to
 // whichever one the writer happened to open.
-//
-// The migration table in ensure_views.go is not a declaration of a column: it
-// records, whole, what an OLDER build generated, so an installed file can be
-// told apart from an edited one.
 func TestNoPerTypeColumnLiteralInConfig(t *testing.T) {
 	fset, files := views7ConfigFiles(t)
 
-	history := map[string][2]token.Pos{}
-	for name, f := range files {
-		for _, decl := range f.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok || gd.Tok != token.VAR {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				vs, ok := spec.(*ast.ValueSpec)
-				if !ok {
-					continue
-				}
-				for _, id := range vs.Names {
-					if id.Name == "viewColumnChanges" {
-						history[name] = [2]token.Pos{gd.Pos(), gd.End()}
-					}
-				}
-			}
-		}
-	}
-
 	var offenders []string
-	for name, f := range files {
+	for _, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
 			if !ok {
 				return true
 			}
 			if !views7IsListColumnLiteral(lit) || len(lit.Elts) == 0 {
-				return true
-			}
-			if r, recorded := history[name]; recorded && lit.Pos() >= r[0] && lit.End() <= r[1] {
 				return true
 			}
 			offenders = append(offenders, fmt.Sprintf("%s: ListColumn literal", fset.Position(lit.Pos())))
@@ -228,86 +200,4 @@ func TestRepoViewFilesAreWhatThisBuildGenerates(t *testing.T) {
 				filepath.Join(".a9s", "views", name+".yaml"), onDisk, want)
 		}
 	}
-}
-
-// TestInstalledViewFileMigratesToTheMovedColumns: an untouched file written by
-// an older build takes this build's column set — but only while every column
-// in it is one this build still declares or one the migration table names,
-// whole, as what an older build wrote. A column whose key or width changed
-// without a line in that table makes the file look edited, and the operator
-// keeps the old column forever.
-func TestInstalledViewFileMigratesToTheMovedColumns(t *testing.T) {
-	previous := views7PreChangeViewFiles(t)
-	dir := t.TempDir()
-	for name, body := range previous {
-		if err := os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(body), 0o600); err != nil {
-			t.Fatalf("seed %s: %v", name, err)
-		}
-	}
-	if err := config.EnsureViewsDir(dir); err != nil {
-		t.Fatalf("EnsureViewsDir: %v", err)
-	}
-
-	names := make([]string, 0, len(previous))
-	for name := range previous {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		raw, err := os.ReadFile(filepath.Join(dir, name+".yaml")) //nolint:gosec // a temp dir this test wrote
-		if err != nil {
-			t.Errorf("%s: %v", name, err)
-			continue
-		}
-		vd, err := config.ParseSingle(raw)
-		if err != nil {
-			t.Errorf("%s: parse migrated file: %v", name, err)
-			continue
-		}
-		if vd.Generated != config.GeneratedViewsVersion {
-			t.Errorf("%s: migrated file is stamped %d, this build is %d", name, vd.Generated, config.GeneratedViewsVersion)
-		}
-		want := config.DefaultViewDef(name).List
-		if len(vd.List) != len(want) {
-			t.Errorf("%s: an untouched file from the previous build kept %d columns, this build declares %d — "+
-				"record the change in ensure_views.go's migration table so the file is recognised as generated",
-				name, len(vd.List), len(want))
-			continue
-		}
-		for i := range want {
-			if vd.List[i] != want[i] {
-				t.Errorf("%s column %d after migration: %s, want %s — the previous build's column is not "+
-					"recorded, so the file reads as one the operator edited and is left alone",
-					name, i, views7Describe(vd.List[i]), views7Describe(want[i]))
-			}
-		}
-	}
-}
-
-// views7PreChangeViewFiles reads the view files an older build generated,
-// before the column list moved onto the catalog. They are what an operator
-// who has run a9s once has on disk.
-func views7PreChangeViewFiles(t *testing.T) map[string]string {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(projectRoot(t), "tests", "unit", "testdata", "views7_pre_change_views.txt"))
-	if err != nil {
-		t.Fatalf("read the pre-change view files: %v", err)
-	}
-	out := map[string]string{}
-	for _, block := range strings.Split(string(raw), "===== ") {
-		block = strings.TrimPrefix(block, "\n")
-		if strings.TrimSpace(block) == "" {
-			continue
-		}
-		head, body, ok := strings.Cut(block, "\n")
-		if !ok {
-			t.Fatalf("malformed capture near %.40q", block)
-		}
-		out[strings.TrimSpace(head)] = body
-	}
-	if len(out) == 0 {
-		t.Fatal("the pre-change capture is empty")
-	}
-	return out
 }

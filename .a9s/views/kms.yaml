@@ -1,4 +1,24 @@
-generated: 11
+generated: 12
+list_hashes:
+  Alias: 4f22eaf2b38b3f74
+  Key ID: 467cca39304a38f7
+  Status: 89507bb429278bb5
+  Rotation: 256ae1e94282646a
+  Description: 0022b6f6290d9419
+detail_hashes:
+  KeyId: 7af249b76e26e982
+  Arn: fb866fb55912dfcd
+  Description: 170fb1f14fe6d129
+  KeyState: 475fd42caedf301b
+  KeyUsage: 81f955bc250de57c
+  KeySpec: 990f5feb1c650b1c
+  KeyManager: 52f552c0dd50f664
+  Enabled: 0266064248bf45d6
+  CreationDate: 9de39562d22bb856
+  Origin: 4241b6652a3011e0
+  MultiRegion: 7bf159255bc164a1
+  EncryptionAlgorithms: c140468d3249c14c
+  SigningAlgorithms: 33531c1e5da45fa5
 list:
   Alias:
     key: alias

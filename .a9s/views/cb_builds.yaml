@@ -1,4 +1,32 @@
-generated: 11
+generated: 12
+list_hashes:
+  "Build #": 9d87bbf74b4c636b
+  Status: 6c216014cc261bb3
+  Start Time: 276abffecd496d05
+  Duration: 8105ac895120e341
+  Source Version: 236095cc9c59ee42
+  Initiator: bdb054ed71e9ac0a
+detail_hashes:
+  Id: 75be4e070c3dd9b3
+  Arn: fb866fb55912dfcd
+  BuildNumber: 9b3686006c04501a
+  BuildStatus: f132e3875c09afcf
+  StartTime: 187a3ca235028ea9
+  EndTime: 3e2a8710b83f9761
+  CurrentPhase: 4de46a52e783d0b5
+  SourceVersion: a4f74761e6644c6e
+  ResolvedSourceVersion: 99050572ff373154
+  Initiator: 9545b954f8c4e6ee
+  Source: 869d2cb3f6317654
+  Environment: 71a615c32a29ecd5
+  Phases: c7af47fb9fd40c1f
+  Logs: 56e6d85f480fa3e5
+  Cache: 48539eba13663184
+  VpcConfig: 2e7f28064c49a6eb
+  ServiceRole: daa2caa6964987bb
+  TimeoutInMinutes: 55b794bee41a252a
+  QueuedTimeoutInMinutes: 066741411f33300e
+  BuildBatchArn: d75cf4edb97aa28a
 list:
   "Build #":
     key: build_number

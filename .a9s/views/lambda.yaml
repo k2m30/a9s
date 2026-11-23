@@ -1,4 +1,37 @@
-generated: 11
+generated: 12
+list_hashes:
+  Function Name: 9e84fb2c1e7a3eac
+  Runtime: 583388f6bfe5b4e6
+  Memory: 6b0113b350601e32
+  Timeout: f06da9952874a8f3
+  Status: 5da5b3eba930969d
+  Handler: 630b66c565ebdf6f
+  Last Modified: 4f3fe753e3fcb2cb
+detail_hashes:
+  FunctionName: 7c9f999b7489641e
+  FunctionArn: 471fe7bc8e0826de
+  Runtime: 2ac760bb90b26437
+  Handler: 6dc336d1eb1e31b4
+  MemorySize: d050da8253593411
+  Timeout: 3ec9650aedcaa6c4
+  EphemeralStorage: fa5b26e3734633d7
+  CodeSize: 6b0f36f4240dadb5
+  Description: 170fb1f14fe6d129
+  Role: 5f2dc9cb822f04d0
+  PackageType: b133fc59817c8821
+  Architectures: 2d70aa3237a421c2
+  State: a60d7692c7b3780c
+  LastUpdateStatus: c0ea09d193f7fbc2
+  LastUpdateStatusReason: 1248d5890bddde2e
+  Environment: 71a615c32a29ecd5
+  VpcConfig: 2e7f28064c49a6eb
+  DeadLetterConfig: 561070b06de71d6a
+  TracingConfig: e0a1c86fba8a1434
+  Layers: 3e87b3e4d43e5ce0
+  LoggingConfig: f91bdbea3901c9bf
+  KMSKeyArn: f4edd8afb9b2ff0d
+  LastModified: 6b3b06aaac7b075a
+  Concurrency: 0cf96bf97b58526e
 list:
   Function Name:
     path: FunctionName

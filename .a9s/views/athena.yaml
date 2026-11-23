@@ -1,4 +1,16 @@
-generated: 11
+generated: 12
+list_hashes:
+  Workgroup: 3c11ab7e46e584cb
+  Status: 22256ac216898d4c
+  Cost Cap: facc82f34d05794f
+  Description: db8526853ab7a372
+  Engine: efe7788f885a111e
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  State: a60d7692c7b3780c
+  Description: 170fb1f14fe6d129
+  EngineVersion: fa03e131c10745b7
+  CreationTime: 74875c541e4b7e5e
 list:
   Workgroup:
     path: Name

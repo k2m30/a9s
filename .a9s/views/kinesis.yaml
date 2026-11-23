@@ -1,4 +1,15 @@
-generated: 11
+generated: 12
+list_hashes:
+  Stream Name: 120d63429419f6c0
+  Status: a0231b6154398747
+  Mode: 37df4721a62a3034
+  Created: 79f8ba12ce996bba
+detail_hashes:
+  StreamName: 79ae8d5a44938a58
+  StreamARN: bef436123c129a40
+  StreamStatus: 6e1ca29f9c96f09a
+  StreamModeDetails: 44a88e6024ee48d5
+  StreamCreationTimestamp: db5b9a09c0d8f44d
 list:
   Stream Name:
     path: StreamName

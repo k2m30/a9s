@@ -1,4 +1,20 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 49cd2c5c00dfc200
+  TGW ID: 12adcfb1f3c6a24e
+  Status: 22256ac216898d4c
+  Att Issues: 211cb226c5e9d723
+  Owner: 51b5abab26a3cfff
+  Description: db8526853ab7a372
+detail_hashes:
+  TransitGatewayId: bfd61fe8d3788449
+  TransitGatewayArn: 74d8d546579dae58
+  State: a60d7692c7b3780c
+  OwnerId: ecd0ef57f1a859e4
+  Description: 170fb1f14fe6d129
+  Options: f741773f4dba4cce
+  CreationTime: 74875c541e4b7e5e
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

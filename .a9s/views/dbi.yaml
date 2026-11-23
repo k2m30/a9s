@@ -1,4 +1,37 @@
-generated: 11
+generated: 12
+list_hashes:
+  DB Identifier: e54df3d28f835d93
+  Engine: d1392eb8994ac982
+  Version: 0d4effbddeed9778
+  Status: f5c60c907d4fccf7
+  Class: a6e9b53bc3f940e4
+  Endpoint: 5a9811ea9c3c3dd4
+  Multi-AZ: 6746efca01552f0c
+detail_hashes:
+  DBInstanceIdentifier: 91a3aaf89ac3e398
+  DBInstanceArn: 1731555b6f0cbf61
+  Engine: 83731104bb17fbf1
+  EngineVersion: fa03e131c10745b7
+  DBInstanceStatus: 31799ca024ef6db4
+  DBInstanceClass: ecb9734522c0f5ea
+  Endpoint: 2c68a2f6afefc792
+  MultiAZ: e22621ddef6af0e2
+  AllocatedStorage: ae8060563d50ba22
+  StorageType: 8725cde9d093063e
+  Iops: 2a57b63fe80553bc
+  StorageEncrypted: 7b907aabf534e972
+  KmsKeyId: 63690001b224e625
+  AvailabilityZone: 498a95b163a5e4df
+  PubliclyAccessible: 497581f18cd13ec5
+  DBSubnetGroup: 122cff97343b33d9
+  VpcSecurityGroups: 12d003d493563edd
+  BackupRetentionPeriod: db31923947e337ed
+  PreferredMaintenanceWindow: b63338bef49c9730
+  PreferredBackupWindow: 6df03b19e1e79ebb
+  DeletionProtection: 39fd7d08321280db
+  MasterUsername: 6d06a268017f9d6a
+  PerformanceInsightsEnabled: 6b7cc41f931adf74
+  TagList: f1965671df855d0a
 list:
   DB Identifier:
     path: DBInstanceIdentifier

@@ -1,4 +1,18 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 821963eee092fc8f
+  Status: 516e63265dd02620
+  Zone ID: b34a6346f368bfd4
+  Records: 05e0ab01cea3f0f2
+  Private: 169eac52cd40f29c
+  Comment: b7b9503f295ec4f3
+detail_hashes:
+  Id: 75be4e070c3dd9b3
+  Name: 1e4a1612672f42b2
+  CallerReference: cb342e3a348423db
+  ResourceRecordSetCount: 16df795ad355da07
+  Config: 4e274068ade1329c
+  LinkedService: 9e9b600ca1dab336
 list:
   Name:
     path: Name

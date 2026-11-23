@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A view file in `~/.a9s/views/` now follows the version of a9s you run, and your edits to it are merged with the new defaults instead of freezing the file. Each generated file records a hash of every column and detail field it was generated with. A column or field you did not touch takes the new version's value or disappears with it, a new one appears, and a column or field you changed, added or removed stays the way you left it, in your order if you reordered. When a new version changes something the file takes, the first start rewrites it with the merged result and drops its comments; other starts leave it as it is. An empty section (`list: {}`) removes every generated item from the file; a list with no columns is shown with the built-in columns. On the first start, a file an earlier version generated (it has a `generated:` line and no hashes) is replaced by the file this version generates, including any edits you made to it; make them again in the new file. A file without a `generated:` line is yours and is never rewritten.
 - The menu issue count for ECR, launch templates and Transfer Family no longer includes the scan-on-push, IMDSv1, volume-encryption and security-policy warnings. These checks now need an extra read, and warnings from those reads colour the row without raising the menu count, as for every other type.
 
 ### Fixed

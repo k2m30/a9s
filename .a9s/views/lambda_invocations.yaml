@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Timestamp: 5bf08271cbcd6527
+  Request ID: fd931fae98f9eb70
+  Status: 1891c14343dc9da0
+  Duration: 6405907157943192
+  Memory: 77856ac6b341d1d4
+  Cold Start: 6fa188464e3e0f05
+detail_hashes:
+  request_id: 62d1e346a877d466
+  timestamp: 0ef36ad9c35adbf4
+  status: a21cfc365898cbf8
+  duration_ms: ad74cf681d6b61f0
+  billed_duration_ms: a9cd661313fac4d1
+  memory_size_mb: c20b5c969cc68cff
+  memory_used_mb: 57dfbc676fc3cdfa
+  init_duration_ms: c31fc77e1e6c89d7
+  restore_duration_ms: 68c1a144ccbd1706
+  error_type: f669afd4a2dfc059
+  xray_trace_id: cc3a00d33833bff8
 list:
   Timestamp:
     key: timestamp

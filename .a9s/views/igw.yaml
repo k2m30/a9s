@@ -1,4 +1,14 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 49cd2c5c00dfc200
+  IGW ID: b5c75be0de868377
+  VPC ID: 8fd38a59c94f4eb1
+  Status: 516e63265dd02620
+detail_hashes:
+  InternetGatewayId: 5cbd1b2c73fd4b5f
+  Attachments: e489c254170454df
+  OwnerId: ecd0ef57f1a859e4
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

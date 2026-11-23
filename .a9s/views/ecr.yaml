@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Repository: 956da080e958f39c
+  Status: 516e63265dd02620
+  URI: 8b6688ea3b14f1ce
+  Tag Mutability: 943bffad19ff3680
+  Scan: 220f9bc00c8c4dd2
+  Critical: 6f63806909c8e9e1
+  High: 96e1a09d61195739
+  Scanned: 06a4ec476d779f4f
+  Created: 7db3e78a48e36bcf
+detail_hashes:
+  RepositoryName: cae5f19ca92ab093
+  RepositoryUri: 87fe5ff31a72707e
+  RepositoryArn: b1baaebe2963ec45
+  RegistryId: 6df08ac9a68a76b5
+  ImageTagMutability: 80effcc1958aa216
+  ImageScanningConfiguration: fa21a729bfcce2fd
+  EncryptionConfiguration: 93009138ebb91dd4
+  CreatedAt: ac4f44b9064dcc14
 list:
   Repository:
     path: RepositoryName

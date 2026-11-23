@@ -1,4 +1,22 @@
-generated: 11
+generated: 12
+list_hashes:
+  Timestamp: 5bf08271cbcd6527
+  Logical ID: 4de1aed3538f1b37
+  Type: 9a995c28b9125a5b
+  Status: 46a13ebc90e10d8a
+  Reason: 35c293e83598e7e8
+detail_hashes:
+  EventId: 0dd67fb5d60808c3
+  StackId: 92cb7d95f8b691b3
+  StackName: 4060d964a1325a2c
+  Timestamp: 0e9ecd8fbdbd1d21
+  LogicalResourceId: 5838fad4aa37e502
+  PhysicalResourceId: b15d4e74a1bb43f0
+  ResourceType: 16d47381c924c1cb
+  ResourceStatus: 2c8cfe6734532159
+  ResourceStatusReason: 8369bdc3dc781968
+  ResourceProperties: e648727ee7161bd7
+  ClientRequestToken: 65f141a4aba4dcb4
 list:
   Timestamp:
     key: timestamp

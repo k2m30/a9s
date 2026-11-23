@@ -1,4 +1,26 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 49cd2c5c00dfc200
+  Subnet ID: a0cf06052f954706
+  VPC ID: 51b18126b8707aee
+  CIDR Block: d28de27bfb9a12d3
+  AZ: b52665006f1474a4
+  Status: 22256ac216898d4c
+  Public: 302b9aabafc79241
+  Available IPs: e28a88f1aa4f0fe5
+detail_hashes:
+  SubnetId: 133fe12eea3b4232
+  VpcId: 2f6df9d3ec6df63c
+  CidrBlock: 3f70ede262b6bfe2
+  AvailabilityZone: 498a95b163a5e4df
+  AvailabilityZoneId: 3ad681d2af521586
+  State: a60d7692c7b3780c
+  AvailableIpAddressCount: c1154b5f756373c4
+  MapPublicIpOnLaunch: 4a29e295ad9002c8
+  DefaultForAz: 1924ee74ea045db4
+  SubnetArn: aaef9c34e29680fe
+  OwnerId: ecd0ef57f1a859e4
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

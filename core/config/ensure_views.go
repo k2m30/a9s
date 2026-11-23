@@ -3,7 +3,10 @@
 package config
 
 import (
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,98 +14,310 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
-	"github.com/k2m30/a9s/v3/core/logging"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed views_reference.yaml
 var viewsReferenceData []byte
 
-// GenerateViewYAML returns the YAML bytes for a single ViewDef, stamped with
-// the build that generated it.
+type ItemHash struct {
+	Key  string
+	Hash string
+}
+
+// An empty block is left out: written as `list: {}` it would be an edit that
+// removes every item.
 func GenerateViewYAML(v ViewDef) []byte {
+	if len(v.List) == 0 {
+		v.List = nil
+	}
+	if len(v.Detail) == 0 {
+		v.Detail = nil
+	}
+	return viewYAML(v, listHashes(v.List), detailHashes(v.Detail))
+}
+
+func listHashes(cols []ListColumn) []ItemHash {
+	return itemHashes(cols, columnKey, columnHash)
+}
+
+func detailHashes(fields []DetailField) []ItemHash {
+	return itemHashes(fields, DetailField.ID, fieldHash)
+}
+
+func viewYAML(v ViewDef, listBase, detailBase []ItemHash) []byte {
 	var b strings.Builder
 	fmt.Fprintf(&b, "generated: %d\n", GeneratedViewsVersion)
-
-	if len(v.List) > 0 {
+	writeHashes(&b, "list_hashes", listBase)
+	writeHashes(&b, "detail_hashes", detailBase)
+	switch {
+	case v.List == nil:
+	case len(v.List) == 0:
+		b.WriteString("list: {}\n")
+	default:
 		b.WriteString("list:\n")
 		for _, col := range v.List {
-			fmt.Fprintf(&b, "  %s:\n", yamlKey(col.Title))
-			if col.Path != "" {
-				fmt.Fprintf(&b, "    path: %s\n", col.Path)
-			}
-			if col.Key != "" {
-				fmt.Fprintf(&b, "    key: %s\n", col.Key)
-			}
-			fmt.Fprintf(&b, "    width: %d\n", col.Width)
-			if col.SortKey != "" {
-				fmt.Fprintf(&b, "    sort_key: %s\n", col.SortKey)
-			}
+			writeColumn(&b, col)
 		}
 	}
-
-	if len(v.Detail) > 0 {
-		if len(v.List) > 0 {
+	switch {
+	case v.Detail == nil:
+	case len(v.Detail) == 0:
+		b.WriteString("detail: []\n")
+	default:
+		if v.List != nil {
 			b.WriteString("\n")
 		}
 		b.WriteString("detail:\n")
 		for _, df := range v.Detail {
-			switch {
-			case df.Key != "" && df.Label != "":
-				fmt.Fprintf(&b, "  - { key: %s, label: %q }\n", df.Key, df.Label)
-			case df.Key != "":
-				fmt.Fprintf(&b, "  - { key: %s }\n", df.Key)
-			case df.Path != "" && df.Label != "":
-				fmt.Fprintf(&b, "  - { path: %s, label: %q }\n", df.Path, df.Label)
-			default:
-				// Bare path-form (no label) stays as a simple string for readability.
-				fmt.Fprintf(&b, "  - %s\n", df.Path)
-			}
+			writeField(&b, df)
 		}
 	}
-
 	return []byte(b.String())
 }
 
-// yamlKey quotes a YAML key that contains special characters.
-func yamlKey(s string) string {
-	if strings.ContainsAny(s, "#:{}[]&*?|>!%@`") {
-		return fmt.Sprintf("%q", s)
+func writeHashes(b *strings.Builder, name string, hashes []ItemHash) {
+	if len(hashes) == 0 {
+		return
 	}
-	return s
+	fmt.Fprintf(b, "%s:\n", name)
+	for _, h := range hashes {
+		fmt.Fprintf(b, "  %s: %s\n", yamlScalar(h.Key), h.Hash)
+	}
 }
 
-// EnsureViewsDir writes any missing built-in view YAML files to dir and brings
-// files written by an older build up to this one's column set.
+// An item whose key an earlier item already has is not recorded, so a merge
+// reads it as one the operator added.
+func itemHashes[T any](items []T, key, hash func(T) string) []ItemHash {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]ItemHash, 0, len(items))
+	seen := make(map[string]bool, len(items))
+	for _, it := range items {
+		if k := key(it); !seen[k] {
+			seen[k] = true
+			out = append(out, ItemHash{Key: k, Hash: hash(it)})
+		}
+	}
+	return out
+}
+
+func columnKey(c ListColumn) string { return c.Title }
+
+// columnHash and fieldHash hash an item as the generator renders it from its
+// parsed content, so comments, indentation and another YAML spelling of the
+// same value hash alike. The rendering omits a zero field, so a field the
+// generator learns to write later leaves every existing hash unchanged.
+func columnHash(c ListColumn) string {
+	var b strings.Builder
+	writeColumn(&b, c)
+	return contentHash(b.String())
+}
+
+func fieldHash(f DetailField) string {
+	var b strings.Builder
+	writeField(&b, f)
+	return contentHash(b.String())
+}
+
+func contentHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
+}
+
+func writeColumn(b *strings.Builder, col ListColumn) {
+	fmt.Fprintf(b, "  %s:\n", yamlScalar(col.Title))
+	if col.Path != "" {
+		fmt.Fprintf(b, "    path: %s\n", yamlScalar(col.Path))
+	}
+	if col.Key != "" {
+		fmt.Fprintf(b, "    key: %s\n", yamlScalar(col.Key))
+	}
+	fmt.Fprintf(b, "    width: %d\n", col.Width)
+	if col.SortKey != "" {
+		fmt.Fprintf(b, "    sort_key: %s\n", yamlScalar(col.SortKey))
+	}
+}
+
+func writeField(b *strings.Builder, df DetailField) {
+	switch {
+	case df.Key != "" && df.Label != "":
+		fmt.Fprintf(b, "  - { key: %s, label: %s }\n", yamlScalar(df.Key), yamlScalar(df.Label))
+	case df.Key != "":
+		fmt.Fprintf(b, "  - { key: %s }\n", yamlScalar(df.Key))
+	case df.Path != "" && df.Label != "":
+		fmt.Fprintf(b, "  - { path: %s, label: %s }\n", yamlScalar(df.Path), yamlScalar(df.Label))
+	default:
+		// Bare path-form (no label) stays as a simple string for readability.
+		fmt.Fprintf(b, "  - %s\n", yamlScalar(df.Path))
+	}
+}
+
+// A value with an indicator character or a line break is double-quoted: the plain
+// form the encoder may pick for it is valid in a block but not inside the
+// `{ … }` of a detail field.
+func yamlScalar(s string) string {
+	n := yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s}
+	if strings.ContainsAny(s, ",:#[]{}&*?|>!%@`\n") {
+		n.Style = yaml.DoubleQuotedStyle
+	}
+	out, _ := yaml.Marshal(&n) //nolint:errcheck // a string scalar node always encodes
+	return strings.TrimSuffix(string(out), "\n")
+}
+
+func (v *ViewDef) mergeWithBuild(def ViewDef) {
+	v.List = mergeItems(v.List, v.ListHashes, def.List, columnKey, columnHash)
+	v.Detail = mergeItems(v.Detail, v.DetailHashes, def.Detail, DetailField.ID, fieldHash)
+}
+
+// build is -1 when the operator owns the entry; file is -1 for an item only
+// the build has.
+type mergeEntry[T any] struct {
+	v           T
+	build, file int
+}
+
+// Against the recorded base, a file item is
+// "same" when its hash matches, "changed" when it does not, "added" when its
+// key has no hash, and a base key with no file item was removed:
 //
-// A file already stamped with this build is left byte for byte alone: whatever
-// the operator did to it is theirs.
+//	same, in the build     the build's item
+//	same, not in the build removed
+//	changed                the operator's item, whole
+//	removed                stays removed
+//	added                  the operator's item
+//	only in the build      added
 //
-// A file with an older stamp (or none) is first read for evidence of an
-// edit. One whose every column
-// is still the source and width the build at its stamp generated has never been
-// touched: it takes this build's column set and order wholesale, which is the
-// only way a corrected default order reaches an installation that already
-// exists. Reordering columns and changing nothing else leaves no such evidence,
-// so a file edited only that way is reordered back.
+// When the base items left in the file are in base order, the result takes
+// the build's order and each item the operator owns follows the item it
+// followed in the file. Otherwise it takes the file's order, and each item
+// only the build has follows the nearest preceding build item present.
 //
-// Any other file is the operator's. It keeps every column it has, in the order
-// it has them, and gains the built-in columns whose titles it does not carry —
-// each at the position it holds in the built-in set, so a column added in the
-// middle does not land at the far right of the operator's table.
-//
-// A column it does carry keeps what it has, field by field, with one
-// exception: on a column this build has corrected (viewColumnChanges), every
-// field still holding what the build at the file's stamp generated takes this
-// build's value. That field has never been edited, and leaving it behind leaves
-// the operator reading the source, or the raw constant, the correction moved
-// away from. A field they changed is theirs — and only that field, so widening
-// a column never costs them the rest of a correction.
+// A nil block is absent from the file and stays absent, so the directory
+// below it or the defaults answer for it. A block with no recorded hashes has
+// no base: it is the operator's as written.
+func mergeItems[T any](file []T, base []ItemHash, build []T, key, hash func(T) string) []T {
+	if file == nil || len(base) == 0 {
+		return file
+	}
+	baseAt := make(map[string]int, len(base))
+	for i, b := range base {
+		if _, dup := baseAt[b.Key]; !dup {
+			baseAt[b.Key] = i
+		}
+	}
+	buildAt := make(map[string]int, len(build))
+	for i, b := range build {
+		if _, dup := buildAt[key(b)]; !dup {
+			buildAt[key(b)] = i
+		}
+	}
+
+	var kept []mergeEntry[T]
+	inFile := make(map[string]bool, len(file))
+	last, reordered := -1, false
+	for _, f := range file {
+		k := key(f)
+		bi, inBase := baseAt[k]
+		if inFile[k] || !inBase {
+			inFile[k] = true
+			kept = append(kept, mergeEntry[T]{f, -1, len(kept)})
+			continue
+		}
+		inFile[k] = true
+		reordered = reordered || bi < last
+		last = bi
+		j, inBuild := buildAt[k]
+		switch {
+		case hash(f) != base[bi].Hash && inBuild:
+			kept = append(kept, mergeEntry[T]{f, j, len(kept)})
+		case hash(f) != base[bi].Hash:
+			kept = append(kept, mergeEntry[T]{f, -1, len(kept)})
+		case inBuild:
+			kept = append(kept, mergeEntry[T]{build[j], j, len(kept)})
+		}
+	}
+	isNew := func(b T) bool {
+		_, inBase := baseAt[key(b)]
+		return !inBase && !inFile[key(b)]
+	}
+
+	var out []mergeEntry[T]
+	if reordered {
+		out = kept
+		for j, b := range build {
+			if isNew(b) {
+				at := after(out, func(e mergeEntry[T]) int { return rankBelow(e.build, j) })
+				out = slices.Insert(out, at, mergeEntry[T]{b, j, -1})
+			}
+		}
+	} else {
+		for j, b := range build {
+			if isNew(b) {
+				out = append(out, mergeEntry[T]{b, j, -1})
+			} else if i := slices.IndexFunc(kept, func(e mergeEntry[T]) bool { return e.build == j }); i >= 0 {
+				out = append(out, kept[i])
+			}
+		}
+		for i, e := range kept {
+			if e.build < 0 {
+				out = slices.Insert(out, after(out, func(o mergeEntry[T]) int { return rankBelow(o.file, i) }), e)
+			}
+		}
+	}
+	merged := make([]T, len(out))
+	for i, e := range out {
+		merged[i] = e.v
+	}
+	return merged
+}
+
+func after[T any](out []mergeEntry[T], rank func(mergeEntry[T]) int) int {
+	best, at := -1, 0
+	for i, e := range out {
+		if r := rank(e); r > best {
+			best, at = r, i+1
+		}
+	}
+	return at
+}
+
+func rankBelow(i, limit int) int {
+	if i < limit {
+		return i
+	}
+	return -1
+}
+
+// A block without hashes in the file stays the operator's and is written
+// without them again.
+func rebased(vd *ViewDef, def ViewDef) ViewDef {
+	m := *vd
+	m.mergeWithBuild(def)
+	m.ListHashes, m.DetailHashes = nil, nil
+	if m.List != nil && len(vd.ListHashes) > 0 {
+		m.ListHashes = listHashes(def.List)
+	}
+	if m.Detail != nil && len(vd.DetailHashes) > 0 {
+		m.DetailHashes = detailHashes(def.Detail)
+	}
+	return m
+}
+
+func sameView(a, b ViewDef) bool {
+	return (a.List == nil) == (b.List == nil) && slices.Equal(a.List, b.List) &&
+		(a.Detail == nil) == (b.Detail == nil) && slices.Equal(a.Detail, b.Detail) &&
+		slices.Equal(a.ListHashes, b.ListHashes) && slices.Equal(a.DetailHashes, b.DetailHashes)
+}
+
+// A file whose merge and next base equal what it holds is left byte for byte,
+// so an operator's comments survive every start of the same build. A file with
+// no stamp was written by hand and is never rewritten. A file a
+// newer build stamped is left as that build wrote it. A file an earlier build
+// stamped carries no item hashes and is replaced, edited or not.
 func EnsureViewsDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	if err := carryRenamedViewFiles(dir); err != nil {
 		return err
 	}
 
@@ -115,376 +330,47 @@ func EnsureViewsDir(dir string) error {
 
 	for _, name := range keys {
 		dest := filepath.Join(dir, name+".yaml")
+		def := cfg.Views[name]
 		data, readErr := os.ReadFile(dest) //nolint:gosec // dest is built from the caller's own config dir
+		next := GenerateViewYAML(def)
 		switch {
 		case readErr != nil && !os.IsNotExist(readErr):
 			return readErr
-		case readErr != nil:
-			data = GenerateViewYAML(cfg.Views[name])
-		default:
-			merged, changed := mergeGeneratedColumns(name, data, cfg.Views[name])
-			if !changed {
+		case readErr == nil:
+			vd, err := ParseSingle(data)
+			if err != nil || vd.Generated == 0 || vd.Generated > GeneratedViewsVersion {
 				continue
 			}
-			data = merged
-		}
-		if writeErr := os.WriteFile(dest, data, 0644); writeErr != nil { //nolint:gosec // view YAML files are non-sensitive, world-readable is acceptable
-			return writeErr
-		}
-	}
-	return nil
-}
-
-// viewColumnChange records one built-in column this build has corrected, and
-// the whole column the build before Version generated for it. The corrected
-// value is whatever the defaults say, the one place a built-in column is
-// defined.
-//
-// A corrected column keeps its title, so the missing-title rule below never
-// sees it. Matching on
-// the whole column the previous build generated is what separates a column
-// nobody has touched from one the operator set themselves: theirs differs in
-// at least the field they changed, and is left exactly as it is.
-type viewColumnChange struct {
-	Version int        // the GeneratedViewsVersion that introduced the correction
-	View    string     // the view file's name, e.g. "sns"
-	Was     ListColumn // the column the build before Version generated, whole
-}
-
-// viewColumnChanges is the migration table, scanned in order. Add a row in the
-// same change that alters ANY field of a built-in column — its path, its key,
-// its width, whether it humanizes — and bump GeneratedViewsVersion with it.
-var viewColumnChanges = []viewColumnChange{
-	{Version: 2, View: "sns", Was: ListColumn{Title: "Topic Name", Path: "TopicArn", Width: 40}},
-	{Version: 2, View: "sns-sub", Was: ListColumn{Title: "Confirmed", Path: "SubscriptionArn", Width: 22}},
-	{Version: 3, View: "alarm", Was: ListColumn{Title: "Threshold", Path: "Threshold", Width: 12}},
-	{Version: 3, View: "ecs-task", Was: ListColumn{Title: "Task ID", Path: "TaskArn", Width: 38}},
-	{Version: 3, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 3, View: "ng", Was: ListColumn{Title: "Node Group", Path: "NodegroupName", Width: 28}},
-	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Accessed", Path: "LastAccessedDate", Width: 18}},
-	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Changed", Path: "LastChangedDate", Width: 18}},
-	{Version: 3, View: "sns-sub", Was: ListColumn{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60}},
-	{Version: 4, View: "ecs-task", Was: ListColumn{Title: "Stop Code", Path: "StopCode", Width: 24}},
-	{Version: 4, View: "nat", Was: ListColumn{Title: "Failure", Path: "FailureCode", Width: 22}},
-	// An entry only carries while its Version is above the stamp the file was
-	// written at, so the Retention entry repeats at every stamp a file still
-	// carrying its pre-correction spelling can have; keyMoveVersion's class
-	// rule cannot deliver it because that spelling differs in more than the key.
-	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 6, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 7, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 8, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 8, View: "athena", Was: ListColumn{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12}},
-	{Version: 8, View: "kms", Was: ListColumn{Title: "Alias", Path: "AliasName", Width: 32}},
-	{Version: 9, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 10, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	// Both spellings of the ebs column a file can hold: one written before the
-	// key move carries no key beside the path.
-	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Width: 20}},
-	{Version: 10, View: "ebs", Was: ListColumn{Title: "Attached To", Path: "Attachments", Key: "attached_to", Width: 20}},
-	{Version: 11, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	{Version: 11, View: "ecr", Was: ListColumn{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6}},
-	{Version: 11, View: "ecr", Was: ListColumn{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Key: "scan_on_push", Width: 6}},
-}
-
-// keyMoveVersion is the stamp at which every built-in column took the key its
-// resource type declares. Before it, a column in a view file carried whatever
-// key the second per-type column list in core/config gave it — for most
-// columns none at all, the cell resolving through the RawStruct path beside it
-// — while the renderer merged the type's key onto that same column anyway, on
-// every frame. A file written before the move therefore differs from this
-// build's column in Key and in no other field, and that difference is this
-// build's own doing rather than an edit.
-//
-// It matches whole columns rather than the key alone, so a column the operator
-// touched at all — a width they set — keeps no key at this migration. That
-// costs them nothing on screen: ResolveListColumnCascade merges the type's key
-// onto every title both declare on every frame, so the cell reads the same
-// field either way. The alternative, taking the key wherever the title
-// matches, would overwrite a key an operator wrote themselves, which the file
-// does not record as theirs.
-const keyMoveVersion = 6
-
-// keyMovedOnly reports whether onDisk is, whole, what the build before
-// keyMoveVersion generated for this column: its title, path, width and sort
-// key, and NO key where this build declares one.
-//
-// The empty key is the load-bearing half. The move only added keys, so the
-// previous generated form of a moved column is this build's column with the
-// key taken off. A key merely DIFFERING from this build's may be the
-// operator's own, and generatedAsIs asks this question of every column to
-// decide whether the file was ever edited.
-func keyMovedOnly(on, now ListColumn, stamp int) bool {
-	return stamp < keyMoveVersion &&
-		on.Key == "" && now.Key != "" &&
-		on.Title == now.Title &&
-		on.Path == now.Path &&
-		on.Width == now.Width &&
-		on.SortKey == now.SortKey
-}
-
-// statusKeyMoveVersion is the stamp at which the status column stopped being
-// the one a TITLE said was the status column, or the one whose key was spelled
-// "status" whatever the type calls its own key. The type declares it
-// (catalog.ResourceTypeDef.LifecycleKey), so a file written before this stamp
-// carries columns the replaced rule treated as the status and this build does
-// not — a renamed Status column above all, which is the one the renderer's
-// title merge cannot reach either.
-//
-// A migration encodes the rule it replaced. movedStatusKey is that rule,
-// written out once: it is what config.IsStatusColumn said before this build,
-// and every column it recognises takes the key the type declares.
-const statusKeyMoveVersion = 7
-
-// movedStatusKey returns the key a column the REPLACED status rule recognised
-// takes on this type, and whether it moved at all.
-func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
-	if stamp >= statusKeyMoveVersion {
-		return "", false
-	}
-	// catalog.FindAny: a child type has a view file, an operator and a
-	// lifecycle key of its own.
-	td := catalog.FindAny(view)
-	if td == nil {
-		return "", false
-	}
-	statusKey := td.StatusKey()
-	if col.Key == statusKey {
-		return "", false
-	}
-	// The replaced predicate, verbatim: key "status", key == the type's
-	// lifecycle key, or a title of "status"/"state" whatever the key said.
-	wasStatus := col.Key == "status" ||
-		strings.EqualFold(col.Title, "status") ||
-		strings.EqualFold(col.Title, "state")
-	if !wasStatus {
-		return "", false
-	}
-	return statusKey, true
-}
-
-// viewFileRenames records a type this build has RENAMED, old name to new. An
-// installation that ran an older build may carry a file under the old name,
-// which names no type.
-//
-// Same shape and same bargain as viewColumnAdditions: the migration owns what
-// the generator wrote, and a file it wrote is not the operator's mistake to be
-// told about on every start. Add a row in the same change that renames a type
-// whose views file this repo carries.
-var viewFileRenames = map[string]string{ //nolint:gochecknoglobals // static migration table
-	"docdb-snap": "dbc-snap",
-	"rds-snap":   "dbi-snap",
-}
-
-// carryRenamedViewFiles moves a view file written under a name this build has
-// renamed to the name in use, and retires it when that name already has a
-// file — the one under the name in use is the one being edited, so it is
-// never written over. A retired file keeps its contents beside its old name
-// with a suffix the loader does not read, because deleting what an operator
-// may have edited to say "this build renamed the type" is not the migration's
-// call.
-func carryRenamedViewFiles(dir string) error {
-	for from, to := range viewFileRenames {
-		old := filepath.Join(dir, from+".yaml")
-		if _, err := os.Stat(old); err != nil {
-			continue
-		}
-		dest := filepath.Join(dir, to+".yaml")
-		if _, err := os.Stat(dest); err == nil {
-			retired := old + ".retired"
-			if err := os.Rename(old, retired); err != nil {
-				return err
+			if vd.Generated == GeneratedViewsVersion {
+				m := rebased(vd, def)
+				if sameView(*vd, m) {
+					continue
+				}
+				next = viewYAML(m, m.ListHashes, m.DetailHashes)
 			}
-			logging.L().Info("retired a view file for a renamed type",
-				"file", from+".yaml", "renamed_to", to, "kept", filepath.Base(retired),
-				"reason", to+".yaml already exists and is the one in use")
-			continue
 		}
-		if err := os.Rename(old, dest); err != nil {
+		if err := replaceFile(dest, next); err != nil {
 			return err
 		}
-		logging.L().Info("carried a view file to the type's new name",
-			"file", from+".yaml", "renamed_to", to+".yaml")
 	}
 	return nil
 }
 
-// viewColumnAdditions names a column the built-in views GAINED, and the
-// GeneratedViewsVersion that gained it. Add a row in the same change that adds
-// a column to core/config/defaults_*.go, and bump GeneratedViewsVersion with
-// it.
-//
-// It is what tells a migration the difference between a column a file has
-// never been offered and one the operator deleted. Absence is the only record
-// a view file keeps of that decision, so a migration that re-adds every
-// built-in the file does not carry reverses it — and does it again on the next
-// start, so deleting the column twice does not help either.
-var viewColumnAdditions = []struct { //nolint:gochecknoglobals // static migration table
-	Version int
-	View    string
-	Title   string
-}{
-	{Version: 5, View: "lambda", Title: "Handler"},
-	{Version: 9, View: "sfn_execution_history", Title: "Status"},
-}
-
-// introducedAfter reports whether the named column entered the built-in views
-// after the stamp a file was written at, which is the only reason to insert a
-// column the file does not carry.
-func introducedAfter(view, title string, stamp int) bool {
-	return slices.ContainsFunc(viewColumnAdditions, func(a struct {
-		Version int
-		View    string
-		Title   string
-	}) bool {
-		return a.View == view && a.Title == title && a.Version > stamp
-	})
-}
-
-// mergeGeneratedColumns returns the YAML for onDisk brought up to this build:
-// def's columns whose titles are missing are added, and a column still carrying
-// the source an older build generated for it takes this build's source and
-// width. changed=false when there is nothing to do: onDisk already carries this
-// build's stamp, or it does not parse, which is the operator's problem to see
-// and fix rather than this function's to overwrite.
-func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, bool) {
-	vd, err := ParseSingle(onDisk)
-	if err != nil || vd.Generated >= GeneratedViewsVersion {
-		return nil, false
+// The rename means a concurrent reader sees the old file or the new one, never
+// a partial write, and a failed write leaves the original.
+func replaceFile(dest string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".*.tmp")
+	if err != nil {
+		return err
 	}
-	have := make(map[string]bool, len(vd.List))
-	for _, c := range vd.List {
-		have[c.Title] = true
+	_, writeErr := tmp.Write(data)
+	if err := errors.Join(writeErr, tmp.Close(), os.Chmod(tmp.Name(), 0644)); err != nil { //nolint:gosec // view YAML files are non-sensitive, world-readable is acceptable
+		return errors.Join(err, os.Remove(tmp.Name()))
 	}
-	want := make(map[string]ListColumn, len(def.List))
-	for _, c := range def.List {
-		want[c.Title] = c
+	if err := os.Rename(tmp.Name(), dest); err != nil {
+		return errors.Join(err, os.Remove(tmp.Name()))
 	}
-
-	// belongs reports whether a built-in column belongs in the migrated file:
-	// one the file already carries, or one introduced after the stamp it was
-	// written at. Both writers below ask, so neither can restore a column the
-	// operator deleted.
-	belongs := func(title string) bool {
-		// A file with no stamp at all predates the table: the build that wrote
-		// it never generated the current column vocabulary, so nothing missing
-		// from it can be a column the operator deleted. Every built-in is new
-		// to that file.
-		return vd.Generated == 0 || have[title] || introducedAfter(name, title, vd.Generated)
-	}
-
-	// A file nobody has touched carries this build's column set, or the set the
-	// build at its stamp generated, and nothing else. It has no order of its
-	// own to protect, so it takes this build's — which is the only way a
-	// corrected default order reaches an operator who has already run a9s once.
-	// The trade is deliberate: reordering columns and changing nothing else is
-	// indistinguishable from never having opened the file, and such a file is
-	// reordered back.
-	if generatedAsIs(name, vd.List, want, vd.Generated) {
-		kept := make([]ListColumn, 0, len(def.List))
-		for _, c := range def.List {
-			if belongs(c.Title) {
-				kept = append(kept, c)
-			}
-		}
-		vd.List = kept
-		return GenerateViewYAML(*vd), true
-	}
-
-	for i, c := range def.List {
-		if have[c.Title] || !belongs(c.Title) {
-			continue
-		}
-		vd.List = slices.Insert(vd.List, min(i, len(vd.List)), c)
-	}
-	// Carry this build's corrections, field by field. An entry names the whole
-	// column an older build generated, so every field of it can be compared:
-	// one still holding what that build wrote is one nobody has touched and
-	// takes the current default's value, and one the operator changed is
-	// theirs. Comparing whole columns instead would let a single edit freeze
-	// every other field, and comparing only the fields a given correction
-	// happens to change would leave the next kind of correction stranded.
-	for i, on := range vd.List {
-		now, ok := want[on.Title]
-		// A column already carrying the key this build declares for it is
-		// current, whatever its title reads as. Only a column whose key this
-		// build has no use for can be one the replaced status rule keyed.
-		current := ok && on.Key == now.Key
-		if moved, movedOK := movedStatusKey(name, on, vd.Generated); movedOK && !current {
-			vd.List[i].Key = moved
-		}
-		if !ok {
-			continue
-		}
-		if keyMovedOnly(on, now, vd.Generated) {
-			vd.List[i].Key = now.Key
-		}
-		for _, ch := range viewColumnChanges {
-			if ch.View != name || ch.Was.Title != on.Title || ch.Version <= vd.Generated {
-				continue
-			}
-			vd.List[i] = carryGeneratedFields(vd.List[i], ch.Was, now)
-		}
-	}
-	return GenerateViewYAML(*vd), true
-}
-
-// generatedAsIs reports whether every column onDisk is one a build generated
-// and left alone: this build's own declaration of that column, or — for a
-// column a later build corrected — exactly what the build at stamp wrote for
-// it. A column the defaults do not declare at all is the operator's, and so is
-// any other spelling of one they do.
-func generatedAsIs(name string, onDisk []ListColumn, want map[string]ListColumn, stamp int) bool {
-	for _, on := range onDisk {
-		now, ok := want[on.Title]
-		if !ok {
-			return false
-		}
-		if on != now && !generatedByStamp(name, on, stamp) && !keyMovedOnly(on, now, stamp) {
-			return false
-		}
-	}
-	return true
-}
-
-// generatedByStamp reports whether on is, whole, what the build at stamp
-// generated for a column this build has since corrected. Whole rather than
-// field by field because its caller asks a different question: not "may this
-// field be corrected" but "has this file been edited at all".
-func generatedByStamp(name string, on ListColumn, stamp int) bool {
-	for _, ch := range viewColumnChanges {
-		if ch.View == name && ch.Version > stamp && ch.Was == on {
-			return true
-		}
-	}
-	return false
-}
-
-// carryGeneratedFields returns on with every field that still holds what the
-// previous build generated (was) replaced by what this build declares (now).
-// Title identifies the column and is never carried; it is what the two are
-// matched on.
-//
-// ponytail: "untouched" is "equal to what the previous build wrote", which a
-// bool cannot always express — an operator who sets a flag back to the value
-// that build generated is indistinguishable from one who never opened the
-// file, and the correction lands on them once. They set it again afterwards
-// and the current stamp leaves the file alone from then on. Recording what the
-// operator changed, rather than inferring it, is the upgrade path.
-func carryGeneratedFields(on, was, now ListColumn) ListColumn {
-	if on.Path == was.Path {
-		on.Path = now.Path
-	}
-	if on.Key == was.Key {
-		on.Key = now.Key
-	}
-	if on.Width == was.Width {
-		on.Width = now.Width
-	}
-	if on.SortKey == was.SortKey {
-		on.SortKey = now.SortKey
-	}
-	return on
+	return nil
 }
 
 // EnsureViewsReference writes the embedded views_reference.yaml to configDir.

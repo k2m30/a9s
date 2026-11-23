@@ -1,4 +1,18 @@
-generated: 11
+generated: 12
+list_hashes:
+  User Name: 5a79e8ec32af45b0
+  User ID: 9275ea651bc1be13
+  Created: cbf57c551f7bb916
+  Password Last Used: 206b2b223784da33
+detail_hashes:
+  UserName: e9d04b791f722a2c
+  UserId: eafc68318870ee19
+  Arn: fb866fb55912dfcd
+  Path: 9f41e3fe5a1f14fb
+  CreateDate: 12566b0c4fd518ca
+  PasswordLastUsed: 756fdd608d0a3bb4
+  PermissionsBoundary: 274e4865b8cab7f9
+  Tags: ee0396ef28e977b0
 list:
   User Name:
     key: user_name

@@ -1,4 +1,25 @@
-generated: 11
+generated: 12
+list_hashes:
+  Trail Name: d86e12ce1a3fb11e
+  Status: 516e63265dd02620
+  S3 Bucket: 84747f39c6a55b2f
+  Home Region: b9da25d849d8869a
+  Multi-Region: 3e4af4d1b978c589
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  TrailARN: 50ce8454dd421165
+  S3BucketName: df9f552ebdc42184
+  HomeRegion: 4fa14a3196573531
+  IsMultiRegionTrail: 9b68391386c183e5
+  IsOrganizationTrail: 4ae07b8b6207f7b9
+  LogFileValidationEnabled: 6a18035742c3af66
+  IncludeGlobalServiceEvents: 6f08356feb784e45
+  KmsKeyId: 63690001b224e625
+  CloudWatchLogsLogGroupArn: bf3fb91d1cf5c049
+  CloudWatchLogsRoleArn: 787be930844bb110
+  SnsTopicARN: c20d2d5920f6956e
+  "key:is_logging": e9f940400866a67f
+  "key:latest_delivery_error": fd028eaec926c193
 list:
   Trail Name:
     path: Name
@@ -33,5 +54,5 @@ detail:
   - CloudWatchLogsLogGroupArn
   - CloudWatchLogsRoleArn
   - SnsTopicARN
-  - { key: is_logging, label: "Logging" }
-  - { key: latest_delivery_error, label: "Latest Delivery Error" }
+  - { key: is_logging, label: Logging }
+  - { key: latest_delivery_error, label: Latest Delivery Error }

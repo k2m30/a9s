@@ -1,4 +1,27 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster ID: ff82512536d3c91a
+  Node Type: c3fef09b93b861cb
+  Status: de81d4d25f6b3255
+  Nodes: 0582efabbe3d1455
+  Endpoint: 73bf19ff7356f8ed
+detail_hashes:
+  ReplicationGroupId: 079c6026e586b971
+  ARN: 55343400ae662083
+  Description: 170fb1f14fe6d129
+  Status: 37925f95190b7a7e
+  CacheNodeType: a45082ac228a8c06
+  MemberClusters: 33931a9086e1ebc1
+  ConfigurationEndpoint: be7c1add596f95b5
+  MultiAZ: e22621ddef6af0e2
+  AutomaticFailover: f7207126445f3ae4
+  KmsKeyId: 63690001b224e625
+  AtRestEncryptionEnabled: 4a6a712f7d9dee35
+  TransitEncryptionEnabled: 633e8b4138a99957
+  AuthTokenEnabled: 7ca73301bce74a51
+  SnapshotRetentionLimit: 1a24bcf6e587ec0a
+  SnapshotWindow: 26a24de62784d87f
+  LogDeliveryConfigurations: 9f54ab9a96c6ed4b
 list:
   Cluster ID:
     path: ReplicationGroupId

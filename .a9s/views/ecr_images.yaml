@@ -1,4 +1,21 @@
-generated: 11
+generated: 12
+list_hashes:
+  Tag(s): b9cd0521361a7457
+  Digest: 1c9f1715f0a5d352
+  Pushed At: 4ca6b613da05160c
+  Size: 79951614f78728be
+  Scan Status: 5077c7223d58b4a0
+  Findings: 59590a0c72f7c160
+detail_hashes:
+  ImageDigest: 80876e1588183c85
+  ImageTags: c2b2c4865892118f
+  ImagePushedAt: f904ae4e9411768f
+  ImageSizeInBytes: 201143950ec6b7c7
+  ImageManifestMediaType: 07b6033f3db0fdb3
+  ArtifactMediaType: e36c4194c5a4b36a
+  ImageScanStatus: 2ca6bec8486ef36e
+  ImageScanFindingsSummary: bd378901519663af
+  LastRecordedPullTime: 8d1cdaa18908ea58
 list:
   Tag(s):
     key: image_tags

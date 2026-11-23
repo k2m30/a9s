@@ -1,4 +1,15 @@
-generated: 11
+generated: 12
+list_hashes:
+  Priority: ec1d7700d2fc97c8
+  Conditions: 220aaf1247907a8f
+  Action: 62807695b8d479fa
+  Target: b4eaf7f8f56547cd
+detail_hashes:
+  RuleArn: 4005fb3f4eecf446
+  Priority: 30fadd7c6b831d29
+  Conditions: 95210026a72a1a0c
+  Actions: 5db2f58f7f6d042d
+  IsDefault: 3954878bc120532b
 list:
   Priority:
     key: priority

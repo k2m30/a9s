@@ -1,4 +1,13 @@
-generated: 11
+generated: 12
+list_hashes:
+  Policy Name: ae6be94ff2bf90b6
+  Policy ARN: 5be8ebf11741f3c3
+  Type: a3aa40dba1aedb98
+detail_hashes:
+  PolicyName: b7b996e2896cf938
+  PolicyArn: 01500abcdf96edec
+  PolicyType: 5e205f75671570c1
+  Document: 5def81a9570c9bb6
 list:
   Policy Name:
     key: policy_name

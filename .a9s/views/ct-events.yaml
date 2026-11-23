@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  V: b86ab78550cc8e82
+  TIME: a37d6a2d2bd54dcd
+  Status: 168e38cf521a9b36
+  ACTOR: 7245c00d9c4edaad
+  ORIGIN: c00fdb5c44119f43
+  EVENT: c7863d45149e412f
+  TARGET: bf21d453f4e311db
+  OUTCOME: 9fe548706ec5d98d
+detail_hashes:
+  EventId: 0dd67fb5d60808c3
+  EventName: d482865ebb37ba2c
+  EventTime: 1e3bff687be09ffa
+  EventSource: 3e69575d6bcf9537
+  Username: 5a88dcbcefac1aec
+  ReadOnly: a71e5ac521a1d657
+  AccessKeyId: 2ff21e44a13c01d2
+  Resources: 1cb71b4bb5d202d9
+  CloudTrailEvent: dc88c715517567ba
 list:
   V:
     key: _ct.verb

@@ -62,8 +62,7 @@ func views7Flash(t *testing.T, c *client) app.Flash {
 // operator's config folder, config.Load, the server started with what it
 // returned — and reads the report where the page shows the terminal's flash.
 func TestWebLaneShowsTheConfigReport(t *testing.T) {
-	viewCfg, cfgErr := views7ViewsDir(t, "vpce", `generated: 6
-list:
+	viewCfg, cfgErr := views7ViewsDir(t, "vpce", `list:
   Endpoint ID:
     key: vpce_id
     width: 26
@@ -106,8 +105,7 @@ detail:
 // opens with an error flash on a healthy config is a lane nobody will read
 // twice.
 func TestWebLaneShowsNoReportForAGoodConfig(t *testing.T) {
-	viewCfg, cfgErr := views7ViewsDir(t, "vpce", `generated: 6
-list:
+	viewCfg, cfgErr := views7ViewsDir(t, "vpce", `list:
   Endpoint ID:
     key: vpce_id
     width: 26

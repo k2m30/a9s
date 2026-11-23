@@ -1,4 +1,31 @@
-generated: 11
+generated: 12
+list_hashes:
+  Node Group: abd83323caecb919
+  Cluster: fa426a143b3ff9b7
+  Status: 78d294393c20d2aa
+  Instance Types: 2b4f973fd4bf7d30
+  Desired: 0557c34e2e25bc8c
+detail_hashes:
+  NodegroupName: 3878bdc98826f1f0
+  ClusterName: 512427c560ea8825
+  Status: 37925f95190b7a7e
+  InstanceTypes: 11f3a5ffecb0212c
+  AmiType: 4742d79716a36c77
+  CapacityType: c852b348f6014ff9
+  DiskSize: df82300e271756cd
+  ScalingConfig: 8bb481e33474516d
+  NodeRole: f70615845236f7d2
+  NodegroupArn: 913a28f1b35ab4ad
+  ReleaseVersion: dfe9f30da75bc946
+  Version: 6342d6bffe05ee59
+  Subnets: 55601798418f39df
+  LaunchTemplate: 157fd4bafa2d433d
+  Labels: 3818400404b59c26
+  Taints: bafc5304576d9a36
+  Tags: ee0396ef28e977b0
+  Health: 61f5a99cba85cdcc
+  CreatedAt: ac4f44b9064dcc14
+  "key:health_issues": 1e21b7533fcfec08
 list:
   Node Group:
     path: NodegroupName
@@ -41,4 +68,4 @@ detail:
   - Tags
   - Health
   - CreatedAt
-  - { key: health_issues, label: "Health Issues" }
+  - { key: health_issues, label: Health Issues }

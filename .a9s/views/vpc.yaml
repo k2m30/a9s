@@ -1,4 +1,22 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  VPC ID: 51b18126b8707aee
+  CIDR Block: d28de27bfb9a12d3
+  Status: 22256ac216898d4c
+  Default: 3ad26453df878502
+  Flow Logs: 7d87f3f0430cdda4
+detail_hashes:
+  VpcId: 2f6df9d3ec6df63c
+  CidrBlock: 3f70ede262b6bfe2
+  State: a60d7692c7b3780c
+  IsDefault: 3954878bc120532b
+  InstanceTenancy: 9ccbb4d608fffc67
+  DhcpOptionsId: 54a2f02fed0fafc6
+  OwnerId: ecd0ef57f1a859e4
+  CidrBlockAssociationSet: b3dfc5b108602e53
+  Ipv6CidrBlockAssociationSet: 2047767fc7027bc6
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

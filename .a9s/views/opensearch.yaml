@@ -1,4 +1,26 @@
-generated: 11
+generated: 12
+list_hashes:
+  Domain Name: 661ab4391e247f98
+  Status: 1ba84f451d344b6b
+  Engine Version: 7a4db8ce5777c04c
+  Instance Type: f0c6f5098274e2b3
+  Instances: 7b03a0b50740b59b
+  Endpoint: c88357e86510aac5
+detail_hashes:
+  DomainName: dce31d3d792a5d93
+  DomainId: 3b87d29b919eb3df
+  ARN: 55343400ae662083
+  EngineVersion: fa03e131c10745b7
+  ClusterConfig: 3170c0f73b9e05f9
+  EBSOptions: 061058bd5d47d50b
+  Endpoint: 2c68a2f6afefc792
+  Endpoints: 5c9f06a78149665e
+  EncryptionAtRestOptions: 3f62d37f2ef7793a
+  DomainEndpointOptions: 114022363b0c703e
+  AdvancedSecurityOptions: 3586d3d7c6f8f993
+  VPCOptions: 910de4cb83f947b7
+  Created: fd908279a794af45
+  Deleted: 066942ee1494fb3d
 list:
   Domain Name:
     path: DomainName

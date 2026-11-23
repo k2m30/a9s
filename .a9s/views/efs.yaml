@@ -1,4 +1,25 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 141f2e161b230f88
+  File System ID: 69edb187ae96f448
+  Status: 793ab4f12f570394
+  Perf Mode: 0d02af0924cbefb6
+  Encrypted: 956f4cdf07855f30
+  Mounts: 0725df7c5a84c96b
+detail_hashes:
+  FileSystemId: 829222dfd7589b06
+  Name: 1e4a1612672f42b2
+  LifeCycleState: 34927b3d0d5c7341
+  PerformanceMode: 78c3082484ca27a9
+  ThroughputMode: 7c1c47e8c3411118
+  Encrypted: 3feca6c26df1124a
+  KmsKeyId: 63690001b224e625
+  NumberOfMountTargets: da629042856afa85
+  FileSystemArn: 19aa8c921c7ba337
+  OwnerId: ecd0ef57f1a859e4
+  SizeInBytes: 08233b9321b5e8cd
+  CreationTime: 74875c541e4b7e5e
+  Tags: ee0396ef28e977b0
 list:
   Name:
     path: Name

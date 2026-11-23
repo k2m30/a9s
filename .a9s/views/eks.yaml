@@ -1,4 +1,25 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster Name: a1ff5437a3fc6b46
+  Version: afe447c4e3a20b90
+  Status: 78d294393c20d2aa
+  Endpoint: c88357e86510aac5
+  Platform Version: d2e9cc223e337423
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  Version: 6342d6bffe05ee59
+  Status: 37925f95190b7a7e
+  Endpoint: 2c68a2f6afefc792
+  PlatformVersion: 291612949499faed
+  Arn: fb866fb55912dfcd
+  RoleArn: 53f87cbcf258bdaa
+  KubernetesNetworkConfig: 05e76cd3b93ad1d0
+  ResourcesVpcConfig: d148a0f74923f159
+  Logging: 07dac774719438ac
+  Identity: 07070b5881759337
+  CreatedAt: ac4f44b9064dcc14
+  Tags: ee0396ef28e977b0
+  "key:health_issues": 1e21b7533fcfec08
 list:
   Cluster Name:
     path: Name
@@ -35,4 +56,4 @@ detail:
   - Identity
   - CreatedAt
   - Tags
-  - { key: health_issues, label: "Health Issues" }
+  - { key: health_issues, label: Health Issues }

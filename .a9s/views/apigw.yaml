@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 141f2e161b230f88
+  Status: 516e63265dd02620
+  API ID: b68a07664bc25eec
+  Protocol: 79986511aef28dc6
+  Stages: d9fa7cd5f54b1e79
+  Endpoint: 730ee9b980150ed6
+  Description: db8526853ab7a372
+detail_hashes:
+  "key:api_id": c95416731ca26921
+  Name: 1e4a1612672f42b2
+  "key:protocol": 7e46f0b7cb3c2b14
+  "key:endpoint": 3a4cf8237f694c72
+  Description: 170fb1f14fe6d129
+  CreatedDate: 9513b0d1560a8c37
+  ApiKeySelectionExpression: 94b9c35547def264
+  RouteSelectionExpression: 8f46840512db30ca
+  CorsConfiguration: 51e7e5fd10f0cff9
+  Tags: ee0396ef28e977b0
 list:
   Name:
     path: Name
@@ -25,10 +44,10 @@ list:
     width: 30
 
 detail:
-  - { key: api_id, label: "ApiId" }
+  - { key: api_id, label: ApiId }
   - Name
-  - { key: protocol, label: "Protocol" }
-  - { key: endpoint, label: "Endpoint" }
+  - { key: protocol, label: Protocol }
+  - { key: endpoint, label: Endpoint }
   - Description
   - CreatedDate
   - ApiKeySelectionExpression

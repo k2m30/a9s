@@ -1,4 +1,22 @@
-generated: 11
+generated: 12
+list_hashes:
+  Agreement Id: 838f66b0d19049a9
+  Description: 2574ecedda8c7bf0
+  Status: 793ab4f12f570394
+  Local Profile: 5dd2f0ca7b649410
+  Partner Profile: f3910406513f5485
+  Base Directory: 4b00a80e21b98268
+detail_hashes:
+  AgreementId: 273bbc68baefcbc9
+  ServerId: f684b484bcd5527b
+  Description: 170fb1f14fe6d129
+  Status: 37925f95190b7a7e
+  "key:local_profile": a7c6f4e7c9da97ce
+  "key:partner_profile": 8825326f4c2f29b8
+  BaseDirectory: 6d88b5654af50430
+  AccessRole: fd3ed6b3dab3e5ee
+  EnforceMessageSigning: 5b5ad70a80065166
+  PreserveFilename: 0031ad771288baaf
 list:
   Agreement Id:
     key: agreement_id
@@ -24,8 +42,8 @@ detail:
   - ServerId
   - Description
   - Status
-  - { key: local_profile, label: "Local Profile" }
-  - { key: partner_profile, label: "Partner Profile" }
+  - { key: local_profile, label: Local Profile }
+  - { key: partner_profile, label: Partner Profile }
   - BaseDirectory
   - AccessRole
   - EnforceMessageSigning

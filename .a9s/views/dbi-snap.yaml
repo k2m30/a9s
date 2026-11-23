@@ -1,4 +1,31 @@
-generated: 11
+generated: 12
+list_hashes:
+  Snapshot ID: 2cc6fce0bd0abbbe
+  DB Instance: 8fb0d64cd969e596
+  Status: 567ed47cf133ae50
+  Engine: d1392eb8994ac982
+  Type: 914d703eca6e6c38
+  Created: dbe508ebe53e697f
+detail_hashes:
+  DBSnapshotIdentifier: b122881841faf71b
+  DBSnapshotArn: d67b688727efaac0
+  DBInstanceIdentifier: 91a3aaf89ac3e398
+  Status: 37925f95190b7a7e
+  Engine: 83731104bb17fbf1
+  EngineVersion: fa03e131c10745b7
+  SnapshotType: dec7864b55e19ede
+  SnapshotCreateTime: b80f078ee45fe213
+  AllocatedStorage: ae8060563d50ba22
+  StorageType: 8725cde9d093063e
+  Encrypted: 3feca6c26df1124a
+  KmsKeyId: 63690001b224e625
+  AvailabilityZone: 498a95b163a5e4df
+  MasterUsername: 6d06a268017f9d6a
+  LicenseModel: e39a6e6a767b1ba9
+  Iops: 2a57b63fe80553bc
+  PercentProgress: af832b87afb6c608
+  SourceDBSnapshotIdentifier: 56d112af2ee7a7f9
+  SourceRegion: 99a264f7f2f3e8b1
 list:
   Snapshot ID:
     path: DBSnapshotIdentifier

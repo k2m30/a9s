@@ -1,4 +1,28 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 61bd1f26e94ffe26
+  Status: 567ed47cf133ae50
+  Default: d54fb5766107f470
+  Latest: b14f068aa8691755
+  Created By: 5e8caac098ab3d01
+  Created: cf55830c0e061ed6
+detail_hashes:
+  Template.LaunchTemplateId: 017fd8fd8c411669
+  Template.LaunchTemplateName: dfe9b667f6f6a13c
+  Template.DefaultVersionNumber: d00bcd0958b78cc7
+  Template.LatestVersionNumber: ce24735cd53f5e33
+  Template.CreatedBy: 0217585525da7246
+  Template.CreateTime: 3d8f128a0ebc01b4
+  Template.Tags: 680c8f9103541baa
+  DefaultVersion.LaunchTemplateData.ImageId: 379540a80a33f1a4
+  DefaultVersion.LaunchTemplateData.InstanceType: 9aa8869dfbdedba4
+  DefaultVersion.LaunchTemplateData.KeyName: 0b8320d647f87cef
+  DefaultVersion.LaunchTemplateData.IamInstanceProfile: c935c39a54fe8275
+  DefaultVersion.LaunchTemplateData.SecurityGroupIds: 0acaec34179bc5fa
+  DefaultVersion.LaunchTemplateData.SecurityGroups: f993515ccd759a8f
+  DefaultVersion.LaunchTemplateData.NetworkInterfaces: 5bc0f62446cf0a56
+  DefaultVersion.LaunchTemplateData.BlockDeviceMappings: 06554cc58b69bc48
+  DefaultVersion.LaunchTemplateData.MetadataOptions: 68efa3e79b874456
 list:
   Name:
     key: name

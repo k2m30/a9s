@@ -1,4 +1,26 @@
-generated: 11
+generated: 12
+list_hashes:
+  Domain Name: 71b1a428322b442d
+  Distribution ID: ad8c7e7fbd610241
+  Status: 2bb69a4a55078c29
+  WAF: 0db76e22b4d04906
+  TLS: 02b9d177ed5a85cd
+  Enabled: f1d553976c94ebd4
+  Aliases: 848f9bf61f6c9c5d
+  Price Class: e8cbae40821f9d33
+detail_hashes:
+  Id: 75be4e070c3dd9b3
+  DomainName: dce31d3d792a5d93
+  Status: 37925f95190b7a7e
+  Enabled: 0266064248bf45d6
+  Comment: 0ec25ed4aaf65f02
+  ARN: 55343400ae662083
+  Aliases: 3aa38ab3e2de2aee
+  Origins: 93183ce7297fbefb
+  PriceClass: 3920b40fd6276baf
+  HttpVersion: 3fa0a8a448b9b041
+  LastModifiedTime: 8e21b564a0432727
+  DefaultCacheBehavior: 639269faf9010623
 list:
   Domain Name:
     path: DomainName

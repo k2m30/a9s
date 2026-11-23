@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Cluster Name: f803e20536a9aecf
+  Status: 2bb69a4a55078c29
+  Running: 3ac67be1a398be4a
+  Pending: 9a990dd2a927e67f
+  Services: f2817e46559c75af
+detail_hashes:
+  ClusterName: 512427c560ea8825
+  ClusterArn: be3a87d4853b3411
+  Status: 37925f95190b7a7e
+  RunningTasksCount: fbc2def0036abf88
+  PendingTasksCount: 110b8af90986ef1a
+  ActiveServicesCount: 19578653b35c78e4
+  RegisteredContainerInstancesCount: 5f675667956501f5
+  CapacityProviders: 4ec6f17deb67e31b
+  DefaultCapacityProviderStrategy: 3f0678237ad42a3c
+  Settings: d95b3e4d3308a23c
+  Configuration: 03e121917759bcb1
+  Tags: ee0396ef28e977b0
 list:
   Cluster Name:
     path: ClusterName

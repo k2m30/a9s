@@ -1,4 +1,32 @@
-generated: 11
+generated: 12
+list_hashes:
+  Service Name: c6714ebdabcd8de2
+  Cluster: c3bab12c86575436
+  Status: 2bb69a4a55078c29
+  Desired: 8b0291e5df92531b
+  Running: 0d82505a940ce7ab
+  Launch Type: 6eeeed9cc2f3a649
+detail_hashes:
+  ServiceName: 4f976f40ff44d688
+  ServiceArn: b935502db2724ec5
+  ClusterArn: be3a87d4853b3411
+  Status: 37925f95190b7a7e
+  DesiredCount: 312dd2dd0bd0f38e
+  RunningCount: 8f30215c1f433d88
+  PendingCount: 0427cc609c61cf90
+  LaunchType: 1cfe1b77b39d6a9e
+  TaskDefinition: a8f436a9efe14727
+  DeploymentConfiguration: a45323e4a24c474a
+  Deployments: d0a21841b6495eea
+  NetworkConfiguration: e603be1ac0897e06
+  LoadBalancers: d8f73b500ee49773
+  Events: 7446e74a0bd29c48
+  PlatformVersion: 291612949499faed
+  SchedulingStrategy: 32cdd683cc5ad6aa
+  EnableExecuteCommand: a5c485b13b688c21
+  RoleArn: 53f87cbcf258bdaa
+  CreatedAt: ac4f44b9064dcc14
+  Tags: ee0396ef28e977b0
 list:
   Service Name:
     path: ServiceName

@@ -1,4 +1,38 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  Status: 5527f63f4698b312
+  Health: de14f417bb18acf5
+  Lifecycle: 2bf11cafccfc44aa
+  Type: 9ead0594bc41f465
+  Private IP: 290b8e0aa43d1dd5
+  Public IP: 70507575d9bbbbd0
+  Instance ID: bf665d8b044e27be
+  Launch Time: 863159acdb435de8
+detail_hashes:
+  InstanceId: eca2142cd16c4577
+  State: a60d7692c7b3780c
+  InstanceType: 9ce2c29c67bd9d70
+  InstanceLifecycle: aa123929e36b790a
+  ImageId: 0cdee1891bcda243
+  KeyName: c1ee93640e35e33c
+  Placement: 4e91e5c5a4df432e
+  VpcId: 2f6df9d3ec6df63c
+  SubnetId: 133fe12eea3b4232
+  PrivateIpAddress: 50ab61cf99f0df1a
+  PrivateDnsName: bba69a4f55409e84
+  PublicIpAddress: b3b8d01a1024bb95
+  IamInstanceProfile: 004c381d8a5add18
+  SecurityGroups: 4e041b64b75f6550
+  BlockDeviceMappings: 1416825b449e7b2b
+  EbsOptimized: c8ca642d4013f4e8
+  MetadataOptions: e98b2b1125a661d0
+  LaunchTime: 8917e0e74796aef7
+  Architecture: 722c7eaca9b84ff0
+  Platform: e0405ac07402ff25
+  Tags: ee0396ef28e977b0
+  NetworkInterfaces: dde31ec72085b79c
+  UserData: fe1837cd5aebd2e0
 list:
   Name:
     key: name

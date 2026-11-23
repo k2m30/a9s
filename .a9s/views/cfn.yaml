@@ -1,4 +1,30 @@
-generated: 11
+generated: 12
+list_hashes:
+  Stack Name: 6a32f0d3c7d748fb
+  Status: 11a8c9781f53218d
+  Drift: eef82d5842efdb15
+  Reason: 359a417cbc6f120c
+  Created: 7a6dab8b926267ef
+  Updated: 2b48f821b39e7f8f
+  Description: db8526853ab7a372
+detail_hashes:
+  StackName: 4060d964a1325a2c
+  StackId: 92cb7d95f8b691b3
+  StackStatus: 58c9858ff3f9e9ec
+  DetailedStatus: 973c0fa77c80badd
+  StackStatusReason: 81771616fa70f7cd
+  CreationTime: 74875c541e4b7e5e
+  LastUpdatedTime: ffcb96b02e7cf1fe
+  DeletionTime: 7a3649c4aa1fa40d
+  Description: 170fb1f14fe6d129
+  RoleARN: 535e44e3ce7d5af9
+  Capabilities: b6f8274b2c1f2f5b
+  EnableTerminationProtection: 6f83cd7058d76d62
+  DriftInformation: ca3c65cc9ba049ec
+  NotificationARNs: a3b38ea07b1f5081
+  Parameters: 83fee0d4fc3d7ef9
+  Outputs: 7ba254df159c874a
+  Tags: ee0396ef28e977b0
 list:
   Stack Name:
     path: StackName

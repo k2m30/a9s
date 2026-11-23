@@ -1,4 +1,23 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  Allocation ID: b52377b08d35e201
+  Public IP: afbe6aac5a76a7e5
+  Status: 168e38cf521a9b36
+  Association: 20af4c1c5891bfba
+  Instance: 8e1bbcb94f805b17
+  Domain: c0ee0ce78453eb78
+detail_hashes:
+  AllocationId: c975f8e9fcaff796
+  PublicIp: cd4892049861c034
+  AssociationId: 67e6359a877d4d68
+  InstanceId: eca2142cd16c4577
+  Domain: 4d14b1d2316b5436
+  NetworkBorderGroup: a246ce65196cba87
+  SubnetId: 133fe12eea3b4232
+  PrivateIpAddress: 50ab61cf99f0df1a
+  NetworkInterfaceId: b4dbc076d06b8a57
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

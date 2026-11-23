@@ -1,4 +1,19 @@
-generated: 11
+generated: 12
+list_hashes:
+  Pcx Id: 0a5e9448264e946b
+  Status: 6a83f47a325c2b6d
+  Requester VPC: 780e069d7a570f7d
+  Requester Owner: 3d9705f90ce285b3
+  Accepter VPC: d5b31630c7d98cb8
+  Accepter Owner: 2115160ca81eb129
+  Expires: 3b19e68b5f78ea84
+detail_hashes:
+  VpcPeeringConnectionId: 1ec1fbddeacdf345
+  Status: 37925f95190b7a7e
+  ExpirationTime: ef1c255c4c5975be
+  RequesterVpcInfo: f06c2e5a191da044
+  AccepterVpcInfo: b359ccaecc738cab
+  Tags: ee0396ef28e977b0
 list:
   Pcx Id:
     path: VpcPeeringConnectionId

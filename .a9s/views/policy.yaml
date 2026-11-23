@@ -1,4 +1,25 @@
-generated: 11
+generated: 12
+list_hashes:
+  Policy Name: 6346b11711e2862e
+  Type: a3aa40dba1aedb98
+  Status: cd95227e87bde6f1
+  Attached: e0d95115c7875748
+  Path: f9e06cee6f3a2621
+  Created: cbf57c551f7bb916
+detail_hashes:
+  PolicyName: b7b996e2896cf938
+  PolicyId: 936f3b94901661d5
+  Arn: fb866fb55912dfcd
+  Path: 9f41e3fe5a1f14fb
+  AttachmentCount: 1b5886d616fc2c05
+  PermissionsBoundaryUsageCount: 178c51b4d9d95912
+  IsAttachable: 5cc5009475ff1dc8
+  DefaultVersionId: 73a4e22c1c5ce046
+  CreateDate: 12566b0c4fd518ca
+  UpdateDate: bf755142e1795471
+  Description: 170fb1f14fe6d129
+  Tags: ee0396ef28e977b0
+  Document: 5def81a9570c9bb6
 list:
   Policy Name:
     key: policy_name

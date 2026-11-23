@@ -39,6 +39,14 @@ func (d DetailField) String() string {
 	return d.Key
 }
 
+// A key is prefixed so it never equals a path spelled the same.
+func (d DetailField) ID() string {
+	if d.Path != "" {
+		return d.Path
+	}
+	return "key:" + d.Key
+}
+
 // DisplayLabel returns the user-facing label, falling back to Path's last
 // segment or Key.
 func (d DetailField) DisplayLabel() string {
@@ -91,30 +99,23 @@ type ViewsConfig struct {
 	Views map[string]ViewDef `yaml:"views"`
 }
 
-// GeneratedViewsVersion stamps the view files this build generates. Bump it in
-// the same change that ADDS a built-in column, or that CORRECTS any field of an
-// existing one — where it reads its value from, how wide it is, whether it
-// humanizes. EnsureViewsDir reads the stamp off a file already on disk and,
-// when it is older, adds the columns this build ships that the file has never
-// heard of and carries every correction listed in viewColumnChanges onto the
-// fields the operator has not touched. Without the stamp an operator who ran
-// a9s once keeps the columns of that day forever — and without the correction
-// half, they keep a column reading the field, or the raw constant, that the
-// correction moved away from, which is worse than a missing column because it
-// looks like it works.
-//
-// The merge only adds and re-sources: a removed built-in column stays on the
-// operator's disk, and a renamed one arrives as a new title beside the old
-// column.
-const GeneratedViewsVersion = 11
+// A change of defaults never bumps GeneratedViewsVersion: the item hashes are
+// what a merge reads. A file with a lower stamp has no hashes and is replaced;
+// a file with a higher one is used as that build wrote it.
+const GeneratedViewsVersion = 12
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
+	// List and Detail are nil when the file has no such block, which leaves the
+	// block to the directory below or the defaults, and empty but non-nil when
+	// the file has the block with no items, which removes every item.
 	List   []ListColumn  `yaml:"-"`
 	Detail []DetailField `yaml:"-"`
 	// Generated is the GeneratedViewsVersion the file on disk was written with,
 	// zero for an unstamped file.
-	Generated int `yaml:"-"`
+	Generated    int        `yaml:"-"`
+	ListHashes   []ItemHash `yaml:"-"`
+	DetailHashes []ItemHash `yaml:"-"`
 }
 
 // DetailStringsForTest returns the canonical string identifiers of all
@@ -204,7 +205,7 @@ func (v *ViewDef) UnmarshalYAML(value *yaml.Node) error {
 			v.List = cols
 
 		case "detail":
-			var details []DetailField
+			details := []DetailField{}
 			if err := val.Decode(&details); err != nil {
 				return fmt.Errorf("decoding detail: %w", err)
 			}
@@ -214,9 +215,26 @@ func (v *ViewDef) UnmarshalYAML(value *yaml.Node) error {
 			if err := val.Decode(&v.Generated); err != nil {
 				return fmt.Errorf("decoding generated: %w", err)
 			}
+		case "list_hashes":
+			v.ListHashes = parseItemHashes(val)
+		case "detail_hashes":
+			v.DetailHashes = parseItemHashes(val)
 		}
 	}
 	return nil
+}
+
+// A value other than a mapping records no base, so the block is read as the
+// operator's.
+func parseItemHashes(node *yaml.Node) []ItemHash {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	out := make([]ItemHash, 0, len(node.Content)/2)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		out = append(out, ItemHash{Key: node.Content[i].Value, Hash: node.Content[i+1].Value})
+	}
+	return out
 }
 
 // parseListColumns extracts ordered columns from a YAML mapping node.
@@ -225,7 +243,7 @@ func parseListColumns(node *yaml.Node) ([]ListColumn, error) {
 		return nil, fmt.Errorf("expected mapping node, got %d", node.Kind)
 	}
 
-	var cols []ListColumn
+	cols := make([]ListColumn, 0, len(node.Content)/2)
 	for i := 0; i < len(node.Content)-1; i += 2 {
 		keyNode := node.Content[i]
 		valNode := node.Content[i+1]
@@ -314,6 +332,9 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 				continue
 			}
 			resourceName = td.ShortName
+			if vd.Generated == GeneratedViewsVersion {
+				vd.mergeWithBuild(DefaultViewDef(resourceName))
+			}
 
 			if first, twice := fileFor[resourceName]; twice {
 				// The later file replaces the earlier one WHOLE. Merging them
@@ -328,10 +349,10 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 			fileFor[resourceName] = name
 
 			if existing, ok := merged[resourceName]; ok {
-				if len(vd.List) > 0 {
+				if vd.List != nil {
 					existing.List = vd.List
 				}
-				if len(vd.Detail) > 0 {
+				if vd.Detail != nil {
 					existing.Detail = vd.Detail
 				}
 				merged[resourceName] = existing
@@ -479,10 +500,10 @@ func GetViewDef(cfg *ViewsConfig, shortName string) ViewDef {
 		return def
 	}
 
-	if len(userDef.List) > 0 {
+	if userDef.List != nil {
 		def.List = userDef.List
 	}
-	if len(userDef.Detail) > 0 {
+	if userDef.Detail != nil {
 		def.Detail = userDef.Detail
 	}
 	return def

@@ -1,4 +1,27 @@
-generated: 11
+generated: 12
+list_hashes:
+  Server Id: c0793d3d91ab28d7
+  Status: 567ed47cf133ae50
+  Domain: f8f6188e74874b1d
+  Endpoint: 6450038f4c96f5b8
+  Identity Provider: a0feb347352f02d4
+  Users: 0ee3cbf73c99d49b
+detail_hashes:
+  ServerId: f684b484bcd5527b
+  Arn: fb866fb55912dfcd
+  Domain: 4d14b1d2316b5436
+  EndpointType: 4de73dd7996afda6
+  IdentityProviderType: 957cbbc5d3b9b043
+  IdentityProviderDetails: 2560adaeb8c56436
+  UserCount: 147e511852f5a5ea
+  SecurityPolicyName: dd6f97f506e33ce2
+  Protocols: acae436461e8ac10
+  Certificate: 4523d82b14c36a5d
+  LoggingRole: d8be6bd4b1bcdf9a
+  StructuredLogDestinations: fd2d34ab636cee11
+  EndpointDetails: ab1e134bdd84e4e6
+  HostKeyFingerprint: b5078ed4932cc1d7
+  As2ServiceManagedEgressIpAddresses: ae362dc19c8af381
 list:
   Server Id:
     path: ServerId

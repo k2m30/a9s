@@ -1,4 +1,15 @@
-generated: 11
+generated: 12
+list_hashes:
+  Queue Name: 7151756349361769
+  Status: 516e63265dd02620
+  Messages: ee146e057854876d
+  In Flight: ff41995d9058a34a
+  DLQ: 77bf55c77253be2f
+  Delay: 9aa454f772481c1d
+  Queue URL: f5ab747f86722c80
+detail_hashes:
+  QueueUrl: 983b0c1316c2c5bd
+  Attributes: 6f6b86be683c5a60
 list:
   Queue Name:
     key: queue_name

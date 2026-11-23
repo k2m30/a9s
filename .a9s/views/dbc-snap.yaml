@@ -1,4 +1,31 @@
-generated: 11
+generated: 12
+list_hashes:
+  Snapshot ID: d986cf7fd1c96b73
+  Cluster ID: f13937105fefa2f4
+  Status: 567ed47cf133ae50
+  Engine: d1392eb8994ac982
+  Type: 914d703eca6e6c38
+  Created: b525065403ee1d90
+  Storage: f9e42772e9b724d8
+detail_hashes:
+  DBClusterSnapshotIdentifier: 15207311ef616902
+  DBClusterSnapshotArn: a86ff9d7bb9eff5e
+  DBClusterIdentifier: 2cc43370ef5237b7
+  Status: 37925f95190b7a7e
+  Engine: 83731104bb17fbf1
+  EngineVersion: fa03e131c10745b7
+  SnapshotType: dec7864b55e19ede
+  SnapshotCreateTime: b80f078ee45fe213
+  ClusterCreateTime: 70fa33fe643b3089
+  MasterUsername: 6d06a268017f9d6a
+  Port: 8d1b399690ddef45
+  VpcId: 2f6df9d3ec6df63c
+  StorageEncrypted: 7b907aabf534e972
+  KmsKeyId: 63690001b224e625
+  StorageType: 8725cde9d093063e
+  PercentProgress: af832b87afb6c608
+  SourceDBClusterSnapshotArn: ac307ab5b2eca3ed
+  AvailabilityZones: 6e756300e4e860aa
 list:
   Snapshot ID:
     path: DBClusterSnapshotIdentifier

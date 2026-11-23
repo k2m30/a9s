@@ -1,4 +1,26 @@
-generated: 11
+generated: 12
+list_hashes:
+  Service Name: 0addb0ecd6aa8b1b
+  Endpoint ID: ac283c7455aa2d95
+  Type: 1b5efe88f345be3a
+  Status: 22256ac216898d4c
+  Last Error: c700bbb95741d780
+  VPC ID: 51b18126b8707aee
+detail_hashes:
+  VpcEndpointId: 9685f87028206e49
+  ServiceName: 4f976f40ff44d688
+  VpcEndpointType: 30d28597f8a4f2a7
+  State: a60d7692c7b3780c
+  VpcId: 2f6df9d3ec6df63c
+  SubnetIds: 507fe926d4f61ba2
+  NetworkInterfaceIds: 3bfaf30912568ba7
+  RouteTableIds: 1176090d39f55c6f
+  Groups: f10e4420b9be3f14
+  PrivateDnsEnabled: c9a6f63f86152d82
+  PolicyDocument: 26a6cc333b815048
+  CreationTimestamp: 00363f47d276e8b3
+  OwnerId: ecd0ef57f1a859e4
+  Tags: ee0396ef28e977b0
 list:
   Service Name:
     path: ServiceName

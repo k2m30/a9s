@@ -1,4 +1,24 @@
-generated: 11
+generated: 12
+list_hashes:
+  Role Name: 83f6ca6c76b88615
+  Status: 516e63265dd02620
+  Last Used: f085ea6c30ca8cdc
+  Trust: 66ee9f84f16f96e9
+  Path: d416fd403468cb3e
+  Created: 15feb82878e9ee9a
+  Description: db8526853ab7a372
+detail_hashes:
+  RoleName: b1b28b0f7ad08665
+  RoleId: e959b659af9aac3e
+  Arn: fb866fb55912dfcd
+  Path: 9f41e3fe5a1f14fb
+  CreateDate: 12566b0c4fd518ca
+  Description: 170fb1f14fe6d129
+  MaxSessionDuration: 02a47f014746ecfc
+  RoleLastUsed: 0b90af39ed443de8
+  PermissionsBoundary: 274e4865b8cab7f9
+  AssumeRolePolicyDocument: 7df93a021000b731
+  Tags: ee0396ef28e977b0
 list:
   Role Name:
     path: RoleName

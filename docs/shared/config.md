@@ -2,7 +2,19 @@ a9s stores view configuration in `~/.a9s/views/` as per-resource YAML files (e.g
 
 ## View Customization
 
-Default view config files are auto-created in `~/.a9s/views/` on first launch (one YAML file per resource type). These control which columns appear in list views and which fields show in detail views. Edit any file to customize — a9s never overwrites user-edited files. Delete a file to restore its defaults on next launch.
+Default view config files are auto-created in `~/.a9s/views/` on first launch (one YAML file per resource type). These control which columns appear in list views and which fields show in detail views. Each generated file records a hash of every column and detail field it was generated with (`list_hashes`, `detail_hashes`). After an upgrade, a9s merges your edits with the new defaults, item by item:
+
+| You did | The new version did | You see |
+|---|---|---|
+| nothing to an item | changed or removed it | the new version's item, or none |
+| changed an item | anything | your item |
+| removed an item | anything | it stays removed |
+| added an item | anything | your item, after the item it followed |
+| — | added an item | the new item |
+
+If you reordered a section, your order is kept and a new item goes after the nearest item before it in the defaults. Comments and reformatting are not edits. An empty section (`list: {}`, `detail: []`) removes every generated item from the file; a list with no columns is shown with the built-in columns. A section you delete entirely falls back to the defaults. If you delete a section's hashes (`list_hashes` or `detail_hashes`), that section is yours and is used as written.
+
+When a new version changes something your file takes, the first start rewrites the file with the merged result, and that rewrite does not keep your comments. Starts that change nothing leave the file byte for byte. A file without a `generated:` line is yours and is used exactly as written. Delete a file to restore its defaults on next launch.
 
 ### File Structure
 

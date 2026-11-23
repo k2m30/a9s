@@ -1,4 +1,21 @@
-generated: 11
+generated: 12
+list_hashes:
+  User Name: 6fd48113122f36ac
+  MFA: 72ddceafd5be0714
+  Status: cd95227e87bde6f1
+  User ID: 2e6edd21106a33c4
+  Path: d416fd403468cb3e
+  Created: 15feb82878e9ee9a
+  Password Last Used: cc56ae16e4a2edcf
+detail_hashes:
+  UserName: e9d04b791f722a2c
+  UserId: eafc68318870ee19
+  Arn: fb866fb55912dfcd
+  Path: 9f41e3fe5a1f14fb
+  CreateDate: 12566b0c4fd518ca
+  PasswordLastUsed: 756fdd608d0a3bb4
+  PermissionsBoundary: 274e4865b8cab7f9
+  Tags: ee0396ef28e977b0
 list:
   User Name:
     path: UserName

@@ -1,4 +1,29 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 825a9ede861cbc56
+  Volume ID: f6fc54dc378434cc
+  Status: 22256ac216898d4c
+  Size (GiB): d1f4d27985f8e209
+  Type: cf826c7989e703b0
+  IOPS: 9476b3dbb6a4eeb6
+  Encrypted: 956f4cdf07855f30
+  Attached To: ced1d7f24e16370b
+  AZ: 7509768e33ad401a
+  Created: f1231a85c4fbc755
+detail_hashes:
+  VolumeId: 2091fb42a68ac306
+  State: a60d7692c7b3780c
+  Size: 967b94ca90be54e3
+  VolumeType: 791125ff1200ad86
+  Iops: 2a57b63fe80553bc
+  Throughput: 5ef174b9cb39794a
+  Encrypted: 3feca6c26df1124a
+  KmsKeyId: 63690001b224e625
+  MultiAttachEnabled: d3555e1f07a5a239
+  AvailabilityZone: 498a95b163a5e4df
+  CreateTime: 7363c08e808f9359
+  Attachments: e489c254170454df
+  Tags: ee0396ef28e977b0
 list:
   Name:
     key: name

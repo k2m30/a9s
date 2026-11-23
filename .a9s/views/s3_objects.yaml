@@ -1,4 +1,19 @@
-generated: 11
+generated: 12
+list_hashes:
+  Key: 42e79ca49c0e9ba7
+  Size: 6d758d8df7ae2046
+  Storage Class: b49b5b529360f95c
+  Last Modified: 4f3fe753e3fcb2cb
+detail_hashes:
+  Key: 699b276a0427a38e
+  Size: 967b94ca90be54e3
+  LastModified: 6b3b06aaac7b075a
+  StorageClass: e6440b8ff556cb4b
+  ETag: d5fd73721a7c5f90
+  ChecksumAlgorithm: d1dbbb575bb21f49
+  ChecksumType: 0ea75b380c10b5c9
+  Owner: 75f8ac264d4c1d5a
+  RestoreStatus: 406a735d08e05b71
 list:
   Key:
     path: Key

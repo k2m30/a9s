@@ -1,4 +1,22 @@
-generated: 11
+generated: 12
+list_hashes:
+  Name: 0804cc29dc2dba48
+  Type: 356d71307faa5d28
+  TTL: 950c4a277cbd6342
+  Values: c247815c13b028ba
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  Type: 94b276c178bd3a02
+  TTL: 8fa4d5297012f0c9
+  ResourceRecords: 7dc733de26aefdd4
+  AliasTarget: 8d48a265da911d6f
+  SetIdentifier: 608367b13148008f
+  Weight: 0782c1f731cbae8e
+  Region: fa2c6ab8f1e3944c
+  Failover: 76906a44f9dc096d
+  GeoLocation: 87f9ead1f9214136
+  HealthCheckId: fa032b8e93a53045
+  MultiValueAnswer: 5ac772f7594327bf
 list:
   Name:
     path: Name

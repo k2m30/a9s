@@ -1,4 +1,21 @@
-generated: 11
+generated: 12
+list_hashes:
+  Rule Name: c78195761a9d7b27
+  Status: 5da5b3eba930969d
+  Targets: 5a24225af75c4206
+  Event Bus: 142c868e63ac210c
+  Schedule: 083aad0130ff92d3
+  Description: db8526853ab7a372
+detail_hashes:
+  Name: 1e4a1612672f42b2
+  Arn: fb866fb55912dfcd
+  State: a60d7692c7b3780c
+  Description: 170fb1f14fe6d129
+  EventBusName: 93882cdde2c6abb6
+  ScheduleExpression: ffbd1edba7a65aa8
+  EventPattern: 37538566bb075bae
+  ManagedBy: b0af29a3dd332e2c
+  RoleArn: 53f87cbcf258bdaa
 list:
   Rule Name:
     path: Name
