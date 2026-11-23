@@ -8,7 +8,7 @@ import (
 )
 
 func TestHandleIdentityError_ViewShowsError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("i"))
 
@@ -30,7 +30,7 @@ func TestHandleIdentityError_ViewShowsError(t *testing.T) {
 }
 
 func TestHandleIdentityError_NoIdentityView(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.IdentityError{Err: "some error"})
 

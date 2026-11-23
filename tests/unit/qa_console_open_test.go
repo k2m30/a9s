@@ -261,7 +261,7 @@ func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 // return to the main menu.
 func assertOverlayDismissedByConsoleOpenKey(t *testing.T, openKey, dismissKey, label string) {
 	t.Helper()
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, rootKeyPress(openKey))
 
 	m, cmd := rootApplyMsg(m, rootKeyPress(dismissKey))

@@ -40,7 +40,6 @@ func m2NewHeadlessController(t *testing.T, profile string, now time.Time) *app.C
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
 	return c
@@ -259,7 +258,7 @@ func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 	_, headlessFired := m2FindFetchCostsTask(fallbackTasks)
 
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{
 		Query:    q,
@@ -308,7 +307,7 @@ func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
 	// ctrl+r is bound to both "ctrl+r" and the raw control byte \x12 (keys.go);
 	// the control-byte rune matches what a real terminal's ctrl+r produces.
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{
 		Query:    q,
@@ -503,7 +502,7 @@ func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
 	headlessLoading := c.Snapshot().Body.Costs.Loading
 
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{
 		Query:    q,

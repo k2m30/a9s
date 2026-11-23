@@ -337,7 +337,7 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 // isolate the ctrl+z visibility behaviour.
 func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	// Each degraded resource carries the Wave-2 Finding the real enricher
@@ -397,7 +397,7 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 // instances.
 func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

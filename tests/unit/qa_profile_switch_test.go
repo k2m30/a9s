@@ -12,7 +12,7 @@ import (
 )
 
 func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	oldResources := []resource.Resource{
 		{ID: "i-old", Name: "old-server", Fields: map[string]string{"instance_id": "i-old", "name": "old-server", "state": "running"}},
@@ -45,7 +45,7 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 }
 
 func TestBug_ProfileSwitch_UpdatesHeaderProfile(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	if !strings.Contains(content, "testprofile") {
 		t.Fatal("header should show initial profile")
@@ -66,7 +66,7 @@ func TestBug_ProfileSwitch_UpdatesHeaderProfile(t *testing.T) {
 }
 
 func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "server", Fields: map[string]string{"instance_id": "i-123"}},
@@ -90,7 +90,7 @@ func TestBug_ProfileList_MatchesAWSCLI(t *testing.T) {
 	// Profiles follow `aws configure list-profiles`: only [profile xxx] sections
 	// from ~/.aws/config, never bare sections from ~/.aws/credentials. The host's
 	// config decides the exact list.
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: ':'})
 	if cmd != nil {
 		msg := cmd()
@@ -143,7 +143,7 @@ func TestBug_RegionShownInHeader_AfterConnect(t *testing.T) {
 }
 
 func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	// ProfileSelected returns a batch (flash + connectAWS).
 	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "test-prod"})
 	if cmd == nil {
@@ -170,7 +170,7 @@ func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
 }
 
 func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "srv", Fields: map[string]string{"instance_id": "i-123"}},
@@ -231,7 +231,7 @@ func TestBug_ProfileSwitch_ClearsRegion(t *testing.T) {
 }
 
 func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
@@ -262,7 +262,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 }
 
 func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
@@ -290,7 +290,7 @@ func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 }
 
 func TestBug_ProfileSwitch_FromMainMenu_NoRefresh(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	// Gen:2 — ConnectGen seeds at 1 (session.New()); one ProfileSelected
 	// Rotate()s it to 2.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})

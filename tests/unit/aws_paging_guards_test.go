@@ -85,7 +85,7 @@ func TestRelatedCheckers_EveryPaginatedCallGoesThroughPageAll(t *testing.T) {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
 		Dir:  filepath.Join("..", ".."),
 	}
-	pkgs, err := packages.Load(cfg, pagingGuardAWSPkg)
+	pkgs, err := loadPackagesOnce(cfg, pagingGuardAWSPkg)
 	if err != nil {
 		t.Fatalf("load %s: %v", pagingGuardAWSPkg, err)
 	}

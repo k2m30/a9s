@@ -19,7 +19,6 @@ func newRelatedSkipController(t *testing.T, rows []app.DetailRelatedRow) *app.Co
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})

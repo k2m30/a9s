@@ -90,8 +90,9 @@ func TestSSMStatusCellAndColourComeFromOneClassifier(t *testing.T) {
 	}
 
 	for _, rows := range [][]resource.Resource{out.Resources, demoRows} {
+		cells := listStatusCells(t, *td, rows)
 		for _, row := range rows {
-			cell, ok := listStatusCellFor(t, *td, rows, row.ID)
+			cell, ok := cells[row.ID]
 			if !ok {
 				t.Fatalf("%s: no Status cell rendered", row.ID)
 			}

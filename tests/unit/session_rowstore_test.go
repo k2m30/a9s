@@ -562,7 +562,6 @@ func newRowStoreControllerPin(t *testing.T) (*session.Session, *runtime.Core, *a
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return s, core, c
 }
 

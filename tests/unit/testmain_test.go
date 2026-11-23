@@ -7,6 +7,7 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -36,9 +37,7 @@ func TestMain(m *testing.M) {
 	// (package unit AND package unit_test share this one TestMain) that
 	// builds a tui.Model/session without its own t.Setenv("A9S_CONFIG_FOLDER",
 	// t.TempDir()) call would otherwise read/write the developer's REAL
-	// ~/.a9s cache and config — e.g. newRootSizedModel (tuitest.Sized ->
-	// tui.New), newEC2ListModel/newEC2DetailModel/newEC2YAMLModel
-	// (tui.New directly). A per-test A9S_CONFIG_FOLDER override (via t.Setenv)
+	// ~/.a9s cache and config. A per-test A9S_CONFIG_FOLDER override (via t.Setenv)
 	// still wins for that test's duration.
 	var cleanupDir string
 	if os.Getenv("A9S_CONFIG_FOLDER") == "" {
@@ -60,6 +59,10 @@ func TestMain(m *testing.M) {
 	if os.Getenv("TEST_SKIP_INSTALL") != "1" {
 		awsclient.Install()
 		resource.WireProjection()
+		// The default views are built once, from the child types registered at
+		// the first call. Built here, before any test registers one of its own,
+		// a test's child type cannot become a default view for every later test.
+		config.SharedDefaultConfig()
 	}
 	fixturesChanged := fixtures.MutationCheckForTest()
 	code := m.Run()
@@ -70,14 +73,11 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "demo fixtures changed during the run: %v\n", changed)
 		code = 1
 	}
-	// newRootSizedModel (tui_root_test.go) closes the PREVIOUS call's
-	// controller on every new call, but the very LAST model it ever built in
-	// this run has no later call to trigger that drain — flush it here,
-	// before cleanupDir (which its own auto-isolated directory may still be,
-	// or may itself be a still-live A9S_CONFIG_FOLDER target) is removed.
-	if prevRootModel != nil {
-		prevRootModel.CloseController()
-		prevRootModel = nil
+	// The per-test check sees only goroutines labelled by a blessed
+	// constructor; this one sees a controller built any other way.
+	if leaked := CheckNoProductionGoroutines(); leaked != "" {
+		fmt.Fprintf(os.Stderr, "a9s goroutines still running after the last test:\n%s\n", leaked)
+		code = 1
 	}
 	if cleanupDir != "" {
 		os.RemoveAll(cleanupDir) //nolint:errcheck // best-effort cleanup, process is exiting regardless

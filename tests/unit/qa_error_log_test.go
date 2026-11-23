@@ -23,7 +23,7 @@ import (
 // "!" on a model that received only non-error flashes should show "No errors".
 func TestErrorHistoryAccumulation_ErrorFlashesAddToHistory(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "first error", IsError: true})
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "second error", IsError: true})
@@ -50,7 +50,7 @@ func TestErrorHistoryAccumulation_ErrorFlashesAddToHistory(t *testing.T) {
 // flashes do NOT accumulate in the error history.
 func TestErrorHistoryAccumulation_NonErrorFlashesNotAdded(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "copied to clipboard", IsError: false})
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "theme applied", IsError: false})
@@ -127,7 +127,7 @@ func TestErrorFlashFullWidth_ExceedsWidthMinus4IsTruncated(t *testing.T) {
 //  2. Any subsequent keypress dismisses the hint, restoring "? for help".
 func TestErrorHintAfterClear_HintShownAfterErrorFlashClears(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Send an error flash. handleFlash increments gen to 1.
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "something failed", IsError: true})
@@ -146,7 +146,7 @@ func TestErrorHintAfterClear_HintShownAfterErrorFlashClears(t *testing.T) {
 // hint disappears after any keypress (e.g., "j") and "? for help" is restored.
 func TestErrorHintAfterClear_KeypressDismissesHint(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "error occurred", IsError: true})
 	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
@@ -172,7 +172,7 @@ func TestErrorHintAfterClear_KeypressDismissesHint(t *testing.T) {
 // set showErrorHint — after a non-error flash clears, "? for help" is shown.
 func TestErrorHintNotShownForNonErrors(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Send a non-error flash (gen increments to 1).
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
@@ -193,7 +193,7 @@ func TestErrorHintNotShownForNonErrors(t *testing.T) {
 // pushes a text viewer onto the view stack whose frame title contains "error".
 func TestErrorLogKeyOpensViewer(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "access denied", IsError: true})
 
@@ -223,7 +223,7 @@ func TestErrorLogKeyOpensViewer(t *testing.T) {
 // entries newest-first (last error appears before earlier ones in the output).
 func TestErrorLogKeyOpensViewer_NewestFirst(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "first-error-aaa", IsError: true})
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "second-error-bbb", IsError: true})
@@ -255,7 +255,7 @@ func TestErrorLogKeyOpensViewer_NewestFirst(t *testing.T) {
 // history shows a "No errors this session" flash instead of opening a viewer.
 func TestErrorLogKeyEmptyHistory(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Do NOT execute the returned cmd: it is a tea.Tick (auto-clear timer), and
 	// running it immediately would deliver ClearFlashMsg, erasing the flash before
@@ -280,7 +280,7 @@ func TestErrorLogKeyEmptyHistory(t *testing.T) {
 // with the error visible.
 func TestErrorHistoryFromAPIError(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2-instances",
@@ -307,7 +307,7 @@ func TestErrorHistoryFromAPIError(t *testing.T) {
 // appends to error history directly (bypasses handleFlash).
 func TestErrorHistoryFromClientsReady(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
@@ -335,7 +335,7 @@ func TestErrorHistoryFromClientsReady(t *testing.T) {
 // [HH:MM:SS] timestamp prefix.
 func TestErrorLogTimestampFormat(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "timestamp test error", IsError: true})
 

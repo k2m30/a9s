@@ -70,7 +70,7 @@ func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 
 func TestQA_MainMenu_DisplayNameAndAliasOnSameRow(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
 
@@ -107,7 +107,7 @@ func TestQA_MainMenu_DisplayNameAndAliasOnSameRow(t *testing.T) {
 
 func TestQA_MainMenu_FirstRowSelectedByDefault(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	lines := strings.SplitSeq(content, "\n")
 
@@ -161,7 +161,7 @@ func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 
 func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Default cursor is on EC2 Instances (index 0). Press j to move to ECS Services (index 1).
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -182,7 +182,7 @@ func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 
 func TestQA_MainMenu_MoveDownWithDownArrow(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyDown))
 
@@ -202,7 +202,7 @@ func TestQA_MainMenu_MoveDownWithDownArrow(t *testing.T) {
 
 func TestQA_MainMenu_MoveUpWithK(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("k"))
@@ -223,7 +223,7 @@ func TestQA_MainMenu_MoveUpWithK(t *testing.T) {
 
 func TestQA_MainMenu_MoveUpWithUpArrow(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyDown))
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyUp))
@@ -244,7 +244,7 @@ func TestQA_MainMenu_MoveUpWithUpArrow(t *testing.T) {
 
 func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Press G to go to bottom (Backup Plans), then j should stay at bottom
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
@@ -391,7 +391,7 @@ func TestQA_MainMenu_CtrlU_PageUp(t *testing.T) {
 
 func TestQA_MainMenu_CursorStopsAtTop(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("k"))
 
@@ -411,7 +411,7 @@ func TestQA_MainMenu_CursorStopsAtTop(t *testing.T) {
 
 func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	for range 4 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -434,7 +434,7 @@ func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 
 func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 
@@ -458,7 +458,7 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 
 func TestQA_MainMenu_GOnFirstRowIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
 
@@ -478,7 +478,7 @@ func TestQA_MainMenu_GOnFirstRowIsNoop(t *testing.T) {
 
 func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
@@ -514,7 +514,7 @@ func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 		i := indexOf[expected]
 		t.Run(expected, func(t *testing.T) {
 			tui.Version = "1.0.2"
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 
 			for range i {
 				m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -541,7 +541,7 @@ func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 
 func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Press j 5 times -> should land on index 5 (Auto Scaling Groups)
 	for range 5 {
@@ -564,7 +564,7 @@ func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 
 func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	for range 4 {
 		m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -713,7 +713,7 @@ func TestQA_MainMenu_CategoryHeadersVisible(t *testing.T) {
 
 func TestQA_MainMenu_CategoryHeadersNotSelectable(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Press Enter on the first item — should be EC2 Instances, not COMPUTE header
 	_, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))

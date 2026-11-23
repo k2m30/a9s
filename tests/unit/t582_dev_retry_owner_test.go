@@ -170,7 +170,7 @@ func TestT582Dev_NoRetryLoopWaitsAroundACall(t *testing.T) {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
 		Dir:  filepath.Join("..", ".."),
 	}
-	pkgs, err := packages.Load(cfg, "./core/...", "./internal/...", "./cmd/...")
+	pkgs, err := loadPackagesOnce(cfg, "./core/...", "./internal/...", "./cmd/...")
 	if err != nil {
 		t.Fatal(err)
 	}

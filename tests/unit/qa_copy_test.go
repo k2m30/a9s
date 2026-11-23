@@ -117,7 +117,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 // --- Main menu: c is no-op ---
 
 func TestQA_Copy_MainMenu_NoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
 	if cmd != nil {
 		t.Error("c on main menu should be no-op (nil cmd)")

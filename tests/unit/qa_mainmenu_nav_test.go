@@ -18,7 +18,7 @@ import (
 
 func TestQA_MainMenu_SlashEntersFilterMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
@@ -33,7 +33,7 @@ func TestQA_MainMenu_SlashEntersFilterMode(t *testing.T) {
 
 func TestQA_MainMenu_FilterTextAppearsInHeader(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "dbi" {
@@ -48,7 +48,7 @@ func TestQA_MainMenu_FilterTextAppearsInHeader(t *testing.T) {
 
 func TestQA_MainMenu_EscClearsFilterMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "redis" {
@@ -68,7 +68,7 @@ func TestQA_MainMenu_EscClearsFilterMode(t *testing.T) {
 
 func TestQA_MainMenu_EnterConfirmsFilterMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "test" {
@@ -85,7 +85,7 @@ func TestQA_MainMenu_EnterConfirmsFilterMode(t *testing.T) {
 
 func TestQA_MainMenu_BackspaceInFilterRemovesCharacter(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "ec2" {
@@ -109,7 +109,7 @@ func TestQA_MainMenu_BackspaceInFilterRemovesCharacter(t *testing.T) {
 
 func TestQA_MainMenu_ColonEntersCommandMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -121,7 +121,7 @@ func TestQA_MainMenu_ColonEntersCommandMode(t *testing.T) {
 
 func TestQA_MainMenu_CommandTextAppearsInHeader(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "s3" {
@@ -136,7 +136,7 @@ func TestQA_MainMenu_CommandTextAppearsInHeader(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateEC2(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "ec2" {
@@ -159,7 +159,7 @@ func TestQA_MainMenu_CommandNavigateEC2(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateS3(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "s3" {
@@ -182,7 +182,7 @@ func TestQA_MainMenu_CommandNavigateS3(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateRDS(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "dbi" {
@@ -205,7 +205,7 @@ func TestQA_MainMenu_CommandNavigateRDS(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateRedis(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "redis" {
@@ -228,7 +228,7 @@ func TestQA_MainMenu_CommandNavigateRedis(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateDocDB(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "dbc" {
@@ -251,7 +251,7 @@ func TestQA_MainMenu_CommandNavigateDocDB(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateEKS(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "eks" {
@@ -274,7 +274,7 @@ func TestQA_MainMenu_CommandNavigateEKS(t *testing.T) {
 
 func TestQA_MainMenu_CommandTabAutocompleteCompletesUniquePrefix(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "he" {
@@ -304,7 +304,7 @@ func TestQA_MainMenu_CommandTabAutocompleteCompletesUniquePrefix(t *testing.T) {
 
 func TestQA_MainMenu_CommandTabAutocompleteCyclesAmbiguousPrefix(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Type ":e" then press Tab: should jump to the first matching candidate
 	// (a concrete command, not the bare prefix). A second Tab should rotate
@@ -338,7 +338,7 @@ func TestQA_MainMenu_CommandTabAutocompleteCyclesAmbiguousPrefix(t *testing.T) {
 
 func TestQA_MainMenu_CommandNavigateSecrets(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "secrets" {
@@ -361,7 +361,7 @@ func TestQA_MainMenu_CommandNavigateSecrets(t *testing.T) {
 
 func TestQA_MainMenu_CommandQuit(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
@@ -374,7 +374,7 @@ func TestQA_MainMenu_CommandQuit(t *testing.T) {
 
 func TestQA_MainMenu_CommandQuitLong(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "quit" {
@@ -389,7 +389,7 @@ func TestQA_MainMenu_CommandQuitLong(t *testing.T) {
 
 func TestQA_MainMenu_CommandCtx(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "ctx" {
@@ -412,7 +412,7 @@ func TestQA_MainMenu_CommandCtx(t *testing.T) {
 
 func TestQA_MainMenu_CommandRegion(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "region" {
@@ -435,7 +435,7 @@ func TestQA_MainMenu_CommandRegion(t *testing.T) {
 
 func TestQA_MainMenu_UnknownCommandShowsError(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "foobar" {
@@ -461,7 +461,7 @@ func TestQA_MainMenu_UnknownCommandShowsError(t *testing.T) {
 
 func TestQA_MainMenu_EscCancelsCommandMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "xyzzy" {
@@ -491,7 +491,7 @@ func TestQA_MainMenu_EscCancelsCommandMode(t *testing.T) {
 
 func TestQA_MainMenu_HelpOpensOnQuestionMark(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -503,7 +503,7 @@ func TestQA_MainMenu_HelpOpensOnQuestionMark(t *testing.T) {
 
 func TestQA_MainMenu_HelpShowsCategories(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -518,7 +518,7 @@ func TestQA_MainMenu_HelpShowsCategories(t *testing.T) {
 
 func TestQA_MainMenu_HelpShowsNavigationKeys(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -534,7 +534,7 @@ func TestQA_MainMenu_HelpShowsNavigationKeys(t *testing.T) {
 
 func TestQA_MainMenu_HelpShowsGeneralKeys(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -550,7 +550,7 @@ func TestQA_MainMenu_HelpShowsGeneralKeys(t *testing.T) {
 
 func TestQA_MainMenu_HelpShowsCloseHint(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -562,7 +562,7 @@ func TestQA_MainMenu_HelpShowsCloseHint(t *testing.T) {
 
 func TestQA_MainMenu_AnyKeyClosesHelp(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -581,7 +581,7 @@ func TestQA_MainMenu_AnyKeyClosesHelp(t *testing.T) {
 
 func TestQA_MainMenu_EscClosesHelp(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -601,7 +601,7 @@ func TestQA_MainMenu_EscClosesHelp(t *testing.T) {
 
 func TestQA_MainMenu_QQuits(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, rootKeyPress("q"))
 	if cmd == nil {
@@ -611,7 +611,7 @@ func TestQA_MainMenu_QQuits(t *testing.T) {
 
 func TestQA_MainMenu_CtrlCQuits(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	if cmd == nil {
@@ -621,7 +621,7 @@ func TestQA_MainMenu_CtrlCQuits(t *testing.T) {
 
 func TestQA_MainMenu_QInFilterModeDoesNotQuit(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
@@ -637,7 +637,7 @@ func TestQA_MainMenu_QInFilterModeDoesNotQuit(t *testing.T) {
 
 func TestQA_MainMenu_QInCommandModeDoesNotQuit(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("q"))
@@ -650,7 +650,7 @@ func TestQA_MainMenu_QInCommandModeDoesNotQuit(t *testing.T) {
 
 func TestQA_MainMenu_CtrlCQuitsFromFilterMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "test" {
@@ -665,7 +665,7 @@ func TestQA_MainMenu_CtrlCQuitsFromFilterMode(t *testing.T) {
 
 func TestQA_MainMenu_CtrlCQuitsFromCommandMode(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "test" {
@@ -684,7 +684,7 @@ func TestQA_MainMenu_CtrlCQuitsFromCommandMode(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsAppName(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "a9s") {
@@ -694,7 +694,7 @@ func TestQA_MainMenu_HeaderShowsAppName(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsVersion(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "v1.0.2") {
@@ -704,7 +704,7 @@ func TestQA_MainMenu_HeaderShowsVersion(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsProfileAndRegion(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "testprofile:us-east-1") {
@@ -714,7 +714,7 @@ func TestQA_MainMenu_HeaderShowsProfileAndRegion(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsHelpHint(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "? for help") {
@@ -724,7 +724,7 @@ func TestQA_MainMenu_HeaderShowsHelpHint(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsFilterWhenActive(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	for _, ch := range "eks" {
@@ -739,7 +739,7 @@ func TestQA_MainMenu_HeaderShowsFilterWhenActive(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsCommandWhenActive(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "s3" {
@@ -754,7 +754,7 @@ func TestQA_MainMenu_HeaderShowsCommandWhenActive(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsFlashOnError(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Error: unknown command", IsError: true})
 
@@ -766,7 +766,7 @@ func TestQA_MainMenu_HeaderShowsFlashOnError(t *testing.T) {
 
 func TestQA_MainMenu_HeaderShowsFlashOnSuccess(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
@@ -778,7 +778,7 @@ func TestQA_MainMenu_HeaderShowsFlashOnSuccess(t *testing.T) {
 
 func TestQA_MainMenu_HeaderSpansFullWidth(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	content := rootViewContent(m)
 	firstLine := strings.Split(content, "\n")[0]
@@ -794,7 +794,7 @@ func TestQA_MainMenu_HeaderSpansFullWidth(t *testing.T) {
 
 func TestQA_MainMenu_FrameTitle(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
@@ -807,7 +807,7 @@ func TestQA_MainMenu_FrameTitle(t *testing.T) {
 
 func TestQA_MainMenu_FrameHasBorders(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -830,7 +830,7 @@ func TestQA_MainMenu_FrameHasBorders(t *testing.T) {
 
 func TestQA_MainMenu_FrameFillsRemainingHeight(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
@@ -841,7 +841,7 @@ func TestQA_MainMenu_FrameFillsRemainingHeight(t *testing.T) {
 
 func TestQA_MainMenu_ContentRowsBoundedByVerticalBars(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
@@ -922,7 +922,7 @@ func TestQA_MainMenu_ExactMinHeightRendersCorrectly(t *testing.T) {
 
 func TestQA_MainMenu_CommandModeOverridesNormalKeys(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -939,7 +939,7 @@ func TestQA_MainMenu_CommandModeOverridesNormalKeys(t *testing.T) {
 
 func TestQA_MainMenu_FilterModeOverridesNormalKeys(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
@@ -956,7 +956,7 @@ func TestQA_MainMenu_FilterModeOverridesNormalKeys(t *testing.T) {
 
 func TestQA_MainMenu_EscInNormalModeIsNoop(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Esc on main menu with no filter should be a no-op (NOT quit).
 	// Only q and ctrl+c should quit.
@@ -969,7 +969,7 @@ func TestQA_MainMenu_EscInNormalModeIsNoop(t *testing.T) {
 
 func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "? for help") {
@@ -1009,7 +1009,7 @@ func TestQA_MainMenu_HeaderTransitionsBetweenModes(t *testing.T) {
 
 func TestQA_MainMenu_OnlyOneInputModeActive_FilterBlocksCommand(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	// Type : -- should be added to filter text, not enter command mode
@@ -1023,7 +1023,7 @@ func TestQA_MainMenu_OnlyOneInputModeActive_FilterBlocksCommand(t *testing.T) {
 
 func TestQA_MainMenu_OnlyOneInputModeActive_CommandBlocksFilter(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	// Type / -- should be added to command text, not enter filter mode
@@ -1037,7 +1037,7 @@ func TestQA_MainMenu_OnlyOneInputModeActive_CommandBlocksFilter(t *testing.T) {
 
 func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, rootKeyPress("g"))
@@ -1060,7 +1060,7 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 
 func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.Flash{Text: "test flash", IsError: false})
 
@@ -1087,7 +1087,7 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 
 func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -1116,7 +1116,7 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 
 func TestQA_MainMenu_NoLineExceedsWidth(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	content := rootViewContent(m)
 	for i, line := range strings.Split(content, "\n") {

@@ -25,7 +25,6 @@ func newEnrichmentMenuBadgeController(t *testing.T) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c
 }
 

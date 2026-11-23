@@ -467,8 +467,7 @@ func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T
 	}, nil, false)
 	body := *c.Snapshot().Body.List
 
-	m := views.NewResourceList(*td, nil, keys.Default())
-	m.SetSize(80, 20) // narrow — 80 cols can't fit 22+120
+	m := views.NewTransientResourceList(*td, 80, 20) // narrow — 80 cols can't fit 22+120
 
 	// Colors are on (the package TestMain baseline), so ANSI is stripped before
 	// substring checks.

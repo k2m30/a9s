@@ -656,7 +656,7 @@ func TestExecuteTask_FetchMore_FilteredContinuation_SetsFilteredProvenance(t *te
 // m.fetchMoreResources), for a continuation carrying ParentContext.
 func TestFetchMoreResources_TUI_ChildContinuation_SetsChildProvenance(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m.Core().SetNoCache(true)
 	m.Core().SetPreSuppliedClients(demo.NewServiceClients())
 	m.Core().HandleClientsReady(runtime.ClientsReadyEvent{ //nolint:errcheck // side-effect only
@@ -702,7 +702,7 @@ func TestFetchMoreResources_TUI_ChildContinuation_SetsChildProvenance(t *testing
 // carrying FetchFilter, and asserts Provenance is FetchProvenanceFilteredList.
 func TestFetchMoreResources_TUI_FilteredContinuation_SetsFilteredProvenance(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m.Core().SetNoCache(true)
 	m.Core().SetPreSuppliedClients(demo.NewServiceClients())
 	m.Core().HandleClientsReady(runtime.ClientsReadyEvent{ //nolint:errcheck // side-effect only

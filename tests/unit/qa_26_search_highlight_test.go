@@ -214,7 +214,7 @@ func TestSearch_D05_PartialMatchWithinStyledToken(t *testing.T) {
 // n advances to the next match: "1/4" → "2/4".
 func TestSearch_E01_NAdvancesToNextMatch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-nav-e01",
@@ -245,7 +245,7 @@ func TestSearch_E01_NAdvancesToNextMatch(t *testing.T) {
 // n wraps from the last match to the first: "4/4" → "1/4".
 func TestSearch_E02_NWrapsFromLastToFirst(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-nav-e02",
@@ -280,7 +280,7 @@ func TestSearch_E02_NWrapsFromLastToFirst(t *testing.T) {
 // N moves to the previous match: "3/4" → "2/4".
 func TestSearch_E03_ShiftNMovesToPrevious(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-nav-e03",
@@ -314,7 +314,7 @@ func TestSearch_E03_ShiftNMovesToPrevious(t *testing.T) {
 // N wraps from the first match to the last: "1/4" → "4/4".
 func TestSearch_E04_ShiftNWrapsFromFirstToLast(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-nav-e04",
@@ -345,7 +345,7 @@ func TestSearch_E04_ShiftNWrapsFromFirstToLast(t *testing.T) {
 // n/N with a single match stay at "1/1".
 func TestSearch_E05_SingleMatch_NoChange(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-nav-e05",
@@ -403,7 +403,7 @@ func TestSearch_I02_CaseInsensitiveMatchesUppercaseKeys(t *testing.T) {
 // Case-insensitive search in the detail view: "prod" matches "PROD".
 func TestSearch_I03_CaseInsensitiveDetailView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-case-i03",

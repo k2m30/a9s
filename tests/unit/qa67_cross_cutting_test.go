@@ -48,7 +48,7 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 	}
 
 	t.Run("main_menu", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		for _, input := range inputs {
 			m, _ = rootApplyMsg(m, input.key)
 			out := rootViewContent(m)
@@ -59,7 +59,7 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 	})
 
 	t.Run("resource_list_loaded", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m, _ = rootApplyMsg(m, messages.Navigate{
 			Target:       messages.TargetResourceList,
 			ResourceType: "ec2",
@@ -91,7 +91,7 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 
 // View stack integrity after an error: Esc returns to the correct view.
 func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -139,7 +139,7 @@ func errAccessDenied(action string) error {
 
 // An error in one child view does not affect sibling child views.
 func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ecs-svc",
@@ -185,7 +185,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 
 // Rapid ctrl+r does not cause data corruption or a crash.
 func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -223,7 +223,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 
 // An error flash does not overlap with filter mode.
 func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -259,7 +259,7 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 
 // The frame title shows the correct count after an error then a refresh.
 func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -311,7 +311,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 
 // An empty filter result followed by clear shows all resources.
 func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -364,7 +364,7 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 
 // Copy from an empty resource list does not crash.
 func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -383,7 +383,7 @@ func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 
 // Sort on an empty resource list is a no-op.
 func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -404,7 +404,7 @@ func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 
 // Filter on an empty resource list does not crash.
 func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -427,7 +427,7 @@ func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 
 // Detail view on an empty resource list is a no-op.
 func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -451,7 +451,7 @@ func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 
 // YAML view on an empty resource list is a no-op.
 func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -486,7 +486,7 @@ func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 	for _, rt := range sampleTypes {
 		for _, op := range ops {
 			t.Run(rt+"/"+op.name, func(t *testing.T) {
-				m := newRootSizedModel()
+				m := newRootSizedModel(t)
 				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: rt,

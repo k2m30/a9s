@@ -40,7 +40,7 @@ func rerunDBIResources() []resource.Resource {
 // trigger the tail-branch dispatch. Returns the model and the probeEnrichment cmd.
 func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.Model, func() interface{}) {
 	t.Helper()
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToDBIList(m)
 
 	// Ctrl+R bumps enrichmentTypeGen["dbi"] → 1.
@@ -97,7 +97,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	// Non-nil empty clients keep probeEnrichment past its nil-clients early
 	// return; the fake enricher ignores the *ServiceClients argument, so a zero
 	// value is safe.
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 	m = navigateToDBIList(m)
@@ -150,7 +150,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 
 	awsclient.DeleteWave2EnricherForTest(t, "dbi")
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
@@ -171,7 +171,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,

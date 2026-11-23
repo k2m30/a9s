@@ -132,7 +132,7 @@ func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.Enri
 // through the wrapper unchanged.
 func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	m, refreshCmd := rootApplyMsg(m, ctrlRKeyMsg())
@@ -168,7 +168,7 @@ func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
 // EnricherRegistry and buildEnrichQueue's order list.
 func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEBSList(m)
 
 	// Ctrl+R: bumps enrichmentTypeGen["ebs"] from 0 to 1.
@@ -200,7 +200,7 @@ func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 // reflects the loaded resources — the list update is unconditional.
 func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
@@ -232,7 +232,7 @@ func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 // order list.
 func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEBSList(m)
 
 	// First Ctrl+R: enrichmentTypeGen["ebs"] → 1.
@@ -303,7 +303,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 // ebs is registered in both EnricherRegistry and buildEnrichQueue's order list.
 func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEBSList(m)
 
 	// enrichmentTypeGen["ebs"]=0 on fresh model; Gen=0 is the fresh session gen.
@@ -387,7 +387,7 @@ func (e simpleError) Error() string { return string(e) }
 // hasReenrichOrRefetch).
 func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
@@ -423,7 +423,7 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 // the rerun branch is under test.
 func TestListCtrlR_NormalFetch_TypeGenZeroDoesNotCorruptRerunGen(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,

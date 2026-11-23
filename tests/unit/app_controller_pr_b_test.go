@@ -837,8 +837,8 @@ func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *test
 
 // newTestControllerWithCore builds a Controller backed by a fresh runtime.Core
 // and returns both so tests can assert on Core state (e.g. IdentityFetching).
-// It redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() before registering
-// t.Cleanup(c.Close), so Close runs before the TempDir removal (see
+// It redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() before building the
+// controller, so its close runs before the TempDir removal (see
 // app_availsave_tempdir_cleanup_race_test.go).
 func newTestControllerWithCore(t *testing.T) (*runtime.Core, *app.Controller) {
 	t.Helper()
@@ -848,7 +848,6 @@ func newTestControllerWithCore(t *testing.T) (*runtime.Core, *app.Controller) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return core, c
 }
 

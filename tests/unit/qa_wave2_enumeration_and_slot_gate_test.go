@@ -322,8 +322,9 @@ func TestNoStatusCellCarriesAnSDKErrorCode(t *testing.T) {
 			continue
 		}
 		merged := mergeWave2Findings(t, td, rows, cache, clients)
+		cells := listStatusCells(t, td, merged)
 		for _, r := range merged {
-			cell, ok := listStatusCellFor(t, td, merged, r.ID)
+			cell, ok := cells[r.ID]
 			if !ok || cell == "" {
 				continue
 			}

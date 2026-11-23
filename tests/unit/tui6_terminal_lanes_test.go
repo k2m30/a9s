@@ -34,7 +34,7 @@ import (
 // a9s paints its own colour in truecolor form, so a literal \x1b[31m on the
 // screen can only have come from the AWS message.
 func TestAdapterFlash_PaintsTheSanitisedText(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	m, _ = rootApplyMsg(m, messages.APIError{
@@ -81,7 +81,7 @@ func TestAdapterFlash_DoesNotReadTheIntentsText(t *testing.T) {
 // renderer leaves the sentence wrapped for the old width, and the narrower
 // pane then cuts it off mid-word instead of re-wrapping it.
 func TestDetailResize_RewrapsForTheNewWidth(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	page, err := awsclient.FetchEC2InstancesPage(context.Background(), demo.NewServiceClients().EC2, "")
 	if err != nil {

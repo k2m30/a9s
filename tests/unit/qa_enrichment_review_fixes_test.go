@@ -40,7 +40,7 @@ func isVisibleUnderCtrlZ(m tui.Model, needle string) (tui.Model, bool) {
 
 func TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	resources := rerunEC2Resources()

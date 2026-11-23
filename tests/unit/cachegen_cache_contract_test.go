@@ -40,7 +40,6 @@ func newCachegenController(t *testing.T, profile, region string) (*app.Controlle
 	s.SetProfileRegion(profile, region)
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 	return ctrl, core, s
 }
 

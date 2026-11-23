@@ -9,9 +9,10 @@ import (
 )
 
 // SessionCoreForTest builds a session the way the server does and returns its
-// runtime core.
+// runtime core. The session's controller is closed when the test ends.
 func SessionCoreForTest(t *testing.T, profile, region, command string, demoMode, noCache bool) *runtime.Core {
 	t.Helper()
-	_, core := newSession(profile, region, command, demoMode, noCache, nil, "")
+	ctrl, core := newSession(profile, region, command, demoMode, noCache, nil, "")
+	t.Cleanup(ctrl.Close)
 	return core
 }

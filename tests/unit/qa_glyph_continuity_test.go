@@ -36,7 +36,6 @@ func glyphContinuityPair(t *testing.T, profile, region string) *app.Controller {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return ctrl
 }
@@ -102,7 +101,7 @@ func hasStorePhraseForID(ctrl *app.Controller, id, phrase string) bool {
 // (qa_enrichment_review_fixes_test.go) is the renderer-agnostic check.
 func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	resources := rerunEC2Resources()

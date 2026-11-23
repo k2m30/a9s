@@ -208,7 +208,7 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 
 func TestQA_Redis_NavigateFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -226,7 +226,7 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -253,7 +253,7 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -284,7 +284,7 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -311,7 +311,7 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -337,7 +337,7 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 
 func TestQA_Redis_CommandNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -356,7 +356,7 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -388,7 +388,7 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -431,7 +431,7 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 
 func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -455,7 +455,7 @@ func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 
 func TestQA_Redis_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

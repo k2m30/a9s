@@ -17,8 +17,7 @@ import (
 
 func TestListReEntry_TUIRendersRefreshingMarker(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	m := tuitest.Sized("reentry-verify-prof", "us-east-1")
-	t.Cleanup(func() { m.CloseController() })
+	m := newSizedModel(t, "reentry-verify-prof", "us-east-1")
 
 	m = tuitest.StepModel(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

@@ -18,7 +18,7 @@ import (
 // carries a full PaginationMeta with NextToken, the seeded ResourceCache entry
 // MUST keep that NextToken so a later load-more path can advance.
 func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	const targetType = "ec2"
@@ -67,7 +67,7 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 // Without the Pagination field, the seed builds a PaginationMeta with
 // IsTruncated taken from the Truncated map.
 func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	const targetType = "rds"

@@ -108,7 +108,7 @@ func TestCostsRound6_Item1_WebBodyTemplate_HasCostsCase(t *testing.T) {
 }
 
 func TestCostsRound6_Item2_TUI_ScrollLeftAtOldestColumn_DispatchesFetchCmd(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 
 	// core/costs/window.go's defaultMonthColumns: the default root

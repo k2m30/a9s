@@ -15,8 +15,8 @@
 // Each test constructs a SYNTHETIC ListBody whose pre-resolved Cells
 // disagree with what a re-derivation from EnrichmentFindings would produce.
 //
-// Harness: construct a views.ResourceListModel via views.NewResourceList(td,
-// nil, k), SetSize, then call m.RenderList(body) directly with a hand-built
+// Harness: construct a views.ResourceListModel via
+// views.NewTransientResourceList, then call m.RenderList(body) directly with a hand-built
 // app.ListBody. No controller is involved, which is what lets the body's
 // fields disagree with the findings map.
 package unit_test
@@ -28,7 +28,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -62,10 +61,7 @@ func purityColumns() []app.ColumnDef {
 // newPurityListModel builds a sized ResourceListModel for the given typeDef,
 // ready to receive RenderList(body) calls.
 func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 30)
-	return m
+	return views.NewTransientResourceList(td, 120, 30)
 }
 
 // The findings map carries an issue finding for the row, and the row renders

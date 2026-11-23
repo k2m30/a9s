@@ -156,8 +156,9 @@ func TestAvailSaveTempDirRace_WithClose_NeverFails(t *testing.T) {
 	}
 }
 
-// A helper that calls t.TempDir() and then registers t.Cleanup(c.Close) is
-// safe: cleanups run LIFO, so Close runs before TempDir's RemoveAll.
+// A test that calls t.TempDir() and then builds its controller through
+// newBlessedController is safe: cleanups run LIFO, so Close runs before
+// TempDir's RemoveAll.
 func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -167,7 +168,6 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: availSaveRaceShortName})
 	handlePage(c, messages.ResourcesLoaded{
@@ -199,6 +199,6 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	if !saved {
 		t.Fatal("availability cache file never appeared on disk before cleanup — test assumption broken (no save was queued)")
 	}
-	// t.Cleanup(c.Close) then t.TempDir()'s own RemoveAll run in LIFO order
-	// (Close registered second, so it runs first) when this test returns.
+	// The close newBlessedController registered runs before t.TempDir()'s
+	// own RemoveAll, which was registered first.
 }

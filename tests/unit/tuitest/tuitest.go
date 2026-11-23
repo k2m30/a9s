@@ -72,14 +72,6 @@ func Render(m tui.Model) string {
 	return m.View().Content
 }
 
-// Sized constructs a root model for the given AWS profile and region with an
-// 80×40 terminal size already applied, so View() produces real output.
-func Sized(profile, region string) tui.Model {
-	m := tui.New(profile, region)
-	m, _ = Step(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	return m
-}
-
 // StripANSI removes ANSI escape sequences from s, returning plain text
 // suitable for string assertions in tests.
 func StripANSI(s string) string {

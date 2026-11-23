@@ -333,12 +333,13 @@ func TestIssueTextStyleGate_RenderedSurfacesNeverRawEnum(t *testing.T) {
 		}
 
 		merged := mergeWave2Findings(t, td, fixtures, cache, demoClients)
+		cells := listStatusCells(t, td, merged)
 
 		for _, res := range merged {
 			testName := fmt.Sprintf("%s/%s", td.ShortName, res.ID)
 
 			t.Run(testName, func(t *testing.T) {
-				statusCell, _ := listStatusCellFor(t, td, merged, res.ID)
+				statusCell := cells[res.ID]
 				statusViolations := findRawEnumViolations(statusCell, res.ID, res.Name)
 				// A status cell is text a9s composes: a declared phrase with
 				// its slots filled, every one of which passes through
@@ -841,12 +842,13 @@ func TestIssueTextStyleGate_RenderedSurfacesNeverVacuous(t *testing.T) {
 		}
 
 		merged := mergeWave2Findings(t, td, fixtures, cache, demoClients)
+		cells := listStatusCells(t, td, merged)
 
 		for _, res := range merged {
 			testName := fmt.Sprintf("%s/%s", td.ShortName, res.ID)
 
 			t.Run(testName, func(t *testing.T) {
-				statusCell, _ := listStatusCellFor(t, td, merged, res.ID)
+				statusCell := cells[res.ID]
 				checkVacuousPhraseSurface(t, td.ShortName, res.ID, "list-status", statusCell,
 					isVacuousPhrase(statusCell), &newlyRegressed, &readyForBurnDown, &stillGapped)
 

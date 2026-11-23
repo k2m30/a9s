@@ -235,7 +235,6 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 100, Truncated: true},

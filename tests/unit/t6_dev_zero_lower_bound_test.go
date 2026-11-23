@@ -19,7 +19,7 @@ type t6DevZeroBoundScreens struct {
 func t6DevZeroBound(t *testing.T, shortName string) t6DevZeroBoundScreens {
 	t.Helper()
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 220})
 	rows := []resource.Resource{
 		{ID: shortName + "-unread", Name: shortName + "-unread", Fields: map[string]string{}},
@@ -99,7 +99,7 @@ func TestT6Dev_ExactZeroIsNotRendered(t *testing.T) {
 // title reads the same fact the menu does.
 func TestT6Dev_DiskSeededZeroLowerBoundReachesTheTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 220})
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries:        map[string]int{"sqs": 2},
@@ -128,7 +128,7 @@ func TestT6Dev_DiskSeededZeroLowerBoundReachesTheTitle(t *testing.T) {
 // frame is built.
 func TestT6Dev_LiveBrokenAnswerReachesTitleAndFilterTogether(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 220})
 	rows := []resource.Resource{
 		{ID: "i-0abc1111aaa111111", Name: "web-server-1", Fields: map[string]string{"state": "running"}},

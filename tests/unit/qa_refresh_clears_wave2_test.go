@@ -20,7 +20,7 @@ import (
 // TaskKindSaveCache background-cache-save cmd is tolerated.
 func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -71,7 +71,7 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 // triggers no enrichment or refetch work.
 func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
@@ -103,7 +103,7 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 // the enrichment maps are non-nil (not nil) so subsequent writes don't panic.
 func TestMainMenuCtrlR_MapsSafeAfterReset(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 

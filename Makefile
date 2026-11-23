@@ -21,11 +21,11 @@ install:
 test:
 	go test ./... -count=1 -timeout 300s
 
-# 1800s, not the 300s the other two targets use: -race makes tests/unit alone
-# take ~200s solo and around 800s while other builds share the machine. See
-# docs/development-process.md.
+# The ceiling is the heaviest loaded race time of tests/unit, 1224s with four
+# race runs of it and an integration run sharing the machine, plus 20%,
+# rounded up to the next 100s; docs/development-process.md has the runs.
 test-race:
-	go test ./... -count=1 -timeout 1800s -race -shuffle=on
+	go test ./... -count=1 -timeout 1500s -race -shuffle=on
 
 # Captures wall time of `make test` and writes test-budget.json. The CI
 # `test-budget` job (.github/workflows/ci.yml) runs this, then invokes

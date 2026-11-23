@@ -15,7 +15,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 	// EC2 defaults apply deterministically on all platforms.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -68,7 +68,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 
 func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -127,7 +127,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 
 func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	src := resource.Resource{
 		ID:     "i-cache-001",
@@ -187,7 +187,7 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 
 func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	src := resource.Resource{
 		ID:     "i-cache-002",
@@ -226,7 +226,7 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 
 func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	stack := resource.Resource{
 		ID:     "stack-001",
@@ -267,7 +267,7 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 
 func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Status is verb-based, not ReadOnly. _ct.actor is set to the resource
 	// Name so it renders in the ACTOR column and can be used as an assertion target

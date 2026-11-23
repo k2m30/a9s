@@ -34,7 +34,7 @@ import (
 func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	partialErr := errors.New("partial: throttled on 1 of 3 IDs")
 	partialResources := []resource.Resource{
 		{ID: "res-b-001", Name: "res-b-001"},
@@ -103,7 +103,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	hardErr := errors.New("hard: endpoint unreachable")
 
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
@@ -137,7 +137,7 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	partialErr := errors.New("partial: enrichment timed out for 1 of 5 resources")
 
 	findings := map[string][]domain.Finding{
@@ -233,7 +233,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 func TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	hardErr := errors.New("enricher: network timeout, no data returned")
 
 	_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{

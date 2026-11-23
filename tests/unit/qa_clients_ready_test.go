@@ -15,7 +15,7 @@ import (
 // ClientsReadyMsg carries a *awsclient.ServiceClients, the model assigns it
 // and no error flash is surfaced.
 func TestQA_ClientsReady_CorrectType_Assigns(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	clients := &awsclient.ServiceClients{}
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
@@ -68,7 +68,7 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 // either via the returned tea.Cmd resolving to a messages.APIError, or via an
 // error flash in the view.
 func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// "definitely not a client" — a string, which is not *awsclient.ServiceClients.
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.

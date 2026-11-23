@@ -25,7 +25,7 @@ import (
 // AcceptZeroGen=true means a Gen=0 stamp is never stale, so the stale stamp
 // must be non-zero.
 func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -71,7 +71,7 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 // A stale IdentityLoaded would show the previous account's ID in the header
 // after a profile switch.
 func TestIdentityLoaded_Stale_Dropped(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -101,7 +101,7 @@ func TestIdentityLoaded_Stale_Dropped(t *testing.T) {
 
 // A stale ValueRevealed would render the previous profile's secret.
 func TestValueRevealed_Stale_Dropped(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -131,7 +131,7 @@ func TestValueRevealed_Stale_Dropped(t *testing.T) {
 // ── matching gen (happy path) applies all three message types ────────
 
 func TestHappyPath_MatchingGen_ResourcesLoaded(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -156,7 +156,7 @@ func TestHappyPath_MatchingGen_ResourcesLoaded(t *testing.T) {
 }
 
 func TestHappyPath_MatchingGen_IdentityLoaded(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	currentGen := m.Core().Session().ConnectGen
 	freshIdentity := &awsclient.CallerIdentity{AccountID: "999988887777"}
 	m, _ = rootApplyMsg(m, messages.IdentityLoaded{
@@ -172,7 +172,7 @@ func TestHappyPath_MatchingGen_IdentityLoaded(t *testing.T) {
 }
 
 func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	currentGen := m.Core().Session().ConnectGen
 	const freshSecret = "FRESH_CURRENT_SESSION_SECRET_abc123"
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
@@ -196,7 +196,7 @@ func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
 // AcceptZeroGen()" branch of IsStale can admit the message.
 func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 	t.Run("ResourcesLoaded", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m.Core().Session().Rotate()
 		if got := m.Core().Session().AvailabilityGen; got == 0 {
 			t.Fatalf("precondition: AvailabilityGen must be non-zero, got 0")
@@ -225,7 +225,7 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 	})
 
 	t.Run("IdentityLoaded", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m.Core().Session().Rotate()
 		if got := m.Core().Session().ConnectGen; got == 0 {
 			t.Fatalf("precondition: ConnectGen must be non-zero, got 0")
@@ -242,7 +242,7 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 	})
 
 	t.Run("ValueRevealed", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		// ValueRevealed uses AspectConnect.
 		m.Core().Session().Rotate()
 		if got := m.Core().Session().ConnectGen; got == 0 {
@@ -268,7 +268,7 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 // A stale APIError would flash a slow "fetch ec2: ..." error from a region
 // the user already left.
 func TestAPIError_Stale_NoFlash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -300,7 +300,7 @@ func TestAPIError_Stale_NoFlash(t *testing.T) {
 // post-rotate dispatch, hiding the header spinner while a real fetch is still
 // in flight.
 func TestIdentityError_Stale_DoesNotClearFetching(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -326,7 +326,7 @@ func TestIdentityError_Stale_DoesNotClearFetching(t *testing.T) {
 // ── Complement: fresh APIError / IdentityError DO flash ─────────────────────
 
 func TestAPIError_Fresh_DoesFlash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	genBefore := m.FlashGen()
 	currentGen := m.Core().Session().AvailabilityGen
@@ -343,7 +343,7 @@ func TestAPIError_Fresh_DoesFlash(t *testing.T) {
 }
 
 func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().IdentityFetching = true
 	currentGen := m.Core().Session().ConnectGen
@@ -367,7 +367,7 @@ func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
 // AvailabilityGen at 1, so a zero-stamped prefetch cannot pass the guard
 // either.
 func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m.Core().Session().Rotate()
 
@@ -401,7 +401,7 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 // before any Rotate(); the AvailabilityGen=1 seed in session.New() keeps a
 // legitimate first prefetch from carrying Gen=0.
 func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	if got := m.Core().Session().AvailabilityGen; got != 1 {
 		t.Fatalf("precondition failed: fresh AvailabilityGen = %d, want 1 (session.New seed)", got)
@@ -431,7 +431,7 @@ func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 // Controller.Handle) rather than calling messages.IsStale.
 func TestConnectGenLeak_PreSwitchStamp_DoesNotFoldAfterRotate(t *testing.T) {
 	t.Run("Identity", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		preSwitchGen := m.Core().Session().ConnectGen
 		if preSwitchGen != 1 {
 			t.Fatalf("precondition: fresh session's ConnectGen = %d, want 1 (the seed)", preSwitchGen)
@@ -453,7 +453,7 @@ func TestConnectGenLeak_PreSwitchStamp_DoesNotFoldAfterRotate(t *testing.T) {
 	})
 
 	t.Run("ValueRevealed", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		preSwitchGen := m.Core().Session().ConnectGen
 		if preSwitchGen != 1 {
 			t.Fatalf("precondition: fresh session's ConnectGen = %d, want 1 (the seed)", preSwitchGen)
@@ -523,11 +523,8 @@ func TestConnectGenLeak_PreSwitchStamp_DoesNotFoldAfterRotate(t *testing.T) {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-// leakPinCostsController builds a *session.Session + *app.Controller with
-// ScreenCosts pushed and EnsureCostsState seeded. It is listed in
-// qa_controller_construction_discipline_test.go's ccdBlessedHelpers: it pairs
-// t.TempDir() + t.Cleanup(c.Close) in the correct LIFO order, and returns the
-// *session.Session so the caller can read and Rotate() ConnectGen.
+// leakPinCostsController returns the *session.Session too, so the caller can
+// read and Rotate() ConnectGen.
 func leakPinCostsController(t *testing.T, now time.Time) (*session.Session, *app.Controller) {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -536,7 +533,6 @@ func leakPinCostsController(t *testing.T, now time.Time) (*session.Session, *app
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
 	return s, c

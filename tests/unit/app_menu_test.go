@@ -23,7 +23,6 @@ func newMenuController(t *testing.T) *app.Controller {
 	s.Region = "eu-west-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c
 }
 

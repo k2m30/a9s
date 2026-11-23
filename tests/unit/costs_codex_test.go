@@ -93,7 +93,6 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	s.Clients = demo.NewServiceClients()
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(time.Now())
 
@@ -310,7 +309,6 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
 
@@ -558,7 +556,6 @@ func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow)
 
@@ -583,7 +580,6 @@ func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *te
 	s.Clients = demo.NewServiceClients()
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow)
 

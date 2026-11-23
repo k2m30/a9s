@@ -64,7 +64,7 @@ import (
 // must be HIDDEN under ctrl+z.
 func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	entries := map[string]int{}
 	truncated := map[string]bool{}
@@ -128,7 +128,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 // enricher-backed type must flip to HIDDEN under ctrl+z.
 func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	entries := map[string]int{}
 	issueCounts := map[string]int{}
@@ -193,7 +193,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 // the count is exact and the type is hidden.
 func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 220})
 
 	entries := map[string]int{}
@@ -270,7 +270,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllEnricherTypes(t *testing.T) 
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
 		}
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 			Entries:        map[string]int{shortName: 3},
 			Truncated:      map[string]bool{},
@@ -303,7 +303,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 		if td.ExcludeFromIssueBadge {
 			continue
 		}
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 			Entries:        map[string]int{td.ShortName: 3},
 			Truncated:      map[string]bool{},
@@ -334,7 +334,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 // enrichment system untestable in realistic multi-switch scenarios.
 func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel() // fresh model: enrichmentGen starts at 0
+	m := newRootSizedModel(t) // fresh model: enrichmentGen starts at 0
 
 	// Switching profile bumps enrichmentGen to 1; the returned cmd (AWS connect)
 	// is not executed.

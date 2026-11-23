@@ -30,7 +30,7 @@ import (
 // markers and banner must be visible.
 func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -100,7 +100,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 // must appear.
 func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

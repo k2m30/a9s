@@ -30,7 +30,6 @@ func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.C
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }
@@ -341,7 +340,6 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	reloaded := cache.LoadDirForTest("coldboot-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
@@ -404,7 +402,6 @@ func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	ctrl.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -479,7 +476,6 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	storeA := cache.LoadDirForTest("pair-a", "us-east-1")
 	storeA.Put("ec2", cache.TypeFile{HasResources: true, Count: 1})
@@ -519,7 +515,6 @@ func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	core := runtime.New(s, resource.AllResourceTypes())
 	core.SetNoCache(true)
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	snap := ctrl.Snapshot()
 	if snap.Body.Menu == nil {
@@ -593,7 +588,6 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": ancientTF.Count},

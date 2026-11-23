@@ -57,7 +57,7 @@ func twoMatchResource(id string) *resource.Resource {
 // reflect the cleared state and the header must revert to "? for help").
 func TestSearch_G01_EscClearsHighlightsReturnsNormalMode(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-g01")
 	m = navigateToDetail(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -89,7 +89,7 @@ func TestSearch_G01_EscClearsHighlightsReturnsNormalMode(t *testing.T) {
 // are cleared and new query matches are highlighted.
 func TestSearch_G02_NewSearchReplacesCurrentSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:   "i-g02",
 		Name: "i-g02",
@@ -131,7 +131,7 @@ func TestSearch_G02_NewSearchReplacesCurrentSearch(t *testing.T) {
 // The user remains in the detail/YAML view.
 func TestSearch_G03_EscDuringInputDoesNotExitView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-g03")
 	m = navigateToYAML(m, res)
 
@@ -159,7 +159,7 @@ func TestSearch_G03_EscDuringInputDoesNotExitView(t *testing.T) {
 // Esc during search results clears search; second Esc exits to resource list.
 func TestSearch_G04_TwoEscapesExitView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -201,7 +201,7 @@ func TestSearch_G04_TwoEscapesExitView(t *testing.T) {
 // viewport has moved or the highlighted match has changed position.
 func TestSearch_K01_ViewportScrollsToOffScreenMatch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	fields := map[string]string{}
 	for i := range 40 {
@@ -231,7 +231,7 @@ func TestSearch_K01_ViewportScrollsToOffScreenMatch(t *testing.T) {
 // Pressing N from the first match should wrap to the last match, changing view output.
 func TestSearch_K02_WrapAroundScrollsToDistantMatch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-k02")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -259,7 +259,7 @@ func TestSearch_K02_WrapAroundScrollsToDistantMatch(t *testing.T) {
 // We verify that the match counter advances regardless.
 func TestSearch_K03_MatchAlreadyVisibleHighlightMoves(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-k03")
 	m = navigateToDetail(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -280,7 +280,7 @@ func TestSearch_K03_MatchAlreadyVisibleHighlightMoves(t *testing.T) {
 // Scroll-to-match works with word wrap enabled.
 func TestSearch_K04_ScrollToMatchWithWordWrap(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-k04")
 	m = navigateToYAML(m, res)
 
@@ -303,7 +303,7 @@ func TestSearch_K04_ScrollToMatchWithWordWrap(t *testing.T) {
 // Search results preserved when toggling wrap ON.
 func TestSearch_L01_SearchPreservedWhenWrapEnabled(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-l01")
 	m = navigateToYAML(m, res)
 
@@ -327,7 +327,7 @@ func TestSearch_L01_SearchPreservedWhenWrapEnabled(t *testing.T) {
 // Search results preserved when toggling wrap OFF.
 func TestSearch_L02_SearchPreservedWhenWrapDisabled(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-l02")
 	m = navigateToDetail(m, res)
 
@@ -352,7 +352,7 @@ func TestSearch_L02_SearchPreservedWhenWrapDisabled(t *testing.T) {
 // exposes more lines) and the view does not crash.
 func TestSearch_L03_HiddenMatchVisibleAfterWrap(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Resource with a very long ARN value that will be clipped when wrap is off.
 	longARN := "arn:aws:iam::123456789012:role/very-long-role-name-that-will-clip-on-narrow-screens-running-role"
@@ -390,12 +390,12 @@ func TestSearch_N01_IdenticalActivationDetailAndYAML(t *testing.T) {
 
 	res := twoMatchResource("i-n01")
 
-	md := newRootSizedModel()
+	md := newRootSizedModel(t)
 	md = navigateToDetail(md, res)
 	md, _ = rootApplyMsg(md, tea.KeyPressMsg{Code: '/', Text: "/"})
 	plainDetail := ansiRe.ReplaceAllString(rootViewContent(md), "")
 
-	my := newRootSizedModel()
+	my := newRootSizedModel(t)
 	my = navigateToYAML(my, res)
 	my, _ = rootApplyMsg(my, tea.KeyPressMsg{Code: '/', Text: "/"})
 	plainYAML := ansiRe.ReplaceAllString(rootViewContent(my), "")
@@ -413,12 +413,12 @@ func TestSearch_N02_IdenticalMatchHighlightingDetailAndYAML(t *testing.T) {
 	tui.Version = "0.6.0"
 	res := twoMatchResource("i-n02")
 
-	md := newRootSizedModel()
+	md := newRootSizedModel(t)
 	md = navigateToDetail(md, res)
 	md = activateAndConfirmSearch(t, md, "running")
 	plainDetail := ansiRe.ReplaceAllString(rootViewContent(md), "")
 
-	my := newRootSizedModel()
+	my := newRootSizedModel(t)
 	my = navigateToYAML(my, res)
 	my = activateAndConfirmSearch(t, my, "running")
 	plainYAML := ansiRe.ReplaceAllString(rootViewContent(my), "")
@@ -438,7 +438,7 @@ func TestSearch_N03_IdenticalNavigationDetailAndYAML(t *testing.T) {
 
 	for _, viewName := range []string{"detail", "yaml"} {
 		t.Run(viewName, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			if viewName == "detail" {
 				m = navigateToDetail(m, res)
 			} else {
@@ -473,7 +473,7 @@ func TestSearch_N04_IdenticalEscBehaviorDetailAndYAML(t *testing.T) {
 
 	for _, viewName := range []string{"detail", "yaml"} {
 		t.Run(viewName, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			if viewName == "detail" {
 				m = navigateToDetail(m, res)
 			} else {
@@ -527,7 +527,7 @@ func TestSearch_N05_DetailViewAllResourceTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.typeName, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			res := tc.res
 			m = navigateToDetail(m, &res)
 			m = activateAndConfirmSearch(t, m, tc.query)
@@ -580,7 +580,7 @@ func TestSearch_N06_YAMLViewAllResourceTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.typeName, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			res := tc.res
 			m = navigateToYAML(m, &res)
 			m = activateAndConfirmSearch(t, m, tc.query)
@@ -608,7 +608,7 @@ func TestSearch_N06_YAMLViewAllResourceTypes(t *testing.T) {
 // j/k scroll works while search is active — highlights remain.
 func TestSearch_O01_JKScrollWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o01")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -636,7 +636,7 @@ func TestSearch_O01_JKScrollWorksWhileSearchActive(t *testing.T) {
 // g/G jump works while search is active.
 func TestSearch_O02_GJumpWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o02")
 	m = navigateToDetail(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -662,7 +662,7 @@ func TestSearch_O02_GJumpWorksWhileSearchActive(t *testing.T) {
 // PageUp/PageDown works while search is active.
 func TestSearch_O03_PageUpDownWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o03")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -692,7 +692,7 @@ func TestSearch_O03_PageUpDownWorksWhileSearchActive(t *testing.T) {
 // is active without panicking or swallowing the key.
 func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o04")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -729,7 +729,7 @@ func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 // Help (?) opens while search is active; closing help restores search.
 func TestSearch_O05_HelpOpenAndClosePreservesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o05")
 	m = navigateToDetail(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -759,7 +759,7 @@ func TestSearch_O05_HelpOpenAndClosePreservesSearch(t *testing.T) {
 // that after a refresh key the view does not crash.
 func TestSearch_O06_CtrlRDuringSearch_NoCrash(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Navigate to resource list first so Ctrl+r has a context.
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -781,7 +781,7 @@ func TestSearch_O06_CtrlRDuringSearch_NoCrash(t *testing.T) {
 // Command mode (`:`) works while search is active.
 func TestSearch_O07_CommandModeWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-o07")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -804,7 +804,7 @@ func TestSearch_O07_CommandModeWorksWhileSearchActive(t *testing.T) {
 // ("n"), and prev match ("N") — not just incidental characters in other labels.
 func TestSearch_P01_HelpInDetailListsSearchBindings(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-p01")
 	m = navigateToDetail(m, res)
 
@@ -830,7 +830,7 @@ func TestSearch_P01_HelpInDetailListsSearchBindings(t *testing.T) {
 // Help in YAML view lists search bindings.
 func TestSearch_P02_HelpInYAMLListsSearchBindings(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-p02")
 	m = navigateToYAML(m, res)
 
@@ -856,7 +856,7 @@ func TestSearch_P02_HelpInYAMLListsSearchBindings(t *testing.T) {
 // Resize preserves search state.
 func TestSearch_Q01_ResizePreservesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-q01")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -878,7 +878,7 @@ func TestSearch_Q01_ResizePreservesSearch(t *testing.T) {
 // Resize with word wrap on — matches remain.
 func TestSearch_Q02_ResizeWithWordWrapPreservesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-q02")
 	m = navigateToDetail(m, res)
 
@@ -903,7 +903,7 @@ func TestSearch_Q02_ResizeWithWordWrapPreservesSearch(t *testing.T) {
 // Resize below minimum (< 60 cols) shows error; resize back preserves search.
 func TestSearch_Q03_ResizeBelowMinimumThenRestorePreservesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := twoMatchResource("i-q03")
 	m = navigateToYAML(m, res)
 	m = activateAndConfirmSearch(t, m, "running")
@@ -931,7 +931,7 @@ func TestSearch_Q03_ResizeBelowMinimumThenRestorePreservesSearch(t *testing.T) {
 // Search for "10.0" in EC2 detail to find private IP.
 func TestSearch_R01_FindPrivateIPInEC2Detail(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-0abc123def",
@@ -960,7 +960,7 @@ func TestSearch_R01_FindPrivateIPInEC2Detail(t *testing.T) {
 // Search for "sg-" in EC2 YAML to find security group.
 func TestSearch_R02_FindSecurityGroupInEC2YAML(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-0def456abc",
@@ -1004,7 +1004,7 @@ func TestSearch_R05_YAMLFindsMoreMatchesThanDetail(t *testing.T) {
 		},
 	}
 
-	md := newRootSizedModel()
+	md := newRootSizedModel(t)
 	md = navigateToDetail(md, res)
 	md = activateAndConfirmSearch(t, md, "available")
 	plainDetail := ansiRe.ReplaceAllString(rootViewContent(md), "")
@@ -1013,7 +1013,7 @@ func TestSearch_R05_YAMLFindsMoreMatchesThanDetail(t *testing.T) {
 		t.Fatalf("R05: detail search for 'available' should find matches; got: %q", plainDetail)
 	}
 
-	my := newRootSizedModel()
+	my := newRootSizedModel(t)
 	my = navigateToYAML(my, res)
 	my = activateAndConfirmSearch(t, my, "available")
 	plainYAML := ansiRe.ReplaceAllString(rootViewContent(my), "")

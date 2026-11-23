@@ -16,7 +16,6 @@
 package unit_test
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -34,11 +33,8 @@ func TestFlushCacheWrites_HoldsNoLockAcrossTheEncode(t *testing.T) {
 
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	// The hook is process-wide: a cache writer left running by an earlier
-	// test's controller can reach it too.
-	var once sync.Once
 	restore := cache.SetEncodeHookForTest(func() {
-		once.Do(func() { close(entered) })
+		close(entered)
 		<-release
 	})
 	defer restore()

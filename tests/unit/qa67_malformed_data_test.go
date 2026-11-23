@@ -10,7 +10,7 @@ import (
 
 // Nil optional fields in a resource do not panic the list render.
 func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -48,7 +48,7 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 	for _, rt := range []string{"ec2", "s3", "secrets", "dbi"} {
 		t.Run(rt, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
@@ -73,7 +73,7 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 // An empty string ID renders a selectable row rather than being skipped or
 // panicking.
 func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -119,7 +119,7 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 
 // An unknown enum value in the status field renders as plain text.
 func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -150,7 +150,7 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 
 // A malformed ARN renders as-is in the list without truncating other fields.
 func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -182,7 +182,7 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 
 // Unicode and emoji in resource names do not corrupt the layout or panic.
 func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -221,7 +221,7 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 
 // A zero-value timestamp does not panic during rendering.
 func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -251,7 +251,7 @@ func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 
 // A resource with every optional field empty renders in detail without panic.
 func TestQa67_C7_AllNilOptionalFields_DetailViewNoPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:        "i-all-nil",
 		Name:      "all-nil-instance",
@@ -271,7 +271,7 @@ func TestQa67_C7_AllNilOptionalFields_DetailViewNoPanic(t *testing.T) {
 // A 256-char tag value in resource Fields does not break the list layout.
 func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 	longTag := strings.Repeat("x", 256)
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -304,7 +304,7 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 // A resource with all optional fields nil renders its available fields in
 // the detail view.
 func TestQa67_C9_AllNilFields_DetailViewRendersAvailableFields(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:   "minimal-resource",
 		Name: "minimal",
@@ -331,7 +331,7 @@ func TestQa67_C9_AllNilFields_DetailViewRendersAvailableFields(t *testing.T) {
 
 // Pressing y in the detail view of a resource with nil fields does not panic.
 func TestQa67_C9_AllNilFields_YAMLViewNoPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:        "yaml-nil-resource",
 		Name:      "yaml-nil",

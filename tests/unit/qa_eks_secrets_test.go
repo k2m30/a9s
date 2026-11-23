@@ -15,7 +15,7 @@ import (
 // columns: Cluster Name, Version, Status, Endpoint, Platform Version.
 func TestQA_EKS_ListColumns(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -120,7 +120,7 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 // TestQA_EKS_FrameTitle verifies the frame title shows eks-clusters(<count>).
 func TestQA_EKS_FrameTitle(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -144,7 +144,7 @@ func TestQA_EKS_FrameTitle(t *testing.T) {
 // the detail view with the cluster name in the frame title.
 func TestQA_EKS_DetailView(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -173,7 +173,7 @@ func TestQA_EKS_DetailView(t *testing.T) {
 // pairs from the EKS cluster's Fields map.
 func TestQA_EKS_DetailViewFields(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -195,7 +195,7 @@ func TestQA_EKS_DetailViewFields(t *testing.T) {
 // YAML view with "yaml" in the frame title.
 func TestQA_EKS_YAMLView(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -217,7 +217,7 @@ func TestQA_EKS_YAMLView(t *testing.T) {
 // cluster data as YAML key-value pairs.
 func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	clusters := fixtureEKSClusters()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -239,7 +239,7 @@ func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 // expected columns: Secret Name, Description, Last Accessed, Last Changed, Rotation.
 func TestQA_Secrets_ListColumns(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -315,7 +315,7 @@ func TestQA_Secrets_ListColumnsFromTypeDef(t *testing.T) {
 // TestQA_Secrets_FrameTitle verifies the frame title shows secrets(<count>).
 func TestQA_Secrets_FrameTitle(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -339,7 +339,7 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 // resource list produces a command (fetching the secret value).
 func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -364,7 +364,7 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 // instance list does nothing -- no view change, no error, no command.
 func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -395,7 +395,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 // instance list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -419,7 +419,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
 // bucket list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -443,7 +443,7 @@ func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
 // cluster list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -467,7 +467,7 @@ func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
 // ElastiCache Redis list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -491,7 +491,7 @@ func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
 // DocumentDB cluster list does nothing.
 func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -515,7 +515,7 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 // displays the secret value after receiving ValueRevealedMsg.
 func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -550,7 +550,7 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 // persistent red warning in the header: "Secret visible -- press esc to close".
 func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -587,7 +587,7 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 // view returns a command (to copy the secret value to clipboard).
 func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -617,7 +617,7 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 // on the reveal view returns to the secrets list.
 func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -661,7 +661,7 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 // TestQA_Secrets_DetailView verifies the detail view shows secret metadata.
 func TestQA_Secrets_DetailView(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -683,7 +683,7 @@ func TestQA_Secrets_DetailView(t *testing.T) {
 // TestQA_Secrets_YAMLView verifies the YAML view shows secret metadata.
 func TestQA_Secrets_YAMLView(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -705,7 +705,7 @@ func TestQA_Secrets_YAMLView(t *testing.T) {
 // metadata as YAML key-value pairs.
 func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	secrets := fixtureSecrets()
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -724,7 +724,7 @@ func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
 // main menu does nothing (handleReveal checks for resourceList != nil).
 func TestQA_Secrets_XKeyDoesNothingOnMainMenu(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	contentBefore := rootViewContent(m)
 
@@ -744,7 +744,7 @@ func TestQA_Secrets_XKeyDoesNothingOnMainMenu(t *testing.T) {
 // detail view pops back to the EKS list.
 func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -775,7 +775,7 @@ func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 // YAML view (opened from list) pops back to the EKS list.
 func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -806,7 +806,7 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 // list returns a non-nil command (to fetch the parameter value).
 func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -831,7 +831,7 @@ func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 // ResourceType "ssm".
 func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

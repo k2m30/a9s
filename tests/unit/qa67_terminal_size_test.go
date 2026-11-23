@@ -106,7 +106,7 @@ func TestQa67_H6_ResizeFromAboveToBelowMinimum_ShowsError(t *testing.T) {
 
 // A resize during the detail view re-renders without crash.
 func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:   "i-detail-resize",
 		Name: "resize-test-instance",
@@ -141,7 +141,7 @@ func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
 
 // A resize during the YAML view re-renders without crash.
 func TestQa67_H8_ResizeDuringYAMLView_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:     "i-yaml-resize",
 		Name:   "yaml-resize-test",
@@ -164,7 +164,7 @@ func TestQa67_H8_ResizeDuringYAMLView_NoCrash(t *testing.T) {
 
 // A resize during the help screen re-renders without crash.
 func TestQa67_H9_ResizeDuringHelpScreen_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
 	})
@@ -185,7 +185,7 @@ func TestQa67_H9_ResizeDuringHelpScreen_NoCrash(t *testing.T) {
 
 // A resize during a child view re-renders without crash.
 func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",

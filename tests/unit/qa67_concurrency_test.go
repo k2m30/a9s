@@ -16,7 +16,7 @@ import (
 // A resource deleted between list load and detail open renders without panic
 // from the last-known list data; no second AWS call is made.
 func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -61,7 +61,7 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 // An APIError for a child view (resource deleted) is shown and navigation
 // still works.
 func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -106,7 +106,7 @@ func errNoSuchBucket(bucket string) error {
 
 // Rapid Esc presses through nested views do not leave ghost views or panic.
 func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -146,7 +146,7 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 
 // Navigating away before ResourcesLoaded arrives does not corrupt the view.
 func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -189,7 +189,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 
 // Refresh after a state change shows the updated data.
 func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",

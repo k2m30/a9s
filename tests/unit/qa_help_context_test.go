@@ -20,7 +20,7 @@ import (
 
 func TestQA_HelpContext_MainMenu_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -50,7 +50,7 @@ func TestQA_HelpContext_MainMenu_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -78,7 +78,7 @@ func TestQA_HelpContext_MainMenu_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_ResourceList_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -114,7 +114,7 @@ func TestQA_HelpContext_ResourceList_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_ResourceList_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -141,7 +141,7 @@ func TestQA_HelpContext_ResourceList_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_SecretsResourceList_IncludesReveal(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -165,7 +165,7 @@ func TestQA_HelpContext_SecretsResourceList_IncludesReveal(t *testing.T) {
 
 func TestQA_HelpContext_EC2ResourceList_ExcludesReveal(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -186,7 +186,7 @@ func TestQA_HelpContext_EC2ResourceList_ExcludesReveal(t *testing.T) {
 
 func TestQA_HelpContext_DetailView_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -216,7 +216,7 @@ func TestQA_HelpContext_DetailView_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_DetailView_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -248,7 +248,7 @@ func TestQA_HelpContext_DetailView_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_YAMLView_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -277,7 +277,7 @@ func TestQA_HelpContext_YAMLView_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_YAMLView_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -311,7 +311,7 @@ func TestQA_HelpContext_YAMLView_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_RegionSelector_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -336,7 +336,7 @@ func TestQA_HelpContext_RegionSelector_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_RegionSelector_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -367,7 +367,7 @@ func TestQA_HelpContext_RegionSelector_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_RevealView_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
@@ -390,7 +390,7 @@ func TestQA_HelpContext_RevealView_ShowsRelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
@@ -428,7 +428,7 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 
 func TestQA_HelpContext_DetailView_CopySaysValue(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -451,7 +451,7 @@ func TestQA_HelpContext_DetailView_CopySaysValue(t *testing.T) {
 
 func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -490,7 +490,7 @@ func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 
 func TestQA_HelpContext_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -506,7 +506,7 @@ func TestQA_HelpContext_FrameTitle(t *testing.T) {
 
 func TestQA_HelpContext_AnyKeyCloses(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -553,7 +553,7 @@ func TestQA_HelpContext_NarrowTerminal(t *testing.T) {
 
 func TestQA_HelpContext_QuestionMarkOnHelpClosesHelp(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -581,7 +581,7 @@ func TestQA_HelpContext_QuestionMarkOnHelpClosesHelp(t *testing.T) {
 
 func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -608,7 +608,7 @@ func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 	tui.Version = "0.6.0"
 
-	m1 := newRootSizedModel()
+	m1 := newRootSizedModel(t)
 	m1, _ = rootApplyMsg(m1, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -620,7 +620,7 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 		t.Errorf("secrets help should contain 'reveal', got:\n%s", secretsHelp)
 	}
 
-	m2 := newRootSizedModel()
+	m2 := newRootSizedModel(t)
 	m2, _ = rootApplyMsg(m2, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -644,7 +644,7 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "0.6.0"
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,

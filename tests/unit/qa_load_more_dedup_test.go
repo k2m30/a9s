@@ -116,7 +116,6 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(profile),
 		tui.WithRegionForTest(region))
-	t.Cleanup(func() { m.CloseController() })
 	// Height is tall enough to render all 55 rows without viewport
 	// scrolling — the assertions below check row-ID occurrences and the
 	// frame title text, both of which must be visible in the rendered
@@ -261,7 +260,6 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	// Cold open via the -c/ActionCommand lane (same handler as the
 	// colon-command lane per handleActionCommand's ":s3"-equivalent switch).
@@ -300,7 +298,6 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
@@ -367,7 +364,6 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 

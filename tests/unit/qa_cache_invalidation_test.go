@@ -23,7 +23,7 @@ import (
 // must issue a fresh fetch (non-nil cmd) rather than serving the cached state.
 func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -65,7 +65,7 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 // must issue a fresh fetch (non-nil cmd) rather than serving the cached state.
 func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -107,7 +107,7 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 // remain intact.
 func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -177,7 +177,7 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 // updated when additional pages arrive, not just on the initial load).
 func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

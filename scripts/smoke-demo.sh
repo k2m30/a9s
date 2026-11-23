@@ -12,57 +12,9 @@
 # Requires tmux. Fails fast with the offending capture on any miss.
 set -u
 
-SESSION="a9s-smoke-$$"
-# The smoke builds and drives the REPO binary (./a9s), not a temp copy —
-# every smoke/gate pass leaves the user's binary fresh by construction.
-BIN="./a9s"
-CAPDIR="$(mktemp -d "${TMPDIR:-/tmp}/a9s-smoke.XXXXXX")"
-FAILURES=0
+. "$(dirname "$0")/smoke-lib.sh"
 
-command -v tmux >/dev/null 2>&1 || { echo "smoke: tmux is required"; exit 1; }
-
-echo "smoke: make build (refreshes ./a9s)"
-make build || exit 1
-
-cleanup() {
-	tmux kill-session -t "$SESSION" 2>/dev/null
-	[ -n "${A9S_CONFIG_FOLDER:-}" ] && rm -rf "$A9S_CONFIG_FOLDER"
-}
-trap cleanup EXIT
-
-# A cache root of the run's own: the demo now keeps a cache like any other
-# session, and a smoke must neither read the operator's nor leave anything in
-# it. Fresh per run, so every run starts cold and asserts the same thing.
-A9S_CONFIG_FOLDER="$(mktemp -d "${TMPDIR:-/tmp}/a9s-smoke-home.XXXXXX")"
-export A9S_CONFIG_FOLDER
-
-tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo"
-
-# A keystroke sent before the menu accepts input is dropped silently. Boot is
-# slowest exactly when the gate runs the smokes back to back, so poll for
-# probe data rather than assuming a duration.
-i=0
-ready=0
-while [ "$i" -lt 30 ]; do
-	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/menu.txt"
-	if grep -qE 'issues:[0-9]+' "$CAPDIR/menu.txt"; then
-		ready=1
-		break
-	fi
-	sleep 1
-	i=$((i + 1))
-done
-if [ "$ready" -ne 1 ]; then
-	echo "smoke: app did not reach a populated menu within 30s; capture in $CAPDIR/menu.txt" >&2
-	exit 1
-fi
-
-open_and_capture() {
-	# $1 = command alias, $2 = capture file, $3 = settle seconds
-	tmux send-keys -t "$SESSION" ":$1" Enter
-	sleep "$3"
-	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/$2"
-}
+smoke_start smoke
 
 open_and_capture sg sg.txt 3
 open_and_capture ng ng.txt 3
@@ -73,89 +25,55 @@ open_and_capture s3 s3.txt 3
 # with the RELATED panel, YAML view renders, a circular related drill
 # (bucket → trail → bucket) re-shows cached badges with the depth-badged
 # header, and escape unwinds back to the list.
-tmux send-keys -t "$SESSION" '/a9s-demo-healthy' Enter
+select_row a9s-demo-healthy
+capture s3_filtered.txt
+keys 'd'
+wait_for s3_detail.txt "CloudTrail Trails (1)" "s3 detail related shows the trail witness"
+keys 'y'
+page_until s3_yaml.txt "BucketArn" "yaml view renders the resource document"
+keys Escape
 sleep 1
-tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_filtered.txt"
-tmux send-keys -t "$SESSION" 'd'
+keys Tab
+sleep 1
+keys Enter
 sleep 3
-tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_detail.txt"
-tmux send-keys -t "$SESSION" 'y'
-sleep 2
-tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_yaml.txt"
-tmux send-keys -t "$SESSION" Escape
+keys Tab
 sleep 1
-tmux send-keys -t "$SESSION" Tab
-sleep 1
-tmux send-keys -t "$SESSION" Enter
+keys Enter
 sleep 3
-tmux send-keys -t "$SESSION" Tab
-sleep 1
-tmux send-keys -t "$SESSION" Enter
-sleep 3
-tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_circular.txt"
+capture s3_circular.txt
 
 # A flagged bucket's detail must open with the Attention block on top.
-tmux send-keys -t "$SESSION" Escape
+keys Escape
 sleep 1
-tmux send-keys -t "$SESSION" Escape
+keys Escape
 sleep 1
-tmux send-keys -t "$SESSION" Escape
+keys Escape
 sleep 1
-tmux send-keys -t "$SESSION" ':s3' Enter
+keys ':s3' Enter
 sleep 2
-tmux send-keys -t "$SESSION" '/a9s-demo-nopab' Enter
-sleep 1
-tmux send-keys -t "$SESSION" 'd'
-sleep 3
-tmux capture-pane -t "$SESSION" -p > "$CAPDIR/s3_attention.txt"
+select_row a9s-demo-nopab
+keys 'd'
+wait_for s3_attention.txt "Attention (" "flagged bucket detail opens with the attention block"
 
 # The node-group health issue is a supporting row, not a state, so the detail
 # body is the only place it can be read.
-tmux send-keys -t "$SESSION" Escape
+keys Escape
 sleep 1
-tmux send-keys -t "$SESSION" ':ng' Enter
+keys ':ng' Enter
 sleep 2
-tmux send-keys -t "$SESSION" '/staging-degraded-net-pool' Enter
-sleep 1
+select_row staging-degraded-net-pool
+# The Attention block opens on top of a flagged detail by contract, so its
+# first screen is asserted as captured; the rows under it are paged for.
 tmux send-keys -t "$SESSION" 'd'
 sleep 3
 tmux capture-pane -t "$SESSION" -p > "$CAPDIR/ng_detail.txt"
+expect ng_detail.txt "health issue" "ng health issue is readable in the detail body"
+page_until ng_detail.txt "~ Health issue" "ng detail carries the health issue as its own row"
+page_until ng_detail.txt "Issue: insufficient free addresses" "ng detail carries the reported code as a row under the finding"
 
-expect() {
-	# $1 = capture file, $2 = required substring, $3 = human label
-	if grep -qF -- "$2" "$CAPDIR/$1"; then
-		echo "PASS  $3"
-	else
-		echo "FAIL  $3 — missing \"$2\" in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	fi
-}
-
-expect_re() {
-	# $1 = capture file, $2 = required ERE, $3 = human label
-	if grep -qE -- "$2" "$CAPDIR/$1"; then
-		echo "PASS  $3"
-	else
-		echo "FAIL  $3 — no match for /$2/ in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	fi
-}
-
-forbid() {
-	# $1 = capture file, $2 = forbidden substring, $3 = human label
-	if grep -qF -- "$2" "$CAPDIR/$1"; then
-		echo "FAIL  $3 — forbidden \"$2\" present in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	else
-		echo "PASS  $3"
-	fi
-}
-
-# Menu: full catalog present. 70 registered resource types
-# (resource.AllResourceTypes()) plus the synthetic Cost Explorer pseudo-entry
-# (core/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
-# deliberately excluded from AllResourceTypes() itself).
-expect menu.txt "resource-types(71)" "menu shows the full catalog"
+# Menu: full catalog present, the synthetic Cost Explorer entry included.
+expect menu.txt "resource-types($(demo_count resource-types))" "menu shows the full catalog"
 
 # Security groups: owner-worded risk phrases, no raw classifier tokens.
 expect sg.txt "all ports open" "sg wide-open row uses the owner wording"
@@ -173,19 +91,17 @@ expect ng.txt "details denied" "ng keeps the node group whose describe was denie
 expect ng.txt "details unavailable" "ng keeps the node group whose describe found nothing"
 
 # Lambda: the issue-colored rows explain themselves in the State column.
-expect lambda.txt "lambda(44) !" "lambda title carries the issue count"
+expect lambda.txt "lambda($(demo_count lambda)) !" "lambda title carries the issue count"
 expect lambda.txt "runtime is end-of-life" "lambda deprecated runtime explains itself"
 
 # S3: reference type baseline — count, issues, the PAB cause visible.
-expect s3.txt "s3(42)" "s3 list shows the fixture count"
+expect s3.txt "s3($(demo_count s3))" "s3 list shows the fixture count"
 expect s3.txt "public access block incomplete" "s3 flagged bucket names its cause"
 
 # Reference bucket walk.
-expect s3_filtered.txt "s3(1/42)" "filter narrows the list to one row"
+expect s3_filtered.txt "s3(1/$(demo_count s3))" "filter narrows the list to one row"
 expect s3_detail.txt "RELATED" "s3 detail renders the related panel"
-expect s3_detail.txt "CloudTrail Trails (1)" "s3 detail related shows the trail witness"
 expect s3_detail.txt "KMS Key (1)" "s3 detail related shows the kms witness"
-expect s3_yaml.txt "BucketArn" "yaml view renders the resource document"
 
 # Circular drill (bucket → trail → bucket): cached badges reappear at once
 # and the header keeps the version next to the depth badge.
@@ -195,15 +111,6 @@ expect s3_circular.txt "a9s v" "header keeps the version at depth"
 expect_re s3_circular.txt '\[[0-9]+\]' "header shows the depth badge"
 
 # A flagged resource explains itself at the top of its detail.
-expect s3_attention.txt "Attention (" "flagged bucket detail opens with the attention block"
-expect ng_detail.txt "health issue" "ng health issue is readable in the detail body"
-expect ng_detail.txt "~ Health issue" "ng detail carries the health issue as its own row"
-expect ng_detail.txt "Issue: insufficient free addresses" "ng detail carries the reported code as a row under the finding"
 expect_re s3_attention.txt '[Pp]ublic access block incomplete' "attention names the cause"
 
-if [ "$FAILURES" -gt 0 ]; then
-	echo "smoke: $FAILURES failure(s); captures kept in $CAPDIR"
-	exit 1
-fi
-rm -rf "$CAPDIR"
-echo "smoke: all checks green"
+smoke_finish

@@ -26,7 +26,6 @@ func newCostsNavController(t *testing.T) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c
 }
 
@@ -41,7 +40,7 @@ func typeColonCommand(m tui.Model, cmd string) (tui.Model, tea.Cmd) {
 }
 
 func TestQA_Costs_ColonCommand_Costs_EmitsNavigateTargetCosts(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := typeColonCommand(m, "costs")
 
@@ -59,7 +58,7 @@ func TestQA_Costs_ColonCommand_Costs_EmitsNavigateTargetCosts(t *testing.T) {
 }
 
 func TestQA_Costs_ColonCommand_CEAlias_EmitsNavigateTargetCosts(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := typeColonCommand(m, "ce")
 
@@ -80,7 +79,7 @@ func TestQA_Costs_ColonCommand_CEAlias_EmitsNavigateTargetCosts(t *testing.T) {
 // adapter's push logic is unexported.
 
 func TestQA_Costs_Navigate_PushesCostsScreen(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 
@@ -128,7 +127,6 @@ func TestQA_Costs_MainMenu_Enter_EmitsNavigateTargetCosts(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 
 	// "costs" does not collide with any real resource ShortName/Alias/
 	// Display substring, so filtering to it isolates exactly one entry

@@ -183,7 +183,7 @@ func TestIdentityView_SessionSection(t *testing.T) {
 // main menu opens the identity view.
 func TestRoot_IKey_ShowsIdentityView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("i"))
 
@@ -197,7 +197,7 @@ func TestRoot_IKey_ShowsIdentityView(t *testing.T) {
 // identity view returns to the previous view.
 func TestRoot_IdentityView_EscDismisses(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("i"))
 	identityPlain := strings.ToLower(stripANSI(rootViewContent(m)))
@@ -217,7 +217,7 @@ func TestRoot_IdentityView_EscDismisses(t *testing.T) {
 // IdentityLoadedMsg, the header contains the account badge and role name.
 func TestRoot_IdentityLoaded_UpdatesHeader(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	identity := &awsclient.CallerIdentity{
 		AccountID:     "123456789012",
@@ -307,12 +307,12 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 	}{
 		{
 			name:  "main_menu",
-			setup: newRootSizedModel,
+			setup: func() tui.Model { return newRootSizedModel(t) },
 		},
 		{
 			name: "resource_list",
 			setup: func() tui.Model {
-				m := newRootSizedModel()
+				m := newRootSizedModel(t)
 				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: "ec2",
@@ -323,7 +323,7 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 		{
 			name: "detail_view",
 			setup: func() tui.Model {
-				m := newRootSizedModel()
+				m := newRootSizedModel(t)
 				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: "ec2",

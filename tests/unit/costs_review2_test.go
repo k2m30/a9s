@@ -114,7 +114,6 @@ func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testin
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 
 	// The real headless menu-select path runs HandleNavigate/applyNavResult; the
 	// ApplyIntents/EnsureCostsState seam in reviewCostsControllerNoIsolation
@@ -270,7 +269,6 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	s.Clients = &awsclient.ServiceClients{CostExplorer: review2NewDemoCostsClient()}
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	// The controller's `now` is taken from the demo fixture's OWN anchor
 	// month, never a date literal: the trailing month window built from it
@@ -377,11 +375,11 @@ func review2ContainsAll(s string, subs ...string) bool {
 // even though the cache is fresh.
 
 func TestCostsReview2_R7_CtrlR_OnCostsScreen_ForcesOpenPeriodRefetch(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	now := time.Now().UTC()
 	window := costs.BuildWindow(costs.GranularityMonth, now)
-	seed := costs.LoadStore("testprofile") // matches newRootSizedModel's tuitest.Sized profile
+	seed := costs.LoadStore("testprofile") // matches newRootSizedModel's profile
 	var recs []costs.Record
 	for i, p := range window {
 		recs = append(recs, reviewFullMetricRecord(p, "Amazon EC2", 1000.0+float64(i)))

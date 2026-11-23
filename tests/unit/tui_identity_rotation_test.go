@@ -21,7 +21,7 @@ import (
 // only the CONTROLLER, through the TUI's applyIntent
 // (internal/tui/runtime_adapter.go, ClearIdentityIntent case).
 func TestRoot_IdentityScreen_StaleARN_ClearedAfterProfileRotation(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("i"))
 

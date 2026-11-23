@@ -54,7 +54,7 @@ func stackSyncFirstNonEmptyContaining(s, substr string) string {
 // content correctness after EVERY step.
 func TestStackSync_NavigationRoundTrip(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	assertStackInSync(t, m, "step 0 (menu)")
 	plain := stripANSI(rootViewContent(m))
@@ -160,7 +160,7 @@ func TestStackSync_SelectorFlow(t *testing.T) {
 	restoreTheme := styles.ActiveTheme()
 	t.Cleanup(func() { styles.ApplyTheme(restoreTheme) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	themesDir := os.Getenv("A9S_CONFIG_FOLDER") + "/themes"
 	if err := os.MkdirAll(themesDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(themes): %v", err)
@@ -350,7 +350,7 @@ func TestStackSync_DoublePopGuard(t *testing.T) {
 	// call — seed the theme file into the directory IT resolved (not a
 	// directory this test pre-picked), so the seed cannot be clobbered by
 	// that isolation.
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	themesDir := os.Getenv("A9S_CONFIG_FOLDER") + "/themes"
 	if err := os.MkdirAll(themesDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll(themes): %v", err)

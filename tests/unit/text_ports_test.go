@@ -398,7 +398,7 @@ func TestPort_YAMLToggle_SurvivesAsyncEnrichment(t *testing.T) {
 // rsKindList/Detail/Reveal/Text/Identity are in it), so 'c' is a true no-op
 // there.
 func TestPort_SelectorCopy_IsNoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "aws-regions") {
@@ -411,7 +411,7 @@ func TestPort_SelectorCopy_IsNoOp(t *testing.T) {
 }
 
 func TestPort_HelpCopy_IsNoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, cmd := rootApplyMsg(m, rootKeyPress("?"))
 	if cmd != nil {
 		msg := cmd()

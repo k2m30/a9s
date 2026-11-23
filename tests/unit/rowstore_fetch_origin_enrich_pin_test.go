@@ -34,7 +34,6 @@ func newFetchOriginPinSession(t *testing.T) (*session.Session, *runtime.Core, *a
 	s.Clients = &awsclient.ServiceClients{}
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return s, core, c
 }
 

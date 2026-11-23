@@ -40,7 +40,6 @@ func reviewCostsControllerNoIsolation(t *testing.T, now time.Time) *app.Controll
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenCosts},
 	})
@@ -234,7 +233,7 @@ func TestCostsReview_F2_KindFetchCosts_RoutesByGroupBy(t *testing.T) {
 
 func TestCostsReview_F3_EscAtDrillDepth_PopsOnlyDrillFrame_TUIStackStaysSynced(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	assertStackInSync(t, m, "after navigating to costs")
@@ -490,7 +489,6 @@ func TestCostsReview_F7_StaleCostsLoaded_DroppedAfterProfileSwitch(t *testing.T)
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(reviewNow)
 

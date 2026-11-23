@@ -15,21 +15,7 @@
 # Requires tmux. Fails fast with the offending capture on any miss.
 set -u
 
-SESSION="a9s-smoke-costs-$$"
-BIN="./a9s"
-CAPDIR="$(mktemp -d "${TMPDIR:-/tmp}/a9s-smoke-costs.XXXXXX")"
-FAILURES=0
-
-command -v tmux >/dev/null 2>&1 || { echo "smoke-costs: tmux is required"; exit 1; }
-
-echo "smoke-costs: make build (refreshes ./a9s)"
-make build || exit 1
-
-cleanup() {
-	tmux kill-session -t "$SESSION" 2>/dev/null
-	[ -n "${A9S_CONFIG_FOLDER:-}" ] && rm -rf "$A9S_CONFIG_FOLDER"
-}
-trap cleanup EXIT
+. "$(dirname "$0")/smoke-lib.sh"
 
 # Current-month column header, e.g. "Jul'26*" (the open-period marker).
 # BSD date (darwin) first, GNU date fallback.
@@ -37,72 +23,7 @@ CUR_LABEL="$(date "+%b'%y")*"
 # Drilled columns render day ranges ("Jan 1–4"), so match the month name only.
 GROWTH_LABEL="$(date -v-6m "+%b" 2>/dev/null || date -d '-6 months' "+%b")"
 
-expect() {
-	# $1 = capture file, $2 = required substring, $3 = human label
-	if grep -qF -- "$2" "$CAPDIR/$1"; then
-		echo "PASS  $3"
-	else
-		echo "FAIL  $3 — missing \"$2\" in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	fi
-}
-
-expect_re() {
-	# $1 = capture file, $2 = required ERE, $3 = human label
-	if grep -qE -- "$2" "$CAPDIR/$1"; then
-		echo "PASS  $3"
-	else
-		echo "FAIL  $3 — no match for /$2/ in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	fi
-}
-
-expect_absent() {
-	# $1 = capture file, $2 = forbidden substring, $3 = human label
-	if grep -qF -- "$2" "$CAPDIR/$1"; then
-		echo "FAIL  $3 — forbidden \"$2\" present in $CAPDIR/$1"
-		FAILURES=$((FAILURES + 1))
-	else
-		echo "PASS  $3"
-	fi
-}
-
-snap() {
-	# $1 = capture file, $2 = settle seconds
-	sleep "$2"
-	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/$1"
-}
-
-keys() {
-	tmux send-keys -t "$SESSION" "$@"
-}
-
-
-# A cache root of the run's own: the demo now keeps a cache like any other
-# session, and a smoke must neither read the operator's nor leave anything in
-# it. Fresh per run, so every run starts cold and asserts the same thing.
-A9S_CONFIG_FOLDER="$(mktemp -d "${TMPDIR:-/tmp}/a9s-smoke-home.XXXXXX")"
-export A9S_CONFIG_FOLDER
-
-tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo"
-
-# A keystroke sent before the menu accepts input is dropped silently. Boot is
-# slowest exactly when the gate runs the smokes back to back, so poll for
-# probe data rather than assuming a duration.
-i=0
-ready=0
-while [ "$i" -lt 30 ]; do
-	if tmux capture-pane -t "$SESSION" -p 2>/dev/null | grep -qE 'issues:[0-9]+'; then
-		ready=1
-		break
-	fi
-	sleep 1
-	i=$((i + 1))
-done
-if [ "$ready" -ne 1 ]; then
-	echo "smoke-costs: app did not reach a populated menu within 30s" >&2
-	exit 1
-fi
+smoke_start smoke-costs
 
 # --- open the grid ---------------------------------------------------------
 keys ':costs' Enter
@@ -111,10 +32,10 @@ expect     grid.txt "Costs: by service · invoice · month" "grid opens with the
 expect     grid.txt "$CUR_LABEL"                          "current month visible with the open-period marker"
 expect     grid.txt "Elastic Compute Cloud - Compute"     "growth-story service row present"
 expect_re  grid.txt "^│Relational Database Service"       "vendor prefix stripped from service labels"
-expect_absent grid.txt "Amazon "                          "no raw Amazon-prefixed labels"
-expect_absent grid.txt "CE calls"                         "no API-call counter in the footer"
-expect_absent grid.txt "… others"                         "no others-fold row"
-expect_absent grid.txt "-0.0"                             "no negative-zero amounts"
+forbid grid.txt "Amazon "                          "no raw Amazon-prefixed labels"
+forbid grid.txt "CE calls"                         "no API-call counter in the footer"
+forbid grid.txt "… others"                         "no others-fold row"
+forbid grid.txt "-0.0"                             "no negative-zero amounts"
 expect     grid.txt "TOTAL"                               "pinned TOTAL row"
 expect     grid.txt "b Metric"                            "key-hint bar rendered"
 
@@ -131,12 +52,12 @@ keys '-'
 keys '-'
 snap backout.txt 2
 expect     backout.txt "· month" "zoom-out returns to month granularity"
-expect_absent backout.txt "operation error" "no CE error after zoom round-trip"
+forbid backout.txt "operation error" "no CE error after zoom round-trip"
 keys '-'
 snap year.txt 3
 expect     year.txt "· year" "third zoom-out lands on year granularity"
-expect_absent year.txt "operation error"        "no CE validation error at year zoom"
-expect_absent year.txt "ValidationException"    "no raw ValidationException at year zoom"
+forbid year.txt "operation error"        "no CE validation error at year zoom"
+forbid year.txt "ValidationException"    "no raw ValidationException at year zoom"
 keys '+'
 snap remonth.txt 2
 
@@ -144,7 +65,7 @@ snap remonth.txt 2
 keys 'b'
 snap unblended.txt 3
 expect     unblended.txt "· unblended" "b cycles to the unblended metric"
-expect_absent unblended.txt "Tax" "unblended view excludes the Tax row"
+forbid unblended.txt "Tax" "unblended view excludes the Tax row"
 keys 'b'
 keys 'b'
 keys 'b'
@@ -163,9 +84,11 @@ keys '0'
 snap byservice.txt 2
 
 # --- growth-story drill: service × growth month → usage types ---------------
-# The growth service (Elastic Compute Cloud - Compute) is the largest-total
-# row, so it already sits at row 0 after digit-0's reset — no row navigation
-# needed, only the column scroll back to the planted growth month.
+# The costs grid has no name filter, so the row is reached through the sort:
+# the growth service (Elastic Compute Cloud - Compute) is the largest-total
+# row, so it sits at row 0 after digit-0's reset, and the drill's first check
+# names the service, so a different row there fails the step, not a later one.
+# Only the column scroll back to the planted growth month is needed.
 keys Left Left Left Left Left Left
 snap growth_cell.txt 1
 keys Enter
@@ -201,7 +124,7 @@ keys Enter
 snap jump.txt 4
 expect     jump.txt "detail --"          "Enter on a resource row opens the resource detail view"
 expect_re  jump.txt "i-[0-9a-f]"         "detail view shows the drilled instance"
-expect_absent jump.txt "by resource_id"  "the costs grid is no longer the active screen"
+forbid jump.txt "by resource_id"  "the costs grid is no longer the active screen"
 keys Escape
 snap back_from_jump.txt 2
 expect     back_from_jump.txt "by resource_id" "Esc returns from the detail to the costs resource level"
@@ -231,9 +154,4 @@ tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo -c costs"
 snap direct.txt 5
 expect     direct.txt "Costs: by service · invoice · month" "-c costs starts straight into the grid"
 
-echo
-if [ "$FAILURES" -gt 0 ]; then
-	echo "smoke-costs: $FAILURES failure(s); captures in $CAPDIR"
-	exit 1
-fi
-echo "smoke-costs: all checks passed; captures in $CAPDIR"
+smoke_finish

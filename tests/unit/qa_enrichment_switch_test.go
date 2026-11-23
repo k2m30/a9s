@@ -51,7 +51,7 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 // tolerated — see hasReenrichOrRefetch).
 func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = seedEnrichmentFindings(m)
 
@@ -106,7 +106,7 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 // rds must behave identically.
 func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = seedEnrichmentFindings(m)
 
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "dev"})
@@ -133,7 +133,7 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 // profile switch but triggered by RegionSelectedMsg.
 func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = seedEnrichmentFindings(m)
 
@@ -187,7 +187,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 // test above).
 func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = seedEnrichmentFindings(m)
 
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
@@ -210,7 +210,7 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 // resource list correctly bumps it from 0 (missing key = zero value) to 1.
 func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Seed some per-type gen by pressing Ctrl+R on ec2 list.
 	m = navigateToEC2List(m)
@@ -237,7 +237,7 @@ func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 // for region switch — enrichmentTypeGen is reset to empty (not nil) map.
 func TestRegionSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = navigateToEC2List(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg()) // enrichmentTypeGen["ec2"] → 1

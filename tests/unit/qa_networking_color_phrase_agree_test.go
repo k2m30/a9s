@@ -56,6 +56,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 			t.Fatalf("%s: no demo fixtures — this gate cannot see the type", short)
 		}
 		merged := mergeWave2Findings(t, *td, fixtures, cache, demoClients)
+		cells := listStatusCells(t, *td, merged)
 
 		for _, res := range merged {
 			worst, ok := netWorstSeverity(res)
@@ -66,7 +67,7 @@ func TestNetworkingColorAndPhrase_ComeFromTheSameFinding(t *testing.T) {
 				bad = append(bad, fmt.Sprintf("%s/%s: row colour = %v, want %v from the worst finding on the row %v",
 					short, res.ID, got, want, netPhrases(res)))
 			}
-			cell, found := listStatusCellFor(t, *td, merged, res.ID)
+			cell, found := cells[res.ID]
 			if !found || strings.TrimSpace(cell) == "" {
 				continue
 			}

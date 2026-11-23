@@ -31,7 +31,7 @@ import (
 
 // TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk drives a genuine
 // navigate-then-append session entirely through the TUI layer
-// (tuitest.Sized -> messages.Navigate -> messages.ResourcesLoaded, exactly
+// (newSizedModel -> messages.Navigate -> messages.ResourcesLoaded, exactly
 // the shape internal/tui/app.go's Update dispatches for a real fetch/load-more
 // result) and asserts the per-type disk cache file ends up holding the FULL,
 // accumulated row set — not just the first page.
@@ -40,8 +40,7 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "toplevel-persist-prof", "us-east-1"
 
-	m := tuitest.Sized(profile, region)
-	t.Cleanup(func() { m.CloseController() })
+	m := newSizedModel(t, profile, region)
 
 	// Open the s3 list (top-level, menu-driven — the exact ":command open"
 	// shape, since messages.Navigate{TargetResourceList} is what both the
@@ -129,7 +128,6 @@ func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 		s.Region = "us-east-1"
 		core := runtime.New(s, nil)
 		c := newBlessedController(t, core)
-		t.Cleanup(c.Close)
 		return c
 	}
 
@@ -192,8 +190,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 	// Fresh TUI model over the SAME profile/region pair, so HandleNavigate's
 	// cache-miss fallback (no ProbeResources observed yet) reads the just-seeded
 	// disk pair (core/runtime/handlers_navigate.go's ReadCacheStore branch).
-	m := tuitest.Sized(profile, region)
-	t.Cleanup(func() { m.CloseController() })
+	m := newSizedModel(t, profile, region)
 	m, _ = tuitest.Step(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -248,8 +245,7 @@ func TestRowStoreSeededPair_CachedEntryCarriesTotalCount(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "rowstore-seeded-pair-prof", "us-east-1"
 
-	m := tuitest.Sized(profile, region)
-	t.Cleanup(func() { m.CloseController() })
+	m := newSizedModel(t, profile, region)
 
 	// Seed RowStore directly: 50 observed rows (Gen bumped to non-zero), then
 	// a counts-only ObserveCount raising TotalCount to 55 without touching
@@ -294,8 +290,7 @@ func TestCacheMissSeed_RefreshingMarkerOnFirstFrame(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	const profile, region = "refresh-marker-prof", "us-east-1"
 
-	m := tuitest.Sized(profile, region)
-	t.Cleanup(func() { m.CloseController() })
+	m := newSizedModel(t, profile, region)
 
 	// Seed session.RowStore for ec2 BEFORE navigating, exactly as a
 	// prior availability probe would have — this is the CachedEntry seed

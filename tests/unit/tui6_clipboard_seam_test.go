@@ -31,7 +31,7 @@ func tui6RevealAndCopy(t *testing.T, secret string) (screen string, written []st
 		return nil
 	}))
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secret", ResourceID: "prod/db-password", Value: secret,

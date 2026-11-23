@@ -10,35 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/core/session"
 )
-
-// newTestController builds a Controller backed by a fresh runtime.Core
-// with recognisable profile/region values. No AWS clients are attached;
-// all test scenarios either exercise the empty-stack path or inject intents
-// directly via ApplyIntents.
-//
-// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
-// t.Cleanup(c.Close) — in that order, so t.TempDir()'s own RemoveAll
-// cleanup (registered by the FIRST TempDir() call in a test, per Go's
-// testing package) runs AFTER Close via t.Cleanup's LIFO ordering. Any test
-// in this file that drives a ResourcesLoaded/AvailabilityChecked event
-// through the returned Controller can queue an async availability-cache
-// save (queueAvailabilitySave); without this ordering the writer goroutine
-// can still be running cache.Store.SaveType when RemoveAll fires and the
-// directory is not empty when it is removed (see
-// app_availsave_tempdir_cleanup_race_test.go for the mechanism).
-func newTestController(t *testing.T) *app.Controller {
-	t.Helper()
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	s := session.New()
-	s.Profile = "demo"
-	s.Region = "us-east-1"
-	core := runtime.New(s, nil)
-	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
-	return c
-}
 
 // newTestControllerForProfile is newTestController for a test whose subject is
 // the disk cache. The cache directory is keyed by the profile/region pair, so
@@ -51,9 +23,7 @@ func newTestController(t *testing.T) *app.Controller {
 func newTestControllerForProfile(t *testing.T, profile, region string) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	c := newBlessedController(t, runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
-	t.Cleanup(c.Close)
-	return c
+	return newBlessedController(t, runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
 }
 
 func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {

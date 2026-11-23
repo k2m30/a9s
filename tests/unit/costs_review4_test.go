@@ -26,7 +26,7 @@ import (
 
 func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	assertStackInSync(t, m, "after navigating to costs")

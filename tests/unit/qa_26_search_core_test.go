@@ -101,7 +101,7 @@ func qa26PlainView(m tui.Model) string {
 // "/" in the detail view replaces "? for help" in the header with "/".
 func TestQA26_A01_SlashInDetailActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateDetail(m, qa26Resource())
 
 	beforePlain := qa26PlainView(m)
@@ -124,7 +124,7 @@ func TestQA26_A01_SlashInDetailActivatesSearch(t *testing.T) {
 // "/" in the YAML view replaces "? for help" in the header with "/".
 func TestQA26_A02_SlashInYAMLActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateYAML(m, qa26Resource())
 
 	beforePlain := qa26PlainView(m)
@@ -147,7 +147,7 @@ func TestQA26_A02_SlashInYAMLActivatesSearch(t *testing.T) {
 // Typed characters appear in the header search input.
 func TestQA26_B01_TypedCharsAppearInHeader(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateDetail(m, qa26Resource())
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "running")
@@ -162,7 +162,7 @@ func TestQA26_B01_TypedCharsAppearInHeader(t *testing.T) {
 // Typed characters appear in the header search input of the YAML view.
 func TestQA26_B01_TypedCharsAppearInHeader_YAML(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateYAML(m, qa26Resource())
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "running")
@@ -177,7 +177,7 @@ func TestQA26_B01_TypedCharsAppearInHeader_YAML(t *testing.T) {
 // Backspace removes the last character, down to an empty "/".
 func TestQA26_B02_BackspaceRemovesLastChar(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateDetail(m, qa26Resource())
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "running")
@@ -209,7 +209,7 @@ func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -225,7 +225,7 @@ func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -244,7 +244,7 @@ func TestQA26_B03_HighlightsAppearedWhileTyping(t *testing.T) {
 // A colon in the query is a literal character.
 func TestQA26_B04_SpecialCharsColonTreatedLiteral(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateDetail(m, qa26SpecialCharsResource())
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "s3:Get")
@@ -266,7 +266,7 @@ func TestQA26_B05_DotsAndDashesTreatedLiteral(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26SpecialCharsResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "us-east-1a")
@@ -278,7 +278,7 @@ func TestQA26_B05_DotsAndDashesTreatedLiteral(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26SpecialCharsResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "us-east-1a")
@@ -296,7 +296,7 @@ func TestQA26_C01_EnterConfirmsSearch(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -314,7 +314,7 @@ func TestQA26_C01_EnterConfirmsSearch(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -337,7 +337,7 @@ func TestQA26_C02_EnterOnEmptyQueryDoesNothing(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26PressEnter(m)
@@ -353,7 +353,7 @@ func TestQA26_C02_EnterOnEmptyQueryDoesNothing(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26PressEnter(m)
@@ -374,7 +374,7 @@ func TestQA26_C03_EscCancelsInput(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -394,7 +394,7 @@ func TestQA26_C03_EscCancelsInput(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -420,7 +420,7 @@ func TestQA26_F01_MatchCounterOnFirstConfirm(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -434,7 +434,7 @@ func TestQA26_F01_MatchCounterOnFirstConfirm(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -453,7 +453,7 @@ func TestQA26_F02_CounterUpdatesOnNav(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -472,7 +472,7 @@ func TestQA26_F02_CounterUpdatesOnNav(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -496,7 +496,7 @@ func TestQA26_F03_ZeroMatchesCounter(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26EmptyResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "nonexistent-term-xyz")
@@ -509,7 +509,7 @@ func TestQA26_F03_ZeroMatchesCounter(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26EmptyResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "nonexistent-term-xyz")
@@ -528,7 +528,7 @@ func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -562,7 +562,7 @@ func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26Resource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "running")
@@ -599,7 +599,7 @@ func TestQA26_F04_CounterIsInHeader(t *testing.T) {
 // Searching a view with few fields for nonexistent text shows "0/0 matches".
 func TestQA26_H01_SearchFewFieldsNoMatch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateDetail(m, qa26EmptyResource())
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "nonexistent-text")
@@ -636,7 +636,7 @@ func TestQA26_H02_SearchLargeYAMLNoMatch(t *testing.T) {
 	}
 	res := &resource.Resource{ID: "i-large-yaml", Name: "large-yaml-instance", Fields: fields}
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = qa26NavigateYAML(m, res)
 	m = qa26ActivateSearch(m)
 	m = qa26TypeQuery(m, "zzz-no-such-value-zzz")
@@ -658,7 +658,7 @@ func TestQA26_H03_NWithZeroMatchesNoOp(t *testing.T) {
 	tui.Version = "0.6.0"
 
 	t.Run("DetailView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateDetail(m, qa26EmptyResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "nonexistent-text")
@@ -687,7 +687,7 @@ func TestQA26_H03_NWithZeroMatchesNoOp(t *testing.T) {
 	})
 
 	t.Run("YAMLView", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		m = qa26NavigateYAML(m, qa26EmptyResource())
 		m = qa26ActivateSearch(m)
 		m = qa26TypeQuery(m, "nonexistent-text")

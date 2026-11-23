@@ -113,7 +113,6 @@ func newVisibilityListController(t *testing.T, shortName string) *app.Controller
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
 	return c
 }
@@ -124,25 +123,33 @@ func newVisibilityListController(t *testing.T, shortName string) *app.Controller
 // if the row or the status column cannot be located.
 func listStatusCellFor(t *testing.T, td resource.ResourceTypeDef, fixtures []resource.Resource, resourceID string) (string, bool) {
 	t.Helper()
+	cell, ok := listStatusCells(t, td, fixtures)[resourceID]
+	return cell, ok
+}
+
+// listStatusCells is listStatusCellFor for every row at once: one list build
+// answers every row of it, so a sweep over a type's rows builds it once
+// instead of once per row.
+func listStatusCells(t *testing.T, td resource.ResourceTypeDef, fixtures []resource.Resource) map[string]string {
+	t.Helper()
 	c := newVisibilityListController(t, td.ShortName)
 	c.ApplyResourcesLoaded(td.ShortName, fixtures, nil, false)
 	body := c.Snapshot().Body.List
-	if body == nil {
-		return "", false
+	cells := map[string]string{}
+	if body == nil || body.StatusCol < 0 {
+		return cells
 	}
-	if body.StatusCol < 0 {
-		return "", false
-	}
+	seen := map[string]bool{}
 	for _, row := range body.Rows {
-		if row.ResourceID != resourceID {
+		if seen[row.ResourceID] {
 			continue
 		}
-		if body.StatusCol >= len(row.Cells) {
-			return "", false
+		seen[row.ResourceID] = true
+		if body.StatusCol < len(row.Cells) {
+			cells[row.ResourceID] = row.Cells[body.StatusCol]
 		}
-		return row.Cells[body.StatusCol], true
 	}
-	return "", false
+	return cells
 }
 
 // newVisibilityDetailController builds a Controller pushed straight to the
@@ -155,7 +162,6 @@ func newVisibilityDetailController(t *testing.T) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	// Production always sets one — internal/tui/app.go:144 and
 	// core/web/construct.go:31 — and without it the detail projection falls
 	// back to flat alphabetical Fields rows and never reads RawStruct at all.
@@ -248,6 +254,7 @@ func TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere(t *testi
 		}
 
 		merged := mergeWave2Findings(t, td, fixtures, cache, clients)
+		cells := listStatusCells(t, td, merged)
 
 		for _, res := range merged {
 			if !isVisibilityViolation(td, res) {
@@ -258,7 +265,7 @@ func TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere(t *testi
 			testName := fmt.Sprintf("%s/%s", td.ShortName, res.ID)
 
 			t.Run(testName, func(t *testing.T) {
-				statusCell, _ := listStatusCellFor(t, td, merged, res.ID)
+				statusCell := cells[res.ID]
 				listVisible := statusCell != ""
 
 				detailVisible := detailHasAttentionFor(t, res, td.ShortName)

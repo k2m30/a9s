@@ -163,7 +163,7 @@ func t570LoadAWS(t *testing.T) *packages.Package {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
 		Dir:  filepath.Join("..", ".."),
 	}
-	pkgs, err := packages.Load(cfg, t570AWSPkg)
+	pkgs, err := loadPackagesOnce(cfg, t570AWSPkg)
 	if err != nil || len(pkgs) != 1 || len(pkgs[0].Errors) > 0 {
 		t.Fatalf("load %s: %v %v", t570AWSPkg, err, pkgs)
 	}

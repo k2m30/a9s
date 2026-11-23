@@ -126,7 +126,6 @@ func Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *testing.
 	})
 
 	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
-	t.Cleanup(func() { m.CloseController() })
 	m, _ = tuitest.Step(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = tuitest.Step(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 
@@ -754,7 +753,6 @@ func newDetailController(t *testing.T, res resource.Resource, resourceType strin
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})

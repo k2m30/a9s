@@ -3,7 +3,6 @@ package unit
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -16,41 +15,18 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// prevRootModel is the tui.Model (if any) newRootSizedModel handed back on
-// its previous call in this binary, kept so the next call can flush its
-// headless controller (CloseController, nil-safe) before abandoning its
-// config directory.
-var prevRootModel *tui.Model
-
 // newRootSizedModel creates a model with a size set so View() actually
-// renders.
-//
-// Every call sets a fresh, unique A9S_CONFIG_FOLDER via os.Setenv (there is
-// no *testing.T to call t.Setenv with): callers share the
+// renders, over a config directory of its own: callers share the
 // "testprofile"/"us-east-1" pair, so a shared directory would leak one
 // test's persisted list rows into another's fresh model. A caller that needs
 // the model to read pre-seeded files (e.g. a themes/ directory) calls this
-// FIRST, then seeds the directory this call resolved
-// (os.Getenv("A9S_CONFIG_FOLDER") after it returns); see
+// FIRST, then seeds os.Getenv("A9S_CONFIG_FOLDER"); see
 // TestStackSync_SelectorFlow / TestStackSync_DoublePopGuard in
 // tui_stack_sync_test.go.
-//
-// Each call also closes the previous call's headless controller before
-// abandoning its directory: a queued availability-cache write resolves
-// A9S_CONFIG_FOLDER at write time, so a writer left running could land in a
-// later test's t.TempDir() and fail its RemoveAll cleanup
-// (app_availsave_tempdir_cleanup_race_test.go).
-func newRootSizedModel() tui.Model {
-	if prevRootModel != nil {
-		prevRootModel.CloseController()
-		prevRootModel = nil
-	}
-	if dir, err := os.MkdirTemp("", "a9s-roottest-config-*"); err == nil {
-		os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // best-effort per-call isolation, not test-critical
-	}
-	m := tuitest.Sized("testprofile", "us-east-1")
-	prevRootModel = &m
-	return m
+func newRootSizedModel(t testing.TB) tui.Model {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	return newSizedModel(t, "testprofile", "us-east-1")
 }
 
 func rootApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
@@ -71,7 +47,7 @@ func rootSpecialKey(code rune) tea.KeyPressMsg {
 
 func TestRootView_ReturnsNonEmptyWithFrame(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	rendered := rootViewContent(m)
 
@@ -82,7 +58,7 @@ func TestRootView_ReturnsNonEmptyWithFrame(t *testing.T) {
 
 func TestRootView_ContainsHeader(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -99,7 +75,7 @@ func TestRootView_ContainsHeader(t *testing.T) {
 
 func TestRootView_ContainsFrameBorders(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -127,7 +103,7 @@ func TestRootView_EmptyWhenWidthZero(t *testing.T) {
 
 func TestRootView_ContainsFrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -138,7 +114,7 @@ func TestRootView_ContainsFrameTitle(t *testing.T) {
 
 func TestRootView_HeaderAndFrameLines(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	rendered := rootViewContent(m)
 	lines := strings.Split(rendered, "\n")
@@ -151,7 +127,7 @@ func TestRootView_HeaderAndFrameLines(t *testing.T) {
 
 func TestRootHandleNavigate_ResourceList(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -167,7 +143,7 @@ func TestRootHandleNavigate_ResourceList(t *testing.T) {
 
 func TestRootHandleNavigate_Detail(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-abc123",
@@ -187,7 +163,7 @@ func TestRootHandleNavigate_Detail(t *testing.T) {
 
 func TestRootHandleNavigate_YAML(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-abc123",
@@ -207,7 +183,7 @@ func TestRootHandleNavigate_YAML(t *testing.T) {
 
 func TestRootHandleNavigate_JSON_QQuits(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-abc123",
@@ -239,7 +215,7 @@ func TestRootHandleNavigate_JSON_QQuits(t *testing.T) {
 
 func TestRootHandleNavigate_Help(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
@@ -254,7 +230,7 @@ func TestRootHandleNavigate_Help(t *testing.T) {
 
 func TestRootHandleNavigate_Region(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetRegion,
@@ -269,7 +245,7 @@ func TestRootHandleNavigate_Region(t *testing.T) {
 
 func TestRootPopView_ReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -284,7 +260,7 @@ func TestRootPopView_ReturnsToMainMenu(t *testing.T) {
 
 func TestRootPopView_CannotPopLastView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.PopView{})
 
@@ -297,7 +273,7 @@ func TestRootPopView_CannotPopLastView(t *testing.T) {
 
 func TestRootExecuteCommand_ResourceType(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -314,7 +290,7 @@ func TestRootExecuteCommand_ResourceType(t *testing.T) {
 
 func TestRootExecuteCommand_Quit(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -329,7 +305,7 @@ func TestRootExecuteCommand_Quit(t *testing.T) {
 
 func TestRootExecuteCommand_UnknownCommand(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -346,7 +322,7 @@ func TestRootExecuteCommand_UnknownCommand(t *testing.T) {
 
 func TestRootHeaderRight_NormalMode(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -357,7 +333,7 @@ func TestRootHeaderRight_NormalMode(t *testing.T) {
 
 func TestRootHeaderRight_FilterMode(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 
@@ -374,7 +350,7 @@ func TestRootHeaderRight_FilterMode(t *testing.T) {
 
 func TestRootHeaderRight_CommandMode(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -391,7 +367,7 @@ func TestRootHeaderRight_CommandMode(t *testing.T) {
 
 func TestRootHeaderRight_FlashMsg(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
@@ -404,7 +380,7 @@ func TestRootHeaderRight_FlashMsg(t *testing.T) {
 
 func TestRootFetchResources_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	// m.clients is nil (no AWS connection)
 
 	_, cmd := rootApplyMsg(m, messages.Navigate{
@@ -429,7 +405,7 @@ func TestRootFetchResources_NilClients(t *testing.T) {
 
 func TestRootNavigateAndPopRoundTrip(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Navigate: MainMenu -> ResourceList -> Detail -> pop -> pop
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -457,7 +433,7 @@ func TestRootNavigateAndPopRoundTrip(t *testing.T) {
 }
 
 func TestRoot_View_AltScreenEnabled(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	v := m.View()
 	if !v.AltScreen {
 		t.Error("View() must set AltScreen=true for full-screen TUI mode")
@@ -492,7 +468,7 @@ func TestRoot_View_AltScreenOnZeroWidth(t *testing.T) {
 }
 
 func TestRoot_View_HeaderExactWidth(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	firstLine := strings.Split(content, "\n")[0]
 	vis := lipglossWidth(firstLine)
@@ -502,7 +478,7 @@ func TestRoot_View_HeaderExactWidth(t *testing.T) {
 }
 
 func TestRoot_View_NoLineExceedsTerminalWidth(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	for i, line := range strings.Split(content, "\n") {
 		vis := lipglossWidth(line)
@@ -513,7 +489,7 @@ func TestRoot_View_NoLineExceedsTerminalWidth(t *testing.T) {
 }
 
 func TestRoot_View_LineCountMatchesHeight(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
 	if len(lines) != 40 {
@@ -522,7 +498,7 @@ func TestRoot_View_LineCountMatchesHeight(t *testing.T) {
 }
 
 func TestRoot_FilterMode_WorksOnMainMenu(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '/'})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'c', Text: "c"})
@@ -537,7 +513,7 @@ func TestRoot_FilterMode_WorksOnMainMenu(t *testing.T) {
 }
 
 func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	content := rootViewContent(m)
 	lines := strings.Split(content, "\n")
 	// Verify that each resource type name appears on exactly one line (no wrapping).
@@ -569,7 +545,7 @@ func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
 }
 
 func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	// The fetch cmd is not run; rows are loaded below.
 	_ = cmd
@@ -595,7 +571,7 @@ func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 }
 
 func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
@@ -618,7 +594,7 @@ func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 
 func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Send EnterChildViewMsg with a child type that is not registered
 	_, cmd := rootApplyMsg(m, messages.EnterChildView{
@@ -661,7 +637,7 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 	defer resource.CleanupPaginatedChildForTest(testChildType)
 
 	// Create model WITHOUT demo mode and WITHOUT clients (clients == nil)
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Send EnterChildViewMsg — handleEnterChildView will push a view and call fetchChildResources
 	_, cmd := rootApplyMsg(m, messages.EnterChildView{
@@ -734,7 +710,7 @@ const longAWSError = "User: arn:aws:iam::123456789012:user/test-user@example.com
 
 func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
@@ -742,7 +718,7 @@ func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 	})
 
 	// Get the view WITHOUT a long error for baseline comparison
-	baselineModel := newRootSizedModel()
+	baselineModel := newRootSizedModel(t)
 	baselineContent := rootViewContent(baselineModel)
 	baselineLines := len(strings.Split(baselineContent, "\n"))
 
@@ -758,7 +734,7 @@ func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 
 func TestRoot_View_LongErrorStillOneLine(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
@@ -776,7 +752,7 @@ func TestRoot_View_LongErrorStillOneLine(t *testing.T) {
 
 func TestRoot_View_ErrorTruncatedInHeader(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",

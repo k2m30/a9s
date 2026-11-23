@@ -303,7 +303,7 @@ func TestT1aDevGuard_NoLifecycleValueComparedToALiteral(t *testing.T) {
 	}
 
 	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo, Dir: filepath.Join("..", "..")}
-	pkgs, err := packages.Load(cfg, "./core/aws")
+	pkgs, err := loadPackagesOnce(cfg, "./core/aws")
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestT1aDevGuard_UnknownStatePhraseHasOneBuilder(t *testing.T) {
 		}
 	}
 	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo, Dir: filepath.Join("..", "..")}
-	pkgs, err := packages.Load(cfg, "./core/aws")
+	pkgs, err := loadPackagesOnce(cfg, "./core/aws")
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

@@ -83,7 +83,6 @@ func renderRelatedPanel(t *testing.T, src resource.Resource, results map[string]
 	s.Profile = "example-readonly"
 	s.Region = "us-east-1"
 	c := newBlessedController(t, runtime.New(s, nil))
-	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 	c.EnsureDetailState(src, src.Type)
 	c.InitDetailRelatedRows(src.Type)

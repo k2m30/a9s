@@ -798,7 +798,7 @@ func TestT1aGuard_NoLifecycleEnumComparedOutsideTheTable(t *testing.T) {
 		}
 	}
 	cfg := &packages.Config{Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo, Dir: filepath.Join("..", "..")}
-	pkgs, err := packages.Load(cfg, "./core/aws", "./core/runtime", "./core/app")
+	pkgs, err := loadPackagesOnce(cfg, "./core/aws", "./core/runtime", "./core/app")
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

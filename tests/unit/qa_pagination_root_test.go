@@ -116,7 +116,7 @@ func ec2TestResources(n int) []resource.Resource {
 // rendered frame title contains "50+" (not just "50").
 func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -152,7 +152,7 @@ func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 // frame title (no "+" because the last page was not truncated).
 func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -213,7 +213,7 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) {
 
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -287,7 +287,7 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T) {
 
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -340,7 +340,7 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -423,7 +423,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -491,7 +491,7 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 func TestPagination_DoubleLoadIgnored(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -544,7 +544,7 @@ func TestPagination_DoubleLoadIgnored(t *testing.T) {
 func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

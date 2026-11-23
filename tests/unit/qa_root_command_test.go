@@ -16,7 +16,7 @@ import (
 // pressing Enter emits NavigateMsg{Target: TargetMainMenu}.
 func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "root" {
@@ -41,7 +41,7 @@ func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
 // pressing Enter emits NavigateMsg{Target: TargetMainMenu}.
 func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, ch := range "main" {
@@ -66,7 +66,7 @@ func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
 // to "root" in the command input buffer (visible in header).
 func TestQA_RootCommand_TabCompletion(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("r"))
@@ -83,7 +83,7 @@ func TestQA_RootCommand_TabCompletion(t *testing.T) {
 // to "main" (it is the only built-in or resource command starting with "ma").
 func TestQA_MainCommand_TabCompletion(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("m"))
@@ -101,7 +101,7 @@ func TestQA_MainCommand_TabCompletion(t *testing.T) {
 // main menu.
 func TestQA_RootCommand_PopsToMainMenu_FromResourceList(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -120,7 +120,7 @@ func TestQA_RootCommand_PopsToMainMenu_FromResourceList(t *testing.T) {
 // returns all the way to the main menu in one step.
 func TestQA_RootCommand_PopsToMainMenu_FromDeepStack(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -144,7 +144,7 @@ func TestQA_RootCommand_PopsToMainMenu_FromDeepStack(t *testing.T) {
 // crash and leaves the model in the main menu state.
 func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 
@@ -161,7 +161,7 @@ func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
 // section title appears in help opened from the main menu.
 func TestQA_HelpContext_MainMenu_ShowsCommandsSection(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -175,7 +175,7 @@ func TestQA_HelpContext_MainMenu_ShowsCommandsSection(t *testing.T) {
 // individual colon commands appear under the COMMANDS section.
 func TestQA_HelpContext_MainMenu_CommandsSectionContent(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -192,7 +192,7 @@ func TestQA_HelpContext_MainMenu_CommandsSectionContent(t *testing.T) {
 // COMMANDS section appears in help opened from a resource list.
 func TestQA_HelpContext_ResourceList_ShowsCommandsSection(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

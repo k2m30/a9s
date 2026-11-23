@@ -160,7 +160,6 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
 		Code:     "s3-public-read",
@@ -247,7 +246,6 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
@@ -285,7 +283,6 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	rows50 := make([]resource.Resource, 50)
 	for i := range rows50 {
@@ -415,7 +412,6 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
 	sweepResources := []resource.Resource{
@@ -488,7 +484,6 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
 		Code:     "s3-public-read",

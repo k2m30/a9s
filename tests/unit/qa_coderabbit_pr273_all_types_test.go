@@ -277,7 +277,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalseNegatives(t *testing.T) {
 				t.Skipf("type %q is ExcludeFromIssueBadge — never visible under ctrl+z", c.shortName)
 			}
 
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},
@@ -315,7 +315,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 				t.Skipf("type %q is ExcludeFromIssueBadge — never visible under ctrl+z", c.shortName)
 			}
 
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},
@@ -372,7 +372,7 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_ListedOnlyAsALowerBound(t 
 				t.Fatalf("%s declared hasEnricher=true but awsclient.Wave2EnricherFor returns ok=false (catalog Wave2 wiring dropped)", c.shortName)
 			}
 
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},

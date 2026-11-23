@@ -31,8 +31,8 @@ import (
 // and newTestController (app_controller_test.go): a fresh in-memory session,
 // no disk-cache interaction, hermetic.
 //
-// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
-// t.Cleanup(c.Close) — in that order. This file's Handle(EnrichmentChecked)
+// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() before building the
+// controller, so its close runs first. This file's Handle(EnrichmentChecked)
 // calls reach Controller.applyEnrichmentState, which calls
 // persistMenuAvailabilityCache and so can queue an async availability-cache
 // save; without this ordering the writer goroutine can still be running
@@ -46,7 +46,6 @@ func newDetailParityHeadlessController(t *testing.T) (*app.Controller, *runtime.
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c, core
 }
 

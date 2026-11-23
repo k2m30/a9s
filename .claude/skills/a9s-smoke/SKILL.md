@@ -31,8 +31,12 @@ make smoke            # scripts/smoke-demo.sh, ~60s
 Menu catalog, list counts and humanized statuses, owner-worded sg risks,
 per-row causes, filter narrowing, detail + Attention, related witnesses,
 YAML view, circular drill re-showing cached badges, version+depth header.
-When demo fixtures legitimately change, update the script's assertions in
-the same PR.
+The demo smokes share `scripts/smoke-lib.sh`. A count comes from
+`demo_count <type>` (the fixture store `a9s --demo` loads, via
+`go run ./cmd/democount`), a row is reached with `select_row <name>`, and a
+marker in a view that scrolls is found with `page_until`. Never type a count
+or rely on which row is first: `tests/unit/smoke_script_literals_test.go`
+fails on a `<type>(<digits>)` literal.
 
 Related panel, demo (deterministic, asserted, part of `make ready-to-push`):
 

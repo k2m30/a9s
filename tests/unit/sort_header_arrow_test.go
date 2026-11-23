@@ -8,7 +8,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -66,8 +65,7 @@ func sortHeaderLineAtWidth(t *testing.T, cols []app.ColumnDef, sortKey, dir stri
 
 func sortHeaderLineAt(t *testing.T, td resource.ResourceTypeDef, cols []app.ColumnDef, sortKey, dir string, width int) string {
 	t.Helper()
-	m := views.NewResourceList(td, nil, keys.Default())
-	m.SetSize(width, 40)
+	m := views.NewTransientResourceList(td, width, 40)
 	body := app.ListBody{
 		Columns: cols,
 		Rows:    []app.ListRow{{Cells: make([]string, len(cols)), ResourceID: "r-1"}},

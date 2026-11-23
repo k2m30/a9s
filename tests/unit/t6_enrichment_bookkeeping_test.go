@@ -528,6 +528,7 @@ func TestT6Demo_StatusFieldWitnessesRender(t *testing.T) {
 		t.Run(short, func(t *testing.T) {
 			td, rows := t563Merged(t, short)
 			witnesses, stacked, healthy := 0, 0, 0
+			cells := listStatusCells(t, td, rows)
 			for _, r := range rows {
 				switch {
 				case t576HasCode(r.Findings, code):
@@ -538,7 +539,7 @@ func TestT6Demo_StatusFieldWitnessesRender(t *testing.T) {
 					t563AssertWitnessRendered(t, td, rows, r)
 				case len(r.Findings) == 0:
 					healthy++
-					if cell, _ := listStatusCellFor(t, td, rows, r.ID); cell != "" {
+					if cell := cells[r.ID]; cell != "" {
 						t.Errorf("%s has no finding, Status cell = %q, want blank", r.ID, cell)
 					}
 				}

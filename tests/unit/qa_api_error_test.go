@@ -17,7 +17,7 @@ import (
 // a flash error is displayed in the header.
 func TestQA_APIError_FlashShown(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -40,7 +40,7 @@ func TestQA_APIError_FlashShown(t *testing.T) {
 // resource list out of its loading state (no spinner).
 func TestQA_APIError_ClearsLoading(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -67,7 +67,7 @@ func TestQA_APIError_ClearsLoading(t *testing.T) {
 // for classified AWS errors like ExpiredToken.
 func TestQA_APIError_ClassifyAWSError_ExpiredToken(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -94,7 +94,7 @@ func TestQA_APIError_ClassifyAWSError_ExpiredToken(t *testing.T) {
 // for AccessDenied errors.
 func TestQA_APIError_ClassifyAWSError_AccessDenied(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -120,7 +120,7 @@ func TestQA_APIError_ClassifyAWSError_AccessDenied(t *testing.T) {
 // TestQA_APIError_NonAWSError verifies that non-AWS errors still show a flash.
 func TestQA_APIError_NonAWSError(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -146,7 +146,7 @@ func TestQA_APIError_AllResourceTypes(t *testing.T) {
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "test"
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
@@ -171,7 +171,7 @@ func TestQA_APIError_AllResourceTypes(t *testing.T) {
 // the active view is the main menu (not a resource list).
 func TestQA_APIError_OnMainMenu(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
@@ -186,7 +186,7 @@ func TestQA_APIError_OnMainMenu(t *testing.T) {
 
 func TestQA_APIError_ReturnsClearCmd(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -205,7 +205,7 @@ func TestQA_APIError_ReturnsClearCmd(t *testing.T) {
 
 func TestQA_APIError_AutoDismiss(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -236,7 +236,7 @@ func TestQA_APIError_AutoDismiss(t *testing.T) {
 
 func TestQA_FlashMsg_ReturnsClearCmd(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.Flash{Text: "test error", IsError: true})
 
@@ -249,7 +249,7 @@ func TestQA_FlashMsg_ReturnsClearCmd(t *testing.T) {
 // refreshes objects for the same bucket, not the bucket list.
 func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -314,7 +314,7 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 // refreshes objects for the correct bucket+prefix, not the bucket list.
 func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -381,7 +381,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 // level still refreshes buckets correctly.
 func TestBug_S3Refresh_BucketListLevel(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -414,7 +414,7 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 	for _, rt := range []string{"ec2", "dbi", "secrets"} {
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "test"
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
@@ -450,7 +450,7 @@ func TestBug_S3Refresh_NonS3ResourceUnaffected(t *testing.T) {
 // from a resource list that had an error does not leave the app in a broken state.
 func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -479,7 +479,7 @@ func TestQa67_A8_ErrorFlash_ClearedByNavigation(t *testing.T) {
 // after an APIErrorMsg results in a new fetch command being issued.
 func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -517,7 +517,7 @@ func TestQa67_A9_RefreshAfterError_TriggersNewFetch(t *testing.T) {
 // on EC2 does not prevent S3 from loading independently.
 func TestQa67_A10_ErrorOnOneType_DoesNotAffectOthers(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -595,7 +595,7 @@ func navigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 // displayed in the header.
 func TestQA_APIError_DetailView_FlashStillShown(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = navigateToEC2Detail(t, m)
 
@@ -622,7 +622,7 @@ func TestQA_APIError_ResourceListPath_StillWorks(t *testing.T) {
 
 	for _, rt := range resourceTypes {
 		t.Run(rt, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,

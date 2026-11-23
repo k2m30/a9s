@@ -72,7 +72,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	})
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Navigate to src detail view — begins the initial DetailOperation. Its
@@ -199,7 +199,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 	})
 	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "ge2-src-001", Name: "ge2-src-001"}

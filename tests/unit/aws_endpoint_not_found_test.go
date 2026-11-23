@@ -65,7 +65,7 @@ func TestRegionGapClassification(t *testing.T) {
 // plain-language region-gap line instead of transport jargon.
 func TestHandleAvailabilityChecked_RegionGapLogsPlainLanguage(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "codeartifact",

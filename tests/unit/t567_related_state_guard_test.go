@@ -164,7 +164,7 @@ func TestRelatedStateGuard_NoCheckerReadsTheCacheItself(t *testing.T) {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
 		Dir:  filepath.Join("..", ".."),
 	}
-	pkgs, err := packages.Load(cfg, t567CachePkg)
+	pkgs, err := loadPackagesOnce(cfg, t567CachePkg)
 	if err != nil || len(pkgs) != 1 || len(pkgs[0].Errors) > 0 {
 		t.Fatalf("load %s: %v %v", t567CachePkg, err, pkgs)
 	}
@@ -286,7 +286,7 @@ func TestRelatedStateGuard_EveryFetchWriterDecidesCompletenessOnce(t *testing.T)
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo,
 		Dir:  filepath.Join("..", ".."),
 	}
-	pkgs, err := packages.Load(cfg, "./core/...", "./internal/...", "./cmd/...")
+	pkgs, err := loadPackagesOnce(cfg, "./core/...", "./internal/...", "./cmd/...")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -54,7 +54,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 	})
 	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	probeResource := resource.Resource{ID: "pt1-target-001", Name: "pt1-target-001"}
@@ -141,7 +141,7 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 	})
 	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	probeResource := resource.Resource{ID: "pt2-target-001", Name: "pt2-target-001"}

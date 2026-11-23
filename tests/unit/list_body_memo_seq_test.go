@@ -319,7 +319,6 @@ func newBenchListController(b *testing.B) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(b, core)
-	b.Cleanup(c.Close)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	return c
 }

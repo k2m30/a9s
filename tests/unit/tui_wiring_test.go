@@ -17,7 +17,7 @@ import (
 )
 
 func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -50,7 +50,7 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 }
 
 func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:     "i-abc123",
@@ -79,7 +79,7 @@ func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
 }
 
 func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:   "i-abc123",
@@ -117,7 +117,7 @@ func TestWiring_EscapeOnFocusedRightColumn_StaysInDetail(t *testing.T) {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	res := &resource.Resource{
 		ID:   "i-abc123",
 		Name: "web-server",
@@ -148,7 +148,7 @@ func TestWiring_EscapeOnFocusedRightColumn_StaysInDetail(t *testing.T) {
 }
 
 func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{
 		ID:     "i-abc123",
@@ -177,7 +177,7 @@ func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 }
 
 func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
@@ -200,7 +200,7 @@ func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 }
 
 func TestWiring_RefreshInResourceList_ReturnsFetchCmd(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -227,7 +227,7 @@ func TestWiring_RefreshInResourceList_ReturnsFetchCmd(t *testing.T) {
 }
 
 func TestWiring_RefreshOnMainMenu_TriggersAvailabilityCheck(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
@@ -327,7 +327,7 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 // AvailabilityCheckedMsg then drains the remaining len(AllShortNames())-4
 // queue entries plus reaches the terminal branch.
 func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Refreshing availability...", IsError: false})
 
@@ -472,7 +472,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 }
 
 func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -504,7 +504,7 @@ func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
 }
 
 func TestWiring_RevealNotForNonSecrets(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -549,7 +549,7 @@ func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
 }
 
 func TestWiring_ViewConfigLoadedOnClientsReady(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Send ClientsReadyMsg — viewConfig should be loaded. Gen:1 — ConnectGen
 	// seeds at 1 (session.New()); this model is never rotated.
@@ -567,7 +567,7 @@ func TestWiring_ViewConfigLoadedOnClientsReady(t *testing.T) {
 }
 
 func TestWiring_ViewConfigLoadedAtInit(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// The Init cmd should have loaded the config. Send the InitConnectMsg
 	// that Init returns.
@@ -590,7 +590,7 @@ func TestWiring_ViewConfigLoadedAtInit(t *testing.T) {
 
 func TestWiring_ValueRevealedMsg_PushesRevealView(t *testing.T) {
 	tui.Version = "1.0.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "prod/db-password",
@@ -608,7 +608,7 @@ func TestWiring_ValueRevealedMsg_PushesRevealView(t *testing.T) {
 
 func TestWiring_ValueRevealedMsg_Error(t *testing.T) {
 	tui.Version = "1.0.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.ValueRevealed{
 		Err: errForTest("access denied"),

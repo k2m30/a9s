@@ -36,7 +36,6 @@ func alltypesSweepPair(t *testing.T, profile, region string) (*runtime.Core, *ap
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := newBlessedController(t, core)
-	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }

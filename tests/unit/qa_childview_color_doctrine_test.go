@@ -37,7 +37,6 @@ func newChildColorDoctrineController(t *testing.T, childTD resource.ResourceType
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	c.RegisterFallbackTypeDef(childTD)
 	c.PushChildListScreen(childTD.ShortName)
 	return c

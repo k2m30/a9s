@@ -84,7 +84,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 	})
 	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "gf-src-001", Name: "gf-src-001"}

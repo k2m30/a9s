@@ -20,7 +20,7 @@ import (
 // ? opens help from main menu
 func TestQA_Help_OpenFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 
@@ -34,7 +34,7 @@ func TestQA_Help_OpenFromMainMenu(t *testing.T) {
 // ? opens help from resource list
 func TestQA_Help_OpenFromResourceList(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -53,7 +53,7 @@ func TestQA_Help_OpenFromResourceList(t *testing.T) {
 // ? opens help from detail view
 func TestQA_Help_OpenFromDetailView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
@@ -69,7 +69,7 @@ func TestQA_Help_OpenFromDetailView(t *testing.T) {
 // Context-sensitive column layout visible (from main menu)
 func TestQA_Help_FourColumnLayout(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -86,7 +86,7 @@ func TestQA_Help_FourColumnLayout(t *testing.T) {
 // Key bindings listed in context-sensitive help (main menu)
 func TestQA_Help_KeyBindingsListed(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -115,7 +115,7 @@ func TestQA_Help_KeyBindingsListed(t *testing.T) {
 // Any key closes help, returns to previous view
 func TestQA_Help_AnyKeyCloses(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -140,7 +140,7 @@ func TestQA_Help_AnyKeyCloses(t *testing.T) {
 // Escape closes help
 func TestQA_Help_EscapeCloses(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -160,7 +160,7 @@ func TestQA_Help_EscapeCloses(t *testing.T) {
 // Frame title reads "help"
 func TestQA_Help_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -174,7 +174,7 @@ func TestQA_Help_FrameTitle(t *testing.T) {
 // "Press any key to close" hint
 func TestQA_Help_CloseHint(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -188,7 +188,7 @@ func TestQA_Help_CloseHint(t *testing.T) {
 // Help preserves return context (returns to previous view)
 func TestQA_Help_PreservesReturnContext(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -222,7 +222,7 @@ func TestQA_Help_PreservesReturnContext(t *testing.T) {
 // :ctx command opens profile selector (via NavigateMsg)
 func TestQA_Profile_CtxCommandNavigates(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -249,7 +249,7 @@ func TestQA_Profile_CtxCommandNavigates(t *testing.T) {
 // :profile command also opens profile selector
 func TestQA_Profile_ProfileCommandNavigates(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -276,7 +276,7 @@ func TestQA_Profile_ProfileCommandNavigates(t *testing.T) {
 // Frame title "aws-profiles(N)" with correct count
 func TestQA_Profile_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 
@@ -292,7 +292,7 @@ func TestQA_Profile_FrameTitle(t *testing.T) {
 // Profile list shows profiles (tested via the view directly)
 func TestQA_Profile_ListShowsProfiles(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// profilesLoadedMsg is unexported and the profile view shares the region
 	// selector's architecture, so this checks the :ctx dispatch chain.
@@ -319,7 +319,7 @@ func TestQA_Profile_ListShowsProfiles(t *testing.T) {
 // Enter selects profile (via ProfileSelectedMsg)
 func TestQA_Profile_EnterSelectsProfile(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Simulate receiving ProfileSelectedMsg (which is what the profile view emits on Enter)
 	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
@@ -336,7 +336,7 @@ func TestQA_Profile_EnterSelectsProfile(t *testing.T) {
 // Escape cancels profile selection
 func TestQA_Profile_EscapeCancels(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// The profile view needs file I/O; the region view shares its architecture.
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
@@ -357,7 +357,7 @@ func TestQA_Profile_EscapeCancels(t *testing.T) {
 // Profile header updates after selection
 func TestQA_Profile_HeaderUpdatesAfterSelection(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
 
@@ -375,7 +375,7 @@ func TestQA_Profile_HeaderUpdatesAfterSelection(t *testing.T) {
 // :region command opens region list
 func TestQA_Region_CommandOpensRegionList(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -409,7 +409,7 @@ func TestQA_Region_CommandOpensRegionList(t *testing.T) {
 // Region list shows standard regions
 func TestQA_Region_ListContainsStandardRegions(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -425,7 +425,7 @@ func TestQA_Region_ListContainsStandardRegions(t *testing.T) {
 // Frame title "aws-regions(N)"
 func TestQA_Region_FrameTitleWithCount(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -442,7 +442,7 @@ func TestQA_Region_FrameTitleWithCount(t *testing.T) {
 // Navigate regions with j/k
 func TestQA_Region_NavigateWithJK(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -465,7 +465,7 @@ func TestQA_Region_NavigateWithJK(t *testing.T) {
 // Enter selects region
 func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -509,7 +509,7 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 // Escape cancels region selection
 func TestQA_Region_EscapeCancels(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -533,7 +533,7 @@ func TestQA_Region_EscapeCancels(t *testing.T) {
 // Region selector from resource list preserves navigation
 func TestQA_Region_FromResourceListPreservesNav(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -558,7 +558,7 @@ func TestQA_Region_FromResourceListPreservesNav(t *testing.T) {
 // Region header updates after selection
 func TestQA_Region_HeaderUpdatesAfterSelection(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
@@ -576,7 +576,7 @@ func TestQA_Region_HeaderUpdatesAfterSelection(t *testing.T) {
 // Flash messages appear and auto-clear
 func TestQA_Help_FlashMessageAppearsAndAutoClears(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
@@ -593,7 +593,7 @@ func TestQA_Help_FlashMessageAppearsAndAutoClears(t *testing.T) {
 // New flash replaces previous flash
 func TestQA_Help_FlashMessageReplaces(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "First!", IsError: false})
 
@@ -611,7 +611,7 @@ func TestQA_Help_FlashMessageReplaces(t *testing.T) {
 // Error messages in red (flash with IsError=true)
 func TestQA_Help_ErrorFlashMessage(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Error: no credentials", IsError: true})
 
@@ -630,7 +630,7 @@ func TestQA_Help_ErrorFlashMessage(t *testing.T) {
 // ClearFlashMsg reverts to "? for help"
 func TestQA_Help_FlashClearsToHelpHint(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
@@ -648,7 +648,7 @@ func TestQA_Help_FlashClearsToHelpHint(t *testing.T) {
 // Stale ClearFlashMsg (wrong gen) does not clear
 func TestQA_Help_StaleClearFlashIgnored(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "Active!", IsError: false})
 
@@ -664,7 +664,7 @@ func TestQA_Help_StaleClearFlashIgnored(t *testing.T) {
 // Terminal resize adapts
 func TestQA_Help_TerminalResizeAdapts(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
@@ -684,7 +684,7 @@ func TestQA_Help_TerminalResizeAdapts(t *testing.T) {
 // Resize during help view
 func TestQA_Help_ResizeDuringHelp(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
@@ -702,7 +702,7 @@ func TestQA_Help_ResizeDuringHelp(t *testing.T) {
 // Resize during region selector
 func TestQA_Region_ResizeDuringRegion(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -717,7 +717,7 @@ func TestQA_Region_ResizeDuringRegion(t *testing.T) {
 // Minimum width enforcement
 func TestQA_Help_MinimumWidthEnforced(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 24})
 
@@ -730,7 +730,7 @@ func TestQA_Help_MinimumWidthEnforced(t *testing.T) {
 // Minimum height enforcement
 func TestQA_Help_MinimumHeightEnforced(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 5})
 
@@ -743,7 +743,7 @@ func TestQA_Help_MinimumHeightEnforced(t *testing.T) {
 // Recovery from too-small terminal
 func TestQA_Help_RecoveryFromTooSmall(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 40, Height: 24})
 	plain := stripANSI(rootViewContent(m))
@@ -768,7 +768,7 @@ func TestQA_Help_RecoveryFromTooSmall(t *testing.T) {
 // ? opens help from YAML view (via navigate)
 func TestQA_Help_OpenFromYAMLView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "test-123", Name: "test-resource"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -787,7 +787,7 @@ func TestQA_Help_OpenFromYAMLView(t *testing.T) {
 // Test: ? from help (help on help) - closing should still return correctly
 func TestQA_Help_ReturnFromHelpOnHelp(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 

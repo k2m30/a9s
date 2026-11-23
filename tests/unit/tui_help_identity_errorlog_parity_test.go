@@ -41,7 +41,6 @@ func newParityHeadlessController(t *testing.T, profile, region string) *app.Cont
 	s.Region = region
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c
 }
 
@@ -69,7 +68,7 @@ func TestHelpBody_ContentMatchesTUIMainMenuHelp(t *testing.T) {
 	}
 	headlessText := strings.ToLower(bodyText.String())
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	tuiText := strings.ToLower(stripANSI(rootViewContent(m)))
 
@@ -166,7 +165,7 @@ func TestHelpBody_ListContext_ProducedByTUIAndControllerAgree(t *testing.T) {
 // these three rsKinds).
 func assertOverlayRoundTripStaysInSync(t *testing.T, key, contentMarker, label string) {
 	t.Helper()
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(key))
 	if !m.StackInSync() {
@@ -200,7 +199,7 @@ func TestOverlayParity_ErrorLog_NoErrors_RoundTripStaysInSync(t *testing.T) {
 	// of pushing an overlay (core/app/actions_view.go handleActionOpenErrorLog
 	// mirrors this: len(errorHistory)==0 -> flash, no push). StackInSync must
 	// stay true since no rendererState was pushed at all.
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, rootKeyPress("!"))
 	if !m.StackInSync() {
 		t.Error("error-log overlay with zero errors: StackInSync() = false after pressing ! (expected a flash, no screen push)")
@@ -212,7 +211,7 @@ func TestOverlayParity_ErrorLog_NoErrors_RoundTripStaysInSync(t *testing.T) {
 // then opens the '!' overlay and asserts the rendered line count is EXACTLY N,
 // with every distinct error message present exactly once.
 func TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	errs := []string{
 		"errorlog-parity: connection refused",

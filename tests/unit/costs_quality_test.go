@@ -171,7 +171,7 @@ func TestCostsQuality_Item3a_TUI_RenderedFrame_ContainsSharedSnapshotFrameTitle(
 	headless := newCostsScreenController(t, round8Now)
 	headlessTitle := headless.Snapshot().FrameTitle
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	rendered := stripANSI(rootViewContent(m))
 

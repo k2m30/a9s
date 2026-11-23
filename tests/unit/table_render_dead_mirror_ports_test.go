@@ -21,7 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -229,8 +228,7 @@ func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T
 		t.Fatalf("baked status cell = %q, want %q", got, "stopped (+1)")
 	}
 
-	m := views.NewResourceList(td, nil, keys.Default())
-	m.SetSize(160, 30)
+	m := views.NewTransientResourceList(td, 160, 30)
 	rendered := m.RenderList(body)
 
 	if !strings.Contains(rendered, "stopped (+1)") {

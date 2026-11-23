@@ -109,7 +109,7 @@ func extractEnrichmentChecked(cmd tea.Cmd) []messages.EnrichmentChecked {
 func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	// isDemo must be false (default) so startEnrichment is not skipped.
 
 	// availTotal starts at 0, so the first AvailabilityChecked finalizes the

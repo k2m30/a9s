@@ -20,7 +20,7 @@ import (
 // menu badge for that type agree.
 func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 	tui.Version = "test"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	// Load EC2 resources: 2 running (no Wave-1 issues).
@@ -110,7 +110,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	tui.Version = "test"
 
 	t.Run("one ! finding + two ~ findings → count=1 (only ! counts)", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 
 		// Use AvailabilityCheckedMsg stamped with the live AvailabilityGen
 		// (session.New seeds it to 1) to seed probeResources["ec2"]
@@ -155,7 +155,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	})
 
 	t.Run("three ~ findings only → count=0 (no badge)", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 
 		resources := tildeSeverityEC2Instances()
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
@@ -189,7 +189,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	})
 
 	t.Run("one Wave-1 broken + ~ finding on same ID → count=1 (no double-count)", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 
 		// colorEC2 derives colour from findings only (colorFromAnyFinding,
 		// core/aws/catalog_compute.go), so the resource needs its own Wave-1 Finding

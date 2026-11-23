@@ -218,7 +218,7 @@ func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 
 func TestQA_DocDB_NavigateFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -236,7 +236,7 @@ func TestQA_DocDB_LoadAndDisplayList(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -261,7 +261,7 @@ func TestQA_DocDB_NavigateToDetail(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -292,7 +292,7 @@ func TestQA_DocDB_NavigateToYAML(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -319,7 +319,7 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -345,7 +345,7 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 
 func TestQA_DocDB_CommandNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -362,7 +362,7 @@ func TestQA_DocDB_CommandNavigation(t *testing.T) {
 
 func TestQA_CrossCommand_SwitchRedisToDocDB(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -393,7 +393,7 @@ func TestQA_CrossCommand_SwitchRedisToDocDB(t *testing.T) {
 
 func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -421,7 +421,7 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -453,7 +453,7 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -496,7 +496,7 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 
 func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -520,7 +520,7 @@ func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 
 func TestQA_DocDB_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

@@ -55,7 +55,7 @@ func rootScrollProbeResource() *resource.Resource {
 // View() content: a field label deep in the list becomes visible only once
 // the viewport has scrolled.
 func TestRootDetail_DownKeys_ScrollFollowsCursor(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 24})
 
 	res := rootScrollProbeResource()

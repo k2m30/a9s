@@ -586,7 +586,7 @@ func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
 
 func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -623,7 +623,7 @@ func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 
 func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -654,7 +654,7 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 
 func TestQA_RDS_CrossView_CommandModeNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	for _, r := range "dbi" {
@@ -669,7 +669,7 @@ func TestQA_RDS_CrossView_CommandModeNavigation(t *testing.T) {
 
 func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -693,7 +693,7 @@ func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 
 func TestQA_RDS_CrossView_EscFromListReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

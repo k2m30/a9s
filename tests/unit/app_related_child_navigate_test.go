@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// ecr_images is registered as a child type.
 	msg := messages.RelatedNavigate{
@@ -34,7 +34,7 @@ func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 }
 
 func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	msg := messages.RelatedNavigate{
 		TargetType: "nonexistent_child_xyz",

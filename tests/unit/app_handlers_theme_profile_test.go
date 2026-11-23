@@ -18,7 +18,7 @@ import (
 
 func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Absolute path is rejected by config.ThemePath with "absolute paths not allowed".
 	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "/etc/passwd"})
@@ -48,7 +48,7 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Step 1: ThemeSelected → ReadThemeFile task → ThemeFileRead{Err}.
 	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "nonexistent-theme-xyz.yaml"})
@@ -85,7 +85,7 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 
 func TestHandleThemeSelected_EmptyThemeName(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: ""})
 	if cmd == nil {
@@ -103,7 +103,7 @@ func TestHandleThemeSelected_EmptyThemeName(t *testing.T) {
 
 func TestHandleThemeSelected_TraversalRejected(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "../evil.yaml"})
 	if cmd == nil {
@@ -184,7 +184,7 @@ func TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply(t *testing.T) 
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Capture the view before sending the malformed theme so we can assert
 	// the theme was NOT applied (the default theme label stays unchanged).

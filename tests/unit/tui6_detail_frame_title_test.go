@@ -95,7 +95,7 @@ func TestDetailFrameTitle_BothLanesPaintTheBodysTitle(t *testing.T) {
 		t.Errorf("the view state titles the screen %q while its body says %q", vs.FrameTitle, vs.Body.Detail.FrameTitle)
 	}
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 36})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{

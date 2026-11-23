@@ -85,7 +85,7 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 func TestBuildEnrichQueue_OrdersByMetadataPriority(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {
@@ -138,7 +138,7 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 		})
 	}
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, enrichCmd := seedEnricherSubset(m, priority10Types)
 
 	if enrichCmd == nil {
@@ -184,7 +184,7 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 	tui.Version = "test"
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {
@@ -220,7 +220,7 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 		Priority: 100,
 	})
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Seed only "dbi" — deliberately omitting probeSkipType.
 	m, enrichCmd := seedEnricherSubset(m, []string{"dbi"})
@@ -255,7 +255,7 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 		Priority: 10, // batchable tier
 	})
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {

@@ -50,7 +50,6 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
-	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Trigger handleClientsReady which calls loadAvailabilityCache. Gen:1 —
@@ -104,7 +103,6 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
-	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.

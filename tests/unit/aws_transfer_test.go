@@ -19,7 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
-	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
@@ -29,7 +28,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/semantics/projection"
-	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // The demo set includes a server whose DescribeServer is denied, so the fetch
@@ -626,22 +624,6 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 	if got, want := rendered["partner_profile"], "PARTNER-CO"; got != want {
 		t.Errorf("rendered partner_profile = %q, want resolved As2Id %q — the same render path as local_profile (enriched.Fields[\"partner_profile\"]=%q)", got, want, enriched.Fields["partner_profile"])
 	}
-}
-
-// newTestController builds a hermetic *app.Controller, closing it before its
-// t.TempDir is removed. TestControllerConstructionDisciplineGate allows a
-// direct app.New only inside such blessed helpers; the unit_test package has
-// its own copy.
-func newTestController(t *testing.T) *app.Controller {
-	t.Helper()
-	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	s := session.New()
-	s.Profile = "demo"
-	s.Region = "us-east-1"
-	core := runtime.New(s, nil)
-	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
-	return c
 }
 
 // An ACTIVE agreement opens with no findings; enrichment then adds an

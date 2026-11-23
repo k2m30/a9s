@@ -17,7 +17,7 @@ var viewsDirs = []string{"../../.a9s/views"}
 
 // S3 folders are navigable; Enter on one drills into the prefix.
 func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
@@ -56,7 +56,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 
 // d on an S3 bucket opens its detail instead of entering the bucket.
 func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},

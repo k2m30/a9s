@@ -13,7 +13,7 @@ import (
 
 // A Flash carrying a clipboard error shows the error flash without crashing.
 func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -52,7 +52,7 @@ func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 // A ValueRevealed carrying ResourceNotFoundException (a deleted secret) shows
 // the error in the header without crashing.
 func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -94,7 +94,7 @@ func errResourceNotFound(name string) error {
 // Revealing a secret with no current version shows an error or empty
 // indicator.
 func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -138,7 +138,7 @@ func TestQa67_I5_XKeyOnNonSecretType_IsNoOp(t *testing.T) {
 	nonSecretTypes := []string{"ec2", "s3"}
 	for _, rt := range nonSecretTypes {
 		t.Run(rt, func(t *testing.T) {
-			m := newRootSizedModel()
+			m := newRootSizedModel(t)
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
@@ -169,7 +169,7 @@ func TestQa67_I5_XKeyOnNonSecretType_IsNoOp(t *testing.T) {
 
 // Tab autocomplete with no match in command mode does nothing.
 func TestQa67_I7_TabAutocomplete_NoMatch_DoesNothing(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 
@@ -197,7 +197,7 @@ func TestQa67_I7_TabAutocomplete_NoMatch_DoesNothing(t *testing.T) {
 
 // A sort key on a resource type without a status column does not crash.
 func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "sns",
@@ -237,7 +237,7 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 
 // Horizontal scroll on a resource type with few columns stops at the edges.
 func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "sns",
@@ -273,7 +273,7 @@ func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
 
 // The reveal header warning shows "Secret visible" and does not auto-clear.
 func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",

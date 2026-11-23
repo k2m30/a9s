@@ -22,7 +22,7 @@ import (
 // headerLine renders the root model with msg flashing and returns the header.
 func headerLine(t *testing.T, msg string) string {
 	t.Helper()
-	m := tuitest.Sized("testprofile", "us-east-1")
+	m := newSizedModel(t, "testprofile", "us-east-1")
 	m = tuitest.StepModel(m, messages.Flash{Text: msg})
 	lines := strings.Split(tuitest.StripANSI(tuitest.Render(m)), "\n")
 	if len(lines) == 0 {

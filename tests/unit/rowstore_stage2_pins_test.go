@@ -34,7 +34,6 @@ func newStage2PinTestController(t *testing.T) (*session.Session, *runtime.Core, 
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return s, core, c
 }
 

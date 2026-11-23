@@ -15,7 +15,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -37,8 +36,7 @@ func wideTitleHeaderAndRow(t *testing.T, title string) (string, string) {
 	if td == nil {
 		t.Fatal("ec2 is not registered")
 	}
-	m := views.NewResourceList(*td, nil, keys.Default())
-	m.SetSize(4000, 40)
+	m := views.NewTransientResourceList(*td, 4000, 40)
 	out := m.RenderList(app.ListBody{
 		Columns: []app.ColumnDef{
 			{Key: "name", Title: title, Width: 1},

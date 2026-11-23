@@ -55,7 +55,7 @@ func sampleEC2Resources() []resource.Resource {
 
 func TestQA_Filter_11_01_MainMenu_SlashActivatesFilterMode(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '/'})
 
@@ -73,7 +73,7 @@ func TestQA_Filter_11_01_MainMenu_SlashActivatesFilterMode(t *testing.T) {
 
 func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
@@ -100,7 +100,7 @@ func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 
 func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "s3")
 	plain := stripANSI(rootViewContent(m))
@@ -117,7 +117,7 @@ func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 
 func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "xxx")
 	plain := stripANSI(rootViewContent(m))
@@ -136,7 +136,7 @@ func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 
 func TestQA_Filter_11_05_MainMenu_CaseInsensitive(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "EC2")
 	plain := stripANSI(rootViewContent(m))
@@ -150,7 +150,7 @@ func TestQA_Filter_11_05_MainMenu_CaseInsensitive(t *testing.T) {
 
 func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
@@ -177,7 +177,7 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 
 func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "e")
 	plain := stripANSI(rootViewContent(m))
@@ -191,7 +191,7 @@ func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 
 func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "ec2")
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -209,7 +209,7 @@ func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 
 func TestQA_Filter_11_09_MainMenu_EnterConfirmsFilter(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "ec2")
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -227,7 +227,7 @@ func TestQA_Filter_11_09_MainMenu_EnterConfirmsFilter(t *testing.T) {
 
 func TestQA_Filter_11_10_ResourceList_SlashActivates(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -251,7 +251,7 @@ func TestQA_Filter_11_10_ResourceList_SlashActivates(t *testing.T) {
 
 func TestQA_Filter_11_11_ResourceList_FilterPersistsOnScroll(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -270,7 +270,7 @@ func TestQA_Filter_11_11_ResourceList_FilterPersistsOnScroll(t *testing.T) {
 
 func TestQA_Filter_11_12_ResourceList_EscClears(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -286,7 +286,7 @@ func TestQA_Filter_11_12_ResourceList_EscClears(t *testing.T) {
 
 func TestQA_Filter_11_13_ResourceList_CursorResetsOnFilterChange(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "j"})
@@ -307,7 +307,7 @@ func TestQA_Filter_11_13_ResourceList_CursorResetsOnFilterChange(t *testing.T) {
 
 func TestQA_Filter_11_14_ResourceList_FrameTitleFilteredCount(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -322,7 +322,7 @@ func TestQA_Filter_11_14_ResourceList_FrameTitleFilteredCount(t *testing.T) {
 
 func TestQA_Filter_11_15_ProfileSelector_FilterWorks(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// The region selector stands in for the profile selector, which needs AWS
 	// config.
@@ -351,7 +351,7 @@ func TestQA_Filter_11_15_ProfileSelector_FilterWorks(t *testing.T) {
 
 func TestQA_Filter_11_16_RegionSelector_FilterWorks(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
@@ -373,7 +373,7 @@ func TestQA_Filter_11_16_RegionSelector_FilterWorks(t *testing.T) {
 
 func TestQA_Filter_11_17_DetailView_SlashActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance", Fields: map[string]string{"state": "running"}}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -411,7 +411,7 @@ func TestQA_Filter_11_17_DetailView_SlashActivatesSearch(t *testing.T) {
 
 func TestQA_Filter_11_18_YAMLView_SlashActivatesSearch(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-yaml", Fields: map[string]string{"key": "value"}}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -444,7 +444,7 @@ func TestQA_Filter_11_18_YAMLView_SlashActivatesSearch(t *testing.T) {
 
 func TestQA_Filter_11_19_HelpView_SlashClosesHelp(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	plain := stripANSI(rootViewContent(m))
@@ -471,7 +471,7 @@ func TestQA_Filter_11_19_HelpView_SlashClosesHelp(t *testing.T) {
 
 func TestQA_Filter_11_20_RevealView_SlashIgnored(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "test-secret",
@@ -495,7 +495,7 @@ func TestQA_Filter_11_20_RevealView_SlashIgnored(t *testing.T) {
 
 func TestQA_Filter_11_21_SpecialCharacters(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	resources := []resource.Resource{
 		{ID: "i-001", Name: "api-prod-01", Fields: map[string]string{"name": "api-prod-01"}},
 		{ID: "i-002", Name: "app.service", Fields: map[string]string{"name": "app.service"}},
@@ -517,7 +517,7 @@ func TestQA_Filter_11_21_SpecialCharacters(t *testing.T) {
 
 func TestQA_Filter_11_22_FilterMatchesAll(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "i-")
@@ -532,7 +532,7 @@ func TestQA_Filter_11_22_FilterMatchesAll(t *testing.T) {
 
 func TestQA_Filter_11_23_FilterClearedOnNavigateBack(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -557,7 +557,7 @@ func TestQA_Filter_11_23_FilterClearedOnNavigateBack(t *testing.T) {
 
 func TestQA_Filter_11_24_DoubleEsc(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -581,7 +581,7 @@ func TestQA_Filter_11_24_DoubleEsc(t *testing.T) {
 
 func TestQA_Filter_11_24a_EscClearsConfirmedFilter(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -610,7 +610,7 @@ func TestQA_Filter_11_24a_EscClearsConfirmedFilter(t *testing.T) {
 
 func TestQA_Filter_11_24b_EscOnMainMenuNeverQuits(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	if cmd != nil {
@@ -622,7 +622,7 @@ func TestQA_Filter_11_24b_EscOnMainMenuNeverQuits(t *testing.T) {
 
 func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = typeFilter(m, "ec2")
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -644,7 +644,7 @@ func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
 
 func TestQA_Filter_11_25_VeryLongFilterString(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	longFilter := strings.Repeat("a", 60)
@@ -663,7 +663,7 @@ func TestQA_Filter_11_25_VeryLongFilterString(t *testing.T) {
 
 func TestQA_Filter_11_26_FilterSurvivesResize(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = loadEC2Resources(m, sampleEC2Resources())
 
 	m = typeFilter(m, "prod")
@@ -682,7 +682,7 @@ func TestQA_Filter_11_26_FilterSurvivesResize(t *testing.T) {
 
 func TestQA_Filter_11_27_FilterOnEmptyList(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

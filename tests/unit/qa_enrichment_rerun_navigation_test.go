@@ -29,7 +29,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	oldVersion := tui.Version
 	tui.Version = "test"
 	t.Cleanup(func() { tui.Version = oldVersion })
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m = navigateToEBSList(m)
 

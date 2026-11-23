@@ -33,9 +33,9 @@ func s3BucketTypeDef() resource.ResourceTypeDef {
 }
 
 // s3LoadedBucketModel creates a root TUI model navigated to S3 with buckets loaded.
-func s3LoadedBucketModel() tui.Model {
+func s3LoadedBucketModel(t testing.TB) tui.Model {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -48,8 +48,8 @@ func s3LoadedBucketModel() tui.Model {
 }
 
 // s3LoadedObjectModel creates a root TUI model navigated to S3 -> bucket -> objects loaded.
-func s3LoadedObjectModel() tui.Model {
-	m := s3LoadedBucketModel()
+func s3LoadedObjectModel(t testing.TB) tui.Model {
+	m := s3LoadedBucketModel(t)
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -149,7 +149,7 @@ func TestQA_S3_A8_2_EnterOnBucket_DoesNotSendTargetDetail(t *testing.T) {
 
 func TestQA_S3_A13_Escape_ReturnsToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
@@ -161,7 +161,7 @@ func TestQA_S3_A13_Escape_ReturnsToMainMenu(t *testing.T) {
 
 func TestQA_S3_B14_1_Escape_FromObjectsReturnsToBuckets(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedObjectModel()
+	m := s3LoadedObjectModel(t)
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
@@ -173,7 +173,7 @@ func TestQA_S3_B14_1_Escape_FromObjectsReturnsToBuckets(t *testing.T) {
 
 func TestQA_S3_B14_1_Escape_FromObjects_DoesNotReturnToMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedObjectModel()
+	m := s3LoadedObjectModel(t)
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
@@ -229,7 +229,7 @@ func TestQA_S3_C2_ObjectDetail_EnterSendsDetail(t *testing.T) {
 
 func TestQA_S3_C3_ObjectDetail_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedObjectModel()
+	m := s3LoadedObjectModel(t)
 
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -246,7 +246,7 @@ func TestQA_S3_C3_ObjectDetail_FrameTitle(t *testing.T) {
 
 func TestQA_S3_C3_DetailView_EscapeReturnsToObjectList(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedObjectModel()
+	m := s3LoadedObjectModel(t)
 
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -265,7 +265,7 @@ func TestQA_S3_C3_DetailView_EscapeReturnsToObjectList(t *testing.T) {
 
 func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -334,7 +334,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 
 func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// EC2 is the first item in the main menu, press Enter
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -358,7 +358,7 @@ func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 
 func TestQA_S3_FilterMode_ViaRootModel(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
@@ -379,7 +379,7 @@ func TestQA_S3_FilterMode_ViaRootModel(t *testing.T) {
 
 func TestQA_S3_FilterMode_EscapeClearsFilter(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
 	m, _ = rootApplyMsg(m, rootKeyPress("c"))
@@ -399,7 +399,7 @@ func TestQA_S3_FilterMode_EscapeClearsFilter(t *testing.T) {
 
 func TestQA_S3_CommandMode_NavigateToEC2(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
 	m, _ = rootApplyMsg(m, rootKeyPress("e"))
@@ -435,7 +435,7 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 
 func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, rootKeyPress("y"))
@@ -458,7 +458,7 @@ func TestQA_S3_D2_2_BucketYAMLRoundTrip(t *testing.T) {
 
 func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 
 	m, _ = rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "s3_objects",
@@ -475,7 +475,7 @@ func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 func TestQA_S3_D1_HeaderConsistency(t *testing.T) {
 	tui.Version = "0.6.0"
 
-	m := s3LoadedBucketModel()
+	m := s3LoadedBucketModel(t)
 	plain := stripANSI(rootViewContent(m))
 
 	if !strings.Contains(plain, "a9s") {

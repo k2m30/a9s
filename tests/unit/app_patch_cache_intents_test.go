@@ -324,8 +324,8 @@ func TestHandle_RelatedCheckBatch_StaleOperation_Dropped(t *testing.T) {
 // newTestControllerAndCore returns the backing *runtime.Core alongside the
 // Controller so tests can read session-owned cache state.
 //
-// A9S_CONFIG_FOLDER is redirected before t.Cleanup(c.Close) is registered so
-// Close runs before the temp dir is removed.
+// A9S_CONFIG_FOLDER is redirected before the controller is built, so its
+// close runs before the temp dir is removed.
 func newTestControllerAndCore(t *testing.T) (*app.Controller, *runtime.Core) {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -334,7 +334,6 @@ func newTestControllerAndCore(t *testing.T) (*app.Controller, *runtime.Core) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := newBlessedController(t, core)
-	t.Cleanup(c.Close)
 	return c, core
 }
 

@@ -23,7 +23,7 @@ import (
 // must not advance `m.flash.gen` — an in-flight `ClearFlashMsg` for the
 // current flash would otherwise stop matching.
 func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "first flash"})
 	genBefore := m.FlashGen()
@@ -49,7 +49,7 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 // match the session's `ConnectGen`, Core returns (nil, nil) and the adapter
 // leaves `flash.gen` alone.
 func TestHandleClientsReady_StaleGen_FlashGenUnchanged(t *testing.T) {
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "first flash"})
 	genBefore := m.FlashGen()

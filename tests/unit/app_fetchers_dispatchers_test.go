@@ -19,7 +19,7 @@ import (
 // NavigationKindFilteredList branch to m.fetchResourcesFiltered.
 func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel() // clients == nil
+	m := newRootSizedModel(t) // clients == nil
 
 	// Navigate to a detail view first so RelatedNavigateMsg is handled.
 	res := &resource.Resource{ID: "i-0abc123", Name: "web-server"}
@@ -70,7 +70,7 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 
 func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// There is no filtered fetcher for "ec2" — only a paginated fetcher.
 	// LoadMoreMsg{FetchFilter: ...} will call GetFilteredPaginatedFetcher("ec2")
@@ -97,7 +97,7 @@ func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 
 func TestFetchChildResources_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel() // clients == nil
+	m := newRootSizedModel(t) // clients == nil
 
 	// Register a temporary child type so the "unsupported child type" guard is
 	// not hit — we want the nil-clients guard.
@@ -141,7 +141,7 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 
 func TestFetchChildResources_UnknownChildType(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// A registered child type with no paginated child fetcher reaches the
 	// "unsupported child type" message inside fetchChildResources.
@@ -245,7 +245,7 @@ func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *tes
 
 func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Register a child fetcher so the lookup succeeds.
 	const childType = "test_more_child"
@@ -282,7 +282,7 @@ func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 
 func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	const ghostType = "test_more_ghost_xyz"
 	_, cmd := rootApplyMsg(m, messages.LoadMore{
@@ -307,7 +307,7 @@ func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 // checked.
 func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	_, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 	if cmd == nil {
@@ -327,7 +327,7 @@ func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 
 func TestFetchRevealValue_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// "secrets" has a reveal fetcher, so the lookup passes.
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -372,7 +372,7 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 		t.Skip("ec2 unexpectedly has a reveal fetcher — test precondition failed")
 	}
 
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -404,7 +404,7 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 // (fireNextAvailabilityProbes(4)).
 func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel() // clients == nil
+	m := newRootSizedModel(t) // clients == nil
 
 	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
@@ -489,7 +489,7 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 
 func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 
 	// Stamp the live AvailabilityGen so the staleness guard accepts the
 	// message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
@@ -508,7 +508,7 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 // which triggers a probeEnrichment cmd.
 func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel()
+	m := newRootSizedModel(t)
 	m = navigateToEC2List(m)
 
 	_, refreshCmd := rootApplyMsg(m, ctrlRKeyMsg())
@@ -534,7 +534,7 @@ func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 
 func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T) {
 	withTuiVersion(t, "test")
-	m := newRootSizedModel() // nil clients → inner fetchResources returns APIErrorMsg
+	m := newRootSizedModel(t) // nil clients → inner fetchResources returns APIErrorMsg
 	m = navigateToEC2List(m)
 
 	_, refreshCmd := rootApplyMsg(m, ctrlRKeyMsg())
@@ -567,7 +567,7 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 	withTuiVersion(t, "test")
 
 	t.Run("fetchResources", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		dispatchGen := m.Core().Session().AvailabilityGen
 
 		cmd := m.FetchResourcesCmdForTest("ec2", dispatchGen)
@@ -595,7 +595,7 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 	})
 
 	t.Run("fetchIdentity", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		dispatchGen := m.Core().Session().ConnectGen
 
 		cmd := m.FetchIdentityCmdForTest(dispatchGen)
@@ -621,7 +621,7 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 	})
 
 	t.Run("fetchRevealValue", func(t *testing.T) {
-		m := newRootSizedModel()
+		m := newRootSizedModel(t)
 		dispatchGen := m.Core().Session().ConnectGen
 
 		cmd := m.FetchRevealValueCmdForTest("secrets", "prod/api/key", dispatchGen)
