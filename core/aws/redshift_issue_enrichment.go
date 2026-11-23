@@ -46,9 +46,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 
-	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return !resourceIsTearingDown(r.RawStruct)
-	}, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex

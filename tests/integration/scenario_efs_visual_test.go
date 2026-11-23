@@ -33,17 +33,17 @@ const (
 
 	// Menu badge count — rows whose Wave-1-only colour IsIssue, plus
 	// Healthy rows carrying a Wave-2 `!`. Over the 12 efs fixtures:
-	//   Wave-1 Broken (3):  fs-0brokenerror00001, fs-0brokennomt000001,
-	//                       fs-0warnmulti0000001
-	//   Wave-1 Warning (5): fs-0warncreating0001, fs-0warnupdating0001,
+	//   Wave-1 Broken (2):  fs-0brokenerror00001, fs-0brokennomt000001
+	//   Wave-1 Warning (6): fs-0warncreating0001, fs-0warnupdating0001,
 	//                       fs-0warndeleting0001, fs-0warnupdmtdown001,
+	//                       fs-0warnmulti0000001 (deleting),
 	//                       fs-0unencrypted00001 (efs.unencrypted is Wave-1 `~`)
 	//   Healthy + Wave-2 `!` (2): fs-0healthymtdown001 (mount-target-down)
 	//                       and fs-0publicpolicy0001 (efs.public-policy)
 	//   Not counted (2): prod-efs-app-data (clean) and fs-0nobackuppolicy01 —
 	//                    its efs.no-backup-policy is Wave-2 `~`, which never
 	//                    bumps the badge.
-	// 3 + 5 + 2 = 10.
+	// 2 + 6 + 2 = 10.
 	efsExpectedIssueCount = 10
 )
 
@@ -76,9 +76,10 @@ func TestScenario_EFSVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(efsBrokenError, "error")
 	scenario.ExpectRowStatusEquals(efsBrokenNoMountTargets, "no mount targets")
 
-	// warn-efs-multi: LifeCycleState=deleting + NumberOfMountTargets=0.
-	// Broken "no mount targets" tops, hidden Warning "deleting".
-	scenario.ExpectRowStatusEquals(efsWarnMulti, "no mount targets (+1)")
+	// warn-efs-multi: LifeCycleState=deleting + NumberOfMountTargets=0. A file
+	// system being deleted has no mount targets to keep, so the state alone
+	// shows.
+	scenario.ExpectRowStatusEquals(efsWarnMulti, "deleting")
 
 	// W1 Warning + W2 Broken stack. The Broken one tops: domain.TopFinding
 	// selects by severity for both the Status phrase and the row colour, so a
@@ -127,13 +128,12 @@ func TestScenario_EFSVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// The detail expands each phrase in Resource.Issues on its own line.
 	scenario.Back()
 	multi := selectEFSByID(t, scenario, efsWarnMulti)
 	scenario.OpenDetailResource("efs", multi)
 	scenario.ExpectNoAPIError()
-	scenario.ExpectViewContains("No mount targets")
 	scenario.ExpectViewContains("Deleting")
+	scenario.ExpectViewNotContains("No mount targets")
 
 	scenario.Back()
 	stack := selectEFSByID(t, scenario, efsWarnUpdatingMTDown)

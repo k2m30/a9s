@@ -15,45 +15,24 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// efsW1Findings returns the active Wave-1 findings for this filesystem in
-// precedence order: Broken signals first (error, no mount targets), then
-// Warning signals (creating, updating, deleting). The first finding's phrase
-// is the "top" displayed in the Status column (plus (+N-1) suffix); the full
-// slice feeds Resource.Findings so the detail view can render every signal.
+// efsW1Findings returns the Wave-1 findings; "no mount targets" is declared
+// to apply only once the file system is available or in error, because mount
+// targets are created after creation and removed before deletion.
 func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32, encrypted *bool) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	var findings []domain.Finding
-
-	switch lcs {
-	case efstypes.LifeCycleStateError:
-		findings = append(findings, wave1Finding(CodeEFSError))
-	case efstypes.LifeCycleStateCreating:
-		findings = append(findings, wave1Finding(CodeEFSCreating))
-	case efstypes.LifeCycleStateUpdating:
-		findings = append(findings, wave1Finding(CodeEFSUpdating))
-	case efstypes.LifeCycleStateDeleting:
-		findings = append(findings, wave1Finding(CodeEFSDeleting))
+	var posture []domain.Finding
+	if numMT == 0 {
+		posture = append(posture, wave1Finding(CodeEFSNoMountTargets))
 	}
-
-	if numMT == 0 && lcs != efstypes.LifeCycleStateDeleted {
-		noMTFinding := wave1Finding(CodeEFSNoMountTargets)
-		if len(findings) > 0 && findings[0].Code == CodeEFSError {
-			findings = append([]domain.Finding{findings[0], noMTFinding}, findings[1:]...)
-		} else {
-			findings = append([]domain.Finding{noMTFinding}, findings...)
+	var details map[domain.FindingCode]domain.AttentionDetail
+	if !aws.ToBool(encrypted) {
+		posture = append(posture, wave1Finding(CodeEFSUnencrypted))
+		details = map[domain.FindingCode]domain.AttentionDetail{
+			CodeEFSUnencrypted: {Rows: []domain.DetailRow{
+				{Label: "Encryption at rest", Value: "off", Tier: "~"},
+			}},
 		}
 	}
-
-	if isTeardownStatus(string(lcs)) {
-		return findings, nil
-	}
-	if aws.ToBool(encrypted) {
-		return findings, nil
-	}
-	return append(findings, wave1Finding(CodeEFSUnencrypted)), map[domain.FindingCode]domain.AttentionDetail{
-		CodeEFSUnencrypted: {Rows: []domain.DetailRow{
-			{Label: "Encryption at rest", Value: "off", Tier: "~"},
-		}},
-	}
+	return withState("efs", string(lcs), posture), details
 }
 
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems. When api
@@ -100,7 +79,6 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
 		findings, attentionDetails := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets, fs.Encrypted)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       fsID,
@@ -109,7 +87,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			Fields: map[string]string{
 				"file_system_id":   fsID,
 				"name":             name,
-				"status":           statusPhrase,
+				"status":           string(fs.LifeCycleState),
 				"performance_mode": performanceMode,
 				"throughput_mode":  throughputMode,
 				"encrypted":        encrypted,

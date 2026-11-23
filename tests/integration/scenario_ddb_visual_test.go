@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	ddbPhraseCreating      = "creating"
-	ddbPhraseUpdating      = "updating"
-	ddbPhraseDeleting      = "deleting"
-	ddbPhraseArchiving     = "archiving"
-	ddbPhraseKMSLost       = "kms key inaccessible"
-	ddbPhraseArchived      = "archived: kms key lost"
-	ddbPhrasePITROff       = "point-in-time recovery disabled"
-	ddbPhraseArchivedPlus1 = "archived: kms key lost (+1)"
+	ddbPhraseCreating                 = "creating"
+	ddbPhraseUpdating                 = "updating"
+	ddbPhraseDeleting                 = "deleting"
+	ddbPhraseArchiving                = "archiving"
+	ddbPhraseKMSLost                  = "kms key inaccessible"
+	ddbPhraseArchived                 = "archived: kms key lost"
+	ddbPhrasePITROff                  = "point-in-time recovery disabled"
+	ddbPhraseReplicationNotAuthorized = "replication not authorized"
 
 	// ddbDetailPITROffCapitalize is the Attention-section rendering of
 	// ddbPhrasePITROff — the Attention block capitalizes the first
@@ -46,7 +46,9 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// The menu badge is read while the main menu is still the current view.
 	// It counts rows whose Wave-1-only colour IsIssue, plus Healthy rows
 	// carrying a Wave-2 `!`; a Healthy row with only a Wave-2 `~` never bumps it.
-	scenario.ExpectMenuIssueCount("ddb", 10)
+	// The REPLICATION_NOT_AUTHORIZED replica is one of them: a failed but live
+	// state is a Broken Wave-1 row.
+	scenario.ExpectMenuIssueCount("ddb", 11)
 
 	scenario.OpenList("ddb")
 
@@ -69,12 +71,11 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// The enricher sets this phrase on a Healthy row, with no suffix.
 	scenario.ExpectRowStatusEquals(demofixtures.AuditPITROffID, ddbPhrasePITROff)
 
-	// ARCHIVED + PITR disabled → multi-W2 stacking
-	// expressed by the Wave-2 enricher bumping the pre-existing
-	// Wave-2-phrase Status via `resource.BumpFindingSuffix`. (ddb's
-	// "Wave-1" bucket is effectively the fetcher-driven TableStatus
-	// mapping; the enricher treats it as the baseline.)
-	scenario.ExpectRowStatusEquals(demofixtures.LegacyArchivedID, ddbPhraseArchivedPlus1)
+	// An ARCHIVED table has ended: Wave 2 does not read it, so its PITR
+	// setting raises nothing and the state stands alone.
+	scenario.ExpectRowStatusEquals(demofixtures.LegacyArchivedID, ddbPhraseArchived)
+
+	scenario.ExpectRowStatusEquals(demofixtures.GlobalOrdersReplicaID, ddbPhraseReplicationNotAuthorized)
 
 	// colorDDB (catalog_databases.go) resolves color via colorFromAnyFinding
 	// first, and ddbCodePITROff is declared Severity: SevWarn, so
@@ -108,16 +109,20 @@ func TestScenario_DDBVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// Every finding stays visible in the Attention section while the Status
-	// cell shows only the worst-severity phrase.
+	// The archived table's Attention section carries its state and nothing
+	// Wave 2 would have read.
 	scenario.Back()
-	stacked := selectDDBByID(t, scenario, demofixtures.LegacyArchivedID)
-	scenario.OpenDetailResource("ddb", stacked)
+	archived := selectDDBByID(t, scenario, demofixtures.LegacyArchivedID)
+	scenario.OpenDetailResource("ddb", archived)
 	scenario.ExpectNoAPIError()
-	view := scenario.currentView()
-	t.Log("\n" + view)
-
+	t.Log("\n" + scenario.currentView())
 	scenario.ExpectViewContains("Archived: kms key lost")
+	scenario.ExpectViewNotContains(ddbDetailPITROffCapitalize)
+
+	scenario.Back()
+	pitr := selectDDBByID(t, scenario, demofixtures.AuditPITROffID)
+	scenario.OpenDetailResource("ddb", pitr)
+	scenario.ExpectNoAPIError()
 	scenario.ExpectViewContains(ddbDetailPITROffCapitalize)
 	scenario.ExpectViewNotContains("PITR off")
 
@@ -125,12 +130,6 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// it shows as a colon or paren after the phrase.
 	scenario.ExpectViewNotContains(ddbDetailPITROffCapitalize + ":")
 	scenario.ExpectViewNotContains(ddbDetailPITROffCapitalize + " (")
-
-	scenario.Back()
-	pitr := selectDDBByID(t, scenario, demofixtures.AuditPITROffID)
-	scenario.OpenDetailResource("ddb", pitr)
-	scenario.ExpectNoAPIError()
-	scenario.ExpectViewContains(ddbDetailPITROffCapitalize)
 }
 
 // selectDDBByID looks up a concrete ddb resource from the demo clients so the

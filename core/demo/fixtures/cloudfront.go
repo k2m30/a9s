@@ -123,7 +123,7 @@ var sharedCloudFrontFixtures = shared(func() *CloudFrontFixtures {
 				Id:         aws.String("E3C4D5E6F7G8H9"),
 				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E3C4D5E6F7G8H9"),
 				DomainName: aws.String("d333333cdefgh0.cloudfront.net"),
-				Status:     aws.String("InProgress"),
+				Status:     aws.String("Deployed"),
 				Enabled:    aws.Bool(false),
 				Aliases: &cftypes.Aliases{
 					Quantity: aws.Int32(0),
@@ -219,10 +219,6 @@ var sharedCloudFrontFixtures = shared(func() *CloudFrontFixtures {
 				Comment:          aws.String("Demo distribution backed by a9s-demo-healthy S3 bucket"),
 				LastModifiedTime: aws.Time(time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)),
 			},
-			// Status=InProgress with Enabled=true → Warning (colorCF). The
-			// existing InProgress distribution (E3C4D5E6F7G8H9) is also
-			// Enabled=false, which colorCF checks first and resolves to Dim —
-			// this entry isolates the InProgress-only signal.
 			{
 				Id:         aws.String("E8H9I0J1K2L3M4"),
 				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E8H9I0J1K2L3M4"),

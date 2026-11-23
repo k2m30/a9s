@@ -434,8 +434,8 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 			t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, want.phrase, r.Findings)
 			continue
 		}
-		if r.Fields["status"] != want.phrase {
-			t.Errorf("degraded row %q status = %q, want %q", r.ID, r.Fields["status"], want.phrase)
+		if domain.StatusPhrase(r.Findings) != want.phrase {
+			t.Errorf("degraded row %q status = %q, want %q", r.ID, domain.StatusPhrase(r.Findings), want.phrase)
 		}
 		if r.Findings[0].Detail != want.detail {
 			t.Errorf("degraded row %q Findings[0].Detail = %q, want %q", r.ID, r.Findings[0].Detail, want.detail)
@@ -479,7 +479,7 @@ func TestFetchMWAAEnvironmentsPage_NilEnvironmentInGetEnvironmentOutput(t *testi
 		t.Fatalf("Resources: expected 1 degraded name-only row, got %d", len(result.Resources))
 	}
 	// nil Environment is not an authorization denial → "details unavailable".
-	if got := result.Resources[0].Fields["status"]; got != "details unavailable" {
+	if got := domain.StatusPhrase(result.Resources[0].Findings); got != "details unavailable" {
 		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
 	}
 }

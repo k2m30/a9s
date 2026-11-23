@@ -38,6 +38,8 @@ const (
 	// DeletingDomain has Deleted=true (removal in progress).
 	DeletingDomain = "obsolete-tenant-logs"
 
+	CreatingDomain = "acme-search-new"
+
 	// HealthyBaselineDomain is a clean, no-signals domain.
 	HealthyBaselineDomain = "staging-analytics"
 
@@ -122,6 +124,7 @@ var sharedOpenSearchFixtures = shared(func() *OpenSearchFixtures {
 			osProcessingPlusUpdate(),
 			osIsolatedBroken(),
 			osDeletingDim(),
+			osCreating(),
 			osPostureWitness(OpenSearchPublic, func(d *ostypes.DomainStatus) {
 				d.VPCOptions = nil
 				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/` + OpenSearchPublic + `/*"}]}`)
@@ -390,12 +393,20 @@ func osDeletingDim() ostypes.DomainStatus {
 	d.ClusterConfig.InstanceCount = aws.Int32(1)
 	d.EBSOptions.VolumeSize = aws.Int32(50)
 	d.Deleted = aws.Bool(true)
+	d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeDeleting
 	return d
+}
+
+func osCreating() ostypes.DomainStatus {
+	return osPostureWitness(CreatingDomain, func(d *ostypes.DomainStatus) {
+		d.Created = aws.Bool(false)
+		d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeCreating
+	})
 }
 
 func init() {
 	// details_denied: DescribeDomains is one batched call, so a denial degrades
 	// every listed domain at once and cannot stand beside healthy rows. The
 	// demo shows the absent-from-response case (details_unavailable) instead.
-	Register(Pin{ShortName: "opensearch", Rows: 13, Issues: 10, CoverageGaps: []string{"opensearch.warn.details_denied"}})
+	Register(Pin{ShortName: "opensearch", Rows: 14, Issues: 11, CoverageGaps: []string{"opensearch.warn.details_denied"}})
 }

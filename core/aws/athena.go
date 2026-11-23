@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -74,7 +73,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 					"result_output_location": outputLocation,
 					"cost_cap":               costCap,
 				},
-				Findings:  athenaStateFindings(state),
+				Findings:  withState("athena", state, nil),
 				RawStruct: row,
 			}
 		}
@@ -153,16 +152,6 @@ type AthenaWorkGroupRow struct {
 	Configuration *athenatypes.WorkGroupConfiguration
 
 	configRead bool
-}
-
-// athenaStateFindings is the one predicate for a workgroup's state, which is
-// admin-controlled and blocks all query execution while DISABLED. colorAthena
-// runs it over Fields for rows built outside the fetcher.
-func athenaStateFindings(state string) []domain.Finding {
-	if state == "DISABLED" {
-		return []domain.Finding{wave1Finding(athenaCodeWorkgroupDisabled)}
-	}
-	return nil
 }
 
 // athenaConfigUnreadField marks a workgroup row whose GetWorkGroup call did

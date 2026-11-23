@@ -89,7 +89,6 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 		}
 
 		findings := computeRedshiftFindings(cluster)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterID,
@@ -97,7 +96,7 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":                  clusterID,
-				"status":                      statusPhrase,
+				"status":                      clusterStatus,
 				"cluster_status":              clusterStatus,
 				"node_type":                   nodeType,
 				"num_nodes":                   numNodes,
@@ -138,55 +137,37 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 	}, nil
 }
 
-// computeRedshiftFindings returns a []domain.Finding for the given Redshift cluster.
+// redshiftClusterStatuses is the ClusterStatus list of the Cluster type in
+// the Amazon Redshift API reference: "Values: available | available,
+// prep-for-resize | available, resize-cleanup | cancelling-resize | creating |
+// deleting | final-snapshot | hardware-failure | incompatible-hsm |
+// incompatible-network | incompatible-parameters | incompatible-restore |
+// modifying | paused | rebooting | renaming | resizing | rotating-keys |
+// storage-full | updating-hsm".
+var redshiftClusterStatuses = []string{ //nolint:gochecknoglobals // static AWS enum domain
+	"available", "available, prep-for-resize", "available, resize-cleanup",
+	"cancelling-resize", "creating", "deleting", "final-snapshot",
+	"hardware-failure", "incompatible-hsm", "incompatible-network",
+	"incompatible-parameters", "incompatible-restore", "modifying", "paused",
+	"rebooting", "renaming", "resizing", "rotating-keys", "storage-full",
+	"updating-hsm",
+}
+
+// computeRedshiftFindings returns the cluster's state finding from its
+// ClusterStatus and the findings that stand beside it. ClusterAvailabilityStatus
+// is a second axis with its own codes.
 func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
-	clusterStatus := aws.ToString(cluster.ClusterStatus)
-	clusterAvailStatus := aws.ToString(cluster.ClusterAvailabilityStatus)
-
-	// Broken: ClusterStatus-driven
-	brokenByStatus := map[string]domain.FindingCode{
-		"incompatible-hsm":        CodeRedshiftIncompatibleHSM,
-		"incompatible-network":    CodeRedshiftIncompatibleNetwork,
-		"incompatible-parameters": CodeRedshiftIncompatibleParameters,
-		"incompatible-restore":    CodeRedshiftIncompatibleRestore,
-		"hardware-failure":        CodeRedshiftHardwareFailure,
-		"storage-full":            CodeRedshiftStorageFull,
-	}
-	if code, ok := brokenByStatus[clusterStatus]; ok {
-		return []domain.Finding{wave1Finding(code)}
-	}
-
-	// Broken: ClusterAvailabilityStatus-driven
-	switch clusterAvailStatus {
-	case "Unavailable":
-		return []domain.Finding{wave1Finding(CodeRedshiftUnavailable)}
-	case "Failed":
-		return []domain.Finding{wave1Finding(CodeRedshiftFailed)}
-	}
-
-	// Transitional (Warning, ClusterStatus-driven)
-	transitionalByStatus := map[string]domain.FindingCode{
-		"creating":  CodeRedshiftCreating,
-		"modifying": CodeRedshiftModifying,
-		"resizing":  CodeRedshiftResizing,
-		"rebooting": CodeRedshiftRebooting,
-		"renaming":  CodeRedshiftRenaming,
-		"deleting":  CodeRedshiftDeleting,
-	}
-	if code, ok := transitionalByStatus[clusterStatus]; ok {
-		return []domain.Finding{wave1Finding(code)}
-	}
-
-	// Warning bucket — stack all active warnings
 	var findings []domain.Finding
-
-	switch clusterAvailStatus {
+	switch aws.ToString(cluster.ClusterAvailabilityStatus) {
+	case "Unavailable":
+		findings = append(findings, wave1Finding(CodeRedshiftUnavailable))
+	case "Failed":
+		findings = append(findings, wave1Finding(CodeRedshiftFailed))
 	case "Maintenance":
 		findings = append(findings, wave1Finding(CodeRedshiftMaintenance))
 	case "Modifying":
 		findings = append(findings, wave1Finding(CodeRedshiftAvailabilityModifying))
 	}
-
 	if hasPendingRedshiftModifiedValues(cluster.PendingModifiedValues) {
 		findings = append(findings, wave1Finding(CodeRedshiftPendingChange))
 	}
@@ -199,8 +180,7 @@ func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
 	if cluster.Encrypted != nil && !*cluster.Encrypted {
 		findings = append(findings, wave1Finding(CodeRedshiftUnencryptedAtRest))
 	}
-
-	return findings
+	return withState("redshift", aws.ToString(cluster.ClusterStatus), findings)
 }
 
 // hasPendingRedshiftModifiedValues returns true when PendingModifiedValues is

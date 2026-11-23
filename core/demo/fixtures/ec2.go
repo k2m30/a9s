@@ -56,6 +56,12 @@ const (
 	// to 16 Nitro instances. Every other volume names at most one instance.
 	EBSMultiAttached = "vol-0multi0000000e5f"
 
+	VPCDeletingID = "vpc-0deleting11111111"
+
+	// EBSDeletedVolumeID is the volume DescribeVolumes still lists in the
+	// deleted state.
+	EBSDeletedVolumeID = "vol-0deleted0000000f6"
+
 	// EIPOnSecondaryAddress is the one Elastic IP associated with a secondary
 	// private address of a network interface rather than with its primary
 	// one. NetworkInterface.Association carries the primary address's
@@ -1052,6 +1058,19 @@ func buildVpcs() []ec2types.Vpc {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
+		{
+			VpcId:           aws.String(VPCDeletingID),
+			CidrBlock:       aws.String("10.40.0.0/16"),
+			State:           ec2types.VpcStateDeleting,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0deleting00000001"),
+			OwnerId:         aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-retired-sandbox-vpc")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
 	}
 }
 
@@ -1983,7 +2002,6 @@ func buildSubnets() []ec2types.Subnet {
 		},
 	}
 
-	// State=pending → Warning (colorSubnet). State=unavailable → Broken.
 	named = append(named,
 		ec2types.Subnet{
 			SubnetId:                aws.String("subnet-0pending1111111a"),
@@ -2176,7 +2194,6 @@ func buildRouteTables() []ec2types.RouteTable {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
-		// Blackhole route (target deleted) → Broken (colorRTB).
 		{
 			RouteTableId: aws.String("rtb-0blackhole1111111e"),
 			VpcId:        aws.String(fixtStagingVPCID),
@@ -2193,7 +2210,6 @@ func buildRouteTables() []ec2types.RouteTable {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
-		// Zero associations, not main → Warning (colorRTB).
 		{
 			RouteTableId: aws.String("rtb-0orphan111111111f"),
 			VpcId:        aws.String(fixtStagingVPCID),
@@ -2291,8 +2307,6 @@ func buildNatGateways() []ec2types.NatGateway {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
-		// State=DELETED, no wave1 finding emitted for "deleted" → falls through
-		// to colorNAT's structural switch, which maps it to Dim.
 		{
 			NatGatewayId:     aws.String("nat-0deleted11111111f"),
 			VpcId:            aws.String(fixtStagingVPCID),
@@ -2332,7 +2346,6 @@ func buildInternetGateways() []ec2types.InternetGateway {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
-		// No attachments → attachments_count==0 → Warning (colorIGW).
 		{
 			InternetGatewayId: aws.String("igw-0unattached111111c"),
 			OwnerId:           aws.String("123456789012"),
@@ -2532,7 +2545,8 @@ func buildTransitGateways() []ec2types.TransitGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
-		// State=failed → wave1 finding (CodeTGWStateFailed, SevBroken) → Broken.
+		// "failed" is not a TransitGatewayState AWS reports, so the row raises
+		// tgw.state.unrecognised with the word it carries.
 		{
 			TransitGatewayId:  aws.String("tgw-0failed11111111d"),
 			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0failed11111111d"),
@@ -2545,8 +2559,6 @@ func buildTransitGateways() []ec2types.TransitGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
-		// State=deleted: fetcher emits no wave1 finding for "deleted" → falls
-		// through to colorTGW's structural switch, which maps it to Dim.
 		{
 			TransitGatewayId:  aws.String("tgw-0deleted11111111e"),
 			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0deleted11111111e"),
@@ -2585,10 +2597,6 @@ func buildTransitGateways() []ec2types.TransitGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dr")},
 			},
 		},
-		// State=available, and (per buildTGWAttachments below) its only
-		// attachment is also available → EnrichTGWAttachments raises no
-		// finding. The only demo TGW that resolves to colorTGW's structural
-		// Healthy branch.
 		{
 			TransitGatewayId:  aws.String(HealthyTGWID),
 			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/" + HealthyTGWID),
@@ -3523,6 +3531,13 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: nil,
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("old-orphan-vol")}},
 		},
+		{
+			VolumeId: aws.String(EBSDeletedVolumeID), State: ec2types.VolumeStateDeleted,
+			Size: aws.Int32(20), VolumeType: ec2types.VolumeTypeGp3, Iops: aws.Int32(3000),
+			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1b"),
+			CreateTime: aws.Time(time.Date(2026, 2, 10, 9, 0, 0, 0, time.UTC)),
+			Tags:       []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("retired-build-cache")}},
+		},
 		// Error state → Broken
 		{
 			VolumeId: aws.String("vol-0error00000000b2"), State: ec2types.VolumeStateError,
@@ -3890,7 +3905,7 @@ func buildImages() []ec2types.Image {
 
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 41, Issues: 16})
-	Register(Pin{ShortName: "ebs", Rows: 10, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs", Rows: 11, Issues: 6})
 	Register(Pin{ShortName: "ebs-snap", Rows: 13, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 10, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
@@ -3901,6 +3916,6 @@ func init() {
 	Register(Pin{ShortName: "sg", Rows: 45, Issues: 6, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "subnet", Rows: 38, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
-	Register(Pin{ShortName: "vpc", Rows: 8, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "vpc", Rows: 9, Issues: 2, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "vpce", Rows: 12, Issues: 8})
 }

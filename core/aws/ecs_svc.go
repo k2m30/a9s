@@ -89,7 +89,6 @@ func FetchECSServicesPage(
 					arn = *svc.ServiceArn
 				}
 
-				// Fields["status"] stays populated for the structural Color fallback.
 				findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
 				r := resource.Resource{
@@ -149,24 +148,21 @@ func ecsSvcName(res resource.Resource) string {
 	return cmp.Or(res.Fields["service_name"], res.Name)
 }
 
-// ecsSvcFindings is the one predicate for a service's health: its lifecycle
-// state, then whether it is running the tasks it asks for. colorECSSvc runs it
-// over Fields for rows built outside the fetcher.
+// ecsSvcStatuses is the Service.status domain the Amazon ECS API Reference
+// states ("The valid values are ACTIVE, DRAINING, or INACTIVE"); the SDK types
+// it as a plain string.
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html
+var ecsSvcStatuses = []string{"ACTIVE", "DRAINING", "INACTIVE"} //nolint:gochecknoglobals // static AWS status domain
+
 func ecsSvcFindings(status string, desiredCount, runningCount int32) []domain.Finding {
-	var findings []domain.Finding
-	switch status {
-	case "DRAINING":
-		findings = append(findings, wave1Finding(CodeECSSvcStateDraining))
-	case "INACTIVE":
-		findings = append(findings, wave1Finding(CodeECSSvcStateInactive))
-	}
+	var posture []domain.Finding
 	// A service that asks for nothing is idle by design, not short of capacity.
 	switch {
 	case desiredCount <= 0:
 	case runningCount == 0:
-		findings = append(findings, wave1Finding(CodeECSSvcNoTasksRunning))
+		posture = append(posture, wave1Finding(CodeECSSvcNoTasksRunning))
 	case runningCount < desiredCount:
-		findings = append(findings, wave1Finding(CodeECSSvcTasksBelowDesired))
+		posture = append(posture, wave1Finding(CodeECSSvcTasksBelowDesired))
 	}
-	return findings
+	return withState("ecs-svc", status, posture)
 }

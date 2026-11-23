@@ -111,6 +111,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `NetworkInterface.RequesterManaged == true` AND `NetworkInterface.Description` is set AND the referenced owner (parsed from the description string, e.g. NAT gateway id, function name, endpoint id) is not present in the already-loaded sibling list (`nat`, `lambda`, `vpce`, `elb`).
 
+- **Signal**: `Status` outside `NetworkInterfaceStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -135,6 +139,7 @@ One row per signal from §3:
 | `Status == detaching` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `detaching` |
 | `Status == available`, not requester-managed (orphan) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `available` |
 | Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` |
+| `Status` outside `NetworkInterfaceStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 ## 4.1 UX review (two sentences)
 
@@ -173,6 +178,7 @@ eni — NETWORKING. Status key: `status` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| eni.state.unrecognised | <status> (unrecognised) | warn | wave1 | AWS reports a network interface status a9s does not recognise, so a9s cannot tell whether the interface carries traffic. Check it in the AWS console before relying on it. |
 | eni.state.attaching | attaching | warn | wave1 | The interface is still being attached, so the instance it belongs to does not have this network path yet. If it stays here, read the attachment's error: the usual causes are the interface and the instance being in different Availability Zones, the device index already in use, or the instance type having no room for another interface. |
 | eni.state.detaching | detaching | warn | wave1 | The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses. |
 | eni.state.available | available | warn | wave1 | The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it. |

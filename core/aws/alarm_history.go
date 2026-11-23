@@ -118,8 +118,8 @@ type alarmHistoryStateData struct {
 
 // alarmHistoryFindings returns a wave1 finding for a StateUpdate history item
 // whose newState.StateValue is ALARM or INSUFFICIENT_DATA — the same two
-// non-healthy states colorAlarm classifies for the live alarm resource
-// (core/aws/catalog_monitoring.go). ConfigurationUpdate/Action items and
+// non-healthy states the alarm state table classifies for the live alarm
+// resource (core/aws/catalog_monitoring.go). ConfigurationUpdate/Action items and
 // transitions to OK carry no finding (healthy/informational).
 func alarmHistoryFindings(historyItemType, historyData string) []domain.Finding {
 	if historyItemType != string(cwtypes.HistoryItemTypeStateUpdate) || historyData == "" {

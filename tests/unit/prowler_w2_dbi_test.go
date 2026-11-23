@@ -457,10 +457,11 @@ func TestW2DBIDeletingInstanceEmitsNoWave2Finding(t *testing.T) {
 		t.Fatalf("FetchRDSInstancesPageAt: %v", err)
 	}
 	fake := &w2RDSEngineVersionsFake{status: map[string]string{"mysql|5.7.44": "deprecated"}}
-	res, err := w2Enricher(t, "dbi")(context.Background(), &awsclient.ServiceClients{RDS: fake}, out.Resources, nil)
-	w2AssertEnricherInvariants(t, res, err)
+	res := Wave2Result(t, "dbi", &awsclient.ServiceClients{RDS: fake}, out.Resources, t1aNoBackupPlans)
 
-	w2AssertNoCode(t, res.Findings["acme-old-db"], w2DBICodeEngineDeprecated)
+	if got := res.Findings["acme-old-db"]; len(got) != 0 {
+		t.Errorf("deleting instance Wave 2 findings = %v, want none", got)
+	}
 }
 
 // TestW2DBICACertSingularDay: number agreement in the wording is the slot

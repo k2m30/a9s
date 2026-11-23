@@ -298,8 +298,7 @@ func TestW2RedshiftDeletingClusterEmitsNoPostureFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchRedshiftClustersPage: %v", err)
 	}
-	res, err := w2Enricher(t, "redshift")(context.Background(), &awsclient.ServiceClients{Redshift: fake}, out.Resources, nil)
-	w2AssertEnricherInvariants(t, res, err)
+	res := Wave2Result(t, "redshift", &awsclient.ServiceClients{Redshift: fake}, out.Resources)
 
 	w2AssertNoCode(t, res.Findings["acme-old-cluster"], w2RedshiftCodeAuditLoggingOff)
 	w2AssertNoCode(t, res.Findings["acme-old-cluster"], w2RedshiftCodeRequireSSLOff)

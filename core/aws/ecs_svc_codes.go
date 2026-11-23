@@ -19,4 +19,6 @@ const (
 
 	// CodeECSSvcTasksBelowDesired — fewer tasks are running than the service asks for.
 	CodeECSSvcTasksBelowDesired domain.FindingCode = "ecs-svc.tasks.below-desired"
+
+	CodeECSSvcStateUnrecognised domain.FindingCode = "ecs-svc.state.unrecognised"
 )

@@ -43,3 +43,10 @@ func DetailsUnavailableFindingDef(shortName string) catalog.FindingDef {
 		Detail:   detailsUnavailableDetail,
 	}
 }
+
+// unrecognisedStateDef is the one builder of a type's UnknownState
+// FindingDef, so every value a table does not declare reads
+// "<value> (unrecognised)"; slot is the placeholder the value fills.
+func unrecognisedStateDef(code domain.FindingCode, slot, source, detail string) catalog.FindingDef {
+	return catalog.FindingDef{Code: code, Phrase: slot + " (unrecognised)", Severity: domain.SevWarn, Source: source, Detail: detail}
+}

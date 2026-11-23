@@ -7,13 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -26,8 +26,8 @@ const (
 
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
 // Per rule (cap 50) it calls ListTargetsByRule and raises findings for:
-//   - Rule state == ENABLED AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)
-//   - Rule state == DISABLED AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
+//   - A rule that is not disabled AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)
+//   - A disabled rule AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
 func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -54,7 +54,8 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 
 		eventBus := r.Fields["event_bus"]
-		state := strings.ToUpper(r.Fields["state"])
+		state := r.Fields["state"]
+		disabled := LifecycleClassOf("eb-rule", state) == catalog.LifecyclePaused
 
 		targets, complete, fetchErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Target, *string, error) {
 			pageInput := &eventbridge.ListTargetsByRuleInput{
@@ -78,11 +79,11 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 		var rows []domain.DetailRow
 
-		// A rule is either DISABLED or firing: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
+		// A rule is either disabled or firing: ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS
 		// is a second enabled state, and a rule in it delivers like any other.
-		noTargets := fetchErr == nil && state != "DISABLED" && state != "" && len(targets) == 0 && !targetsTruncated
+		noTargets := fetchErr == nil && state != "" && catalog.Applies(ebRuleCodeNoTargets, LifecycleClassOf("eb-rule", state), state) && len(targets) == 0 && !targetsTruncated
 
-		if state == "DISABLED" && len(targets) > 0 {
+		if disabled && len(targets) > 0 {
 			rows = append(rows, domain.DetailRow{
 				Label: "Targets",
 				Value: fmt.Sprintf("disabled rule still has %d target(s) (drift)", len(targets)),

@@ -179,7 +179,7 @@ func TestT561_LambdaLifecycleReadFromGetFunction(t *testing.T) {
 		cell  string
 		color resource.Color
 	}{
-		{"acme-orders-api", "", "active", resource.ColorHealthy},
+		{"acme-orders-api", "", "", resource.ColorHealthy},
 		{"acme-image-resizer", awsclient.CodeLambdaStateFailed, "failed", resource.ColorBroken},
 		{"acme-report-builder", awsclient.CodeLambdaStatePending, "pending", resource.ColorWarning},
 		{"acme-billing-sync", awsclient.CodeLambdaLastUpdateFailed, "last update failed to apply", resource.ColorBroken},

@@ -18,6 +18,7 @@ const (
 	CodeDBCStopped                  domain.FindingCode = "dbc.broken.stopped"
 
 	CodeDBCTransitional          domain.FindingCode = "dbc.warn.transitional"
+	CodeDBCDeleting              domain.FindingCode = "dbc.warn.deleting"
 	CodeDBCUnrecognisedStatus    domain.FindingCode = "dbc.warn.unrecognised_status"
 	CodeDBCDeletionProtectionOff domain.FindingCode = "dbc.warn.deletion_protection_off"
 	CodeDBCNotEncryptedAtRest    domain.FindingCode = "dbc.warn.not_encrypted_at_rest"

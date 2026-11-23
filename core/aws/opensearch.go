@@ -41,21 +41,23 @@ func isZeroOrEpoch(t time.Time) bool {
 	return t.IsZero() || t.Unix() == 0
 }
 
+// openSearchLifecycle is the domain's DomainProcessingStatus. Deleted is
+// AWS's own statement that a deletion is in progress ("True if the domain is
+// in the process of being deleted", DomainStatus in the OpenSearch API
+// Reference), so it reads as Deleting whatever the processing status says.
+func openSearchLifecycle(d opensearchtypes.DomainStatus) string {
+	if aws.ToBool(d.Deleted) {
+		return string(opensearchtypes.DomainProcessingStatusTypeDeleting)
+	}
+	return string(d.DomainProcessingStatus)
+}
+
 // computeOpenSearchFindings classifies a DomainStatus against every
 // opensearch signal. DescribeDomains is the fetcher's own call and
 // DomainStatus carries all of them, so one slice holds every finding and
 // domain.StatusPhrase counts each once.
 func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []domainpkg.Finding {
 	var findings []domainpkg.Finding
-	if d.Deleted != nil && *d.Deleted {
-		// A domain being torn down has no actionable posture left; the
-		// background signals would only add issue-severity noise to a row
-		// that is on its way out.
-		return []domainpkg.Finding{wave1Finding(CodeOpenSearchDeleting)}
-	}
-	if d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated {
-		findings = append(findings, wave1Finding(CodeOpenSearchIsolated))
-	}
 	if (d.Processing != nil && *d.Processing) || (d.UpgradeProcessing != nil && *d.UpgradeProcessing) {
 		findings = append(findings, wave1Finding(CodeOpenSearchProcessing))
 	}
@@ -77,7 +79,7 @@ func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []
 	if openSearchNodeToNodeOff(d) {
 		findings = append(findings, wave1Finding(opensearchCodeN2NOff))
 	}
-	return findings
+	return withState("opensearch", openSearchLifecycle(d), findings)
 }
 
 // openSearchEncryptionAtRestOff, openSearchHTTPSNotEnforced and
@@ -180,8 +182,8 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 	processing := strconv.FormatBool(aws.ToBool(domain.Processing))
 	upgradeProcessing := strconv.FormatBool(aws.ToBool(domain.UpgradeProcessing))
 
-	// DomainProcessingStatus: always emit at least "Active" so the Color func's
-	// Isolated branch is deterministic even when the AWS field is zero-value.
+	// The detail field reads an absent DomainProcessingStatus as Active; the
+	// lifecycle field keeps the value as AWS sent it.
 	processingStatus := "Active"
 	if domain.DomainProcessingStatus != "" {
 		processingStatus = string(domain.DomainProcessingStatus)
@@ -214,20 +216,17 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 	enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
 	nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
 
-	findings := computeOpenSearchFindings(domain, now)
-	statusPhrase := domainpkg.StatusPhrase(findings)
-
 	r := resource.Resource{
 		ID:       domainName,
 		Name:     domainName,
-		Findings: findings,
+		Findings: computeOpenSearchFindings(domain, now),
 		Fields: map[string]string{
 			"domain_name":                       domainName,
 			"engine_version":                    engineVersion,
 			"instance_type":                     instanceType,
 			"instance_count":                    instanceCount,
 			"endpoint":                          endpoint,
-			"status":                            statusPhrase,
+			"status":                            openSearchLifecycle(domain),
 			"deleted":                           deleted,
 			"processing":                        processing,
 			"upgrade_processing":                upgradeProcessing,

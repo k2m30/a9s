@@ -127,6 +127,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Dim.
   - **How obtained**: `State` field on the list-response endpoint.
 
+- **Signal**: `State` outside the documented list.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -159,6 +163,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | `State == partial` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `partial` |
 | One `PolicyDocument` statement grants a wildcard action — `*` or a service-wide `s3:*` — on `Resource: "*"` to a wildcard principal with no restrictive condition (not on a deleting/deleted endpoint) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `endpoint policy open to anyone` |
 | `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `State` outside the documented list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Note: S4 cells pair the state with a cause per the "state keywords are not explanations" rule; bare `Pending` or `Failed` would be insufficient. When `LastError.Message` is present for a `Failed` row, it replaces the generic `failed` cause at render time. Truncate `LastError.Message` at 40 chars for the list view — the full sentence is available in the detail view's field block (which is always rendered for any resource and is not an S5 enrichment line).
 
@@ -214,6 +219,7 @@ vpce — NETWORKING. Status key: `state` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| vpce.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports an endpoint state a9s does not recognise, so a9s cannot tell whether the service is reachable through it. Check it in the AWS console before relying on it. |
 | vpce.state.pending\_acceptance | pending acceptance | warn | wave1 | The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request. |
 | vpce.state.pending | pending | warn | wave1 | The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available. |
 | vpce.state.deleting | deleting | warn | wave1 | The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it. |

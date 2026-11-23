@@ -327,7 +327,8 @@ func TestFetchCBBuilds_BatchError(t *testing.T) {
 	// A refused BatchGetBuilds hides the build's details, not the build: the
 	// build ListBuildsForProject named stays listed as an unjudged row.
 	if len(result.Resources) != 1 || result.Resources[0].ID != "my-project:build-id-001" ||
-		result.Resources[0].Fields["status"] != "details unavailable" {
+		result.Resources[0].Fields["status"] != "" || len(result.Resources[0].Findings) == 0 ||
+		result.Resources[0].Findings[0].Phrase != "details unavailable" {
 		t.Errorf("resources = %+v, want the listed build kept as a details-unavailable row", result.Resources)
 	}
 }

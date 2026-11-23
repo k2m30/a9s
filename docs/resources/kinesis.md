@@ -81,8 +81,12 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `StreamSummary.StreamStatus` from `ListStreams`.
 
 - **Signal**: `StreamStatus == DELETING`.
-  - **State bucket**: Warning.
+  - **State bucket**: Warning. Tearing down: no Wave 2 read.
   - **How obtained**: `StreamSummary.StreamStatus` from `ListStreams`.
+
+- **Signal**: `StreamStatus` outside `StreamStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -121,6 +125,7 @@ One row per signal from §3:
 | `StreamStatus == DELETING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | `EncryptionType` NONE or absent | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted at rest` |
 | `RetentionPeriodHours` at or below the 24-hour default | 2 | Warning | `~` | S2, S3, S4, S5 | `24h retention` |
+| `StreamStatus` outside `StreamStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -172,6 +177,7 @@ kinesis — MESSAGING. Status key: `status` — the key the status cell reads, a
 | kinesis.warn.creating | creating | warn | wave1 | The stream is still being created and cannot take records or be read from yet. Wait for it to become active before starting producers and consumers. |
 | kinesis.warn.updating | updating | warn | wave1 | A change to the stream is being applied. Only a resharding operation changes the shard list; a retention, encryption or capacity-mode change leaves it alone. Check which operation is running, and refresh shard discovery in any hand-written consumer if it is a reshard. |
 | kinesis.warn.deleting | deleting | warn | wave1 | The stream is being removed, so producers start getting errors and any records still in it are lost. If this was not intended, stop the producers before they exhaust their retries, and check whether a replacement stream exists. |
+| kinesis.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | Kinesis reports a stream status a9s does not recognise, so a9s cannot tell whether the stream takes and serves records. Check the stream in the Kinesis console before relying on it. |
 | kinesis.unencrypted | not encrypted at rest | warn | wave2 | Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key. |
 | kinesis.min-retention | 24h retention | warn | wave2 | The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need. |
 <!-- END GENERATED: findings -->

@@ -123,7 +123,7 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 
 // rtbFindings is the one predicate for a route table's health: a blackhole
 // route (its target is gone) outranks a non-main table nothing is associated
-// with. colorRTB runs it over Fields for rows built outside the fetcher.
+// with.
 func rtbFindings(blackholeCount, associationsCount int, isMain string) []domain.Finding {
 	switch {
 	case blackholeCount > 0:

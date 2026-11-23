@@ -311,8 +311,11 @@ func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	if got := ghost.Fields["nodegroup_name"]; got != "ng-ghost" {
 		t.Errorf("degraded row Fields[\"nodegroup_name\"] = %q, want %q", got, "ng-ghost")
 	}
-	if ghost.Fields["status"] != "details unavailable" {
-		t.Errorf("degraded row status = %q, want %q", ghost.Fields["status"], "details unavailable")
+	if got := ghost.Fields["status"]; got != "" {
+		t.Errorf("degraded row Fields[status] = %q, want empty: the lifecycle field holds only what AWS reported", got)
+	}
+	if len(ghost.Findings) == 0 || ghost.Findings[0].Phrase != "details unavailable" {
+		t.Errorf("degraded row findings = %v, want the %q finding first", ghost.Findings, "details unavailable")
 	}
 	if len(ghost.Findings) != 1 || ghost.Findings[0].Code != awsclient.DetailsUnavailableCode("ng") {
 		t.Errorf("degraded row must carry the ng details-unavailable finding, got %+v", ghost.Findings)

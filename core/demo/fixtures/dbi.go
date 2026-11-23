@@ -394,6 +394,7 @@ const (
 	DBIIncompatibleCreate    = "broken-dbi-incompatible-create"
 	DBIInsufficientCapacity  = "broken-dbi-insufficient-capacity"
 	DBIUpgradeFailed         = "broken-dbi-upgrade-failed"
+	DBIDeleting              = "warn-dbi-deleting"
 	// DBIUnrecognisedStatus reports a status in neither AWS DB instance
 	// status table.
 	DBIUnrecognisedStatus = "warn-dbi-unrecognised-status"
@@ -406,10 +407,17 @@ func dbiLifecycleWitnesses() []rdstypes.DBInstance {
 		{DBIIncompatibleCreate, "incompatible-create"},
 		{DBIInsufficientCapacity, "insufficient-capacity"},
 		{DBIUpgradeFailed, "upgrade-failed"},
+		{DBIDeleting, "deleting"},
 		{DBIUnrecognisedStatus, "storage-rebalancing"},
 	} {
 		db := dbiBaselineHealthy(w.id, "arn:aws:rds:us-east-1:123456789012:db:"+w.id)
 		db.DBInstanceStatus = aws.String(w.status)
+		if w.id == DBIDeleting {
+			// Public and unencrypted, so the posture a deleting instance does
+			// not get is visibly skipped.
+			db.PubliclyAccessible = aws.Bool(true)
+			db.StorageEncrypted = aws.Bool(false)
+		}
 		out = append(out, db)
 	}
 	return out

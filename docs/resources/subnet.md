@@ -138,6 +138,10 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `subne
   - **State bucket**: Warning (misconfigured public subnet).
   - **How obtained**: read `Subnet.MapPublicIpOnLaunch`; cross-reference the already-loaded `rtb` list by `Associations[].SubnetId` (falling back to the VPC main route table); scan `Routes[]` for a `DestinationCidrBlock == "0.0.0.0/0"` with `GatewayId` starting `igw-`.
 
+- **Signal**: `State` outside `SubnetState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -169,6 +173,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` |
 | IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` |
 | public subnet with no `0.0.0.0/0` route to an internet gateway — NOT IMPLEMENTED (backlog; no emission in code as of 2026-09-07) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` |
+| `State` outside `SubnetState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -222,6 +227,7 @@ subnet — NETWORKING. Status key: `state` — the key the status cell reads, an
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| subnet.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a subnet state a9s does not recognise, so a9s cannot tell whether launches into it can get an address. Check it in the AWS console before relying on it. |
 | subnet.state.pending | pending | warn | wave1 | The subnet is still being created and cannot host network interfaces yet. Wait for it to become available before launching into it. |
 | subnet.state.unavailable | unavailable | broken | wave1 | The subnet is not usable, so anything scheduled into it fails to get an address — which presents as launch failures rather than as a subnet problem. Check the Availability Zone's status and the subnet's configuration, and place workloads elsewhere meanwhile. |
 | subnet.state.failed | failed | broken | wave1 | The subnet could not be created, so any launch template, node group or service that names it will fail. Recreate it, or repoint the resources that reference it at a working subnet. |

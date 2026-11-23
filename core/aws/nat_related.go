@@ -9,6 +9,7 @@ import (
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -81,7 +82,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 // and not an address whose status is disassociating, unassigning or failed
 // (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGatewayAddress.html).
 func natLiveAddresses(nat ec2types.NatGateway) []ec2types.NatGatewayAddress {
-	if nat.State == ec2types.NatGatewayStateFailed || nat.State == ec2types.NatGatewayStateDeleted {
+	if class := LifecycleClassOf("nat", string(nat.State)); class == catalog.LifecycleFailedLive || class == catalog.LifecycleEnded {
 		return nil
 	}
 	var live []ec2types.NatGatewayAddress

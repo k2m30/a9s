@@ -134,8 +134,8 @@ func TestFetchLaunchTemplatesPage_HealthySilence(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: expected 0 for a healthy template, got %d: %+v", len(r.Findings), r.Findings)
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf(`Fields["status"] = %q, want "" (S4 blank on a healthy row)`, r.Fields["status"])
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf(`Status cell = %q, want "" (S4 blank on a healthy row)`, domain.StatusPhrase(r.Findings))
 	}
 }
 
@@ -411,8 +411,8 @@ func TestFetchLaunchTemplatesPage_DetailsDeniedRich(t *testing.T) {
 	if f.Detail != wantDetail {
 		t.Errorf("Findings[0].Detail = %q, want %q (lt-specific S5 sentence, not the generic degraded_resource.go text)", f.Detail, wantDetail)
 	}
-	if r.Fields["status"] != "details denied" {
-		t.Errorf(`Fields["status"] = %q, want %q`, r.Fields["status"], "details denied")
+	if domain.StatusPhrase(r.Findings) != "details denied" {
+		t.Errorf(`Status cell = %q, want %q`, domain.StatusPhrase(r.Findings), "details denied")
 	}
 }
 

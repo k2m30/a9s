@@ -22,6 +22,8 @@ const (
 	// not recommend it for new launches. Severity: SevWarn.
 	CodeAMIDeprecated domain.FindingCode = "ami.deprecated"
 
+	CodeAMIUnrecognisedState domain.FindingCode = "ami.state.unrecognised"
+
 	// CodeAMIPublic — the AMI's launch permission includes every AWS
 	// account. Severity: SevBroken.
 	CodeAMIPublic domain.FindingCode = "ami.public"

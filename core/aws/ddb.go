@@ -16,38 +16,16 @@ import (
 )
 
 // computeDDBFindings returns the findings for a DynamoDB table plus the
-// supporting AttentionDetail rows keyed by the finding that owns them. The
-// lifecycle status owns the status column; the deletion-protection posture
-// row is evaluated independently and stacks on top of it, except on a table
-// that is already on its way out.
+// supporting AttentionDetail rows keyed by the finding that owns them.
 func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	if table == nil {
 		return nil, nil
 	}
-	var lifecycle []domain.Finding
-	switch table.TableStatus {
-	case ddbtypes.TableStatusActive:
-	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBKMSKeyInaccessible)}
-	case ddbtypes.TableStatusArchived:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchivedKMSLost)}
-	case ddbtypes.TableStatusCreating:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBCreating)}
-	case ddbtypes.TableStatusUpdating:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBUpdating)}
-	case ddbtypes.TableStatusDeleting:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBDeleting)}
-	case ddbtypes.TableStatusArchiving:
-		lifecycle = []domain.Finding{wave1Finding(CodeDDBArchiving)}
+	var posture []domain.Finding
+	if !aws.ToBool(table.DeletionProtectionEnabled) {
+		posture = append(posture, wave1Finding(CodeDDBDeletionProtectionOff))
 	}
-
-	if resourceIsTearingDown(table) {
-		return lifecycle, nil
-	}
-	if aws.ToBool(table.DeletionProtectionEnabled) {
-		return lifecycle, nil
-	}
-	return append(lifecycle, wave1Finding(CodeDDBDeletionProtectionOff)), nil
+	return withState("ddb", string(table.TableStatus), posture), nil
 }
 
 func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
@@ -57,7 +35,6 @@ func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
 	}
 
 	findings, attentionDetails := computeDDBFindings(table)
-	statusPhrase := domain.StatusPhrase(findings)
 
 	itemCount := ""
 	if table.ItemCount != nil {
@@ -89,7 +66,7 @@ func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
 		Findings: findings,
 		Fields: map[string]string{
 			"table_name":     name,
-			"status":         statusPhrase,
+			"status":         string(table.TableStatus),
 			"item_count":     itemCount,
 			"size_bytes":     sizeBytes,
 			"size_bytes_raw": sizeBytesRaw,

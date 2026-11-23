@@ -15,7 +15,9 @@ const (
 	CodeEBSStateDeleting domain.FindingCode = "ebs.state.deleting"
 
 	// CodeEBSStateError — EBS volume is in the "error" state.
-	CodeEBSStateError domain.FindingCode = "ebs.state.error"
+	CodeEBSStateError        domain.FindingCode = "ebs.state.error"
+	CodeEBSStateDeleted      domain.FindingCode = "ebs.state.deleted"
+	CodeEBSUnrecognisedState domain.FindingCode = "ebs.state.unrecognised"
 
 	// CodeEBSOrphanUnattached — volume is "available" (unattached) and older
 	// than 7 days — billed hourly with no workload. Severity: SevWarn.
@@ -36,6 +38,8 @@ const (
 	// "recovering" state, which is the Recycle Bin, not a failure.
 	// Severity: SevWarn.
 	CodeEBSSnapStateRecycleBin domain.FindingCode = "ebs-snap.state.recycle-bin"
+
+	CodeEBSSnapStateUnrecognised domain.FindingCode = "ebs-snap.state.unrecognised"
 
 	// CodeEBSSnapUnencrypted — snapshot is not encrypted at rest, violating
 	// CIS EC2.1. Severity: SevWarn.

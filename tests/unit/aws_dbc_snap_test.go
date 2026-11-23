@@ -169,7 +169,7 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			gotStatus := r.Fields["status"]
+			gotStatus := domain.StatusPhrase(r.Findings)
 			gotIssues := findingPhrases(r.Findings)
 
 			if gotStatus != tc.wantStatus {
@@ -315,7 +315,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			gotStatus := r.Fields["status"]
+			gotStatus := domain.StatusPhrase(r.Findings)
 			gotIssues := findingPhrases(r.Findings)
 
 			if gotStatus != tc.wantStatus {

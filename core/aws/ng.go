@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -59,19 +60,21 @@ func ngLaunchTemplateData(ctx context.Context, api EC2DescribeLaunchTemplateVers
 	return cmp.Or(versions[0].LaunchTemplateData, &ec2types.ResponseLaunchTemplateData{}), nil
 }
 
-// healthIssueFinding builds a Broken Finding for an unhealthy lifecycle
-// state, folding the specific AWS health-issue text (e.g. "insufficient
-// free addresses") into the Phrase instead of a generic lifecycle label —
-// an operator scanning the Status column needs the cause, not just the
-// state name. issueCodes is the already-humanized list from
-// Health.Issues, one Attention row each.
-func healthIssueFinding(code domain.FindingCode, issueCodes []string) (domain.Finding, []domain.DetailRow) {
-	f, tier := wave1Finding(code), tierOf(code)
+// healthIssueRows is one Attention row per already-humanized Health.Issues
+// code, for the top finding when it is one of owners: the unhealthy state
+// that folds the issues in, or the health-issue finding of a row whose state
+// says nothing. Under any other top finding the issues are not what the row
+// is about, so they get no rows.
+func healthIssueRows(findings []domain.Finding, issueCodes []string, owners ...domain.FindingCode) []domain.DetailRow {
+	if len(findings) == 0 || !slices.Contains(owners, findings[0].Code) {
+		return nil
+	}
+	tier := tierOf(findings[0].Code)
 	rows := make([]domain.DetailRow, 0, len(issueCodes))
 	for _, c := range issueCodes {
 		rows = append(rows, domain.DetailRow{Label: "Issue", Value: c, Tier: tier})
 	}
-	return f, rows
+	return rows
 }
 
 // buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.
@@ -104,9 +107,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
-	// The empty degraded code fits a row DescribeNodegroup answered; rows
-	// rebuilt from Fields carry the one degradedNodeGroup stamps.
-	findings, issueRows := ngFindings(status, "", healthIssuesCount, issueCodes)
+	findings, issueRows := ngFindings(status, healthIssuesCount, issueCodes)
 
 	r := resource.Resource{
 		ID:   ngRowID(ngClusterName, nodegroupName),
@@ -161,30 +162,11 @@ func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource 
 // ngFindings is the one predicate for a node group: its lifecycle state, then
 // a bare Health.Issues[] on a node group whose state says nothing — health is
 // tracked independently of the state, the same way it is for the cluster.
-// colorEKSNodeGroup runs it over Fields for rows built outside the fetcher,
-// which have the issue count but not the codes.
-func ngFindings(status, degradedCode string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
-	if f := degradedFindings("ng", degradedCode); f != nil {
-		return f, nil
-	}
-	switch status {
-	case "CREATING":
-		return []domain.Finding{wave1Finding(CodeNGStateCreating)}, nil
-	case "UPDATING":
-		return []domain.Finding{wave1Finding(CodeNGStateUpdating)}, nil
-	case "DELETING":
-		return []domain.Finding{wave1Finding(CodeNGStateDeleting)}, nil
-	case "CREATE_FAILED":
-		return []domain.Finding{wave1Finding(CodeNGStateCreateFailed)}, nil
-	case "DELETE_FAILED":
-		return []domain.Finding{wave1Finding(CodeNGStateDeleteFailed)}, nil
-	case "DEGRADED":
-		f, rows := healthIssueFinding(CodeNGStateDegraded, issueCodes)
-		return []domain.Finding{f}, rows
-	}
+func ngFindings(status string, healthIssuesCount int, issueCodes []string) ([]domain.Finding, []domain.DetailRow) {
+	var posture []domain.Finding
 	if healthIssuesCount > 0 {
-		f, rows := healthIssueFinding(CodeNGHealthIssue, issueCodes)
-		return []domain.Finding{f}, rows
+		posture = append(posture, wave1Finding(CodeNGHealthIssue))
 	}
-	return nil, nil
+	findings := withState("ng", status, posture)
+	return findings, healthIssueRows(findings, issueCodes, CodeNGStateDegraded, CodeNGHealthIssue)
 }

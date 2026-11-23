@@ -915,7 +915,7 @@ func TestW5_EBLifecycleEndedEmitsNoConfigurationFinding(t *testing.T) {
 			r := w5EBRes(env)
 			r.Fields["status"] = status
 
-			res := w5EnrichEB(t, f, r)
+			res := Wave2Result(t, "eb", &awsclient.ServiceClients{ElasticBeanstalk: f}, []resource.Resource{r})
 			id := "e-" + env
 			for _, code := range []string{"eb.managed-updates-off", "eb.enhanced-health-off", "eb.cloudwatch-logs-off"} {
 				w2AssertNoCode(t, res.Findings[id], code)

@@ -77,16 +77,13 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Name != "api.example.com" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "api.example.com", r0.Name)
 	}
-	// status/type are rendered in the acm list's cells, so both go through
-	// domain.HumanizeStatusPhrase: no rendered cell shows a raw UPPER_SNAKE enum.
-	if r0.Fields["status"] != "issued" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "issued", r0.Fields["status"])
+	// The lifecycle field holds the value AWS reported; the Status cell is
+	// built from findings.
+	if r0.Fields["status"] != "ISSUED" {
+		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "ISSUED", r0.Fields["status"])
 	}
 	if r0.Fields["domain_name"] != "api.example.com" {
 		t.Errorf("resource[0].Fields[\"domain_name\"]: expected %q, got %q", "api.example.com", r0.Fields["domain_name"])
-	}
-	if r0.Fields["status"] != "issued" {
-		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "issued", r0.Fields["status"])
 	}
 	if r0.Fields["type"] != "amazon issued" {
 		t.Errorf("resource[0].Fields[\"type\"]: expected %q, got %q", "amazon issued", r0.Fields["type"])
@@ -112,10 +109,8 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Findings[0].Severity != domain.SevBroken {
 		t.Errorf("resource[0].Findings[0].Severity: expected %v, got %v", domain.SevBroken, r0.Findings[0].Severity)
 	}
-	// acmColor reads Fields["status"] directly for ISSUED, the only status with no
-	// Finding for colorFromAnyFinding to use, so it must match the humanized
-	// "issued". The fixture's NotAfter is past, so the ISSUED branch's expired case
-	// gives ColorBroken, which the unmatched-status default does not.
+	// The fixture's NotAfter is past, so the row's colour is its expired
+	// finding's.
 	acmType := resource.FindResourceType("acm")
 	if acmType == nil {
 		t.Fatal("acm type not registered")
@@ -131,8 +126,11 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r1.Name != "staging.example.com" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "staging.example.com", r1.Name)
 	}
-	if r1.Fields["status"] != "pending validation" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "pending validation", r1.Fields["status"])
+	if domain.StatusPhrase(r1.Findings) != "pending validation" {
+		t.Errorf("resource[1].Status cell: expected %q, got %q", "pending validation", domain.StatusPhrase(r1.Findings))
+	}
+	if r1.Fields["status"] != "PENDING_VALIDATION" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "PENDING_VALIDATION", r1.Fields["status"])
 	}
 	if r1.Fields["type"] != "imported" {
 		t.Errorf("resource[1].Fields[\"type\"]: expected %q, got %q", "imported", r1.Fields["type"])
@@ -140,9 +138,6 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r1.Fields["in_use"] != "false" {
 		t.Errorf("resource[1].Fields[\"in_use\"]: expected %q, got %q", "false", r1.Fields["in_use"])
 	}
-	// acmStatusFindings switches on the certificate's raw status before
-	// Fields["status"] is humanized, so PENDING_VALIDATION still emits its wave1
-	// Finding (and ColorWarning via colorFromAnyFinding).
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 finding for PENDING_VALIDATION, got %d: %v", len(r1.Findings), r1.Findings)
 	}

@@ -260,8 +260,11 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 	if !ok {
 		t.Fatalf("denied cluster \"cluster-bad\" must remain as a degraded row, got %v", result.Resources)
 	}
-	if got := bad.Fields["status"]; got != "details unavailable" {
-		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
+	if got := bad.Fields["status"]; got != "" {
+		t.Errorf("degraded row Fields[status] = %q, want empty: the lifecycle field holds only what AWS reported", got)
+	}
+	if len(bad.Findings) == 0 || bad.Findings[0].Phrase != "details unavailable" {
+		t.Errorf("degraded row findings = %v, want the %q finding first", bad.Findings, "details unavailable")
 	}
 }
 

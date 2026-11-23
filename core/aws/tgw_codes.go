@@ -5,11 +5,11 @@ package aws
 import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
-	CodeTGWStatePending   domain.FindingCode = "tgw.state.pending"
-	CodeTGWStateModifying domain.FindingCode = "tgw.state.modifying"
-	CodeTGWStateDeleting  domain.FindingCode = "tgw.state.deleting"
-	CodeTGWStateFailed    domain.FindingCode = "tgw.state.failed"
-	CodeTGWStateDeleted   domain.FindingCode = "tgw.state.deleted"
+	CodeTGWStatePending      domain.FindingCode = "tgw.state.pending"
+	CodeTGWUnrecognisedState domain.FindingCode = "tgw.state.unrecognised"
+	CodeTGWStateModifying    domain.FindingCode = "tgw.state.modifying"
+	CodeTGWStateDeleting     domain.FindingCode = "tgw.state.deleting"
+	CodeTGWStateDeleted      domain.FindingCode = "tgw.state.deleted"
 
 	// CodeTGWAutoAccept marks a transit gateway that attaches any VPC shared
 	// with it without an operator approving the attachment.

@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -203,23 +204,12 @@ func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, id
 }
 
 // ebsSnapshotUnusable reports a snapshot nothing can be restored from as it
-// stands. The single place that set is spelled: the ebs-snap state findings and
-// the volume enricher's snapshot-coverage join both call it, so a snapshot the
-// list shows as unusable is never counted as cover for its volume.
-func ebsSnapshotUnusable(state ec2types.SnapshotState) bool {
-	switch state {
-	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
-		return true
-	}
-	return false
-}
-
-// ebsSnapshotInRecycleBin separates the two Recycle Bin states from a failure.
-// A snapshot in the bin still holds the volume's data and a retention rule is
-// counting down on it; the advice a failed snapshot gets — take a fresh one and
-// delete this — would destroy the only copy.
-func ebsSnapshotInRecycleBin(state ec2types.SnapshotState) bool {
-	return state == ec2types.SnapshotStateRecoverable || state == ec2types.SnapshotStateRecovering
+// stands: a failed one, or one in the Recycle Bin. The ebs-snap state table
+// classes them, so the list and the volume enricher's snapshot-coverage join
+// cannot disagree about which snapshot counts as cover.
+func ebsSnapshotUnusable(state string) bool {
+	class := LifecycleClassOf("ebs-snap", state)
+	return class == catalog.LifecycleFailedLive || class == catalog.LifecyclePendingDeletion
 }
 
 // snapshotToResource converts an ec2types.Snapshot to our generic Resource.
@@ -280,19 +270,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	switch {
-	case snap.State == ec2types.SnapshotStatePending:
-		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending)}
-	case ebsSnapshotInRecycleBin(snap.State):
-		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateRecycleBin)}
-	case ebsSnapshotUnusable(snap.State):
-		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStateError)}
-	}
-
-	if len(r.Findings) == 0 {
-		r.Findings = ebsSnapStructuralFindings(snap)
-	}
-
+	r.Findings = withState("ebs-snap", state, ebsSnapStructuralFindings(snap))
 	return r
 }
 
@@ -307,16 +285,6 @@ func ebsSnapUnencrypted(snap ec2types.Snapshot) bool {
 // snapshot is flagged as a cost concern (no retention policy pruning it).
 const ebsSnapAge = 365 * 24 * time.Hour
 
-// ebsSnapStructuralFindings mirrors colorEBSSnap's own precedence
-// (unencrypted, then aged-automated) for the "completed" branch, which
-// carries no state-derived Finding, so the list Status cell / detail
-// Attention block always explain the Warning color. Only called when
-// len(r.Findings)==0 (state is "completed", the only state with no Finding
-// from the switch above). The orphan (source volume deleted) rule is a
-// cross-ref check requiring the sibling ebs cache and is registered
-// separately as this type's Wave2 IssueEnricher (enrichEBSSnapCrossRef in
-// ebs_snap_issue_enrichment.go), since it needs the full ResourceCache this
-// per-item helper does not have access to.
 func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	if ebsSnapUnencrypted(snap) {
 		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted)}
@@ -338,30 +306,21 @@ func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	return nil
 }
 
-// ebsFindings is the one predicate for a volume: its lifecycle state first,
-// then, only when the state says nothing, the orphan and encryption checks in
-// colorEBS's own precedence. colorEBS runs it over Fields for rows built
-// outside the fetcher, so it takes the same formatted strings the fetcher
-// writes there rather than the SDK struct.
+// ebsFindings is the one predicate for a volume. The orphan check is
+// declared for the normal states only: a volume being created or deleted is
+// unattached by its lifecycle.
 func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding {
-	switch state {
-	case "creating":
-		return []domain.Finding{wave1Finding(CodeEBSStateCreating)}
-	case "deleting":
-		return []domain.Finding{wave1Finding(CodeEBSStateDeleting)}
-	case "error":
-		return []domain.Finding{wave1Finding(CodeEBSStateError)}
-	}
-	if state == "available" && attachedTo == "" {
+	var posture []domain.Finding
+	if attachedTo == "" {
 		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
 			if age := time.Since(t); age > ebsOrphanAge {
 				days := int(age.Hours() / 24)
-				return []domain.Finding{wave1Finding(CodeEBSOrphanUnattached, strconv.Itoa(days))}
+				posture = append(posture, wave1Finding(CodeEBSOrphanUnattached, strconv.Itoa(days)))
 			}
 		}
 	}
 	if encrypted == "false" {
-		return []domain.Finding{wave1Finding(CodeEBSUnencrypted)}
+		posture = append(posture, wave1Finding(CodeEBSUnencrypted))
 	}
-	return nil
+	return withState("ebs", state, posture)
 }

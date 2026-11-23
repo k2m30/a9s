@@ -6,21 +6,13 @@ import (
 	"context"
 	"strings"
 
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// colorCF derives the row colour from the distribution's findings, and for a
-// row that carries none from the same predicate the fetcher used, over the two
-// fields it wrote there.
-func colorCF(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(cfWave1Findings(r.Fields["enabled"], r.Fields["status"]))
-}
 
 // colorAPIGW classifies an API Gateway. All signals are Wave-2-only
 // (apigwCodeNoDeployedStages, apigwCodeStageConfigIssues) — no raw-field
@@ -59,7 +51,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			ContextKeys:    map[string]string{"zone_id": "ID", "zone_name": "Name"},
 			DisplayNameKey: "zone_name",
 		}},
-		Color:          r53Color,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Route53} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
@@ -106,7 +98,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "aliases", Title: "Aliases", Path: "Aliases.Items", Width: 30},
 			{Key: "price_class", Title: "Price Class", Path: "PriceClass", Width: 16},
 		},
-		Color:          colorCF,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      cfStatuses,
+		NormalStates:   []string{"Deployed"},
+		UnknownState:   cfCodeUnrecognisedStatus,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudFront} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
@@ -128,7 +123,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		Findings: []catalog.FindingDef{
 			{Code: cfCodeDisabled, Phrase: "disabled (admin-off)", Severity: domain.SevDim, Source: "wave1"},
-			{Code: cfCodeInProgress, Phrase: "deploying: config propagating", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution."},
+			{Code: cfCodeInProgress, Phrase: "deploying: config propagating", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution.", States: []string{"InProgress"}, Class: catalog.LifecycleTransitional},
+			unrecognisedStateDef(cfCodeUnrecognisedStatus, "<status>", "wave1", "CloudFront reports a distribution status a9s does not recognise, so a9s cannot tell whether its configuration has reached the edge locations. Check the distribution in the CloudFront console before relying on it."),
 			{Code: cfCodeInsecureProtocol, Phrase: "traffic allowed without TLS", Severity: domain.SevWarn, Source: "wave2", Detail: "The distribution accepts plain HTTP from viewers, or reaches an origin that can serve TLS over plain HTTP, so requests and any cookies or tokens in them can be read in transit. Redirect viewers to HTTPS, and set the origin protocol policy to HTTPS only for any origin that supports it."},
 			{Code: CodeCFOriginBucketMissing, Phrase: "S3 origin bucket does not exist", Severity: domain.SevBroken, Source: "wave2", Detail: "The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it."},
 			{Code: CodeCFDeprecatedTLS, Phrase: "minimum TLS below 1.2", Severity: domain.SevWarn, Source: "wave2", Detail: "Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later."},
@@ -143,7 +139,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Name:           "ACM Certificates",
 		ShortName:      "acm",
 		RefToID:        acmRefToID,
-		HumanizeFields: []string{"Type", "RenewalEligibility"},
+		HumanizeFields: []string{"Type", "RenewalEligibility", "Status"},
 		Aliases:        []string{"acm", "certificates", "certs"},
 		Category:       "DNS & CDN",
 		CloudTrailKey:  "ResourceName:ID",
@@ -163,7 +159,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "not_after", Title: "Expires", Path: "NotAfter", Width: 22},
 			{Key: "in_use", Title: "In Use", Path: "InUse", Width: 8},
 		},
-		Color:          acmColor,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[acmtypes.CertificateStatus](),
+		NormalStates:   []string{string(acmtypes.CertificateStatusIssued)},
+		UnknownState:   acmCodeStatusUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ACM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
@@ -177,13 +176,14 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("acm")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: acmCodeExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one."},
-			{Code: acmCodeExpiresCritical, Phrase: "expires in <N day(s)> — renew now", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one."},
-			{Code: acmCodeExpiresSoon, Phrase: "expires in <N day(s)>", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published."},
-			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for."},
-			{Code: acmCodeStatusPendingValidation, Phrase: "pending validation", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out."},
-			{Code: acmCodeStatusFailed, Phrase: "<status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it."},
-			{Code: acmCodeStatusInactive, Phrase: "inactive", Severity: domain.SevDim, Source: "wave1"},
+			{Code: acmCodeExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: acmCodeExpiresCritical, Phrase: "expires in <N day(s)> — renew now", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: acmCodeExpiresSoon, Phrase: "expires in <N day(s)>", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate expires within a month, which is enough time to renew it calmly and not enough to forget about it. Check that automatic renewal is configured and that its validation records are still published.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing is serving this certificate, so it is renewed and tracked for no traffic, and it clutters the list an operator scans during an incident. Delete it, or attach it to the listener it was requested for.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: acmCodeStatusPendingValidation, Phrase: "pending validation", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out.", States: []string{string(acmtypes.CertificateStatusPendingValidation)}, Class: catalog.LifecycleTransitional},
+			{Code: acmCodeStatusFailed, Phrase: "<status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it.", States: []string{string(acmtypes.CertificateStatusExpired), string(acmtypes.CertificateStatusRevoked), string(acmtypes.CertificateStatusFailed), string(acmtypes.CertificateStatusValidationTimedOut)}, Class: catalog.LifecycleFailedLive},
+			{Code: acmCodeStatusInactive, Phrase: "inactive", Severity: domain.SevDim, Source: "wave1", States: []string{string(acmtypes.CertificateStatusInactive)}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(acmCodeStatusUnrecognised, "<status>", "wave1", "ACM reports a certificate status a9s does not recognise, so a9s cannot tell whether the certificate can terminate TLS. Check it in the ACM console before relying on it."),
 			{Code: CodeACMWeakKey, Phrase: "weak key algorithm", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key."},
 		},
 	},

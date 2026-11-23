@@ -117,7 +117,7 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
 
 - **Signal**: `DeletedDate` set → scheduled for deletion.
   - **State bucket**: Broken.
-  - **How obtained**: `SecretListEntry.DeletedDate` on the `ListSecrets` response; presence of a non-null value means the secret is inside its recovery window and will be permanently deleted at the end of it.
+  - **How obtained**: `SecretListEntry.DeletedDate` on the `ListSecrets` response; presence of a non-null value means the secret is inside its recovery window and will be permanently deleted at the end of it. `ListSecrets` has no status field, so the row's lifecycle field holds `active` (no `DeletedDate`: "Not present on active secrets") or `deleted`. A deleted secret is pending deletion: its rotation, staleness and resource-policy checks are not shown and get no Wave 2 read.
 
 - **Signal**: `RotationEnabled` not true — no automatic rotation configured.
   - **State bucket**: Warning.
@@ -130,6 +130,10 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
 - **Signal**: `RotationEnabled==true && (now - LastRotatedDate) > RotationRules.AutomaticallyAfterDays × 2` → rotation failing. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `SecretListEntry.RotationEnabled`, `SecretListEntry.LastRotatedDate`, and `SecretListEntry.RotationRules.AutomaticallyAfterDays` on the `ListSecrets` response. Note: rotations scheduled via `RotationRules.ScheduleExpression` (cron/rate) leave `AutomaticallyAfterDays` null and this rule cannot fire on them — a9s-devops: possible=yes but not covered by the golden doc; worth=yes for operators using cron-based schedules, so flagged as a UX gap in §4.1.
+
+- **Signal**: the lifecycle is neither active (no `DeletedDate`) nor deleted.
+  - **State bucket**: Warning. The row shows the value a9s read.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -176,6 +180,7 @@ One row per signal from §3:
 | Resource policy names a principal in another account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | rotation failing for more than two full intervals, `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` |
 | `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` |
+| the lifecycle is neither active (no `DeletedDate`) nor deleted | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Formatting notes applied:
 
@@ -227,6 +232,7 @@ secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell r
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | secrets.state.deleted | scheduled for deletion | broken | wave1 | This secret is inside its recovery window and will be destroyed when the window ends, and applications reading it are failing already. Restore it now if anything still needs the value — once the window closes there is no way to get it back. |
+| secrets.state.unrecognised | <status> (unrecognised) | warn | wave1 | The secret carries a lifecycle a9s does not recognise, so a9s cannot tell whether applications can still read it. Check it in the Secrets Manager console before relying on it. |
 | secrets.state.rotation\_overdue | rotation overdue | warn | wave1 | Rotation is configured but the secret is past the interval it should have rotated in, so either the rotation function is failing or it was never invoked. Check the rotation function's logs, and run a rotation by hand to prove it works. |
 | secrets.state.dormant | dormant | warn | wave1 | Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed. |
 | secrets.rotation.disabled | rotation not enabled | warn | wave1 | The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source. |

@@ -106,7 +106,7 @@ const (
 	// The five task-definition signals each get their own RUNNING task on its
 	// own revision. A task carries exactly one issue-severity finding that way:
 	// a transitional or stopped task would add its lifecycle finding on top,
-	// and a stopped one emits no posture finding at all (see ecsTaskGone).
+	// and Wave 2 does not read a stopped one.
 	//
 	// ECSTaskPrivileged runs web-frontend:7, the only definition with a
 	// privileged container.
@@ -276,7 +276,6 @@ func buildECSClusters() []ecstypes.Cluster {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
-		// Status=PROVISIONING → Warning (colorECSCluster)
 		{
 			ClusterName:                       aws.String("acme-cluster-provisioning"),
 			ClusterArn:                        aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-provisioning"),
@@ -826,6 +825,22 @@ func buildECSTasks() []ecstypes.Task {
 			Connectivity:      ecstypes.ConnectivityConnected,
 			AvailabilityZone:  aws.String("us-east-1c"),
 		},
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/" + ECSTaskDeletedID),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("DELETED"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("1024"),
+			Memory:            aws.String("2048"),
+			Group:             aws.String("family:batch-etl-runner"),
+			StartedAt:         aws.Time(mustTime("2026-05-03T03:00:00Z")),
+			StoppedAt:         aws.Time(mustTime("2026-05-03T03:40:00Z")),
+			StopCode:          ecstypes.TaskStopCodeUserInitiated,
+			HealthStatus:      ecstypes.HealthStatusUnknown,
+			AvailabilityZone:  aws.String("us-east-1c"),
+		},
 		// Healthy, running tasks whose only signal is their definition's own
 		// posture — one per task-definition rule, so no posture finding ever
 		// shares a row with a lifecycle finding.
@@ -1268,8 +1283,12 @@ func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 	}
 }
 
+// ECSTaskDeletedID is a task describe-tasks still returns as DELETED, the
+// state the ECS task lifecycle documents as shown only by the API.
+const ECSTaskDeletedID = "a3b8c9d0e1f2a8b9c0d1e2f3"
+
 func init() {
 	Register(Pin{ShortName: "ecs", Rows: 8, Issues: 5, CoverageGaps: []string{"dim", "ecs.warn.details_denied"}})
 	Register(Pin{ShortName: "ecs-svc", Rows: 28, Issues: 8, CoverageGaps: []string{"dim", "ecs-svc.warn.details_denied"}})
-	Register(Pin{ShortName: "ecs-task", Rows: 20, Issues: 9, CoverageGaps: []string{"ecs-task.warn.details_denied"}})
+	Register(Pin{ShortName: "ecs-task", Rows: 21, Issues: 9, CoverageGaps: []string{"ecs-task.warn.details_denied"}})
 }

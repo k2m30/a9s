@@ -113,7 +113,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `ClusterAvailabilityStatus` in `Unavailable` / `Failed` → Broken.
+- **Signal**: `ClusterAvailabilityStatus` in `Unavailable` / `Failed` → Broken, beside a normal `ClusterStatus` only. Any other status already says the cluster is not serving (a paused or creating cluster is "not available for queries"), so the row carries the status finding alone and a paused cluster reads Dim.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.ClusterAvailabilityStatus` on the `DescribeClusters` response.
 
@@ -181,6 +181,40 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `ClusterStatus == final-snapshot`. The last step of a delete: the row keeps its state finding only and Wave 2 does not read it, as for `deleting`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == available, prep-for-resize`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == available, resize-cleanup`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == cancelling-resize`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == rotating-keys`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == updating-hsm`.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus == paused`.
+  - **State bucket**: Dim. The cluster is idle on purpose; its posture findings stay.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `ClusterStatus` outside the documented list.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+Posture findings (public endpoint, unencrypted, pending change, deferred maintenance, availability) stand beside every state but `deleting` and `final-snapshot`.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
@@ -230,6 +264,14 @@ One row per signal from §3:
 | `ClusterStatus == rebooting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rebooting` |
 | `ClusterStatus == renaming` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `renaming` |
 | `ClusterStatus == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `ClusterStatus == final-snapshot` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `taking final snapshot` |
+| `ClusterStatus == available, prep-for-resize` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `preparing to resize` |
+| `ClusterStatus == available, resize-cleanup` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `cleaning up after resize` |
+| `ClusterStatus == cancelling-resize` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `cancelling resize` |
+| `ClusterStatus == rotating-keys` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotating encryption keys` |
+| `ClusterStatus == updating-hsm` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `updating hardware security module` |
+| `ClusterStatus == paused` | 1 | Dim | n/a | S2, S4 | `paused` |
+| `ClusterStatus` outside the documented list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 | `DescribeLoggingStatus.LoggingEnabled` not true | 2 | Warning | `~` | S2, S3, S4, S5 | `audit logging off` |
 | Parameter group `require_ssl` not `true` | 2 | Warning | `~` | S2, S3, S4, S5 | `SSL not required` |
 
@@ -287,6 +329,14 @@ redshift — DATABASES & STORAGE. Status key: `status` — the key the status ce
 | redshift.warn.rebooting | rebooting | warn | wave1 | The cluster is restarting, so open connections are dropped and queries in flight are lost. Wait for it to come back; applications should reconnect on their own. |
 | redshift.warn.renaming | renaming | warn | wave1 | The cluster identifier is changing, which changes its endpoint address, so anything holding the old name stops connecting. Update the connection strings and any DNS record pointing at the old endpoint. |
 | redshift.warn.deleting | deleting | warn | wave1 | The cluster is being removed, and unless a final snapshot was requested its data goes with it. If this was not intended, check now whether a snapshot exists to restore from. |
+| redshift.warn.final\_snapshot | taking final snapshot | warn | wave1 | The cluster is being deleted and Redshift is taking the final snapshot that was requested for it; the cluster goes once the snapshot completes. If this was not intended, the final snapshot is what you restore from. |
+| redshift.warn.prep\_for\_resize | preparing to resize | warn | wave1 | The cluster still serves queries while Redshift prepares a resize; the resize itself makes it read-only or unavailable for part of its run. Hold off on large loads until the resize is done. |
+| redshift.warn.resize\_cleanup | cleaning up after resize | warn | wave1 | The resize has finished and the cluster serves queries while Redshift removes what the old layout left behind. Expect slower queries until the cleanup completes. |
+| redshift.warn.cancelling\_resize | cancelling resize | warn | wave1 | A resize is being rolled back to the cluster's previous node layout. Wait for the cluster to return to available before starting another change. |
+| redshift.warn.rotating\_keys | rotating encryption keys | warn | wave1 | Redshift is rotating the cluster's encryption keys, and the cluster is unavailable to queries until the rotation completes. Wait it out before treating query failures as an application fault. |
+| redshift.warn.updating\_hsm | updating hardware security module | warn | wave1 | The cluster's connection to its hardware security module is being updated. Wait for the cluster to return to available; if it lands in a key-store error instead, check the module's client certificate and network path. |
+| redshift.paused | paused | dim | wave1 | — |
+| redshift.unrecognised\_status | <status> (unrecognised) | warn | wave1 | AWS reports a cluster status a9s does not recognise, so a9s cannot tell whether the cluster is serving or whether the state clears on its own. Check the cluster's recent events before relying on it. |
 | redshift.warn.maintenance | maintenance | warn | wave1 | The cluster is in its maintenance window and AWS is applying updates, so it can be briefly unavailable. Nothing to do beyond expecting the interruption; move the window if it clashes with your load schedule. |
 | redshift.warn.availability\_modifying | modifying — availability affected | warn | wave1 | Redshift reports the cluster's availability as changing rather than steady, so queries may be refused or slow while the change lands. Wait for it to report available again before treating a query failure as an application fault. |
 | redshift.warn.pending\_change | pending change queued | warn | wave1 | A modification is queued for the next maintenance window, so the cluster's live configuration is not the one shown as desired. Check what is pending and, if it needs an outage, apply it at a time you choose. |

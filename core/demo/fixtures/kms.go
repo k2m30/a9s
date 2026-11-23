@@ -36,6 +36,10 @@ type KMSFixtures struct {
 // key still shown).
 const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 
+// KMSCreatingReplicaKeyID is a multi-Region replica key in the Creating
+// state, raising kms.state.transitional.
+const KMSCreatingReplicaKeyID = "f1a2b3c4-d5e6-4f70-8a9b-1c2d3e4f5a6b"
+
 // WarnKMSDetailsUnavailableID names the ListKeys entry whose DescribeKey call
 // the KMSFake fails with KMSInternalException, raising
 // kms.warn.details_unavailable: the key is listed, its state never read.
@@ -62,8 +66,7 @@ const AWSManagedS3KeyID = "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0"
 var sharedKMSFixtures = shared(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
 		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
-		// which EnrichKMSRotation raises no kms.rotation-disabled finding,
-		// letting colorKMS fall through to its Enabled->Healthy branch.
+		// which EnrichKMSRotation raises no kms.rotation-disabled finding.
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -153,6 +156,18 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
 			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
 			Enabled:      false,
+		},
+		{
+			KeyId:        aws.String(KMSCreatingReplicaKeyID),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSCreatingReplicaKeyID),
+			Description:  aws.String("Orders replica key — copy from eu-west-1 in progress"),
+			KeyState:     kmstypes.KeyStateCreating,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			KeySpec:      kmstypes.KeySpecSymmetricDefault,
+			Origin:       kmstypes.OriginTypeAwsKms,
+			MultiRegion:  aws.Bool(true),
+			CreationDate: aws.Time(time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)),
 		},
 		// Access-denied key — DescribeKey is denied for this ID (see
 		// KMSFake.DescribeKey), raising kms.access-denied. Real key state
@@ -540,8 +555,7 @@ func NewKMSFixtures() *KMSFixtures {
 }
 
 func init() {
-	// dim: colorKMS (core/aws/catalog_secrets.go) has exactly three branches —
-	// Enabled→Healthy, Disabled→Warning, Pending*/Unavailable→Broken — and
+	// dim: no kms state finding is Dim — Disabled is declared Warning — and
 	// docs/resources/kms.md documents no Dim-producing signal.
-	Register(Pin{ShortName: "kms", Rows: 22, Issues: 9, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "kms", Rows: 23, Issues: 10, CoverageGaps: []string{"dim"}})
 }

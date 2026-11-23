@@ -27,7 +27,6 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Path: "GroupId"}, {Path: "GroupName"}, {Path: "VpcId"}, {Path: "Description"},
 				{Path: "OwnerId"}, {Path: "SecurityGroupArn"}, {Path: "IpPermissions"},
 				{Path: "IpPermissionsEgress"}, {Path: "Tags"},
-				{Key: "risk_summary", Label: "Risk Summary"},
 			},
 		},
 		"vpc": {

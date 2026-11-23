@@ -73,6 +73,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: Take this IGW's `Attachments[0].VpcId`; cross-reference the already-loaded `rtb` list and filter to route tables whose `VpcId` equals that value; scan their `Routes[]` for any route where `DestinationCidrBlock == "0.0.0.0/0"` and `GatewayId == InternetGatewayId`. If none match, raise the signal.
 
+- **Signal**: `Attachments[0].State` outside the documented list (`available`, `attaching`, `attached`, `detaching`, `detached`).
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -100,6 +104,7 @@ One row per §3 signal (Healthy case omitted per rule):
 | `len(Attachments) == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no VPC attachments` |
 | `Attachments[0].State == detached` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` |
 | IGW attached but VPC has no `0.0.0.0/0 → igw` route — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` |
+| `Attachments[0].State` outside the documented list (`available`, `attaching`, `attached`, `detaching`, `detached`) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 ## 4.1 UX review (two sentences)
 
@@ -135,6 +140,7 @@ igw — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| igw.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports an internet gateway attachment state a9s does not recognise, so a9s cannot tell whether the VPC has an internet path. Check it in the AWS console before relying on it. |
 | igw.state.attaching | attaching | warn | wave1 | The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing. |
 | igw.state.detaching | detaching | warn | wave1 | The gateway is being detached and the call cannot be taken back. When it completes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. If this was not intended, reattach it once the detachment finishes and check the route tables still point at it. |
 | igw.no-attachments | no VPC attachments | warn | wave1 | This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure. |

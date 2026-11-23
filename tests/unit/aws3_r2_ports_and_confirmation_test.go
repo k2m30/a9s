@@ -19,6 +19,7 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -103,14 +104,14 @@ func TestEC2ExposureReadsThePortListNotTheSentence(t *testing.T) {
 // port list: the group's own status cell and the instance's exposure phrase.
 func TestOnePortReadsAsOnePort(t *testing.T) {
 	rows := aws3FetchSGs(t, aws3SG("sg-0aaa111bbb222ccc4", 22, 22))
-	if got := rows[0].Fields["risk_summary"]; got != "port 22 open to 0.0.0.0/0" {
-		t.Errorf("risk_summary = %q, want %q", got, "port 22 open to 0.0.0.0/0")
+	if got := domain.StatusPhrase(rows[0].Findings); got != "port 22 open to 0.0.0.0/0" {
+		t.Errorf("Status cell = %q, want %q", got, "port 22 open to 0.0.0.0/0")
 	}
 	// One rule spanning 22-3389 leaves every sensitive port inside it open, so
 	// the plural arm is exercised with the list sg.go actually derives.
 	rows = aws3FetchSGs(t, aws3SG("sg-0aaa111bbb222ccc5", 3306, 3389))
-	if got := rows[0].Fields["risk_summary"]; got != "ports 3306, 3389 open to 0.0.0.0/0" {
-		t.Errorf("risk_summary = %q, want %q", got, "ports 3306, 3389 open to 0.0.0.0/0")
+	if got := domain.StatusPhrase(rows[0].Findings); got != "ports 3306, 3389 open to 0.0.0.0/0" {
+		t.Errorf("Status cell = %q, want %q", got, "ports 3306, 3389 open to 0.0.0.0/0")
 	}
 }
 

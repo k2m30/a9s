@@ -65,12 +65,10 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 	}, nil
 }
 
-// ec2InstanceGone reports an instance no operator can still reconfigure.
-// It is the single lifecycle guard for every ec2 posture finding — the
-// fetcher's Wave-1 rules and the Wave-2 enricher both call it, so the two
-// waves can never disagree about which instances are still worth reporting.
+// ec2InstanceGone reads the ec2 state table, so the pivots below and the
+// posture rules agree on which instances are still there.
 func ec2InstanceGone(state string) bool {
-	return state == "terminated" || state == "shutting-down"
+	return !LifecycleClassOf("ec2", state).Live()
 }
 
 // ec2InstanceLive is ec2InstanceGone over the SDK struct, for the pivots
@@ -185,44 +183,27 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		RawStruct: inst,
 	}
 
-	switch state {
-	case "pending":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StatePending)}
-	case "shutting-down":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateShuttingDown)}
-	case "stopping":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopping)}
-	case "stopped":
-		if strings.HasPrefix(stateReasonCode, "Server.") {
-			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStoppedServer)}
-		} else {
-			r.Findings = []domain.Finding{wave1Finding(CodeEC2StateStopped)}
-		}
-	case "terminated":
-		r.Findings = []domain.Finding{wave1Finding(CodeEC2StateTerminated)}
+	var posture []domain.Finding
+	if strings.HasPrefix(stateReasonCode, "Server.") {
+		posture = append(posture, wave1Finding(CodeEC2StateStoppedServer))
 	}
-
-	// Posture signals. Independently evaluated and appended, so an instance
-	// that is both IMDSv1-permissive and publicly addressed carries both.
-	if !ec2InstanceGone(state) {
-		// HttpEndpoint == disabled means the metadata service is unreachable
-		// entirely; HttpTokens is moot and produces no signal regardless of
-		// its value.
-		if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional &&
-			inst.MetadataOptions.HttpEndpoint != ec2types.InstanceMetadataEndpointStateDisabled {
-			r.Findings = append(r.Findings, wave1Finding(CodeEC2IMDSv1Allowed))
-			addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{
-				Label: "Metadata tokens", Value: "optional", Tier: "~",
-			})
-		}
-		if publicIP != "" {
-			r.Findings = append(r.Findings, wave1Finding(CodeEC2PublicIP))
-			addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{
-				Label: "Public address", Value: publicIP, Tier: "~",
-			})
-		}
+	// HttpEndpoint == disabled means the metadata service is unreachable
+	// entirely; HttpTokens is moot and produces no signal regardless of its
+	// value.
+	if inst.MetadataOptions != nil && inst.MetadataOptions.HttpTokens == ec2types.HttpTokensStateOptional &&
+		inst.MetadataOptions.HttpEndpoint != ec2types.InstanceMetadataEndpointStateDisabled {
+		posture = append(posture, wave1Finding(CodeEC2IMDSv1Allowed))
 	}
-
+	if publicIP != "" {
+		posture = append(posture, wave1Finding(CodeEC2PublicIP))
+	}
+	r.Findings = withState("ec2", state, posture)
+	if hasFinding(r.Findings, CodeEC2IMDSv1Allowed) {
+		addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{Label: "Metadata tokens", Value: "optional", Tier: "~"})
+	}
+	if hasFinding(r.Findings, CodeEC2PublicIP) {
+		addWave1Rows(&r, CodeEC2PublicIP, domain.DetailRow{Label: "Public address", Value: publicIP, Tier: "~"})
+	}
 	return r
 }
 

@@ -176,6 +176,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `State.Name` outside `InstanceStateName.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -244,6 +248,7 @@ One row per signal from §3:
 | public address behind its interface's security group open on a sensitive port to that address's family, in a subnet routing that family to an internet gateway (`sg`, `rtb` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> reachable from the internet` |
 | public address behind a security group admitting every protocol from `0.0.0.0/0` or `::/0` on that address's family (`sg`, `rtb` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `every port reachable from the internet` |
 | credential in `DescribeInstanceAttribute(userData)` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in user data` |
+| `State.Name` outside `InstanceStateName.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes on list-text construction:
 
@@ -318,6 +323,7 @@ ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ec2.state.stopping | stopping | warn | wave1 | The instance is on its way down and is no longer accepting traffic, so anything routed to it is failing now. Wait for it to reach a stopped state before starting it again or detaching its volumes. |
 | ec2.state.stopped | stopped | warn | wave1 | Nothing this instance hosts is answering, while its EBS volumes and any Elastic IP attached to it keep costing money. Start it if it should be serving, or terminate it and release its volumes if it is genuinely finished with. |
 | ec2.state.stopped.server | stopped by AWS | broken | wave1 | AWS stopped this instance itself rather than an operator doing it, which points at degraded underlying hardware or a billing or compliance action on the account. Start it again so it comes up on different hardware, and check the instance's status events and your account notifications for the reason. |
+| ec2.state.unrecognised | <state> (unrecognised) | warn | wave1 | EC2 reports an instance state a9s does not recognise, so a9s cannot tell whether the instance is serving. Check the instance in the AWS console before relying on it. |
 | ec2.state.terminated | terminated | dim | wave1 | — |
 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record. |
 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | The instance is up but its checks have not passed yet, so a load balancer will not send it traffic and an alarm on it has nothing to judge. Give it a few minutes; a check still initializing well past boot usually means the instance is not finishing its startup. |

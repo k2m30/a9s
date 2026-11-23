@@ -74,8 +74,7 @@ func t561Has(fs []domain.Finding, code domain.FindingCode) bool {
 }
 
 // Each state as AWS sends it yields its lifecycle finding and the finding's
-// colour, both on the fetched row and on a row that reaches the classifier
-// with its findings stripped (the colour recomputed from Fields).
+// colour on the fetched row, whose lifecycle field keeps the value AWS sent.
 func TestT561_VPCEStateAsAWSSendsIt(t *testing.T) {
 	td := resource.FindResourceType("vpce")
 	if td == nil {
@@ -109,9 +108,8 @@ func TestT561_VPCEStateAsAWSSendsIt(t *testing.T) {
 			if got := td.ResolveColor(r); got != c.color {
 				t.Errorf("row colour = %v, want %v", got, c.color)
 			}
-			r.Findings = nil
-			if got := td.ResolveColor(r); got != c.color {
-				t.Errorf("row colour recomputed from Fields = %v, want %v", got, c.color)
+			if got := r.Fields["state"]; got != c.state {
+				t.Errorf("Fields[state] = %q, want the AWS value %q", got, c.state)
 			}
 		})
 	}

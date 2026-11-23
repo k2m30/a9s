@@ -96,13 +96,6 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, rows)
 			}
 		}
-		// A cluster being torn down, or already broken beyond use,
-		// has no posture worth reporting. The two checks above describe the
-		// software it is running; the two below describe how it is reachable,
-		// which is what stops mattering when it is going away.
-		if mskLifecycleEnded(r.Fields["state"]) {
-			return
-		}
 		// A nil anywhere down either chain is unknown, not misconfigured.
 		if bng := prov.BrokerNodeGroupInfo; bng != nil &&
 			bng.ConnectivityInfo != nil &&
@@ -169,15 +162,4 @@ func parseVersionPart(s string) (int, error) {
 		val = val*10 + int(c-'0')
 	}
 	return val, nil
-}
-
-// mskLifecycleEnded reports whether a cluster is on its way out or has
-// failed. Fields["state"] carries the raw ListClustersV2 value.
-func mskLifecycleEnded(state string) bool {
-	switch kafkatypes.ClusterState(state) {
-	case kafkatypes.ClusterStateDeleting, kafkatypes.ClusterStateFailed:
-		return true
-	default:
-		return false
-	}
 }

@@ -102,10 +102,6 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 					"price_class":          priceClass,
 					"lambda_function_arns": strings.Join(lambdaARNs, ","),
 				},
-				// emit canonical Findings for every non-healthy branch colorCF
-				// reads, mirroring colorCF's own precedence (enabled checked
-				// before status) so the Findings list and the row color never
-				// disagree.
 				Findings:  cfWave1Findings(enabled, status),
 				RawStruct: dist,
 			}
@@ -139,16 +135,17 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 	}, nil
 }
 
-// cfWave1Findings returns the wave1 Finding for a CloudFront distribution
-// given the same fields colorCF (catalog_color_helpers.go) reads: enabled and
-// status. Mirrors colorCF's precedence (enabled checked before status) so the
-// two never disagree.
+// cfWave1Findings is the distribution's deployment status, then whether it
+// is switched off: Enabled is a second axis beside Status.
 func cfWave1Findings(enabled, status string) []domain.Finding {
+	var posture []domain.Finding
 	if enabled == "false" {
-		return []domain.Finding{wave1Finding(cfCodeDisabled)}
+		posture = append(posture, wave1Finding(cfCodeDisabled))
 	}
-	if status == "InProgress" {
-		return []domain.Finding{wave1Finding(cfCodeInProgress)}
-	}
-	return nil
+	return withState("cf", status, posture)
 }
+
+// cfStatuses is DistributionSummary.Status as the CloudFront API reference
+// documents it: "When the status is Deployed, the distribution's information
+// is propagated to all CloudFront edge locations", and InProgress before it.
+var cfStatuses = []string{"Deployed", "InProgress"} //nolint:gochecknoglobals // static AWS status domain

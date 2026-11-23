@@ -4,7 +4,10 @@ package aws
 
 import (
 	"context"
-	"strconv"
+
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -12,77 +15,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-func colorELB(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(elbStateFindings(r.Fields["state"]))
-}
-
 func colorTG(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	return domain.ColorHealthy
-}
-
-func colorVPC(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(vpcStateFindings(r.Fields["state"]))
-}
-
-func colorSubnet(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(subnetFindings(r.Fields["state"], r.Fields["auto_public_ip"]))
-}
-
-func colorRTB(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	blackhole, _ := strconv.Atoi(r.Fields["blackhole_routes_count"])
-	associations, _ := strconv.Atoi(r.Fields["associations_count"])
-	return colorFromFindings(rtbFindings(blackhole, associations, r.Fields["is_main"]))
-}
-
-func colorNAT(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(natStateFindings(r.Fields["state"]))
-}
-
-func colorIGW(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
-	return colorFromFindings(igwFindings(r.Fields["state"], attachments))
-}
-
-func colorVPCE(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(vpceFindings(r.Fields["state"], r.Fields["policy_exposure"]))
-}
-
-func colorTGW(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(tgwFindings(r.Fields["state"], r.Fields["auto_accept"]))
-}
-
-func colorENI(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(eniFindings(r.Fields["status"], r.Fields["requester_managed"]))
 }
 
 var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -114,7 +51,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"load_balancer_arn": "load_balancer_arn", "lb_name": "Name"},
 			DisplayNameKey: "lb_name",
 		}},
-		Color:          colorELB,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[elbv2types.LoadBalancerStateEnum](),
+		NormalStates:   []string{string(elbv2types.LoadBalancerStateEnumActive)},
+		UnknownState:   CodeELBUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ELBv2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
@@ -141,9 +81,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "AvailabilityZones.SubnetId", TargetType: "subnet"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses."},
-			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses."},
-			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime."},
+			unrecognisedStateDef(CodeELBUnrecognisedState, "<state>", "wave1", "AWS reports a load balancer state a9s does not recognise, so a9s cannot tell whether it routes traffic. Check it in the AWS console before relying on it."),
+			{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses.", States: []string{"provisioning"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses.", States: []string{"active_impaired"}, Class: catalog.LifecycleFailedLive, SeverityDeviates: true},
+			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime.", States: []string{"failed"}, Class: catalog.LifecycleFailedLive},
 			{Code: elbCodeMisconfigured, Phrase: "deletion protection or access logs disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "This load balancer can be deleted with a single call, or is not writing access logs, so an outage is one call away, or leaves no record of the requests that hit it. Turn deletion protection on and point access logs at a bucket."},
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2", Detail: "The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest."},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2", Detail: "Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields."},
@@ -237,7 +178,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichSGUsage, Priority: 100, Reads: []string{"eni"}},
-		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "open_ports", "risk_summary"},
+		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "open_ports"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false, Mirror: true},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSGEC2, NeedsTargetCache: true, Truncated: true, Mirror: true},
@@ -276,7 +217,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9},
 			{Key: "flow_logs", Title: "Flow Logs", Width: 10},
 		},
-		Color:          colorVPC,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.VpcState](),
+		NormalStates:   []string{string(ec2types.VpcStateAvailable)},
+		UnknownState:   CodeVPCUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCsPage(ctx, c.EC2, continuationToken)
@@ -299,7 +243,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it."},
+			unrecognisedStateDef(CodeVPCUnrecognisedState, "<state>", "wave1", "AWS reports a VPC state a9s does not recognise, so a9s cannot tell whether resources can be placed in it. Check it in the AWS console before relying on it."),
+			{Code: CodeVPCStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is being deleted. Anything still placed in it has to be gone before the deletion completes; if this was not intended, recreate it from its infrastructure code before workloads need it.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
 			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No delivering flow log covers this VPC — none on the VPC itself, and not one on every subnet; a flow log whose delivery fails writes nothing — so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3, and fix any failing delivery named below."},
 		},
 	},
@@ -323,7 +269,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
 			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 		},
-		Color:          colorSubnet,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.SubnetState](),
+		NormalStates:   []string{string(ec2types.SubnetStateAvailable)},
+		UnknownState:   CodeSubnetUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSubnetsPage(ctx, c.EC2, continuationToken)
@@ -347,10 +296,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "VpcId", TargetType: "vpc"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The subnet is still being created and cannot host network interfaces yet. Wait for it to become available before launching into it."},
-			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet is not usable, so anything scheduled into it fails to get an address — which presents as launch failures rather than as a subnet problem. Check the Availability Zone's status and the subnet's configuration, and place workloads elsewhere meanwhile."},
-			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet could not be created, so any launch template, node group or service that names it will fail. Recreate it, or repoint the resources that reference it at a working subnet."},
-			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS had no capacity in this Availability Zone to create the subnet, so nothing can be placed here. Use another zone, and spread the workload's subnets across zones so one zone's capacity cannot block it again."},
+			unrecognisedStateDef(CodeSubnetUnrecognisedState, "<state>", "wave1", "AWS reports a subnet state a9s does not recognise, so a9s cannot tell whether launches into it can get an address. Check it in the AWS console before relying on it."),
+			{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The subnet is still being created and cannot host network interfaces yet. Wait for it to become available before launching into it.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet is not usable, so anything scheduled into it fails to get an address — which presents as launch failures rather than as a subnet problem. Check the Availability Zone's status and the subnet's configuration, and place workloads elsewhere meanwhile.", States: []string{"unavailable"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet could not be created, so any launch template, node group or service that names it will fail. Recreate it, or repoint the resources that reference it at a working subnet.", States: []string{"failed"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS had no capacity in this Availability Zone to create the subnet, so nothing can be placed here. Use another zone, and spread the workload's subnets across zones so one zone's capacity cannot block it again.", States: []string{"failed-insufficient-capacity"}, Class: catalog.LifecycleFailedLive},
 			{Code: CodeSubnetAutoPublicIP, Phrase: SubnetAutoPublicIPPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one."},
 		},
 	},
@@ -372,7 +322,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "associations_count", Title: "Assoc.", Width: 8},
 			{Key: "blackhole_routes_count", Title: "Blackholes", Width: 10},
 		},
-		Color:          colorRTB,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRouteTablesPage(ctx, c.EC2, continuationToken)
@@ -422,7 +372,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Failure", Path: "FailureCode", Width: 22},
 			{Key: "public_ip", Title: "Public IP", Width: 16},
 		},
-		Color:          colorNAT,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.NatGatewayState](),
+		NormalStates:   []string{string(ec2types.NatGatewayStateAvailable)},
+		UnknownState:   CodeNATUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
@@ -443,10 +396,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being created, so private subnets routed at it have no outbound path yet. Wait for it to become available before expecting egress to work."},
-			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is going away, and once it does every subnet routed through it loses outbound internet access. Confirm the replacement exists and the route tables point at it before this finishes."},
-			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The gateway could not be created, so the private subnets routing through it have no path out and their workloads fail on any external call. Check the Elastic IP and the public subnet it was placed in, then create it again."},
-			{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			unrecognisedStateDef(CodeNATUnrecognisedState, "<state>", "wave1", "AWS reports a NAT gateway state a9s does not recognise, so a9s cannot tell whether private subnets have an outbound path through it. Check it in the AWS console before relying on it."),
+			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being created, so private subnets routed at it have no outbound path yet. Wait for it to become available before expecting egress to work.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is going away, and once it does every subnet routed through it loses outbound internet access. Confirm the replacement exists and the route tables point at it before this finishes.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The gateway could not be created, so the private subnets routing through it have no path out and their workloads fail on any external call. Check the Elastic IP and the public subnet it was placed in, then create it again.", States: []string{"failed"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
 		},
 	},
 	{
@@ -465,7 +419,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Width: 24},
 			{Key: "state", Title: "Status", Width: 12},
 		},
-		Color:          colorIGW,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      igwAttachmentStates,
+		NormalStates:   []string{"available", "attached"},
+		UnknownState:   CodeIGWUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchInternetGatewaysPage(ctx, c.EC2, continuationToken)
@@ -480,9 +437,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing."},
-			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being detached and the call cannot be taken back. When it completes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. If this was not intended, reattach it once the detachment finishes and check the route tables still point at it."},
-			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1", Detail: "This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure."},
+			unrecognisedStateDef(CodeIGWUnrecognisedState, "<state>", "wave1", "AWS reports an internet gateway attachment state a9s does not recognise, so a9s cannot tell whether the VPC has an internet path. Check it in the AWS console before relying on it."),
+			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing.", States: []string{"attaching"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being detached and the call cannot be taken back. When it completes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. If this was not intended, reattach it once the detachment finishes and check the route tables still point at it.", States: []string{"detaching"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1", Detail: "This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure.", States: []string{"detached"}, Class: catalog.LifecyclePaused, SeverityDeviates: true},
 		},
 	},
 	{
@@ -555,7 +513,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Title: "Last Error", Path: "LastError.Message", Width: 32},
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 		},
-		Color:          colorVPCE,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      vpceStates,
+		NormalStates:   []string{"available"},
+		UnknownState:   CodeVPCEUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
@@ -580,14 +541,15 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "RouteTableIds", TargetType: "rtb"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request."},
-			{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available."},
-			{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it."},
-			{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint could not be created, so the service it was meant to reach privately is unreachable from this VPC. Check the subnets, the security groups and the service name, then create it again."},
-			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The service owner refused this connection, so the endpoint exists and carries nothing. Sort out access with the owning account before recreating it."},
-			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept."},
-			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones."},
-			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			unrecognisedStateDef(CodeVPCEUnrecognisedState, "<state>", "wave1", "AWS reports an endpoint state a9s does not recognise, so a9s cannot tell whether the service is reachable through it. Check it in the AWS console before relying on it."),
+			{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request.", States: []string{"pendingAcceptance"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint could not be created, so the service it was meant to reach privately is unreachable from this VPC. Check the subnets, the security groups and the service name, then create it again.", States: []string{"failed"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The service owner refused this connection, so the endpoint exists and carries nothing. Sort out access with the owning account before recreating it.", States: []string{"rejected"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept.", States: []string{"expired"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones.", States: []string{"partial"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
 			{Code: CodeVPCEPolicyOpen, Phrase: VPCEPolicyOpenPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach."},
 		},
 	},
@@ -609,7 +571,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
-		Color:          colorTGW,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.TransitGatewayState](),
+		NormalStates:   []string{string(ec2types.TransitGatewayStateAvailable)},
+		UnknownState:   CodeTGWUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchTransitGatewaysPage(ctx, c.EC2, continuationToken)
@@ -625,11 +590,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("tgw")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being created and does not route yet. Attachments created now stay pending until it comes up."},
-			{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is being applied. Routing across the gateway can be inconsistent until it settles."},
-			{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop."},
-			{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path."},
-			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			unrecognisedStateDef(CodeTGWUnrecognisedState, "<state>", "wave1", "AWS reports a transit gateway state a9s does not recognise, so a9s cannot tell whether it routes between its attachments. Check it in the AWS console before relying on it."),
+			{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being created and does not route yet. Attachments created now stay pending until it comes up.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is being applied. Routing across the gateway can be inconsistent until it settles.", States: []string{"modifying"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
 			{Code: tgwCodeAttachmentFailed, Phrase: "attachment failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment."},
 			{Code: tgwCodeAttachmentTransitional, Phrase: "attachment between states", Severity: domain.SevWarn, Source: "wave2", Detail: "The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it."},
 			{Code: CodeTGWAutoAccept, Phrase: TGWAutoAcceptPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly."},
@@ -653,7 +618,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 		},
-		Color:          colorENI,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.NetworkInterfaceStatus](),
+		NormalStates:   []string{string(ec2types.NetworkInterfaceStatusAvailable), string(ec2types.NetworkInterfaceStatusAssociated), string(ec2types.NetworkInterfaceStatusInUse)},
+		UnknownState:   CodeENIUnrecognisedStatus,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
@@ -683,15 +651,16 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "PrivateIpAddresses.Association.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance it belongs to does not have this network path yet. If it stays here, read the attachment's error: the usual causes are the interface and the instance being in different Availability Zones, the device index already in use, or the instance type having no room for another interface."},
-			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses."},
-			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it."},
+			unrecognisedStateDef(CodeENIUnrecognisedStatus, "<status>", "wave1", "AWS reports a network interface status a9s does not recognise, so a9s cannot tell whether the interface carries traffic. Check it in the AWS console before relying on it."),
+			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance it belongs to does not have this network path yet. If it stays here, read the attachment's error: the usual causes are the interface and the instance being in different Availability Zones, the device index already in use, or the instance type having no room for another interface.", States: []string{"attaching"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses.", States: []string{"detaching"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it.", AppliesInStates: []string{string(ec2types.NetworkInterfaceStatusAvailable)}},
 		},
 	},
 	{
 		Name:           "Transfer Family",
 		ShortName:      "transfer",
-		HumanizeFields: []string{"endpoint_type", "identity_provider_type", "domain"},
+		HumanizeFields: []string{"endpoint_type", "identity_provider_type", "domain", "status"},
 		Aliases:        []string{"transfer", "sftp", "as2", "ftps"},
 		Category:       "NETWORKING",
 		CloudTrailKey:  "ResourceName:ID",
@@ -714,6 +683,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "server_id",
 		}},
 		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[transfertypes.State](),
+		NormalStates:   []string{string(transfertypes.StateOnline)},
+		UnknownState:   transferCodeUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Transfer} }),
 		Fetcher:        fetcherWithClients(FetchTransferServersPage),
 		Wave2:          IssueEnricher{Fn: EnrichTransferSecurityPolicy, Priority: 100},
@@ -742,11 +714,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "IdentityProviderDetails.Function", TargetType: "lambda"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: transferCodeOffline, Phrase: "offline: not accepting transfers", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is not accepting connections, so partners fail to connect rather than seeing an error they can act on. Start it if that was not deliberate, and tell the partners if it is going to stay down."},
-			{Code: transferCodeStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is coming up and is not answering yet, so a partner connecting now is refused. Wait for it to come online before rerunning a failed transfer."},
-			{Code: transferCodeStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down."},
-			{Code: transferCodeStartFailed, Phrase: "start failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again."},
-			{Code: transferCodeStopFailed, Phrase: "stop failed", Severity: domain.SevWarn, Source: "wave1", Detail: "The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off."},
+			{Code: transferCodeOffline, Phrase: "offline: not accepting transfers", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is not accepting connections, so partners fail to connect rather than seeing an error they can act on. Start it if that was not deliberate, and tell the partners if it is going to stay down.", States: []string{string(transfertypes.StateOffline)}, Class: catalog.LifecyclePaused, SeverityDeviates: true},
+			{Code: transferCodeStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is coming up and is not answering yet, so a partner connecting now is refused. Wait for it to come online before rerunning a failed transfer.", States: []string{string(transfertypes.StateStarting)}, Class: catalog.LifecycleTransitional},
+			{Code: transferCodeStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down.", States: []string{string(transfertypes.StateStopping)}, Class: catalog.LifecycleTransitional},
+			{Code: transferCodeStartFailed, Phrase: "start failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again.", States: []string{string(transfertypes.StateStartFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: transferCodeStopFailed, Phrase: "stop failed", Severity: domain.SevWarn, Source: "wave1", Detail: "The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off.", States: []string{string(transfertypes.StateStopFailed)}, Class: catalog.LifecycleFailedLive, SeverityDeviates: true},
+			unrecognisedStateDef(transferCodeUnrecognised, "<state>", "wave1", "AWS Transfer Family reports a server state a9s does not recognise, so a9s cannot tell whether the server accepts partner connections. Check it in the Transfer Family console before relying on it."),
 			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave2", Detail: "The server's security policy still offers key exchanges, message checks or TLS cipher suites that are no longer safe, so a client can settle on one that does not protect the session. Move the server to a current security policy."},
 			{Code: transferCodeNoLogging, Phrase: "no activity logging", Severity: domain.SevWarn, Source: "wave1", Detail: "The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination."},
 			DetailsDeniedFindingDef("transfer", "Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh."),
@@ -773,6 +746,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "expires", Title: "Expires", Width: 17},
 		},
 		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.VpcPeeringConnectionStateReasonCode](),
+		NormalStates:   []string{string(ec2types.VpcPeeringConnectionStateReasonCodeActive)},
+		UnknownState:   vpcPeerCodeUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVpcPeeringConnectionsPage(ctx, c.EC2, continuationToken)
@@ -785,17 +761,18 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc-peer")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being set up and does not carry traffic yet. Wait for it to become active, then add routes on both sides before expecting anything to cross."},
-			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1", Detail: "The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing."},
-			{Code: vpcPeerCodePendingAcceptance, Phrase: "pending acceptance: expires in <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it."},
-			{Code: vpcPeerCodeExpired, Phrase: "expired: never accepted", Severity: domain.SevWarn, Source: "wave1", Detail: "The peering request was never answered and has lapsed, so no traffic crosses and the connection cannot be accepted now. Delete it and raise a new request once the other account is ready to accept."},
-			{Code: vpcPeerCodeRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees."},
-			{Code: vpcPeerCodeFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one."},
-			{Code: vpcPeerCodeDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended."},
-			{Code: vpcPeerCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
-			{Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer", Severity: domain.SevWarn, Source: "wave1", Detail: "The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap."},
-			{Code: vpcPeerCodeNoLocalRoute, Phrase: "no local route to peer", Severity: domain.SevWarn, Source: "wave2", Detail: "The connection is active but no loaded route table sends anything to it, so it carries no traffic and looks connected while behaving as if it were not. Add a route to the peer's address range in the route tables of the subnets that need it."},
-			{Code: vpcPeerCodeRouteBlackholed, Phrase: "route to peer blackholed", Severity: domain.SevWarn, Source: "wave2", Detail: "A route points at this connection and its state is blackhole, so packets matching it are dropped silently, which reads as a firewall problem from the instance's side. Repoint the route at a live target or remove it."},
+			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being set up and does not carry traffic yet. Wait for it to become active, then add routes on both sides before expecting anything to cross.", States: []string{"provisioning"}, Class: catalog.LifecycleTransitional},
+			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1", Detail: "The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing.", States: []string{"initiating-request"}, Class: catalog.LifecycleTransitional},
+			{Code: vpcPeerCodePendingAcceptance, Phrase: "pending acceptance: expires in <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it.", States: []string{"pending-acceptance"}, Class: catalog.LifecycleTransitional},
+			{Code: vpcPeerCodeExpired, Phrase: "expired: never accepted", Severity: domain.SevWarn, Source: "wave1", Detail: "The peering request was never answered and has lapsed, so no traffic crosses and the connection cannot be accepted now. Delete it and raise a new request once the other account is ready to accept.", States: []string{"expired"}, Class: catalog.LifecycleEnded, SeverityDeviates: true},
+			{Code: vpcPeerCodeRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees.", States: []string{"rejected"}, Class: catalog.LifecycleEnded, SeverityDeviates: true},
+			{Code: vpcPeerCodeFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one.", States: []string{"failed"}, Class: catalog.LifecycleEnded, SeverityDeviates: true},
+			{Code: vpcPeerCodeDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: vpcPeerCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(vpcPeerCodeUnrecognised, "<status>", "wave1", "AWS reports a peering connection status a9s does not recognise, so a9s cannot tell whether traffic crosses it. Check the connection in the AWS console before relying on it."),
+			{Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer", Severity: domain.SevWarn, Source: "wave1", Detail: "The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: vpcPeerCodeNoLocalRoute, Phrase: "no local route to peer", Severity: domain.SevWarn, Source: "wave2", Detail: "The connection is active but no loaded route table sends anything to it, so it carries no traffic and looks connected while behaving as if it were not. Add a route to the peer's address range in the route tables of the subnets that need it.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: vpcPeerCodeRouteBlackholed, Phrase: "route to peer blackholed", Severity: domain.SevWarn, Source: "wave2", Detail: "A route points at this connection and its state is blackhole, so packets matching it are dropped silently, which reads as a firewall problem from the instance's side. Repoint the route at a live target or remove it.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
 		},
 	},
 }

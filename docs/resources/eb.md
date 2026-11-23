@@ -101,15 +101,15 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `eb`.
 
 One bullet per distinct signal. AWS field names verbatim.
 
-- **Signal**: `Health == Yellow`.
+- **Signal**: `Health == Yellow`, beside `Status == Ready` or an operation in flight (`Launching`, `Updating`), where it is the outcome of that operation. Not beside `Terminating` or `Terminated`.
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "something is wrong — two consecutive health-check failures".
 
-- **Signal**: `Health == Grey`.
+- **Signal**: `Health == Grey`, beside `Status == Ready` only. In any other status Grey restates the operation the status already names.
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "new environment not fully launched, or health checks suspended during an `UpdateEnvironment`/`RestartEnvironment` request".
 
-- **Signal**: `Health == Red`.
+- **Signal**: `Health == Red`, in the same statuses as Yellow.
   - **State bucket**: Broken.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "environment not responsive — three or more consecutive health-check failures".
 
@@ -123,6 +123,14 @@ One bullet per distinct signal. AWS field names verbatim.
 
 - **Signal**: `Status == Terminating` with no health signal.
   - **State bucket**: Dim.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status in (Aborting, LinkingFrom, LinkingTo)`.
+  - **State bucket**: Warning. The environment settles on its own.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status` outside `EnvironmentStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -173,6 +181,8 @@ One row per signal from §3:
 | managed platform updates not enabled | 2 | Warning | `~` | S2, S3, S4, S5 | `managed platform updates off` |
 | health reporting not `enhanced` | 2 | Warning | `~` | S2, S3, S4, S5 | `enhanced health reporting off` |
 | log streaming to CloudWatch not enabled | 2 | Warning | `~` | S2, S3, S4, S5 | `log streaming to CloudWatch off` |
+| `Status in (Aborting, LinkingFrom, LinkingTo)` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
+| `Status` outside `EnvironmentStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes on the `Causes[]` row:
 
@@ -234,6 +244,8 @@ eb — MESSAGING. Status key: `status` — the key the status cell reads, and th
 | eb.status.terminated | terminated | dim | wave1 | — |
 | eb.status.launching | launching | warn | wave1 | The environment is still creating its instances and load balancer, so it does not serve yet. Wait for it to reach a health state before deploying an application version onto it. |
 | eb.status.terminating | terminating | dim | wave1 | — |
+| eb.status.transitional | <status> | warn | wave1 | Elastic Beanstalk is aborting an update or linking this environment to another, and the environment settles on its own once that finishes. Wait for it before deploying another version onto it. |
+| eb.status.unrecognised | <status> (unrecognised) | warn | wave1 | Elastic Beanstalk reports an environment status a9s does not recognise, so a9s cannot tell whether the environment serves its application. Check the environment's events before relying on it. |
 | eb.environment-causes | environment reports health causes | warn | wave2 | The environment is reporting specific health causes rather than a clean bill, so something is wrong even if requests are still being served. Read the causes list; each one names an instance or a deployment step to look at. |
 | eb.managed-updates-off | managed platform updates off | warn | wave2 | The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window. |
 | eb.enhanced-health-off | enhanced health reporting off | warn | wave2 | Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced. |

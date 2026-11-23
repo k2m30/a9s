@@ -119,6 +119,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `DescribeLoadBalancers` response fields `LoadBalancer.State.Code` and `LoadBalancer.State.Reason`.
 
+- **Signal**: `State.Code` outside `LoadBalancerStateEnum.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen. Target health is not among them: it lives on `tg`, and that Wave 2 belongs to the target-group spec.
@@ -172,6 +176,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S2, S3, S4, S5 | `<port(s) LIST> in the clear` |
 | `HTTPS`/`TLS` listener whose policy's `SslProtocols` lists `TLSv1` or `TLSv1.1` | 2 | Warning | `~` | S2, S3, S4, S5 | `weak TLS policy on <port(s) LIST>` |
 | `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` (access logs on a Network Load Balancer only with a TLS listener) | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
+| `State.Code` outside `LoadBalancerStateEnum.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
 
@@ -211,6 +216,7 @@ elb — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| elb.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a load balancer state a9s does not recognise, so a9s cannot tell whether it routes traffic. Check it in the AWS console before relying on it. |
 | elb.state.provisioning | provisioning | warn | wave1 | The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses. |
 | elb.state.active\_impaired | active impaired | warn | wave1 | The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses. |
 | elb.state.failed | failed | broken | wave1 | The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime. |

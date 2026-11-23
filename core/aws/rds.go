@@ -91,7 +91,6 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 		}
 
 		findings, attentionDetails := computeDBIFindings(db, now)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       dbIdentifier,
@@ -101,7 +100,7 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 				"db_identifier":           dbIdentifier,
 				"engine":                  engine,
 				"engine_version":          engineVersion,
-				"status":                  statusPhrase,
+				"status":                  aws.ToString(db.DBInstanceStatus),
 				"status_raw":              aws.ToString(db.DBInstanceStatus),
 				"class":                   class,
 				"endpoint":                endpoint,
@@ -143,27 +142,15 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 }
 
 // computeDBIFindings returns the findings for an RDS DB instance plus the
-// supporting AttentionDetail rows keyed by the finding that owns them.
-// The lifecycle status leads; the security-posture pack (rds_posture.go) is
-// evaluated independently and stacks on top of whatever the lifecycle status
-// says, except on an instance that is being torn down.
+// supporting AttentionDetail rows keyed by the finding that owns them. The
+// transitional phrase names the pending modification that is being applied.
 func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	status := aws.ToString(db.DBInstanceStatus)
 	postureFindings, postureDetails := dbiPostureFindings(db, now)
-	// An instance on its way out has no posture worth reporting.
-	if isTeardownStatus(status) {
-		postureFindings, postureDetails = nil, nil
-	}
 
 	transitionalPhrase := status
 	if key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues); key != "" {
 		transitionalPhrase = status + ": " + key
-	}
-	if lead, ok := dbiLifecycle.finding(status, transitionalPhrase); ok {
-		return append([]domain.Finding{lead}, postureFindings...), postureDetails
-	}
-	if status != "available" {
-		return postureFindings, postureDetails
 	}
 
 	var findings []domain.Finding
@@ -179,7 +166,7 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 	if db.DeletionProtection != nil && !*db.DeletionProtection {
 		findings = append(findings, wave1Finding(CodeDBIDeletionProtectionOff))
 	}
-	return append(findings, postureFindings...), postureDetails
+	return withState("dbi", status, append(findings, postureFindings...), transitionalPhrase), postureDetails
 }
 
 // dbiPostureFindings evaluates the shared RDS posture predicates plus the

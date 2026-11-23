@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// trail_codes.go — canonical FindingCode constants for the trail resource
-// type. The fetcher and EnrichTrail write Findings using these codes;
-// colorTrail (catalog_monitoring.go) reads the same underlying Fields to color
-// rows — both derive from the identical DescribeTrails/GetTrailStatus
-// conditions so the Findings list and the row color never disagree.
 package aws
 
 import (
@@ -74,9 +69,7 @@ func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 }
 
 // trailDeliveryIsStale reports whether latestDeliveryTime (RFC3339) is older
-// than trailDeliveryStaleAfter, given the trail is currently logging. Both
-// trailWave1Wave2Findings and colorTrail call this so the Findings list and
-// the row color never disagree about the stale-delivery condition.
+// than trailDeliveryStaleAfter, given the trail is currently logging.
 func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 	if isLogging != "true" || latestDeliveryTime == "" {
 		return false
@@ -88,12 +81,6 @@ func trailDeliveryIsStale(isLogging, latestDeliveryTime string) bool {
 	return time.Since(t) > trailDeliveryStaleAfter
 }
 
-// trailWave1Wave2Findings returns the Finding slice for a CloudTrail trail
-// given the same fields colorTrail (catalog_monitoring.go) reads: is_logging,
-// latest_delivery_error, latest_delivery_time, and
-// log_file_validation_enabled. Mirrors colorTrail's precedence (broken
-// conditions checked before the warning condition) so the two never disagree
-// about a trail's health.
 func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logFileValidationEnabled string) []domain.Finding {
 	findings := trailStatusFindings(isLogging, latestDeliveryError, latestDeliveryTime)
 	if logFileValidationEnabled == "false" {

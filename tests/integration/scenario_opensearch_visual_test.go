@@ -53,10 +53,11 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	// Menu badge — the count of rows whose colour is an issue. Colour is
 	// the worst severity among a row's findings, so a Warn finding counts
 	// wherever it came from and a Dim one never does.
-	// Over the 13 opensearch fixtures:
+	// Over the 14 opensearch fixtures:
 	//   Broken (2):  legacy-search-isolated (isolated),
 	//                acme-public-search (reachable outside a VPC)
-	//   Warning (8): acme-events and acme-search-alpha (processing),
+	//   Warning (9): acme-search-new (creating),
+	//                acme-events and acme-search-alpha (processing),
 	//                acme-product-search and acme-metrics (update forced),
 	//                legacy-analytics (encryption at rest off),
 	//                acme-http-search (HTTPS not enforced),
@@ -66,9 +67,9 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//                degradation rather than an IAM denial)
 	//   Not counted (3): staging-analytics and acme-logs are clean, and
 	//                obsolete-tenant-logs is Dim.
-	// 2 + 8 = 10. The encryption and transport rows are Wave 1 findings, so
+	// 2 + 9 = 11. The encryption and transport rows are Wave 1 findings, so
 	// they colour their own rows and count here.
-	scenario.ExpectMenuIssueCount("opensearch", 10)
+	scenario.ExpectMenuIssueCount("opensearch", 11)
 
 	scenario.OpenList("opensearch")
 

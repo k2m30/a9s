@@ -29,4 +29,6 @@ const (
 
 	// CodeNGStateDegraded — node group is degraded.
 	CodeNGStateDegraded domain.FindingCode = "ng.state.degraded"
+
+	CodeNGUnrecognisedStatus domain.FindingCode = "ng.state.unrecognised"
 )

@@ -33,32 +33,14 @@ const (
 	// expiry windows above. Expiry takes priority over orphan.
 	acmCodeOrphan domain.FindingCode = "acm.orphan"
 
-	// acmCodeStatusPendingValidation — Status==PENDING_VALIDATION. The
-	// certificate is awaiting DNS/email validation before ACM can issue it.
 	acmCodeStatusPendingValidation domain.FindingCode = "acm.status.pending-validation"
-	// acmCodeStatusFailed — Status is one of EXPIRED, REVOKED, FAILED, or
-	// VALIDATION_TIMED_OUT. The certificate cannot be used for TLS.
-	acmCodeStatusFailed domain.FindingCode = "acm.status.failed"
-	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate not
-	// attached to any resource for TLS termination.
-	acmCodeStatusInactive domain.FindingCode = "acm.status.inactive"
+	acmCodeStatusFailed            domain.FindingCode = "acm.status.failed"
+	acmCodeStatusInactive          domain.FindingCode = "acm.status.inactive"
+	acmCodeStatusUnrecognised      domain.FindingCode = "acm.status.unrecognised"
 
 	// CodeACMWeakKey — KeyAlgorithm is RSA below 2048 bits. Elliptic-curve
 	// keys and RSA 2048+ are fine.
 	CodeACMWeakKey domain.FindingCode = "acm.weak-key"
-)
-
-// The certificate statuses acmStatusFindings reports on, in the words
-// HumanizeStatusPhrase renders and the fetcher writes into Fields. A status
-// outside this vocabulary is reported on like an absent one: nothing.
-const (
-	acmStatusIssued             = "issued"
-	acmStatusPendingValidation  = "pending validation"
-	acmStatusExpired            = "expired"
-	acmStatusRevoked            = "revoked"
-	acmStatusFailed             = "failed"
-	acmStatusValidationTimedOut = "validation timed out"
-	acmStatusInactive           = "inactive"
 )
 
 // acmRSAMinimumBits is the shortest RSA key still considered sound.
@@ -152,7 +134,6 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			id = domainName
 		}
 
-		statusWords := domain.HumanizeStatusPhrase(status)
 		keyAlgorithm := acmKeyAlgorithmWords(string(cert.KeyAlgorithm))
 
 		r := resource.Resource{
@@ -161,14 +142,14 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			Fields: map[string]string{
 				"domain_name":     domainName,
 				"certificate_arn": certARN,
-				"status":          statusWords,
+				"status":          status,
 				"type":            domain.HumanizeStatusPhrase(certType),
 				"not_after":       notAfter,
 				"in_use":          inUse,
 				"days_left":       daysLeft,
 				"key_algorithm":   keyAlgorithm,
 			},
-			Findings:  acmFindings(statusWords, notAfter, inUse, keyAlgorithm, now),
+			Findings:  acmFindings(status, notAfter, inUse, keyAlgorithm, now),
 			RawStruct: cert,
 		}
 
@@ -204,27 +185,19 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 	}, nil
 }
 
-// acmFindings is the one predicate for a certificate. An issued cert gets the
-// expiry/orphan check; every other status carries its own status finding. The
-// key algorithm is independent of both — a cert can be issued, in use, valid
-// for a year, and still built on a key worth attacking.
-//
-// Every argument is a value the fetcher writes into Fields, so a row rebuilt
-// from Fields alone reaches the same verdict.
-func acmFindings(statusWords, notAfter, inUse, keyAlgorithmWords string, now time.Time) []domain.Finding {
-	var out []domain.Finding
-	if statusWords == acmStatusIssued {
-		out = acmIssuedFindings(notAfter, inUse, now)
-	} else {
-		out = acmStatusFindings(statusWords)
-	}
+// acmFindings is the one predicate for a certificate. The expiry/orphan
+// check is declared for an issued cert; every other status carries its own
+// status finding. The key algorithm is independent of both — a cert can be
+// issued, in use, valid for a year, and still built on a key worth attacking.
+func acmFindings(status, notAfter, inUse, keyAlgorithmWords string, now time.Time) []domain.Finding {
+	posture := acmIssuedFindings(notAfter, inUse, now)
 	if acmKeyIsWeak(keyAlgorithmWords) {
-		out = append(out, wave1Finding(CodeACMWeakKey))
+		posture = append(posture, wave1Finding(CodeACMWeakKey))
 	}
-	return out
+	return withState("acm", status, posture, strings.ToLower(domain.HumanizeStatusPhrase(status)))
 }
 
-// acmIssuedFindings returns the wave1 expiry/orphan Finding for an ISSUED
+// acmIssuedFindings returns the wave1 expiry/orphan Finding of a
 // certificate, read straight off ListCertificates' CertificateSummary
 // (NotAfter, InUse). Expiry takes priority over orphan: an expiring orphan
 // cert is still primarily an expiry problem.
@@ -243,22 +216,6 @@ func acmIssuedFindings(notAfter, inUse string, now time.Time) []domain.Finding {
 	}
 	if inUse == "false" {
 		return []domain.Finding{wave1Finding(acmCodeOrphan)}
-	}
-	return nil
-}
-
-// acmStatusFindings returns the wave1 Finding for a non-ISSUED certificate
-// status, mirroring acmColor's (catalog_color_helpers.go) own precedence so
-// the Findings list and the row color never disagree. ISSUED certs are
-// routed to acmIssuedFindings by acmFindings instead.
-func acmStatusFindings(statusWords string) []domain.Finding {
-	switch statusWords {
-	case acmStatusPendingValidation:
-		return []domain.Finding{wave1Finding(acmCodeStatusPendingValidation)}
-	case acmStatusExpired, acmStatusRevoked, acmStatusFailed, acmStatusValidationTimedOut:
-		return []domain.Finding{wave1Finding(acmCodeStatusFailed, statusWords)}
-	case acmStatusInactive:
-		return []domain.Finding{wave1Finding(acmCodeStatusInactive)}
 	}
 	return nil
 }

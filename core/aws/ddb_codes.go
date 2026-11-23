@@ -5,12 +5,14 @@ package aws
 import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
-	CodeDDBKMSKeyInaccessible domain.FindingCode = "ddb.broken.kms_key_inaccessible"
-	CodeDDBArchivedKMSLost    domain.FindingCode = "ddb.broken.archived_kms_lost"
-	CodeDDBCreating           domain.FindingCode = "ddb.warn.creating"
-	CodeDDBUpdating           domain.FindingCode = "ddb.warn.updating"
-	CodeDDBDeleting           domain.FindingCode = "ddb.warn.deleting"
-	CodeDDBArchiving          domain.FindingCode = "ddb.warn.archiving"
+	CodeDDBKMSKeyInaccessible       domain.FindingCode = "ddb.broken.kms_key_inaccessible"
+	CodeDDBArchivedKMSLost          domain.FindingCode = "ddb.broken.archived_kms_lost"
+	CodeDDBCreating                 domain.FindingCode = "ddb.warn.creating"
+	CodeDDBUpdating                 domain.FindingCode = "ddb.warn.updating"
+	CodeDDBDeleting                 domain.FindingCode = "ddb.warn.deleting"
+	CodeDDBArchiving                domain.FindingCode = "ddb.warn.archiving"
+	CodeDDBReplicationNotAuthorized domain.FindingCode = "ddb.broken.replication_not_authorized"
+	CodeDDBUnrecognisedStatus       domain.FindingCode = "ddb.warn.unrecognised_status"
 )
 
 // CodeDDBDeletionProtectionOff is the wave-1 posture finding read from the

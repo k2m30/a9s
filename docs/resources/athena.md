@@ -78,6 +78,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: as above; the row reads `details unavailable` instead of `details denied`.
 
+- **Signal**: `State` outside `WorkGroupState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -118,6 +122,7 @@ One row per signal from §3:
 | `ResultConfiguration.EncryptionConfiguration == nil` without Athena owned storage | 2 | Warning | `~` | S2, S3, S4, S5 | `result encryption not set` |
 | `GetWorkGroup` was denied for this workgroup | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `GetWorkGroup` failed for this workgroup for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `State` outside `WorkGroupState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -163,6 +168,7 @@ athena — DATA & ANALYTICS. Status key: `state` — the key the status cell rea
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | athena.workgroup-disabled | disabled | warn | wave1 | Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries. |
+| athena.state.unrecognised | <state> (unrecognised) | warn | wave1 | Athena reports a workgroup state a9s does not recognise, so a9s cannot tell whether the workgroup accepts queries. Check it in the Athena console before relying on it. |
 | athena.warn.details\_denied | details denied | warn | wave1 | Reading this workgroup's configuration was denied, so its result location and per-query scan cap are unknown rather than unset. Grant the role you browse with permission to read the workgroup, then refresh. |
 | athena.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 | athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query. |

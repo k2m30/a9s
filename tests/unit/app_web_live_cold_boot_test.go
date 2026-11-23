@@ -754,10 +754,11 @@ func TestTypeFile_FirstFieldIsFormatVersion(t *testing.T) {
 	}
 }
 
-// Per-finding FirstSeen is part of the on-disk schema at version 2.
+// Version 3 is the format whose status key holds the lifecycle value AWS
+// reported.
 func TestCacheSchemaVersion_Exported(t *testing.T) {
-	if cache.SchemaVersion != 2 {
-		t.Errorf("cache.SchemaVersion = %d, want 2", cache.SchemaVersion)
+	if cache.SchemaVersion != 3 {
+		t.Errorf("cache.SchemaVersion = %d, want 3", cache.SchemaVersion)
 	}
 }
 

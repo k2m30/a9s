@@ -27,6 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -157,7 +158,19 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
 			res := resource.Resource{ID: "test-id", Name: "test-name", RawStruct: tc.rawStruct}
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
+			// The Status cell of a type with a state table comes from findings
+			// alone, and this row carries none, so its lifecycle value is not
+			// on screen.
+			lifecycle := map[string]bool{}
+			if td := resource.FindResourceType(tc.shortName); td != nil {
+				for _, s := range td.StateEnum {
+					lifecycle[domain.HumanizeStatusPhrase(s)] = true
+				}
+			}
 			for _, expected := range tc.expectInRow {
+				if lifecycle[expected] {
+					continue
+				}
 				if !strings.Contains(joined, expected) {
 					t.Errorf("%s row cells should contain %q from RawStruct, got: %q", tc.shortName, expected, joined)
 				}
@@ -339,17 +352,20 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			PrivateIpAddress: new("172.16.0.100"),
 			State:            &ec2types.InstanceState{Name: ec2types.InstanceStateNameStopped},
 		}
+		// The Status cell is the state finding's phrase: neither the stored
+		// Fields[state] nor RawStruct.State.Name reaches it.
+		stopped, ok := awsclient.StateFinding("ec2", "stopped")
+		if !ok {
+			t.Fatal("ec2 raises no state finding for stopped")
+		}
 		c := openListControllerWithConfig(t, "ec2", cfg)
-		res := resource.Resource{ID: "i-prod-config-test", Name: "prod-test", Fields: map[string]string{"state": "WRONG"}, RawStruct: inst}
+		res := resource.Resource{ID: "i-prod-config-test", Name: "prod-test", Fields: map[string]string{"state": "WRONG"}, RawStruct: inst, Findings: []domain.Finding{stopped}}
 		joined := wave3RowCellsJoined(t, c, "ec2", []resource.Resource{res})
-		if !strings.Contains(joined, "wrong") {
-			t.Errorf("EC2 with production config should show 'wrong' (humanized Fields[state], wins over RawStruct for status col), got: %q", joined)
+		if !strings.Contains(joined, stopped.Phrase) {
+			t.Errorf("EC2 with production config should show the state finding %q, got: %q", stopped.Phrase, joined)
 		}
-		if strings.Contains(joined, "WRONG") {
-			t.Error("EC2 with production config should NOT show the raw uppercase 'WRONG'")
-		}
-		if strings.Contains(joined, "stopped") {
-			t.Error("EC2 with production config should NOT show 'stopped' from RawStruct.State.Name")
+		if strings.Contains(strings.ToLower(joined), "wrong") {
+			t.Errorf("EC2 with production config should NOT show the stored Fields[state], got: %q", joined)
 		}
 	})
 
@@ -566,8 +582,8 @@ func TestListRawStruct_EBSVolume(t *testing.T) {
 	if !strings.Contains(joined, "vol-111aabbcc") {
 		t.Errorf("EBS Volume row cells should contain volume ID from RawStruct, got: %q", joined)
 	}
-	if !strings.Contains(joined, "in-use") {
-		t.Errorf("EBS Volume row cells should contain 'in-use' state from RawStruct, got: %q", joined)
+	if strings.Contains(joined, "in-use") {
+		t.Errorf("an in-use volume is in its normal state, so its Status cell is blank; got: %q", joined)
 	}
 	if !strings.Contains(joined, "us-east-1a") {
 		t.Errorf("EBS Volume row cells should contain AZ from RawStruct, got: %q", joined)
@@ -590,8 +606,8 @@ func TestListRawStruct_EBSSnapshot(t *testing.T) {
 	if !strings.Contains(joined, "snap-0aabb11cc") {
 		t.Errorf("EBS Snapshot row cells should contain snapshot ID from RawStruct, got: %q", joined)
 	}
-	if !strings.Contains(joined, "completed") {
-		t.Errorf("EBS Snapshot row cells should contain 'completed' state from RawStruct, got: %q", joined)
+	if strings.Contains(joined, "completed") {
+		t.Errorf("a completed snapshot is in its normal state, so its Status cell is blank; got: %q", joined)
 	}
 	if !strings.Contains(joined, "vol-111aabbcc") {
 		t.Errorf("EBS Snapshot row cells should contain volume ID from RawStruct, got: %q", joined)
@@ -617,8 +633,8 @@ func TestListRawStruct_AMI(t *testing.T) {
 	if !strings.Contains(joined, "ami-0abc111222333444a") {
 		t.Errorf("AMI row cells should contain image ID from RawStruct, got: %q", joined)
 	}
-	if !strings.Contains(joined, "available") {
-		t.Errorf("AMI row cells should contain 'available' state from RawStruct, got: %q", joined)
+	if strings.Contains(joined, "available") {
+		t.Errorf("an available AMI is in its normal state, so its Status cell is blank; got: %q", joined)
 	}
 }
 

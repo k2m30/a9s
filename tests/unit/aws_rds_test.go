@@ -10,6 +10,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -77,8 +78,8 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	if r0.Fields["engine_version"] != "8.0.35" {
 		t.Errorf("resource[0].Fields[\"engine_version\"]: expected %q, got %q", "8.0.35", r0.Fields["engine_version"])
 	}
-	if r0.Fields["status"] != "" {
-		t.Errorf("resource[0].Fields[\"status\"]: expected %q (healthy silence), got %q", "", r0.Fields["status"])
+	if domain.StatusPhrase(r0.Findings) != "" {
+		t.Errorf("resource[0].Status cell: expected %q (healthy silence), got %q", "", domain.StatusPhrase(r0.Findings))
 	}
 	if r0.Fields["class"] != "db.r5.large" {
 		t.Errorf("resource[0].Fields[\"class\"]: expected %q, got %q", "db.r5.large", r0.Fields["class"])

@@ -9,7 +9,8 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeENIStateAttaching — ENI is in the "attaching" transitional state.
-	CodeENIStateAttaching domain.FindingCode = "eni.state.attaching"
+	CodeENIStateAttaching     domain.FindingCode = "eni.state.attaching"
+	CodeENIUnrecognisedStatus domain.FindingCode = "eni.state.unrecognised"
 
 	// CodeENIStateDetaching — ENI is in the "detaching" transitional state.
 	CodeENIStateDetaching domain.FindingCode = "eni.state.detaching"

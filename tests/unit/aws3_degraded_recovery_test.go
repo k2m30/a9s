@@ -49,8 +49,8 @@ func TestDegradedRecoveryReadsTheCodeNotTheStatusText(t *testing.T) {
 			if td == nil {
 				t.Fatalf("%s type not registered", tc.short)
 			}
-			if got := td.Color(rebuilt); got != resource.ColorWarning {
-				t.Errorf("Color(degraded row, status reworded) = %v, want %v — the recovery must read the finding code the row carries",
+			if got := td.ResolveColor(rebuilt); got != resource.ColorWarning {
+				t.Errorf("ResolveColor(degraded row, status reworded) = %v, want %v — the recovery must read the finding code the row carries",
 					got, resource.ColorWarning)
 			}
 		})

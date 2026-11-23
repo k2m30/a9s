@@ -21,7 +21,6 @@ package unit_test
 //     container row legitimately repeat their label once per item.
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -32,6 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/secretscan"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 func TestScanDemoBench_NoResourceReportsOneConditionTwice(t *testing.T) {
@@ -47,12 +47,8 @@ func TestScanDemoBench_NoResourceReportsOneConditionTwice(t *testing.T) {
 		}
 
 		var result awsclient.IssueEnricherResult
-		if enricher, ok := awsclient.Wave2EnricherFor(td.ShortName); ok && enricher.Fn != nil {
-			r, err := enricher.Fn(context.Background(), clients, rows, cache)
-			if err != nil {
-				t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
-			}
-			result = r
+		if _, ok := awsclient.Wave2EnricherFor(td.ShortName); ok {
+			result = unit.Wave2Result(t, td.ShortName, clients, rows, cache)
 			for id, fs := range result.Findings {
 				count := map[domain.FindingCode]int{}
 				for _, f := range fs {

@@ -123,12 +123,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: `Cluster.State` from `ListClustersV2`. `HEALING` buckets with the other transient-warning states because cluster capacity is degraded while AWS replaces the broker — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 
 - **Signal**: `State == DELETING`.
-  - **State bucket**: Warning.
+  - **State bucket**: Warning. Tearing down: no Wave 2 read.
   - **How obtained**: `Cluster.State` from `ListClustersV2`.
 
 - **Signal**: `State == FAILED`.
-  - **State bucket**: Broken.
+  - **State bucket**: Broken. The cluster is still there ("The Provisioned cluster creation or deletion process failed ... You can delete the cluster", Amazon MSK Developer Guide, cluster states), so its Wave 2 posture findings stand beside it.
   - **How obtained**: `Cluster.State` from `ListClustersV2`; the cause text for S4/S5 is `Cluster.StateInfo.Code` and `Cluster.StateInfo.Message` (both optional strings on the same list response).
+
+- **Signal**: `State` outside `ClusterState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -182,6 +186,7 @@ One row per signal from §3:
 | `ClientAuthentication.Unauthenticated.Enabled` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `unauthenticated access allowed` |
 | the cluster runs a broker version behind the newest AWS offers | 2 | Warning | `~` | S2, S3, S4, S5 | `broker software outdated` |
 | client-broker or broker-to-broker encryption allows plaintext | 2 | Warning | `~` | S2, S3, S4, S5 | `encryption in transit not enforced` |
+| `State` outside `ClusterState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes:
 
@@ -205,7 +210,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - msk related-panel targets `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` — `docs/related-resources.md` § Per-type contract, row `msk`.
 - Per-target field citations (`EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId`, `LoggingInfo.BrokerLogs.CloudWatchLogs`, `LoggingInfo.BrokerLogs.S3`, `ClientAuthentication.Sasl.Scram`, `BrokerNodeGroupInfo.SecurityGroups`, `BrokerNodeGroupInfo.ClientSubnets`, `BrokerNodeGroupInfo.ClientVpcIpAddresses → VPC`) — `docs/related-resources.md` § `msk`.
-- msk Wave 1 signal set (`State` enum mapping, `FAILED`→Broken, `DELETING`→Dim) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
+- msk Wave 1 signal set (`State` enum mapping, `FAILED`→Broken, `DELETING`→Warning) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`.
 - msk Wave 2 signal set (broker software version, client-broker encryption, public broker access, unauthenticated access) — `docs/attention-signals.md § Signals § MESSAGING` row `msk`. Per-broker runtime state is not among them: no read-only API exposes it.
 - msk Wave 3 CloudWatch metrics (`ActiveControllerCount`, `OfflinePartitionsCount`, `UnderReplicatedPartitions`, `KafkaDataLogsDiskUsed`) — `docs/attention-signals.md § Not yet implemented`.
 - `State`, `StateInfo`, `ClusterArn`, `ClusterName`, `ClusterType`, `Provisioned`, `Serverless`, `CreationTime`, `CurrentVersion`, `Tags` present on the list response — `AWS SDK Go v2 — service/kafka/types.Cluster § State, StateInfo, ClusterArn, ClusterName, ClusterType, Provisioned, Serverless, CreationTime, CurrentVersion, Tags`.
@@ -239,6 +244,7 @@ msk — MESSAGING. Status key: `state` — the key the status cell reads, and th
 | msk.warn.healing | healing | warn | wave1 | AWS is replacing or repairing a broker after a failure, so the cluster runs with reduced capacity until it finishes. Watch under-replicated partitions during this window. |
 | msk.warn.deleting | deleting | warn | wave1 | The cluster is being torn down, and its brokers and their data go with it. Confirm the producers and consumers have moved before the endpoints stop answering. |
 | msk.broken.failed | failed | broken | wave1 | The cluster is in a failed state and serves no Kafka traffic, so every producer and consumer behind it is stalled. Check the cluster's operations history for the failing step; a cluster in this state usually has to be recreated from a configuration you still hold. |
+| msk.warn.unrecognised\_state | <state> (unrecognised) | warn | wave1 | Amazon MSK reports a cluster state a9s does not recognise, so a9s cannot tell whether the brokers serve producers and consumers. Check the cluster's operations in the MSK console before relying on it. |
 | msk.broker-outdated | broker software outdated | warn | wave2 | The brokers run a Kafka version AWS no longer treats as current, so fixes and features stay out of reach and support for it eventually ends. Plan a rolling version upgrade in a maintenance window — clients keep working across it if the topics are replicated. |
 | msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | Traffic crosses the network in plaintext on the hop named below — client to broker, broker to broker, or both — so records and any credentials in the handshake are readable by anything on the path. Set client-broker encryption to TLS only and turn in-cluster encryption on; in-cluster encryption is chosen at cluster creation, so a cluster without it is replaced. |
 | msk.public-access | brokers reachable from the internet | broken | wave2 | Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network. |

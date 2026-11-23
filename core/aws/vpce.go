@@ -130,9 +130,7 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 				"type":         endpointType,
 				"state":        state,
 				"vpc_id":       vpcID,
-				// The evaluation's verdict as a word, never the document:
-				// colorVPCE's fallback runs vpceFindings over Fields, so a row
-				// stripped of its findings has to be able to recover this one.
+				// The evaluation's verdict as a word, never the document.
 				"policy_exposure": policyExposure,
 			},
 			Findings:         findings,
@@ -166,35 +164,23 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 	}, nil
 }
 
+// vpceStates is the VpcEndpoint State list as DescribeVpcEndpoints answers it
+// (Amazon EC2 API reference, VpcEndpoint: "Valid Values: PendingAcceptance |
+// Pending | Available | Deleting | Deleted | Rejected | Failed | Expired |
+// Partial", sent lower-camel on the wire).
+var vpceStates = []string{ //nolint:gochecknoglobals // static AWS status domain
+	"pendingAcceptance", "pending", "available", "deleting", "deleted",
+	"rejected", "failed", "expired", "partial",
+}
+
 // vpceFindings is the one predicate for an endpoint: its state, then whether
-// its policy lets anyone in. An endpoint being torn down carries no live
-// exposure, so the posture finding is suppressed there. colorVPCE runs this
-// over Fields for rows built outside the fetcher, which is why it takes the
-// exposure verdict as the word the fetcher writes rather than the document.
-// DescribeVpcEndpoints sends the state lower-camel ("pendingAcceptance"),
-// not in the SDK enum constants' spelling ("PendingAcceptance").
+// its policy lets anyone in. DescribeVpcEndpoints sends the state lower-camel
+// ("pendingAcceptance"), not in the SDK enum constants' spelling
+// ("PendingAcceptance"), so the table declares the documented API list.
 func vpceFindings(state, policyExposure string) []domain.Finding {
-	var findings []domain.Finding
-	switch state {
-	case "pendingAcceptance":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePendingAcceptance)}
-	case "pending":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePending)}
-	case "deleting":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleting)}
-	case "failed":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateFailed)}
-	case "rejected":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateRejected)}
-	case "expired":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateExpired)}
-	case "partial":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStatePartial)}
-	case "deleted":
-		findings = []domain.Finding{wave1Finding(CodeVPCEStateDeleted)}
+	var posture []domain.Finding
+	if policyExposure == "open" {
+		posture = append(posture, wave1Finding(CodeVPCEPolicyOpen))
 	}
-	if policyExposure == "open" && state != "deleting" && state != "deleted" {
-		findings = append(findings, wave1Finding(CodeVPCEPolicyOpen))
-	}
-	return findings
+	return withState("vpce", state, posture)
 }

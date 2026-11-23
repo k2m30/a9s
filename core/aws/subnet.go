@@ -94,10 +94,7 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 				"availability_zone": az,
 				"state":             state,
 				"available_ips":     availableIPs,
-				// The flag as a word, not the raw bool: colorSubnet's fallback
-				// runs subnetFindings over Fields, so a row stripped of its
-				// findings has to be able to recover this one.
-				"auto_public_ip": autoPublicIP,
+				"auto_public_ip":    autoPublicIP,
 			},
 			Findings:         findings,
 			AttentionDetails: attentionDetails,
@@ -130,24 +127,10 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 	}, nil
 }
 
-// subnetFindings is the one predicate for a subnet: its state, then whether it
-// hands every instance a public address on launch. colorSubnet runs it over
-// Fields for rows built outside the fetcher, which is why it takes the
-// auto-assign flag as the yes/no word the fetcher writes rather than the bool.
 func subnetFindings(state, autoPublicIP string) []domain.Finding {
-	var findings []domain.Finding
-	switch state {
-	case "pending":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStatePending)}
-	case "unavailable":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateUnavailable)}
-	case "failed":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailed)}
-	case "failed-insufficient-capacity":
-		findings = []domain.Finding{wave1Finding(CodeSubnetStateFailedInsufficientCapacity)}
-	}
+	var posture []domain.Finding
 	if autoPublicIP == "yes" {
-		findings = append(findings, wave1Finding(CodeSubnetAutoPublicIP))
+		posture = append(posture, wave1Finding(CodeSubnetAutoPublicIP))
 	}
-	return findings
+	return withState("subnet", state, posture)
 }

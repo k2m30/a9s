@@ -92,6 +92,10 @@ Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `ng`.
 
 A failed read is reported under the call that failed, counted against what that call was asked for: `ListNodegroups` per cluster attempted, `DescribeNodegroup` per node group attempted, `DescribeLaunchTemplateVersions` per node group with a launch template.
 
+- **Signal**: `status` outside `NodegroupStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. Each signal is derived from the `DescribeNodegroup` response.
@@ -110,7 +114,7 @@ green and blank.
   - **Cost shape**: per-resource.
 
 - **Signal**: `status==DELETING`.
-  - **State bucket**: Warning.
+  - **State bucket**: Warning. Tearing down: its posture findings are not shown.
   - **API call**: `DescribeNodegroup` — one call per node group.
   - **Cost shape**: per-resource.
 
@@ -172,6 +176,7 @@ One row per signal from §3 that reaches at least one surface. Healthy is omitte
 | `health.issues[]` non-empty on an `ACTIVE` group | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `health issue` |
 | describe denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | describe answered with nothing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `status` outside `NodegroupStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 The two health rows carry what AWS reported: each code in `health.issues[]` is a
 row under the finding in the detail view, so `insufficient free addresses` is
@@ -223,6 +228,7 @@ ng — CONTAINERS. Status key: `status` — the key the status cell reads, and t
 | ng.state.delete-failed | delete failed | broken | wave1 | The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again. |
 | ng.state.degraded | degraded | broken | wave1 | The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
 | ng.health-issue | health issue | warn | wave1 | The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears. |
+| ng.state.unrecognised | <status> (unrecognised) | warn | wave1 | Amazon EKS reports a node group status a9s does not recognise, so a9s cannot tell whether its nodes serve the cluster. Check the node group in the EKS console before relying on it. |
 | ng.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | ng.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->

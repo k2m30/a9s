@@ -59,9 +59,10 @@ func TestScenario_RedisVisual(t *testing.T) {
 	// `modifying — config change` before `multi-AZ without auto-failover`.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnRedisMultiID, "modifying — config change (+1)")
 
-	// Multi-shard RGs phrase each non-available shard as `shard <ng-id>: <state>`.
-	scenario.ExpectRowStatusEquals(demofixtures.MultiShardOneModifyingID, "shard 0001: modifying")
-	scenario.ExpectRowStatusEquals(demofixtures.MultiShardTwoTransitioningID, "shard 0001: modifying (+1)")
+	// A modifying multi-shard RG leads with its own state; each non-available
+	// shard stands beside it as `shard <ng-id>: <state>`.
+	scenario.ExpectRowStatusEquals(demofixtures.MultiShardOneModifyingID, "modifying — config change (+1)")
+	scenario.ExpectRowStatusEquals(demofixtures.MultiShardTwoTransitioningID, "modifying — config change (+2)")
 
 	// Glyphs appear only on Healthy + Wave-2, and redis has no Wave-2 signals.
 	for _, id := range []string{
@@ -131,10 +132,11 @@ func TestScenario_RedisVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{"bad-config-redis", []string{"Create failed — see events"}},
 		{"legacy-redis-analytics", []string{"Multi-AZ without auto-failover"}},
 		{demofixtures.WarnRedisMultiID, []string{"Modifying — config change", "Multi-AZ without auto-failover"}},
-		// Multi-shard RGs list each transitioning shard as its own Attention entry.
+		// Multi-shard RGs list the group's state and each transitioning shard
+		// as its own Attention entry.
 		{demofixtures.MultiShardHealthyID, nil},
-		{demofixtures.MultiShardOneModifyingID, []string{"Shard 0001: modifying"}},
-		{demofixtures.MultiShardTwoTransitioningID, []string{"Shard 0001: modifying", "Shard 0002: snapshotting"}},
+		{demofixtures.MultiShardOneModifyingID, []string{"Modifying — config change", "Shard 0001: modifying"}},
+		{demofixtures.MultiShardTwoTransitioningID, []string{"Modifying — config change", "Shard 0001: modifying", "Shard 0002: snapshotting"}},
 	}
 
 	for _, tc := range cases {

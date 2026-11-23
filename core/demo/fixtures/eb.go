@@ -334,9 +334,44 @@ func buildEBEnvironments() []ebtypes.EnvironmentDescription {
 			DateCreated:       aws.Time(mustTime("2025-07-12T09:00:00Z")),
 			DateUpdated:       aws.Time(mustTime("2026-06-02T09:00:00Z")),
 		},
+		{
+			EnvironmentName:   aws.String("acme-api-linking"),
+			EnvironmentId:     aws.String(EBLinkingEnvironmentID),
+			ApplicationName:   aws.String("acme-api"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-api/acme-api-linking"),
+			VersionLabel:      aws.String("v1.9.3"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
+			Health:            ebtypes.EnvironmentHealthGreen,
+			Status:            ebtypes.EnvironmentStatusLinkingTo,
+			CNAME:             aws.String("acme-api-linking.us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2026-11-20T09:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-11-22T09:00:00Z")),
+		},
+		{
+			EnvironmentName:   aws.String("acme-reports-grey"),
+			EnvironmentId:     aws.String(EBGreyHealthEnvironmentID),
+			ApplicationName:   aws.String("acme-api"),
+			EnvironmentArn:    aws.String("arn:aws:elasticbeanstalk:" + ebRegion + ":" + ebAccountID + ":environment/acme-api/acme-reports-grey"),
+			VersionLabel:      aws.String("v1.9.3"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2023 v4.0.1 running Docker"),
+			Health:            ebtypes.EnvironmentHealthGrey,
+			Status:            ebtypes.EnvironmentStatusReady,
+			CNAME:             aws.String("acme-reports-grey.us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2026-02-10T09:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-11-21T09:00:00Z")),
+		},
 	}
 }
 
+// EBGreyHealthEnvironmentID is a Ready environment whose health agent is not
+// reporting, raising eb.health.grey. Grey on a terminating environment is
+// expected and raises nothing, so the witness has to be Ready.
+const EBGreyHealthEnvironmentID = "e-acmereportsgrey"
+
+// EBLinkingEnvironmentID is the environment being linked to another one,
+// raising eb.status.transitional.
+const EBLinkingEnvironmentID = "e-acmeapilinking"
+
 func init() {
-	Register(Pin{ShortName: "eb", Rows: 10, Issues: 4})
+	Register(Pin{ShortName: "eb", Rows: 12, Issues: 5})
 }

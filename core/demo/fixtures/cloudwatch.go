@@ -1192,8 +1192,8 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 // HistorySummary — real DescribeAlarmHistory always populates HistoryData
 // with an {"oldState":...,"newState":...} payload for StateUpdate items;
 // alarmHistoryFindings (core/aws/alarm_history.go) parses this field to
-// classify the ALARM transition as broken, mirroring colorAlarm's live-alarm
-// classification.
+// classify the ALARM transition as broken, as the alarm state table classifies
+// the live alarm.
 func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	t0 := time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)
 	return []cwtypes.AlarmHistoryItem{

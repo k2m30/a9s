@@ -329,12 +329,9 @@ func TestW2EFSDeletingFileSystemEmitsNoWave2Finding(t *testing.T) {
 		policies:  map[string]string{"fs-0acme00000000009": w2EFSPublicPolicyDoc},
 		backupOff: map[string]string{"fs-0acme00000000009": string(efstypes.StatusDisabled)},
 	}
-	res, err := w2Enricher(t, "efs")(context.Background(), &awsclient.ServiceClients{EFS: fake}, out.Resources, nil)
-	w2AssertEnricherShape(t, res)
-	if err != nil {
-		t.Fatalf("enricher returned error: %v", err)
-	}
+	res := Wave2Result(t, "efs", &awsclient.ServiceClients{EFS: fake}, out.Resources)
 
-	w2AssertNoCode(t, res.Findings["fs-0acme00000000009"], w2EFSCodePublicPolicy)
-	w2AssertNoCode(t, res.Findings["fs-0acme00000000009"], w2EFSCodeNoBackupPolicy)
+	if got := res.Findings["fs-0acme00000000009"]; len(got) != 0 {
+		t.Errorf("deleting file system Wave 2 findings = %v, want none", got)
+	}
 }

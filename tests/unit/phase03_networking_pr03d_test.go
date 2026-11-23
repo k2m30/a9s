@@ -6,6 +6,7 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,6 +16,7 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -740,12 +742,11 @@ func TestPR03d_TGWFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 }
 
-// TestPR03d_TGWFetcher_FailedEmitsBrokenFinding asserts that a transit gateway
-// in "failed" state emits one SevBroken Finding with CodeTGWStateFailed.
-//
-// NOTE: "failed" is not in the TransitGatewayState SDK enum but IS handled
-// by the Color func. The test uses a raw cast to match that Color branch.
-func TestPR03d_TGWFetcher_FailedEmitsBrokenFinding(t *testing.T) {
+// TestPR03d_TGWFetcher_FailedIsAnUnrecognisedState asserts that a transit
+// gateway reporting "failed" — a value outside TransitGatewayState.Values()
+// (pending, available, modifying, deleting, deleted) — raises the type's
+// unrecognised-state finding with the value AWS sent in its phrase.
+func TestPR03d_TGWFetcher_FailedIsAnUnrecognisedState(t *testing.T) {
 	mock := &pr03dTGWMock{
 		tgws: []ec2types.TransitGateway{
 			{
@@ -765,15 +766,22 @@ func TestPR03d_TGWFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
+	td := resource.FindResourceType("tgw")
+	if td == nil || td.UnknownState == "" {
+		t.Fatal("tgw declares no unrecognised-state code")
+	}
 	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: got %d, want 1 for failed TGW", len(r.Findings))
+		t.Fatalf("Findings: got %v, want one for the failed TGW", r.Findings)
 	}
 	f := r.Findings[0]
-	if f.Code != awsclient.CodeTGWStateFailed {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, awsclient.CodeTGWStateFailed)
+	if f.Code != td.UnknownState {
+		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, td.UnknownState)
 	}
-	if f.Severity != domain.SevBroken {
-		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken", f.Severity)
+	if !strings.Contains(f.Phrase, "failed") {
+		t.Errorf("Findings[0].Phrase %q does not name the value AWS sent", f.Phrase)
+	}
+	if f.Severity != catalog.Severity(td.UnknownState) {
+		t.Errorf("Findings[0].Severity: got %v, want %v", f.Severity, catalog.Severity(td.UnknownState))
 	}
 	if f.Source != "wave1" {
 		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
@@ -794,7 +802,7 @@ func TestPR03d_TGWColor_ReadsWave1First(t *testing.T) {
 	r := resource.Resource{
 		Type: "tgw",
 		Findings: []domain.Finding{
-			{Code: awsclient.CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: "tgw.broken.probe", Phrase: "broken", Severity: domain.SevBroken, Source: "wave1"},
 		},
 		Fields: map[string]string{"state": "available"},
 	}

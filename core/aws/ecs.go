@@ -65,8 +65,6 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
 			servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
 
-			findings := ecsClusterFindings(status)
-
 			r := resource.Resource{
 				ID:   clusterName,
 				Name: clusterName,
@@ -77,7 +75,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 					"pending_tasks":  pendingTasks,
 					"services_count": servicesCount,
 				},
-				Findings:  findings,
+				Findings:  withState("ecs", status, nil),
 				RawStruct: cluster,
 			}
 			ans.rows = append(ans.rows, r)
@@ -113,22 +111,11 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 	}, AggregateFailures("ecs: DescribeClusters", failures, len(listOutput.ClusterArns))
 }
 
-// ecsClusterFindings is the one predicate for a cluster's lifecycle state.
-// ACTIVE reports nothing. colorECSCluster runs it over Fields for rows built
-// outside the fetcher.
-func ecsClusterFindings(status string) []domain.Finding {
-	switch status {
-	case "PROVISIONING":
-		return []domain.Finding{wave1Finding(CodeECSStateProvisioning)}
-	case "DEPROVISIONING":
-		return []domain.Finding{wave1Finding(CodeECSStateDeprovisioning)}
-	case "FAILED":
-		return []domain.Finding{wave1Finding(CodeECSStateFailed)}
-	case "INACTIVE":
-		return []domain.Finding{wave1Finding(CodeECSStateInactive)}
-	}
-	return nil
-}
+// ecsClusterStatuses is the Cluster.status domain the Amazon ECS API
+// Reference lists ("The following are the possible states that are
+// returned"); the SDK types it as a plain string.
+// https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html
+var ecsClusterStatuses = []string{"ACTIVE", "PROVISIONING", "DEPROVISIONING", "FAILED", "INACTIVE"} //nolint:gochecknoglobals // static AWS status domain
 
 // ecsGone reads the names an ECS Describe* call reports as no longer
 // existing: a Failure whose Reason is MISSING.

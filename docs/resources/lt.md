@@ -179,7 +179,7 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-lt — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
+lt — COMPUTE. Status key: `status` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

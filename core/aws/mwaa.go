@@ -19,11 +19,8 @@ import (
 
 // mwaa.* FindingCodes (docs/resources/mwaa.md). The eleven mwaaCode* state
 // codes below classify Environment.Status; the two background codes
-// (mwaaCodeLastUpdateFailed, mwaaCodeWebserverPublic) fire on ANY status.
-// Every code here is color-bearing — the shared colorAnyFindingOrHealthy
-// helper (catalog_color_helpers.go) derives row color from the
-// worst-severity Finding present, with no state-vs-background distinction:
-// every mwaa signal moves the row off green.
+// (mwaaCodeLastUpdateFailed, mwaaCodeWebserverPublic) stand on every live
+// status.
 const (
 	mwaaCodeCreating         domain.FindingCode = "mwaa.warn.creating"
 	mwaaCodeCreatingSnapshot domain.FindingCode = "mwaa.warn.creating_snapshot"
@@ -38,6 +35,7 @@ const (
 	mwaaCodeDeleted          domain.FindingCode = "mwaa.dim.deleted"
 	mwaaCodeLastUpdateFailed domain.FindingCode = "mwaa.warn.last_update_failed"
 	mwaaCodeWebserverPublic  domain.FindingCode = "mwaa.warn.webserver_public"
+	mwaaCodeUnrecognised     domain.FindingCode = "mwaa.warn.unrecognised_status"
 )
 
 // mwaaListPageSize caps ListEnvironments MaxResults at the MWAA API limit —
@@ -96,15 +94,6 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resource {
 	findings, attentionDetails := computeMWAAFindings(env)
 
-	rawStatus := string(env.Status)
-	statusPhrase := domain.StatusPhrase(findings)
-	if statusPhrase == "" && rawStatus != "" && rawStatus != string(mwaatypes.EnvironmentStatusAvailable) {
-		// As in rds.go's status-phrase fallback, an undocumented status value
-		// surfaces as raw text instead of rendering blank. AVAILABLE with zero
-		// findings stays "": healthy rows render blank.
-		statusPhrase = rawStatus
-	}
-
 	var securityGroupIDs, subnetIDs []string
 	if env.NetworkConfiguration != nil {
 		securityGroupIDs = env.NetworkConfiguration.SecurityGroupIds
@@ -137,7 +126,7 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 		Name: name,
 		Fields: map[string]string{
 			"name":                      name,
-			"status":                    statusPhrase,
+			"status":                    string(env.Status),
 			"airflow_version":           aws.ToString(env.AirflowVersion),
 			"environment_class":         aws.ToString(env.EnvironmentClass),
 			"min_workers":               mwaaInt32ToStr(env.MinWorkers),
@@ -185,8 +174,7 @@ func buildMWAADegradedResource(name string, err error) resource.Resource {
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{
-			"name":   name,
-			"status": finding.Phrase,
+			"name": name,
 		},
 		Findings: []domain.Finding{finding},
 	}
@@ -195,17 +183,10 @@ func buildMWAADegradedResource(name string, err error) resource.Resource {
 // computeMWAAFindings builds the ordered Finding slice for one environment:
 // the state-bucket finding (if Status != AVAILABLE), then the
 // last-update-failed background finding, then the webserver-public
-// background finding — the precedence order in docs/resources/mwaa.md. Both
-// background findings apply regardless of Status (they stack after the
-// state finding on a non-green row, and are the only findings on an
-// AVAILABLE row).
+// background finding — the precedence order in docs/resources/mwaa.md.
 func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	var findings []domain.Finding
 	var attentionDetails map[domain.FindingCode]domain.AttentionDetail
-
-	if f, ok := mwaaStateFinding(env.Status); ok {
-		findings = append(findings, f)
-	}
 
 	if env.LastUpdate != nil && env.LastUpdate.Status == mwaatypes.UpdateStatusFailed {
 		errCode := ""
@@ -236,33 +217,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 		}}
 	}
 
-	return findings, attentionDetails
-}
-
-// mwaaStateFindings maps Environment.Status to its
-// state-bucket code. AVAILABLE has no entry (Healthy — no finding).
-var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table
-	mwaatypes.EnvironmentStatusCreating:         mwaaCodeCreating,
-	mwaatypes.EnvironmentStatusCreatingSnapshot: mwaaCodeCreatingSnapshot,
-	mwaatypes.EnvironmentStatusPending:          mwaaCodePending,
-	mwaatypes.EnvironmentStatusUpdating:         mwaaCodeUpdating,
-	mwaatypes.EnvironmentStatusRollingBack:      mwaaCodeRollingBack,
-	mwaatypes.EnvironmentStatusMaintenance:      mwaaCodeMaintenance,
-	mwaatypes.EnvironmentStatusCreateFailed:     mwaaCodeCreateFailed,
-	mwaatypes.EnvironmentStatusUpdateFailed:     mwaaCodeUpdateFailed,
-	mwaatypes.EnvironmentStatusUnavailable:      mwaaCodeUnavailable,
-	mwaatypes.EnvironmentStatusDeleting:         mwaaCodeDeleting,
-	mwaatypes.EnvironmentStatusDeleted:          mwaaCodeDeleted,
-}
-
-// mwaaStateFinding maps Environment.Status to its
-// state-bucket Finding. ok is false for AVAILABLE (Healthy — no finding).
-func mwaaStateFinding(status mwaatypes.EnvironmentStatus) (domain.Finding, bool) {
-	code, ok := mwaaStateFindings[status]
-	if !ok {
-		return domain.Finding{}, false
-	}
-	return wave1Finding(code), true
+	return withState("mwaa", string(env.Status), findings), attentionDetails
 }
 
 // mwaaUpdateErrorText formats a LastUpdate.Error as a single detail-view

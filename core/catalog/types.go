@@ -222,6 +222,16 @@ type ResourceTypeDef struct {
 
 	// Findings is the declarative table of finding codes for this type.
 	Findings []FindingDef
+
+	// StateEnum is every value AWS can report in this type's lifecycle field
+	// (Fields[StatusKey()]): the SDK enum's Values() or the documented list.
+	// NormalStates are the values with no finding; every other value is in
+	// the States of one FindingDef, and a value outside StateEnum raises
+	// UnknownState with the value in its phrase. A type with an empty
+	// StateEnum declares no state table.
+	StateEnum    []string
+	NormalStates []string
+	UnknownState domain.FindingCode
 }
 
 // CloudTrailQualifier is how a row of a parent-scoped type is told from its
@@ -296,6 +306,25 @@ type FindingDef struct {
 	// the docs. Empty means the finding renders its Phrase alone and the doc
 	// cell reads "—". The emitter copies it from here; nothing else declares it.
 	Detail string
+
+	// States are the lifecycle values AWS reports that raise this code, which
+	// makes it the type's state finding for them; Class is what they mean for
+	// the row. Each value of the type's StateEnum is owned by exactly one
+	// state FindingDef or by the type's NormalStates.
+	States []string
+	Class  LifecycleClass
+	// SeverityDeviates declares that Severity is not Class.DefaultSeverity(),
+	// so a departure from the class's colour is a decision and not a typo.
+	SeverityDeviates bool
+	// AppliesIn names the classes a finding beside the state finding is true
+	// in (an EFS file system has mount targets only once it is available).
+	// Empty means every live class; a class that is not live is named only by
+	// a finding AWS reports about a resource that has stopped (an ECS task's
+	// stop code). AppliesInStates narrows it to the lifecycle
+	// values it is true in, for a check two normal values tell apart (an
+	// unattached network interface is "available", an attached one "in-use").
+	AppliesIn       []LifecycleClass
+	AppliesInStates []string
 }
 
 // HumanizeFieldKey normalizes a field identifier to the FACT it names: case

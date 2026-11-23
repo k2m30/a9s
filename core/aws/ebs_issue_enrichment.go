@@ -10,6 +10,7 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -183,7 +184,7 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 	listed := ok && !entry.IsTruncated
 	snapshotted := make(map[string]bool, len(entry.Resources))
 	for _, snap := range entry.Resources {
-		if ebsSnapshotUnusable(ec2types.SnapshotState(snap.Fields["state"])) {
+		if ebsSnapshotUnusable(snap.Fields["state"]) {
 			continue
 		}
 		if v := snap.Fields["volume_id"]; v != "" {
@@ -195,7 +196,8 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 		if volumeID == "" {
 			volumeID = r.ID
 		}
-		if volumeID == "" || r.Fields["state"] != string(ec2types.VolumeStateInUse) || snapshotted[volumeID] {
+		state := r.Fields["state"]
+		if volumeID == "" || !catalog.Applies(CodeEBSNoSnapshot, LifecycleClassOf("ebs", state), state) || snapshotted[volumeID] {
 			continue
 		}
 		if !listed {

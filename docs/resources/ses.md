@@ -89,6 +89,10 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `ses`.
   - **State bucket**: Warning.
   - **How obtained**: `IdentityInfo.SendingEnabled` on the list response. If combined with a non-`SUCCESS` verification status, the more severe bucket (Broken) wins.
 
+- **Signal**: `VerificationStatus` outside `VerificationStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `EnforcementStatus==PROBATION`.
@@ -136,6 +140,7 @@ One row per signal from §3:
 | `EnforcementStatus==SHUTDOWN` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `sending paused by AWS (shutdown)` |
 | `SentLast24Hours > 0.8 × Max24HourSend` | 2 | Warning | `~` | S2, S3, S4, S5 | `quota 80%+ used` |
 | a domain identity not signing its outbound mail | 2 | Warning | `~` | S2, S3, S4, S5 | `DKIM not enabled` |
+| `VerificationStatus` outside `VerificationStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `verification <status> (unrecognised)` |
 
 Account-wide Wave 2 findings (`PROBATION`, `SHUTDOWN`, quota) apply to the account, not any single identity — a9s-devops: surface the finding on **every** identity row's S4 with the compact `account ...:` prefix so a glance at the list correctly attributes the problem to the account, not the identity; S1 counts the account-level finding once, not N times.
 
@@ -180,6 +185,7 @@ ses — MESSAGING. Status key: `status` — the key the status cell reads, and t
 | ses.verification.temp\_failure | verify: temp failure | broken | wave1 | Verification failed for a reason the service treats as temporary, and until it succeeds this identity cannot send. Confirm the records are published and resolvable from outside your own network, then retry. |
 | ses.verification.not\_started | verification not started | broken | wave1 | Nothing has been verified for this identity, so no mail is accepted from it at all. Publish the verification records the console issues for the domain or address and complete the process. |
 | ses.verification.pending | pending verification | warn | wave1 | Verification is still waiting to see the published records, so this identity cannot send yet. Check the records resolve publicly — propagation is usually minutes, and hours means something is wrong in the zone. |
+| ses.verification.unrecognised | verification <status> (unrecognised) | warn | wave1 | Amazon SES reports a verification status a9s does not recognise, so a9s cannot tell whether mail from this identity is accepted. Check the identity in the SES console before relying on it. |
 | ses.sending.disabled | sending disabled | warn | wave1 | The service reports that this identity cannot send, most often because its verification or authorisation is incomplete rather than because a switch was thrown. Resolve the identity's own status first, then check the account-level sending status and any configuration set the sender uses, which are the two places sending is actually turned off. |
 | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 | AWS has paused sending for this account, usually after sustained bounces or complaints, so no mail leaves until it is lifted. Read the account's reputation metrics, fix the list hygiene or content that caused it, and open a case to request reinstatement. |
 | ses.account-probation | account under review (probation) | broken | wave2 | The account is under review because its bounce or complaint rate crossed a threshold, and sending will be paused if it does not improve. Find the campaigns or senders driving the rate, suppress the bad addresses, and fix the acquisition path that produced them. |

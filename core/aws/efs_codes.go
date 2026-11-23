@@ -10,6 +10,8 @@ const (
 	CodeEFSCreating       domain.FindingCode = "efs.warn.creating"
 	CodeEFSUpdating       domain.FindingCode = "efs.warn.updating"
 	CodeEFSDeleting       domain.FindingCode = "efs.warn.deleting"
+	CodeEFSDeleted        domain.FindingCode = "efs.deleted"
+	CodeEFSUnrecognised   domain.FindingCode = "efs.warn.unrecognised_state"
 )
 
 // CodeEFSUnencrypted is the wave-1 posture finding read from the

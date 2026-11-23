@@ -79,6 +79,7 @@ const (
 	DBCCloningFailed   = "broken-dbc-cloning-failed"
 	DBCMigrationFailed = "broken-dbc-migration-failed"
 	DBCUpgradeFailed   = "broken-dbc-upgrade-failed"
+	DBCDeleting        = "warn-dbc-deleting"
 	// DBCUnrecognisedStatus reports a status in neither AWS DB cluster
 	// status table.
 	DBCUnrecognisedStatus = "warn-dbc-unrecognised-status"
@@ -591,6 +592,13 @@ func buildRDSDBClusters() []rdstypes.DBCluster {
 		rdsPostureWitnessCluster(DBCMigrationFailed, func(c *rdstypes.DBCluster) { c.Status = aws.String("migration-failed") }),
 		rdsPostureWitnessCluster(DBCUpgradeFailed, func(c *rdstypes.DBCluster) { c.Status = aws.String("upgrade-failed") }),
 		rdsPostureWitnessCluster(DBCUnrecognisedStatus, func(c *rdstypes.DBCluster) { c.Status = aws.String("storage-rebalancing") }),
+		rdsPostureWitnessCluster(DBCDeleting, func(c *rdstypes.DBCluster) {
+			c.Status = aws.String("deleting")
+			// Unencrypted, so the posture a deleting cluster does not get is
+			// visibly skipped.
+			c.StorageEncrypted = aws.Bool(false)
+			c.KmsKeyId = nil
+		}),
 		rdsPostureWitnessCluster(DBCNeptune, func(c *rdstypes.DBCluster) {
 			c.Engine = aws.String("neptune")
 			c.EngineVersion = aws.String("1.3.2.1")
@@ -754,10 +762,10 @@ func buildRDSEvents() []rdstypes.Event {
 func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
-	Register(Pin{ShortName: "dbi", Rows: 57, Issues: 34, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 58, Issues: 35, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 13, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.
-	Register(Pin{ShortName: "dbc", Rows: 23, Issues: 20, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbc", Rows: 24, Issues: 21, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbc-snap", Rows: 14, Issues: 6, CoverageGaps: []string{"dim"}})
 }

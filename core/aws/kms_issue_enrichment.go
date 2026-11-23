@@ -63,6 +63,13 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 
 		}
 		mu.Unlock()
+		if !kmsKeyCanAutoRotate(r) {
+			mu.Lock()
+			defer mu.Unlock()
+			result.FieldUpdates[keyID] = map[string]string{"rotation_enabled": "false"}
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, nil)
+			return
+		}
 		out, err := clients.KMS.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{
 			KeyId: aws.String(keyID),
 		})
@@ -92,7 +99,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 // be read or parsed leaves the key unknown, never healthy; the error that made
 // it unknown is returned so the caller can record it.
 func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resource.Resource, ownAccount string) (ex iampolicy.Exposure, public bool, err error) {
-	if api == nil || kmsKeyIsAWSManaged(r) || kmsKeyIsGoingAway(r) {
+	if api == nil || kmsKeyIsAWSManaged(r) {
 		return ex, false, nil
 	}
 	out, err := api.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
@@ -115,16 +122,20 @@ func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resourc
 	return ex, ex.Public, nil
 }
 
-// kmsKeyIsGoingAway reports a key already scheduled for deletion. The
-// operator's move on such a key is to wait or cancel the deletion, so a
-// posture row about its policy would outlive the key it describes.
-func kmsKeyIsGoingAway(r resource.Resource) bool {
+// kmsKeyCanAutoRotate reports whether GetKeyRotationStatus has a schedule to
+// report: "Automatic key rotation is supported only on symmetric encryption
+// KMS keys with key material that AWS KMS generates" (AWS KMS Developer Guide,
+// "Rotate AWS KMS keys"), which excludes asymmetric and HMAC keys, imported
+// key material and keys in a custom key store. A row with no metadata is
+// asked.
+func kmsKeyCanAutoRotate(r resource.Resource) bool {
 	meta, ok := assertStruct[kmstypes.KeyMetadata](r.RawStruct)
 	if !ok {
-		return false
+		return true
 	}
-	return meta.KeyState == kmstypes.KeyStatePendingDeletion ||
-		meta.KeyState == kmstypes.KeyStatePendingReplicaDeletion
+	return meta.KeySpec == kmstypes.KeySpecSymmetricDefault &&
+		meta.Origin == kmstypes.OriginTypeAwsKms &&
+		aws.ToString(meta.CustomKeyStoreId) == ""
 }
 
 // kmsKeyIsAWSManaged reads KeyManager off the DescribeKey metadata the

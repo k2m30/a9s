@@ -101,8 +101,8 @@ var sharedSSMFixtures = shared(func() *SSMFixtures {
 			KeyId:            aws.String("alias/aws/ssm"),
 			DataType:         aws.String("text"),
 		},
-		// Issue: Type=String AND name suffix=_token (exact match — colorSSM's
-		// sensitiveSuffixes are underscore-delimited, e.g. "_token", not
+		// Issue: Type=String AND name suffix=_token (exact match — the
+		// sensitive suffixes are underscore-delimited, e.g. "_token", not
 		// "-token" or "/token") → Broken (plaintext credential in a
 		// non-encrypted parameter type).
 		{
@@ -114,8 +114,8 @@ var sharedSSMFixtures = shared(func() *SSMFixtures {
 			Description:      aws.String("Third-party API token stored as plaintext — should be SecureString"),
 			DataType:         aws.String("text"),
 		},
-		// Issue: Type=String AND name suffix=_password (exact match — colorSSM's
-		// sensitiveSuffixes are underscore-delimited, e.g. "_password", not
+		// Issue: Type=String AND name suffix=_password (exact match — the
+		// sensitive suffixes are underscore-delimited, e.g. "_password", not
 		// "/password" or "-password") → Broken (plaintext credential in a
 		// non-encrypted parameter type).
 		{

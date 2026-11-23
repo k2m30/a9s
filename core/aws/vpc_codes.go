@@ -5,5 +5,7 @@ package aws
 import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
-	CodeVPCStatePending domain.FindingCode = "vpc.state.pending"
+	CodeVPCStatePending      domain.FindingCode = "vpc.state.pending"
+	CodeVPCStateDeleting     domain.FindingCode = "vpc.state.deleting"
+	CodeVPCUnrecognisedState domain.FindingCode = "vpc.state.unrecognised"
 )

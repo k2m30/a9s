@@ -148,12 +148,8 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 			return td.Fetcher(context.Background(), clients, token)
 		})
 		res := awsclient.IssueEnricherResult{}
-		if e, ok := awsclient.Wave2EnricherFor(short); ok && e.Fn != nil {
-			var err error
-			res, err = e.Fn(context.Background(), clients, resources, cache)
-			if err != nil {
-				t.Fatalf("demo %s enrich: %v", short, err)
-			}
+		if _, ok := awsclient.Wave2EnricherFor(short); ok {
+			res = Wave2Result(t, short, clients, resources, cache)
 		}
 		for i := range resources {
 			r := resources[i]

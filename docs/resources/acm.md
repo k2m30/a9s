@@ -106,6 +106,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `Status` outside `CertificateStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -148,6 +152,7 @@ One row per signal from §3:
 | `KeyAlgorithm` is RSA below 2048 bits | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `weak key algorithm` |
 | `RenewalSummary.RenewalStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `auto-renewal failed` |
 | `DomainValidationOptions[].ValidationStatus == FAILED` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | n/a | S4, S5 | `validation failed: <domain>` |
+| `Status` outside `CertificateStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes:
 
@@ -193,6 +198,7 @@ acm — DNS & CDN. Status key: `status` — the key the status cell reads, and t
 | acm.status.pending-validation | pending validation | warn | wave1 | The certificate has been requested but not issued: the domain is still waiting to be proved yours, so nothing can serve TLS with it yet. Publish the validation record in the domain's zone, or answer the validation email, before the request times out. |
 | acm.status.failed | <status, in words> | broken | wave1 | The certificate cannot terminate TLS: it has expired, been revoked, failed issuance, or run out of time to validate, and the status says which. Anything still pointing at it is serving a broken handshake, so request a replacement and move the listeners onto it. |
 | acm.status.inactive | inactive | dim | wave1 | — |
+| acm.status.unrecognised | <status> (unrecognised) | warn | wave1 | ACM reports a certificate status a9s does not recognise, so a9s cannot tell whether the certificate can terminate TLS. Check it in the ACM console before relying on it. |
 | acm.weak-key | weak key algorithm | warn | wave1 | The certificate's key is short enough to be worth attacking, and browsers are withdrawing trust from keys this size. Reissue the certificate with a key of 2048 bits or more, or an elliptic-curve key. |
 <!-- END GENERATED: findings -->
 

@@ -115,6 +115,10 @@ A cluster `DescribeClusters` did not describe is KEPT name-only: `details denied
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `status` is a value the ECS API Reference does not list
+  - **State bucket**: Warning. The row is not shown clean; the value AWS sent is in the phrase
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -154,6 +158,7 @@ One row per signal from §3:
 | `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive (cluster deleted)` |
 | `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
 | `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
+| `status` is a value the ECS API Reference does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -199,6 +204,7 @@ ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | ecs.state.deprovisioning | deprovisioning | warn | wave1 | The cluster is being torn down, so it will stop accepting task placements and anything still running on it is on borrowed time. Move the remaining services to another cluster if this was not meant to happen. |
 | ecs.state.failed | failed | broken | wave1 | The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster. |
 | ecs.state.inactive | inactive (cluster deleted) | broken | wave1 | The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster. |
+| ecs.state.unrecognised | <status> (unrecognised) | warn | wave1 | Amazon ECS reports a cluster status a9s does not recognise, so a9s cannot tell whether tasks can be placed on it. Check the cluster in the ECS console before relying on it. |
 | ecs.cluster-issue | tasks pending or not running | warn | wave2 | The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short. |
 | ecs.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | ecs.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |

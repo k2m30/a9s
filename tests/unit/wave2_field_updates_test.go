@@ -39,6 +39,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -1021,9 +1022,11 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 	// Precedence: delete-protection off, then not encrypted, then no automated
 	// backups.
 	const want = "delete-protection off (+2)"
-	// The display phrase lives in Fields["status"]; findings carry severity.
-	if r.Fields["status"] != want {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
+	if got := domain.StatusPhrase(r.Findings); got != want {
+		t.Errorf("Status cell = %q, want %q", got, want)
+	}
+	if r.Fields["status"] != "available" {
+		t.Errorf("Fields[\"status\"] = %q, want the AWS value %q", r.Fields["status"], "available")
 	}
 
 	// Findings enumerate every active warning; the detail view renders each one.
@@ -1055,9 +1058,9 @@ func (f *secretsFake) ListSecrets(
 	return &secretsmanager.ListSecretsOutput{SecretList: f.secrets}, nil
 }
 
-// TestFetchSecrets_WritesStatus verifies that FetchSecretsPage sets
-// Fields["status"] == "OVERDUE" for a secret whose NextRotationDate is in the past
-// and RotationEnabled is true.
+// A secret whose rotation is enabled and whose NextRotationDate has passed is
+// still an active secret: the lifecycle field reads "active" and the overdue
+// rotation is a posture finding the Status cell shows.
 func TestFetchSecrets_WritesStatus(t *testing.T) {
 	pastDate := time.Now().Add(-48 * time.Hour)
 	rotEnabled := true
@@ -1081,9 +1084,14 @@ func TestFetchSecrets_WritesStatus(t *testing.T) {
 	}
 
 	r := result.Resources[0]
-	status := r.Fields["status"]
-	if status != "OVERDUE" {
-		t.Errorf("secret status = %q, want %q — coder must compute status=OVERDUE when NextRotationDate is past and RotationEnabled=true", status, "OVERDUE")
+	if status := r.Fields["status"]; status != "active" {
+		t.Errorf("secret Fields[status] = %q, want %q", status, "active")
+	}
+	if !hasCode(r.Findings, awsclient.CodeSecretStateRotationOverdue) {
+		t.Errorf("findings %v lack %s", r.Findings, awsclient.CodeSecretStateRotationOverdue)
+	}
+	if got := domain.StatusPhrase(r.Findings); got != "rotation overdue" {
+		t.Errorf("Status cell = %q, want %q", got, "rotation overdue")
 	}
 }
 

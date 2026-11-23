@@ -195,7 +195,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - a9s-devops persona (2026-04-20) — no per-row cause text for `creating`/`failed` Status values — possible=no on the DocDB SDK shape. Rationale: the operator must pivot to `ct-events` to get the failure cause; this is an acceptable design limit given AWS's own surface is thin here.
 
 <!-- BEGIN GENERATED: header -->
-dbc-snap — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
+dbc-snap — DATABASES & STORAGE. Status key: `status` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

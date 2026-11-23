@@ -10,6 +10,7 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -56,21 +57,21 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 	if r.ID != "my-stream-1" {
 		t.Errorf("expected ID 'my-stream-1', got %q", r.ID)
 	}
-	// Healthy streams: Status=="" and Fields["status"]=="" (healthy silence).
+	// A healthy stream's Status cell is blank.
 	if r.Fields["stream_name"] != "my-stream-1" {
 		t.Errorf("expected Fields[stream_name] 'my-stream-1', got %q", r.Fields["stream_name"])
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf("expected Fields[status] %q (healthy silence), got %q", "", r.Fields["status"])
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf("expected Status cell %q (healthy silence), got %q", "", domain.StatusPhrase(r.Findings))
 	}
 	if r.Fields["stream_arn"] == "" {
 		t.Error("expected Fields[stream_arn] to be non-empty")
 	}
 
-	// Verify second stream: Status=="" (fetcher does not write Status), phrase is in Fields["status"].
+	// Verify second stream: Status=="" (fetcher does not write Status); the Status cell is its state finding's phrase.
 	r2 := resources[1]
-	if r2.Fields["status"] != "creating" {
-		t.Errorf("expected Fields[status] %q for CREATING stream, got %q", "creating", r2.Fields["status"])
+	if domain.StatusPhrase(r2.Findings) != "creating" {
+		t.Errorf("expected Status cell %q for CREATING stream, got %q", "creating", domain.StatusPhrase(r2.Findings))
 	}
 
 	if r.RawStruct == nil {

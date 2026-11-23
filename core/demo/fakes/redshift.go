@@ -27,9 +27,10 @@ func (f *RedshiftFake) DescribeClusters(_ context.Context, _ *redshift.DescribeC
 	return &redshift.DescribeClustersOutput{Clusters: f.fix.Clusters}, nil
 }
 
-// DescribeLoggingStatus routes by ClusterIdentifier. A cluster without its
-// own case gets CloudWatch logging enabled, the healthy default, so exactly
-// one demo row carries the audit-logging-off finding.
+// DescribeLoggingStatus routes by ClusterIdentifier: logging is enabled on
+// every cluster but fixtures.RedshiftAuditLoggingOff, so exactly one demo row
+// carries the audit-logging-off finding, and goes to CloudWatch Logs for a
+// cluster that exports there and to S3 otherwise.
 func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.DescribeLoggingStatusInput, _ ...func(*redshift.Options)) (*redshift.DescribeLoggingStatusOutput, error) {
 	if in == nil || in.ClusterIdentifier == nil {
 		return &redshift.DescribeLoggingStatusOutput{}, nil
@@ -41,31 +42,25 @@ func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.Des
 		}
 	}
 
-	switch clusterID {
-	case fixtures.AcmeWarehouseID:
+	if clusterID == fixtures.RedshiftAuditLoggingOff {
 		return &redshift.DescribeLoggingStatusOutput{
-			LoggingEnabled:     aws.Bool(true),
-			LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
-			LogExports:         fixtures.RedshiftCloudWatchLogExports(clusterID),
+			LoggingEnabled: aws.Bool(false),
 		}, nil
-	case fixtures.AcmeReportingID:
+	}
+	exports := fixtures.RedshiftCloudWatchLogExports(clusterID)
+	if exports == nil {
 		return &redshift.DescribeLoggingStatusOutput{
 			LoggingEnabled:     aws.Bool(true),
 			LogDestinationType: redshifttypes.LogDestinationTypeS3,
 			BucketName:         aws.String(fixtures.RedshiftAuditBucket),
 			S3KeyPrefix:        aws.String("audit/"),
 		}, nil
-	case fixtures.RedshiftAuditLoggingOff:
-		return &redshift.DescribeLoggingStatusOutput{
-			LoggingEnabled: aws.Bool(false),
-		}, nil
-	default:
-		return &redshift.DescribeLoggingStatusOutput{
-			LoggingEnabled:     aws.Bool(true),
-			LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
-			LogExports:         fixtures.RedshiftCloudWatchLogExports(clusterID),
-		}, nil
 	}
+	return &redshift.DescribeLoggingStatusOutput{
+		LoggingEnabled:     aws.Bool(true),
+		LogDestinationType: redshifttypes.LogDestinationTypeCloudwatch,
+		LogExports:         exports,
+	}, nil
 }
 
 // DescribeClusterParameters answers the require_ssl check. Only

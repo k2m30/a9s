@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -54,7 +53,7 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			state = string(igw.Attachments[0].State)
 		}
 
-		findings := igwFindings(state, len(igw.Attachments))
+		findings := withState("igw", state, nil)
 
 		r := resource.Resource{
 			ID:   igwID,
@@ -96,18 +95,8 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 	}, nil
 }
 
-// igwFindings is the one predicate for an internet gateway: its attachment
-// state, then whether it is attached to anything at all. colorIGW runs it over
-// Fields for rows built outside the fetcher.
-func igwFindings(state string, attachmentsCount int) []domain.Finding {
-	switch state {
-	case "attaching":
-		return []domain.Finding{wave1Finding(CodeIGWStateAttaching)}
-	case "detaching":
-		return []domain.Finding{wave1Finding(CodeIGWStateDetaching)}
-	}
-	if attachmentsCount == 0 {
-		return []domain.Finding{wave1Finding(CodeIGWNoAttachments)}
-	}
-	return nil
-}
+// igwAttachmentStates is the InternetGatewayAttachment State domain: "For an
+// internet gateway the state is available when attached to a VPC", beside the
+// documented values attaching, attached, detaching and detached (Amazon EC2
+// API reference, InternetGatewayAttachment).
+var igwAttachmentStates = []string{"available", "attaching", "attached", "detaching", "detached"} //nolint:gochecknoglobals // static AWS status domain

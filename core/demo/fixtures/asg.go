@@ -310,7 +310,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 		// zero instances are Unhealthy, so this fixture demonstrates the
 		// suspended-processes branch alone (asg.scaling.suspended), not the
 		// underprovisioned or unhealthy branches that take precedence in
-		// colorASG/the fetcher's Finding emission.
+		// the fetcher's Finding emission.
 		{
 			AutoScalingGroupName:   aws.String("asg-suspended"),
 			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:77777777-7777-7777-7777-777777777777:autoScalingGroupName/asg-suspended"),

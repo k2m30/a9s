@@ -22,6 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 const (
@@ -30,6 +31,7 @@ const (
 	pw1ECSTaskCodeWritableRoot  = domain.FindingCode("ecs-task.writable-root")
 	pw1ECSTaskCodeNoLogging     = domain.FindingCode("ecs-task.no-logging")
 	pw1ECSTaskCodeEnvSecret     = domain.FindingCode("ecs-task.env-secret")
+	pw1ECSTaskCodeTaskFailed    = domain.FindingCode("ecs-task.task-failed")
 )
 
 const pw1TaskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/acme-app:7"
@@ -580,7 +582,7 @@ func TestECSTask_PostureSignalsSilentThroughoutTeardown(t *testing.T) {
 				tasks: map[string]ecstypes.Task{id: task},
 				defs:  map[string]ecstypes.TaskDefinition{pw1TaskDefARN: pw1BadDefinition()},
 			}
-			res := pw1EnrichECSTasks(t, fake, r)
+			res := Wave2Result(t, "ecs-task", &awsclient.ServiceClients{ECS: fake}, []resource.Resource{r})
 
 			for _, code := range []domain.FindingCode{
 				pw1ECSTaskCodePrivileged,
@@ -635,5 +637,71 @@ func TestECSTask_TeardownStatesKeepTheirLifecycleFinding(t *testing.T) {
 				t.Errorf("state %s: lifecycle phrase = %q, want %q", state, r.Findings[0].Phrase, want[state])
 			}
 		})
+	}
+}
+
+// A task the scheduler stopped for a routine reason (ServiceSchedulerInitiated)
+// whose essential container exited non-zero still failed: its work did not
+// complete, and only the DescribeTasks re-read sees the exit code. The pass
+// that raises "task failed" therefore reaches the stopped task through the
+// runner, while the task-definition posture rules stay silent for it. A task
+// stopped the same way with every container at exit code 0 gets nothing.
+func TestECSTask_StoppedTaskWithANonZeroEssentialExitIsAFailedTask(t *testing.T) {
+	const failed, clean = "0aaaa1111bbbb2222cccc3333dddd4470", "0aaaa1111bbbb2222cccc3333dddd4471"
+	stopped := func(id string, exit int32) ecstypes.Task {
+		task := pw1Task(id, pw1TaskDefARN)
+		task.LastStatus = aws.String("STOPPED")
+		task.DesiredStatus = aws.String("STOPPED")
+		task.StopCode = ecstypes.TaskStopCodeServiceSchedulerInitiated
+		task.StoppedReason = aws.String("Scaling activity initiated by (deployment ecs-svc/1234567890123456789)")
+		task.Containers = []ecstypes.Container{{
+			Name:       aws.String("web"),
+			ExitCode:   aws.Int32(exit),
+			LastStatus: aws.String("STOPPED"),
+			Reason:     aws.String("Essential container in task exited"),
+		}}
+		return task
+	}
+	fake := &pw1ECSTaskFake{
+		tasks: map[string]ecstypes.Task{failed: stopped(failed, 137), clean: stopped(clean, 0)},
+		defs:  map[string]ecstypes.TaskDefinition{pw1TaskDefARN: pw1BadDefinition()},
+	}
+	clients := &awsclient.ServiceClients{ECS: fake}
+	td := catalog.FindAny("ecs-task")
+	if td == nil || td.Fetcher == nil {
+		t.Fatal("ecs-task has no catalog Fetcher")
+	}
+	page, err := td.Fetcher(context.Background(), clients, "")
+	if err != nil {
+		t.Fatalf("ecs-task fetcher: %v", err)
+	}
+	// The fetch reads each task's definition for its pivots; only the Wave 2
+	// pass's reads are counted below.
+	fetched := len(fake.defRequests)
+	res := Wave2Result(t, "ecs-task", clients, page.Resources)
+
+	row := pw1ResourceByID(t, page.Resources, failed)
+	runtime.ApplyWave2ToRow(&row, *td, res.Findings, res.AttentionDetails)
+	f, ok := pw1FindFinding(row.Findings, pw1ECSTaskCodeTaskFailed)
+	if !ok {
+		t.Fatalf("stopped task with essential exit 137 carries %v, want %s", row.Findings, pw1ECSTaskCodeTaskFailed)
+	}
+	if f.Severity != domain.SevBroken || f.Phrase != "task failed" {
+		t.Errorf("%s = %q/%v, want %q/%v", f.Code, f.Phrase, f.Severity, "task failed", domain.SevBroken)
+	}
+	if got := domain.StatusPhrase(row.Findings); got != "task failed" {
+		t.Errorf("Status cell = %q, want %q", got, "task failed")
+	}
+	for _, code := range []domain.FindingCode{pw1ECSTaskCodePrivileged, pw1ECSTaskCodeHostNamespace, pw1ECSTaskCodeWritableRoot, pw1ECSTaskCodeNoLogging, pw1ECSTaskCodeEnvSecret} {
+		if _, ok := pw1FindFinding(row.Findings, code); ok {
+			t.Errorf("%s emitted for a stopped task", code)
+		}
+	}
+	if wave2 := fake.defRequests[fetched:]; len(wave2) != 0 {
+		t.Errorf("DescribeTaskDefinition asked %v for stopped tasks, want none", wave2)
+	}
+
+	if fs := res.Findings[clean]; len(fs) != 0 {
+		t.Errorf("stopped task with every container at exit 0 carries %v, want none", fs)
 	}
 }

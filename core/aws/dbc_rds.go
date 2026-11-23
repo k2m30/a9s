@@ -127,7 +127,6 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			withheld++
 		}
 		findings, attentionDetails := computeRDSDBClusterFindings(cluster, expectsWriter)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterID,
@@ -137,7 +136,7 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 				"cluster_id":              clusterID,
 				"engine":                  engine,
 				"engine_version":          engineVersion,
-				"status":                  statusPhrase,
+				"status":                  aws.ToString(cluster.Status),
 				"status_raw":              aws.ToString(cluster.Status),
 				"instances":               instances,
 				"endpoint":                endpoint,

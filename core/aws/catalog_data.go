@@ -7,6 +7,9 @@ import (
 	"net/url"
 	"strings"
 
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
+	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -22,18 +25,6 @@ func colorGlue(r domain.Resource) domain.Color {
 		return c
 	}
 	return domain.ColorHealthy
-}
-
-// colorAthena prefers colorFromAnyFinding so real fetched resources
-// (Findings populated by the fetcher's DISABLED-state wave1 Finding, Source:
-// "wave1", and EnrichAthenaWorkGroup, Source: "wave2:athena") color from
-// their own Finding; the raw-field switch below is the identical-precedence
-// fallback for callers that construct a Resource with only Fields set.
-func colorAthena(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(athenaStateFindings(r.Fields["state"]))
 }
 
 var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -107,7 +98,10 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
 		},
-		Color:          colorAthena,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[athenatypes.WorkGroupState](),
+		NormalStates:   []string{string(athenatypes.WorkGroupStateEnabled)},
+		UnknownState:   athenaCodeUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Athena} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
@@ -122,7 +116,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("athena")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries."},
+			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries.", States: []string{string(athenatypes.WorkGroupStateDisabled)}, Class: catalog.LifecyclePaused, SeverityDeviates: true},
+			unrecognisedStateDef(athenaCodeUnrecognisedState, "<state>", "wave1", "Athena reports a workgroup state a9s does not recognise, so a9s cannot tell whether the workgroup accepts queries. Check it in the Athena console before relying on it."),
 			DetailsDeniedFindingDef("athena", "Reading this workgroup's configuration was denied, so its result location and per-query scan cap are unknown rather than unset. Grant the role you browse with permission to read the workgroup, then refresh."),
 			DetailsUnavailableFindingDef("athena"),
 			{Code: athenaCodeSettingsNotEnforced, Phrase: "settings can be overridden per query", Severity: domain.SevWarn, Source: "wave2", Detail: "Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query."},
@@ -151,6 +146,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22},
 		},
 		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[mwaatypes.EnvironmentStatus](),
+		NormalStates:   []string{string(mwaatypes.EnvironmentStatusAvailable)},
+		UnknownState:   mwaaCodeUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.MWAA} }),
 		Fetcher:        fetcherWithClients(FetchMWAAEnvironmentsPage),
 		FieldKeys: []string{
@@ -180,17 +178,18 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "SourceBucketArn", TargetType: "s3"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: mwaaCodeCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The environment is still being provisioned, so Airflow is not reachable and nothing it schedules is running yet. Wait for it to become available; provisioning takes tens of minutes and a much longer wait points at the VPC endpoints or the execution role."},
-			{Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot", Severity: domain.SevWarn, Source: "wave1", Detail: "The metadata database is being snapshotted before an update, so the environment is briefly read-only and scheduling is paused. Nothing to do; let it finish before starting another change."},
-			{Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints", Severity: domain.SevWarn, Source: "wave1", Detail: "Creation is waiting for the VPC endpoints the environment needs, so it will sit here indefinitely until they exist. Create the required interface endpoints in the environment's VPC, or let AWS create them by using a VPC with the right access mode."},
-			{Code: mwaaCodeUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "An update is being applied, so workers and the web server are being replaced and a task can be interrupted and retried. Confirm your pipelines tolerate a retry, and wait for the environment to become available before starting another change."},
-			{Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed", Severity: domain.SevWarn, Source: "wave1", Detail: "An update failed and the environment is restoring its previous metadata snapshot, so scheduling is stopped until it finishes. Wait for it to come back, then read the logs for what the update tripped on before retrying."},
-			{Code: mwaaCodeMaintenance, Phrase: "maintenance in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS is applying scheduled maintenance, so the environment can be briefly unavailable and a task running across the window may be retried. Nothing to fix; move the maintenance window if it keeps landing on your peak."},
-			{Code: mwaaCodeCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The environment never came up, so no Airflow scheduler, web server or worker exists and every scheduled pipeline behind it has stopped. Read the environment's CloudWatch logs for the failing step, usually the execution role or the VPC endpoints, then delete it and create it again."},
-			{Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back", Severity: domain.SevBroken, Source: "wave1", Detail: "The update did not take and the environment was rolled back, so it is running and serving on its previous configuration while the change you asked for is not applied. Read the logs for what the update tripped on before retrying it."},
-			{Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable", Severity: domain.SevBroken, Source: "wave1", Detail: "The environment failed and did not recover on its own, so it is neither serving nor going to. Open a support case; an environment in this state cannot be repaired from the console and recreating it is the usual outcome."},
-			{Code: mwaaCodeDeleting, Phrase: "deleting — environment teardown", Severity: domain.SevDim, Source: "wave1"},
-			{Code: mwaaCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: mwaaCodeCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The environment is still being provisioned, so Airflow is not reachable and nothing it schedules is running yet. Wait for it to become available; provisioning takes tens of minutes and a much longer wait points at the VPC endpoints or the execution role.", States: []string{string(mwaatypes.EnvironmentStatusCreating)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot", Severity: domain.SevWarn, Source: "wave1", Detail: "The metadata database is being snapshotted before an update, so the environment is briefly read-only and scheduling is paused. Nothing to do; let it finish before starting another change.", States: []string{string(mwaatypes.EnvironmentStatusCreatingSnapshot)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints", Severity: domain.SevWarn, Source: "wave1", Detail: "Creation is waiting for the VPC endpoints the environment needs, so it will sit here indefinitely until they exist. Create the required interface endpoints in the environment's VPC, or let AWS create them by using a VPC with the right access mode.", States: []string{string(mwaatypes.EnvironmentStatusPending)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodeUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "An update is being applied, so workers and the web server are being replaced and a task can be interrupted and retried. Confirm your pipelines tolerate a retry, and wait for the environment to become available before starting another change.", States: []string{string(mwaatypes.EnvironmentStatusUpdating)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed", Severity: domain.SevWarn, Source: "wave1", Detail: "An update failed and the environment is restoring its previous metadata snapshot, so scheduling is stopped until it finishes. Wait for it to come back, then read the logs for what the update tripped on before retrying.", States: []string{string(mwaatypes.EnvironmentStatusRollingBack)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodeMaintenance, Phrase: "maintenance in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS is applying scheduled maintenance, so the environment can be briefly unavailable and a task running across the window may be retried. Nothing to fix; move the maintenance window if it keeps landing on your peak.", States: []string{string(mwaatypes.EnvironmentStatusMaintenance)}, Class: catalog.LifecycleTransitional},
+			{Code: mwaaCodeCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The environment never came up, so no Airflow scheduler, web server or worker exists and every scheduled pipeline behind it has stopped. Read the environment's CloudWatch logs for the failing step, usually the execution role or the VPC endpoints, then delete it and create it again.", States: []string{string(mwaatypes.EnvironmentStatusCreateFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back", Severity: domain.SevBroken, Source: "wave1", Detail: "The update did not take and the environment was rolled back, so it is running and serving on its previous configuration while the change you asked for is not applied. Read the logs for what the update tripped on before retrying it.", States: []string{string(mwaatypes.EnvironmentStatusUpdateFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable", Severity: domain.SevBroken, Source: "wave1", Detail: "The environment failed and did not recover on its own, so it is neither serving nor going to. Open a support case; an environment in this state cannot be repaired from the console and recreating it is the usual outcome.", States: []string{string(mwaatypes.EnvironmentStatusUnavailable)}, Class: catalog.LifecycleFailedLive},
+			{Code: mwaaCodeDeleting, Phrase: "deleting — environment teardown", Severity: domain.SevDim, Source: "wave1", States: []string{string(mwaatypes.EnvironmentStatusDeleting)}, Class: catalog.LifecycleTearingDown, SeverityDeviates: true},
+			{Code: mwaaCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{string(mwaatypes.EnvironmentStatusDeleted)}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(mwaaCodeUnrecognised, "<status>", "wave1", "Amazon MWAA reports an environment status a9s does not recognise, so a9s cannot tell whether Airflow is scheduling. Check the environment in the MWAA console before relying on it."),
 			{Code: mwaaCodeLastUpdateFailed, Phrase: "last update failed", Severity: domain.SevWarn, Source: "wave1", Detail: "The last update to this environment failed, so it is still running its previous configuration; the error code and message are listed below. Fix the cause and update again."},
 			{Code: mwaaCodeWebserverPublic, Phrase: "webserver public", Severity: domain.SevWarn, Source: "wave1", Detail: "The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC."},
 			DetailsDeniedFindingDef("mwaa", "Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh."),

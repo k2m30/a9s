@@ -11,6 +11,7 @@ import (
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -104,25 +105,25 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"performance_mode\"]: expected %q, got %q", "generalPurpose", r0.Fields["performance_mode"])
 	}
 
-	// Verify second file system (LifeCycleState=creating + NumberOfMountTargets=0):
-	// three coexisting wave-1 signals: the fixture is creating, has no mount
-	// targets, and is unencrypted. Broken ("no mount targets") wins precedence
-	// and the other two ride along in the suffix.
+	// Second file system (LifeCycleState=creating + NumberOfMountTargets=0,
+	// unencrypted): a file system gets its mount targets only once it is
+	// available, so a creating one with none is not a gap; the encryption
+	// posture stands beside the state.
 	r1 := resources[1]
-	if r1.Fields["status"] != "no mount targets (+2)" {
-		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+2)", r1.Fields["status"])
+	if domain.StatusPhrase(r1.Findings) != "creating (+1)" {
+		t.Errorf("resource[1].Status cell: expected %q, got %q", "creating (+1)", domain.StatusPhrase(r1.Findings))
 	}
-	if len(r1.Findings) != 3 {
-		t.Fatalf("resource[1].Findings: expected 3 findings, got %v", r1.Findings)
+	if r1.Fields["status"] != "creating" {
+		t.Errorf("resource[1].Fields[status] = %q, want the AWS value %q", r1.Fields["status"], "creating")
 	}
-	if r1.Findings[0].Code != awsclient.CodeEFSNoMountTargets {
-		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEFSNoMountTargets, r1.Findings[0].Code)
+	if len(r1.Findings) != 2 {
+		t.Fatalf("resource[1].Findings: expected 2 findings, got %v", r1.Findings)
 	}
-	if r1.Findings[1].Code != awsclient.CodeEFSCreating {
-		t.Errorf("resource[1].Findings[1].Code: expected %q, got %q", awsclient.CodeEFSCreating, r1.Findings[1].Code)
+	if r1.Findings[0].Code != awsclient.CodeEFSCreating {
+		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEFSCreating, r1.Findings[0].Code)
 	}
-	if string(r1.Findings[2].Code) != "efs.unencrypted" {
-		t.Errorf("resource[1].Findings[2].Code: expected %q, got %q", "efs.unencrypted", r1.Findings[2].Code)
+	if string(r1.Findings[1].Code) != "efs.unencrypted" {
+		t.Errorf("resource[1].Findings[1].Code: expected %q, got %q", "efs.unencrypted", r1.Findings[1].Code)
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty, got %q", r1.Name)

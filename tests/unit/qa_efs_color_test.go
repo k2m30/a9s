@@ -65,11 +65,13 @@ func TestEfsColor(t *testing.T) {
 			mutate: func(fs *efstypes.FileSystemDescription) { fs.Encrypted = aws.Bool(false) },
 			want:   resource.ColorWarning,
 		},
+		// Mount targets exist only once a file system is available, so an
+		// updating one with none reads as its state alone.
 		{
-			name:   "no_mount_targets_outranks_updating",
+			name:   "updating_without_mount_targets_is_its_state",
 			state:  efstypes.LifeCycleStateUpdating,
 			mutate: func(fs *efstypes.FileSystemDescription) { fs.NumberOfMountTargets = 0 },
-			want:   resource.ColorBroken,
+			want:   resource.ColorWarning,
 		},
 	}
 

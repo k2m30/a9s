@@ -7,6 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -211,9 +213,10 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: initial, Provenance: messages.FetchProvenanceCanonicalList})
 
+	// running is the normal state: the row shows and its Status cell is blank.
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "running") {
-		t.Fatalf("F.5: initial state should show 'running', got: %s", plain[:min(200, len(plain))])
+	if !strings.Contains(plain, "changeable-instance") || strings.Contains(plain, "running") {
+		t.Fatalf("F.5: initial row should show with a blank Status, got: %s", plain[:min(400, len(plain))])
 	}
 
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -234,6 +237,11 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 			},
 		},
 	}
+	stopped, ok := awsclient.StateFinding("ec2", "stopped")
+	if !ok {
+		t.Fatal("ec2 raises no state finding for stopped")
+	}
+	updated[0].Findings = []domain.Finding{stopped}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: updated, Provenance: messages.FetchProvenanceCanonicalList})
 
 	plain = stripANSI(rootViewContent(m))

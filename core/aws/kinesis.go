@@ -8,25 +8,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
-	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// computeKinesisFindings returns a []domain.Finding for the given Kinesis stream state.
-func computeKinesisFindings(state kinesistypes.StreamStatus) []domain.Finding {
-	switch state {
-	case kinesistypes.StreamStatusCreating:
-		return []domain.Finding{wave1Finding(CodeKinesisCreating)}
-	case kinesistypes.StreamStatusUpdating:
-		return []domain.Finding{wave1Finding(CodeKinesisUpdating)}
-	case kinesistypes.StreamStatusDeleting:
-		return []domain.Finding{wave1Finding(CodeKinesisDeleting)}
-	default:
-		return nil
-	}
-}
 
 // FetchKinesisStreamsPage fetches a single page of Kinesis streams.
 func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, continuationToken string) (resource.FetchResult, error) {
@@ -67,8 +51,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 			streamMode = string(stream.StreamModeDetails.StreamMode)
 		}
 
-		findings := computeKinesisFindings(stream.StreamStatus)
-		statusPhrase := domain.StatusPhrase(findings)
+		findings := withState("kinesis", rawStatus, nil)
 
 		r := resource.Resource{
 			ID:       streamName,
@@ -76,7 +59,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 			Findings: findings,
 			Fields: map[string]string{
 				"stream_name":   streamName,
-				"status":        statusPhrase,
+				"status":        rawStatus,
 				"stream_status": rawStatus,
 				"stream_arn":    streamARN,
 				"creation_time": creationTime,

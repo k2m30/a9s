@@ -242,14 +242,13 @@ func TestDemoRowIdentity_SourcePanelsDoNotDependOnTheIDShape(t *testing.T) {
 			}
 		}
 
-		enr, ok := awsclient.Wave2EnricherFor(short)
-		if !ok || enr.Fn == nil {
+		if _, ok := awsclient.Wave2EnricherFor(short); !ok {
 			continue
 		}
-		ra, errA := enr.Fn(ctx, clients, rows, cache)
-		rb, errB := enr.Fn(ctx, clients, bare, cache)
-		if (errA == nil) != (errB == nil) {
-			t.Errorf("%s wave-2: error with qualified IDs %v, with bare names %v", short, errA, errB)
+		ra := unit.ProbeWave2(t, short, clients, rows, cache)
+		rb := unit.ProbeWave2(t, short, clients, bare, cache)
+		if (ra.Err == nil) != (rb.Err == nil) {
+			t.Errorf("%s wave-2: error with qualified IDs %v, with bare names %v", short, ra.Err, rb.Err)
 		}
 		for i := range rows {
 			ca := ridCodes(ra.Findings[rows[i].ID])

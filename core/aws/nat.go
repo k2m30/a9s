@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -64,7 +63,7 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			}
 		}
 
-		findings := natStateFindings(state)
+		findings := withState("nat", state, nil)
 
 		r := resource.Resource{
 			ID:   natID,
@@ -105,21 +104,4 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// natStateFindings is the one predicate for a NAT gateway's state. available
-// reports nothing. colorNAT runs it over Fields for rows built outside the
-// fetcher.
-func natStateFindings(state string) []domain.Finding {
-	switch state {
-	case "pending":
-		return []domain.Finding{wave1Finding(CodeNATStatePending)}
-	case "deleting":
-		return []domain.Finding{wave1Finding(CodeNATStateDeleting)}
-	case "failed":
-		return []domain.Finding{wave1Finding(CodeNATStateFailed)}
-	case "deleted":
-		return []domain.Finding{wave1Finding(CodeNATStateDeleted)}
-	}
-	return nil
 }

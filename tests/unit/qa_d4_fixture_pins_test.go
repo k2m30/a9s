@@ -150,14 +150,10 @@ func TestD4_PlainHTTPListenerWitnessedOnAnNLB(t *testing.T) {
 	rows := d4DemoRows(t, "elb")
 	clients := demo.NewServiceClients()
 
-	enricher, ok := awsclient.Wave2EnricherFor("elb")
-	if !ok || enricher.Fn == nil {
+	if _, ok := awsclient.Wave2EnricherFor("elb"); !ok {
 		t.Fatal("elb has no wave-2 enricher")
 	}
-	res, err := enricher.Fn(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("elb wave-2: %v", err)
-	}
+	res := Wave2Result(t, "elb", clients, rows)
 	folded := append([]resource.Resource(nil), rows...)
 	for i := range folded {
 		a9sruntime.ApplyWave2ToRow(&folded[i], *td, res.Findings, res.AttentionDetails)

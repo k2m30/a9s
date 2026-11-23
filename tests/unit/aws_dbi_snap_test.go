@@ -28,7 +28,7 @@ func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	rows := make([]resourceRow, len(result.Resources))
 	for i, r := range result.Resources {
 		rows[i] = resourceRow{
-			status:   r.Fields["status"],
+			status:   domain.StatusPhrase(r.Findings),
 			findings: r.Findings,
 			fields:   r.Fields,
 			id:       r.ID,
@@ -282,7 +282,7 @@ func TestDBISnap_Fetcher_FindingsPopulatedInPrecedenceOrder(t *testing.T) {
 			}
 			r := rows[0]
 			if r.status != tc.wantPhrase {
-				t.Errorf("Fields[status] = %q, want %q", r.status, tc.wantPhrase)
+				t.Errorf("Status cell = %q, want %q", r.status, tc.wantPhrase)
 			}
 			gotPhrases := make([]string, len(r.findings))
 			for i, f := range r.findings {

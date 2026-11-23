@@ -8,6 +8,7 @@ const (
 	CodeAlarmStateAlarm        domain.FindingCode = "alarm.state.alarm"
 	CodeAlarmStateInsufficient domain.FindingCode = "alarm.state.insufficient_data"
 	CodeAlarmNoActions         domain.FindingCode = "alarm.no_actions"
+	CodeAlarmStateUnrecognised domain.FindingCode = "alarm.state.unrecognised"
 
 	// CodeAlarmActionsDisabled — ActionsEnabled==false. The alarm still
 	// evaluates but fires nothing. Complements CodeAlarmNoActions: an alarm

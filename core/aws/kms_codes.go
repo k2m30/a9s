@@ -9,4 +9,6 @@ const (
 	CodeKMSStateDisabled        domain.FindingCode = "kms.state.disabled"
 	CodeKMSStateUnavailable     domain.FindingCode = "kms.state.unavailable"
 	CodeKMSAccessDenied         domain.FindingCode = "kms.access-denied"
+	CodeKMSStateTransitional    domain.FindingCode = "kms.state.transitional"
+	CodeKMSUnrecognisedState    domain.FindingCode = "kms.state.unrecognised"
 )

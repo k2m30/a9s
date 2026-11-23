@@ -253,7 +253,6 @@ func isIssueCapable(td resource.ResourceTypeDef) bool {
 func TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildDemoTypeCache(t)
-	ctx := context.Background()
 
 	types := resource.AllResourceTypes()
 	sort.Slice(types, func(i, j int) bool { return types[i].ShortName < types[j].ShortName })
@@ -282,15 +281,11 @@ func TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture(t *testing.T)
 
 			var findingsLen int
 			if !flagged {
-				enricher, ok := awsclient.Wave2EnricherFor(td.ShortName)
-				if !ok || enricher.Fn == nil {
+				if _, ok := awsclient.Wave2EnricherFor(td.ShortName); !ok {
 					t.Fatalf("%s: isIssueCapable reported true but Wave2EnricherFor now returns ok=%v", td.ShortName, ok)
 				}
 
-				result, err := enricher.Fn(ctx, clients, fixtures, cache)
-				if err != nil {
-					t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
-				}
+				result := unit.Wave2Result(t, td.ShortName, clients, fixtures, cache)
 				findingsLen = len(result.Findings)
 				flagged = findingsLen > 0
 			}

@@ -72,33 +72,24 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
 
-- **Signal**: `KeyState==Creating`.
+- **Signal**: `KeyState==PendingDeletion` or `PendingReplicaDeletion`.
+  - **State bucket**: Broken. The key is leaving: Wave 2 does not read its rotation or its policy.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==Creating` or `Updating`.
+  - **State bucket**: Warning. The state ends on its own.
+  - **API call**: `DescribeKey` — one per key (N+1).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `KeyState==PendingImport` or `Unavailable`.
   - **State bucket**: Broken.
   - **API call**: `DescribeKey` — one per key (N+1).
   - **Cost shape**: per-resource.
 
-- **Signal**: `KeyState==Updating`.
-  - **State bucket**: Broken.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
-
-- **Signal**: `KeyState==PendingDeletion`.
-  - **State bucket**: Broken.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
-
-- **Signal**: `KeyState==PendingImport`.
-  - **State bucket**: Broken.
+- **Signal**: `KeyState` is a value outside `KeyState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
-
-- **Signal**: `KeyState==PendingReplicaDeletion`.
-  - **State bucket**: Broken.
-  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
-
-- **Signal**: `KeyState==Unavailable`.
-  - **State bucket**: Broken.
-  - **API call**: `DescribeKey` — one per key (N+1).
-  - **Cost shape**: per-resource.
 
 - **Signal**: `DescribeKey` was denied for this key.
   - **State bucket**: Broken.
@@ -114,7 +105,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
 
 - **Signal**: `KeyRotationEnabled==false` on CMK.
   - **State bucket**: Warning.
-  - **API call**: `DescribeKey` — one per key (N+1).
+  - **API call**: `GetKeyRotationStatus` — one per key that can rotate automatically (`KeySpec=SYMMETRIC_DEFAULT`, `Origin=AWS_KMS`, no custom key store). A customer key that cannot rotate automatically gets the signal without the call.
   - **Cost shape**: per-resource.
 
 - **Signal**: Default key policy allows a wildcard principal with no restrictive condition.
@@ -140,12 +131,10 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `KeyState==Disabled` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
-| `KeyState==PendingDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `pending deletion` |
-| `KeyState==Creating` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
-| `KeyState==Updating` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
-| `KeyState==PendingImport` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
-| `KeyState==PendingReplicaDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
-| `KeyState==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState==PendingDeletion` or `PendingReplicaDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `pending deletion` |
+| `KeyState==Creating` or `Updating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<key state> in progress` |
+| `KeyState==PendingImport` or `Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
+| `KeyState` outside `KeyState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<key state> (unrecognised)` |
 | `DescribeKey` was denied for this key | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `access denied (kms:DescribeKey)` |
 | `DescribeKey` failed for this key for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
@@ -191,7 +180,9 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 | --- | --- | --- | --- | --- |
 | kms.state.pending\_deletion | pending deletion | broken | wave1 | The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it. |
 | kms.state.disabled | disabled | warn | wave1 | The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it. |
-| kms.state.unavailable | <key state> | broken | wave1 | The key is not usable in the state it reports, and what to do depends on which state that is. A key still being created or updated only needs waiting out; one awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read. |
+| kms.state.unavailable | <key state> | broken | wave1 | The key is not usable in the state it reports, and what to do depends on which state that is. A key awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read. |
+| kms.state.transitional | <key state> in progress | warn | wave1 | The key is being created or updated, for example a multi-Region replica being copied or a key in a custom key store being set up, and becomes usable on its own once AWS finishes. Wait it out before treating a failed encrypt or decrypt as a permission problem. |
+| kms.state.unrecognised | <key state> (unrecognised) | warn | wave1 | AWS reports a key state a9s does not recognise, so a9s cannot tell whether the key can be used. Check the key in the AWS console before relying on it. |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
 | kms.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it. |

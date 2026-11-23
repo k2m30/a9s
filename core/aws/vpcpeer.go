@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -44,6 +45,7 @@ const (
 	vpcPeerCodeDeleting          domain.FindingCode = "vpc-peer.warn.deleting"
 	vpcPeerCodeDeleted           domain.FindingCode = "vpc-peer.dim.deleted"
 	vpcPeerCodeCidrOverlap       domain.FindingCode = "vpc-peer.warn.cidr_overlap"
+	vpcPeerCodeUnrecognised      domain.FindingCode = "vpc-peer.warn.unrecognised_status"
 )
 
 // FetchVpcPeeringConnectionsPage fetches a single page of VPC Peering
@@ -91,7 +93,7 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 		Name: name,
 		Fields: map[string]string{
 			"pcx_id":          id,
-			"status":          domain.StatusPhrase(findings),
+			"status":          vpcPeerStatus(pc),
 			"requester_vpc":   requesterVPC,
 			"requester_owner": requesterOwner,
 			"accepter_vpc":    accepterVPC,
@@ -112,66 +114,57 @@ func vpcPeerSide(info *ec2types.VpcPeeringConnectionVpcInfo) (vpcID, ownerID str
 	return aws.ToString(info.VpcId), aws.ToString(info.OwnerId)
 }
 
-// computeVpcPeerFindings builds the ordered Finding slice for one peering
-// connection: state first, then (active-only) CIDR overlap —
-// docs/resources/vpc-peer.md precedence order. An active connection with
-// disjoint CIDRs returns nil (blank Status, Healthy).
-func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+func vpcPeerStatus(pc *ec2types.VpcPeeringConnection) string {
 	if pc.Status == nil {
-		return nil, nil
+		return ""
 	}
-	code := pc.Status.Code
-	message := aws.ToString(pc.Status.Message)
+	return string(pc.Status.Code)
+}
 
-	var findings []domain.Finding
+// computeVpcPeerFindings builds the ordered Finding slice for one peering
+// connection: state first, then CIDR overlap, which is declared for an
+// active connection only because CidrBlock/CidrBlockSet are nil for every
+// other (VpcPeeringConnectionVpcInfo doc comment). The pending-acceptance
+// phrase counts down to ExpirationTime.
+func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
+	status := vpcPeerStatus(pc)
+	message := ""
+	if pc.Status != nil {
+		message = aws.ToString(pc.Status.Message)
+	}
 	attention := map[domain.FindingCode]domain.AttentionDetail{}
-	statusRow := func(fc domain.FindingCode) {
-		if message != "" {
-			attention[fc] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Status message", Value: message, Tier: "!"}}}
-		}
-	}
+	var slots []string
+	_, code := catalog.LifecycleOf("vpc-peer", status)
 	switch code {
-	case ec2types.VpcPeeringConnectionStateReasonCodeProvisioning:
-		findings = append(findings, wave1Finding(vpcPeerCodeProvisioning))
-	case ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest:
-		findings = append(findings, wave1Finding(vpcPeerCodeInitiating))
-	case ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance:
-		f, rows := vpcPeerPendingAcceptanceFinding(pc.ExpirationTime)
-		findings = append(findings, f)
-		attention[vpcPeerCodePendingAcceptance] = domain.AttentionDetail{Rows: rows}
-	case ec2types.VpcPeeringConnectionStateReasonCodeExpired:
-		findings = append(findings, wave1Finding(vpcPeerCodeExpired))
-	case ec2types.VpcPeeringConnectionStateReasonCodeRejected:
-		findings = append(findings, wave1Finding(vpcPeerCodeRejected))
-		statusRow(vpcPeerCodeRejected)
-	case ec2types.VpcPeeringConnectionStateReasonCodeFailed:
-		findings = append(findings, wave1Finding(vpcPeerCodeFailed))
-		statusRow(vpcPeerCodeFailed)
-	case ec2types.VpcPeeringConnectionStateReasonCodeDeleting:
-		findings = append(findings, wave1Finding(vpcPeerCodeDeleting))
-	case ec2types.VpcPeeringConnectionStateReasonCodeDeleted:
-		findings = append(findings, wave1Finding(vpcPeerCodeDeleted))
+	case vpcPeerCodePendingAcceptance:
+		days, rows := vpcPeerPendingAcceptance(pc.ExpirationTime)
+		slots = []string{strconv.Itoa(days)}
+		if rows != nil {
+			attention[code] = domain.AttentionDetail{Rows: rows}
+		}
+	case vpcPeerCodeRejected, vpcPeerCodeFailed:
+		if message != "" {
+			attention[code] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Status message", Value: message, Tier: "!"}}}
+		}
 	}
 
-	// CIDR overlap is active-only: CidrBlock/CidrBlockSet are nil for every
-	// non-active connection (VpcPeeringConnectionVpcInfo doc comment).
-	if code == ec2types.VpcPeeringConnectionStateReasonCodeActive {
-		if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
-			findings = append(findings, wave1Finding(vpcPeerCodeCidrOverlap))
-			attention[vpcPeerCodeCidrOverlap] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Overlapping range", Value: ranges, Tier: "~"}}}
-		}
+	var posture []domain.Finding
+	if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
+		posture = append(posture, wave1Finding(vpcPeerCodeCidrOverlap))
+		attention[vpcPeerCodeCidrOverlap] = domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Overlapping range", Value: ranges, Tier: "~"}}}
 	}
+	findings := withState("vpc-peer", status, posture, slots...)
 	if len(attention) == 0 {
 		return findings, nil
 	}
 	return findings, attention
 }
 
-// vpcPeerPendingAcceptanceFinding builds the pending-acceptance Finding: the
-// countdown to ExpirationTime IS the status phrase, rounded up to at least
-// 1 day so a request expiring within hours never
-// reads as "0d". The expiration date itself is the Attention row.
-func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []domain.DetailRow) {
+// vpcPeerPendingAcceptance is the countdown to ExpirationTime the
+// pending-acceptance phrase carries, rounded up to at least 1 day so a
+// request expiring within hours never reads as "0d". The expiration date
+// itself is the Attention row.
+func vpcPeerPendingAcceptance(expiration *time.Time) (int, []domain.DetailRow) {
 	days := 1
 	var rows []domain.DetailRow
 	if expiration != nil {
@@ -182,7 +175,7 @@ func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []d
 		}
 		rows = []domain.DetailRow{{Label: "Expires", Value: expiration.Format("2006-01-02"), Tier: "~"}}
 	}
-	return wave1Finding(vpcPeerCodePendingAcceptance, strconv.Itoa(days)), rows
+	return days, rows
 }
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's

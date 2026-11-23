@@ -134,11 +134,15 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `asg`.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `Status` other than the documented `Delete in progress`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: Most recent scaling activity `StatusCode == Failed` (launch-failure loop).
   - **State bucket**: Broken.
-  - **API call**: `DescribeScalingActivities(AutoScalingGroupName=<name>, MaxRecords=1)` — one call per ASG.
+  - **API call**: `DescribeScalingActivities(AutoScalingGroupName=<name>, MaxRecords=1)` — one call per ASG, a group in `Delete in progress` included: a group stuck there is waiting on instances that cannot terminate, and the failed activity says why. The launch-configuration checks below skip such a group.
   - **Cost shape**: per-resource.
 
 - **Signal**: launch configuration `HttpTokens != required` with the metadata endpoint enabled. Each setting follows the EC2 order of precedence: the value the launch configuration sets, then the Region's account-level default (`GetInstanceMetadataDefaults`), then, for `HttpTokens` alone, the AMI's `ImdsSupport`. An account that enforces IMDSv2 produces no signal. A failed account-defaults read, or an AMI `DescribeImages` does not return, leaves the group not inspected. The rule is the launch template rule (`docs/resources/lt.md`), decided in one place for both.
@@ -178,6 +182,7 @@ Badge aggregation for `asg`: Wave 1 issue-colored rows plus Wave 2 `!`-severity 
 | launch configuration `HttpTokens != required`, an unset value taking the AMI's `ImdsSupport` default | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration allows IMDSv1` |
 | launch configuration `AssociatePublicIpAddress == true` | 2 | Warning | `~` | S2, S3, S4, S5 | `launch configuration assigns public IPs` |
 | credential in launch configuration `UserData` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in launch configuration user data` |
+| `Status` other than the documented `Delete in progress` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes:
 
@@ -220,6 +225,7 @@ asg — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | asg.state.deleting | delete in progress | warn | wave1 | The group is being removed and is terminating its instances; the deletion cannot be cancelled. If this was not intended, recreate the group from its launch template and scaling settings once it is gone, and restore the capacity by hand in the meantime. |
+| asg.state.unrecognised | <status> (unrecognised) | warn | wave1 | Auto Scaling reports a group status a9s does not recognise; the only documented one is a delete in progress. Check the group in the AWS console before relying on it. |
 | asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 | The group is running fewer instances in service than it is meant to, so the workload behind it carries its traffic short-handed. Read the group's scaling activities for launch failures: insufficient capacity in the Availability Zone, a bad launch template, or a failing health check are the usual causes. |
 | asg.instances.unhealthy | <N unhealthy instance(s)> | warn | wave1 | Some instances in this group are failing their health checks and will be terminated and replaced, briefly reducing capacity. Look at those instances' system logs before they go, so the replacements do not simply repeat the failure. |
 | asg.scaling.suspended | scaling suspended | warn | wave1 | At least one scaling process is suspended, and which one decides what the group has stopped doing. Suspending launch stops it adding capacity; suspending terminate stops it removing instances and leaves replacements half-finished; suspending the health check stops it noticing an instance has failed. Resume the process named here unless a deployment tool is holding it deliberately. |

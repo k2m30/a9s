@@ -7,24 +7,13 @@ import (
 	"net/url"
 	"strings"
 
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// colorCFN derives the row colour from the stack's findings, and for a row that
-// carries none from the same predicates the fetcher used: its status, and the
-// two posture words it wrote into Fields. Nothing reads a rendered phrase back.
-func colorCFN(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	findings := cfnStackFindings(r.Fields["status"])
-	findings = append(findings, cfnPostureFindings(
-		r.Fields["termination_protection"], r.Fields["output_secret"])...)
-	return colorFromFindings(findings)
-}
 
 func colorPipeline(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
@@ -84,7 +73,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID", "stack_arn": "arn"}, DisplayNameKey: "Name"},
 		},
-		Color:          colorCFN,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[cfntypes.StackStatus](),
+		NormalStates:   []string{string(cfntypes.StackStatusCreateComplete), string(cfntypes.StackStatusUpdateComplete), string(cfntypes.StackStatusImportComplete)},
+		UnknownState:   CodeCFNStackUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudFormation} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
@@ -106,13 +98,16 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		IssueEnricherFieldKeys: []string{"drift_status"},
 		Findings: []catalog.FindingDef{
-			{Code: CodeCFNStackFailed, Phrase: "<failure status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "The stack's last operation failed and the stack is now in a state that decides what you may do next. Read the exact status and the failure options the operation ran under, then choose between retrying, continuing the rollback, updating with a corrected template, or deleting; a stack left in a failed rollback needs the rollback continued before anything else is accepted."},
-			{Code: CodeCFNStackRollback, Phrase: "<rollback status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudFormation attempted to undo the last change. A completed rollback means the previous template is what is deployed and the update delivered nothing; a rollback that itself failed means the stack is stuck part-way and needs the rollback continued before it will accept another operation. Read the events for the resource that started it either way."},
-			{Code: CodeCFNStackInProgress, Phrase: "<in-progress status, in words>", Severity: domain.SevWarn, Source: "wave1", Detail: "An operation is running against this stack right now, so its resources are being created, replaced or removed and no other change will be accepted until it ends. Watch the stack events until a terminal status appears."},
-			{Code: CodeCFNStackDeleted, Phrase: "delete complete", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeCFNStackFailed, Phrase: "<failure status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "The stack's last operation failed and the stack is now in a state that decides what you may do next. Read the exact status and the failure options the operation ran under, then choose between retrying, continuing the rollback, updating with a corrected template, or deleting; a stack left in a failed rollback needs the rollback continued before anything else is accepted.", States: []string{string(cfntypes.StackStatusCreateFailed), string(cfntypes.StackStatusUpdateFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeCFNStackRollback, Phrase: "<rollback status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudFormation attempted to undo the last change. A completed rollback means the previous template is what is deployed and the update delivered nothing; a rollback that itself failed means the stack is stuck part-way and needs the rollback continued before it will accept another operation. Read the events for the resource that started it either way.", States: []string{string(cfntypes.StackStatusRollbackComplete), string(cfntypes.StackStatusRollbackFailed), string(cfntypes.StackStatusUpdateRollbackComplete), string(cfntypes.StackStatusUpdateRollbackFailed), string(cfntypes.StackStatusImportRollbackComplete), string(cfntypes.StackStatusImportRollbackFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeCFNStackInProgress, Phrase: "<in-progress status, in words>", Severity: domain.SevWarn, Source: "wave1", Detail: "An operation is running against this stack right now, so its resources are being created, replaced or removed and no other change will be accepted until it ends. Watch the stack events until a terminal status appears.", States: []string{string(cfntypes.StackStatusCreateInProgress), string(cfntypes.StackStatusRollbackInProgress), string(cfntypes.StackStatusUpdateInProgress), string(cfntypes.StackStatusUpdateCompleteCleanupInProgress), string(cfntypes.StackStatusUpdateRollbackInProgress), string(cfntypes.StackStatusUpdateRollbackCompleteCleanupInProgress), string(cfntypes.StackStatusImportInProgress), string(cfntypes.StackStatusImportRollbackInProgress), string(cfntypes.StackStatusReviewInProgress)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeCFNStackDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "CloudFormation is removing this stack and every resource it owns that has no retain policy. If the deletion was not intended, the resources already gone cannot be brought back by the stack; check the events for what is left.", States: []string{string(cfntypes.StackStatusDeleteInProgress)}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeCFNStackDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The stack could not be deleted, so some of its resources may still be running and billing, and the stack accepts no update. Read the events for the resource that blocked the deletion, clear the cause, and delete the stack again.", States: []string{string(cfntypes.StackStatusDeleteFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeCFNStackDeleted, Phrase: "delete complete", Severity: domain.SevDim, Source: "wave1", States: []string{string(cfntypes.StackStatusDeleteComplete)}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(CodeCFNStackUnrecognised, "<status>", "wave1", "CloudFormation reports a stack status a9s does not recognise, so a9s cannot tell whether an operation is running or the stack is settled. Read the stack events before deploying to it."),
 			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure", Severity: domain.SevBroken, Source: "wave2", Detail: "At least one resource in this stack reported a failure during its most recent operation, so what is deployed is not what the template describes. Open the failing resource in the events list and fix the cause before the next deployment repeats it."},
 			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2", Detail: "The live resources no longer match the template CloudFormation last applied, so the next stack update may overwrite a change somebody made by hand, or fail outright. Run a drift detail report, then either fold the manual change into the template or revert it."},
-			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted."},
+			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted.", AppliesInStates: cfnBuiltStates()},
 			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1", Detail: "A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential."},
 		},
 	},
@@ -203,7 +198,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichCodeBuildStatus, Priority: 10},
-		FieldKeys:              []string{"name", "source_type", "description", "last_modified", "arn", "degraded_finding", "status"},
+		FieldKeys:              []string{"name", "source_type", "description", "last_modified", "arn", "degraded_finding"},
 		IssueEnricherFieldKeys: []string{"last_build"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true, Truncated: true},

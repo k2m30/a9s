@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -23,10 +24,11 @@ const (
 )
 
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
-// up to EnrichmentCap stacks). It scans the most recent events client-side for any
-// resource with ResourceStatus ending in "_FAILED". A failed resource event produces
-// a "!" finding: "recent resource failure: <ResourceType>/<LogicalResourceId>".
-// This surfaces hidden failures that are not reflected in the top-level StackStatus.
+// up to EnrichmentCap stacks). It scans the events of the stack's latest
+// operation for any resource with ResourceStatus ending in "_FAILED". A failed
+// resource event produces a "!" finding: "recent resource failure:
+// <ResourceType>/<LogicalResourceId>". This surfaces hidden failures that are
+// not reflected in the top-level StackStatus.
 func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -64,11 +66,8 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			truncated = true
 			return
 		}
-		// Scan events from the first page for any resource with a _FAILED status.
-		// The API returns events in reverse-chronological order; we inspect all
-		// events on the first page to catch recent failures.
 		var failedRows []domain.DetailRow
-		for _, ev := range out.StackEvents {
+		for _, ev := range cfnLatestOperation(out.StackEvents) {
 			status := string(ev.ResourceStatus)
 			if !strings.HasSuffix(status, "_FAILED") {
 				continue
@@ -111,6 +110,27 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 
 	SetTruncated(&result, truncated)
 	return result, errors.Join(loopErr, AggregateFailures("DescribeStackEvents", failures, total))
+}
+
+// cfnLatestOperation is the newest-first events of the stack's latest
+// operation: everything down to and including the newest event of the stack
+// itself that starts a create, update, delete or import. The stack's own
+// events are the ones whose PhysicalResourceId is the stack ID; a nested
+// stack's events carry the nested stack's ID, and a rollback or cleanup phase
+// belongs to the operation that started it. DescribeStackEvents keeps every
+// past operation, so a failure an earlier one recovered from is history.
+func cfnLatestOperation(events []cfntypes.StackEvent) []cfntypes.StackEvent {
+	for i, ev := range events {
+		if id := aws.ToString(ev.StackId); id == "" || aws.ToString(ev.PhysicalResourceId) != id {
+			continue
+		}
+		switch ev.ResourceStatus {
+		case cfntypes.ResourceStatusCreateInProgress, cfntypes.ResourceStatusUpdateInProgress,
+			cfntypes.ResourceStatusDeleteInProgress, cfntypes.ResourceStatusImportInProgress:
+			return events[:i+1]
+		}
+	}
+	return events
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.

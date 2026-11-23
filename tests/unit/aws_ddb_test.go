@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 type ddbListStub struct {
@@ -58,11 +59,14 @@ func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status stri
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
+	if got, want := r.Fields["status"], string(table.TableStatus); got != want {
+		t.Errorf("Fields[status] = %q, want the AWS value %q", got, want)
+	}
 	phrases := make([]string, 0, len(r.Findings))
 	for _, f := range r.Findings {
 		phrases = append(phrases, f.Phrase)
 	}
-	return r.Fields["status"], phrases, r.Fields
+	return domain.StatusPhrase(r.Findings), phrases, r.Fields
 }
 
 func findDDBTable(t *testing.T, id string) *ddbtypes.TableDescription {
@@ -78,18 +82,10 @@ func findDDBTable(t *testing.T, id string) *ddbtypes.TableDescription {
 
 func TestDDB_Fetch_Active_StatusBlank(t *testing.T) {
 	table := findDDBTable(t, fixtures.OrdersProdID)
-	status, issues, fields := fetchDDBSingle(t, table)
+	status, issues, _ := fetchDDBSingle(t, table)
 
 	if status != "" {
 		t.Errorf("Status = %q, want %q (ACTIVE healthy silence)", status, "")
-	}
-	for _, banned := range []string{"OK", "ACTIVE", "active", "healthy", "available"} {
-		if status == banned {
-			t.Errorf("banned Status value %q — healthy rows must render blank", banned)
-		}
-	}
-	if fields["status"] != "" {
-		t.Errorf("Fields[status] = %q, want blank", fields["status"])
 	}
 	if len(issues) != 0 {
 		t.Errorf("Issues = %v, want nil or empty for ACTIVE row", issues)
@@ -240,8 +236,11 @@ func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 	}
 	// nil TableDescription is not an authorization denial — the shared
 	// DegradedDetails classifier renders the neutral "details unavailable".
-	if got := result.Resources[0].Fields["status"]; got != "details unavailable" {
-		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
+	if got := result.Resources[0].Fields["status"]; got != "" {
+		t.Errorf("degraded row Fields[status] = %q, want empty: the lifecycle field holds only what AWS reported", got)
+	}
+	if len(result.Resources[0].Findings) == 0 || result.Resources[0].Findings[0].Phrase != "details unavailable" {
+		t.Errorf("degraded row findings = %v, want the %q finding first", result.Resources[0].Findings, "details unavailable")
 	}
 }
 

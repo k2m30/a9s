@@ -5,8 +5,7 @@ package unit_test
 //   - Fetcher writes no Status for lifecycle states; keeps Fields["state"].
 //   - Fetcher EMITS canonical Finding entries into Resource.Findings for
 //     non-healthy, non-terminal lifecycle states.
-//   - EC2 Color func reads Findings[0].Severity first, falling back to
-//     structural-field logic when Findings is empty.
+//   - EC2 colour derives from Findings.
 //   - core/aws/ec2_codes.go declares FindingCode constants.
 
 import (
@@ -18,6 +17,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -127,8 +127,9 @@ func TestEC2Fetcher_PendingStateEmitsWarnFinding(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestEC2Fetcher_StoppedServerEmitsBrokenFinding asserts that a stopped
-// instance with a Server.* state_reason_code emits one SevBroken Finding
-// with CodeEC2StateStoppedServer.
+// instance with a Server.* state_reason_code carries its stopped state finding
+// and, beside it, one SevBroken CodeEC2StateStoppedServer: AWS stopped it, so
+// the reason is a second axis on a paused instance.
 func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 	mock := newEC2MockForPR03b([]ec2types.Instance{
 		{
@@ -156,16 +157,25 @@ func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if len(r.Findings) != 1 {
-		t.Fatalf("Findings: got %d, want 1 for stopped+Server.* state", len(r.Findings))
+	if len(r.Findings) != 2 {
+		t.Fatalf("Findings: got %v, want the stopped state and the Server.* reason", r.Findings)
 	}
-
-	f := r.Findings[0]
-	if f.Code != awsclient.CodeEC2StateStoppedServer {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, awsclient.CodeEC2StateStoppedServer)
+	byCode := map[domain.FindingCode]domain.Finding{}
+	for _, f := range r.Findings {
+		byCode[f.Code] = f
+	}
+	if _, state := catalog.LifecycleOf("ec2", "stopped"); byCode[state].Code == "" {
+		t.Errorf("Findings %v lack the stopped state finding %s", r.Findings, state)
+	}
+	f, ok := byCode[awsclient.CodeEC2StateStoppedServer]
+	if !ok {
+		t.Fatalf("Findings %v lack %s", r.Findings, awsclient.CodeEC2StateStoppedServer)
 	}
 	if f.Severity != domain.SevBroken {
-		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken", f.Severity)
+		t.Errorf("%s severity: got %v, want domain.SevBroken", f.Code, f.Severity)
+	}
+	if top, _ := domain.TopFinding(r.Findings); top.Code != awsclient.CodeEC2StateStoppedServer {
+		t.Errorf("top finding = %s, want %s", top.Code, awsclient.CodeEC2StateStoppedServer)
 	}
 }
 

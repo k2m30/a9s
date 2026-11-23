@@ -12,10 +12,8 @@ import (
 // is set. Covers the common AWS vocabulary so ad-hoc ResourceTypeDef instances
 // (which omit Color) behave sensibly without requiring every type to set up Color.
 //
-// Used by ResolveColor in types.go; per-type classifiers (e.g. colorEC2) and
-// other shared helpers (colorFromSeverity, colorCFN,
-// acmColor, r53Color) live alongside the catalog data in
-// core/aws/catalog_color_helpers.go.
+// Used by ResolveColor in types.go; the per-type classifiers live alongside
+// the catalog data in core/aws.
 func colorFallback(status string) domain.Color {
 	switch status {
 	case "running", "available", "active", "ACTIVE", "AVAILABLE", "RUNNING",

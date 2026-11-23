@@ -39,7 +39,7 @@ func warnOnlyFindings(ids []string) map[string][]domain.Finding {
 func TestController_ListIssueCount_TildeOnlyFindings_NoSuffix(t *testing.T) {
 	c := newListController(t, "ec2")
 
-	resources := controllerIssueResourcesWithState(5, 0, "running", "stopped")
+	resources := controllerIssueResourcesWithState("ec2", 5, 0, "running", "stopped")
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
 	ids := make([]string, len(resources))
@@ -64,7 +64,7 @@ func TestController_ListIssueCount_TildeOnlyFindings_NoSuffix(t *testing.T) {
 func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testing.T) {
 	c := newListController(t, "ec2")
 
-	resources := controllerIssueResourcesWithState(5, 0, "running", "stopped")
+	resources := controllerIssueResourcesWithState("ec2", 5, 0, "running", "stopped")
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
 	findings := make(map[string][]domain.Finding, len(resources))
@@ -104,7 +104,7 @@ func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testi
 func TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation(t *testing.T) {
 	c := newListController(t, "ec2")
 
-	resources := controllerIssueResourcesWithState(7, 0, "running", "stopped")
+	resources := controllerIssueResourcesWithState("ec2", 7, 0, "running", "stopped")
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
 	findings := make(map[string][]domain.Finding, len(resources))

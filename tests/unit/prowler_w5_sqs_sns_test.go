@@ -868,37 +868,6 @@ func TestW5_SNSSubPlainHTTP_ByTopicFetcherAgrees(t *testing.T) {
 		"delivers over plain HTTP", domain.SevWarn, "wave1")
 }
 
-// The third site: a cache-restored row arrives with Fields and no Findings,
-// and the classifier recomputes from Fields alone. A protocol-derived
-// finding that the fetcher sees and the classifier does not is the row
-// changing colour depending on where it came from.
-func TestW5_SNSSubPlainHTTP_ColourFallbackAgreesWithTheFetcher(t *testing.T) {
-	td := resource.FindResourceType("sns-sub")
-	if td == nil {
-		t.Fatal("sns-sub not registered")
-	}
-	out, err := awsclient.FetchSNSSubscriptionsPage(
-		context.Background(),
-		&w5SNSSubListFake{subs: []snstypes.Subscription{
-			w5Sub("http", "http://hooks.acme-corp.com/sns/orders"),
-		}},
-		"",
-	)
-	if err != nil {
-		t.Fatalf("FetchSNSSubscriptionsPage: %v", err)
-	}
-	fetched := out.Resources[0]
-	bare := resource.Resource{ID: fetched.ID, Fields: fetched.Fields}
-
-	if got, want := td.ResolveColor(bare), td.ResolveColor(fetched); got != want {
-		t.Errorf("cache-restored row colour %v, fetched row colour %v — the classifier and the fetcher disagree; Fields = %v",
-			got, want, fetched.Fields)
-	}
-	if got := td.ResolveColor(bare); got != resource.ColorWarning {
-		t.Errorf("cache-restored plain-HTTP subscription colour = %v, want ColorWarning", got)
-	}
-}
-
 // A subscription AWS reports as Deleted is gone and emits no posture
 // finding, whatever its protocol was.
 func TestW5_SNSSubPlainHTTP_DeletedSubscriptionEmitsNoPostureFinding(t *testing.T) {

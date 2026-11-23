@@ -32,8 +32,7 @@ const (
 //     "resource policy grants another account"
 //
 // A secret with no resource policy attached (ResourcePolicy nil) is the
-// normal case and yields nothing, and a secret already scheduled for deletion
-// is skipped entirely. Skip when clients.SecretsManager == nil.
+// normal case and yields nothing. Skip when clients.SecretsManager == nil.
 func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -50,9 +49,7 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 
 	var failures []Failure
-	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return r.Fields["status"] != "DELETED"
-	}, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {

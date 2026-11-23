@@ -206,6 +206,12 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 		if phrase := domain.StatusPhrase(r.Findings); phrase != "" {
 			return phrase
 		}
+		// A type with a state table raises a finding for every value that is
+		// not normal, so the value under the phrase is a normal one and a
+		// healthy row reads blank (docs/attention-signals.md).
+		if td != nil && len(td.StateEnum) > 0 {
+			return ""
+		}
 		if v, ok := r.Fields[col.Key]; ok && v != "" {
 			return domain.HumanizeStatusPhrase(v)
 		}

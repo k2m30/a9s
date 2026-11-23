@@ -171,8 +171,8 @@ var sharedEventBridgeFixtures = shared(func() *EventBridgeFixtures {
 		},
 		// scheduled-report-generator — ENABLED with exactly one target that
 		// carries a DeadLetterConfig, so EnrichEventBridgeRuleTargets raises
-		// no eb-rule.target-issue finding. The only demo rule that resolves
-		// to colorEBRule's Healthy fallback.
+		// no eb-rule.target-issue finding. The only demo rule with no
+		// finding at all.
 		{
 			Name:               aws.String("scheduled-report-generator"),
 			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/scheduled-report-generator"),

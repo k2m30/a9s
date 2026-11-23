@@ -30,20 +30,6 @@ const (
 	ecsTaskCodeEnvSecret domain.FindingCode = "ecs-task.env-secret"
 )
 
-// ecsTaskGone reports a task that is stopped or on its way there. The row is
-// a task, not a definition, so once teardown starts its definition's posture
-// is not an open item — nobody is going to reconfigure a task that is
-// already draining. The single place that fact is spelled: the fetcher's
-// lifecycle findings and the Wave-2 posture pass both call it. The lifecycle
-// finding for these states still fires; a state is not a posture.
-func ecsTaskGone(lastStatus string) bool {
-	switch lastStatus {
-	case "STOPPED", "STOPPING", "DEPROVISIONING", "DEACTIVATING":
-		return true
-	}
-	return false
-}
-
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.
 // It groups tasks by cluster ARN and calls DescribeTasks (up to 100 per call)
 // to surface failures that Wave 1 status coloring cannot detect.
@@ -115,7 +101,9 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					continue
 				}
 				returned[taskID] = true
-				if arn := aws.ToString(task.TaskDefinitionArn); arn != "" && !ecsTaskGone(aws.ToString(task.LastStatus)) {
+				// The describe answers now, so a task listed running may have
+				// started stopping since; its definition is no open item then.
+				if arn := aws.ToString(task.TaskDefinitionArn); arn != "" && appliesAny("ecs-task", aws.ToString(task.LastStatus), ecsTaskCodePrivileged, ecsTaskCodeHostNamespace, ecsTaskCodeWritableRoot, ecsTaskCodeNoLogging, ecsTaskCodeEnvSecret) {
 					taskDefByTaskID[taskID] = arn
 				}
 

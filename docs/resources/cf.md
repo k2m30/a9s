@@ -93,6 +93,10 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.WebACLId` field on the list response.
 
+- **Signal**: `Status` outside the documented `Deployed` and `InProgress`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`.
@@ -156,6 +160,7 @@ One row per signal from §3:
 | the default CloudFront certificate on a distribution with custom aliases | 2 | Warning | `~` | S2, S3, S4, S5 | `uses the default CloudFront certificate` |
 | `GeoRestriction.RestrictionType == none` | 2 | Warning | `~` | S2, S3, S4, S5 | `no geo restriction` |
 | `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` |
+| `Status` outside the documented `Deployed` and `InProgress` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 ## 4.1 UX review (two sentences)
 
@@ -210,6 +215,7 @@ cf — DNS & CDN. Status key: `status` — the key the status cell reads, and th
 | --- | --- | --- | --- | --- |
 | cf.disabled | disabled (admin-off) | dim | wave1 | — |
 | cf.status.in-progress | deploying: config propagating | warn | wave1 | A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution. |
+| cf.status.unrecognised | <status> (unrecognised) | warn | wave1 | CloudFront reports a distribution status a9s does not recognise, so a9s cannot tell whether its configuration has reached the edge locations. Check the distribution in the CloudFront console before relying on it. |
 | cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | The distribution accepts plain HTTP from viewers, or reaches an origin that can serve TLS over plain HTTP, so requests and any cookies or tokens in them can be read in transit. Redirect viewers to HTTPS, and set the origin protocol policy to HTTPS only for any origin that supports it. |
 | cf.origin-bucket-missing | S3 origin bucket does not exist | broken | wave2 | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
 | cf.deprecated-tls | minimum TLS below 1.2 | warn | wave2 | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |

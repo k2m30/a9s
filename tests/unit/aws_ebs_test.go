@@ -84,9 +84,14 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
 	// An unattached "available" volume older than ebsOrphanAge (7 days) emits a
-	// CodeEBSOrphanUnattached SevWarn finding, which explains the yellow row.
-	if len(r1.Findings) != 1 {
-		t.Fatalf("resource[1].Findings: expected 1 orphan finding for aged unattached volume, got %d: %+v", len(r1.Findings), r1.Findings)
+	// CodeEBSOrphanUnattached SevWarn finding, which explains the yellow row;
+	// "available" is a normal state, so the volume's missing encryption stands
+	// beside it.
+	if len(r1.Findings) != 2 {
+		t.Fatalf("resource[1].Findings: expected the orphan and the encryption finding, got %d: %+v", len(r1.Findings), r1.Findings)
+	}
+	if r1.Findings[1].Code != awsclient.CodeEBSUnencrypted {
+		t.Errorf("resource[1].Findings[1].Code = %q, want %q", r1.Findings[1].Code, awsclient.CodeEBSUnencrypted)
 	}
 	orphanFinding := r1.Findings[0]
 	if orphanFinding.Code != awsclient.CodeEBSOrphanUnattached {

@@ -115,6 +115,14 @@ The list API returns table names only, so the fetcher reads each table with `Des
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `TableStatus == REPLICATION_NOT_AUTHORIZED`.
+  - **State bucket**: Broken. A global-table replica whose replication permissions are denied (Amazon DynamoDB Developer Guide, "DynamoDB global tables security").
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `TableStatus` outside `TableStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` run once per table, and every finding they raise is a row on `docs/attention-signals.md § Signals § DATABASES & STORAGE` row `ddb`.
@@ -169,6 +177,8 @@ One row per signal from §3:
 | Resource policy names a foreign account | 2 | Warning | `~` | S2, S3, S4, S5 | `resource policy grants another account` |
 | Resource policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
 | no backup plan selection matches this table | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
+| `TableStatus == REPLICATION_NOT_AUTHORIZED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `replication not authorized` |
+| `TableStatus` outside `TableStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -225,6 +235,8 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | ddb.warn.updating | updating | warn | wave1 | A change is being applied — capacity mode, an index, a replica — and some operations are restricted while it runs. Wait for it to finish before starting another table change. |
 | ddb.warn.deleting | deleting | warn | wave1 | The table and its indexes are being removed, and the data is not recoverable unless a backup exists. If this was not intended, check right now whether point-in-time recovery covers the window you need. |
 | ddb.warn.archiving | archiving | warn | wave1 | The table is being moved to an archived state and is becoming unavailable for reads and writes. Nothing to do while it runs; restoring it later needs the encryption key it used. |
+| ddb.broken.replication\_not\_authorized | replication not authorized | broken | wave1 | This global-table replica cannot replicate because the permissions DynamoDB replicates with are denied, so its data drifts from the other Regions. Restore the service-linked role's permissions or the replication service principal's access: a replica left in this state is converted to a single-Region table, after 20 hours for an eventually consistent global table, and becomes unusable after seven days for a strongly consistent one. |
+| ddb.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | DynamoDB reports a table status a9s does not recognise, so a9s cannot tell whether the table serves requests. Check the table in the AWS console before relying on it. |
 | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 | Point-in-time recovery is off, so there is no way to roll this table back to a moment before a bad write and only explicit backups exist. Turn it on — it keeps a rolling 35-day window with no change to the table. |
 | ddb.deletion-protection-off | deletion protection off | warn | wave1 | A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step. |
 | ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |

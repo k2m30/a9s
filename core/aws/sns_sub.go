@@ -114,13 +114,14 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 }
 
 // snsSubFindings is the single source of every sns-sub wave-1 finding: the
-// top-level fetcher, the by-topic child fetcher and colorSNSSub's
-// cache-restored fallback all call it. Every argument is a Fields key, never
-// an SDK struct, so no caller can see a finding another one cannot.
+// top-level fetcher and the by-topic child fetcher both call it. Every
+// argument is a Fields key, never an SDK struct, so no caller can see a
+// finding another one cannot.
 func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	findings := snsSubStateFindings(subscriptionArn)
-	// A subscription AWS reports as Deleted or still unconfirmed is not
-	// carrying traffic, so its transport is not a posture problem yet.
+	// A subscription AWS reports as Deleted carries nothing. One still
+	// unconfirmed is sent its SubscriptionConfirmation message, token
+	// included, over the endpoint's own scheme, so its transport is judged.
 	if snsSubConfirmation(subscriptionArn) == snsSubDeleted || protocol != "http" {
 		return findings, nil
 	}
@@ -152,7 +153,6 @@ const (
 	snsSubArnDeleted = "Deleted"
 )
 
-// snsSubStateFindings mirrors colorSNSSub's own precedence.
 func snsSubStateFindings(subscriptionArn string) []domain.Finding {
 	switch subscriptionArn {
 	case snsSubArnPending:

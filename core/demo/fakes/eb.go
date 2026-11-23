@@ -30,13 +30,22 @@ func (f *EBFake) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.Des
 }
 
 // DescribeEnvironmentHealth returns the fixture-registered health causes for
-// the requested environment name (see EBFixtures.EnvironmentHealthCauses).
-// Required for EnrichEBEnvironmentHealth's Wave-2 issue check.
+// the requested environment, named or by ID (see
+// EBFixtures.EnvironmentHealthCauses). Required for
+// EnrichEBEnvironmentHealth's Wave-2 issue check.
 func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, input *elasticbeanstalk.DescribeEnvironmentHealthInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error) {
-	if input == nil || input.EnvironmentName == nil {
+	if input == nil || (input.EnvironmentName == nil && input.EnvironmentId == nil) {
 		return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
 	}
 	name := aws.ToString(input.EnvironmentName)
+	if id := aws.ToString(input.EnvironmentId); id != "" {
+		name = id
+		for _, e := range f.fix.Environments {
+			if aws.ToString(e.EnvironmentId) == id {
+				name = aws.ToString(e.EnvironmentName)
+			}
+		}
+	}
 	if !f.hasEnvironment(name) {
 		return nil, &ebtypes.ResourceNotFoundException{Message: notFoundMessage("Environment", name)}
 	}

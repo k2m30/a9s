@@ -62,10 +62,18 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if name == "" {
 			return
 		}
-		out, err := clients.ElasticBeanstalk.DescribeEnvironmentHealth(ctx, &elasticbeanstalk.DescribeEnvironmentHealthInput{
-			EnvironmentName: aws.String(name),
-			AttributeNames:  []ebtypes.EnvironmentHealthAttribute{ebtypes.EnvironmentHealthAttributeCauses},
-		})
+		// A name resolves to whichever environment holds it now, which is not
+		// this row when a terminated environment shares a live one's name; the
+		// ID is this row's own.
+		in := &elasticbeanstalk.DescribeEnvironmentHealthInput{
+			AttributeNames: []ebtypes.EnvironmentHealthAttribute{ebtypes.EnvironmentHealthAttributeCauses},
+		}
+		if id := r.Fields["environment_id"]; id != "" {
+			in.EnvironmentId = aws.String(id)
+		} else {
+			in.EnvironmentName = aws.String(name)
+		}
+		out, err := clients.ElasticBeanstalk.DescribeEnvironmentHealth(ctx, in)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -100,11 +108,7 @@ func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result
 	if !ok {
 		return nil
 	}
-	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		// An environment being torn down has no posture worth
-		// reporting, and its settings are about to stop existing.
-		return !ebLifecycleEnded(r.Fields["status"])
-	}, resourceIDsOf)
+	resources = capAtEnrichmentCap(result, resources, nil, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
@@ -161,11 +165,4 @@ func ebOptionValue(options []ebtypes.ConfigurationOptionSetting, namespace, name
 		}
 	}
 	return "", false
-}
-
-// ebLifecycleEnded reports whether an environment is on its way out, or
-// already gone. Fields["status"] carries the raw DescribeEnvironments value.
-func ebLifecycleEnded(status string) bool {
-	return status == string(ebtypes.EnvironmentStatusTerminating) ||
-		status == string(ebtypes.EnvironmentStatusTerminated)
 }

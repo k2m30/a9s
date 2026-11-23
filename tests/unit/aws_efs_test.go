@@ -13,6 +13,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -43,8 +44,8 @@ func TestFetchEFSFileSystems_HealthyBaseline_Silence(t *testing.T) {
 		t.Fatalf("graph-root fixture %q not found in fetcher output", fixtures.ProdEFSID)
 	}
 
-	if statusField := r.Fields["status"]; statusField != "" {
-		t.Errorf("Fields[\"status\"] = %q, want %q (healthy rows must have blank status field)", statusField, "")
+	if statusCell := domain.StatusPhrase(r.Findings); statusCell != "" {
+		t.Errorf("Status cell = %q, want %q (healthy rows must have blank status field)", statusCell, "")
 	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings = %v, want nil/empty (healthy rows have no Wave-1 findings)", r.Findings)
@@ -64,8 +65,8 @@ func TestFetchEFSFileSystems_Creating_Warning(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	if r.Fields["status"] != "creating" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "creating")
+	if domain.StatusPhrase(r.Findings) != "creating" {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), "creating")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "creating" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "creating")
@@ -85,8 +86,8 @@ func TestFetchEFSFileSystems_Updating_Warning(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	if r.Fields["status"] != "updating" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "updating")
+	if domain.StatusPhrase(r.Findings) != "updating" {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), "updating")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "updating" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "updating")
@@ -106,8 +107,8 @@ func TestFetchEFSFileSystems_Deleting_Warning(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	if r.Fields["status"] != "deleting" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting")
+	if domain.StatusPhrase(r.Findings) != "deleting" {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), "deleting")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "deleting" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "deleting")
@@ -127,8 +128,8 @@ func TestFetchEFSFileSystems_Error_Broken(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	if r.Fields["status"] != "error" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "error")
+	if domain.StatusPhrase(r.Findings) != "error" {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), "error")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "error" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "error")
@@ -148,15 +149,15 @@ func TestFetchEFSFileSystems_NoMountTargets_Broken(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	if r.Fields["status"] != "no mount targets" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "no mount targets")
+	if domain.StatusPhrase(r.Findings) != "no mount targets" {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), "no mount targets")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "no mount targets" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "no mount targets")
 	}
 }
 
-func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
+func TestFetchEFSFileSystems_DeletingWithNoMountTargetsShowsOnlyTheState(t *testing.T) {
 	const fsID = "fs-0warnmulti0000001"
 
 	resources, err := buildEFSResourcesFromFake()
@@ -169,11 +170,13 @@ func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	wantStatus := "no mount targets (+1)"
-	if statusField := r.Fields["status"]; statusField != wantStatus {
-		t.Errorf("Fields[\"status\"] = %q, want %q (top phrase + (+N) suffix)", statusField, wantStatus)
+	// A file system being deleted has no posture left to judge: its zero
+	// mount targets are part of the teardown, so only the state shows.
+	wantStatus := "deleting"
+	if statusCell := domain.StatusPhrase(r.Findings); statusCell != wantStatus {
+		t.Errorf("Status cell = %q, want %q", statusCell, wantStatus)
 	}
-	wantPhrases := []string{"no mount targets", "deleting"}
+	wantPhrases := []string{"deleting"}
 	if len(r.Findings) != len(wantPhrases) {
 		t.Errorf("Findings = %v, want %d findings", r.Findings, len(wantPhrases))
 	} else {
@@ -232,9 +235,9 @@ func TestFetchEFSFileSystems_PopulatesResourceIssues(t *testing.T) {
 			wantIssues: []string{"no mount targets"},
 		},
 		{
-			name:       "warn-efs-multi (multi-W1: Broken first, Warning second)",
+			name:       "warn-efs-multi (deleting with zero mount targets: the state alone)",
 			fsID:       "fs-0warnmulti0000001",
-			wantIssues: []string{"no mount targets", "deleting"},
+			wantIssues: []string{"deleting"},
 		},
 		{
 			name:       "warn-efs-updating-mt-down (W1 only; W2 in EnrichmentFinding, not Issues)",
@@ -368,13 +371,13 @@ func TestFetchEFSFileSystems_StatusField_Warning(t *testing.T) {
 			if !ok {
 				t.Fatalf("fixture %q not found", tc.fsID)
 			}
-			got := r.Fields["status"]
+			got := domain.StatusPhrase(r.Findings)
 			if got != tc.wantPhrase {
-				t.Errorf("Fields[\"status\"] = %q, want %q", got, tc.wantPhrase)
+				t.Errorf("Status cell = %q, want %q", got, tc.wantPhrase)
 			}
 			// status must not embed raw SDK enum suffix (e.g. "LifeCycleState.creating")
 			if strings.Contains(got, ".") {
-				t.Errorf("Fields[\"status\"] %q contains dot — must be plain phrase", got)
+				t.Errorf("Status cell %q contains dot — must be plain phrase", got)
 			}
 		})
 	}
@@ -405,9 +408,9 @@ func TestFetchEFSFileSystems_StatusField_Broken(t *testing.T) {
 			if !ok {
 				t.Fatalf("fixture %q not found", tc.fsID)
 			}
-			got := r.Fields["status"]
+			got := domain.StatusPhrase(r.Findings)
 			if got != tc.wantPhrase {
-				t.Errorf("Fields[\"status\"] = %q, want %q", got, tc.wantPhrase)
+				t.Errorf("Status cell = %q, want %q", got, tc.wantPhrase)
 			}
 		})
 	}
@@ -426,8 +429,8 @@ func TestFetchEFSFileSystems_W1Updating_IsolatesFromMTState(t *testing.T) {
 		t.Fatalf("fixture %q not found", fsID)
 	}
 
-	if r.Fields["status"] != "updating" {
-		t.Errorf("Fields[\"status\"] = %q, want %q (W1 signal only; MT state is W2)", r.Fields["status"], "updating")
+	if domain.StatusPhrase(r.Findings) != "updating" {
+		t.Errorf("Status cell = %q, want %q (W1 signal only; MT state is W2)", domain.StatusPhrase(r.Findings), "updating")
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != "updating" {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "updating")

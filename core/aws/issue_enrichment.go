@@ -39,6 +39,10 @@ type IssueEnricher struct {
 	// Dispatch (Core.probeEnrichmentRows) hands it those entries and no
 	// others, so this is the one place a cross-cache read is declared.
 	Reads []string
+	// ReadsNonLive keeps the rows whose lifecycle class is tearing down,
+	// ended or pending deletion in the rows the runner hands this enricher,
+	// for a pass whose answer exists only once a resource has stopped.
+	ReadsNonLive bool
 }
 
 // InFetcherWave2Sentinel returns zero findings, zero issues, not truncated,

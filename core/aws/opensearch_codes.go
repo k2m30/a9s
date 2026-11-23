@@ -13,6 +13,9 @@ const (
 	CodeOpenSearchIsolated   domain.FindingCode = "opensearch.broken.isolated"
 	CodeOpenSearchProcessing domain.FindingCode = "opensearch.warn.processing"
 
+	CodeOpenSearchCreating     domain.FindingCode = "opensearch.state.creating"
+	CodeOpenSearchUnrecognised domain.FindingCode = "opensearch.state.unrecognised"
+
 	opensearchCodeUpdateForced   domain.FindingCode = "opensearch.update-forced"
 	opensearchCodeEncryptionOff  domain.FindingCode = "opensearch.encryption-off"
 	opensearchCodePublic         domain.FindingCode = "opensearch.public"

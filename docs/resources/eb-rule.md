@@ -88,6 +88,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Dim (admin-off).
   - **How obtained**: `Rule.State` from `ListRules`.
 
+- **Signal**: `State` outside `RuleState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -127,6 +131,7 @@ One row per signal from §3:
 | `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `enabled rule has no targets` |
 | `DISABLED` rule with `len(Targets)>0` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
 | target without `DeadLetterConfig` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
+| `State` outside `RuleState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes on the table above:
 
@@ -171,6 +176,7 @@ eb-rule — MESSAGING. Status key: `state` — the key the status cell reads, an
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | eb-rule.state.disabled | disabled (rule off) | dim | wave1 | — |
+| eb-rule.state.unrecognised | <state> (unrecognised) | warn | wave1 | EventBridge reports a rule state a9s does not recognise, so a9s cannot tell whether the rule still matches events and delivers them. Check the rule in the EventBridge console before relying on it. |
 | eb-rule.no-targets | enabled rule has no targets | broken | wave2 | This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule. |
 | eb-rule.target-issue | target drift or no dead-letter config | warn | wave2 | This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter. |
 <!-- END GENERATED: findings -->

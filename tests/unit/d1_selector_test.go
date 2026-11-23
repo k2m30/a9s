@@ -9,6 +9,7 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -182,40 +183,35 @@ var d1ExpectedPhrases = map[string][]string{
 	"ssm": {"plaintext value looks like a credential", "not modified in over 365 days"},
 }
 
-// ─── the two private phrase pickers ──────────────────────────────────
-
-// TestD1_OpenSearchStatusCountsEverySignalOnce pins that the background-check
-// signals are findings on the row, not a separate counter. While they are
-// counted outside the slice, the "(+N)" in the Status cell and the number of
-// findings the detail view shows disagree.
-func TestD1_OpenSearchStatusCountsEverySignalOnce(t *testing.T) {
+// TestD1_StatusCellCountsEverySignalOnce pins that the Status cell the list
+// renders for opensearch and ses rows is the phrase of the row's findings, so
+// the "(+N)" in the cell and the number of findings the detail view shows
+// agree; a phrase picked elsewhere would count the background signals twice
+// or not at all.
+func TestD1_StatusCellCountsEverySignalOnce(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
-	rows := byType["opensearch"]
-	if len(rows) == 0 {
-		t.Fatal("no opensearch demo fixtures")
-	}
-	for _, res := range rows {
-		want := domain.StatusPhrase(res.Findings)
-		if got := res.Fields["status"]; got != want {
-			t.Errorf("opensearch/%s: Fields[status]=%q but its findings say %q; the phrase is built twice",
-				res.ID, got, want)
+	for _, short := range []string{"opensearch", "ses"} {
+		td := resource.FindResourceType(short)
+		rows := byType[short]
+		if td == nil || len(rows) == 0 {
+			t.Fatalf("no %s demo fixtures", short)
 		}
-	}
-}
-
-// TestD1_SESStatusIsTheWorstFindingsPhrase pins the same for ses, whose own
-// picker takes findings[0]. The quota signal is expected to be expressed as a
-// severity rather than as an exception inside a selector.
-func TestD1_SESStatusIsTheWorstFindingsPhrase(t *testing.T) {
-	byType, _ := buildVisibilityTypeCache(t)
-	rows := byType["ses"]
-	if len(rows) == 0 {
-		t.Fatal("no ses demo fixtures")
-	}
-	for _, res := range rows {
-		want := domain.StatusPhrase(res.Findings)
-		if got := res.Fields["status"]; got != want {
-			t.Errorf("ses/%s: Fields[status]=%q but its findings say %q", res.ID, got, want)
+		stacked := 0
+		for _, res := range rows {
+			want := domain.StatusPhrase(res.Findings)
+			if strings.Contains(want, "(+") {
+				stacked++
+			}
+			got, ok := listStatusCellFor(t, *td, rows, res.ID)
+			if !ok {
+				t.Fatalf("%s/%s: no rendered Status cell", short, res.ID)
+			}
+			if got != want {
+				t.Errorf("%s/%s: Status cell %q, findings say %q", short, res.ID, got, want)
+			}
+		}
+		if stacked == 0 {
+			t.Errorf("no %s demo row stacks two findings; the (+N) count is unwitnessed", short)
 		}
 	}
 }
@@ -311,9 +307,24 @@ func TestD1_ChildTaskRowsCarryTheSameFindingsAsTheParentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ecs-task fetch: %v", err)
 	}
+	// The ecs-task state table covers the top-level type; the child kind's
+	// rows carry the stop code and health findings, so the comparison is over
+	// those.
+	stateCode := map[domain.FindingCode]bool{}
+	for _, def := range parentTD.Findings {
+		if len(def.States) > 0 {
+			stateCode[def.Code] = true
+		}
+	}
 	parentByARN := map[string][]domain.Finding{}
 	for _, r := range parentPage.Resources {
-		parentByARN[r.Fields["arn"]] = r.Findings
+		var kept []domain.Finding
+		for _, f := range r.Findings {
+			if !stateCode[f.Code] {
+				kept = append(kept, f)
+			}
+		}
+		parentByARN[r.Fields["arn"]] = kept
 	}
 
 	child, err := awsclient.FetchEcsSvcTasks(context.Background(), fake, fake, d1ClusterARN, "acme-app", "")

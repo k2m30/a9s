@@ -10,6 +10,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -45,8 +46,8 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings = %v, want empty for healthy identity", r.Findings)
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf("Fields[status] = %q, want empty for healthy identity", r.Fields["status"])
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf("Status cell = %q, want empty for healthy identity", domain.StatusPhrase(r.Findings))
 	}
 	if r.Fields["identity_name"] != "acme-corp.com" {
 		t.Errorf("Fields[identity_name] = %q, want %q", r.Fields["identity_name"], "acme-corp.com")
@@ -101,8 +102,8 @@ func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 	if r.Fields["sending_enabled"] != "false" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "false")
 	}
-	if r.Fields["status"] == "" {
-		t.Error("Fields[status] = empty, want non-empty (PENDING + sending disabled identity)")
+	if domain.StatusPhrase(r.Findings) == "" {
+		t.Error("Status cell = empty, want non-empty (PENDING + sending disabled identity)")
 	}
 	if r.Fields["verification_status"] != "PENDING" {
 		t.Errorf("Fields[verification_status] = %q, want %q", r.Fields["verification_status"], "PENDING")
@@ -150,8 +151,8 @@ func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 			if len(result.Resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
-			if result.Resources[0].Fields["status"] != tc.wantStatus {
-				t.Errorf("Fields[status] = %q, want %q", result.Resources[0].Fields["status"], tc.wantStatus)
+			if domain.StatusPhrase(result.Resources[0].Findings) != tc.wantStatus {
+				t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(result.Resources[0].Findings), tc.wantStatus)
 			}
 		})
 	}
@@ -180,8 +181,8 @@ func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 	}
 	r := result.Resources[0]
 	expected := "verification failed (+1)"
-	if r.Fields["status"] != expected {
-		t.Errorf("Fields[status] = %q, want %q (multi-finding suffix)", r.Fields["status"], expected)
+	if domain.StatusPhrase(r.Findings) != expected {
+		t.Errorf("Status cell = %q, want %q (multi-finding suffix)", domain.StatusPhrase(r.Findings), expected)
 	}
 	if len(r.Findings) != 2 {
 		t.Errorf("Findings = %v, want 2 entries", r.Findings)
@@ -380,8 +381,8 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 		if len(r.Findings) != 0 {
 			t.Errorf("graph-root Findings = %v, want empty (healthy)", r.Findings)
 		}
-		if r.Fields["status"] != "" {
-			t.Errorf("graph-root Fields[status] = %q, want empty (healthy)", r.Fields["status"])
+		if domain.StatusPhrase(r.Findings) != "" {
+			t.Errorf("graph-root Status cell = %q, want empty (healthy)", domain.StatusPhrase(r.Findings))
 		}
 		if r.Fields["identity_type"] != "domain" {
 			t.Errorf("graph-root Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "domain")
@@ -439,8 +440,8 @@ func TestFetchSESIdentitiesPage_FixtureMultiIssueIdentityHasSuffix(t *testing.T)
 	for _, r := range result.Resources {
 		if r.ID == "broken.acme-corp.com" {
 			expected := "verification failed (+1)"
-			if r.Fields["status"] != expected {
-				t.Errorf("broken.acme-corp.com Fields[status] = %q, want %q", r.Fields["status"], expected)
+			if domain.StatusPhrase(r.Findings) != expected {
+				t.Errorf("broken.acme-corp.com Status cell = %q, want %q", domain.StatusPhrase(r.Findings), expected)
 			}
 			if len(r.Findings) != 2 {
 				t.Errorf("broken.acme-corp.com Findings = %v, want 2", r.Findings)

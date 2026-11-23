@@ -56,6 +56,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -762,7 +763,7 @@ func TestQA_FetchResources_MWAA(t *testing.T) {
 	if got := rl.Resources[0].ID; got != "mock-mwaa-1" {
 		t.Errorf("expected the mock environment's name as ID, got %q", got)
 	}
-	if got := rl.Resources[0].Fields["status"]; got != "" {
+	if got := domain.StatusPhrase(rl.Resources[0].Findings); got != "" {
 		t.Errorf("AVAILABLE environment with no findings should render a blank status, got %q", got)
 	}
 }
@@ -799,9 +800,9 @@ func TestQA_FetchResources_Transfer(t *testing.T) {
 	}
 	// ONLINE (no state finding), but the mock server has no LoggingRole/
 	// StructuredLogDestinations set — computeTransferFindings' no-logging
-	// finding fires regardless of state, so this is the real fetcher's
-	// genuine status phrase for a minimal server, not a stubbed value.
-	if got := rl.Resources[0].Fields["status"]; got != "no activity logging" {
+	// finding fires regardless of state, so this is the Status cell the list
+	// shows for a minimal server.
+	if got := domain.StatusPhrase(rl.Resources[0].Findings); got != "no activity logging" {
 		t.Errorf("expected status %q, got %q", "no activity logging", got)
 	}
 }

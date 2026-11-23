@@ -58,9 +58,10 @@ func TestQA_EC2_A1_5_StateColumnData(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
 
-	// State column title-matches Fields key "state" -- data renders
-	if !strings.Contains(plain, "running") {
-		t.Error("A.1.5: list should contain 'running' state")
+	// The Status cell is the state finding's phrase; running is the normal
+	// state, so the five running rows read blank.
+	if strings.Contains(plain, "running") {
+		t.Error("A.1.5: a running instance's Status cell should be blank")
 	}
 	if !strings.Contains(plain, "terminated") {
 		t.Error("A.1.5: list should contain 'terminated' state")
@@ -481,15 +482,15 @@ func TestQA_EC2_A8_8_FilterCaseInsensitive(t *testing.T) {
 	m := newEC2ListModel(t)
 
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
-	for _, r := range "RUNNING" {
+	for _, r := range "TERMINATED" {
 		m, _ = rootApplyMsg(m, rootKeyPress(string(r)))
 	}
 
 	plain := stripANSI(rootViewContent(m))
 
-	// Should match running instances (5 running in fixture)
-	if !strings.Contains(plain, "ec2(5/6)") {
-		t.Errorf("A.8.8: case-insensitive filter 'RUNNING' should narrow to 5/6, got: %s", plain[:min(300, len(plain))])
+	// Matches the one terminated instance's "terminated" Status cell.
+	if !strings.Contains(plain, "ec2(1/6)") {
+		t.Errorf("A.8.8: case-insensitive filter 'TERMINATED' should narrow to 1/6, got: %s", plain[:min(300, len(plain))])
 	}
 }
 

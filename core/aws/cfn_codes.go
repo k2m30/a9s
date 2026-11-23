@@ -10,7 +10,10 @@ const (
 	CodeCFNStackInProgress domain.FindingCode = "cfn.stack.in_progress"
 	// CodeCFNStackDeleted — stack is DELETE_COMPLETE. DescribeStacks still
 	// reports it for a retention window after deletion.
-	CodeCFNStackDeleted domain.FindingCode = "cfn.stack.deleted"
+	CodeCFNStackDeleted      domain.FindingCode = "cfn.stack.deleted"
+	CodeCFNStackDeleting     domain.FindingCode = "cfn.stack.deleting"
+	CodeCFNStackDeleteFailed domain.FindingCode = "cfn.stack.delete_failed"
+	CodeCFNStackUnrecognised domain.FindingCode = "cfn.stack.unrecognised"
 )
 
 const (

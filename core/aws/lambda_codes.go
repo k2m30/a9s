@@ -30,6 +30,12 @@ const (
 	// extended idle time. Severity: SevDim (lifecycle, not an issue).
 	CodeLambdaInactive domain.FindingCode = "lambda.state.inactive"
 
+	CodeLambdaDeactivating       domain.FindingCode = "lambda.state.deactivating"
+	CodeLambdaDeactivated        domain.FindingCode = "lambda.state.deactivated"
+	CodeLambdaActiveNonInvocable domain.FindingCode = "lambda.state.active-non-invocable"
+	CodeLambdaDeleting           domain.FindingCode = "lambda.state.deleting"
+	CodeLambdaUnrecognisedState  domain.FindingCode = "lambda.state.unrecognised"
+
 	// CodeLambdaEnvSecret — a plaintext credential sits in the function's
 	// environment variables. Severity: SevBroken.
 	//nolint:gosec // G101 false positive: a finding code, not a credential

@@ -126,6 +126,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `LifeCycleState == deleted`.
+  - **State bucket**: Dim. Ended: no posture finding and no Wave 2 read.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `LifeCycleState` outside `LifeCycleState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -170,6 +178,8 @@ One row per signal from §3:
 | any mount target `LifeCycleState != available` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `mount target down` |
 | File system policy allows any principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `file system policy open to anyone` |
 | AWS Backup policy status not `ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `automatic backups off` |
+| `LifeCycleState == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `LifeCycleState` outside `LifeCycleState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -222,6 +232,8 @@ efs — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | efs.warn.updating | updating | warn | wave1 | A change to the filesystem is being applied, such as its throughput mode or lifecycle policy. Existing mounts keep working; expect throughput to change once it lands. |
 | efs.warn.deleting | deleting | warn | wave1 | The filesystem is being removed and its data goes with it; mounts still open start failing. If this was not intended, check whether an AWS Backup recovery point exists before it completes. |
 | efs.mount-target-down | mount target down | broken | wave2 | A mount target for this filesystem is unavailable, so clients in that Availability Zone cannot mount it while clients elsewhere still can — which presents as a partial, confusing outage. Check the mount target's subnet and security groups, and whether the subnet still has free addresses. |
+| efs.deleted | deleted | dim | wave1 | — |
+| efs.warn.unrecognised\_state | <state> (unrecognised) | warn | wave1 | EFS reports a file system state a9s does not recognise, so a9s cannot tell whether it can be mounted. Check the file system in the AWS console before relying on it. |
 | efs.unencrypted | not encrypted | warn | wave1 | File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across. |
 | efs.public-policy | file system policy open to anyone | broken | wave2 | The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access. |
 | efs.no-backup-policy | automatic backups off | warn | wave2 | AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on. |

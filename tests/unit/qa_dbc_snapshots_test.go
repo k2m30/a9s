@@ -11,6 +11,7 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -77,9 +78,9 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	// The display phrase lives in Fields["status"]; findings carry severity.
-	if r2.Fields["status"] != "creating" {
-		t.Errorf("expected Fields[\"status\"] 'creating', got %q", r2.Fields["status"])
+	// The Status cell is the phrase of the row's top finding.
+	if domain.StatusPhrase(r2.Findings) != "creating" {
+		t.Errorf("expected Status cell 'creating', got %q", domain.StatusPhrase(r2.Findings))
 	}
 	if r2.Fields["snapshot_type"] != "manual" {
 		t.Errorf("expected snapshot_type 'manual', got %q", r2.Fields["snapshot_type"])

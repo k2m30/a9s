@@ -118,19 +118,15 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 		ID:   name,
 		Name: clusterName,
 		Fields: map[string]string{
-			"cluster_name":        clusterName,
-			"version":             version,
-			"status":              status,
-			"endpoint":            endpoint,
-			"platform_version":    platformVersion,
-			"arn":                 aws.ToString(cluster.Arn),
-			"health_issues_count": strconv.Itoa(healthIssuesCount),
-			"health_issues":       strings.Join(issueCodes, ", "),
-			"subnet_ids":          subnetIDs,
-			// The four posture verdicts as words. colorEKSCluster's fallback
-			// runs eksClusterFindings over Fields, so a row stripped of its
-			// findings has to be able to recover them; the config they are
-			// derived from is on the DescribeCluster struct and nowhere else.
+			"cluster_name":          clusterName,
+			"version":               version,
+			"status":                status,
+			"endpoint":              endpoint,
+			"platform_version":      platformVersion,
+			"arn":                   aws.ToString(cluster.Arn),
+			"health_issues_count":   strconv.Itoa(healthIssuesCount),
+			"health_issues":         strings.Join(issueCodes, ", "),
+			"subnet_ids":            subnetIDs,
 			"public_endpoint":       posture.PublicEndpoint,
 			"control_plane_logging": posture.ControlPlaneLogging,
 			"secrets_encryption":    posture.SecretsEncryption,
@@ -140,10 +136,10 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 	}
 
 	var issueRows []domain.DetailRow
-	r.Findings, issueRows = eksClusterFindings(status, r.Fields[DegradedFindingField], healthIssuesCount, issueCodes, version, posture)
+	r.Findings, issueRows = eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
 	if len(r.Findings) > 0 {
 		// The rows belong to whichever finding built them — the failed state
-		// folds them in, any other state leaves them on the health-issue
+		// folds them in, an active cluster leaves them on the health-issue
 		// finding, and both put that finding first.
 		addWave1Rows(&r, r.Findings[0].Code, issueRows...)
 	}
@@ -333,15 +329,10 @@ func eksMissingLogTypes(cluster *ekstypes.Cluster) []string {
 	return missing
 }
 
-// eksPostureFindings decides the four posture findings from the words alone. A
-// cluster on its way out reports none of them: nothing an operator does to a
-// deleting cluster matters. An absent word is unknown rather than bad — the
-// fetcher always writes all four, so a missing one means a row built outside
-// it.
-func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
-	if status == string(ekstypes.ClusterStatusDeleting) {
-		return nil
-	}
+// eksPostureFindings decides the four posture findings from the words alone. An
+// absent word is unknown rather than bad — the fetcher always writes all four,
+// so a missing one means a row built outside it.
+func eksPostureFindings(version string, p eksPosture) []domain.Finding {
 	var findings []domain.Finding
 	switch p.PublicEndpoint {
 	case eksEndpointOpen:
@@ -403,34 +394,11 @@ func addEKSPostureRows(r *resource.Resource, cluster *ekstypes.Cluster, versions
 	addWave1Rows(r, CodeEKSVersionUnsupported, domain.DetailRow{Label: "Support", Value: support, Tier: "!"})
 }
 
-// eksClusterFindings is the one predicate for a cluster: the lifecycle state,
-// then the posture verdicts. colorEKSCluster runs it over Fields for rows built
-// outside the fetcher, which have the issue count but not the codes; the phrase
-// is then the fallback wording and the severity, which is what decides the
-// colour, is the same either way.
-func eksClusterFindings(status, degradedCode string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
-	if f := degradedFindings("eks", degradedCode); f != nil {
-		return f, nil
+func eksClusterFindings(status string, healthIssuesCount int, issueCodes []string, version string, p eksPosture) ([]domain.Finding, []domain.DetailRow) {
+	var posture []domain.Finding
+	if healthIssuesCount > 0 {
+		posture = append(posture, wave1Finding(CodeEKSHealthIssue))
 	}
-	var findings []domain.Finding
-	var rows []domain.DetailRow
-	switch status {
-	case string(ekstypes.ClusterStatusFailed):
-		f, r := healthIssueFinding(CodeEKSStateFailed, issueCodes)
-		findings, rows = []domain.Finding{f}, r
-	case string(ekstypes.ClusterStatusCreating):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateCreating)}
-	case string(ekstypes.ClusterStatusUpdating):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateUpdating)}
-	case string(ekstypes.ClusterStatusDeleting):
-		findings = []domain.Finding{wave1Finding(CodeEKSStateDeleting)}
-	case string(ekstypes.ClusterStatusPending):
-		findings = []domain.Finding{wave1Finding(CodeEKSStatePending)}
-	default:
-		if healthIssuesCount > 0 {
-			f, r := healthIssueFinding(CodeEKSHealthIssue, issueCodes)
-			findings, rows = []domain.Finding{f}, r
-		}
-	}
-	return append(findings, eksPostureFindings(status, version, p)...), rows
+	findings := withState("eks", status, append(posture, eksPostureFindings(version, p)...))
+	return findings, healthIssueRows(findings, issueCodes, CodeEKSStateFailed, CodeEKSHealthIssue)
 }

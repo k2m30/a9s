@@ -352,7 +352,8 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 	// A refused DescribeTasks hides the task's details, not the task: the task
 	// ListTasks named stays listed as an unjudged row.
 	if len(result.Resources) != 1 || result.Resources[0].ID != "some-task" ||
-		result.Resources[0].Fields["status"] != "details unavailable" {
+		result.Resources[0].Fields["status"] != "" || len(result.Resources[0].Findings) == 0 ||
+		result.Resources[0].Findings[0].Phrase != "details unavailable" {
 		t.Errorf("resources = %+v, want the listed task kept as a details-unavailable row", result.Resources)
 	}
 }

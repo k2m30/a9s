@@ -6,40 +6,16 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-func colorEKSCluster(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
-	findings, _ := eksClusterFindings(
-		r.Fields["status"], r.Fields[DegradedFindingField], issues, nil, r.Fields["version"], eksPosture{
-			PublicEndpoint:      r.Fields["public_endpoint"],
-			ControlPlaneLogging: r.Fields["control_plane_logging"],
-			SecretsEncryption:   r.Fields["secrets_encryption"],
-			VersionSupport:      r.Fields["version_support"],
-		})
-	return colorFromFindings(findings)
-}
-
-func colorEKSNodeGroup(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	issues, _ := strconv.Atoi(r.Fields["health_issues_count"])
-	findings, _ := ngFindings(r.Fields["status"], r.Fields[DegradedFindingField], issues, nil)
-	return colorFromFindings(findings)
-}
 
 var containersTypes = []catalog.ResourceTypeDef{
 	{
@@ -61,7 +37,10 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 			{Key: "platform_version", Title: "Platform Version", Path: "PlatformVersion", Width: 18},
 		},
-		Color:          colorEKSCluster,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ekstypes.ClusterStatus](),
+		NormalStates:   []string{string(ekstypes.ClusterStatusActive)},
+		UnknownState:   CodeEKSUnrecognisedStatus,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EKS} }),
 		Fetcher:        fetcherWithClients(FetchEKSClustersPage),
 		FieldKeys: []string{
@@ -92,12 +71,13 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEKSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane is still being built, so kubectl and the node groups that will join it cannot connect yet. Wait for the cluster to become active before creating node groups or add-ons against it."},
-			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "A control-plane change is in flight — a version upgrade, a logging or endpoint change — and other cluster updates are rejected while it runs. Wait for it to finish, then confirm your nodes and add-ons are on a compatible version."},
-			{Code: CodeEKSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down and its workloads are going with it. Move anything that still has to run to another cluster now, because the control plane stops answering before the deletion finishes."},
-			{Code: CodeEKSStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane exists but is not serving, so nothing can be scheduled on the cluster yet. Wait for it to become active; a cluster that stays pending usually cannot reach the subnets it was given."},
-			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster."},
-			{Code: CodeEKSHealthIssue, Phrase: "health issue", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane reports at least one health issue; every reported code is a row under this finding, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears."},
+			{Code: CodeEKSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane is still being built, so kubectl and the node groups that will join it cannot connect yet. Wait for the cluster to become active before creating node groups or add-ons against it.", States: []string{string(ekstypes.ClusterStatusCreating)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "A control-plane change is in flight — a version upgrade, a logging or endpoint change — and other cluster updates are rejected while it runs. Wait for it to finish, then confirm your nodes and add-ons are on a compatible version.", States: []string{string(ekstypes.ClusterStatusUpdating)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEKSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down and its workloads are going with it. Move anything that still has to run to another cluster now, because the control plane stops answering before the deletion finishes.", States: []string{string(ekstypes.ClusterStatusDeleting)}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeEKSStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane exists but is not serving, so nothing can be scheduled on the cluster yet. Wait for it to become active; a cluster that stays pending usually cannot reach the subnets it was given.", States: []string{string(ekstypes.ClusterStatusPending)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster.", States: []string{string(ekstypes.ClusterStatusFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeEKSHealthIssue, Phrase: "health issue", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane reports at least one health issue; every reported code is a row under this finding, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			unrecognisedStateDef(CodeEKSUnrecognisedStatus, "<status>", "wave1", "Amazon EKS reports a cluster status a9s does not recognise, so a9s cannot tell whether the control plane serves the cluster. Check the cluster in the EKS console before relying on it."),
 			{Code: CodeEKSPublicEndpoint, Phrase: "cluster endpoint reachable from the internet", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges."},
 			{Code: CodeEKSPublicEndpointRestricted, Phrase: "cluster endpoint reachable from listed networks", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster's Kubernetes endpoint is public but only the listed address ranges may reach it, so the exposure is bounded by a list somebody has to keep correct. Check the ranges are still the ones you meant, and prefer reaching the cluster over the VPC."},
 			{Code: CodeEKSControlPlaneLoggingOff, Phrase: "control plane logging incomplete", Severity: domain.SevWarn, Source: "wave1", Detail: "Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster."},
@@ -136,7 +116,10 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "instance_types", Title: "Instance Types", Path: "InstanceTypes", Width: 20},
 			{Key: "desired_size", Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
 		},
-		Color:          colorEKSNodeGroup,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ekstypes.NodegroupStatus](),
+		NormalStates:   []string{string(ekstypes.NodegroupStatusActive)},
+		UnknownState:   CodeNGUnrecognisedStatus,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EKS} }),
 		Fetcher:        fetchNodeGroupsPage,
 		FieldKeys: []string{
@@ -161,13 +144,14 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "Subnets", TargetType: "subnet"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group is still bringing up its instances and registering them with the cluster, so its capacity is not schedulable yet. Wait for it to become active before draining the node group it replaces."},
-			{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "Nodes in this group are being replaced or reconfigured, so pods are being evicted and rescheduled while it runs. Confirm your workloads have pod disruption budgets and enough spare capacity to absorb the rolling replacement."},
-			{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is draining and terminating its nodes, so the capacity it contributed to the cluster is going away. Make sure the pods it hosts have somewhere else to land before the last node goes."},
-			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group never came up, so the capacity you planned for this cluster does not exist. Its health issues name the cause — a subnet with no route to the cluster endpoint, an instance type unavailable in the zone, or a node role missing its policies."},
-			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again."},
-			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile."},
-			{Code: CodeNGHealthIssue, Phrase: "health issue", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears."},
+			{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group is still bringing up its instances and registering them with the cluster, so its capacity is not schedulable yet. Wait for it to become active before draining the node group it replaces.", States: []string{string(ekstypes.NodegroupStatusCreating)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "Nodes in this group are being replaced or reconfigured, so pods are being evicted and rescheduled while it runs. Confirm your workloads have pod disruption budgets and enough spare capacity to absorb the rolling replacement.", States: []string{string(ekstypes.NodegroupStatusUpdating)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is draining and terminating its nodes, so the capacity it contributed to the cluster is going away. Make sure the pods it hosts have somewhere else to land before the last node goes.", States: []string{string(ekstypes.NodegroupStatusDeleting)}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group never came up, so the capacity you planned for this cluster does not exist. Its health issues name the cause — a subnet with no route to the cluster endpoint, an instance type unavailable in the zone, or a node role missing its policies.", States: []string{string(ekstypes.NodegroupStatusCreateFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again.", States: []string{string(ekstypes.NodegroupStatusDeleteFailed)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile.", States: []string{string(ekstypes.NodegroupStatusDegraded)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeNGHealthIssue, Phrase: "health issue", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			unrecognisedStateDef(CodeNGUnrecognisedStatus, "<status>", "wave1", "Amazon EKS reports a node group status a9s does not recognise, so a9s cannot tell whether its nodes serve the cluster. Check the node group in the EKS console before relying on it."),
 			DetailsDeniedFindingDef("ng", ""),
 			DetailsUnavailableFindingDef("ng"),
 		},

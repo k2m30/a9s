@@ -13,9 +13,7 @@ import (
 
 // d1_messaging_classifier_test.go covers the eb-rule, kinesis and msk
 // classifiers. A row that carries findings is coloured by the worst of them,
-// not the first one in the slice. A row built without findings is coloured by
-// the type's own predicate over its raw field, so the bare-Fields path and the
-// fetcher agree.
+// not the first one in the slice.
 
 // d1MessagingTypes are the three short names under test.
 var d1MessagingTypes = []string{"eb-rule", "kinesis", "msk"} //nolint:gochecknoglobals // test-only list
@@ -39,44 +37,6 @@ func TestD1_MessagingWarnThenBrokenReadsAsBroken(t *testing.T) {
 			}
 			if got := td.ResolveColor(r); got != resource.ColorBroken {
 				t.Errorf("ResolveColor with a warn and a broken finding = %v, want ColorBroken", got)
-			}
-		})
-	}
-}
-
-// The bare-Fields path runs the type's predicate. eb-rule and kinesis have
-// their own tables (qa_eb_rule_color_test.go, qa_kinesis_color_test.go); this
-// table covers msk and the one eb-rule state the eb-rule table omits.
-func TestD1_MessagingBareFieldsMatchesThePredicate(t *testing.T) {
-	cases := []struct {
-		short string
-		field string
-		value string
-		want  resource.Color
-	}{
-		{"eb-rule", "state", "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS", resource.ColorHealthy},
-
-		{"msk", "state", "ACTIVE", resource.ColorHealthy},
-		{"msk", "state", "CREATING", resource.ColorWarning},
-		{"msk", "state", "UPDATING", resource.ColorWarning},
-		{"msk", "state", "MAINTENANCE", resource.ColorWarning},
-		{"msk", "state", "REBOOTING_BROKER", resource.ColorWarning},
-		{"msk", "state", "HEALING", resource.ColorWarning},
-		{"msk", "state", "FAILED", resource.ColorBroken},
-		{"msk", "state", "", resource.ColorHealthy},
-		// A cluster being torn down (DELETING) is reported by the predicate.
-		{"msk", "state", "DELETING", resource.ColorWarning},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.short+"_"+tc.value, func(t *testing.T) {
-			td := resource.FindResourceType(tc.short)
-			if td == nil {
-				t.Fatalf("%s not registered", tc.short)
-			}
-			got := td.ResolveColor(resource.Resource{Fields: map[string]string{tc.field: tc.value}})
-			if got != tc.want {
-				t.Errorf("%s %s=%q → %v, want %v", tc.short, tc.field, tc.value, got, tc.want)
 			}
 		})
 	}
@@ -134,25 +94,6 @@ func TestD1_MessagingBenchColoursMatchTheirFindings(t *testing.T) {
 		for _, r := range rows {
 			if got, want := td.ResolveColor(r), d1ColorOf(r.Findings); got != want {
 				t.Errorf("%s row %q colour = %v, want %v from findings %+v", short, r.ID, got, want, r.Findings)
-			}
-		}
-	}
-}
-
-// Stripping a fetched row of its findings must not change its colour: the
-// predicate the classifier runs over Fields is the same one that produced them.
-// A row where the two disagree is a second truth source that has drifted.
-func TestD1_MessagingBareFieldsAgreeWithTheFetchedRow(t *testing.T) {
-	for short, rows := range d1MessagingBench(t) {
-		td := resource.FindResourceType(short)
-		if td == nil {
-			t.Fatalf("%s not registered", short)
-		}
-		for _, r := range rows {
-			bare := resource.Resource{ID: r.ID, Fields: r.Fields}
-			if got, want := td.ResolveColor(bare), td.ResolveColor(r); got != want {
-				t.Errorf("%s row %q: without findings %v, with findings %v — the classifier and the predicate disagree; Fields = %v",
-					short, r.ID, got, want, r.Fields)
 			}
 		}
 	}

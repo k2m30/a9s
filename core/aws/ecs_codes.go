@@ -19,4 +19,6 @@ const (
 
 	// CodeECSStateInactive — cluster is inactive (non-recoverable without recreation).
 	CodeECSStateInactive domain.FindingCode = "ecs.state.inactive"
+
+	CodeECSStateUnrecognised domain.FindingCode = "ecs.state.unrecognised"
 )

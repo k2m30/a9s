@@ -8,4 +8,5 @@ const (
 	CodeELBStateProvisioning   domain.FindingCode = "elb.state.provisioning"
 	CodeELBStateActiveImpaired domain.FindingCode = "elb.state.active_impaired"
 	CodeELBStateFailed         domain.FindingCode = "elb.state.failed"
+	CodeELBUnrecognisedState   domain.FindingCode = "elb.state.unrecognised"
 )

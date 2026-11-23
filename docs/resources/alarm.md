@@ -152,6 +152,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.Namespace` + `MetricAlarm.Dimensions[]` from `DescribeAlarms`, cross-referenced against the loaded list of whichever sibling type the namespace maps to (e.g. `AWS/EC2` + `InstanceId` vs loaded `ec2` list; `AWS/RDS` + `DBInstanceIdentifier` vs loaded `dbi` list; same pivot table as §2).
 
+- **Signal**: `StateValue` outside `StateValue.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -178,6 +182,7 @@ One row per signal from §3:
 | `ActionsEnabled == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `actions disabled` |
 | `INSUFFICIENT_DATA older than 2×Period` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `metric pipeline stale <Xm>` |
 | zombie alarm (dimension points at missing resource) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `zombie: <dim-name>=<dim-value>` |
+| `StateValue` outside `StateValue.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes:
 
@@ -229,6 +234,7 @@ alarm — MONITORING. Status key: `state` — the key the status cell reads, and
 | alarm.state.alarm | alarm triggered | broken | wave1 | The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself. |
 | alarm.state.insufficient\_data | insufficient data | warn | wave1 | The alarm has no data to judge, so it is neither confirming health nor able to fire — and a silent alarm looks exactly like a quiet system. Check that the metric is still being published; a deleted resource or a renamed dimension is the usual cause. |
 | alarm.no\_actions | no actions | warn | wave1 | This alarm has no action attached, so on its own it changes a colour and tells nobody. An EventBridge rule or a composite alarm may still be watching its state changes; check whether one is before assuming nothing reacts. If nothing does, attach a notification topic or delete the alarm. |
+| alarm.state.unrecognised | <state> (unrecognised) | warn | wave1 | CloudWatch reports an alarm state a9s does not recognise, so a9s cannot tell whether the alarm is watching its metric or has fired. Check the alarm's history before relying on it. |
 | alarm.actions-disabled | actions disabled | warn | wave1 | The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm. |
 <!-- END GENERATED: findings -->
 

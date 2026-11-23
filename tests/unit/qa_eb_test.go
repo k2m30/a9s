@@ -10,6 +10,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -83,19 +84,18 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// A Yellow-health environment carries CodeEBHealthYellow/SevWarn from
-	// ebEnvironmentFindings (core/aws/eb_codes.go): colorEB is
-	// colorFromAnyFinding-first (core/aws/catalog_compute.go), so Color needs
-	// its own Finding to color from.
+	// An Updating environment with Yellow health carries its Updating state
+	// finding and, beside it, CodeEBHealthYellow/SevWarn: health is a second
+	// axis that stands while the environment is live.
 	r2 := resources[1]
-	if len(r2.Findings) != 1 {
-		t.Fatalf("expected 1 Finding for Yellow environment (colorEB needs its own Finding to color from), got %d", len(r2.Findings))
+	if len(r2.Findings) != 2 {
+		t.Fatalf("expected the state and the health finding for an Updating Yellow environment, got %v", r2.Findings)
 	}
-	if r2.Findings[0].Code != awsclient.CodeEBHealthYellow {
-		t.Errorf("r2 Findings[0].Code = %q, want %q", r2.Findings[0].Code, awsclient.CodeEBHealthYellow)
+	if _, want := catalog.LifecycleOf("eb", "Updating"); r2.Findings[0].Code != want {
+		t.Errorf("r2 Findings[0].Code = %q, want the Updating state finding", r2.Findings[0].Code)
 	}
-	if r2.Findings[0].Severity != domain.SevWarn {
-		t.Errorf("r2 Findings[0].Severity = %v, want domain.SevWarn", r2.Findings[0].Severity)
+	if r2.Findings[1].Code != awsclient.CodeEBHealthYellow || r2.Findings[1].Severity != domain.SevWarn {
+		t.Errorf("r2 Findings[1] = %s/%v, want %s/%v", r2.Findings[1].Code, r2.Findings[1].Severity, awsclient.CodeEBHealthYellow, domain.SevWarn)
 	}
 }
 

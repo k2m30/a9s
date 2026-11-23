@@ -69,27 +69,39 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `StackStatus` matches `*_IN_PROGRESS` or `REVIEW_IN_PROGRESS` → Warning (operation in flight).
+- **Signal**: `StackStatus` is an `*_IN_PROGRESS` value other than `DELETE_IN_PROGRESS`, or `REVIEW_IN_PROGRESS` → Warning (operation in flight). `REVIEW_IN_PROGRESS` is "Ongoing creation of one or more stacks with an expected StackId but without any templates or resources" (AWS CloudFormation User Guide, stack status codes), so it is an operation in flight like the others. Such a stack holds no resources yet, so it gets no termination-protection finding.
   - **State bucket**: Warning.
   - **How obtained**: `StackStatus` field.
 
-- **Signal**: `StackStatus == ROLLBACK_COMPLETE` → Broken (failed-create tombstone — stack operationally dead, delete-and-recreate required, but not actively failing).
+- **Signal**: `StackStatus` ∈ {`ROLLBACK_COMPLETE`, `ROLLBACK_FAILED`} → Broken (failed-create tombstone: "When in this state, only a delete operation can be performed", so no termination-protection finding).
   - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field.
 
-- **Signal**: `StackStatus` ∈ {`UPDATE_ROLLBACK_COMPLETE`, `IMPORT_ROLLBACK_COMPLETE`} → Broken (update failed, stack reverted to prior state).
+- **Signal**: `StackStatus` ∈ {`UPDATE_ROLLBACK_COMPLETE`, `UPDATE_ROLLBACK_FAILED`, `IMPORT_ROLLBACK_COMPLETE`, `IMPORT_ROLLBACK_FAILED`} → Broken (update or import failed; the stack still owns its resources, so its posture findings stand beside it).
   - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field.
 
-- **Signal**: `StackStatus` matches `*_FAILED` → Broken.
+- **Signal**: `StackStatus` ∈ {`CREATE_FAILED`, `UPDATE_FAILED`} → Broken; the posture findings stand beside it (termination protection only once the stack was built).
   - **State bucket**: Broken.
   - **How obtained**: `StackStatus` field + `StackStatusReason` carries the human cause.
+
+- **Signal**: `StackStatus == DELETE_IN_PROGRESS`.
+  - **State bucket**: Warning. Tearing down: no posture finding, no Wave 2 read.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `StackStatus == DELETE_FAILED` ("you can't work with or update the stack. Delete the stack again").
+  - **State bucket**: Broken. The stack and the resources that blocked the delete still exist, so it is a failed live stack: its posture findings stand (a credential in its outputs) and Wave 2 reads its events for the resource that blocked the delete. It gets no termination-protection finding, which is advice against the delete the operator already ran.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `StackStatus == DELETE_COMPLETE`.
   - **State bucket**: Dim.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `EnableTerminationProtection == false` on a live, top-level stack.
+- **Signal**: `StackStatus` outside `StackStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `EnableTerminationProtection == false` on a top-level stack that was built (not `CREATE_FAILED` or `ROLLBACK_*`) and is not being deleted.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -103,9 +115,9 @@ Transcribed from `docs/attention-signals.md § Signals § CI/CD` row `cfn`.
   - **State bucket**: Warning.
   - **How obtained**: `DriftInformation.StackDriftStatus` field on the list response.
 
-- **Signal**: Recent stack event with `ResourceStatus == *_FAILED` → Broken.
+- **Signal**: a stack event of the latest operation with `ResourceStatus == *_FAILED` → Broken. The latest operation starts at the newest `CREATE_IN_PROGRESS`, `UPDATE_IN_PROGRESS`, `DELETE_IN_PROGRESS` or `IMPORT_IN_PROGRESS` event of the stack itself (its `PhysicalResourceId` is the stack ID); a rollback or cleanup phase and a nested stack's events start none. A failure of an earlier operation is history.
   - **State bucket**: Broken.
-  - **API call**: `DescribeStackEvents` — one per stack, take the first response page and scan client-side for the most recent `*_FAILED` event.
+  - **API call**: `DescribeStackEvents` — one per stack, take the first response page (newest first) and scan client-side down to the start of the latest operation.
   - **Cost shape**: per-resource.
 
 ### 3.3 Wave 3 — OUT OF SCOPE
@@ -124,12 +136,15 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<in-progress status, in words>` |
-| `ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
-| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
-| `*_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<failure status, in words>` |
+| `*_IN_PROGRESS` (not `DELETE_IN_PROGRESS`) / `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<in-progress status, in words>` |
+| `ROLLBACK_COMPLETE` / `ROLLBACK_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
+| `UPDATE_ROLLBACK_*` / `IMPORT_ROLLBACK_*` complete or failed | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
+| `CREATE_FAILED` / `UPDATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<failure status, in words>` |
+| `StackStatus == DELETE_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete in progress` |
+| `StackStatus == DELETE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `delete failed` |
 | `StackStatus == DELETE_COMPLETE` | 1 | Dim | n/a | S2, S4 | `delete complete` |
-| `EnableTerminationProtection == false` on a live, top-level stack | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `termination protection off` |
+| `StackStatus` outside `StackStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
+| `EnableTerminationProtection == false` on a built top-level stack not being deleted and not in `DELETE_FAILED` or `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `termination protection off` |
 | a stack output value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in stack outputs` |
 | `DriftInformation.StackDriftStatus == DRIFTED` | 2 | Warning | `~` | S2, S3, S4, S5 | `stack drifted from template` |
 | Recent stack event `ResourceStatus == *_FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `recent resource failure` |
@@ -193,7 +208,10 @@ cfn — CI/CD. Status key: `status` — the key the status cell reads, and the c
 | cfn.stack.failed | <failure status, in words> | broken | wave1 | The stack's last operation failed and the stack is now in a state that decides what you may do next. Read the exact status and the failure options the operation ran under, then choose between retrying, continuing the rollback, updating with a corrected template, or deleting; a stack left in a failed rollback needs the rollback continued before anything else is accepted. |
 | cfn.stack.rollback | <rollback status, in words> | broken | wave1 | CloudFormation attempted to undo the last change. A completed rollback means the previous template is what is deployed and the update delivered nothing; a rollback that itself failed means the stack is stuck part-way and needs the rollback continued before it will accept another operation. Read the events for the resource that started it either way. |
 | cfn.stack.in\_progress | <in-progress status, in words> | warn | wave1 | An operation is running against this stack right now, so its resources are being created, replaced or removed and no other change will be accepted until it ends. Watch the stack events until a terminal status appears. |
+| cfn.stack.deleting | delete in progress | warn | wave1 | CloudFormation is removing this stack and every resource it owns that has no retain policy. If the deletion was not intended, the resources already gone cannot be brought back by the stack; check the events for what is left. |
+| cfn.stack.delete\_failed | delete failed | broken | wave1 | The stack could not be deleted, so some of its resources may still be running and billing, and the stack accepts no update. Read the events for the resource that blocked the deletion, clear the cause, and delete the stack again. |
 | cfn.stack.deleted | delete complete | dim | wave1 | — |
+| cfn.stack.unrecognised | <status> (unrecognised) | warn | wave1 | CloudFormation reports a stack status a9s does not recognise, so a9s cannot tell whether an operation is running or the stack is settled. Read the stack events before deploying to it. |
 | cfn.recent-resource-failure | recent resource failure | broken | wave2 | At least one resource in this stack reported a failure during its most recent operation, so what is deployed is not what the template describes. Open the failing resource in the events list and fix the cause before the next deployment repeats it. |
 | cfn.stack-drifted | stack drifted from template | warn | wave2 | The live resources no longer match the template CloudFormation last applied, so the next stack update may overwrite a change somebody made by hand, or fail outright. Run a drift detail report, then either fold the manual change into the template or revert it. |
 | cfn.termination-protection-off | termination protection off | warn | wave1 | A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted. |

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -77,19 +78,25 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			markUninspected(&result, r.ID, "GetFunction")
 			return
 		}
+		class, state := catalog.LifecycleNormal, ""
 		if cfg != nil {
+			state = string(cfg.State)
+			class = LifecycleClassOf("lambda", state)
 			result.FieldUpdates[r.ID] = map[string]string{
 				"state":              string(cfg.State),
 				"last_update_status": string(cfg.LastUpdateStatus),
 			}
-			if code := lambdaLifecycleCode(cfg); code != "" {
-				setWave2Finding(&result, r.ID, code, nil)
+			if f, ok := StateFinding("lambda", string(cfg.State)); ok {
+				setWave2Finding(&result, r.ID, f.Code, nil, domain.HumanizeStatusPhrase(string(cfg.State)))
+			}
+			if cfg.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed {
+				setWave2Finding(&result, r.ID, CodeLambdaLastUpdateFailed, nil)
 			}
 		}
-		if policyPublic {
+		if policyPublic && catalog.Applies(lambdaCodePublicPolicy, class, state) {
 			setWave2Finding(&result, r.ID, lambdaCodePublicPolicy, policyRows)
 		}
-		if urlPublic {
+		if urlPublic && catalog.Applies(lambdaCodeFunctionURLPublic, class, state) {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 		}
 		// Each read that failed is recorded: two calls refused for two
@@ -103,23 +110,6 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 
 	err := errors.Join(loopErr, Finish(&result, failures, len(targets), op))
 	return result, err
-}
-
-// lambdaLifecycleCode is the one lifecycle finding GetFunction's answer
-// earns: a failed last update first, since the function then runs a version
-// other than the one configured, then the function's own state.
-func lambdaLifecycleCode(cfg *lambdatypes.FunctionConfiguration) domain.FindingCode {
-	switch {
-	case cfg.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
-		return CodeLambdaLastUpdateFailed
-	case cfg.State == lambdatypes.StatePending:
-		return CodeLambdaStatePending
-	case cfg.State == lambdatypes.StateFailed:
-		return CodeLambdaStateFailed
-	case cfg.State == lambdatypes.StateInactive:
-		return CodeLambdaInactive
-	}
-	return ""
 }
 
 // lambdaGetConfiguration reads the function's configuration through

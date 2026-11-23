@@ -39,6 +39,7 @@ const (
 	transferCodeStopFailed   domain.FindingCode = "transfer.warn.stop_failed"
 	transferCodeLegacyPolicy domain.FindingCode = "transfer.warn.legacy_policy"
 	transferCodeNoLogging    domain.FindingCode = "transfer.warn.no_logging"
+	transferCodeUnrecognised domain.FindingCode = "transfer.warn.unrecognised_state"
 )
 
 // FetchTransferServersPage fetches a single page of Transfer Family
@@ -98,21 +99,13 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 func buildTransferResource(server *transfertypes.DescribedServer) resource.Resource {
 	id := aws.ToString(server.ServerId)
 	findings := computeTransferFindings(server)
-	statusPhrase := domain.StatusPhrase(findings)
-	if statusPhrase == "" && server.State != "" && server.State != transfertypes.StateOnline {
-		// Defensive parity with mwaa.go's status-phrase fallback: an
-		// undocumented future State value still surfaces as raw text
-		// instead of silently rendering blank. ONLINE with zero findings
-		// legitimately stays "" (Healthy).
-		statusPhrase = string(server.State)
-	}
 
 	return resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
 			"server_id":              id,
-			"status":                 statusPhrase,
+			"status":                 string(server.State),
 			"domain":                 string(server.Domain),
 			"endpoint_type":          string(server.EndpointType),
 			"identity_provider_type": string(server.IdentityProviderType),
@@ -130,40 +123,11 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 // (EnrichTransferSecurityPolicy) by what DescribeSecurityPolicy says it
 // allows.
 func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Finding {
-	var findings []domain.Finding
-
-	if f, ok := transferStateFinding(server.State); ok {
-		findings = append(findings, f)
-	}
-
+	var posture []domain.Finding
 	if server.LoggingRole == nil && len(server.StructuredLogDestinations) == 0 {
-		findings = append(findings, wave1Finding(transferCodeNoLogging))
+		posture = append(posture, wave1Finding(transferCodeNoLogging))
 	}
-
-	return findings
-}
-
-// transferStateFindings maps ListedServer/DescribedServer.State to its
-// docs/resources/transfer.md state-bucket code. ONLINE has no entry
-// (Healthy — no finding).
-var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table
-	transfertypes.StateOffline:     transferCodeOffline,
-	transfertypes.StateStarting:    transferCodeStarting,
-	transfertypes.StateStopping:    transferCodeStopping,
-	transfertypes.StateStartFailed: transferCodeStartFailed,
-	transfertypes.StateStopFailed:  transferCodeStopFailed,
-}
-
-// transferStateFinding maps ListedServer/DescribedServer.State to its
-// docs/resources/transfer.md state-bucket Finding. ok is false for
-// ONLINE (Healthy — no finding). Shared by the healthy-row and degraded-row
-// builders since State is present on both ListedServer and DescribedServer.
-func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
-	code, ok := transferStateFindings[state]
-	if !ok {
-		return domain.Finding{}, false
-	}
-	return wave1Finding(code), true
+	return withState("transfer", string(server.State), posture)
 }
 
 // buildTransferDegradedResource builds the RICH degraded row for a server
@@ -180,12 +144,7 @@ func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
 func buildTransferDegradedResource(listed transfertypes.ListedServer, err error) resource.Resource {
 	id := aws.ToString(listed.ServerId)
 
-	var findings []domain.Finding
-	if f, ok := transferStateFinding(listed.State); ok {
-		findings = append(findings, f)
-	}
-	findings = append(findings, degradedDetailsFinding("transfer", err))
-	statusPhrase := domain.StatusPhrase(findings)
+	findings := append(withState("transfer", string(listed.State), nil), degradedDetailsFinding("transfer", err))
 
 	raw := listed
 	return resource.Resource{
@@ -193,7 +152,7 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 		Name: id,
 		Fields: map[string]string{
 			"server_id":              id,
-			"status":                 statusPhrase,
+			"status":                 string(listed.State),
 			"domain":                 string(listed.Domain),
 			"endpoint_type":          string(listed.EndpointType),
 			"identity_provider_type": string(listed.IdentityProviderType),

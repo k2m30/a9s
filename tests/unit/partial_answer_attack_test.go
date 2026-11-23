@@ -128,10 +128,10 @@ func TestPartialAttackECSTask_EveryTaskOnADroppedDefinitionIsMarked(t *testing.T
 }
 
 // TestPartialAttackEC2_SkippedInstancesAreNotCoverageGaps attacks the filtered
-// side of the cap helper. A terminated instance is deliberately not read — its
-// user data can no longer be changed and the host is gone — so it is left out
-// of the work list before the cap and must not come back as a "?" row. The cap
-// marks what it dropped, not what the filter excluded.
+// side of the cap. A terminated instance is deliberately not read — the host
+// is gone and its user data runs nowhere — so the runner leaves it out before
+// the enricher and its cap, and it must not come back as a "?" row.
+// The cap marks what it dropped, not what the filter excluded.
 func TestPartialAttackEC2_SkippedInstancesAreNotCoverageGaps(t *testing.T) {
 	fake := &partialEC2Fake{userData: map[string]string{}}
 	var rows []resource.Resource
@@ -149,7 +149,8 @@ func TestPartialAttackEC2_SkippedInstancesAreNotCoverageGaps(t *testing.T) {
 		})
 	}
 
-	res := partialEnrichEC2(t, fake, rows)
+	noNetwork := resource.ResourceCache{"sg": {Resources: []resource.Resource{}}, "rtb": {Resources: []resource.Resource{}}}
+	res := Wave2Result(t, "ec2", &awsclient.ServiceClients{EC2: fake}, rows, noNetwork)
 
 	// Exactly fifty instances are live, so the cap never bites and nothing —
 	// live or terminated — is a coverage gap.

@@ -1,9 +1,9 @@
 // The renderer's status column reads findings first, then
 // Fields[lifecycleKey]. Production fetchers for status-column types write
-// Fields["status"] for the lifecycle steady-state text, so each of those
-// catalog entries must declare LifecycleKey: "status"; with it empty the
-// 2-layer read falls back to Fields["state"] (empty) and the steady-state text
-// vanishes from the list view.
+// Fields["status"], so each of those catalog entries must declare
+// LifecycleKey: "status"; with it empty the 2-layer read falls back to
+// Fields["state"] (empty). A type with a state table shows a blank cell for a
+// healthy row; a type without one shows the steady-state text.
 package unit_test
 
 import (
@@ -76,6 +76,16 @@ func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 			wantPhrase := domain.HumanizeStatusPhrase(tc.statusPhrase)
+			if len(td.StateEnum) > 0 {
+				// A type with a state table raises a finding for every value
+				// that is not normal, so a row with none is healthy and its
+				// Status cell is blank (docs/attention-signals.md).
+				if strings.Contains(strings.ReplaceAll(joined, tc.id, ""), wantPhrase) {
+					t.Errorf("%s healthy row shows its lifecycle value %q; want a blank Status cell; got: %q",
+						tc.shortName, wantPhrase, joined)
+				}
+				return
+			}
 			if !strings.Contains(joined, wantPhrase) {
 				t.Errorf("AS-140 regression: list row for %q missing fetcher-emitted Fields[\"status\"] = %q (humanized: %q); got: %q",
 					tc.shortName, tc.statusPhrase, wantPhrase, joined)

@@ -101,7 +101,7 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 - **Signal**: `ReplicationGroup.Status in ("creating", "deleting")`.
   - **State bucket**: Warning.
-  - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`. Applies when the RG itself is being created or torn down — shards do not exist yet (creating) or are going away (deleting), so the shard-level signals below do not fire for these states.
+  - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`. Applies when the RG itself is being created or torn down. A `deleting` group keeps this state finding only: no shard, posture or failover signal stands beside it.
 
 - **Signal**: `Status == modifying` (single-shard).
   - **State bucket**: Warning.
@@ -121,7 +121,7 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 - **Signal**: `any NodeGroup.Status != "available"` AND `len(NodeGroups) > 1` (cluster-mode-enabled, per-shard transition).
   - **State bucket**: Warning.
-  - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available — N = total count of non-available NodeGroups in this RG; the rendered suffix is literally `(+N-1)` (e.g. three transitioning shards → `shard <top-id>: <state> (+2)`).
+  - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status, beside the group's own state finding. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available — N = total count of non-available NodeGroups in this RG; the rendered suffix is literally `(+N-1)` (e.g. three transitioning shards → `shard <top-id>: <state> (+2)`).
 
 - **Signal**: `ReplicationGroup.Status in ("modifying", "snapshotting")` AND `len(NodeGroups) <= 1`.
   - **State bucket**: Warning.
@@ -157,6 +157,10 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 - **Signal**: `SnapshotRetentionLimit` 0 or absent.
   - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status` outside the documented list.
+  - **State bucket**: Warning. The row shows the value AWS reported.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -198,6 +202,7 @@ Badge aggregation for `redis`: Wave 1 issue-colored rows only — this type regi
 | `TransitEncryptionEnabled` not true, or `TransitEncryptionMode == preferred` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `encryption in transit not enforced` |
 | `AuthTokenEnabled` not true while in-transit encryption is on and no user group is attached | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no authentication token` |
 | `SnapshotRetentionLimit` 0 or absent | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `automatic backups off` |
+| `Status` outside the documented list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes for fillers:
 
@@ -270,6 +275,7 @@ redis — DATABASES & STORAGE. Status key: `status` — the key the status cell 
 | redis.warn.deleting | deleting — teardown | warn | wave1 | The group's nodes are being removed and its endpoint stops answering shortly. Confirm nothing still connects to it — a cache that disappears usually shows up as latency on the database behind it. |
 | redis.warn.modifying | modifying — config change | warn | wave1 | A configuration change is being applied, and depending on the change the group may fail over or restart nodes while it runs. Expect brief connection resets, and hold off on further changes until it settles. |
 | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 | A backup is being taken, which uses memory and I/O on the node doing it and can slow responses on a busy group. Nothing to fix; move the backup window outside peak hours if this keeps appearing during traffic. |
+| redis.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | ElastiCache reports a replication group status a9s does not recognise, so a9s cannot tell whether the group serves connections. Check the group's events before relying on it. |
 | redis.warn.shard\_issue | shard <shard id>: <status> | warn | wave1 | One shard of this group is not in a normal state, so the keys that hash to it may be unavailable or served without a replica. Check that shard's nodes and its failover history before treating the whole group as healthy. |
 | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | The group has replicas in more than one Availability Zone but will not promote them by itself, so losing the primary means downtime until somebody fails it over by hand. Turn automatic failover on — the replicas are already being paid for. |
 | redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate. |

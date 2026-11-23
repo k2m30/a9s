@@ -180,21 +180,13 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 		t.Errorf("Fields[\"log_file_validation_enabled\"] = %q, want %q — fetcher likely writes wrong key (\"log_validation\")", got, "false")
 	}
 
-	// is_logging=true, latest_delivery_error="-" and
-	// log_file_validation_enabled="false" reach ColorWarning through the full
-	// type → color path.
+	// The fetched row carries the validation finding, which colours it.
 	td := resource.FindResourceType("trail")
 	if td == nil {
 		t.Fatal("trail type not registered")
 	}
-	colorableFields := map[string]string{
-		"is_logging":                  "true",
-		"latest_delivery_error":       "-",
-		"log_file_validation_enabled": "false",
-	}
-	got2 := td.Color(resource.Resource{Fields: colorableFields})
-	if got2 != resource.ColorWarning {
-		t.Errorf("trail Color with log_file_validation_enabled=false should be ColorWarning, got %v", got2)
+	if got2 := td.ResolveColor(r); got2 != resource.ColorWarning {
+		t.Errorf("trail with log file validation off should be ColorWarning, got %v (findings %v)", got2, r.Findings)
 	}
 }
 

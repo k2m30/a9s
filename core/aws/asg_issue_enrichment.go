@@ -45,7 +45,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		if r.ID == "" {
+		if r.ID == "" || !appliesAny("asg", r.Fields["status"], asgCodeScalingActivityFailed) {
 			return
 		}
 		mu.Lock()
@@ -109,7 +109,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 			continue
 		}
 		name := aws.ToString(group.LaunchConfigurationName)
-		if name == "" || r.ID == "" || asgDeleting(r.Fields["status"]) {
+		if name == "" || r.ID == "" || !appliesAny("asg", r.Fields["status"], asgCodeLaunchConfigIMDSv1, asgCodeLaunchConfigPublicIP, asgCodeLaunchConfigSecret) {
 			continue
 		}
 		groupsByLC[name] = append(groupsByLC[name], r.ID)

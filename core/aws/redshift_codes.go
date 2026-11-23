@@ -25,4 +25,12 @@ const (
 	CodeRedshiftMaintenanceDeferred    domain.FindingCode = "redshift.warn.maintenance_deferred"
 	CodeRedshiftPubliclyAccessible     domain.FindingCode = "redshift.warn.publicly_accessible"
 	CodeRedshiftUnencryptedAtRest      domain.FindingCode = "redshift.warn.unencrypted_at_rest"
+	CodeRedshiftPrepForResize          domain.FindingCode = "redshift.warn.prep_for_resize"
+	CodeRedshiftResizeCleanup          domain.FindingCode = "redshift.warn.resize_cleanup"
+	CodeRedshiftCancellingResize       domain.FindingCode = "redshift.warn.cancelling_resize"
+	CodeRedshiftRotatingKeys           domain.FindingCode = "redshift.warn.rotating_keys"
+	CodeRedshiftUpdatingHSM            domain.FindingCode = "redshift.warn.updating_hsm"
+	CodeRedshiftFinalSnapshot          domain.FindingCode = "redshift.warn.final_snapshot"
+	CodeRedshiftPaused                 domain.FindingCode = "redshift.paused"
+	CodeRedshiftUnrecognisedStatus     domain.FindingCode = "redshift.unrecognised_status"
 )

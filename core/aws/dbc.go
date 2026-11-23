@@ -236,7 +236,6 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			withheld++
 		}
 		findings, attentionDetails := computeDBCFindings(cluster, expectsWriter)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       clusterID,
@@ -246,7 +245,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 				"cluster_id":              clusterID,
 				"engine":                  engine,
 				"engine_version":          engineVersion,
-				"status":                  statusPhrase,
+				"status":                  aws.ToString(cluster.Status),
 				"status_raw":              aws.ToString(cluster.Status),
 				"instances":               instances,
 				"endpoint":                endpoint,
@@ -305,30 +304,14 @@ type dbClusterState struct {
 }
 
 // computeDBClusterFindings returns the findings for a DB cluster plus the
-// supporting AttentionDetail rows keyed by the finding that owns them. The
-// security-posture pack (rds_posture.go) is evaluated independently of the
-// lifecycle status and stacks on top of it.
+// supporting AttentionDetail rows keyed by the finding that owns them.
 func computeDBClusterFindings(c dbClusterState) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	postureFindings, postureDetails := rdsPostureFindings(c.Posture, dbcPostureCodes)
-	// A cluster on its way out has no posture worth reporting.
-	if isTeardownStatus(c.Status) {
-		postureFindings, postureDetails = nil, nil
-	}
-
-	if lead, ok := dbcLifecycle.finding(c.Status, c.Status); ok {
-		return append([]domain.Finding{lead}, postureFindings...), postureDetails
-	}
-	if c.Status != "available" {
-		return postureFindings, postureDetails
-	}
-
-	// No writer on an available cluster — reads only (Broken; beats warnings).
-	if c.Writers == 0 && aws.ToBool(c.ExpectsWriter) {
-		lead := []domain.Finding{wave1Finding(CodeDBCNoWriter)}
-		return append(lead, postureFindings...), postureDetails
-	}
 
 	var findings []domain.Finding
+	if c.Writers == 0 && aws.ToBool(c.ExpectsWriter) {
+		findings = append(findings, wave1Finding(CodeDBCNoWriter))
+	}
 	if c.DeletionProtection != nil && !*c.DeletionProtection {
 		findings = append(findings, wave1Finding(CodeDBCDeletionProtectionOff))
 	}
@@ -338,7 +321,7 @@ func computeDBClusterFindings(c dbClusterState) ([]domain.Finding, map[domain.Fi
 	if c.BackupRetentionPeriod != nil && *c.BackupRetentionPeriod == 0 {
 		findings = append(findings, wave1Finding(CodeDBCNoAutomatedBackups))
 	}
-	return append(findings, postureFindings...), postureDetails
+	return withState("dbc", c.Status, append(findings, postureFindings...)), postureDetails
 }
 
 // computeDBCFindings reads a DocumentDB cluster's findings.

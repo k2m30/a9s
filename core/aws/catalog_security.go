@@ -20,21 +20,6 @@ func colorRole(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorPolicy(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(orphanUnattachedPolicyFinding(r.Fields["attachment_count"], r.Fields["is_attachable"] == "true"))
-}
-
-func colorIAMUser(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(iamUserConsoleDormantFindings(
-		r.Fields["has_console_password"], r.Fields["password_last_used"]))
-}
-
 func colorIAMGroup(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
@@ -139,7 +124,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "path", Title: "Path", Width: 20},
 			{Key: "create_date", Title: "Created", Width: 22},
 		},
-		Color:          colorPolicy,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
@@ -254,7 +239,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
 			{Key: "password_last_used", Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22},
 		},
-		Color:          colorIAMUser,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMUsersPage(ctx, c.IAM, continuationToken)

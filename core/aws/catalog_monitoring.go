@@ -5,7 +5,8 @@ package aws
 import (
 	"context"
 	"net/url"
-	"strconv"
+
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -13,35 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
-
-func colorAlarm(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	actionsCount, _ := strconv.Atoi(r.Fields["actions_count"])
-	return colorFromFindings(alarmStateFindings(r.Fields["state"], actionsCount))
-}
-
-// colorLogs derives the row colour from the log group's findings, and for a row
-// that carries none from the same predicate the fetcher used, over the words it
-// wrote into Fields for retention and encryption.
-func colorLogs(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(logsGroupFindings(
-		r.Fields["retention"], r.Fields["stored_bytes"],
-		r.Fields["creation_time"], r.Fields["encryption"]))
-}
-
-func colorTrail(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(trailWave1Wave2Findings(
-		r.Fields["is_logging"], r.Fields["latest_delivery_error"],
-		r.Fields["latest_delivery_time"], r.Fields["log_file_validation_enabled"]))
-}
 
 func colorCTEvents(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
@@ -79,7 +51,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"alarm_name": "alarm_name"},
 			DisplayNameKey: "alarm_name",
 		}},
-		Color:          colorAlarm,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[cwtypes.StateValue](),
+		NormalStates:   []string{string(cwtypes.StateValueOk)},
+		UnknownState:   CodeAlarmStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudWatch} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchAlarmsPage(ctx, c.CloudWatch, continuationToken)
@@ -103,9 +78,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("alarm")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1", Detail: "The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself."},
-			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm has no data to judge, so it is neither confirming health nor able to fire — and a silent alarm looks exactly like a quiet system. Check that the metric is still being published; a deleted resource or a renamed dimension is the usual cause."},
-			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1", Detail: "This alarm has no action attached, so on its own it changes a colour and tells nobody. An EventBridge rule or a composite alarm may still be watching its state changes; check whether one is before assuming nothing reacts. If nothing does, attach a notification topic or delete the alarm."},
+			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1", Detail: "The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself.", States: []string{string(cwtypes.StateValueAlarm)}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm has no data to judge, so it is neither confirming health nor able to fire — and a silent alarm looks exactly like a quiet system. Check that the metric is still being published; a deleted resource or a renamed dimension is the usual cause.", States: []string{string(cwtypes.StateValueInsufficientData)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1", Detail: "This alarm has no action attached, so on its own it changes a colour and tells nobody. An EventBridge rule or a composite alarm may still be watching its state changes; check whether one is before assuming nothing reacts. If nothing does, attach a notification topic or delete the alarm.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			unrecognisedStateDef(CodeAlarmStateUnrecognised, "<state>", "wave1", "CloudWatch reports an alarm state a9s does not recognise, so a9s cannot tell whether the alarm is watching its metric or has fired. Check the alarm's history before relying on it."),
 			{Code: CodeAlarmActionsDisabled, Phrase: "actions disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm."},
 		},
 	},
@@ -135,7 +111,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"log_group_name": "Name"},
 			DisplayNameKey: "log_group_name",
 		}},
-		Color:          colorLogs,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudWatchLogs} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
@@ -185,7 +161,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "home_region", Title: "Home Region", Path: "HomeRegion", Width: 16},
 			{Key: "multi_region", Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},
 		},
-		Color:          colorTrail,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudTrail} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)

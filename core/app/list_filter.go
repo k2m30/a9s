@@ -73,7 +73,8 @@ func applyListFiltersWith(ls *ListState, td *resource.ResourceTypeDef, columns [
 }
 
 // listFilterResources is the pure text-filter, and the only one. It matches
-// the row's identity, every cell the row renders, and every finding phrase.
+// the row's identity, every cell the row renders, every finding phrase, and
+// the lifecycle value of a type with a state table (listRowMatches).
 //
 // Cells rather than raw Fields values: the operator types what the screen
 // showed them. A humanized column renders "task failed to start" and the AWS
@@ -96,9 +97,14 @@ func listFilterResources(query string, columns []ColumnDef, td *resource.Resourc
 }
 
 // listRowMatches reports whether one row answers the (already lowercased)
-// query on any of the three things an operator can read off it.
+// query on any of the three things an operator can read off it, or on the
+// lifecycle value AWS reported for a type with a state table, whose healthy
+// row shows a blank Status cell an operator still filters by ("running").
 func listRowMatches(q string, columns []ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) bool {
 	if strings.Contains(strings.ToLower(r.ID), q) || strings.Contains(strings.ToLower(r.Name), q) {
+		return true
+	}
+	if td != nil && len(td.StateEnum) > 0 && strings.Contains(strings.ToLower(r.Fields[td.StatusKey()]), q) {
 		return true
 	}
 	for _, col := range columns {

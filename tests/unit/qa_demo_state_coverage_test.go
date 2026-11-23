@@ -68,7 +68,6 @@
 package unit_test
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -80,6 +79,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // knownStateCoverageGaps is the burn-down allowlist, read from the per-type
@@ -176,11 +176,8 @@ func findingCodesFor(
 	var wave2AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	hasEnricher := false
 
-	if enricher, ok := awsclient.Wave2EnricherFor(td.ShortName); ok && enricher.Fn != nil {
-		result, err := enricher.Fn(context.Background(), clients, fixtures, cache)
-		if err != nil {
-			t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
-		}
+	if _, ok := awsclient.Wave2EnricherFor(td.ShortName); ok {
+		result := unit.Wave2Result(t, td.ShortName, clients, fixtures, cache)
 		hasEnricher = true
 		wave2Findings = result.Findings
 		wave2AttentionDetails = result.AttentionDetails
@@ -327,6 +324,11 @@ func TestDemoStateCoverage_EveryDocumentedFindingHasAFixture(t *testing.T) {
 		codes, _ := findingCodesFor(t, td, fixtures, cache, clients)
 
 		for _, fd := range td.Findings {
+			// The unrecognised-state code fires on a value AWS has not
+			// documented, which no fixture can hold honestly.
+			if fd.Code == td.UnknownState {
+				continue
+			}
 			totalFindings++
 			key := td.ShortName + ":" + string(fd.Code)
 			testName := fmt.Sprintf("%s/%s", td.ShortName, fd.Code)

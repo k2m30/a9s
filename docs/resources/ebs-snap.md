@@ -95,6 +95,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.Encrypted` on the `DescribeSnapshots` list response.
 
+- **Signal**: `State` is a value the SDK enum `SnapshotState` does not list
+  - **State bucket**: Warning. The row is not shown clean; the value AWS sent is in the phrase
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. Each runs on the type's bounded second pass, after the rows are on screen.
@@ -132,6 +136,7 @@ One row per signal from §3:
 | `Encrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted` |
 | orphan: source volume deleted | 2 | Warning | `~` | S2, S3, S4, S5 | `orphan: source volume deleted` |
 | restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
+| `State` is a value the SDK enum `SnapshotState` does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars. The Detail cell quotes the finding's Detail constant verbatim, however long it is.)
 
@@ -176,6 +181,7 @@ ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and
 | --- | --- | --- | --- | --- |
 | ebs-snap.state.pending | pending | warn | wave1 | The snapshot is still being written and cannot be used to restore a volume or copied to another region yet. Wait for it to complete before relying on it as the recovery point for anything. |
 | ebs-snap.state.error | error | broken | wave1 | This snapshot failed and holds no usable copy of the volume, so any recovery plan naming it has a hole in it. Take a fresh snapshot of the source volume and delete this one. |
+| ebs-snap.state.unrecognised | <state> (unrecognised) | warn | wave1 | EC2 reports a snapshot state a9s does not recognise, so a9s cannot tell whether a volume can be restored from it. Check the snapshot in the AWS console before relying on it. |
 | ebs-snap.state.recycle-bin | in recycle bin | warn | wave1 | This snapshot was deleted and is being held in the Recycle Bin, so nothing can be restored from it until it is recovered, and a retention rule will remove it for good when the period ends. Recover it from the Recycle Bin if the recovery point is still wanted. |
 | ebs-snap.encryption.disabled | unencrypted | warn | wave1 | The snapshot's contents are stored unencrypted, and any volume restored from it starts unencrypted too. Copy it with a KMS key, restore from the copy, then delete this one. |
 | ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |

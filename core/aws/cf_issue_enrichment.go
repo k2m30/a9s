@@ -31,6 +31,8 @@ const (
 	// disabled and not serving traffic.
 	cfCodeDisabled domain.FindingCode = "cf.disabled"
 
+	cfCodeUnrecognisedStatus domain.FindingCode = "cf.status.unrecognised"
+
 	// CodeCFOriginBucketMissing — an S3 origin naming a bucket absent from
 	// the account.
 	CodeCFOriginBucketMissing domain.FindingCode = "cf.origin-bucket-missing"

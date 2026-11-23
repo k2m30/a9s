@@ -28,7 +28,8 @@ const (
 
 	// CodeEC2StateTerminated — instance is in the "terminated" lifecycle
 	// state (permanent, no further action possible). Severity: SevDim.
-	CodeEC2StateTerminated domain.FindingCode = "ec2.state.terminated"
+	CodeEC2StateTerminated   domain.FindingCode = "ec2.state.terminated"
+	CodeEC2UnrecognisedState domain.FindingCode = "ec2.state.unrecognised"
 
 	// CodeEC2IMDSv1Allowed — instance metadata is reachable without a
 	// session token (MetadataOptions.HttpTokens == optional).

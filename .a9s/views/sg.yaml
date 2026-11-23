@@ -15,7 +15,6 @@ detail_hashes:
   IpPermissions: c47f3b3bafbd5c4f
   IpPermissionsEgress: 4d5891d1a415e117
   Tags: ee0396ef28e977b0
-  "key:risk_summary": f82fe0d91138183f
 list:
   Group Name:
     path: GroupName
@@ -47,4 +46,3 @@ detail:
   - IpPermissions
   - IpPermissionsEgress
   - Tags
-  - { key: risk_summary, label: Risk Summary }

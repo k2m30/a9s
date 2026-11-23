@@ -131,7 +131,7 @@ One bullet per distinct signal.
   - **Cost shape**: per-resource.
 
 - **Signal**: `Status == DELETING`.
-  - **State bucket**: Warning.
+  - **State bucket**: Warning. Tearing down: its posture findings are not shown.
   - **API call**: `DescribeCluster` per cluster.
   - **Cost shape**: per-resource.
 
@@ -185,6 +185,10 @@ One bullet per distinct signal.
   - **API call**: the same describe; only the cluster name is visible after it.
   - **Cost shape**: per-resource.
 
+- **Signal**: `Status` outside `ClusterStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals: no enricher runs a second pass over a cluster.
@@ -221,6 +225,7 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 | Kubernetes minor past standard support | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `Kubernetes <version> is out of standard support` |
 | describe denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | describe answered with nothing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `Status` outside `ClusterStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes:
 
@@ -272,6 +277,7 @@ eks — CONTAINERS. Status key: `status` — the key the status cell reads, and 
 | eks.state.pending | pending | warn | wave1 | The control plane exists but is not serving, so nothing can be scheduled on the cluster yet. Wait for it to become active; a cluster that stays pending usually cannot reach the subnets it was given. |
 | eks.state.failed | failed | broken | wave1 | The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster. |
 | eks.health-issue | health issue | warn | wave1 | The control plane reports at least one health issue; every reported code is a row under this finding, and the EKS console carries the message. Add-ons and nodes may misbehave until it clears. |
+| eks.state.unrecognised | <status> (unrecognised) | warn | wave1 | Amazon EKS reports a cluster status a9s does not recognise, so a9s cannot tell whether the control plane serves the cluster. Check the cluster in the EKS console before relying on it. |
 | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
 | eks.public-endpoint-restricted | cluster endpoint reachable from listed networks | warn | wave1 | The cluster's Kubernetes endpoint is public but only the listed address ranges may reach it, so the exposure is bounded by a list somebody has to keep correct. Check the ranges are still the ones you meant, and prefer reaching the cluster over the VPC. |
 | eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 | Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster. |

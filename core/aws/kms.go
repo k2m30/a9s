@@ -216,7 +216,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		resources = append(resources, resource.Resource{
 			ID:       keyID,
 			Name:     alias,
-			Findings: kmsStateFindings(meta.KeyState, status),
+			Findings: withState("kms", status, nil),
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"arn":         aws.ToString(meta.Arn),
@@ -264,7 +264,7 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 	return resource.Resource{
 		ID:       keyID,
 		Name:     alias,
-		Findings: kmsStateFindings(meta.KeyState, status),
+		Findings: withState("kms", status, nil),
 		Fields: map[string]string{
 			"key_id":      keyID,
 			"arn":         aws.ToString(meta.Arn),
@@ -280,7 +280,7 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 // kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call
 // was denied: the real key state is unknowable, but the key's existence
 // (from ListKeys) is not in question, so it stays visible with a finding
-// distinguishing it from the generic "unavailable" bucket in kmsStateFindings.
+// distinguishing it from a key whose state was read.
 func kmsAccessDeniedResource(keyID, keyARN string) resource.Resource {
 	return resource.Resource{
 		ID: keyID,
@@ -290,29 +290,6 @@ func kmsAccessDeniedResource(keyID, keyARN string) resource.Resource {
 		Fields: map[string]string{
 			"key_id": keyID,
 			"arn":    keyARN,
-			"status": "AccessDenied",
 		},
-	}
-}
-
-// kmsStateFindings maps a KMS key state to the canonical Finding slice.
-// Enabled keys produce no findings (healthy state). All other states produce
-// a single finding so callers can drive row coloring and attention aggregation
-// without re-parsing the raw status string.
-func kmsStateFindings(state kmstypes.KeyState, stateStr string) []domain.Finding {
-	switch state {
-	case "":
-		// A row with no state at all is one built outside the fetcher; there
-		// is nothing to report, and the default arm below would call it
-		// unavailable.
-		return nil
-	case kmstypes.KeyStateEnabled:
-		return nil
-	case kmstypes.KeyStatePendingDeletion:
-		return []domain.Finding{wave1Finding(CodeKMSStatePendingDeletion)}
-	case kmstypes.KeyStateDisabled:
-		return []domain.Finding{wave1Finding(CodeKMSStateDisabled)}
-	default:
-		return []domain.Finding{wave1Finding(CodeKMSStateUnavailable, stateStr)}
 	}
 }

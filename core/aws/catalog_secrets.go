@@ -6,7 +6,6 @@ import (
 	"context"
 	"net/url"
 	"strings"
-	"time"
 
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
@@ -15,33 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-func colorSecrets(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(secretFindings(
-		r.Fields["status"], r.Fields["rotation_enabled"], r.Fields["last_changed"]))
-}
-
-func colorSSM(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	var lastModified *time.Time
-	if t, err := time.Parse("2006-01-02 15:04", r.Fields["last_modified"]); err == nil {
-		lastModified = &t
-	}
-	return colorFromFindings(ssmColorFindings(r.Fields["name"], r.Fields["type"], lastModified))
-}
-
-func colorKMS(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(kmsStateFindings(
-		kmstypes.KeyState(r.Fields["status"]), r.Fields["status"]))
-}
 
 var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
@@ -64,7 +36,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "last_changed", Title: "Last Changed", Path: "LastChangedDate", Width: 18},
 			{Key: "rotation_enabled", Title: "Rotation", Path: "RotationEnabled", Width: 10},
 		},
-		Color:          colorSecrets,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      []string{secretsStateActive, secretsStateDeleted},
+		NormalStates:   []string{secretsStateActive},
+		UnknownState:   CodeSecretStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SecretsManager} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
@@ -93,7 +68,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeSecretStateDeleted, Phrase: "scheduled for deletion", Severity: domain.SevBroken, Source: "wave1", Detail: "This secret is inside its recovery window and will be destroyed when the window ends, and applications reading it are failing already. Restore it now if anything still needs the value — once the window closes there is no way to get it back."},
+			{Code: CodeSecretStateDeleted, Phrase: "scheduled for deletion", Severity: domain.SevBroken, Source: "wave1", Detail: "This secret is inside its recovery window and will be destroyed when the window ends, and applications reading it are failing already. Restore it now if anything still needs the value — once the window closes there is no way to get it back.", States: []string{secretsStateDeleted}, Class: catalog.LifecyclePendingDeletion, SeverityDeviates: true},
+			unrecognisedStateDef(CodeSecretStateUnrecognised, "<status>", "wave1", "The secret carries a lifecycle a9s does not recognise, so a9s cannot tell whether applications can still read it. Check it in the Secrets Manager console before relying on it."),
 			{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1", Detail: "Rotation is configured but the secret is past the interval it should have rotated in, so either the rotation function is failing or it was never invoked. Check the rotation function's logs, and run a rotation by hand to prove it works."},
 			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed."},
 			{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source."},
@@ -123,7 +99,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedDate", Width: 22},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
-		Color:          colorSSM,
+		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SSM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
@@ -163,7 +139,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10},
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
-		Color:                  colorKMS,
+		Color:                  colorAnyFindingOrHealthy,
+		StateEnum:              enumValues[kmstypes.KeyState](),
+		NormalStates:           []string{string(kmstypes.KeyStateEnabled)},
+		UnknownState:           CodeKMSUnrecognisedState,
 		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.KMS} }),
 		Fetcher:                fetcherWithClients(FetchKMSKeysPage),
 		Wave2:                  IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
@@ -178,9 +157,11 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kms")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1", Detail: "The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it."},
-			{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it."},
-			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevBroken, Source: "wave1", Detail: "The key is not usable in the state it reports, and what to do depends on which state that is. A key still being created or updated only needs waiting out; one awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read."},
+			{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1", Detail: "The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it.", States: []string{"PendingDeletion", "PendingReplicaDeletion"}, Class: catalog.LifecyclePendingDeletion, SeverityDeviates: true},
+			{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it.", States: []string{"Disabled"}, Class: catalog.LifecyclePaused, SeverityDeviates: true},
+			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevBroken, Source: "wave1", Detail: "The key is not usable in the state it reports, and what to do depends on which state that is. A key awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read.", States: []string{"PendingImport", "Unavailable"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeKMSStateTransitional, Phrase: "<key state> in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "The key is being created or updated, for example a multi-Region replica being copied or a key in a custom key store being set up, and becomes usable on its own once AWS finishes. Wait it out before treating a failed encrypt or decrypt as a permission problem.", States: []string{"Creating", "Updating"}, Class: catalog.LifecycleTransitional},
+			unrecognisedStateDef(CodeKMSUnrecognisedState, "<key state>", "wave1", "AWS reports a key state a9s does not recognise, so a9s cannot tell whether the key can be used. Check the key in the AWS console before relying on it."),
 			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1", Detail: "This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key."},
 			DetailsUnavailableFindingDef("kms"),
 			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it."},

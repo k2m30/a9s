@@ -1120,7 +1120,7 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 	}{
 		{"Yellow", ebtypes.EnvironmentHealthYellow, ebtypes.EnvironmentStatusReady, awsclient.CodeEBHealthYellow, domain.SevWarn},
 		{"Red", ebtypes.EnvironmentHealthRed, ebtypes.EnvironmentStatusReady, awsclient.CodeEBHealthRed, domain.SevBroken},
-		{"Grey", ebtypes.EnvironmentHealthGrey, ebtypes.EnvironmentStatusUpdating, awsclient.CodeEBHealthGrey, domain.SevWarn},
+		{"Grey", ebtypes.EnvironmentHealthGrey, ebtypes.EnvironmentStatusReady, awsclient.CodeEBHealthGrey, domain.SevWarn},
 	}
 
 	for _, tc := range cases {

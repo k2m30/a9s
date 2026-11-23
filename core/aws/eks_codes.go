@@ -23,12 +23,12 @@ const (
 	// CodeEKSStateFailed — cluster is in the "FAILED" lifecycle state.
 	CodeEKSStateFailed domain.FindingCode = "eks.state.failed"
 
-	// CodeEKSHealthIssue — Health.Issues[] is non-empty on an otherwise-healthy
-	// (non-FAILED/CREATING/UPDATING) cluster (docs/resources/eks.md).
-	// Health is tracked independently of lifecycle state. Severity: SevWarn —
-	// colorEKSCluster (catalog_containers.go) ranks a bare health issue below
-	// the FAILED/CREATING/UPDATING lifecycle states.
+	// CodeEKSHealthIssue — Health.Issues[] is non-empty on an ACTIVE cluster
+	// (docs/resources/eks.md). Health is tracked independently of lifecycle
+	// state; a FAILED cluster folds its issues into the failed finding.
 	CodeEKSHealthIssue domain.FindingCode = "eks.health-issue"
+
+	CodeEKSUnrecognisedStatus domain.FindingCode = "eks.state.unrecognised"
 )
 
 // Wave-1 posture findings. eks.go's fetcher calls

@@ -1,8 +1,8 @@
 package unit
 
 // Colour invariants: no presentation-layer code
-// reads type-specific fields; EC2 colour comes from findings; EC2
-// CellDecorators["state"]; a nil CellDecorators map reads safely; ct-events is
+// reads type-specific fields; EC2 colour comes from findings; a nil
+// CellDecorators map reads safely; ct-events is
 // kept out of the issue badge while ct-danger is Broken; every registered type
 // has a Color function.
 
@@ -18,8 +18,7 @@ import (
 )
 
 // The strings "system_status" and "instance_status" must not appear in the
-// generic row-rendering files of internal/tui/; the EC2 CellDecorators func
-// lives in core/resource/.
+// generic row-rendering files of internal/tui/.
 
 func TestColorRefactor_NoEC2FieldsInPresentationLayer(t *testing.T) {
 	targetFiles := []string{
@@ -204,91 +203,6 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			got := td.Color(r)
 			if got != tc.want {
 				t.Errorf("ec2.Color(%v, findings=%v) = %v, want %v", tc.fields, tc.findings, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestColorRefactor_EC2CellDecorator_StateParity(t *testing.T) {
-	td := resource.FindResourceType("ec2")
-	if td == nil {
-		t.Fatal("ec2 resource type not found in registry")
-	}
-	dec, ok := td.CellDecorators["state"]
-	if !ok || dec == nil {
-		t.Fatal(`ec2.CellDecorators["state"] missing or nil — invariant #4 violated`)
-	}
-
-	cases := []struct {
-		name   string
-		fields map[string]string
-		value  string
-		want   string
-	}{
-		{
-			name:   "system_status=impaired → ! running",
-			fields: map[string]string{"system_status": "impaired"},
-			value:  "running",
-			want:   "! running",
-		},
-		{
-			name:   "instance_status=impaired → ! running",
-			fields: map[string]string{"instance_status": "impaired"},
-			value:  "running",
-			want:   "! running",
-		},
-		{
-			name:   "instance_status=initializing → ~ running",
-			fields: map[string]string{"instance_status": "initializing"},
-			value:  "running",
-			want:   "~ running",
-		},
-		{
-			name:   "system_status=initializing → ~ running",
-			fields: map[string]string{"system_status": "initializing"},
-			value:  "running",
-			want:   "~ running",
-		},
-		{
-			name:   "both ok → running unchanged",
-			fields: map[string]string{"system_status": "ok", "instance_status": "ok"},
-			value:  "running",
-			want:   "running",
-		},
-		{
-			name:   "no status fields → running unchanged",
-			fields: map[string]string{},
-			value:  "running",
-			want:   "running",
-		},
-		{
-			// The decorator only fires when the cell value is "running".
-			// For non-running values, the prefix is not added regardless of
-			// system/instance status — the cell value is returned unchanged.
-			name:   "state=stopped → value unchanged (decorator only prefixes running)",
-			fields: map[string]string{"system_status": "impaired"},
-			value:  "stopped",
-			want:   "stopped",
-		},
-		{
-			name:   "system_status=impaired has priority over initializing",
-			fields: map[string]string{"system_status": "impaired", "instance_status": "initializing"},
-			value:  "running",
-			want:   "! running",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := resource.Resource{
-				ID:     "i-0abc1234567",
-				Name:   "test-instance",
-				Fields: tc.fields,
-			}
-			got := dec(r, tc.value)
-			if got != tc.want {
-				t.Errorf("ec2.CellDecorators[\"state\"]({fields=%v}, %q) = %q, want %q",
-					tc.fields, tc.value, got, tc.want)
 			}
 		})
 	}

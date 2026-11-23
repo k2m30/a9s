@@ -248,8 +248,11 @@ func TestFetchNodeGroups_DescribeNodegroupError(t *testing.T) {
 	if resources[0].ID != "cluster-a/ng-web" {
 		t.Errorf("degraded resource ID: expected %q, got %q", "cluster-a/ng-web", resources[0].ID)
 	}
-	if resources[0].Fields["status"] != "details unavailable" {
-		t.Errorf("degraded resource Fields[status]: expected %q, got %q", "details unavailable", resources[0].Fields["status"])
+	if got := resources[0].Fields["status"]; got != "" {
+		t.Errorf("degraded row Fields[status] = %q, want empty: the lifecycle field holds only what AWS reported", got)
+	}
+	if len(resources[0].Findings) == 0 || resources[0].Findings[0].Phrase != "details unavailable" {
+		t.Errorf("degraded row findings = %v, want the %q finding first", resources[0].Findings, "details unavailable")
 	}
 }
 

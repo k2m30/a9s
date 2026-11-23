@@ -5,6 +5,7 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -73,8 +74,20 @@ func fixtureS3Objects() []resource.Resource {
 }
 
 // fixtureEC2Instances returns sanitized EC2 instance data for testing.
-// Source: sanitized from real AWS data (6 instances).
+// Source: sanitized from real AWS data (6 instances). Each row carries the
+// state finding the fetcher emits for its state, so a non-running row reads
+// its state in the Status cell and a running one reads blank.
 func fixtureEC2Instances() []resource.Resource {
+	rows := fixtureEC2InstanceFields()
+	for i := range rows {
+		if f, ok := awsclient.StateFinding("ec2", rows[i].Fields["state"]); ok {
+			rows[i].Findings = append(rows[i].Findings, f)
+		}
+	}
+	return rows
+}
+
+func fixtureEC2InstanceFields() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID:   "i-0aaa111111111111a",

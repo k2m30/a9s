@@ -162,8 +162,8 @@ func TestW3SGDangerousPorts_FlagsSensitivePortOpenToInternet(t *testing.T) {
 			if got := rows[0].Fields["dangerous_open_count"]; got != "1" {
 				t.Errorf("dangerous_open_count = %q, want %q", got, "1")
 			}
-			if got := rows[0].Fields["risk_summary"]; got != wantPhrase {
-				t.Errorf("risk_summary = %q, want %q", got, wantPhrase)
+			if got := domain.StatusPhrase(rows[0].Findings); got != wantPhrase {
+				t.Errorf("Status cell = %q, want %q", got, wantPhrase)
 			}
 		})
 	}

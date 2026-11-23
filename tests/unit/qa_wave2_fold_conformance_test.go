@@ -107,11 +107,12 @@ func TestWave2FoldConformance_BenchHelpersFoldBeforeReading(t *testing.T) {
 }
 
 // drivesWave2Enricher reports whether the body looks up a registered wave-2
-// enricher and calls it, which is the generic bench shape. A test that calls a
-// specific Enrich* function directly is asserting that enricher's contract and
-// is not building a bench.
+// enricher and runs it, through the runner helpers or by calling it, which is
+// the generic bench shape. A test that runs one named type's enricher is
+// asserting that enricher's contract and is not building a bench.
 func drivesWave2Enricher(body ast.Node) bool {
-	return bodyContainsAny(body, "Wave2EnricherFor") && bodyCallsSelector(body, "Fn")
+	return bodyContainsAny(body, "Wave2EnricherFor") &&
+		(bodyCallsSelector(body, "Fn") || bodyContainsAny(body, "ProbeWave2", "Wave2Result"))
 }
 
 // indexesEnricherResultMap reports whether the body indexes a .Findings or

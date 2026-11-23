@@ -64,7 +64,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 			eventPattern = *rule.EventPattern
 		}
 
-		findings := ebRuleStateFindings(state)
+		findings := withState("eb-rule", state, nil)
 
 		r := resource.Resource{
 			ID:   ebRuleID(eventBus, name),
@@ -210,13 +210,4 @@ func ebRuleRefToID(ref string, rc domain.RefContext) (string, bool) {
 		return ebRuleID(bus, name), bus != "" && name != ""
 	}
 	return ebRuleID("", res), res != ""
-}
-
-// ebRuleStateFindings is the one predicate for a rule's lifecycle state.
-// colorEBRule runs it over Fields for rows built outside the fetcher.
-func ebRuleStateFindings(state string) []domain.Finding {
-	if strings.EqualFold(state, "DISABLED") {
-		return []domain.Finding{wave1Finding(CodeEBRuleDisabled)}
-	}
-	return nil
 }

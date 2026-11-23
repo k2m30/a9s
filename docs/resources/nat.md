@@ -91,6 +91,10 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `nat`.
   - **State bucket**: Dim.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `State` outside `NatGatewayState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -117,6 +121,7 @@ One row per signal from §3:
 | `State==deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | `State==failed` + `FailureCode` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
 | `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `State` outside `NatGatewayState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes on filling list and detail text:
 
@@ -163,6 +168,7 @@ nat — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| nat.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a NAT gateway state a9s does not recognise, so a9s cannot tell whether private subnets have an outbound path through it. Check it in the AWS console before relying on it. |
 | nat.state.pending | pending | warn | wave1 | The gateway is still being created, so private subnets routed at it have no outbound path yet. Wait for it to become available before expecting egress to work. |
 | nat.state.deleting | deleting | warn | wave1 | The gateway is going away, and once it does every subnet routed through it loses outbound internet access. Confirm the replacement exists and the route tables point at it before this finishes. |
 | nat.state.failed | failed | broken | wave1 | The gateway could not be created, so the private subnets routing through it have no path out and their workloads fail on any external call. Check the Elastic IP and the public subnet it was placed in, then create it again. |

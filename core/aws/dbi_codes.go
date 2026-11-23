@@ -24,6 +24,7 @@ const (
 	CodeDBIUpgradeFailed            domain.FindingCode = "dbi.broken.upgrade_failed"
 
 	CodeDBITransitional          domain.FindingCode = "dbi.warn.transitional"
+	CodeDBIDeleting              domain.FindingCode = "dbi.warn.deleting"
 	CodeDBIUnrecognisedStatus    domain.FindingCode = "dbi.warn.unrecognised_status"
 	CodeDBINoAutomatedBackups    domain.FindingCode = "dbi.warn.no_automated_backups"
 	CodeDBIPubliclyAccessible    domain.FindingCode = "dbi.warn.publicly_accessible"

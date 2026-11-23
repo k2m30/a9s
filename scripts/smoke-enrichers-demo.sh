@@ -196,7 +196,7 @@ sleep 1
 tmux send-keys -t "$SESSION" ':ec2' Enter
 sleep 2
 tmux send-keys -t "$SESSION" 'd'
-wait_for ec2_detail.txt '#!/bin/bash' "ec2 detail (curated view, not just yaml) shows the decoded bootstrap script"
+page_until ec2_detail.txt '#!/bin/bash' "ec2 detail (curated view, not just yaml) shows the decoded bootstrap script" 12
 tmux send-keys -t "$SESSION" 'y'
 sleep 1
 page_until ec2_yaml.txt '#!/bin/bash' "ec2 yaml renders the decoded bootstrap script" 12

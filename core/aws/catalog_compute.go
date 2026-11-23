@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -17,7 +20,7 @@ import (
 // ecsTaskStopCodeFailedDef is the stop-code finding, declared once. The
 // ecs-task and ecs_tasks catalog entries are the same rows reached by two
 // routes, so the definition they share is one literal.
-var ecsTaskStopCodeFailedDef = catalog.FindingDef{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones."}
+var ecsTaskStopCodeFailedDef = catalog.FindingDef{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal, catalog.LifecycleTransitional, catalog.LifecycleFailedLive, catalog.LifecyclePaused, catalog.LifecycleTearingDown, catalog.LifecycleEnded, catalog.LifecyclePendingDeletion}}
 
 // lambdaRuntimeDeprecation maps a Lambda runtime identifier to its AWS
 // deprecation date: the "Deprecated runtimes" table and the dates the
@@ -95,68 +98,7 @@ func colorEC2(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorECSSvc(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	desired, _ := strconv.ParseInt(r.Fields["desired_count"], 10, 32)
-	running, _ := strconv.ParseInt(r.Fields["running_count"], 10, 32)
-	return colorFromFindings(ecsSvcFindings(r.Fields["status"], int32(desired), int32(running)))
-}
-
-func colorECSCluster(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(ecsClusterFindings(r.Fields["status"]))
-}
-
-func colorECSTask(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(ecsTaskStructuralFindings(
-		r.Fields["status"], r.Fields["stop_code"], r.Fields["health_status"]))
-}
-
 func colorLambda(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
-}
-
-func colorASG(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	inService, _ := strconv.Atoi(r.Fields["in_service_count"])
-	unhealthy, _ := strconv.Atoi(r.Fields["instances_unhealthy_count"])
-	minSize, err := strconv.Atoi(r.Fields["min_size"])
-	if err != nil {
-		// An absent min_size cannot make a group underprovisioned.
-		minSize = inService
-	}
-	return colorFromFindings(asgHealthFindings(
-		r.Fields["status"], inService, unhealthy, minSize, r.Fields["suspended_processes"]))
-}
-
-func colorEB(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(ebEnvironmentFindings(r.Fields["status"], r.Fields["health"]))
-}
-
-func colorEBS(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(ebsFindings(
-		r.Fields["state"], r.Fields["attached_to"], r.Fields["created"], r.Fields["encrypted"]))
-}
-
-func colorEBSSnap(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
@@ -172,8 +114,7 @@ func colorAMI(r domain.Resource) domain.Color {
 
 // augmentEC2StatusChecks injects a Status Checks section after the State block.
 func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []domain.Section {
-	state := r.Fields["state"]
-	if state != "running" {
+	if LifecycleClassOf("ec2", r.Fields["state"]) != catalog.LifecycleNormal {
 		return sections
 	}
 	sysStatus := r.Fields["system_status"]
@@ -297,23 +238,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "instance_id", Title: "Instance ID", Path: "InstanceId", Width: 20},
 			{Key: "launch_time", Title: "Launch Time", Path: "LaunchTime", Width: 22},
 		},
-		CellDecorators: map[string]func(domain.Resource, string) string{
-			"state": func(r domain.Resource, v string) string {
-				if v != "running" {
-					return v
-				}
-				sys := r.Fields["system_status"]
-				inst := r.Fields["instance_status"]
-				if sys == "impaired" || inst == "impaired" {
-					return "! " + v
-				}
-				if sys == "initializing" || inst == "initializing" {
-					return "~ " + v
-				}
-				return v
-			},
-		},
 		Color:          colorEC2,
+		StateEnum:      enumValues[ec2types.InstanceStateName](),
+		NormalStates:   []string{string(ec2types.InstanceStateNameRunning)},
+		UnknownState:   CodeEC2UnrecognisedState,
 		Augment:        augmentEC2StatusChecks,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -375,20 +303,21 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEC2StatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is still booting, so it is not serving yet and its status checks have not run. Give it a minute; if it stays here, check the launch's status reason and whether the instance type has capacity in that Availability Zone."},
-			{Code: CodeEC2StateShuttingDown, Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is being terminated and the call cannot be taken back. Anything on its instance-store volumes is gone; an EBS volume survives only if it was set not to delete on termination. If this was not intended, find the snapshots and retained volumes and launch a replacement from them."},
-			{Code: CodeEC2StateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is on its way down and is no longer accepting traffic, so anything routed to it is failing now. Wait for it to reach a stopped state before starting it again or detaching its volumes."},
-			{Code: CodeEC2StateStopped, Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing this instance hosts is answering, while its EBS volumes and any Elastic IP attached to it keep costing money. Start it if it should be serving, or terminate it and release its volumes if it is genuinely finished with."},
-			{Code: CodeEC2StateStoppedServer, Phrase: "stopped by AWS", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS stopped this instance itself rather than an operator doing it, which points at degraded underlying hardware or a billing or compliance action on the account. Start it again so it comes up on different hardware, and check the instance's status events and your account notifications for the reason."},
-			{Code: CodeEC2StateTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeEC2StatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is still booting, so it is not serving yet and its status checks have not run. Give it a minute; if it stays here, check the launch's status reason and whether the instance type has capacity in that Availability Zone.", States: []string{"pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEC2StateShuttingDown, Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is being terminated and the call cannot be taken back. Anything on its instance-store volumes is gone; an EBS volume survives only if it was set not to delete on termination. If this was not intended, find the snapshots and retained volumes and launch a replacement from them.", States: []string{"shutting-down"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeEC2StateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance is on its way down and is no longer accepting traffic, so anything routed to it is failing now. Wait for it to reach a stopped state before starting it again or detaching its volumes.", States: []string{"stopping"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEC2StateStopped, Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing this instance hosts is answering, while its EBS volumes and any Elastic IP attached to it keep costing money. Start it if it should be serving, or terminate it and release its volumes if it is genuinely finished with.", States: []string{"stopped"}, Class: catalog.LifecyclePaused, SeverityDeviates: true},
+			{Code: CodeEC2StateStoppedServer, Phrase: "stopped by AWS", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS stopped this instance itself rather than an operator doing it, which points at degraded underlying hardware or a billing or compliance action on the account. Start it again so it comes up on different hardware, and check the instance's status events and your account notifications for the reason.", AppliesIn: []catalog.LifecycleClass{catalog.LifecyclePaused}},
+			unrecognisedStateDef(CodeEC2UnrecognisedState, "<state>", "wave1", "EC2 reports an instance state a9s does not recognise, so a9s cannot tell whether the instance is serving. Check the instance in the AWS console before relying on it."),
+			{Code: CodeEC2StateTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1", States: []string{"terminated"}, Class: catalog.LifecycleEnded},
 			{Code: ec2CodeInstanceStatusImpaired, Phrase: "impaired: system checks failing", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record."},
 			{Code: ec2CodeInstanceStatusInitializing, Phrase: "initializing: checks in progress", Severity: domain.SevWarn, Source: "wave2", Detail: "The instance is up but its checks have not passed yet, so a load balancer will not send it traffic and an alarm on it has nothing to judge. Give it a few minutes; a check still initializing well past boot usually means the instance is not finishing its startup."},
 			{Code: ec2CodeInstanceStatusInsufficient, Phrase: "status unknown: checks not reporting", Severity: domain.SevWarn, Source: "wave2", Detail: "AWS cannot reach the instance to check it, so its health is unknown rather than good, and a monitor reading this as healthy is reading nothing. Wait for the next check, and treat a run of these as a possible host problem worth a stop and start."},
 			{Code: ec2CodeScheduledEvent, Phrase: "scheduled event", Severity: domain.SevWarn, Source: "wave2", Detail: "AWS has scheduled work on this instance and will carry it out at the stated deadline whether or not anyone is ready. Read the event's type and window and take the action that matches it: a reboot or maintenance event can often be rescheduled, and a retirement wants a stop and start so the instance moves to healthy hardware. Stop and start only an instance backed by EBS, and copy anything on its instance-store volumes off first, because stopping discards them."},
 			{Code: CodeEC2IMDSv1Allowed, Phrase: "IMDSv1 allowed", Severity: domain.SevWarn, Source: "wave1", Detail: "Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata."},
 			{Code: CodeEC2PublicIP, Phrase: "public address", Severity: domain.SevWarn, Source: "wave1", Detail: "The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly."},
-			{Code: ec2CodeInternetExposed, Phrase: "<port(s) LIST> reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion."},
-			{Code: ec2CodeInternetExposedAll, Phrase: "every port reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "A security group on this instance admits every protocol and port from any address on the internet, so nothing the host listens on is shielded. Replace the all-protocols rule with the ports the service actually needs, from the addresses that need them."},
+			{Code: ec2CodeInternetExposed, Phrase: "<port(s) LIST> reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
+			{Code: ec2CodeInternetExposedAll, Phrase: "every port reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "A security group on this instance admits every protocol and port from any address on the internet, so nothing the host listens on is shielded. Replace the all-protocols rule with the ports the service actually needs, from the addresses that need them.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
 			{Code: ec2CodeUserDataSecret, Phrase: "credential in user data", Severity: domain.SevBroken, Source: "wave2", Detail: "A credential is stored in this instance's user data, which every principal holding ec2:DescribeInstanceAttribute can read. Move the value into Secrets Manager or Systems Manager Parameter Store and rotate it."},
 		},
 	},
@@ -440,7 +369,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				DisplayNameKey: "service_name",
 			},
 		},
-		Color:          colorECSSvc,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      ecsSvcStatuses,
+		NormalStates:   []string{"ACTIVE"},
+		UnknownState:   CodeECSSvcStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSServicesPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
@@ -477,8 +409,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeECSSvcStateInactive, Phrase: "inactive (service deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "The service has been deleted and only its record remains, so it runs nothing and will never place a task again. Recreate it if the workload is still needed; otherwise remove whatever still points at it."},
-			{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1", Detail: "The service is being wound down and its tasks are being deregistered from their load balancer, so it carries less traffic each minute. Confirm the replacement is already serving before the last task goes."},
+			{Code: CodeECSSvcStateInactive, Phrase: "inactive (service deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "The service has been deleted and only its record remains, so it runs nothing and will never place a task again. Recreate it if the workload is still needed; otherwise remove whatever still points at it.", States: []string{"INACTIVE"}, Class: catalog.LifecycleEnded, SeverityDeviates: true},
+			{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1", Detail: "The service is being wound down and its tasks are being deregistered from their load balancer, so it carries less traffic each minute. Confirm the replacement is already serving before the last task goes.", States: []string{"DRAINING"}, Class: catalog.LifecycleTearingDown},
+			unrecognisedStateDef(CodeECSSvcStateUnrecognised, "<status>", "wave1", "Amazon ECS reports a service status a9s does not recognise, so a9s cannot tell whether the service is placing its tasks. Check the service's events before relying on it."),
 			{Code: CodeECSSvcNoTasksRunning, Phrase: "no tasks running", Severity: domain.SevBroken, Source: "wave1", Detail: "The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes."},
 			{Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count", Severity: domain.SevWarn, Source: "wave1", Detail: "Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks."},
 			{Code: ecsSvcCodeDeploymentFailed, Phrase: "not running its desired tasks", Severity: domain.SevBroken, Source: "wave2", Detail: "This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them."},
@@ -506,7 +439,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "pending_tasks", Title: "Pending", Path: "PendingTasksCount", Width: 9},
 			{Key: "services_count", Title: "Services", Path: "ActiveServicesCount", Width: 10},
 		},
-		Color:          colorECSCluster,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      ecsClusterStatuses,
+		NormalStates:   []string{"ACTIVE"},
+		UnknownState:   CodeECSStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
@@ -528,11 +464,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is still being set up, so task placement can fail until its capacity providers are ready. Wait for it to become active before deploying services onto it."},
-			{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down, so it will stop accepting task placements and anything still running on it is on borrowed time. Move the remaining services to another cluster if this was not meant to happen."},
-			{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster."},
-			{Code: CodeECSStateInactive, Phrase: "inactive (cluster deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster."},
-			{Code: ecsCodeClusterIssue, Phrase: "tasks pending or not running", Severity: domain.SevWarn, Source: "wave2", Detail: "The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short."},
+			{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is still being set up, so task placement can fail until its capacity providers are ready. Wait for it to become active before deploying services onto it.", States: []string{"PROVISIONING"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down, so it will stop accepting task placements and anything still running on it is on borrowed time. Move the remaining services to another cluster if this was not meant to happen.", States: []string{"DEPROVISIONING"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster.", States: []string{"FAILED"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeECSStateInactive, Phrase: "inactive (cluster deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster.", States: []string{"INACTIVE"}, Class: catalog.LifecycleEnded, SeverityDeviates: true},
+			unrecognisedStateDef(CodeECSStateUnrecognised, "<status>", "wave1", "Amazon ECS reports a cluster status a9s does not recognise, so a9s cannot tell whether tasks can be placed on it. Check the cluster in the ECS console before relying on it."),
+			{Code: ecsCodeClusterIssue, Phrase: "tasks pending or not running", Severity: domain.SevWarn, Source: "wave2", Detail: "The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
 			DetailsDeniedFindingDef("ecs", ""),
 			DetailsUnavailableFindingDef("ecs"),
 		},
@@ -564,12 +501,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "cpu", Title: "CPU", Path: "Cpu", Width: 6},
 			{Key: "memory", Title: "Memory", Path: "Memory", Width: 8},
 		},
-		Color:          colorECSTask,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      ecsTaskStatuses,
+		NormalStates:   []string{"RUNNING"},
+		UnknownState:   CodeECSTaskStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.ECS} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100, ReadsNonLive: true},
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
@@ -594,13 +534,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "ClusterArn", TargetType: "ecs"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is waiting for its network interface and volumes before its containers start, so it is not serving yet. If it stays here, check the subnet's free addresses and the interface limit on the instance or account."},
-			{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The task has been placed but its containers are not up, usually while an image is pulled. A long stay here points at a slow or failing image pull — check the registry credentials and the network path to it."},
-			{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers are running but the task's supporting work — service discovery, sidecar startup, load balancer registration — has not finished, so it takes no traffic yet. Wait; if it stays here, read the container dependencies in the task definition."},
-			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is being taken out of service and deregistered from its targets, so it is shedding traffic. Confirm a replacement task is already healthy if this service has to stay available."},
-			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it."},
-			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly."},
-			{Code: CodeECSTaskStateStopped, Phrase: "stopped (task exited)", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is waiting for its network interface and volumes before its containers start, so it is not serving yet. If it stays here, check the subnet's free addresses and the interface limit on the instance or account.", States: []string{"PROVISIONING"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The task has been placed but its containers are not up, usually while an image is pulled. A long stay here points at a slow or failing image pull — check the registry credentials and the network path to it.", States: []string{"PENDING"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers are running but the task's supporting work — service discovery, sidecar startup, load balancer registration — has not finished, so it takes no traffic yet. Wait; if it stays here, read the container dependencies in the task definition.", States: []string{"ACTIVATING"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is being taken out of service and deregistered from its targets, so it is shedding traffic. Confirm a replacement task is already healthy if this service has to stay available.", States: []string{"DEACTIVATING"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it.", States: []string{"STOPPING"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly.", States: []string{"DEPROVISIONING"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeECSTaskStateStopped, Phrase: "stopped (task exited)", Severity: domain.SevDim, Source: "wave1", States: []string{"STOPPED"}, Class: catalog.LifecycleEnded},
+			{Code: CodeECSTaskStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"DELETED"}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(CodeECSTaskStateUnrecognised, "<status>", "wave1", "Amazon ECS reports a task status a9s does not recognise, so a9s cannot tell whether the task is running its containers. Check the task in the ECS console before relying on it."),
 			ecsTaskStopCodeFailedDef,
 			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1", Detail: "The container health check inside this task is failing. A task run by a service is replaced by the scheduler under its deployment settings, and a load balancer stops routing to it only if its target group also marks it unhealthy; a task started on its own is neither replaced nor drained. Read the container logs from when the check started failing, and confirm the check command and its grace period suit the application's startup."},
 			{Code: ecsTaskCodeTaskFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave2", Detail: "This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why."},
@@ -645,6 +587,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			},
 		},
 		Color:          colorLambda,
+		StateEnum:      enumValues[lambdatypes.State](),
+		NormalStates:   []string{string(lambdatypes.StateActive)},
+		UnknownState:   CodeLambdaUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Lambda} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
@@ -694,9 +639,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply", Severity: domain.SevBroken, Source: "wave2", Detail: "The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again."},
 			{Code: CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life", Severity: domain.SevBroken, Source: "wave1", Detail: "This function runs on a runtime AWS no longer patches, so language and base-image security fixes will never reach it. Existing functions keep being invoked, but AWS first stops you creating new functions on it and then stops you updating this one, which turns an urgent fix into a migration under pressure. Move to a supported runtime version and redeploy while the update path is still open."},
-			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave2", Detail: "The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it."},
-			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry."},
-			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave2"},
+			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave2", Detail: "The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it.", States: []string{"Pending"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry.", States: []string{"Failed"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave2", States: []string{"Inactive"}, Class: catalog.LifecyclePaused},
+			{Code: CodeLambdaDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave2", Detail: "Lambda is deactivating this function, so it is on its way out of service and new invocations are not to be relied on. Check who deactivated it and whether anything still sends it events.", States: []string{"Deactivating"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeLambdaDeactivated, Phrase: "deactivated", Severity: domain.SevDim, Source: "wave2", States: []string{"Deactivated"}, Class: catalog.LifecyclePaused},
+			{Code: CodeLambdaActiveNonInvocable, Phrase: "active but not invocable", Severity: domain.SevBroken, Source: "wave2", Detail: "The function exists and is configured, but Lambda reports it cannot be invoked, so every event sent to it fails. Read its state reason for the cause, fix what it names, and update the function.", States: []string{"ActiveNonInvocable"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeLambdaDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave2", Detail: "The function is being deleted, so its event sources and callers start failing once it is gone. If this was not intended, redeploy it from its source before anything depends on the gap.", States: []string{"Deleting"}, Class: catalog.LifecycleTearingDown},
+			unrecognisedStateDef(CodeLambdaUnrecognisedState, "<state>", "wave2", "Lambda reports a function state a9s does not recognise, so a9s cannot tell whether the function can be invoked. Check the function in the AWS console before relying on it."),
 			{Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1", Detail: "Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed."},
 			{Code: CodeLambdaEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1", Detail: "A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one."},
 			{Code: lambdaCodePublicPolicy, Phrase: "invokable by anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it."},
@@ -726,12 +676,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Children: []domain.ChildViewDef{
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 		},
-		Color:          colorASG,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      asgStatuses,
+		UnknownState:   CodeASGUnrecognisedStatus,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.AutoScaling} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichASGScalingActivities, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichASGScalingActivities, Priority: 100, ReadsNonLive: true},
 		FieldKeys: []string{
 			"asg_name", "min_size", "max_size", "desired", "instances", "status",
 			"instances_unhealthy_count", "in_service_count", "suspended_processes",
@@ -756,11 +708,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeASGStateDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is being removed and is terminating its instances; the deletion cannot be cancelled. If this was not intended, recreate the group from its launch template and scaling settings once it is gone, and restore the capacity by hand in the meantime."},
+			{Code: CodeASGStateDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is being removed and is terminating its instances; the deletion cannot be cancelled. If this was not intended, recreate the group from its launch template and scaling settings once it is gone, and restore the capacity by hand in the meantime.", States: []string{"Delete in progress"}, Class: catalog.LifecycleTearingDown},
+			unrecognisedStateDef(CodeASGUnrecognisedStatus, "<status>", "wave1", "Auto Scaling reports a group status a9s does not recognise; the only documented one is a delete in progress. Check the group in the AWS console before relying on it."),
 			{Code: CodeASGUnderprovisioned, Phrase: "<N> of <M> instances in service", Severity: domain.SevBroken, Source: "wave1", Detail: "The group is running fewer instances in service than it is meant to, so the workload behind it carries its traffic short-handed. Read the group's scaling activities for launch failures: insufficient capacity in the Availability Zone, a bad launch template, or a failing health check are the usual causes."},
 			{Code: CodeASGUnhealthyInstances, Phrase: "<N unhealthy instance(s)>", Severity: domain.SevWarn, Source: "wave1", Detail: "Some instances in this group are failing their health checks and will be terminated and replaced, briefly reducing capacity. Look at those instances' system logs before they go, so the replacements do not simply repeat the failure."},
 			{Code: CodeASGScalingSuspended, Phrase: "scaling suspended", Severity: domain.SevWarn, Source: "wave1", Detail: "At least one scaling process is suspended, and which one decides what the group has stopped doing. Suspending launch stops it adding capacity; suspending terminate stops it removing instances and leaves replacements half-finished; suspending the health check stops it noticing an instance has failed. Resume the process named here unless a deployment tool is holding it deliberately."},
-			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The group's most recent attempt to launch or terminate an instance failed, so it is not at the size its policies asked for. The activity's status message names the cause — capacity, a launch template error, or an IAM permission — fix that and the group retries."},
+			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The group's most recent attempt to launch or terminate an instance failed, so it is not at the size its policies asked for. The activity's status message names the cause — capacity, a launch template error, or an IAM permission — fix that and the group retries.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal, catalog.LifecycleTransitional, catalog.LifecycleTearingDown}},
 			{Code: CodeASGLegacyLaunchConfig, Phrase: "uses a launch configuration", Severity: domain.SevWarn, Source: "wave1", Detail: "The group launches from a launch configuration, an immutable legacy resource AWS no longer develops — it cannot carry IMDSv2 defaults, newer instance types, or versioned edits. Copy it to a launch template and point the group at that."},
 			{Code: CodeASGSingleAZ, Phrase: "single availability zone", Severity: domain.SevWarn, Source: "wave1", Detail: "Every instance in this group sits in one availability zone, so a single zone failure takes the whole group down. Add subnets from at least one more zone to the group."},
 			{Code: CodeASGNoELBHealthCheck, Phrase: "no load balancer health check", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is behind a load balancer but only watches EC2 status checks, so an instance whose application has stopped answering stays in service. Set the group's health check type to the load balancer's."},
@@ -793,7 +746,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "az", Title: "AZ", Path: "AvailabilityZone", Width: 16},
 			{Key: "created", Title: "Created", Path: "CreateTime", Width: 18},
 		},
-		Color:          colorEBS,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.VolumeState](),
+		NormalStates:   []string{string(ec2types.VolumeStateAvailable), string(ec2types.VolumeStateInUse)},
+		UnknownState:   CodeEBSUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
@@ -814,14 +770,16 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume is still being created, or restored from a snapshot, and cannot be attached until it is available. A restore from a large snapshot takes a while; wait rather than recreating it."},
-			{Code: CodeEBSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume is being deleted and its data is going with it. If that was not intended, check now whether a snapshot covers it, because there is nothing to stop once the deletion completes."},
-			{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS has marked this volume as failed, so its data is not reachable and it cannot be attached. Restore the most recent snapshot into a new volume — the failed one will not recover."},
-			{Code: CodeEBSOrphanUnattached, Phrase: "orphan: unattached <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it."},
+			{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume is still being created, or restored from a snapshot, and cannot be attached until it is available. A restore from a large snapshot takes a while; wait rather than recreating it.", States: []string{"creating"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEBSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume is being deleted and its data is going with it. If that was not intended, check now whether a snapshot covers it, because there is nothing to stop once the deletion completes.", States: []string{"deleting"}, Class: catalog.LifecycleTearingDown},
+			{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS has marked this volume as failed, so its data is not reachable and it cannot be attached. Restore the most recent snapshot into a new volume — the failed one will not recover.", States: []string{"error"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeEBSStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", States: []string{"deleted"}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(CodeEBSUnrecognisedState, "<state>", "wave1", "EC2 reports a volume state a9s does not recognise, so a9s cannot tell whether the volume can be attached. Check the volume in the AWS console before relying on it."),
+			{Code: CodeEBSOrphanUnattached, Phrase: "orphan: unattached <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
 			{Code: CodeEBSUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1", Detail: "The volume's data is written to disk unencrypted, and encryption cannot be turned on in place. Snapshot it, copy the snapshot with a KMS key, and restore that copy over the volume at the next window you can take."},
 			{Code: ebsCodeVolumeIODegraded, Phrase: "volume I/O degraded", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS reports this volume's I/O as degraded or its data as potentially inconsistent, so reads may return stale or corrupt blocks. Take a snapshot while you still can, then restore onto a fresh volume and check the filesystem before trusting it."},
 			{Code: CodeEBSNotInBackupPlan, Phrase: "not covered by a backup plan", Severity: domain.SevWarn, Source: "wave2", Detail: "No backup plan backs up this volume, so nothing is scheduled to copy it and a deletion is final. Add it to a plan by its ARN or by the EBS volume resource type; a plan that takes it in only by tag, by service name or by selecting everything backs it up only once EBS is opted in under this Region's AWS Backup service opt-in."},
-			{Code: CodeEBSNoSnapshot, Phrase: "no snapshot exists", Severity: domain.SevWarn, Source: "wave2", Detail: "This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will."},
+			{Code: CodeEBSNoSnapshot, Phrase: "no snapshot exists", Severity: domain.SevWarn, Source: "wave2", Detail: "This volume is attached and in use, and no snapshot of it exists, so there is no point to restore from. Take one, or put the volume in a backup plan that will.", AppliesInStates: []string{string(ec2types.VolumeStateInUse)}},
 		},
 	},
 	{
@@ -844,7 +802,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "started", Title: "Started", Path: "StartTime", Width: 18},
 			{Key: "progress", Title: "Progress", Path: "Progress", Width: 10},
 		},
-		Color:          colorEBSSnap,
+		Color:          colorAnyFindingOrHealthy,
+		StateEnum:      enumValues[ec2types.SnapshotState](),
+		NormalStates:   []string{string(ec2types.SnapshotStateCompleted)},
+		UnknownState:   CodeEBSSnapStateUnrecognised,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
@@ -867,9 +828,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEBSSnapStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The snapshot is still being written and cannot be used to restore a volume or copied to another region yet. Wait for it to complete before relying on it as the recovery point for anything."},
-			{Code: CodeEBSSnapStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This snapshot failed and holds no usable copy of the volume, so any recovery plan naming it has a hole in it. Take a fresh snapshot of the source volume and delete this one."},
-			{Code: CodeEBSSnapStateRecycleBin, Phrase: "in recycle bin", Severity: domain.SevWarn, Source: "wave1", Detail: "This snapshot was deleted and is being held in the Recycle Bin, so nothing can be restored from it until it is recovered, and a retention rule will remove it for good when the period ends. Recover it from the Recycle Bin if the recovery point is still wanted."},
+			{Code: CodeEBSSnapStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The snapshot is still being written and cannot be used to restore a volume or copied to another region yet. Wait for it to complete before relying on it as the recovery point for anything.", States: []string{string(ec2types.SnapshotStatePending)}, Class: catalog.LifecycleTransitional},
+			{Code: CodeEBSSnapStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This snapshot failed and holds no usable copy of the volume, so any recovery plan naming it has a hole in it. Take a fresh snapshot of the source volume and delete this one.", States: []string{string(ec2types.SnapshotStateError)}, Class: catalog.LifecycleFailedLive},
+			unrecognisedStateDef(CodeEBSSnapStateUnrecognised, "<state>", "wave1", "EC2 reports a snapshot state a9s does not recognise, so a9s cannot tell whether a volume can be restored from it. Check the snapshot in the AWS console before relying on it."),
+			{Code: CodeEBSSnapStateRecycleBin, Phrase: "in recycle bin", Severity: domain.SevWarn, Source: "wave1", Detail: "This snapshot was deleted and is being held in the Recycle Bin, so nothing can be restored from it until it is recovered, and a retention rule will remove it for good when the period ends. Recover it from the Recycle Bin if the recovery point is still wanted.", States: []string{string(ec2types.SnapshotStateRecoverable), string(ec2types.SnapshotStateRecovering)}, Class: catalog.LifecyclePendingDeletion},
 			{Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1", Detail: "The snapshot's contents are stored unencrypted, and any volume restored from it starts unencrypted too. Copy it with a KMS key, restore from the copy, then delete this one."},
 			{Code: CodeEBSSnapAgedAutomated, Phrase: "automated, <N>d old", Severity: domain.SevWarn, Source: "wave1", Detail: "This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it."},
 			{Code: CodeEBSSnapOrphan, Phrase: "orphan: source volume deleted", Severity: domain.SevWarn, Source: "wave2", Detail: "The volume this snapshot came from no longer exists, so nothing is refreshing it and it will never get any newer. Keep it deliberately as an archive with an owner, or delete it — either way its stored data is billed every month."},
@@ -908,6 +870,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			}
 		},
 		Color:          colorAMI,
+		StateEnum:      enumValues[ec2types.ImageState](),
+		NormalStates:   []string{string(ec2types.ImageStateAvailable)},
+		UnknownState:   CodeAMIUnrecognisedState,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.EC2} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAMIsPage(ctx, c.EC2, continuationToken)
@@ -932,10 +897,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeAMIStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The image is still being registered and cannot be launched from until it finishes. Wait rather than pointing a launch template or Auto Scaling group at it."},
-			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "Registration of this image failed, so anything that launches from its identifier will error. Rebuild the image and update the launch templates or pipelines that reference it."},
-			{Code: CodeAMIStateDim, Phrase: "<image state>", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS has marked this image as past its deprecation date, so it stays launchable but is no longer maintained or recommended, and anything still launching from it inherits whatever it was frozen with. Point the launch templates and Auto Scaling groups that reference it at a current image, then deregister it once nothing does."},
+			{Code: CodeAMIStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The image is still being registered and cannot be launched from until it finishes. Wait rather than pointing a launch template or Auto Scaling group at it.", States: []string{"pending", "transient"}, Class: catalog.LifecycleTransitional},
+			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "Registration of this image failed, so anything that launches from its identifier will error. Rebuild the image and update the launch templates or pipelines that reference it.", States: []string{"failed", "error", "invalid"}, Class: catalog.LifecycleFailedLive},
+			{Code: CodeAMIStateDim, Phrase: "<image state>", Severity: domain.SevDim, Source: "wave1", States: []string{"deregistered", "disabled"}, Class: catalog.LifecycleEnded},
+			unrecognisedStateDef(CodeAMIUnrecognisedState, "<image state>", "wave1", "EC2 reports an image state a9s does not recognise, so a9s cannot tell whether the image can be launched. Check the image in the AWS console before relying on it."),
+			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS has marked this image as past its deprecation date, so it stays launchable but is no longer maintained or recommended, and anything still launching from it inherits whatever it was frozen with. Point the launch templates and Auto Scaling groups that reference it at a current image, then deregister it once nothing does.", AppliesIn: []catalog.LifecycleClass{catalog.LifecycleNormal}},
 			{Code: CodeAMIPublic, Phrase: "shared with all AWS accounts", Severity: domain.SevBroken, Source: "wave1", Detail: "This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission."},
 		},
 	},
@@ -963,7 +929,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichLTDeprecatedAMI, Priority: 100, Reads: []string{"ami"}},
-		FieldKeys: []string{"name", "status", "default_version", "latest_version", "created_by", "created", "degraded_finding"},
+		FieldKeys: []string{"name", "default_version", "latest_version", "created_by", "created", "degraded_finding"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkLTAMI},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkLTASG, NeedsTargetCache: true, Truncated: true},

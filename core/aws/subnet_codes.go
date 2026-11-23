@@ -6,6 +6,7 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	CodeSubnetStatePending                    domain.FindingCode = "subnet.state.pending"
+	CodeSubnetUnrecognisedState               domain.FindingCode = "subnet.state.unrecognised"
 	CodeSubnetStateUnavailable                domain.FindingCode = "subnet.state.unavailable"
 	CodeSubnetStateFailed                     domain.FindingCode = "subnet.state.failed"
 	CodeSubnetStateFailedInsufficientCapacity domain.FindingCode = "subnet.state.failed-insufficient-capacity"

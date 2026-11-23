@@ -380,9 +380,9 @@ func TestCache_LoadDirForTest_AllResourceTypes(t *testing.T) {
 	}
 }
 
-func TestCache_SchemaVersion_IsTwo(t *testing.T) {
-	if cache.SchemaVersion != 2 {
-		t.Errorf("SchemaVersion = %d, want 2 (issue #463: per-finding FirstSeen bumped the on-disk schema)", cache.SchemaVersion)
+func TestCache_SchemaVersion_IsThree(t *testing.T) {
+	if cache.SchemaVersion != 3 {
+		t.Errorf("SchemaVersion = %d, want 3: the status key holds the AWS lifecycle value since version 3", cache.SchemaVersion)
 	}
 }
 

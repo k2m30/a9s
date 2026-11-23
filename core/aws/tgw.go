@@ -78,13 +78,10 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			ID:   tgwID,
 			Name: name,
 			Fields: map[string]string{
-				"tgw_id":   tgwID,
-				"name":     name,
-				"state":    state,
-				"owner_id": ownerID,
-				// The option as a word: colorTGW's fallback runs tgwFindings
-				// over Fields, so a row stripped of its findings has to be able
-				// to recover this one. Same reason as subnet's auto_public_ip.
+				"tgw_id":      tgwID,
+				"name":        name,
+				"state":       state,
+				"owner_id":    ownerID,
 				"auto_accept": autoAccept,
 				"description": description,
 			},
@@ -119,26 +116,10 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 	}, nil
 }
 
-// tgwFindings is the one predicate for a transit gateway: its state, then
-// whether it accepts shared attachments without review. A gateway on its way
-// out cannot accept anything, so the posture finding is suppressed there.
-// colorTGW runs this over Fields for rows built outside the fetcher.
 func tgwFindings(state, autoAccept string) []domain.Finding {
-	var findings []domain.Finding
-	switch state {
-	case "pending":
-		findings = []domain.Finding{wave1Finding(CodeTGWStatePending)}
-	case "modifying":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateModifying)}
-	case "deleting":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleting)}
-	case "failed":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateFailed)}
-	case "deleted":
-		findings = []domain.Finding{wave1Finding(CodeTGWStateDeleted)}
+	var posture []domain.Finding
+	if autoAccept == "yes" {
+		posture = append(posture, wave1Finding(CodeTGWAutoAccept))
 	}
-	if autoAccept == "yes" && state != "deleting" && state != "deleted" {
-		findings = append(findings, wave1Finding(CodeTGWAutoAccept))
-	}
-	return findings
+	return withState("tgw", state, posture)
 }

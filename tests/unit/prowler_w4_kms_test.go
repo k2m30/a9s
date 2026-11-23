@@ -228,6 +228,6 @@ func TestW4KMSPendingDeletionEmitsNoPostureFinding(t *testing.T) {
 		KeyState:   kmstypes.KeyStatePendingDeletion,
 	}
 	fake := &w4KMSFake{policies: map[string]string{w4KMSPublicKeyID: w4KMSPublicPolicyDoc}}
-	res := w4EnrichKMS(t, fake, []resource.Resource{pending})
+	res := Wave2Result(t, "kms", &awsclient.ServiceClients{KMS: fake, Region: "us-east-1"}, []resource.Resource{pending})
 	w4AssertNoCode(t, res.Findings[w4KMSPublicKeyID], w4CodeKMSPublicPolicy)
 }

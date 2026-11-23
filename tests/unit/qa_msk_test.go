@@ -11,6 +11,7 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -87,10 +88,10 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"version\"]: expected %q, got %q", "2.8.1", r0.Fields["version"])
 	}
 
-	// Verify second cluster: Status=="" (fetcher does not write Status), phrase in Fields["status"].
+	// Verify second cluster: Status=="" (fetcher does not write Status); the Status cell is its state finding's phrase.
 	r1 := resources[1]
-	if r1.Fields["status"] != "creating" {
-		t.Errorf("resource[1].Fields[\"status\"]: expected %q for CREATING cluster, got %q", "creating", r1.Fields["status"])
+	if domain.StatusPhrase(r1.Findings) != "creating" {
+		t.Errorf("resource[1].Status cell: expected %q for CREATING cluster, got %q", "creating", domain.StatusPhrase(r1.Findings))
 	}
 	if r1.Fields["cluster_type"] != "SERVERLESS" {
 		t.Errorf("resource[1].Fields[\"cluster_type\"]: expected %q, got %q", "SERVERLESS", r1.Fields["cluster_type"])

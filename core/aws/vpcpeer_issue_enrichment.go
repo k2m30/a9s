@@ -56,8 +56,7 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 	}
 
 	for _, res := range resources {
-		raw, asserted := assertStruct[ec2types.VpcPeeringConnection](res.RawStruct)
-		if !asserted || raw.Status == nil || raw.Status.Code != ec2types.VpcPeeringConnectionStateReasonCodeActive {
+		if status := res.Fields["status"]; status == "" || !appliesAny("vpc-peer", status, vpcPeerCodeNoLocalRoute, vpcPeerCodeRouteBlackholed) {
 			continue
 		}
 		switch {

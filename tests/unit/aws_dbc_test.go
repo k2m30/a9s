@@ -13,6 +13,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -84,7 +85,7 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 	wantFields := map[string]string{
 		"cluster_id":              "prod-docdb-01",
 		"engine_version":          "5.0.0",
-		"status":                  "",
+		"status":                  "available",
 		"instances":               "2",
 		"endpoint":                "prod-docdb-01.cluster-xyz.us-east-1.docdb.amazonaws.com",
 		"arn":                     "arn:aws:rds:us-east-1:123456789012:cluster:prod-docdb-01",
@@ -888,9 +889,10 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
 			// A status in neither AWS status table reads as the status word
-			// itself: a9s cannot claim the cluster is mid-transition.
-			wantPhrase:   "cross-region-copying",
-			wantFindings: []string{"cross-region-copying"},
+			// marked unrecognised: a9s cannot claim the cluster is
+			// mid-transition.
+			wantPhrase:   "cross-region-copying (unrecognised)",
+			wantFindings: []string{"cross-region-copying (unrecognised)"},
 		},
 	}
 
@@ -904,8 +906,8 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			if r.Fields["status"] != tc.wantPhrase {
-				t.Errorf("Fields[status] = %q, want %q", r.Fields["status"], tc.wantPhrase)
+			if domain.StatusPhrase(r.Findings) != tc.wantPhrase {
+				t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), tc.wantPhrase)
 			}
 			gotPhrases := make([]string, len(r.Findings))
 			for i, f := range r.Findings {

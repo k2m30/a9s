@@ -20,6 +20,7 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -520,8 +521,9 @@ func TestW5_KinesisDeletingStreamEmitsNoPostureFinding(t *testing.T) {
 
 	r := w5KinesisRes(stream)
 	r.Fields["stream_status"] = "DELETING"
+	r.Fields["status"] = "DELETING"
 
-	res := w5EnrichKinesis(t, f, r)
+	res := Wave2Result(t, "kinesis", &awsclient.ServiceClients{Kinesis: f}, []resource.Resource{r})
 	w2AssertNoCode(t, res.Findings[stream], "kinesis.unencrypted")
 	w2AssertNoCode(t, res.Findings[stream], "kinesis.min-retention")
 }
@@ -624,10 +626,10 @@ func TestW5_Kinesis_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-// A cluster being torn down, or already failed, carries no reachability
-// finding. The cluster is hand-built to trip both checks: no demo cluster in
-// either state carries the connectivity or client-authentication blocks they
-// read.
+// A cluster in a state its lifecycle class puts on the way out carries no
+// reachability finding; one its class keeps live still does. The cluster is
+// hand-built to trip both checks: no demo cluster in either state carries the
+// connectivity or client-authentication blocks they read.
 func TestW5_MSKLifecycleEndedEmitsNoReachabilityFinding(t *testing.T) {
 	for _, state := range []string{"DELETING", "FAILED"} {
 		t.Run(state, func(t *testing.T) {
@@ -641,17 +643,26 @@ func TestW5_MSKLifecycleEndedEmitsNoReachabilityFinding(t *testing.T) {
 			r := w5MSKRes(name)
 			r.Fields["state"] = state
 
-			res := w5EnrichMSK(t, f, r)
-			w2AssertNoCode(t, res.Findings[name], "msk.public-access")
-			w2AssertNoCode(t, res.Findings[name], "msk.unauthenticated")
+			res := Wave2Result(t, "msk", &awsclient.ServiceClients{MSK: f}, []resource.Resource{r})
+			switch awsclient.LifecycleClassOf("msk", state) {
+			case catalog.LifecycleTearingDown, catalog.LifecycleEnded, catalog.LifecyclePendingDeletion:
+				w2AssertNoCode(t, res.Findings[name], "msk.public-access")
+				w2AssertNoCode(t, res.Findings[name], "msk.unauthenticated")
+			default:
+				for _, code := range []string{"msk.public-access", "msk.unauthenticated"} {
+					if _, ok := w2Find(res.Findings[name], code); !ok {
+						t.Errorf("%s cluster in a live class lacks %s; got %v", state, code, w2Codes(res.Findings[name]))
+					}
+				}
+			}
 		})
 	}
 }
 
-// The guard sits below the broker-version and encryption-in-transit checks:
-// those describe the software the cluster is running, which stays true while
-// it drains. A guard at the top of the loop would silence them too.
-func TestW5_MSKLifecycleEndedStillReportsSoftwareFindings(t *testing.T) {
+// A cluster being deleted will not run its brokers much longer, so neither
+// its software nor its encryption settings are anything to act on; the Wave 2
+// pass does not read it at all.
+func TestW5_MSKDeletingClusterGetsNoWave2Read(t *testing.T) {
 	name := "acme-events-draining"
 	f := newW5MSKFake()
 	c := w5ProvisionedCluster(name)
@@ -662,26 +673,9 @@ func TestW5_MSKLifecycleEndedStillReportsSoftwareFindings(t *testing.T) {
 	r := w5MSKRes(name)
 	r.Fields["state"] = "DELETING"
 
-	res := w5EnrichMSK(t, f, r)
-
-	// Asserted by code and phrase rather than through w2AssertFinding, which
-	// requires a Detail sentence these two codes do not carry.
-	for _, want := range []struct{ code, phrase string }{
-		{"msk.broker-outdated", "broker software outdated"},
-		{"msk.encryption-not-tls", "encryption in transit not enforced"},
-	} {
-		got, ok := w2Find(res.Findings[name], want.code)
-		if !ok {
-			t.Errorf("no finding %q on a draining cluster; the guard sits below the software checks and must not silence them. got %v",
-				want.code, w2Codes(res.Findings[name]))
-			continue
-		}
-		if got.Phrase != want.phrase {
-			t.Errorf("%s: Phrase = %q, want %q", want.code, got.Phrase, want.phrase)
-		}
-		if got.Severity != domain.SevWarn {
-			t.Errorf("%s: Severity = %v, want %v", want.code, got.Severity, domain.SevWarn)
-		}
+	res := Wave2Result(t, "msk", &awsclient.ServiceClients{MSK: f}, []resource.Resource{r})
+	if got := res.Findings[name]; len(got) != 0 {
+		t.Errorf("deleting cluster Wave 2 findings = %v, want none", w2Codes(got))
 	}
 }
 

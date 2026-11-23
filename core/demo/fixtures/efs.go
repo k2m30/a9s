@@ -114,6 +114,7 @@ const (
 	WarnEFSMultiID            = "fs-0warnmulti0000001"
 	WarnEFSUpdatingMTDownID   = "fs-0warnupdmtdown001"
 	HealthyEFSMTDownID        = "fs-0healthymtdown001"
+	DimEFSDeletedID           = "fs-0dimdeleted000001"
 
 	// One carrier per efs posture finding. Every other file system is encrypted,
 	// has no file system policy or one EFS counts non-public, and has its
@@ -183,6 +184,9 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 	// acme-daily-backup's tag selection does not take this file system in.
 	noBackupPolicy := efsPostureWitness(EFSNoBackupPolicy, "no-backup-policy-efs", true)
 	noBackupPolicy.Tags = append(noBackupPolicy.Tags, efstypes.Tag{Key: aws.String("backup"), Value: aws.String("daily")})
+	deleted := efsPostureWitness(DimEFSDeletedID, "retired-scratch-efs", true)
+	deleted.LifeCycleState = efstypes.LifeCycleStateDeleted
+	deleted.NumberOfMountTargets = 0
 
 	return []efstypes.FileSystemDescription{
 		// prod-efs-app-data — graph-root, healthy.
@@ -315,7 +319,8 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// warn-efs-multi — deleting + no mount targets (multi W1, Broken wins).
+		// warn-efs-multi — deleting with its mount targets already removed:
+		// the delete removes them first, so only the deletion shows.
 		{
 			FileSystemId:         aws.String("fs-0warnmulti0000001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warnmulti0000001"),
@@ -378,6 +383,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
+		deleted,
 		efsPostureWitness(EFSUnencrypted, "unencrypted-legacy-efs", false),
 		efsPostureWitness(EFSPublicPolicy, "public-policy-efs", true),
 		noBackupPolicy,
@@ -601,5 +607,5 @@ func buildEFSAccessPoints() map[string][]efstypes.AccessPointDescription {
 func init() {
 	// efs issues counts Wave-1 findings only: fs-0healthymtdown001 and
 	// fs-0publicpolicy0001 raise Wave-2 findings alone.
-	Register(Pin{ShortName: "efs", Rows: 12, Issues: 8, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "efs", Rows: 13, Issues: 8})
 }

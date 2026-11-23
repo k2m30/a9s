@@ -155,7 +155,7 @@ func fetchECSTasksPageWithJoin(
 					joinFailures = append(joinFailures, FailedCall(taskID, joinErr))
 				}
 
-				findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
+				findings := ecsTaskFindings(status, stopCode, healthStatus)
 
 				r := resource.Resource{
 					ID:        taskID,

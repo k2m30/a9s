@@ -12,4 +12,6 @@ const (
 	CodeMSKHealing         domain.FindingCode = "msk.warn.healing"
 	CodeMSKDeleting        domain.FindingCode = "msk.warn.deleting"
 	CodeMSKFailed          domain.FindingCode = "msk.broken.failed"
+
+	CodeMSKUnrecognisedState domain.FindingCode = "msk.warn.unrecognised_state"
 )

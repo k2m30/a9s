@@ -226,7 +226,7 @@ func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resou
 	}
 
 	for _, r := range resources {
-		if r.Fields["state"] != "running" {
+		if !appliesAny("ec2", r.Fields["state"], ec2CodeInternetExposed, ec2CodeInternetExposedAll) {
 			continue
 		}
 		inst, ok := assertStruct[ec2types.Instance](r.RawStruct)
@@ -462,17 +462,16 @@ func ec2RoutedToInternet(vpc, subnet, dest string, rtb resource.ResourceCacheEnt
 
 // ec2UserDataSecrets reads each instance's user-data script via
 // DescribeInstanceAttribute and reports plaintext credentials found in it.
-// Terminated and shutting-down instances are skipped: their user data can no
-// longer be changed and the host is gone. The call is not part of the EC2API
-// aggregate (see ec2_interfaces.go), so a client that cannot serve it — every
-// narrow test double — yields no findings rather than an error.
+// The call is not part of the EC2API aggregate (see ec2_interfaces.go), so a
+// client that cannot serve it — every narrow test double — yields no findings
+// rather than an error.
 func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	api, ok := clients.EC2.(EC2DescribeInstanceAttributeAPI)
 	if !ok {
 		return nil
 	}
 	targets := capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		return r.ID != "" && !ec2InstanceGone(r.Fields["state"])
+		return r.ID != ""
 	}, resourceIDsOf)
 
 	const op = "DescribeInstanceAttribute(userData)"

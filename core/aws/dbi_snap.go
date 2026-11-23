@@ -113,7 +113,6 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 		encryptedStr := strconv.FormatBool(!isSnapUnencrypted(snap))
 
 		findings := ComputeDBISnapStatusAndIssues(snap)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       snapshotID,
@@ -122,7 +121,6 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 			Fields: map[string]string{
 				"snapshot_id":   snapshotID,
 				"db_instance":   dbInstance,
-				"status":        statusPhrase,
 				"encrypted":     encryptedStr,
 				"engine":        engine,
 				"snapshot_type": snapshotType,

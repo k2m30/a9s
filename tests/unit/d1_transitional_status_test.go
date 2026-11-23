@@ -265,12 +265,12 @@ func TestD1_DbcSnapBrokenStatusesDoNotFireTransitional(t *testing.T) {
 	}
 }
 
-func TestD1_DbiDeletingCarriesTheTransitionalWarning(t *testing.T) {
+func TestD1_DbiDeletingCarriesItsOwnStateWarning(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
 	inst.DBInstanceStatus = aws.String("deleting")
 
 	r := fetchSingleResource(t, inst)
-	d1AssertFinding(t, d1FindOne(t, r.Findings, awsclient.CodeDBITransitional), "deleting", domain.SevWarn)
+	d1AssertFinding(t, d1FindOne(t, r.Findings, awsclient.CodeDBIDeleting), "deleting", domain.SevWarn)
 }
 
 // An instance on its way out reports that it is going and nothing else. Its
@@ -288,13 +288,14 @@ func TestD1_DbiDeletingSuppressesPosture(t *testing.T) {
 	if len(r.Findings) != 1 {
 		t.Fatalf("findings = %+v, want only the deleting one", r.Findings)
 	}
-	if r.Findings[0].Code != awsclient.CodeDBITransitional {
-		t.Errorf("Code = %q, want %q", r.Findings[0].Code, awsclient.CodeDBITransitional)
+	if r.Findings[0].Code != awsclient.CodeDBIDeleting {
+		t.Errorf("Code = %q, want %q", r.Findings[0].Code, awsclient.CodeDBIDeleting)
 	}
 }
 
 // A status in neither AWS DB instance status table reads as the status word
-// itself at Warn, never as a transition in progress and never as silence.
+// marked unrecognised at Warn, never as a transition in progress and never as
+// silence.
 func TestD1_DbiUnknownStatusReadsAsItself(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
 	inst.DBInstanceStatus = aws.String("some-future-aws-status")
@@ -303,7 +304,7 @@ func TestD1_DbiUnknownStatusReadsAsItself(t *testing.T) {
 	if len(r.Findings) == 0 || r.Findings[0].Code != awsclient.CodeDBIUnrecognisedStatus {
 		t.Fatalf("findings = %+v, want %s first", r.Findings, awsclient.CodeDBIUnrecognisedStatus)
 	}
-	d1AssertFinding(t, r.Findings[0], "some-future-aws-status", domain.SevWarn)
+	d1AssertFinding(t, r.Findings[0], "some-future-aws-status (unrecognised)", domain.SevWarn)
 }
 
 // Each finding code needs a demo fixture that reaches it and reaches it

@@ -8,33 +8,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
-	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// computeMSKFindings returns a []domain.Finding for the given MSK cluster state.
-func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
-	switch state {
-	case kafkatypes.ClusterStateFailed:
-		return []domain.Finding{wave1Finding(CodeMSKFailed)}
-	case kafkatypes.ClusterStateCreating:
-		return []domain.Finding{wave1Finding(CodeMSKCreating)}
-	case kafkatypes.ClusterStateUpdating:
-		return []domain.Finding{wave1Finding(CodeMSKUpdating)}
-	case kafkatypes.ClusterStateMaintenance:
-		return []domain.Finding{wave1Finding(CodeMSKMaintenance)}
-	case kafkatypes.ClusterStateRebootingBroker:
-		return []domain.Finding{wave1Finding(CodeMSKRebootingBroker)}
-	case kafkatypes.ClusterStateHealing:
-		return []domain.Finding{wave1Finding(CodeMSKHealing)}
-	case kafkatypes.ClusterStateDeleting:
-		return []domain.Finding{wave1Finding(CodeMSKDeleting)}
-	default:
-		return nil
-	}
-}
 
 // FetchMSKClustersPage fetches a single page of MSK clusters.
 func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continuationToken string) (resource.FetchResult, error) {
@@ -74,8 +50,7 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 			clusterARN = *cluster.ClusterArn
 		}
 
-		findings := computeMSKFindings(cluster.State)
-		statusPhrase := domain.StatusPhrase(findings)
+		findings := withState("msk", state, nil)
 
 		r := resource.Resource{
 			ID:       clusterName,
@@ -86,7 +61,6 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 				"cluster_arn":  clusterARN,
 				"cluster_type": clusterType,
 				"state":        state,
-				"status":       statusPhrase,
 				"version":      version,
 			},
 			RawStruct: cluster,

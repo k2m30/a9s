@@ -89,14 +89,15 @@ var views7StatusCases = []views7StatusCase{
 		want: "last build failed",
 	},
 	{
-		// No key at all: the cell comes from the struct, and the save lane is
-		// what puts it in Fields for the next start.
+		// No key at all, the value is in the struct: vpc has a state table, so
+		// a row with no finding is healthy and its cell is blank, live and
+		// after the save lane has put the state in Fields for the next start.
 		name:      "no key, the value is in the struct",
 		shortName: "vpc",
 		id:        "vpc-0123456789abcdef0",
 		fields:    map[string]string{"name": "acme-prod-vpc"},
 		raw:       views7StatusVPCRaw{VpcId: "vpc-0123456789abcdef0", State: "available"},
-		want:      "available",
+		want:      "",
 	},
 	{
 		// A finding outranks every stored value, on every shape: the phrase is

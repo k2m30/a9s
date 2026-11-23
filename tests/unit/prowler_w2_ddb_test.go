@@ -325,12 +325,9 @@ func TestW2DDBDeletingTableEmitsNoWave2Finding(t *testing.T) {
 	}
 
 	fake := &w2DDBPolicyFake{policies: map[string]string{"acme-old": w2DDBPublicPolicyDoc}}
-	res, err := w2Enricher(t, "ddb")(context.Background(), w2DDBClients(fake), out.Resources, nil)
-	w2AssertEnricherShape(t, res)
-	if err != nil {
-		t.Fatalf("enricher returned error: %v", err)
-	}
+	res := Wave2Result(t, "ddb", w2DDBClients(fake), out.Resources, t1aNoBackupPlans)
 
-	w2AssertNoCode(t, res.Findings["acme-old"], w2DDBCodePublicPolicy)
-	w2AssertNoCode(t, res.Findings["acme-old"], w2DDBCodeCrossAccountPolicy)
+	if got := res.Findings["acme-old"]; len(got) != 0 {
+		t.Errorf("deleting table Wave 2 findings = %v, want none", got)
+	}
 }

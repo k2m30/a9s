@@ -231,6 +231,26 @@ read failed, is not inspected: its Status cell stays empty, never `Active`.
   - **API call**: `ListFunctionUrlConfigs` — one call per function.
   - **Cost shape**: per-resource.
 
+- **Signal**: `State == Deactivating` (GetFunction).
+  - **State bucket**: Warning. Class by the value name: the Lambda Developer Guide, "Lambda function states", does not describe it.
+  - **How obtained**: `Configuration.State` on the `GetFunction` answer the Wave 2 pass already reads.
+
+- **Signal**: `State == Deactivated` (GetFunction).
+  - **State bucket**: Dim. Class by the value name: the Lambda Developer Guide does not describe it.
+  - **How obtained**: `Configuration.State` on the `GetFunction` answer the Wave 2 pass already reads.
+
+- **Signal**: `State == ActiveNonInvocable` (GetFunction).
+  - **State bucket**: Broken. Class by the value name: the Lambda Developer Guide does not describe it.
+  - **How obtained**: `Configuration.State` on the `GetFunction` answer the Wave 2 pass already reads.
+
+- **Signal**: `State == Deleting` (GetFunction).
+  - **State bucket**: Warning. Tearing down: the function public-policy and URL findings do not stand beside it.
+  - **How obtained**: `Configuration.State` on the `GetFunction` answer the Wave 2 pass already reads.
+
+- **Signal**: `State` outside `State.Values()` (GetFunction).
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: `Configuration.State` on the `GetFunction` answer the Wave 2 pass already reads.
+
 ### 3.3 Wave 3 — OUT OF SCOPE
 
 - OUT OF SCOPE: CloudWatch `Errors/Invocations` ratio.
@@ -259,6 +279,11 @@ One row per signal from §3:
 | credential in `Environment.Variables` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in environment variables` |
 | resource policy allows a wildcard principal (`GetPolicy`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `invokable by anyone` |
 | function URL with `AuthType == NONE` (`ListFunctionUrlConfigs`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `function endpoint open without authentication` |
+| `State == Deactivating` (GetFunction) | 2 | Warning | `~` | S2, S3, S4, S5 | `deactivating` |
+| `State == Deactivated` (GetFunction) | 2 | Dim | n/a | S2, S4 | `deactivated` |
+| `State == ActiveNonInvocable` (GetFunction) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `active but not invocable` |
+| `State == Deleting` (GetFunction) | 2 | Warning | `~` | S2, S3, S4, S5 | `deleting` |
+| `State` outside `State.Values()` (GetFunction) | 2 | Warning | `~` | S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -362,6 +387,11 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 | lambda.state.pending | pending | warn | wave2 | The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it. |
 | lambda.state.failed | failed | broken | wave2 | The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry. |
 | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave2 | — |
+| lambda.state.deactivating | deactivating | warn | wave2 | Lambda is deactivating this function, so it is on its way out of service and new invocations are not to be relied on. Check who deactivated it and whether anything still sends it events. |
+| lambda.state.deactivated | deactivated | dim | wave2 | — |
+| lambda.state.active-non-invocable | active but not invocable | broken | wave2 | The function exists and is configured, but Lambda reports it cannot be invoked, so every event sent to it fails. Read its state reason for the cause, fix what it names, and update the function. |
+| lambda.state.deleting | deleting | warn | wave2 | The function is being deleted, so its event sources and callers start failing once it is gone. If this was not intended, redeploy it from its source before anything depends on the gap. |
+| lambda.state.unrecognised | <state> (unrecognised) | warn | wave2 | Lambda reports a function state a9s does not recognise, so a9s cannot tell whether the function can be invoked. Check the function in the AWS console before relying on it. |
 | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed. |
 | lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
 | lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |

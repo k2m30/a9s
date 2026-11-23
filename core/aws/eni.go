@@ -160,19 +160,14 @@ func eniToResource(eni ec2types.NetworkInterface) resource.Resource {
 
 // eniFindings is the one predicate for a network interface. An unattached
 // interface is wasted spend unless AWS itself owns it: requester-managed
-// interfaces (VPC endpoints, ELB NICs, EFS mount targets) are "available" by
-// design, and InterfaceType alone cannot tell them apart. colorENI runs this
-// over Fields for rows built outside the fetcher.
+// interfaces (VPC endpoints, ELB NICs, EFS mount targets) are unattached by
+// design, and InterfaceType alone cannot tell them apart. The finding is
+// declared for the "available" status, the one AWS gives an interface that
+// is attached to nothing.
 func eniFindings(status, requesterManaged string) []domain.Finding {
-	switch status {
-	case "available":
-		if requesterManaged != "true" {
-			return []domain.Finding{wave1Finding(CodeENIStateAvailable)}
-		}
-	case "attaching":
-		return []domain.Finding{wave1Finding(CodeENIStateAttaching)}
-	case "detaching":
-		return []domain.Finding{wave1Finding(CodeENIStateDetaching)}
+	var posture []domain.Finding
+	if requesterManaged != "true" {
+		posture = append(posture, wave1Finding(CodeENIStateAvailable))
 	}
-	return nil
+	return withState("eni", status, posture)
 }

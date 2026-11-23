@@ -18,41 +18,31 @@ import (
 	"strings"
 	"testing"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// controllerIssueResources builds n ec2-shaped resources where exactly
-// wantIssues of them carry a "stopped" lifecycle state and the rest are
-// "running". colorEC2 is colorFromAnyFinding-only, so the "stopped" rows also
-// carry the wave1 Finding the real fetcher (core/aws/ec2.go) attaches for a
-// user-initiated stop (CodeEC2StateStopped, SevWarn). colorEBS
-// (core/aws/catalog_compute.go) classifies off Fields["state"] and has no
-// "stopped" case, so the ebs child-list test uses "error", which colorEBS
-// maps to ColorBroken.
+// controllerIssueResources builds n ec2 rows where exactly wantIssues of them
+// are "stopped" and the rest "running".
 func controllerIssueResources(n, wantIssues int) []resource.Resource {
-	return controllerIssueResourcesWithState(n, wantIssues, "running", "stopped")
+	return controllerIssueResourcesWithState("ec2", n, wantIssues, "running", "stopped")
 }
 
-// controllerIssueResourcesWithState is like controllerIssueResources but lets
-// the caller supply the type-specific healthy/issue lifecycle-state values,
-// since the Warning/Broken state vocabulary differs per resource type's Color
-// func (see colorEC2 vs colorEBS in core/aws/catalog_compute.go). When
-// issueState is ec2's "stopped" value, the matching wave1 Finding
-// (CodeEC2StateStopped, SevWarn) is attached too, since colorEC2 reads
-// findings rather than Fields["state"].
-func controllerIssueResourcesWithState(n, wantIssues int, healthyState, issueState string) []resource.Resource {
+// controllerIssueResourcesWithState builds n rows of shortName, the first
+// wantIssues in issueState and the rest in healthyState. Each row carries the
+// state finding the fetcher emits for its state, which is what its colour and
+// the issue badge read.
+func controllerIssueResourcesWithState(shortName string, n, wantIssues int, healthyState, issueState string) []resource.Resource {
 	res := make([]resource.Resource, n)
 	for i := range n {
 		state := healthyState
-		var findings []domain.Finding
 		if i < wantIssues {
 			state = issueState
-			if issueState == "stopped" {
-				findings = []domain.Finding{
-					{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
-				}
-			}
+		}
+		var findings []domain.Finding
+		if f, ok := awsclient.StateFinding(shortName, state); ok {
+			findings = []domain.Finding{f}
 		}
 		res[i] = resource.Resource{
 			ID:       "i-" + itoaPad(i),
@@ -112,7 +102,7 @@ func TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional(t *testing
 	c := newListController(t, "ec2")
 
 	c.PushChildListScreen("ebs")
-	resources := controllerIssueResourcesWithState(5, 5, "in-use", "error")
+	resources := controllerIssueResourcesWithState("ebs", 5, 5, "in-use", "error")
 	c.ApplyResourcesLoaded("ebs", resources, nil, false)
 
 	snap := c.Snapshot()

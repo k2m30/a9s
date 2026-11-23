@@ -9,7 +9,8 @@ import "github.com/k2m30/a9s/v3/core/domain"
 
 const (
 	// CodeASGStateDeleting — Auto Scaling Group has "Delete in progress" status.
-	CodeASGStateDeleting domain.FindingCode = "asg.state.deleting"
+	CodeASGStateDeleting      domain.FindingCode = "asg.state.deleting"
+	CodeASGUnrecognisedStatus domain.FindingCode = "asg.state.unrecognised"
 
 	// CodeASGUnderprovisioned — fewer instances in service than MinSize.
 	CodeASGUnderprovisioned domain.FindingCode = "asg.instances.underprovisioned"

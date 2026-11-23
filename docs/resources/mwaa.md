@@ -127,7 +127,7 @@ AccessDenied contract: when the profile's role denies `mwaa:ListEnvironments`, t
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `Status` in `DELETING` / `DELETED`.
-  - **State bucket**: Dim.
+  - **State bucket**: Dim. Tearing down or ended: the last-update and web-server findings are not shown.
   - **API call**: `GetEnvironment`, one per environment.
   - **Cost shape**: per-resource.
 
@@ -153,6 +153,10 @@ Deliberately not signals (a9s-devops 2026-07-14): any `LoggingConfiguration` com
 
 - **Signal**: `GetEnvironment` answered with nothing usable.
   - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status` outside `EnvironmentStatus.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -191,6 +195,7 @@ One row per signal from §3. `ListEnvironments` is opaque, so `GetEnvironment` r
 | `WebserverAccessMode` public | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `webserver public` |
 | `GetEnvironment` denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `GetEnvironment` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `Status` outside `EnvironmentStatus.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes:
 
@@ -247,6 +252,7 @@ mwaa — DATA & ANALYTICS. Status key: `status` — the key the status cell read
 | mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | The environment failed and did not recover on its own, so it is neither serving nor going to. Open a support case; an environment in this state cannot be repaired from the console and recreating it is the usual outcome. |
 | mwaa.dim.deleting | deleting — environment teardown | dim | wave1 | — |
 | mwaa.dim.deleted | deleted | dim | wave1 | — |
+| mwaa.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | Amazon MWAA reports an environment status a9s does not recognise, so a9s cannot tell whether Airflow is scheduling. Check the environment in the MWAA console before relying on it. |
 | mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | The last update to this environment failed, so it is still running its previous configuration; the error code and message are listed below. Fix the cause and update again. |
 | mwaa.warn.webserver\_public | webserver public | warn | wave1 | The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC. |
 | mwaa.warn.details\_denied | details denied | warn | wave1 | Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh. |

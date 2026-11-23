@@ -115,6 +115,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: Cross-reference the already-loaded `subnet` list; count entries where `Subnet.VpcId == this.VpcId`. If zero, raise the signal.
 
+- **Signal**: `State == deleting`.
+  - **State bucket**: Warning. Tearing down: no Wave 2 read.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `State` outside `VpcState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -143,6 +151,8 @@ One row per §3 signal (Healthy case omitted per rule):
 | `State == pending` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
 | no delivering flow log on the VPC or on every subnet | 2 | Warning | `~` | S2, S3, S4, S5 | `no active VPC flow logs` |
 | no subnets in VPC — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `empty: no subnets` |
+| `State == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
+| `State` outside `VpcState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 ## 4.1 UX review (two sentences)
 
@@ -186,6 +196,8 @@ vpc — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| vpc.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a VPC state a9s does not recognise, so a9s cannot tell whether resources can be placed in it. Check it in the AWS console before relying on it. |
+| vpc.state.deleting | deleting | warn | wave1 | The VPC is being deleted. Anything still placed in it has to be gone before the deletion completes; if this was not intended, recreate it from its infrastructure code before workloads need it. |
 | vpc.state.pending | pending | warn | wave1 | The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it. |
 | vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | No delivering flow log covers this VPC — none on the VPC itself, and not one on every subnet; a flow log whose delivery fails writes nothing — so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3, and fix any failing delivery named below. |
 <!-- END GENERATED: findings -->

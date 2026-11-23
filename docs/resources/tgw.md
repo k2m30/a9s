@@ -83,8 +83,8 @@ Transcribed from `docs/attention-signals.md § Signals § NETWORKING` row `tgw`.
   - **State bucket**: Warning.
   - **How obtained**: `TransitGateway.State` on the list response.
 
-- **Signal**: `State == failed`.
-  - **State bucket**: Broken.
+- **Signal**: `State` outside `TransitGatewayState.Values()` (`pending`, `available`, `modifying`, `deleting`, `deleted`; AWS has no `failed` transit gateway state).
+  - **State bucket**: Warning. The row shows the value AWS reported.
   - **How obtained**: `TransitGateway.State` on the list response.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -127,7 +127,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | `State==deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 | `State==deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
 | `Options.AutoAcceptSharedAttachments == enable` (not on a deleting/deleted gateway) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `auto-accepts shared attachments` |
-| `State == failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
+| `State` outside `TransitGatewayState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 | attachment `State==failed`/`failing` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `attachment failed` |
 | attachment `State==rejected`/`rejecting` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `attachment failed` |
 | attachment `State==pendingAcceptance` >24h | 2 | Warning | `~` | S2, S3, S4, S5 | `attachment between states` |
@@ -165,10 +165,10 @@ tgw — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
+| tgw.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a transit gateway state a9s does not recognise, so a9s cannot tell whether it routes between its attachments. Check it in the AWS console before relying on it. |
 | tgw.state.pending | pending | warn | wave1 | The gateway is still being created and does not route yet. Attachments created now stay pending until it comes up. |
 | tgw.state.modifying | modifying | warn | wave1 | A configuration change is being applied. Routing across the gateway can be inconsistent until it settles. |
 | tgw.state.deleting | deleting | warn | wave1 | The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop. |
-| tgw.state.failed | failed | broken | wave1 | The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path. |
 | tgw.state.deleted | deleted | dim | wave1 | — |
 | tgw.attachment-failed | attachment failed | broken | wave2 | The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment. |
 | tgw.attachment-transitional | attachment between states | warn | wave2 | The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it. |

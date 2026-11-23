@@ -99,6 +99,10 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ami`.
   - **State bucket**: Warning.
   - **How obtained**: read `Image.BlockDeviceMappings[].Ebs.SnapshotId` and look each ID up in the already-loaded `ebs-snap` list; a miss on an owner-scoped AMI is the signal. Skip the check when `ImageOwnerAlias` is `amazon`/`aws-marketplace` or the AMI is otherwise not in the caller's account.
 
+- **Signal**: `State` outside `ImageState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 No Wave 2 signals.
@@ -125,6 +129,7 @@ One row per signal from §3:
 | `DeprecationTime < now()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprecated` |
 | `Public == true` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `shared with all AWS accounts` |
 | Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` |
+| `State` outside `ImageState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<image state> (unrecognised)` |
 
 ## 4.1 UX review (two sentences)
 
@@ -167,6 +172,7 @@ ami — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ami.state.pending | pending | warn | wave1 | The image is still being registered and cannot be launched from until it finishes. Wait rather than pointing a launch template or Auto Scaling group at it. |
 | ami.state.failed | failed | broken | wave1 | Registration of this image failed, so anything that launches from its identifier will error. Rebuild the image and update the launch templates or pipelines that reference it. |
 | ami.state.dim | <image state> | dim | wave1 | — |
+| ami.state.unrecognised | <image state> (unrecognised) | warn | wave1 | EC2 reports an image state a9s does not recognise, so a9s cannot tell whether the image can be launched. Check the image in the AWS console before relying on it. |
 | ami.deprecated | deprecated | warn | wave1 | AWS has marked this image as past its deprecation date, so it stays launchable but is no longer maintained or recommended, and anything still launching from it inherits whatever it was frozen with. Point the launch templates and Auto Scaling groups that reference it at a current image, then deregister it once nothing does. |
 | ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |
 <!-- END GENERATED: findings -->

@@ -65,36 +65,16 @@ func appCtrlZRegisteredShortNames() []string {
 	return names
 }
 
-// appCtrlZRawFieldFixtures carries issue/healthy Fields for resource types
-// whose Color func never reads r.Findings (colorSSM, colorSG, colorRTB,
-// colorAlarm, colorTrail, colorCTEvents, colorSNSSub in core/aws/catalog_*.go):
-// the issue signal comes from the raw Fields the fetcher populates.
+// appCtrlZRawFieldFixtures carries issue/healthy Fields for the resource type
+// whose Color func reads raw Fields (colorCTEvents in core/aws/catalog_*.go):
+// the issue signal comes from the raw Fields the fetcher populates. Every
+// other type is coloured by its findings.
 type appCtrlZFieldPair struct {
 	issue   map[string]string
 	healthy map[string]string
 }
 
 var appCtrlZRawFieldFixtures = map[string]appCtrlZFieldPair{
-	"trail": {
-		issue:   map[string]string{"is_logging": "false"},
-		healthy: map[string]string{"is_logging": "true", "log_file_validation_enabled": "true"},
-	},
-	"ssm": {
-		issue:   map[string]string{"type": "String", "name": "app_secret"},
-		healthy: map[string]string{"type": "String", "name": "app_region"},
-	},
-	"sns-sub": {
-		issue:   map[string]string{"subscription_arn": "PendingConfirmation"},
-		healthy: map[string]string{"subscription_arn": "arn:aws:sns:us-east-1:123456789012:topic:sub-id"},
-	},
-	"rtb": {
-		issue:   map[string]string{"blackhole_routes_count": "1", "associations_count": "1", "is_main": "false"},
-		healthy: map[string]string{"blackhole_routes_count": "0", "associations_count": "1", "is_main": "false"},
-	},
-	"alarm": {
-		issue:   map[string]string{"state": "ALARM"},
-		healthy: map[string]string{"state": "OK", "actions_count": "1"},
-	},
 	"ct-events": {
 		issue:   map[string]string{"status": "ct-danger"},
 		healthy: map[string]string{"status": "ct-info"},

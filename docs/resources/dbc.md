@@ -109,7 +109,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 The lifecycle rows map every status in the DB cluster status table of the Amazon Aurora User Guide ("Viewing DB cluster status"); the DocumentDB cluster status table is a subset of it. `dbi` reads its status through the same rule, so `stopped` and a status in neither table render alike on both.
 
-- **Signal**: `Status` is transitional (`backing-up`, `backtracking`, `creating`, `deleting`, `failing-over`, `maintenance`, `migrating`, `modifying`, `promoting`, `preparing-data-migration`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-optimization`, `update-iam-db-auth`, `upgrading`) → Warning.
+- **Signal**: `Status` is transitional (`backing-up`, `backtracking`, `creating`, `failing-over`, `maintenance`, `migrating`, `modifying`, `promoting`, `preparing-data-migration`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-optimization`, `update-iam-db-auth`, `upgrading`) → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
@@ -145,7 +145,7 @@ The lifecycle rows map every status in the DB cluster status table of the Amazon
   - **State bucket**: Broken.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
-- **Signal**: `Status` is in neither AWS table → Warning, the status word itself, with a detail saying a9s does not recognise it.
+- **Signal**: `Status` is in neither AWS table → Warning, `<status> (unrecognised)`, with a detail saying a9s does not recognise it.
   - **State bucket**: Warning.
   - **How obtained**: `Status` field on the `DescribeDBClusters` response.
 
@@ -179,6 +179,10 @@ The lifecycle rows map every status in the DB cluster status table of the Amazon
 
 - **Signal**: `MasterUsername` is a vendor default.
   - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `Status == deleting`.
+  - **State bucket**: Warning. The cluster keeps its state finding only: posture findings and Wave 2 reads stop for a cluster that is being removed.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
@@ -219,7 +223,7 @@ One row per signal from §3:
 | `Status == migration-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `migration failed` |
 | `Status == upgrade-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `engine upgrade failed` |
 | `Status == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped (storage still billed)` |
-| `Status` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
+| `Status` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 | No writer in `DBClusterMembers[]` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no writer: reads only` |
 | `DeletionProtection == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `delete-protection off` |
 | `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted at rest` |
@@ -230,6 +234,7 @@ One row per signal from §3:
 | `MasterUsername` is a vendor default | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default master username` |
 | Pending maintenance action overdue | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `maintenance overdue` |
 | no backup plan selection matches this cluster | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
+| `Status == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 
 Rules for filling list and detail text:
 
@@ -287,7 +292,8 @@ dbc — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbc.broken.migration\_failed | migration failed | broken | wave1 | Restoring a snapshot or migrating data into this cluster failed, so it holds no usable database. Read the cluster events for the cause, delete it, and run the restore or migration again. |
 | dbc.broken.upgrade\_failed | engine upgrade failed | broken | wave1 | AWS could not upgrade this cluster to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new cluster on a supported version. |
 | dbc.broken.stopped | stopped (storage still billed) | broken | wave1 | The cluster accepts no connections, and a stopped cluster is started again automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage is billed while it sits here. |
-| dbc.warn.unrecognised\_status | <status> | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
+| dbc.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
+| dbc.warn.deleting | deleting | warn | wave1 | The cluster is being deleted, and its automated backups go with it unless they were kept. If this was not intended, check now for a final snapshot to restore from. |
 | dbc.warn.transitional | <status>: in progress | warn | wave1 | The cluster is mid-operation, so it may fail over or drop connections before it settles. Wait for it to return to available rather than starting another change on top of this one. |
 | dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 | Nothing stands between this cluster and a delete call. Aurora and DocumentDB still make you remove the member instances before the cluster volume goes, so it is not one click, but it is also nothing anybody has to think twice about. Turn deletion protection on so removing it takes a deliberate second step. |
 | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | The cluster's volume, its snapshots and its backups are stored unencrypted, and that cannot be changed in place. Snapshot it, copy the snapshot with a KMS key, and restore into a new encrypted cluster at the next opportunity for a cutover. |

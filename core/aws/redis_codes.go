@@ -12,6 +12,7 @@ const (
 	CodeRedisSnapshotting               domain.FindingCode = "redis.warn.snapshotting"
 	CodeRedisShardIssue                 domain.FindingCode = "redis.warn.shard_issue"
 	CodeRedisMultiAZWithoutAutoFailover domain.FindingCode = "redis.warn.multiaz_without_auto_failover"
+	CodeRedisUnrecognisedStatus         domain.FindingCode = "redis.warn.unrecognised_status"
 )
 
 // Security-posture findings, all evaluated in

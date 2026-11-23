@@ -1,7 +1,7 @@
 package unit
 
 // The ECS task's lifecycle state is one field, "status": the column,
-// LifecycleKey and the colour classifier all read it.
+// and LifecycleKey both read it.
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -58,33 +57,6 @@ func TestECSTask_StateIsOneField(t *testing.T) {
 	}
 	if td.LifecycleKey != "status" {
 		t.Errorf("ecs-task LifecycleKey = %q, want %q — the key the surviving field carries", td.LifecycleKey, "status")
-	}
-}
-
-// A row rebuilt from the cache carries only the key the column persists, so
-// the colour classifier reads "status" too.
-func TestECSTask_ColourReadsTheSurvivingKey(t *testing.T) {
-	td := aws5TypeDef(t, "ecs-task")
-	if td.Color == nil {
-		t.Fatal("ecs-task registers no Color function")
-	}
-	stopped := domain.Resource{
-		ID:   "abc123def456",
-		Name: "abc123def456",
-		Fields: map[string]string{
-			"status":        "STOPPED",
-			"stop_code":     "TaskFailedToStart",
-			"health_status": "UNKNOWN",
-		},
-	}
-	healthy := domain.Resource{
-		ID:     "xyz789uvw012",
-		Name:   "xyz789uvw012",
-		Fields: map[string]string{"status": "RUNNING"},
-	}
-	if got := td.Color(stopped); got == td.Color(healthy) {
-		t.Errorf("Color(status=STOPPED, stop_code=TaskFailedToStart) = %v, the same as a running task: "+
-			"the classifier is reading a key the fetcher no longer writes", got)
 	}
 }
 

@@ -75,10 +75,10 @@ func TestPR03e_DBIFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DBI", len(r.Findings))
 	}
-	// Fields["status"] should be the display value — empty for healthy silence.
-	// (The display column reads Fields["status"], not Resource.Status.)
-	if got := r.Fields["status"]; got != "" {
-		t.Errorf("Fields[\"status\"]: got %q, want %q (healthy silence)", got, "")
+	// The lifecycle field holds the AWS value; the Status cell comes from
+	// Findings, so a healthy row reads blank.
+	if got := r.Fields["status"]; got != "available" {
+		t.Errorf("Fields[\"status\"]: got %q, want the AWS value %q", got, "available")
 	}
 }
 
@@ -954,9 +954,10 @@ func TestPR03e_DDBFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DDB table", len(r.Findings))
 	}
-	// A healthy row's display phrase is the empty string.
-	if got := r.Fields["status"]; got != "" {
-		t.Errorf("Fields[\"status\"]: got %q, want %q (healthy silence)", got, "")
+	// The lifecycle field holds the AWS value; the Status cell comes from
+	// Findings, so a healthy row reads blank.
+	if got := r.Fields["status"]; got != "ACTIVE" {
+		t.Errorf("Fields[\"status\"]: got %q, want the AWS value %q", got, "ACTIVE")
 	}
 }
 
@@ -1452,9 +1453,8 @@ func TestPR03e_KinesisFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy Kinesis stream", len(r.Findings))
 	}
-	// Healthy streams: Fields["status"] == "" (healthy silence), raw state in Fields["stream_status"].
-	if got := r.Fields["status"]; got != "" {
-		t.Errorf("Fields[\"status\"]: got %q, want %q (healthy streams must have blank status phrase)", got, "")
+	if got := r.Fields["status"]; got != "ACTIVE" {
+		t.Errorf("Fields[\"status\"]: got %q, want the AWS value %q", got, "ACTIVE")
 	}
 	if got := r.Fields["stream_status"]; got != "ACTIVE" {
 		t.Errorf("Fields[\"stream_status\"]: got %q, want %q (raw AWS state must be in stream_status)", got, "ACTIVE")

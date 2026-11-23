@@ -97,7 +97,6 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		autoFailover := rg.AutomaticFailover == elasticachetypes.AutomaticFailoverStatusEnabled
 
 		findings, attentionDetails := computeRedisFindings(status, multiAZ, autoFailover, rg)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       rgID,
@@ -108,7 +107,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 				"node_type":  nodeType,
 				"nodes":      nodes,
 				"endpoint":   endpoint,
-				"status":     statusPhrase,
+				"status":     status,
 				"status_raw": status,
 				"arn":        arn,
 			},
@@ -142,54 +141,27 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 	}, nil
 }
 
+// redisReplicationGroupStatuses is the ReplicationGroup Status list of the
+// ElastiCache API reference: "The current state of this replication group -
+// creating, available, modifying, deleting, create-failed, snapshotting."
+var redisReplicationGroupStatuses = []string{ //nolint:gochecknoglobals // static AWS status domain
+	"creating", "available", "modifying", "deleting", "create-failed", "snapshotting",
+}
+
 // computeRedisFindings derives the ordered findings slice for a ReplicationGroup
 // plus the supporting AttentionDetail rows keyed by the finding that owns them.
-// Lifecycle findings come first (they own the status column); the
-// security-posture rows are evaluated independently and appended after them.
+// A shard not in a normal state is reported beside the group's own state.
 func computeRedisFindings(status string, multiAZ bool, autoFailover bool, rg elasticachetypes.ReplicationGroup) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	nodeGroups := rg.NodeGroups
-	var broken []domain.Finding
 	var warnings []domain.Finding
-
-	switch status {
-	case "available":
-		// healthy
-	case "creating":
-		warnings = append(warnings, wave1Finding(CodeRedisCreating))
-	case "deleting":
-		warnings = append(warnings, wave1Finding(CodeRedisDeleting))
-	case "create-failed":
-		broken = append(broken, wave1Finding(CodeRedisCreateFailed))
-	case "modifying", "snapshotting":
-		shardIssues := computeShardIssues(nodeGroups)
-		if len(shardIssues) > 0 {
-			for _, si := range shardIssues {
-				warnings = append(warnings, wave1Finding(CodeRedisShardIssue, si.id, si.status))
-			}
-		} else {
-			code := CodeRedisModifying
-			if status == "snapshotting" {
-				code = CodeRedisSnapshotting
-			}
-			warnings = append(warnings, wave1Finding(code))
-		}
+	for _, si := range computeShardIssues(rg.NodeGroups) {
+		warnings = append(warnings, wave1Finding(CodeRedisShardIssue, si.id, si.status))
 	}
-
 	if multiAZ && !autoFailover {
 		warnings = append(warnings, wave1Finding(CodeRedisMultiAZWithoutAutoFailover))
 	}
-
 	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Phrase < warnings[j].Phrase })
-	findings := make([]domain.Finding, 0, len(broken)+len(warnings))
-	findings = append(findings, broken...)
-	findings = append(findings, warnings...)
-
-	if isTeardownStatus(status) {
-		// A group on its way out has no posture worth reporting.
-		return findings, nil
-	}
 	posture, details := redisPostureFindings(rg)
-	return append(findings, posture...), details
+	return withState("redis", status, append(warnings, posture...)), details
 }
 
 // redisPostureFindings evaluates the four encryption/authentication/backup

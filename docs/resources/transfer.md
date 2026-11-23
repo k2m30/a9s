@@ -135,6 +135,10 @@ Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `State` outside `State.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: the server's security policy offers a SHA-1 SSH key exchange (`diffie-hellman-group14-sha1`), a SHA-1 or 64-bit SSH MAC (`hmac-sha1`, `umac-64`), or a TLS cipher suite with RSA key exchange (`TLS_RSA_*`, no forward secrecy). The policy is judged by the algorithms `DescribeSecurityPolicy` states for it, never by its name: of the published policies, `TransferSecurityPolicy-2018-11`, `TransferSecurityPolicy-Restricted-2018-11` and `TransferSFTPConnectorSecurityPolicy-2023-07` offer them, and `TransferSecurityPolicy-2020-06` does not.
@@ -164,6 +168,7 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 | no activity logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no activity logging` |
 | `DescribeServer` denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | `DescribeServer` answered with nothing usable | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `State` outside `State.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes:
 
@@ -208,6 +213,7 @@ transfer — NETWORKING. Status key: `status` — the key the status cell reads,
 | transfer.warn.stopping | stopping | warn | wave1 | The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down. |
 | transfer.broken.start\_failed | start failed | broken | wave1 | The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again. |
 | transfer.warn.stop\_failed | stop failed | warn | wave1 | The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off. |
+| transfer.warn.unrecognised\_state | <state> (unrecognised) | warn | wave1 | AWS Transfer Family reports a server state a9s does not recognise, so a9s cannot tell whether the server accepts partner connections. Check it in the Transfer Family console before relying on it. |
 | transfer.warn.legacy\_policy | legacy security policy | warn | wave2 | The server's security policy still offers key exchanges, message checks or TLS cipher suites that are no longer safe, so a client can settle on one that does not protect the session. Move the server to a current security policy. |
 | transfer.warn.no\_logging | no activity logging | warn | wave1 | The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination. |
 | transfer.warn.details\_denied | details denied | warn | wave1 | Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh. |

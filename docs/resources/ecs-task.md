@@ -176,6 +176,14 @@ A task `DescribeTasks` did not describe is KEPT with its id and cluster: `detail
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `lastStatus == DELETED`
+  - **State bucket**: Dim. The task lifecycle documents DELETED as a state only the API shows; no posture is judged and Wave 2 does not read the task
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `lastStatus` is a value the ECS task lifecycle does not list
+  - **State bucket**: Warning. The row is not shown clean; the value AWS sent is in the phrase
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -242,6 +250,8 @@ One row per signal from §3:
 | any container without `readonlyRootFilesystem` | 2 | Warning | `~` | S2, S3, S4, S5 | `writable root filesystem` |
 | any container without `logConfiguration` | 2 | Warning | `~` | S2, S3, S4, S5 | `container without log driver` |
 | credential in a container `environment[]` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in container environment` |
+| `lastStatus == DELETED` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `lastStatus` is a value the ECS task lifecycle does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -298,6 +308,8 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 | ecs-task.state.stopping | stopping | warn | wave1 | The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it. |
 | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly. |
 | ecs-task.state.stopped | stopped (task exited) | dim | wave1 | — |
+| ecs-task.state.deleted | deleted | dim | wave1 | — |
+| ecs-task.state.unrecognised | <status> (unrecognised) | warn | wave1 | Amazon ECS reports a task status a9s does not recognise, so a9s cannot tell whether the task is running its containers. Check the task in the ECS console before relying on it. |
 | ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones. |
 | ecs-task.health.unhealthy | unhealthy | broken | wave1 | The container health check inside this task is failing. A task run by a service is replaced by the scheduler under its deployment settings, and a load balancer stops routing to it only if its target group also marks it unhealthy; a task started on its own is neither replaced nor drained. Read the container logs from when the check started failing, and confirm the check command and its grace period suit the application's startup. |
 | ecs-task.task-failed | task failed | broken | wave2 | This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why. |

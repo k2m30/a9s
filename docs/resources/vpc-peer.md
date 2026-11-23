@@ -73,6 +73,8 @@ Load-bearing SDK fact (doc comment on `Requester/AccepterVpcInfo`): "CIDR block 
 - **Signal**: `Status.Code == pending-acceptance` — the other side has not accepted; AWS expires the request at 7 days. The countdown to `ExpirationTime` is the actionable bit.
   - **State bucket**: Warning. — **How obtained**: `Status.Code` + `ExpirationTime`.
 
+`expired`, `rejected` and `failed` are terminal, like `deleted`: the VPC peering connection lifecycle (Amazon VPC Peering Guide) says of each that it cannot be accepted or acted on, and that it "remains visible" for 2 hours or 2 days. All four are in the ended class, so none gets a posture finding or a Wave 2 read; each keeps its own severity below.
+
 - **Signal**: `Status.Code == expired` — the request died unaccepted.
   - **State bucket**: Warning.
   - **How obtained**: `VpcPeeringConnection.Status.Code`.
@@ -94,6 +96,10 @@ Load-bearing SDK fact (doc comment on `Requester/AccepterVpcInfo`): "CIDR block 
 
 - **Signal**: active-only IPv4 CIDR overlap — `RequesterVpcInfo.CidrBlockSet` × `AccepterVpcInfo.CidrBlockSet` intersection (≈15 lines of prefix math). Overlapping ranges silently blackhole traffic subsets.
   - **State bucket**: Warning. Ranked below missing-route.
+
+- **Signal**: `Status.Code` outside `VpcPeeringConnectionStateReasonCode.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -131,6 +137,7 @@ Surfaces S1–S5 per `docs/attention-signals.md § Visualization Surfaces`; wave
 | CIDR overlap (active) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `CIDR overlap with peer` |
 | no local route (active) | 2 | Warning | `~` | S2, S3, S4, S5 | `no local route to peer` |
 | route blackholed | 2 | Warning | `~` | S2, S3, S4, S5 | `route to peer blackholed` |
+| `Status.Code` outside `VpcPeeringConnectionStateReasonCode.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Notes:
 
@@ -175,6 +182,7 @@ vpc-peer — NETWORKING. Status key: `status` — the key the status cell reads,
 | vpc-peer.broken.failed | failed | broken | wave1 | The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one. |
 | vpc-peer.warn.deleting | deleting | warn | wave1 | The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended. |
 | vpc-peer.dim.deleted | deleted | dim | wave1 | — |
+| vpc-peer.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | AWS reports a peering connection status a9s does not recognise, so a9s cannot tell whether traffic crosses it. Check the connection in the AWS console before relying on it. |
 | vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 | The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap. |
 | vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 | The connection is active but no loaded route table sends anything to it, so it carries no traffic and looks connected while behaving as if it were not. Add a route to the peer's address range in the route tables of the subnets that need it. |
 | vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 | A route points at this connection and its state is blackhole, so packets matching it are dropped silently, which reads as a firewall problem from the instance's side. Repoint the route at a live target or remove it. |

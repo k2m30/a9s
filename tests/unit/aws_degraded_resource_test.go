@@ -45,8 +45,8 @@ func TestDegradedDetails_ClassifiesAuthVsNonAuth(t *testing.T) {
 			if got := r.Findings[0].Phrase; got != tc.wantPhrase {
 				t.Errorf("Findings[0].Phrase = %q, want %q", got, tc.wantPhrase)
 			}
-			if got := r.Fields["status"]; got != tc.wantPhrase {
-				t.Errorf("Fields[\"status\"] = %q, want %q", got, tc.wantPhrase)
+			if got := r.Fields["status"]; got != "" {
+				t.Errorf("Fields[\"status\"] = %q, want empty: the lifecycle field holds only what AWS reported", got)
 			}
 			// A degraded row must never vanish — the id is always preserved.
 			if r.ID != "res-1" {

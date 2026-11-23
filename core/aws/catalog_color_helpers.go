@@ -4,7 +4,6 @@ package aws
 
 import (
 	"slices"
-	"time"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 )
@@ -56,27 +55,4 @@ func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
 		return c
 	}
 	return domain.ColorHealthy
-}
-
-// acmColor derives the row colour from the certificate's findings, and for a
-// row that carries none from the same predicate the fetcher used, over the
-// values it wrote into Fields.
-func acmColor(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(acmFindings(
-		r.Fields["status"], r.Fields["not_after"], r.Fields["in_use"],
-		r.Fields["key_algorithm"], time.Now()))
-}
-
-// r53Color derives the row colour from the zone's findings, and for a row that
-// carries none from the same predicate the fetcher used, over the record count
-// it wrote into Fields. The orphan-private-zone signal is wave 2 and no
-// fallback recovers it.
-func r53Color(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return colorFromFindings(r53ZoneFindings(r.Fields["record_count"]))
 }

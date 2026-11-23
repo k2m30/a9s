@@ -319,8 +319,8 @@ func TestOnDemandAnswer_CleanAnswerSurvivesAStaleSweep(t *testing.T) {
 		t.Errorf("the row the sweep really did leave at its cap reads %q, want %q", set[rows[1].ID], awsclient.CheckCap)
 	}
 	c.Apply(app.Action{Kind: app.ActionBack})
-	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "running" {
-		t.Errorf("after a stale sweep the cleanly answered row's Status cell reads %q, want its own state", got)
+	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "" {
+		t.Errorf("after a stale sweep the cleanly answered row's Status cell reads %q, want blank: a running instance with no finding is healthy", got)
 	}
 	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[1].ID); got != domain.NotInspectedPhrase {
 		t.Errorf("the other capped row's Status cell reads %q, want %q", got, domain.NotInspectedPhrase)
@@ -432,8 +432,8 @@ func TestOnDemandAnswer_CleanAnswerClearsOnlyThatRowsFindings(t *testing.T) {
 	c.Apply(app.Action{Kind: app.ActionBack})
 	// With no finding left, the Status column falls back to the row's own
 	// state — the cell a never-flagged running instance shows.
-	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "running" {
-		t.Errorf("the answered row's Status cell reads %q, want its own state", got)
+	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "" {
+		t.Errorf("the answered row's Status cell reads %q, want blank: a running instance with no finding is healthy", got)
 	}
 	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[1].ID); got != onDemandPhrase {
 		t.Errorf("the other row's Status cell reads %q, want its own finding %q", got, onDemandPhrase)

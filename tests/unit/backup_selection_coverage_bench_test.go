@@ -5,7 +5,6 @@ package unit_test
 // the list and detail builders the app uses.
 
 import (
-	"context"
 	"regexp"
 	"slices"
 	"strings"
@@ -46,13 +45,12 @@ func bk551DemoFolded(t *testing.T) map[string][]resource.Resource {
 	for _, short := range []string{"ebs", "dbi", "dbc", "ddb"} {
 		td := resource.FindResourceType(short)
 		rows := bk551DemoRows(t, short)
-		enricher, ok := awsclient.Wave2EnricherFor(short)
-		if !ok || enricher.Fn == nil {
+		if _, ok := awsclient.Wave2EnricherFor(short); !ok {
 			t.Fatalf("%s has no wave-2 enricher", short)
 		}
-		res, err := enricher.Fn(context.Background(), clients, rows, cache)
-		if err != nil && res.Findings == nil {
-			t.Fatalf("%s wave-2: %v", short, err)
+		res := unit.ProbeWave2(t, short, clients, rows, cache)
+		if res.Err != nil && res.Findings == nil {
+			t.Fatalf("%s wave-2: %v", short, res.Err)
 		}
 		for i := range rows {
 			a9sruntime.ApplyWave2ToRow(&rows[i], *td, res.Findings, res.AttentionDetails)

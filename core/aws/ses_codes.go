@@ -10,4 +10,5 @@ const (
 	CodeSESVerificationNotStarted domain.FindingCode = "ses.verification.not_started"
 	CodeSESVerificationPending    domain.FindingCode = "ses.verification.pending"
 	CodeSESSendingDisabled        domain.FindingCode = "ses.sending.disabled"
+	CodeSESVerificationUnknown    domain.FindingCode = "ses.verification.unrecognised"
 )

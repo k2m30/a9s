@@ -139,7 +139,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
 		_, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
-		return ok && !resourceIsTearingDown(r.RawStruct)
+		return ok
 	}, resourceIDsOf)
 
 	type enginePair struct{ engine, version string }

@@ -10,6 +10,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A view file in `~/.a9s/views/` now follows the version of a9s you run, and your edits to it are merged with the new defaults instead of freezing the file. Each generated file records a hash of every column and detail field it was generated with. A column or field you did not touch takes the new version's value or disappears with it, a new one appears, and a column or field you changed, added or removed stays the way you left it, in your order if you reordered. When a new version changes something the file takes, the first start rewrites it with the merged result and drops its comments; other starts leave it as it is. An empty section (`list: {}`) removes every generated item from the file; a list with no columns is shown with the built-in columns. On the first start, a file an earlier version generated (it has a `generated:` line and no hashes) is replaced by the file this version generates, including any edits you made to it; make them again in the new file. A file without a `generated:` line is yours and is never rewritten.
+- Each resource status now has one meaning on every type. A status AWS
+  reports that a9s does not know shows as `<status> (unrecognised)` and is a
+  warning; before, such a row looked healthy.
+- A healthy row has an empty Status cell on every type with a lifecycle
+  status, and the detail view's Status row shows the value AWS reported, not
+  the finding text.
+- A resource that is failed but still exists keeps its posture findings next
+  to its status: a CloudFormation stack in `UPDATE_FAILED` or
+  `UPDATE_ROLLBACK_FAILED`, a failed MSK cluster, an RDS instance or cluster
+  that is backing up, modifying or stopped, a Redshift cluster with full
+  storage, and so on. A resource that is being deleted, deleted, or waiting
+  for its deletion shows only its status and gets no extra reads.
+- A CloudFormation stack's "recent resource failure" counts only failures of
+  its latest operation. A failure that an earlier operation recovered from is
+  no longer reported.
+- New status findings: CloudFormation `DELETE_IN_PROGRESS` and
+  `DELETE_FAILED`, RDS instance and cluster `deleting`, DynamoDB
+  `REPLICATION_NOT_AUTHORIZED`, EFS `deleted`, EBS `deleted`, VPC `deleting`,
+  KMS `Creating` and `Updating` (a warning, not broken), and the Lambda states
+  `Deactivating`, `Deactivated`, `ActiveNonInvocable` and `Deleting`. Redshift
+  `paused`, `final-snapshot`, `rotating-keys`, `updating-hsm`,
+  `cancelling-resize` and the resize statuses no longer show an empty cell.
+  An OpenSearch domain that is `Creating` shows `creating`, and one that is
+  `Modifying`, upgrading its engine or updating its service software shows
+  that a change is in flight. An ECS task that is `DELETED` shows `deleted`.
+  An EBS snapshot state a9s does not know shows as unrecognised, and a
+  snapshot in the Recycle Bin is no longer checked for public sharing or a
+  deleted source volume.
+- An ECS task that stopped with a failing stop code shows that stop code
+  next to `stopped`, and an ECS service that is draining or inactive no
+  longer also reports its running-task count.
+- The EC2 Status cell no longer puts `!` or `~` in front of `running`; the
+  Health column shows the status checks.
+- The security group detail view no longer has a Risk Summary row; the same
+  text is in its Attention section.
+- The disk cache moves to version 3. A cache from an earlier version still
+  loads, without the old status text.
+- A CloudFormation stack in `DELETE_FAILED` is a failed stack that still
+  exists: it keeps its "credential in stack outputs" finding and its recent
+  resource failure, which names the resource that blocked the delete. Neither
+  it nor a stack in `REVIEW_IN_PROGRESS` reports termination protection off.
+- A VPC peering connection that is `rejected` or `failed` gets no route
+  checks, like an `expired` or `deleted` one.
+- A Redshift cluster that is paused, creating or otherwise not available
+  shows its status only, without an extra `unavailable` or `failed` from its
+  availability; a paused cluster reads dim.
+- An Elastic Beanstalk environment shows `health: grey` only when it is
+  `Ready`, and red or yellow health only when it is ready or an operation is
+  running.
+- An Auto Scaling group in `Delete in progress` shows its failed scaling
+  activity, which says why the delete is stuck.
+- The list filter matches the status AWS reports, so `/running` finds the
+  running EC2 instances even though their Status cell is empty.
+- A row whose details could not be read keeps its status field empty; its
+  Status cell shows `details denied` or `details unavailable` from its
+  finding.
+
 - The menu issue count for ECR, launch templates and Transfer Family no longer includes the scan-on-push, IMDSv1, volume-encryption and security-policy warnings. These checks now need an extra read, and warnings from those reads colour the row without raising the menu count, as for every other type.
 
 ### Fixed

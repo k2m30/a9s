@@ -529,9 +529,10 @@ func TestASG_PostureSignalsSilentOnDeletingGroup(t *testing.T) {
 		}
 	}
 
-	res := pw1EnrichASG(t, &pw1ASGEnrichFake{
-		configs: map[string]asgtypes.LaunchConfiguration{lcName: lc},
-	}, g)
+	res := Wave2Result(t, "asg", &awsclient.ServiceClients{
+		AutoScaling: &pw1ASGEnrichFake{configs: map[string]asgtypes.LaunchConfiguration{lcName: lc}},
+		EC2:         t581NoIMDSDefaultEC2{},
+	}, []resource.Resource{wave1})
 	for _, code := range []domain.FindingCode{pw1ASGCodeLCIMDSv1, pw1ASGCodeLCPublicIP, pw1ASGCodeLCSecret} {
 		if _, ok := pw1FindFinding(res.Findings["acme-deleting-asg"], code); ok {
 			t.Errorf("%s emitted for a group AWS is deleting", code)

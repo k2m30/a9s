@@ -23,14 +23,6 @@ const (
 	ecsSvcCodePublicIP         domain.FindingCode = "ecs-svc.public-ip"
 )
 
-// ecsServiceScheduling reports a service that still launches tasks. An
-// inactive or draining service schedules nothing, so its network settings
-// hand out nothing. The single lifecycle guard for every ecs-svc posture
-// finding.
-func ecsServiceScheduling(status string) bool {
-	return status != "INACTIVE" && status != "DRAINING"
-}
-
 // ecsEventReason is AWS's own explanation out of a service event message: the
 // clause after the words AWS introduces it with, without the documentation
 // pointer AWS appends, which is not a reason and is long enough to push the
@@ -209,7 +201,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				// Independent of the deployment health below: a service that
 				// hands its tasks public addresses is a posture signal even
 				// when every deployment is green.
-				if nc := svc.NetworkConfiguration; ecsServiceScheduling(aws.ToString(svc.Status)) &&
+				if nc := svc.NetworkConfiguration; appliesAny("ecs-svc", aws.ToString(svc.Status), ecsSvcCodePublicIP) &&
 					nc != nil && nc.AwsvpcConfiguration != nil &&
 					nc.AwsvpcConfiguration.AssignPublicIp == ecstypes.AssignPublicIpEnabled {
 					setWave2Finding(&result, row.ID, ecsSvcCodePublicIP, []domain.DetailRow{{Label: "Public address assignment", Value: "enabled", Tier: tierOf(ecsSvcCodePublicIP)}})

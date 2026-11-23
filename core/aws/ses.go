@@ -42,7 +42,6 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 		verificationStatus := string(identity.VerificationStatus)
 
 		findings := sesIdentityFindings(identity)
-		topPhrase := domain.StatusPhrase(findings)
 
 		r := resource.Resource{
 			ID:       identityName,
@@ -53,7 +52,7 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 				"identity_type":       identityType,
 				"sending_enabled":     sendingEnabled,
 				"verification_status": verificationStatus,
-				"status":              topPhrase,
+				"status":              verificationStatus,
 			},
 			RawStruct: identity,
 		}
@@ -106,19 +105,9 @@ func sesIdentityTypeWord(t sesv2types.IdentityType) string {
 }
 
 func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
-	var findings []domain.Finding
-	switch identity.VerificationStatus {
-	case sesv2types.VerificationStatusFailed:
-		findings = append(findings, wave1Finding(CodeSESVerificationFailed))
-	case sesv2types.VerificationStatusTemporaryFailure:
-		findings = append(findings, wave1Finding(CodeSESVerificationTempFail))
-	case sesv2types.VerificationStatusNotStarted:
-		findings = append(findings, wave1Finding(CodeSESVerificationNotStarted))
-	case sesv2types.VerificationStatusPending:
-		findings = append(findings, wave1Finding(CodeSESVerificationPending))
-	}
+	var posture []domain.Finding
 	if !identity.SendingEnabled {
-		findings = append(findings, wave1Finding(CodeSESSendingDisabled))
+		posture = append(posture, wave1Finding(CodeSESSendingDisabled))
 	}
-	return findings
+	return withState("ses", string(identity.VerificationStatus), posture)
 }

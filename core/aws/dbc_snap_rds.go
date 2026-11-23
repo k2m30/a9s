@@ -83,7 +83,6 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 		}
 
 		findings := computeRDSDBClusterSnapshotFindings(snapshot)
-		statusPhrase := domain.StatusPhrase(findings)
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -117,7 +116,6 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               statusPhrase,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,

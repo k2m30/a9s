@@ -94,8 +94,8 @@ func TestOpenSearch_Fetch_HealthyHappyPath(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Fields["status"] != "" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "")
+	if domainpkg.StatusPhrase(r.Findings) != "" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "")
 	}
 	if r.Fields["deleted"] != "false" {
 		t.Errorf("Fields[\"deleted\"] = %q, want %q", r.Fields["deleted"], "false")
@@ -139,8 +139,8 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "deleting: removal in progress"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domainpkg.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -172,8 +172,8 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "isolated: quarantined by AWS"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domainpkg.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -206,8 +206,8 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domainpkg.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -240,8 +240,8 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domainpkg.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -280,8 +280,8 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Fields["status"] != "software update forced soon" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
+	if domainpkg.StatusPhrase(r.Findings) != "software update forced soon" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "software update forced soon")
 	}
 	// The status phrase and the finding that produced it are one object.
 	if len(r.Findings) != 1 || r.Findings[0].Code != "opensearch.update-forced" {
@@ -346,8 +346,8 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Fields["status"] != "encryption at rest off" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
+	if domainpkg.StatusPhrase(r.Findings) != "encryption at rest off" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "encryption at rest off")
 	}
 	// The status column is built from the findings, so the phrase comes with its
 	// finding.
@@ -391,8 +391,8 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	// Both signals read the DescribeDomains response the fetcher already holds
 	// and need no AWS call, so they are wave-1 findings on the row; the status
 	// cell is built from them.
-	if r.Fields["status"] != "software update forced soon (+1)" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
+	if domainpkg.StatusPhrase(r.Findings) != "software update forced soon (+1)" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "software update forced soon (+1)")
 	}
 
 	// Each independently evaluated condition keeps its own Finding and sentence.
@@ -474,8 +474,8 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Fields["status"] != "processing: config change in flight (+1)" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight (+1)")
+	if domainpkg.StatusPhrase(r.Findings) != "processing: config change in flight (+1)" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "processing: config change in flight (+1)")
 	}
 	// The "(+1)" counts the second finding.
 	if len(r.Findings) != 2 {
@@ -510,8 +510,8 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Fields["status"] != "isolated: quarantined by AWS (+1)" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS (+1)")
+	if domainpkg.StatusPhrase(r.Findings) != "isolated: quarantined by AWS (+1)" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "isolated: quarantined by AWS (+1)")
 	}
 	// Isolated leads because it is the worse of the two signals; each is its own
 	// finding.
@@ -555,8 +555,8 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 
 	// A domain being torn down yields only the dim lifecycle finding; posture
 	// signals are not evaluated, so the column carries the bare phrase.
-	if r.Fields["status"] != "deleting: removal in progress" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress")
+	if domainpkg.StatusPhrase(r.Findings) != "deleting: removal in progress" {
+		t.Errorf("Status cell = %q, want %q", domainpkg.StatusPhrase(r.Findings), "deleting: removal in progress")
 	}
 	if len(r.Findings) != 1 {
 		t.Errorf("Findings len = %d, want 1 (only deleting); Findings = %+v", len(r.Findings), r.Findings)
@@ -635,8 +635,8 @@ func TestOpenSearch_Fetch_DescribeDomainsBatchError_KeepsListedDomainsAsDegraded
 		}
 		delete(wantIDs, r.ID)
 
-		if r.Fields["status"] != "details denied" {
-			t.Errorf("domain %q: Fields[\"status\"] = %q, want %q", r.ID, r.Fields["status"], "details denied")
+		if domainpkg.StatusPhrase(r.Findings) != "details denied" {
+			t.Errorf("domain %q: Status cell = %q, want %q", r.ID, domainpkg.StatusPhrase(r.Findings), "details denied")
 		}
 		if len(r.Findings) != 1 {
 			t.Fatalf("domain %q: Findings = %+v, want exactly 1 details-denied finding", r.ID, r.Findings)

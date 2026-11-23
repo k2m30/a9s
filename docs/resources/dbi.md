@@ -109,7 +109,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 The lifecycle rows map every status in the DB instance status tables of the Amazon RDS User Guide ("Viewing Amazon RDS DB instance status") and the Amazon Aurora User Guide ("Viewing DB instance status in an Aurora cluster"). `dbc` reads its status through the same rule, so `stopped` and a status in neither table render alike on both.
 
-- **Signal**: `DBInstanceStatus` in transitional set (`backing-up`, `backtracking`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `creating`, `delete-precheck`, `deleting`, `maintenance`, `modifying`, `moving-to-vpc`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-config-upgrade`, `storage-initialization`, `storage-optimization`, `upgrading`) → Warning.
+- **Signal**: `DBInstanceStatus` in transitional set (`backing-up`, `backtracking`, `configuring-enhanced-monitoring`, `configuring-iam-database-auth`, `configuring-log-exports`, `converting-to-vpc`, `creating`, `delete-precheck`, `maintenance`, `modifying`, `moving-to-vpc`, `rebooting`, `renaming`, `resetting-master-credentials`, `starting`, `stopping`, `storage-config-upgrade`, `storage-initialization`, `storage-optimization`, `upgrading`) → Warning.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
@@ -129,7 +129,7 @@ The lifecycle rows map every status in the DB instance status tables of the Amaz
   - **State bucket**: Broken.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
-- **Signal**: `DBInstanceStatus` is in neither AWS table → Warning, the status word itself, with a detail saying a9s does not recognise it.
+- **Signal**: `DBInstanceStatus` is in neither AWS table → Warning, `<status> (unrecognised)`, with a detail saying a9s does not recognise it.
   - **State bucket**: Warning.
   - **How obtained**: `DBInstance.DBInstanceStatus` on the `DescribeDBInstances` response.
 
@@ -209,6 +209,10 @@ The lifecycle rows map every status in the DB instance status tables of the Amaz
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `DBInstanceStatus == deleting`.
+  - **State bucket**: Warning. The instance keeps its state finding only: posture findings and Wave 2 reads stop for a database that is being removed.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -258,7 +262,7 @@ One row per signal from §3:
 | `incompatible-create` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `incompatible-create` |
 | `insufficient-capacity` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `insufficient capacity` |
 | `upgrade-failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `engine upgrade failed` |
-| `DBInstanceStatus` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status>` |
+| `DBInstanceStatus` in neither AWS table | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no automated backups` |
 | `PubliclyAccessible == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public endpoint` |
 | `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted storage` |
@@ -273,6 +277,7 @@ One row per signal from §3:
 | Pending maintenance overdue | 2 | Warning | `~` | S2, S3, S4, S5 | `maintenance scheduled` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `engine version deprecated` |
 | no backup plan selection matches this instance | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
+| `DBInstanceStatus == deleting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deleting` |
 
 Notes on the table:
 
@@ -345,7 +350,8 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbi.broken.incompatible\_create | incompatible-create | broken | wave1 | AWS cannot finish creating this instance because something it depends on is incompatible with it, for example an instance profile without the permissions the instance needs. Read the instance's recent events for the resource AWS names and correct it. |
 | dbi.broken.insufficient\_capacity | insufficient capacity | broken | wave1 | AWS has no capacity for this instance class in this Availability Zone right now, so the instance was never created. Delete it and create it again in a few hours, or create it with a different instance class or Availability Zone. |
 | dbi.broken.upgrade\_failed | engine upgrade failed | broken | wave1 | AWS could not upgrade this instance to a supported engine version, so it is not serving. AWS took a final snapshot whose name starts with rds-final: restore it into a new instance on a supported version. |
-| dbi.warn.unrecognised\_status | <status> | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
+| dbi.warn.unrecognised\_status | <status> (unrecognised) | warn | wave1 | AWS reports a status a9s does not recognise, so a9s cannot tell whether the database is serving or whether the state clears on its own. Check the database's recent events in the AWS console before relying on it. |
+| dbi.warn.deleting | deleting | warn | wave1 | The instance is being deleted, and its automated backups go with it unless they were kept. If this was not intended, check now for a final snapshot to restore from. |
 | dbi.warn.transitional | <transitional status> | warn | wave1 | The instance is mid-change, so it may fail over, drop connections, or run with reduced performance until it settles. Wait for it to return to available before starting another modification or judging its performance. |
 | dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | Backup retention is zero, so there are no automated backups and no point-in-time recovery: a bad deployment or a dropped table can only be undone from a manual snapshot. Set a retention period of at least one day, and longer for anything that matters. |
 | dbi.warn.publicly\_accessible | public endpoint | warn | wave1 | The instance resolves to a routable address from outside the VPC, so only its security groups stand between the database and the internet. Turn public accessibility off and reach it over a private link or a bastion host unless an external system genuinely requires it. |

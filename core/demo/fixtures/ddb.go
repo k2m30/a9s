@@ -105,9 +105,14 @@ const (
 	LegacyKMSLostID  = "legacy-kms-lost"
 	LegacyKMSLostARN = "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-kms-lost"
 
-	// legacy-archived — ARCHIVED broken state + PITR DISABLED (multi-W2 stack).
+	// legacy-archived — ARCHIVED: ended, so Wave 2 does not read its PITR.
 	LegacyArchivedID  = "legacy-archived"
 	LegacyArchivedARN = "arn:aws:dynamodb:us-east-1:123456789012:table/legacy-archived"
+
+	// global-orders-replica — a global-table replica whose replication
+	// permissions are denied.
+	GlobalOrdersReplicaID  = "global-orders-replica"
+	GlobalOrdersReplicaARN = "arn:aws:dynamodb:us-east-1:123456789012:table/global-orders-replica"
 
 	// audit-pitr-off — ACTIVE + PITR DISABLED (~-severity finding only).
 	AuditPITROffID  = "audit-pitr-off"
@@ -229,6 +234,8 @@ func buildDDBKinesisDestinations() map[string][]ddbtypes.KinesisDataStreamDestin
 }
 
 func buildDDBTables() []*ddbtypes.TableDescription {
+	replicationNotAuthorized := ddbPostureWitnessTable(GlobalOrdersReplicaID, GlobalOrdersReplicaARN, true)
+	replicationNotAuthorized.TableStatus = ddbtypes.TableStatusReplicationNotAuthorized
 	return []*ddbtypes.TableDescription{
 		// orders-prod — graph-root, Healthy, all pivots wired.
 		{
@@ -435,6 +442,7 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 		ddbPostureWitnessTable(DDBDeletionProtectionOff, ddbDeletionProtectionOffARN, false),
 		ddbPostureWitnessTable(DDBCrossAccountPolicyID, DDBCrossAccountPolicyARN, true),
 		ddbPostureWitnessTable(DDBPublicPolicyID, DDBPublicPolicyARN, true),
+		replicationNotAuthorized,
 	}
 }
 
@@ -463,5 +471,5 @@ func ddbPostureWitnessTable(name, arn string, deletionProtection bool) *ddbtypes
 }
 
 func init() {
-	Register(Pin{ShortName: "ddb", Rows: 13, Issues: 9, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ddb", Rows: 14, Issues: 10, CoverageGaps: []string{"dim"}})
 }

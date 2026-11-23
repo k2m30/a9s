@@ -29,8 +29,6 @@ const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 // managed KMS key (KmsKeyId empty).
 const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 
-// logsStaleEmptyAge is the age threshold colorLogs uses to flag an empty log
-// group as stale.
 const logsStaleEmptyAge = 90 * 24 * time.Hour
 
 // The words the fetcher writes into Fields for the two settings a log group is

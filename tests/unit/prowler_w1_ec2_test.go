@@ -449,12 +449,10 @@ func TestEC2_InternetExposed_NoSGCacheIsSilent(t *testing.T) {
 func TestEC2_InternetExposed_TerminatedInstanceIsSilent(t *testing.T) {
 	const id = "i-0termexposed0aa1"
 	cache := pw1SGCache(t, pw1SG("sg-0ssh10000aaaaaa1", 22, 22, false))
+	cache["rtb"] = pw1PublicRTB()
 
-	res, err := pw1EnrichEC2(t, &pw1EC2EnrichFake{}, cache,
-		pw1Instance(id, "terminated", "203.0.113.14", ec2types.HttpTokensStateRequired, "sg-0ssh10000aaaaaa1"))
-	if err != nil {
-		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
-	}
+	rs := pw1FetchEC2(t, pw1Instance(id, "terminated", "203.0.113.14", ec2types.HttpTokensStateRequired, "sg-0ssh10000aaaaaa1"))
+	res := Wave2Result(t, "ec2", &awsclient.ServiceClients{EC2: &pw1EC2EnrichFake{}}, rs, cache)
 	pw1RequireNoFinding(t, res.Findings[id], pw1EC2CodeInternetExposed)
 }
 
@@ -569,11 +567,9 @@ func TestEC2_UserDataSecret_SkipsTerminated(t *testing.T) {
 	const id = "i-0termud000aaaaa1"
 	fake := &pw1EC2EnrichFake{userData: map[string]string{id: pw1UserDataWithSecret}}
 
-	res, err := pw1EnrichEC2(t, fake, resource.ResourceCache{},
-		pw1Instance(id, "terminated", "", ec2types.HttpTokensStateOptional))
-	if err != nil {
-		t.Fatalf("EnrichEC2InstanceStatus: %v", err)
-	}
+	rs := pw1FetchEC2(t, pw1Instance(id, "terminated", "", ec2types.HttpTokensStateOptional))
+	res := Wave2Result(t, "ec2", &awsclient.ServiceClients{EC2: fake}, rs,
+		resource.ResourceCache{"sg": {Resources: []resource.Resource{}}, "rtb": pw1PublicRTB()})
 	pw1RequireNoFinding(t, res.Findings[id], pw1EC2CodeUserDataSecret)
 	for _, called := range fake.attrCalls {
 		if called == id {

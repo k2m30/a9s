@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -107,7 +106,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			isDefault = "true"
 		}
 
-		findings := vpcStateFindings(state)
+		findings := withState("vpc", state, nil)
 
 		r := resource.Resource{
 			ID:   vpcID,
@@ -149,13 +148,4 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// vpcStateFindings is the one predicate for a VPC's state. available reports
-// nothing. colorVPC runs it over Fields for rows built outside the fetcher.
-func vpcStateFindings(state string) []domain.Finding {
-	if state == "pending" {
-		return []domain.Finding{wave1Finding(CodeVPCStatePending)}
-	}
-	return nil
 }

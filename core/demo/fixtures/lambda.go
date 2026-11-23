@@ -40,6 +40,12 @@ type LambdaFixtures struct {
 }
 
 const (
+	// One function per lifecycle state that has a finding of its own.
+	LambdaDeactivatingName       = "acme-reports-deactivating"
+	LambdaDeactivatedName        = "acme-reports-deactivated"
+	LambdaActiveNonInvocableName = "acme-reports-non-invocable"
+	LambdaDeletingName           = "acme-reports-deleting"
+
 	// LambdaEnvSecret is the only function with a plaintext credential in
 	// its environment; every other function stores references, not values.
 	LambdaEnvSecret = "payment-webhook"
@@ -462,11 +468,9 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
-	// Issue: State=Failed with LastUpdateStatus=Successful → Broken via the
-	// lifecycle-state branch alone (lambda.state.failed). legacy-data-sync
-	// above hits the higher-precedence last-update-failed branch instead
-	// (LastUpdateStatus=Failed on that fixture), so this fixture is needed to
-	// demonstrate the State=Failed branch in isolation.
+	// Issue: State=Failed with LastUpdateStatus=Successful → Broken through
+	// lambda.state.failed alone; legacy-data-sync above carries
+	// last-update-failed beside it.
 	fns = append(fns, lambdatypes.FunctionConfiguration{
 		FunctionName:     aws.String("lambda-runtime-crash"),
 		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:lambda-runtime-crash"),
@@ -493,6 +497,36 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		},
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
+
+	for _, w := range []struct {
+		name  string
+		state lambdatypes.State
+	}{
+		{LambdaDeactivatingName, lambdatypes.StateDeactivating},
+		{LambdaDeactivatedName, lambdatypes.StateDeactivated},
+		{LambdaActiveNonInvocableName, lambdatypes.StateActiveNonInvocable},
+		{LambdaDeletingName, lambdatypes.StateDeleting},
+	} {
+		fns = append(fns, lambdatypes.FunctionConfiguration{
+			FunctionName:     aws.String(w.name),
+			FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + w.name),
+			Role:             aws.String(lambdaProdRoleARN),
+			Runtime:          lambdatypes.RuntimePython312,
+			MemorySize:       aws.Int32(128),
+			Timeout:          aws.Int32(15),
+			Handler:          aws.String("handler.lambda_handler"),
+			LastModified:     aws.String("2026-11-02T09:00:00+00:00"),
+			CodeSize:         262144,
+			State:            w.state,
+			PackageType:      lambdatypes.PackageTypeZip,
+			Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureArm64},
+			EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
+			},
+			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+		})
+	}
 
 	// One container-image function for the ECR→Lambda relationship.
 	// checkECRLambda matches any lambda with PackageType=Image as potentially using an ECR repo.
@@ -779,5 +813,5 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 }
 
 func init() {
-	Register(Pin{ShortName: "lambda", Rows: 39, Issues: 13})
+	Register(Pin{ShortName: "lambda", Rows: 43, Issues: 13})
 }

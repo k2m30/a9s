@@ -8,6 +8,7 @@ const (
 	CodeSecretStateDeleted         domain.FindingCode = "secrets.state.deleted"
 	CodeSecretStateRotationOverdue domain.FindingCode = "secrets.state.rotation_overdue"
 	CodeSecretStateDormant         domain.FindingCode = "secrets.state.dormant"
+	CodeSecretStateUnrecognised    domain.FindingCode = "secrets.state.unrecognised"
 
 	// CodeSecretRotationDisabled — secret has no automatic rotation
 	// configured. Severity: SevWarn.

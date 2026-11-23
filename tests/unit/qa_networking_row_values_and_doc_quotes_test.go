@@ -26,6 +26,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // netTypes is every registered type whose resource page ships a signals
@@ -99,11 +100,8 @@ func netBench(t *testing.T, shortName string) (rows []netRow, details map[domain
 	// AttentionDetails is keyed. Reading the result map instead would assert
 	// against a shape the renderer never sees.
 	benchRows := append([]resource.Resource(nil), fixtures...)
-	if enricher, ok := awsclient.Wave2EnricherFor(shortName); ok && enricher.Fn != nil {
-		result, err := enricher.Fn(t.Context(), clients, fixtures, cache)
-		if err != nil {
-			t.Fatalf("%s: Wave-2 enricher returned error: %v", shortName, err)
-		}
+	if _, ok := awsclient.Wave2EnricherFor(shortName); ok {
+		result := unit.Wave2Result(t, shortName, clients, fixtures, cache)
 		for i := range benchRows {
 			a9sruntime.ApplyWave2ToRow(&benchRows[i], *td, result.Findings, result.AttentionDetails)
 		}

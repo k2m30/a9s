@@ -81,8 +81,6 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		pitr := out.ContinuousBackupsDescription.PointInTimeRecoveryDescription
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
 		if !pitrEnabled {
-			// The merged display phrase (e.g. "archived: kms key lost") is
-			// computed at render time by domain.StatusPhrase(r.Findings).
 			setWave2Finding(&result, r.ID, ddbCodePITROff, nil)
 		}
 	})
@@ -111,7 +109,7 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		}
 	}
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		return r.Fields["arn"] != "" && !resourceIsTearingDown(r.RawStruct)
+		return r.Fields["arn"] != ""
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure

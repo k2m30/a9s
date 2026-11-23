@@ -95,6 +95,14 @@ Transcribed from `docs/attention-signals.md § Signals § COMPUTE` row `ebs`.
   - **State bucket**: Warning.
   - **How obtained**: `Volume.Encrypted` on the list response (`AWS SDK Go v2 — ec2/types.Volume § Encrypted`).
 
+- **Signal**: `State == deleted`.
+  - **State bucket**: Dim. Ended: no posture finding and no Wave 2 read.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `State` outside `VolumeState.Values()`.
+  - **State bucket**: Warning. The row shows the value AWS reported.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 - **Signal**: `VolumeStatus.Status == "impaired"` → Broken (AWS-observed volume I/O failure).
@@ -141,6 +149,8 @@ One row per signal from §3:
 | `VolumeStatus.Status == warning` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `volume I/O degraded` |
 | no backup plan selection matches this volume | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
 | an attached volume with no snapshot behind it | 2 | Warning | `~` | S2, S3, S4, S5 | `no snapshot exists` |
+| `State == deleted` | 1 | Dim | n/a | S2, S4 | `deleted` |
+| `State` outside `VolumeState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Notes on rows omitted:
 
@@ -193,6 +203,8 @@ ebs — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ebs.state.creating | creating | warn | wave1 | The volume is still being created, or restored from a snapshot, and cannot be attached until it is available. A restore from a large snapshot takes a while; wait rather than recreating it. |
 | ebs.state.deleting | deleting | warn | wave1 | The volume is being deleted and its data is going with it. If that was not intended, check now whether a snapshot covers it, because there is nothing to stop once the deletion completes. |
 | ebs.state.error | error | broken | wave1 | AWS has marked this volume as failed, so its data is not reachable and it cannot be attached. Restore the most recent snapshot into a new volume — the failed one will not recover. |
+| ebs.state.deleted | deleted | dim | wave1 | — |
+| ebs.state.unrecognised | <state> (unrecognised) | warn | wave1 | EC2 reports a volume state a9s does not recognise, so a9s cannot tell whether the volume can be attached. Check the volume in the AWS console before relying on it. |
 | ebs.orphan-unattached | orphan: unattached <N>d | warn | wave1 | The volume has been unattached since it was created, so it is billed hourly for no workload; the age is in the status. Snapshot it if the data matters, then delete it. |
 | ebs.encryption.disabled | unencrypted | warn | wave1 | The volume's data is written to disk unencrypted, and encryption cannot be turned on in place. Snapshot it, copy the snapshot with a KMS key, and restore that copy over the volume at the next window you can take. |
 | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 | AWS reports this volume's I/O as degraded or its data as potentially inconsistent, so reads may return stale or corrupt blocks. Take a snapshot while you still can, then restore onto a fresh volume and check the filesystem before trusting it. |

@@ -74,25 +74,9 @@ func detailsUnavailableFinding(shortName string) domain.Finding {
 // finding it emitted, so a row rebuilt from Fields alone carries the finding's
 // one identity. The status cell holds the same finding's rendered phrase, but
 // a phrase is wording: reading it back would make every reword a silent
-// retirement of the recovery below, and catalog.ResolveColor reads it for the
+// retirement of the recovery, and catalog.ResolveColor reads the code for the
 // colour of every type.
 const DegradedFindingField = catalog.DegradedFindingField
-
-// degradedFindings recovers the degraded row's finding for a row rebuilt from
-// Fields alone — a cache read, a colour fallback. It reads the code
-// DegradedDetails recorded, and answers only for the two codes shortName
-// itself declares, so a Fields map carrying anything else yields nothing. A
-// type whose fetcher builds degraded rows calls this first in its own
-// predicate, before the vocabulary its live status uses.
-func degradedFindings(shortName, degradedCode string) []domain.Finding {
-	switch domain.FindingCode(degradedCode) {
-	case DetailsDeniedCode(shortName):
-		return []domain.Finding{detailsDeniedFinding(shortName)}
-	case DetailsUnavailableCode(shortName):
-		return []domain.Finding{detailsUnavailableFinding(shortName)}
-	}
-	return nil
-}
 
 // degradedAuthDenial reports whether err is an authorization denial, across
 // the SDK's service-specific codes: AccessDenied/AccessDeniedException (most
@@ -139,7 +123,6 @@ func DegradedDetails(shortName, id string, err error) resource.Resource {
 		Name: id,
 		Fields: map[string]string{
 			"name":               id,
-			"status":             finding.Phrase,
 			DegradedFindingField: string(finding.Code),
 		},
 		Findings: []domain.Finding{finding},
@@ -203,8 +186,8 @@ func keepListed(op string, names []string, idOf func(name string) string, ans li
 
 // stampDegraded records on r the code of the degraded finding its builder
 // added, so every reader that keys on DegradedFindingField — the Wave-2
-// describedRow gate, DegradedRowAnswer, a row rebuilt from Fields — knows the row
-// whichever builder made it.
+// describedRow gate, DegradedRowAnswer, a row rebuilt from Fields — knows
+// the row whichever builder made it.
 func stampDegraded(r resource.Resource) resource.Resource {
 	for _, f := range r.Findings {
 		code := string(f.Code)

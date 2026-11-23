@@ -18,7 +18,6 @@
 package unit_test
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -73,10 +72,11 @@ func buildVisibilityTypeCache(t *testing.T) (map[string][]resource.Resource, res
 	return byType, cache
 }
 
-// mergeWave2Findings runs the type's registered Wave-2 IssueEnricher (if any)
-// against fixtures and returns a COPY of fixtures folded the way the running
-// app folds them — through runtime.ApplyWave2ToRow, the same call the
-// enrichment handler makes.
+// mergeWave2Findings runs the type's Wave-2 pass through the runner, the one
+// call site of an enricher in the app, against fixtures with every list in
+// cache loaded, and returns a COPY of fixtures folded the way the running app
+// folds them — through runtime.ApplyWave2ToRow, the same call the enrichment
+// handler makes.
 //
 // A hand-rolled merge that appends Findings and ignores
 // IssueEnricherResult.AttentionDetails builds a row the app never produces,
@@ -93,14 +93,10 @@ func mergeWave2Findings(
 	merged := make([]resource.Resource, len(fixtures))
 	copy(merged, fixtures)
 
-	enricher, ok := awsclient.Wave2EnricherFor(td.ShortName)
-	if !ok || enricher.Fn == nil {
+	if _, ok := awsclient.Wave2EnricherFor(td.ShortName); !ok {
 		return merged
 	}
-	result, err := enricher.Fn(context.Background(), clients, fixtures, cache)
-	if err != nil {
-		t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
-	}
+	result := unit.Wave2Result(t, td.ShortName, clients, fixtures, cache)
 	for i := range merged {
 		runtime.ApplyWave2ToRow(&merged[i], td, result.Findings, result.AttentionDetails)
 	}

@@ -12,7 +12,6 @@ package unit
 // already exercises and relies on.
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -112,12 +111,8 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 		}
 
 		res := awsclient.IssueEnricherResult{}
-		if e, ok := awsclient.Wave2EnricherFor(td.ShortName); ok && e.Fn != nil {
-			var err error
-			res, err = e.Fn(context.Background(), clients, resources, cache)
-			if err != nil {
-				t.Fatalf("demo %s Wave2Enricher: %v", td.ShortName, err)
-			}
+		if _, ok := awsclient.Wave2EnricherFor(td.ShortName); ok {
+			res = Wave2Result(t, td.ShortName, clients, resources, cache)
 		}
 
 		for i := range resources {
@@ -194,7 +189,9 @@ func TestDetailContract_EveryDeclaredDetailHasABenchWitness(t *testing.T) {
 	var missing []string
 	for _, td := range resource.AllResourceTypes() {
 		for _, def := range td.Findings {
-			if def.Detail == "" {
+			// The unrecognised-state code fires on a value AWS has not
+			// documented, which no fixture can hold honestly.
+			if def.Detail == "" || def.Code == td.UnknownState {
 				continue
 			}
 			if gaps[td.ShortName+":"+string(def.Code)] {

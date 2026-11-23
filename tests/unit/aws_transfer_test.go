@@ -119,8 +119,8 @@ func TestFetchTransferServersPage_OnlineSilence(t *testing.T) {
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: expected 0 for healthy ONLINE server, got %d: %+v", len(r.Findings), r.Findings)
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf(`Fields["status"] = %q, want "" (S4 blank on a healthy row)`, r.Fields["status"])
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf(`Status cell = %q, want "" (S4 blank on a healthy row)`, domain.StatusPhrase(r.Findings))
 	}
 	described := transferAsDescribedServer(t, r.RawStruct)
 	if aws.ToString(described.ServerId) != fixtures.ProdAS2GatewayID {
@@ -184,11 +184,11 @@ func TestFetchTransferServersPage_StatePhrases(t *testing.T) {
 			if strings.Contains(f.Phrase, tc.rawEnum) {
 				t.Errorf("Phrase %q must not contain the raw AWS enum %q", f.Phrase, tc.rawEnum)
 			}
-			if strings.Contains(r.Fields["status"], tc.rawEnum) {
-				t.Errorf(`Fields["status"] = %q must not contain the raw AWS enum %q`, r.Fields["status"], tc.rawEnum)
+			if strings.Contains(domain.StatusPhrase(r.Findings), tc.rawEnum) {
+				t.Errorf(`Status cell = %q must not contain the raw AWS enum %q`, domain.StatusPhrase(r.Findings), tc.rawEnum)
 			}
-			if r.Fields["status"] != tc.phrase {
-				t.Errorf(`Fields["status"] = %q, want %q (S4 mirrors the state finding phrase)`, r.Fields["status"], tc.phrase)
+			if domain.StatusPhrase(r.Findings) != tc.phrase {
+				t.Errorf(`Status cell = %q, want %q (S4 mirrors the state finding phrase)`, domain.StatusPhrase(r.Findings), tc.phrase)
 			}
 		})
 	}
@@ -317,8 +317,8 @@ func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 	if f.Detail != wantDetail {
 		t.Errorf("Findings[0].Detail = %q, want %q (transfer-specific — rows are rich, not name-only)", f.Detail, wantDetail)
 	}
-	if r.Fields["status"] != "details denied" {
-		t.Errorf(`Fields["status"] = %q, want %q`, r.Fields["status"], "details denied")
+	if domain.StatusPhrase(r.Findings) != "details denied" {
+		t.Errorf(`Status cell = %q, want %q`, domain.StatusPhrase(r.Findings), "details denied")
 	}
 
 	listed := transferAsListedServer(t, r.RawStruct)

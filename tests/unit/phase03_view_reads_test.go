@@ -782,60 +782,6 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 13 — ECS INACTIVE classifies as broken via td.Color
-// ---------------------------------------------------------------------------
-
-// TestViews_ListColor_ECSInactiveIsBroken pins that an ECS service with
-// Fields["status"]="INACTIVE" is classified as broken (ColorBroken) even
-// though "inactive" / "INACTIVE" is a lifecycle keyword that FallbackColor
-// maps to ColorDim (not an issue).
-//
-// The ECS service type def (ShortName "ecs-svc") has an explicit Color func
-// that returns ColorBroken for "INACTIVE" (types_compute.go). IssueCount
-// must respect this via td.ResolveColor(r), not fall back to FallbackColor.
-func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
-	ensureNoColor(t)
-
-	td := resource.FindResourceType("ecs-svc")
-	if td == nil {
-		t.Fatal("ecs-svc type def not registered — update short name if it changed")
-	}
-
-	// Confirm the invariant this test relies on: td.Color must classify INACTIVE
-	// as ColorBroken. If this assertion fails, the type def has changed and the
-	// test needs updating.
-	inactiveProbe := resource.Resource{
-		ID:     "svc-probe",
-		Name:   "probe",
-		Fields: map[string]string{"status": "INACTIVE"},
-	}
-	if got := td.ResolveColor(inactiveProbe); got != resource.ColorBroken {
-		t.Fatalf("precondition: ecs-svc.ResolveColor for INACTIVE = %v, want ColorBroken; "+
-			"update this test if the type def changed", got)
-	}
-
-	r := resource.Resource{
-		ID:   "svc-inactive",
-		Name: "inactive-service",
-		// Status field intentionally matches the ECS status key.
-		Fields: map[string]string{
-			"service_name": "inactive-service",
-			"status":       "INACTIVE",
-		},
-		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
-		Findings: nil,
-	}
-
-	c := loadListController(t, *td, []resource.Resource{r})
-	got := c.GetListIssueCount()
-
-	if got != 1 {
-		t.Errorf("GetListIssueCount() = %d, want 1 (ECS INACTIVE is ColorBroken per td.Color; "+
-			"pre-fix value is 0 because FallbackColor(\"INACTIVE\") = ColorDim)", got)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Test 14 — empty-Findings fallback uses td.ResolveColor, not FallbackColor
 // ---------------------------------------------------------------------------
 

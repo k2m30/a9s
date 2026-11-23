@@ -334,9 +334,8 @@ func lastFourOfKeyID(keyID string) string {
 }
 
 // iamUserConsoleDormantFindings is the one predicate for a console login
-// nobody has used in unusedCredentialAge. colorIAMUser runs it over Fields for
-// rows built outside the enricher. A password that was never used at all is
-// the separate iamUserCodeConsoleNeverUsed finding.
+// nobody has used in unusedCredentialAge. A password that was never used at
+// all is the separate iamUserCodeConsoleNeverUsed finding.
 func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) []domain.Finding {
 	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, unusedCredentialAge) {
 		return nil

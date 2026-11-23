@@ -114,15 +114,9 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 }
 
 func alarmStateFindings(state string, actionsCount int) []domain.Finding {
-	switch state {
-	case "ALARM":
-		return []domain.Finding{wave1Finding(CodeAlarmStateAlarm)}
-	case "INSUFFICIENT_DATA":
-		return []domain.Finding{wave1Finding(CodeAlarmStateInsufficient)}
-	case "OK":
-		if actionsCount == 0 {
-			return []domain.Finding{wave1Finding(CodeAlarmNoActions)}
-		}
+	var posture []domain.Finding
+	if actionsCount == 0 {
+		posture = append(posture, wave1Finding(CodeAlarmNoActions))
 	}
-	return nil
+	return withState("alarm", state, posture)
 }

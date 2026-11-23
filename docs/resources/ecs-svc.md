@@ -160,6 +160,10 @@ A service `DescribeServices` did not describe is KEPT with its name and cluster:
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `status` is a value the ECS API Reference does not list
+  - **State bucket**: Warning. The row is not shown clean; the value AWS sent is in the phrase
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -222,6 +226,7 @@ One row per signal from §3:
 | `events[]` matches `ELB health checks failed` ≤10m | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |
 | deployment circuit-breaker triggered | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |
 | `awsvpcConfiguration.assignPublicIp == ENABLED` | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks get public IPs` |
+| `status` is a value the ECS API Reference does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 Rules for filling list and detail text:
 
@@ -290,6 +295,7 @@ ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and
 | --- | --- | --- | --- | --- |
 | ecs-svc.state.inactive | inactive (service deleted) | broken | wave1 | The service has been deleted and only its record remains, so it runs nothing and will never place a task again. Recreate it if the workload is still needed; otherwise remove whatever still points at it. |
 | ecs-svc.state.draining | draining | warn | wave1 | The service is being wound down and its tasks are being deregistered from their load balancer, so it carries less traffic each minute. Confirm the replacement is already serving before the last task goes. |
+| ecs-svc.state.unrecognised | <status> (unrecognised) | warn | wave1 | Amazon ECS reports a service status a9s does not recognise, so a9s cannot tell whether the service is placing its tasks. Check the service's events before relying on it. |
 | ecs-svc.tasks.none-running | no tasks running | broken | wave1 | The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes. |
 | ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks. |
 | ecs-svc.deployment-failed | not running its desired tasks | broken | wave2 | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |

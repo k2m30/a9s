@@ -89,14 +89,6 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 	}, nil
 }
 
-// amiLaunchable reports an image someone can still launch. Deregistered and
-// disabled images are gone in every sense that matters to a posture check:
-// nobody can launch them, so nothing they are shared with can reach them.
-// The single lifecycle guard for every ami posture finding.
-func amiLaunchable(state ec2types.ImageState) bool {
-	return state != ec2types.ImageStateDeregistered && state != ec2types.ImageStateDisabled
-}
-
 func imageResource(img ec2types.Image) resource.Resource {
 	imageID := ""
 	if img.ImageId != nil {
@@ -163,33 +155,21 @@ func imageResource(img ec2types.Image) resource.Resource {
 		RawStruct: img,
 	}
 
-	// emit canonical Findings for every non-healthy AMI state or condition,
-	// mirroring colorAMI's own precedence: broken state wins outright; a
-	// dim (deregistered/disabled) state stays dim even when also deprecated;
-	// otherwise a passed DeprecationTime bumps an available AMI to warning.
-	switch img.State {
-	case ec2types.ImageStatePending, ec2types.ImageStateTransient:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStatePending)}
-	case ec2types.ImageStateFailed, ec2types.ImageStateError, ec2types.ImageStateInvalid:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateFailed)}
-	case ec2types.ImageStateDeregistered, ec2types.ImageStateDisabled:
-		r.Findings = []domain.Finding{wave1Finding(CodeAMIStateDim, string(img.State))}
-	default:
-		if img.DeprecationTime != nil && *img.DeprecationTime != "" {
-			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
-				r.Findings = []domain.Finding{wave1Finding(CodeAMIDeprecated)}
-			}
+	var posture []domain.Finding
+	if img.DeprecationTime != nil && *img.DeprecationTime != "" {
+		if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
+			posture = append(posture, wave1Finding(CodeAMIDeprecated))
 		}
 	}
-
-	// Launch permission is evaluated independently of the state switch above,
-	// but not independently of the state itself: an image nobody can launch
-	// exposes nothing, however open its permission reads. The fetcher asks
-	// for Owners=self, so a public image here is one this account owns.
-	if amiLaunchable(img.State) && img.Public != nil && *img.Public {
-		r.Findings = append(r.Findings, wave1Finding(CodeAMIPublic))
+	// The fetcher asks for Owners=self, so a public image here is one this
+	// account owns. A deregistered or disabled image is Ended in the table:
+	// nobody can launch it, so its permission exposes nothing.
+	if img.Public != nil && *img.Public {
+		posture = append(posture, wave1Finding(CodeAMIPublic))
+	}
+	r.Findings = withState("ami", state, posture)
+	if hasFinding(r.Findings, CodeAMIPublic) {
 		addWave1Rows(&r, CodeAMIPublic, domain.DetailRow{Label: "Public", Value: "yes", Tier: "!"})
 	}
-
 	return r
 }

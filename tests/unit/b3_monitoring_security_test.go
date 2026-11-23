@@ -14,8 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -162,52 +160,5 @@ func TestIAMUserMFAIsUncheckedForProgrammaticUsers(t *testing.T) {
 	}
 	if got := res.FieldUpdates["batch-runner"]["mfa"]; got != "n/a" {
 		t.Errorf("mfa = %q, want %q", got, "n/a")
-	}
-}
-
-// kmsPolicyProbeFake answers GetKeyPolicy with a wildcard-principal policy and
-// records whether it was asked at all.
-type kmsPolicyProbeFake struct {
-	awsclient.KMSAPI
-	asked bool
-}
-
-func (f *kmsPolicyProbeFake) GetKeyPolicy(
-	_ context.Context,
-	_ *kms.GetKeyPolicyInput,
-	_ ...func(*kms.Options),
-) (*kms.GetKeyPolicyOutput, error) {
-	f.asked = true
-	return &kms.GetKeyPolicyOutput{Policy: aws.String(
-		`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"kms:*","Resource":"*"}]}`)}, nil
-}
-
-func (f *kmsPolicyProbeFake) GetKeyRotationStatus(
-	_ context.Context,
-	_ *kms.GetKeyRotationStatusInput,
-	_ ...func(*kms.Options),
-) (*kms.GetKeyRotationStatusOutput, error) {
-	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: true}, nil
-}
-
-// TestKMSKeyStateReadsThroughAPointer pins that the pending-deletion guard
-// resolves on the *KeyMetadata both KMS fetchers store, so a key on its way
-// out is not chased for a policy posture the operator cannot act on.
-func TestKMSKeyStateReadsThroughAPointer(t *testing.T) {
-	fake := &kmsPolicyProbeFake{}
-	rows := []resource.Resource{{
-		ID:        "11111111-2222-3333-4444-555555555555",
-		RawStruct: &kmstypes.KeyMetadata{KeyState: kmstypes.KeyStatePendingDeletion},
-	}}
-	res, err := awsclient.EnrichKMSRotation(context.Background(),
-		&awsclient.ServiceClients{KMS: fake}, rows, nil)
-	if err != nil {
-		t.Fatalf("EnrichKMSRotation: %v", err)
-	}
-	if fake.asked {
-		t.Error("the policy of a key scheduled for deletion was read")
-	}
-	if fs := res.Findings[rows[0].ID]; len(fs) > 0 {
-		t.Errorf("a key scheduled for deletion carries policy findings: %v", fs)
 	}
 }

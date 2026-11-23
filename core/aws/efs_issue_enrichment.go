@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/iampolicy"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -57,9 +58,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		// The policy checks are independent of the mount-target walk below —
 		// they run first so a mount-target pagination failure cannot swallow
 		// them.
-		if !resourceIsTearingDown(r.RawStruct) {
-			enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
-		}
+		enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
 
 		allMountTargets, complete, pageErr := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]efstypes.MountTargetDescription, *string, error) {
 			out, err := clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
@@ -91,7 +90,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		unavailableCount := 0
 		for j := range allMountTargets {
 			mt := &allMountTargets[j]
-			if mt.LifeCycleState != efstypes.LifeCycleStateAvailable {
+			if LifecycleClassOf("efs", string(mt.LifeCycleState)) != catalog.LifecycleNormal {
 				unavailableCount++
 				if firstBad == nil {
 					firstBad = mt
@@ -206,11 +205,12 @@ func isEFSPolicyNotFound(err error) bool {
 }
 
 // efsMountTargetState words a mount target's lifecycle state for a detail
-// row. AWS reports a failed mount target as the bare state "error", which
-// says nothing the row's colour has not already said; the others describe
-// themselves.
+// row. A mount target shares the file system's LifeCycleState domain, so it
+// reads the efs table: AWS reports a failed one as the bare state "error",
+// which says nothing the row's colour has not already said; the others
+// describe themselves.
 func efsMountTargetState(s efstypes.LifeCycleState) string {
-	if s == efstypes.LifeCycleStateError {
+	if LifecycleClassOf("efs", string(s)) == catalog.LifecycleFailedLive {
 		return "mount failed"
 	}
 	return string(s)

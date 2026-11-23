@@ -23,6 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/tests/unit"
 )
 
 type t577OSList struct{ names []string }
@@ -254,8 +255,11 @@ func TestT577Dev_Wave2NeverRepeatsTheDescribeADegradedRowStates(t *testing.T) {
 			if len(degraded) == 0 {
 				continue
 			}
-			run := t576Enrich(t, w.Enricher.Fn, page.Resources, t576ReadsOf(cache, w.Enricher.Reads), nil)
-			for _, c := range run.calls {
+			swept := &t576Injector{}
+			sweepClients := demo.NewServiceClients()
+			t576WrapClients(sweepClients, swept)
+			unit.ProbeWave2(t, w.ShortName, sweepClients, page.Resources, t576ReadsOf(cache, w.Enricher.Reads))
+			for _, c := range swept.calls {
 				if c.Op != op {
 					continue
 				}

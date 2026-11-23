@@ -197,9 +197,9 @@ var replayShadowedCells = []replayShadowedCell{
 	// column headed "Task ID" and 38 wide shows the ID rather than a
 	// 78-character ARN cut in half.
 	{"ecs-task", "a1b2c3d4e5f6a1b2c3d4e5f6", "Task ID", "a1b2c3d4e5f6a1b2c3d4e5f6"},
-	// The status column, which the save lane excludes outright: the fetcher
-	// left no lifecycle key behind, so the replayed cell is empty.
-	{"kinesis", "clickstream-ingest", "Status", "active"},
+	// The status column reads the row's findings, which the save lane keeps,
+	// so a stream still being created says so on both frames.
+	{"kinesis", "audit-log-stream", "Status", "creating"},
 }
 
 // TestReplay_ShadowedColumnKeepsItsLiveWordAfterARestart pins the exact string

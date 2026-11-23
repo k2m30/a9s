@@ -53,6 +53,13 @@ const (
 	RedshiftRenamingID  = "redshift-renaming"
 	RedshiftDeletingID  = "redshift-deleting"
 
+	RedshiftFinalSnapshotID    = "redshift-final-snapshot"
+	RedshiftPrepForResizeID    = "redshift-prep-for-resize"
+	RedshiftResizeCleanupID    = "redshift-resize-cleanup"
+	RedshiftCancellingResizeID = "redshift-cancelling-resize"
+	RedshiftRotatingKeysID     = "redshift-rotating-keys"
+	RedshiftUpdatingHSMID      = "redshift-updating-hsm"
+
 	// ClusterAvailabilityStatus-driven (Broken)
 	RedshiftAvailUnavailableID = "redshift-avail-unavailable"
 	RedshiftAvailFailedID      = "redshift-avail-failed"
@@ -123,13 +130,15 @@ var sharedRedshiftFixtures = shared(func() *RedshiftFixtures {
 
 // RedshiftCloudWatchLogExports is what each demo cluster's audit logging
 // exports to CloudWatch Logs (DescribeLoggingStatus.LogExports); nil for a
-// cluster that logs to S3 or not at all. The Redshift fake answers from it
+// cluster that logs to S3 or not at all, so a state witness adds no log group. The Redshift fake answers from it
 // and cwlogs.go holds one log group per export.
 func RedshiftCloudWatchLogExports(clusterID string) []string {
 	switch clusterID {
 	case AcmeWarehouseID:
 		return []string{"connectionlog", "userlog", "useractivitylog"}
-	case AcmeReportingID, RedshiftAuditLoggingOff:
+	case AcmeReportingID, RedshiftAuditLoggingOff,
+		RedshiftFinalSnapshotID, RedshiftPrepForResizeID, RedshiftResizeCleanupID,
+		RedshiftCancellingResizeID, RedshiftRotatingKeysID, RedshiftUpdatingHSMID:
 		return nil
 	}
 	return []string{"connectionlog", "userlog"}
@@ -260,7 +269,6 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		},
 	}
 
-	// staging-dwh — ClusterStatus=paused (treated Healthy).
 	stagingDwh := redshifttypes.Cluster{
 		ClusterIdentifier:         aws.String(StagingDwhID),
 		ClusterStatus:             aws.String("paused"),
@@ -440,9 +448,9 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	warnTwo.KmsKeyId = nil
 	warnTwo.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-08-05T11:00:00Z"))
 
-	// redshift-broken-with-warning-hidden — Broken suppresses Warnings
-	// ClusterStatus=storage-full (Broken) + ClusterAvailabilityStatus=Modifying + PubliclyAccessible=true + Encrypted=false
-	// Expected: Fields["status"] = "broken: storage-full", Findings (wave1) phrases = ["broken: storage-full"]
+	// ClusterStatus=storage-full (Broken) beside ClusterAvailabilityStatus=Modifying,
+	// a public endpoint and unencrypted storage: the cluster still holds its
+	// data, so the three warnings stand beside the state.
 	brokenWithWarning := redshiftBaselineHealthy(RedshiftBrokenWithWarningHiddenID)
 	brokenWithWarning.ClusterStatus = aws.String("storage-full")
 	brokenWithWarning.ClusterAvailabilityStatus = aws.String("Modifying")
@@ -451,20 +459,32 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	brokenWithWarning.KmsKeyId = nil
 	brokenWithWarning.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-09-15T08:00:00Z"))
 
-	// redshift-avail-unavailable-with-warning-hidden — availability-driven Broken suppresses Warning
-	// ClusterStatus=available, ClusterAvailabilityStatus=Unavailable + PubliclyAccessible=true
-	// Expected: Fields["status"] = "unavailable", Findings (wave1) phrases = ["unavailable"]
 	availUnavailableWithWarning := redshiftBaselineHealthy(RedshiftAvailUnavailableWithWarningHiddenID)
 	availUnavailableWithWarning.ClusterAvailabilityStatus = aws.String("Unavailable")
 	availUnavailableWithWarning.PubliclyAccessible = aws.Bool(true)
 	availUnavailableWithWarning.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-10-01T10:00:00Z"))
+
+	var transientStates []redshifttypes.Cluster
+	for _, w := range []struct{ id, status string }{
+		{RedshiftFinalSnapshotID, "final-snapshot"},
+		{RedshiftPrepForResizeID, "available, prep-for-resize"},
+		{RedshiftResizeCleanupID, "available, resize-cleanup"},
+		{RedshiftCancellingResizeID, "cancelling-resize"},
+		{RedshiftRotatingKeysID, "rotating-keys"},
+		{RedshiftUpdatingHSMID, "updating-hsm"},
+	} {
+		c := redshiftBaselineHealthy(w.id)
+		c.ClusterStatus = aws.String(w.status)
+		c.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-11-03T10:00:00Z"))
+		transientStates = append(transientStates, c)
+	}
 
 	auditLoggingOff := redshiftBaselineHealthy(RedshiftAuditLoggingOff)
 	auditLoggingOff.KmsKeyId = aws.String(RedshiftKMSKeyARN1)
 	requireSSLOff := redshiftBaselineHealthy(RedshiftRequireSSLOff)
 	requireSSLOff.KmsKeyId = aws.String(RedshiftKMSKeyARN1)
 
-	return []redshifttypes.Cluster{
+	return append([]redshifttypes.Cluster{
 		warehouse,
 		reporting,
 		stagingDwh,
@@ -495,7 +515,7 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		availUnavailableWithWarning,
 		auditLoggingOff,
 		requireSSLOff,
-	}
+	}, transientStates...)
 }
 
 func mustParseRedshiftTime(s string) time.Time {
@@ -510,5 +530,5 @@ func mustParseRedshiftTime(s string) time.Time {
 }
 
 func init() {
-	Register(Pin{ShortName: "redshift", Rows: 30, Issues: 24, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "redshift", Rows: 36, Issues: 30})
 }

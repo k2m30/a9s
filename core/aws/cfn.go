@@ -63,7 +63,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 		r := resource.Resource{
 			ID:       stackName,
 			Name:     stackName,
-			Findings: cfnStackFindings(status),
+			Findings: withState("cfn", status, cfnPostureFindings(protection, outputSecret), cfnStatusWords(status)),
 
 			Fields: map[string]string{
 				"stack_name":             stackName,
@@ -78,7 +78,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			RawStruct: stack,
 		}
 
-		addCFNPostureRows(&r, protection, outputSecret, secretRows)
+		addCFNPostureRows(&r, secretRows)
 		resources = append(resources, r)
 	}
 
@@ -112,35 +112,31 @@ func cfnStatusWords(status string) string {
 	return strings.ToLower(domain.HumanizeStatusPhrase(status))
 }
 
-func cfnStackFindings(status string) []domain.Finding {
-	switch status {
-	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
-		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
-		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
-		return []domain.Finding{wave1Finding(CodeCFNStackRollback, cfnStatusWords(status))}
-	case "DELETE_COMPLETE":
-		return []domain.Finding{wave1Finding(CodeCFNStackDeleted, cfnStatusWords(status))}
+// cfnBuiltStates is every stack status but those of a create that failed
+// (CREATE_FAILED) or is being undone (ROLLBACK_IN_PROGRESS, ROLLBACK_FAILED,
+// ROLLBACK_COMPLETE): such a stack never built what its template describes,
+// and of ROLLBACK_COMPLETE the AWS CloudFormation User Guide says "When in
+// this state, only a delete operation can be performed". Protection against
+// deletion is advice against the action that clears it, and against the
+// delete an operator already ran on a DELETE_FAILED stack. A stack in
+// REVIEW_IN_PROGRESS is "expected StackId but without any templates or
+// resources", so there is nothing to protect yet.
+func cfnBuiltStates() []string {
+	var out []string
+	for _, s := range enumValues[cfntypes.StackStatus]() {
+		switch {
+		case s == string(cfntypes.StackStatusCreateFailed), strings.HasPrefix(s, "ROLLBACK_"),
+			s == string(cfntypes.StackStatusDeleteFailed), s == string(cfntypes.StackStatusReviewInProgress):
+			continue
+		}
+		out = append(out, s)
 	}
-	if strings.HasSuffix(status, "_FAILED") {
-		return []domain.Finding{wave1Finding(CodeCFNStackFailed, cfnStatusWords(status))}
-	}
-	if strings.HasSuffix(status, "_IN_PROGRESS") {
-		return []domain.Finding{wave1Finding(CodeCFNStackInProgress, cfnStatusWords(status))}
-	}
-	return nil
-}
-
-// cfnStackIsTearingDown reports whether a stack has nothing left to fix: it is
-// on its way out, or it never built. Posture findings ask the operator to
-// change a setting, and there is no setting worth changing on either.
-func cfnStackIsTearingDown(status string) bool {
-	return strings.HasPrefix(status, "DELETE_") || strings.HasSuffix(status, "_FAILED")
+	return out
 }
 
 // The words the fetcher writes into Fields for the two settings a stack is
-// judged on beyond its status. cfnPostureFindings reads these rather than the
-// DescribeStacks struct, so a row rebuilt from Fields alone reaches the same
-// verdict, and a word from no vocabulary is reported on like an absent one.
+// judged on beyond its status; a word from no vocabulary is reported on like
+// an absent one.
 const (
 	cfnProtectionOn  = "on"
 	cfnProtectionOff = "off"
@@ -149,17 +145,13 @@ const (
 	cfnOutputSecretAbsent  = "no"
 )
 
-// cfnPostureOf derives the two words. Both are empty for a stack there is
-// nothing to fix on — one on its way out, one that never built — and the
-// protection word is empty for a nested stack, whose protection
-// CloudFormation refuses to set separately from its root's.
+// cfnPostureOf derives the two words. The protection word is empty for a
+// nested stack, whose protection CloudFormation refuses to set separately
+// from its root's.
 //
 // secretInOutputs is the caller's single scan of the stack outputs; the word
 // and the supporting rows are then the same reading of the same outputs.
 func cfnPostureOf(stack cfntypes.Stack, secretInOutputs bool) (protection, outputSecret string) {
-	if cfnStackIsTearingDown(string(stack.StackStatus)) {
-		return "", ""
-	}
 	if stack.ParentId == nil {
 		protection = cfnProtectionOn
 		if !aws.ToBool(stack.EnableTerminationProtection) {
@@ -181,8 +173,8 @@ func cfnStackOutputs(stack cfntypes.Stack) map[string]string {
 	return outputs
 }
 
-// cfnPostureFindings returns the two posture signals. Each is independent of
-// the other and of the lifecycle finding.
+// cfnPostureFindings returns the two posture signals; which of them stand in
+// the stack's status is the state table's answer.
 func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 	var out []domain.Finding
 	if protection == cfnProtectionOff {
@@ -194,12 +186,10 @@ func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 	return out
 }
 
-// addCFNPostureRows appends the posture findings and, for the output-secret
-// one, the rows naming where the credential is and what kind it looks like.
-// The value itself never leaves the scanner.
-func addCFNPostureRows(r *resource.Resource, protection, outputSecret string, secretRows []domain.DetailRow) {
-	r.Findings = append(r.Findings, cfnPostureFindings(protection, outputSecret)...)
-	if outputSecret == cfnOutputSecretPresent {
+// addCFNPostureRows attaches the rows naming where the credential is and what
+// kind it looks like. The value itself never leaves the scanner.
+func addCFNPostureRows(r *resource.Resource, secretRows []domain.DetailRow) {
+	if hasFinding(r.Findings, CodeCFNOutputSecret) {
 		addWave1Rows(r, CodeCFNOutputSecret, secretRows...)
 	}
 }

@@ -16,13 +16,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// asgDeleting reports a group AWS is tearing down. Its capacity is on its
-// way to zero and nothing about it can be reconfigured. The single place that
-// fact is spelled: the fetcher's lifecycle switch and posture rules and the
-// launch-configuration pass in the Wave-2 enricher all call it.
-func asgDeleting(status string) bool {
-	return status == "Delete in progress"
-}
+// asgStatuses is the AutoScalingGroup Status domain: "The current state of
+// the group when the DeleteAutoScalingGroup operation is in progress" (Amazon
+// EC2 Auto Scaling API reference); a group not being deleted has none.
+var asgStatuses = []string{"Delete in progress"} //nolint:gochecknoglobals // static AWS status domain
 
 // asgChecksELBHealth reports whether the group replaces instances the load
 // balancer calls unhealthy. HealthCheckType is a comma-separated list, so a
@@ -127,29 +124,29 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		if asg.MinSize != nil {
 			minSizeInt = int(*asg.MinSize)
 		}
-		r.Findings = asgHealthFindings(status, inServiceCount, unhealthyCount, minSizeInt, suspendedProcesses)
-
-		// Posture signals, each evaluated independently of the health switch
-		// above and of one another.
-		if asgDeleting(status) {
-			resources = append(resources, r)
-			continue
-		}
+		posture := asgHealthFindings(inServiceCount, unhealthyCount, minSizeInt, suspendedProcesses)
 		if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGLegacyLaunchConfig))
+			posture = append(posture, wave1Finding(CodeASGLegacyLaunchConfig))
+		}
+		if len(asg.AvailabilityZones) < 2 {
+			posture = append(posture, wave1Finding(CodeASGSingleAZ))
+		}
+		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
+			!asgChecksELBHealth(aws.ToString(asg.HealthCheckType)) {
+			posture = append(posture, wave1Finding(CodeASGNoELBHealthCheck))
+		}
+		r.Findings = withState("asg", status, posture)
+		if hasFinding(r.Findings, CodeASGLegacyLaunchConfig) {
 			addWave1Rows(&r, CodeASGLegacyLaunchConfig, domain.DetailRow{
 				Label: "Launch configuration", Value: *asg.LaunchConfigurationName, Tier: "~",
 			})
 		}
-		if len(asg.AvailabilityZones) < 2 {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGSingleAZ))
+		if hasFinding(r.Findings, CodeASGSingleAZ) {
 			addWave1Rows(&r, CodeASGSingleAZ, domain.DetailRow{
 				Label: "Availability zones", Value: strings.Join(asg.AvailabilityZones, ", "), Tier: "~",
 			})
 		}
-		if (len(asg.LoadBalancerNames) > 0 || len(asg.TargetGroupARNs) > 0) &&
-			!asgChecksELBHealth(aws.ToString(asg.HealthCheckType)) {
-			r.Findings = append(r.Findings, wave1Finding(CodeASGNoELBHealthCheck))
+		if hasFinding(r.Findings, CodeASGNoELBHealthCheck) {
 			// The API spells the type "EC2"/"ELB"; the row says which check the
 			// group runs, not how the SDK spells it.
 			addWave1Rows(&r, CodeASGNoELBHealthCheck, domain.DetailRow{
@@ -183,14 +180,10 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 	}, nil
 }
 
-// asgHealthFindings is the one predicate for a group's health, in precedence
-// order: a group being deleted reports nothing else, then too few instances in
-// service, then unhealthy instances, then scaling processes an operator
-// suspended. colorASG runs it over Fields for rows built outside the fetcher.
-func asgHealthFindings(status string, inServiceCount, unhealthyCount, minSize int, suspendedProcesses string) []domain.Finding {
+// asgHealthFindings reports one health finding, the worst, so a short group
+// is not also told it has unhealthy instances.
+func asgHealthFindings(inServiceCount, unhealthyCount, minSize int, suspendedProcesses string) []domain.Finding {
 	switch {
-	case asgDeleting(status):
-		return []domain.Finding{wave1Finding(CodeASGStateDeleting)}
 	case inServiceCount < minSize:
 		return []domain.Finding{wave1Finding(CodeASGUnderprovisioned, strconv.Itoa(inServiceCount), strconv.Itoa(minSize))}
 	case unhealthyCount > 0:

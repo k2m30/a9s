@@ -77,8 +77,10 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
-	if len(r1.Findings) != 1 {
-		t.Fatalf("resource[1].Findings: expected 1 for pending snapshot, got %d", len(r1.Findings))
+	// A pending snapshot is Transitional, so its posture stands beside its
+	// state: the unencrypted finding follows the pending one.
+	if len(r1.Findings) != 2 || r1.Findings[1].Code != awsclient.CodeEBSSnapUnencrypted {
+		t.Fatalf("resource[1].Findings: expected pending then unencrypted for an unencrypted pending snapshot, got %+v", r1.Findings)
 	}
 	if r1.Findings[0].Code != awsclient.CodeEBSSnapStatePending {
 		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEBSSnapStatePending, r1.Findings[0].Code)

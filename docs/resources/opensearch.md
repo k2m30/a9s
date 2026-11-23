@@ -91,12 +91,12 @@ Transcribed from `docs/attention-signals.md § Signals § DATABASES & STORAGE` r
 
 One bullet per distinct signal.
 
-- **Signal**: `DomainStatus.Deleted == true`.
+- **Signal**: `DomainStatus.Deleted == true` or `DomainProcessingStatus == Deleting`.
   - **State bucket**: Dim.
   - **API call**: `DescribeDomains` — bounded fan-out (up to 5 domain names per call; effectively one-per-N-resources).
   - **Cost shape**: hybrid (batched per-resource).
 
-- **Signal**: `DomainStatus.Processing == true` OR `DomainStatus.UpgradeProcessing == true`.
+- **Signal**: `DomainStatus.Processing == true` OR `DomainStatus.UpgradeProcessing == true` on an Active domain.
   - **State bucket**: Warning.
   - **API call**: `DescribeDomains` — bounded fan-out (shared; one DescribeDomains call returns all the fields).
   - **Cost shape**: hybrid.
@@ -142,6 +142,18 @@ One bullet per distinct signal.
 
 A domain whose `DescribeDomains` batch answers `ResourceNotFoundException` was deleted after the list call: it is no row and no failure. Every other listed domain keeps its place in the list order.
 
+- **Signal**: `DomainProcessingStatus == Creating`
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DomainProcessingStatus` is Modifying, UpgradingEngineVersion or UpdatingServiceSoftware
+  - **State bucket**: Warning. The same finding an Active domain with `Processing` or `UpgradeProcessing` set raises
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DomainProcessingStatus` is a value the SDK enum does not list
+  - **State bucket**: Warning. The row is not shown clean; the value AWS sent is in the phrase
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 None. `DescribeDomains` is the fetcher's own call and its `DomainStatus`
@@ -175,6 +187,9 @@ One row per signal from §3:
 | `NodeToNodeEncryptionOptions.Enabled` not true | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `node-to-node encryption off` |
 | `DescribeDomains` was denied for this domain | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | the domain is absent from the `DescribeDomains` response | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
+| `DomainProcessingStatus == Creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
+| `DomainProcessingStatus` is Modifying, UpgradingEngineVersion or UpdatingServiceSoftware | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `processing: config change in flight` |
+| `DomainProcessingStatus` is a value the SDK enum does not list | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status> (unrecognised)` |
 
 ## 4.1 UX review
 
@@ -222,6 +237,8 @@ opensearch — DATABASES & STORAGE. Status key: `status` — the key the status 
 | --- | --- | --- | --- | --- |
 | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 | — |
 | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 | AWS has isolated this domain, which it does when a cluster is unstable or out of disk, and a domain in that state serves no requests. Check its storage and shard health, free space or scale up, then work with AWS support to bring it back. |
+| opensearch.state.creating | creating | warn | wave1 | The domain is still being created, so its endpoint does not serve requests yet. Wait for it to become active before pointing clients at it. |
+| opensearch.state.unrecognised | <status> (unrecognised) | warn | wave1 | OpenSearch reports a domain processing status a9s does not recognise, so a9s cannot tell whether the domain serves requests. Check the domain in the OpenSearch console before relying on it. |
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 | A configuration change is being applied to the domain, which moves shards between nodes and can slow queries or briefly reject them. Wait for it to complete before making another change or judging the domain's performance. |
 | opensearch.update-forced | software update forced soon | warn | wave1 | AWS will apply this service software update itself once the scheduled date passes, taking whatever maintenance window it chooses. Apply it yourself before that date so the blue/green deployment lands at a time you picked. |
 | opensearch.encryption-off | encryption at rest off | warn | wave1 | Data at rest is stored unencrypted, so anyone who gets the underlying storage or a snapshot reads the indexes in the clear. On OpenSearch and on Elasticsearch 6.7 or later, turn on encryption at rest in the domain's security configuration after turning off its warm and cold storage tiers; an older Elasticsearch domain needs a new encrypted domain and a data migration. |

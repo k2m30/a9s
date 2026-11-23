@@ -18,51 +18,28 @@ const (
 	// mid-transition).
 	CodeEBHealthGrey domain.FindingCode = "eb.health.grey"
 
-	// CodeEBTerminated — environment Status is Terminated. Takes precedence
-	// over a Grey/Yellow health reading (a torn-down environment's stale
-	// health data is not itself the story) but not over Red (a critical
-	// health reading on a not-yet-fully-terminated environment still wins).
 	CodeEBTerminated domain.FindingCode = "eb.status.terminated"
 
-	// CodeEBLaunching — Status is Launching/Updating with no health signal.
 	CodeEBLaunching domain.FindingCode = "eb.status.launching"
 
-	// CodeEBTerminating — Status is Terminating with no health signal.
 	CodeEBTerminating domain.FindingCode = "eb.status.terminating"
+
+	CodeEBTransitional       domain.FindingCode = "eb.status.transitional"
+	CodeEBUnrecognisedStatus domain.FindingCode = "eb.status.unrecognised"
 )
 
 // ebEnvironmentFindings returns the wave1 Finding slice for an Elastic
-// Beanstalk environment, mirroring colorEB's own precedence exactly: a
-// Terminated status downgrades any non-Red health reading to dim; Red health
-// always wins; otherwise health (Yellow/Grey) wins over status; with no
-// health signal at all, status (Launching/Updating/Terminating) is the only
-// signal.
+// Beanstalk environment: its Status from the state table, and its Health, a
+// second axis, beside it.
 func ebEnvironmentFindings(status, health string) []domain.Finding {
-	var healthFinding *domain.Finding
+	var posture []domain.Finding
 	switch health {
 	case "Red":
-		f := wave1Finding(CodeEBHealthRed)
-		healthFinding = &f
+		posture = append(posture, wave1Finding(CodeEBHealthRed))
 	case "Yellow":
-		f := wave1Finding(CodeEBHealthYellow)
-		healthFinding = &f
+		posture = append(posture, wave1Finding(CodeEBHealthYellow))
 	case "Grey":
-		f := wave1Finding(CodeEBHealthGrey)
-		healthFinding = &f
+		posture = append(posture, wave1Finding(CodeEBHealthGrey))
 	}
-
-	if status == "Terminated" && (healthFinding == nil || healthFinding.Severity != domain.SevBroken) {
-		return []domain.Finding{wave1Finding(CodeEBTerminated)}
-	}
-	if healthFinding != nil {
-		return []domain.Finding{*healthFinding}
-	}
-
-	switch status {
-	case "Launching", "Updating":
-		return []domain.Finding{wave1Finding(CodeEBLaunching)}
-	case "Terminating":
-		return []domain.Finding{wave1Finding(CodeEBTerminating)}
-	}
-	return nil
+	return withState("eb", status, posture)
 }

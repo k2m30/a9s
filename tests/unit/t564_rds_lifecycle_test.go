@@ -275,10 +275,22 @@ func t564Top(t *testing.T, what string, r resource.Resource) domain.Finding {
 		t.Errorf("%s: row carries no finding; Status cell %q", what, r.Fields["status"])
 		return top
 	}
-	if r.Fields["status"] != top.Phrase {
-		t.Errorf("%s: Status cell %q, want the top finding's phrase %q", what, r.Fields["status"], top.Phrase)
+	if raw := t564RawStatus(r); r.Fields["status"] != raw {
+		t.Errorf("%s: Fields[status] %q, want the AWS value %q", what, r.Fields["status"], raw)
 	}
 	return top
+}
+
+func t564RawStatus(r resource.Resource) string {
+	switch v := r.RawStruct.(type) {
+	case rdstypes.DBInstance:
+		return aws.ToString(v.DBInstanceStatus)
+	case rdstypes.DBCluster:
+		return aws.ToString(v.Status)
+	case docdbtypes.DBCluster:
+		return aws.ToString(v.Status)
+	}
+	return ""
 }
 
 // t564AssertFailedState pins what a failed or terminal lifecycle state
@@ -365,8 +377,8 @@ func TestT564_UnrecognisedStatusRendersTheSameInBothLanes(t *testing.T) {
 	var details []string
 	for what, r := range rows {
 		top := t564Top(t, what, r)
-		if top.Phrase != t564InventedStatus || top.Severity != domain.SevWarn {
-			t.Errorf("%s: top finding %q at %v, want %q at Warn", what, top.Phrase, top.Severity, t564InventedStatus)
+		if want := t564InventedStatus + " (unrecognised)"; top.Phrase != want || top.Severity != domain.SevWarn {
+			t.Errorf("%s: top finding %q at %v, want %q at Warn", what, top.Phrase, top.Severity, want)
 		}
 		if !t564NotRecognised.MatchString(top.Detail) {
 			t.Errorf("%s: detail %q does not say a9s does not recognise the status", what, top.Detail)

@@ -760,7 +760,6 @@ var vacuousPhraseAllowlist = map[string]string{ //nolint:gochecknoglobals // bur
 	"phrase:ecs-task:ecs-task.health.unhealthy":              "ecsTaskStructuralFindings' health-check branch (core/aws/ecs_task_codes.go) sets Phrase: \"unhealthy\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"unhealthy: container health check failing\").",
 	"phrase:efs:efs.broken.error":                            "EFS's error branch (core/aws/efs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
 	"rendered:ebs:vol-0error00000000b2:list-status":          "same production gap as phrase:ebs:ebs.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
-	"rendered:ebs-snap:snap-error000000000b:list-status":     "same production gap as phrase:ebs-snap:ebs-snap.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
 	"rendered:ecs-task:a7b8c9d0e1f2a7b8c9d0e1f2:list-status": "same production gap as phrase:ecs-task:ecs-task.health.unhealthy — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
 }
 

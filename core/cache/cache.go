@@ -36,10 +36,24 @@ import (
 // single chokepoint inside this package; a version bump only changes this
 // constant plus the encode/decode logic, never callers.
 //
-// v2 adds Row.FindingFirstSeen. LoadDirIn also accepts a v1 file,
-// backfilling FindingFirstSeen from the file's own SavedAt so a v1 cache
-// still loads instead of reading as "no cache".
-const SchemaVersion = 2
+// LoadDirIn also reads versions 1 and 2. Their value under a type's status key
+// is a finding phrase, not a lifecycle value AWS reported, so it is dropped on
+// load; a version 1 file has no FindingFirstSeen and gets it backfilled from
+// the file's own SavedAt. Either still loads instead of reading as "no cache".
+const SchemaVersion = 3
+
+// dropPhraseStatus removes the status-key value a pre-v3 file stored for a
+// type with a state table. The row keeps its findings, which carry the
+// phrase; the lifecycle value comes back with the next fetch.
+func dropPhraseStatus(shortName string, rows []Row) {
+	td := resource.FindResourceType(resource.CanonicalShortName(shortName))
+	if td == nil || len(td.StateEnum) == 0 {
+		return
+	}
+	for _, r := range rows {
+		delete(r.Fields, td.StatusKey())
+	}
+}
 
 // Row is a render-sufficient snapshot of one list row, persisted alongside
 // the type's TypeFile so a cold start can seed the list screen with real
@@ -343,7 +357,9 @@ func LoadDirIn(root, profile, region string) *Store {
 		switch tf.Version {
 		case SchemaVersion:
 			// current format, nothing to backfill.
-		case SchemaVersion - 1:
+		case 2:
+			dropPhraseStatus(shortName, tf.Rows)
+		case 1:
 			// v1 file: it has no FindingFirstSeen, so every finding
 			// currently on the row is stamped with the file's own SavedAt —
 			// the closest available approximation of when it was first
@@ -358,8 +374,9 @@ func LoadDirIn(root, profile, region string) *Store {
 				}
 				tf.Rows[i].FindingFirstSeen = stamped
 			}
+			dropPhraseStatus(shortName, tf.Rows)
 		default:
-			logging.L().Warn("cache skip", "file", path, "reason", fmt.Sprintf("unsupported schema version %d (want %d or %d)", tf.Version, SchemaVersion, SchemaVersion-1))
+			logging.L().Warn("cache skip", "file", path, "reason", fmt.Sprintf("unsupported schema version %d (want 1 to %d)", tf.Version, SchemaVersion))
 			continue
 		}
 		// One canonicalization, here at the load boundary: a file named after

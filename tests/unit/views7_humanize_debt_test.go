@@ -67,6 +67,10 @@ var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 	{"pipeline", "acme-api-deploy", "ExecutionMode", "QUEUED", "queued"},
 
 	{"tg", "acme-grpc-tg", "ProtocolVersion", "GRPC", "grpc"},
+
+	// The detail Status row shows the lifecycle value AWS reported, in words.
+	{"mwaa", "dim-airflow-deleting", "Status", "DELETING", "deleting"},
+	{"mwaa", "warn-airflow-maintenance", "Status", "MAINTENANCE", "maintenance"},
 }
 
 // views7UntouchedWitnesses are the rows the same fields must leave exactly as
@@ -74,8 +78,6 @@ var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 // and a fact the resource does not carry stays the not-applicable dash rather
 // than becoming a word that looks like an answer.
 var views7UntouchedWitnesses = []views7RawEnumWitness{
-	{"mwaa", "dim-airflow-deleting", "Status", "", "deleting — environment teardown"},
-	{"mwaa", "warn-airflow-maintenance", "Status", "", "maintenance in progress"},
 	{"pipeline", "acme-frontend-deploy", "ExecutionMode", "", "-"},
 	{"tg", "acme-web-tg", "ProtocolVersion", "", "-"},
 }

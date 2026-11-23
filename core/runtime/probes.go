@@ -17,6 +17,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
@@ -1030,6 +1031,12 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
+	if kept := enrichableRows(shortName, e, resources); len(kept) < len(resources) {
+		if len(kept) == 0 {
+			return ProbeEnrichmentResult{ResourceType: shortName}
+		}
+		resources = kept
+	}
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -1063,6 +1070,24 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 		TruncatedIDs:     result.TruncatedIDs,
 		Err:              err,
 	}
+}
+
+// enrichableRows drops the rows whose lifecycle class is tearing down, ended
+// or pending deletion before the enricher, its cap and its declared reads see
+// them: such a resource has no posture left to find, unless the enricher
+// declares ReadsNonLive.
+func enrichableRows(shortName string, e awsclient.IssueEnricher, rows []resource.Resource) []resource.Resource {
+	td, ok := catalog.StateTable(shortName)
+	if !ok || e.ReadsNonLive {
+		return rows
+	}
+	kept := make([]resource.Resource, 0, len(rows))
+	for _, r := range rows {
+		if catalog.RowLifecycle(td, r).Live() {
+			kept = append(kept, r)
+		}
+	}
+	return kept
 }
 
 // prefetchDeclaredRead reads the first page of a list an enricher declares

@@ -292,14 +292,24 @@ func TestW4SecretConditionValuesAsArray(t *testing.T) {
 // TestW4SecretScheduledForDeletionEmitsNoPostureFinding pins that a secret
 // already scheduled for deletion is not reported for its resource policy. The
 // operator's action is to wait or restore, and a posture row on a resource on
-// its way out is noise that outlives the resource.
+// its way out is noise that outlives the resource. A live secret beside it
+// with the same policy is still flagged.
 func TestW4SecretScheduledForDeletionEmitsNoPostureFinding(t *testing.T) {
 	deleted := w4SecretResource("acme-retired-api-key")
-	deleted.Fields["status"] = "DELETED"
+	deleted.Fields["status"] = "deleted"
+	live := w4SecretResource("acme-live-api-key")
 	fake := &w4SecretsFake{policies: map[string]string{
 		"acme-retired-api-key": w4SecretPublicPolicyDoc,
+		"acme-live-api-key":    w4SecretPublicPolicyDoc,
 	}}
-	res := w4EnrichSecrets(t, fake, []resource.Resource{deleted})
+	clients := &awsclient.ServiceClients{SecretsManager: fake, Region: "us-east-1"}
+	identity := session.NewIdentityStore()
+	identity.Set(w4OwnAccount, nil)
+	clients.SetIdentityStore(identity)
+	res := Wave2Result(t, "secrets", clients, []resource.Resource{deleted, live})
 	w4AssertNoCode(t, res.Findings["acme-retired-api-key"], w4CodeSecretPublicPolicy)
 	w4AssertNoCode(t, res.Findings["acme-retired-api-key"], w4CodeSecretCrossAccount)
+	if !hasCode(res.Findings["acme-live-api-key"], w4CodeSecretPublicPolicy) {
+		t.Errorf("live secret findings %v lack %s", res.Findings["acme-live-api-key"], w4CodeSecretPublicPolicy)
+	}
 }

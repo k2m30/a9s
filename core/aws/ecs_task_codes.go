@@ -44,7 +44,32 @@ const (
 	// CodeECSTaskHealthUnhealthy — task's container health check reports
 	// UNHEALTHY while the task itself is still RUNNING.
 	CodeECSTaskHealthUnhealthy domain.FindingCode = "ecs-task.health.unhealthy"
+
+	CodeECSTaskStateDeleted      domain.FindingCode = "ecs-task.state.deleted"
+	CodeECSTaskStateUnrecognised domain.FindingCode = "ecs-task.state.unrecognised"
 )
+
+// ecsTaskStatuses is the task lastStatus domain of the Amazon ECS Developer
+// Guide, "Amazon ECS task lifecycle"; the SDK types it as a plain string.
+// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-lifecycle-explanation.html
+var ecsTaskStatuses = []string{ //nolint:gochecknoglobals // static AWS status domain
+	"PROVISIONING", "PENDING", "ACTIVATING", "RUNNING", "DEACTIVATING",
+	"STOPPING", "DEPROVISIONING", "STOPPED", "DELETED",
+}
+
+// ecsTaskFindings is a task's state finding beside its container health and
+// its stop code, a second axis AWS sets once a stop starts; the stop-code
+// FindingDef declares every class, a stopped task's included.
+func ecsTaskFindings(status, stopCode, healthStatus string) []domain.Finding {
+	var posture []domain.Finding
+	if strings.EqualFold(healthStatus, string(ecstypes.HealthStatusUnhealthy)) {
+		posture = append(posture, wave1Finding(CodeECSTaskHealthUnhealthy))
+	}
+	if stopCode != "" && !ecsStopCodeIsRoutine(stopCode) {
+		posture = append(posture, wave1Finding(CodeECSTaskStopCodeFailed, domain.HumanizeStatusPhrase(stopCode)))
+	}
+	return withState("ecs-task", status, posture)
+}
 
 // ecsStopCodeIsRoutine reports whether a StopCode names the platform doing its
 // job rather than the task failing. The scheduler stops tasks on every
@@ -63,10 +88,6 @@ func ecsStopCodeIsRoutine(stopCode string) bool {
 	return false
 }
 
-// ecsTaskWave1Findings returns the wave1 Finding slice for an ECS task's
-// last_status. Returns nil for terminal/healthy states (RUNNING, STOPPED).
-// Shared by ecs_task.go and ecs_svc_tasks.go::convertEcsTask to keep their
-// lifecycle classification in lockstep.
 func ecsTaskWave1Findings(status string) []domain.Finding {
 	switch status {
 	case "PROVISIONING":
@@ -95,12 +116,6 @@ func ecsTaskHealthWords(status ecstypes.HealthStatus) string {
 	return strings.ToLower(string(status))
 }
 
-// ecsTaskStructuralFindings returns the wave1 Finding slice for the ecs-task
-// top-level resource type, mirroring colorECSTask's own precedence: a
-// RUNNING task with an UNHEALTHY container health check is broken outright;
-// a STOPPED task with a non-UserInitiated stop code is broken; any other
-// STOPPED task is a normal, dim lifecycle stop; everything else falls
-// through to the shared transitional-state findings.
 func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.Finding {
 	// Compared case-insensitively because this predicate also runs over rows
 	// rebuilt from the on-disk type cache, which may hold the SDK's uppercase
@@ -109,10 +124,6 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	if strings.EqualFold(healthStatus, string(ecstypes.HealthStatusUnhealthy)) {
 		return []domain.Finding{wave1Finding(CodeECSTaskHealthUnhealthy)}
 	}
-	// Not ecsTaskGone: that predicate answers "has teardown started", which
-	// is true for the transitional states below and would swallow their own
-	// lifecycle findings. This branch asks the narrower question of whether
-	// the task has actually stopped, which is what picks stop-code over dim.
 	if status == "STOPPED" {
 		if stopCode != "" && !ecsStopCodeIsRoutine(stopCode) {
 			return []domain.Finding{wave1Finding(CodeECSTaskStopCodeFailed, domain.HumanizeStatusPhrase(stopCode))}

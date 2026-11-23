@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -9,6 +10,7 @@ import (
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -77,8 +79,8 @@ func TestRedis_Fetch_HealthyAvailable(t *testing.T) {
 	if r.ID != "prod-redis-sessions" {
 		t.Errorf("ID = %q, want %q", r.ID, "prod-redis-sessions")
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf("Fields[\"status\"] = %q, want %q (Healthy silence)", r.Fields["status"], "")
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf("Status cell = %q, want %q (Healthy silence)", domain.StatusPhrase(r.Findings), "")
 	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings = %v, want empty (Healthy)", r.Findings)
@@ -101,8 +103,8 @@ func TestRedis_Fetch_StatusCreating(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "creating \u2014 new group"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -125,8 +127,8 @@ func TestRedis_Fetch_StatusModifying(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "modifying \u2014 config change"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -149,8 +151,8 @@ func TestRedis_Fetch_StatusSnapshotting(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "snapshotting \u2014 backup running"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -173,8 +175,8 @@ func TestRedis_Fetch_StatusDeleting(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "deleting \u2014 teardown"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -197,8 +199,8 @@ func TestRedis_Fetch_StatusCreateFailed(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "create failed \u2014 see events"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -221,8 +223,8 @@ func TestRedis_Fetch_MultiAZWithoutFailover(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "multi-AZ without auto-failover"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
@@ -244,8 +246,8 @@ func TestRedis_Fetch_MultiAZDisabled_NoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Fields["status"] != "" {
-		t.Errorf("Fields[\"status\"] = %q, want %q (single-AZ groups do not trigger the signal)", r.Fields["status"], "")
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf("Status cell = %q, want %q (single-AZ groups do not trigger the signal)", domain.StatusPhrase(r.Findings), "")
 	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings = %v, want empty (no signal for single-AZ)", r.Findings)
@@ -268,8 +270,8 @@ func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantStatus = "modifying \u2014 config change (+1)"
-	if r.Fields["status"] != wantStatus {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	if domain.StatusPhrase(r.Findings) != wantStatus {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantStatus)
 	}
 	if len(r.Findings) != 2 {
 		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
@@ -340,8 +342,8 @@ func TestRedis_Wave3_NoMetricFieldsInvented(t *testing.T) {
 			t.Errorf("Fields[%q] = %q should not exist — Wave 3 metrics are out of scope for Wave 1 fetcher", key, val)
 		}
 	}
-	if r.Fields["status"] != "" {
-		t.Errorf("Fields[\"status\"] = %q, want %q (healthy group)", r.Fields["status"], "")
+	if domain.StatusPhrase(r.Findings) != "" {
+		t.Errorf("Status cell = %q, want %q (healthy group)", domain.StatusPhrase(r.Findings), "")
 	}
 }
 
@@ -473,8 +475,8 @@ func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
 	r := result.Resources[0]
 
 	const wantPhrase = "modifying \u2014 config change"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q (single-shard preserves RG phrase)", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q (single-shard preserves RG phrase)", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
@@ -501,13 +503,23 @@ func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	const wantPhrase = "shard 0001: modifying"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	// The group's own state finding leads; the shard not available stands
+	// beside it.
+	const wantStatus = "modifying — config change (+1)"
+	if domain.StatusPhrase(r.Findings) != wantStatus {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantStatus)
 	}
-	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
-		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
+	if got := redisPhrases(r.Findings); !reflect.DeepEqual(got, []string{"modifying — config change", "shard 0001: modifying"}) {
+		t.Errorf("Findings = %v", got)
 	}
+}
+
+func redisPhrases(fs []domain.Finding) []string {
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, f.Phrase)
+	}
+	return out
 }
 
 func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
@@ -530,19 +542,13 @@ func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	const wantStatus = "shard 0001: modifying (+1)"
-	if r.Fields["status"] != wantStatus {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	const wantStatus = "modifying — config change (+2)"
+	if domain.StatusPhrase(r.Findings) != wantStatus {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantStatus)
 	}
-	if len(r.Findings) != 2 {
-		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
-	}
-	// Alphabetical by phrase: "shard 0001: modifying" < "shard 0002: snapshotting".
-	if r.Findings[0].Phrase != "shard 0001: modifying" {
-		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "shard 0001: modifying")
-	}
-	if r.Findings[1].Phrase != "shard 0002: snapshotting" {
-		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "shard 0002: snapshotting")
+	want := []string{"modifying — config change", "shard 0001: modifying", "shard 0002: snapshotting"}
+	if got := redisPhrases(r.Findings); !reflect.DeepEqual(got, want) {
+		t.Errorf("Findings = %v, want %v", got, want)
 	}
 }
 
@@ -568,8 +574,8 @@ func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 
 	// Transient: RG is modifying but no specific shard is — fall back to RG phrase.
 	const wantPhrase = "modifying \u2014 config change"
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Fields[\"status\"] = %q, want %q (fallback to RG phrase when no shard is transitioning)", r.Fields["status"], wantPhrase)
+	if domain.StatusPhrase(r.Findings) != wantPhrase {
+		t.Errorf("Status cell = %q, want %q (fallback to RG phrase when no shard is transitioning)", domain.StatusPhrase(r.Findings), wantPhrase)
 	}
 	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
 		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
@@ -596,18 +602,14 @@ func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying".
-	const wantStatus = "multi-AZ without auto-failover (+1)"
-	if r.Fields["status"] != wantStatus {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	// A modifying group is live, so its posture finding stands beside the
+	// state finding and the shard issue.
+	const wantStatus = "modifying — config change (+2)"
+	if domain.StatusPhrase(r.Findings) != wantStatus {
+		t.Errorf("Status cell = %q, want %q", domain.StatusPhrase(r.Findings), wantStatus)
 	}
-	if len(r.Findings) != 2 {
-		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
-	}
-	if r.Findings[0].Phrase != "multi-AZ without auto-failover" {
-		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "multi-AZ without auto-failover")
-	}
-	if r.Findings[1].Phrase != "shard 0001: modifying" {
-		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "shard 0001: modifying")
+	want := []string{"modifying — config change", "multi-AZ without auto-failover", "shard 0001: modifying"}
+	if got := redisPhrases(r.Findings); !reflect.DeepEqual(got, want) {
+		t.Errorf("Findings = %v, want %v", got, want)
 	}
 }

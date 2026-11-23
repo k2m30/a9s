@@ -32,15 +32,10 @@ func d4FoldedRows(t *testing.T, shortName string) ([]resource.Resource, resource
 	rows := DrainPages(t, shortName, func(token string) (resource.FetchResult, error) {
 		return td.Fetcher(context.Background(), clients, token)
 	})
-	enricher, ok := awsclient.Wave2EnricherFor(shortName)
-	if !ok || enricher.Fn == nil {
+	if _, ok := awsclient.Wave2EnricherFor(shortName); !ok {
 		return rows, *td
 	}
-	cache := resource.ResourceCache{shortName: resource.ResourceCacheEntry{Resources: rows}}
-	res, err := enricher.Fn(context.Background(), clients, rows, cache)
-	if err != nil {
-		t.Fatalf("%s wave-2: %v", shortName, err)
-	}
+	res := Wave2Result(t, shortName, clients, rows)
 	for i := range rows {
 		a9sruntime.ApplyWave2ToRow(&rows[i], *td, res.Findings, res.AttentionDetails)
 	}

@@ -8,4 +8,6 @@ const (
 	CodeKinesisCreating domain.FindingCode = "kinesis.warn.creating"
 	CodeKinesisUpdating domain.FindingCode = "kinesis.warn.updating"
 	CodeKinesisDeleting domain.FindingCode = "kinesis.warn.deleting"
+
+	CodeKinesisUnrecognisedStatus domain.FindingCode = "kinesis.warn.unrecognised_status"
 )

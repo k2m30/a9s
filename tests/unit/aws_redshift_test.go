@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -40,13 +41,19 @@ func fetchSingleCluster(t *testing.T, cluster redshifttypes.Cluster) resource.Re
 	if len(result.Resources) != 1 {
 		t.Fatalf("FetchRedshiftClustersPage: expected 1 resource, got %d", len(result.Resources))
 	}
-	return result.Resources[0]
+	r := result.Resources[0]
+	if got, want := r.Fields["status"], aws.ToString(cluster.ClusterStatus); got != want {
+		t.Errorf("Resource.Fields[\"status\"] = %q, want the AWS value %q", got, want)
+	}
+	return r
 }
 
+// assertStatus pins the Status cell, which the list builds from the row's
+// findings.
 func assertStatus(t *testing.T, r resource.Resource, wantPhrase string) {
 	t.Helper()
-	if r.Fields["status"] != wantPhrase {
-		t.Errorf("Resource.Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	if got := domain.StatusPhrase(r.Findings); got != wantPhrase {
+		t.Errorf("Status cell = %q, want %q", got, wantPhrase)
 	}
 }
 
@@ -227,27 +234,20 @@ func TestRedshift_Fetch_MultiW1_Two_Warnings_Suffix_Plus_1(t *testing.T) {
 	})
 }
 
-func TestRedshift_Fetch_Broken_ClusterStatus_Beats_Availability_Modifying(t *testing.T) {
+// A full cluster still exists with its endpoint and its data, so its exposure
+// and the availability axis stand beside the state; the Broken state leads the
+// cell.
+func TestRedshift_Fetch_Broken_ClusterStatus_Leads_And_Posture_Stands(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftBrokenWithWarningHiddenID))
-	assertStatus(t, r, "out of storage")
-	assertFindings(t, r, []string{"out of storage"})
+	assertStatus(t, r, "out of storage (+3)")
+	assertFindings(t, r, []string{"out of storage", "modifying — availability affected", "public endpoint", "unencrypted at rest"})
 	assertClusterStatusField(t, r, "storage-full")
-	for _, f := range r.Findings {
-		if strings.Contains(f.Phrase, "publicly") || strings.Contains(f.Phrase, "unencrypted") || strings.Contains(f.Phrase, "modifying") {
-			t.Errorf("Findings contains warning phrase %q when Broken should suppress all Warnings", f.Phrase)
-		}
-	}
 }
 
-func TestRedshift_Fetch_Broken_Availability_Beats_Warning_PubliclyAccessible(t *testing.T) {
+func TestRedshift_Fetch_Broken_Availability_Leads_And_Posture_Stands(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailUnavailableWithWarningHiddenID))
-	assertStatus(t, r, "unavailable")
-	assertFindings(t, r, []string{"unavailable"})
-	for _, f := range r.Findings {
-		if strings.Contains(f.Phrase, "publicly") || strings.Contains(f.Phrase, "unencrypted") {
-			t.Errorf("Findings contains warning phrase %q when Broken should suppress all Warnings", f.Phrase)
-		}
-	}
+	assertStatus(t, r, "unavailable (+1)")
+	assertFindings(t, r, []string{"unavailable", "public endpoint"})
 }
 
 func TestRedshift_Fetch_IgnoresCloudWatchPercentageDiskSpaceUsed(t *testing.T) {

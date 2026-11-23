@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -61,21 +62,15 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			rotationEnabled = "Yes"
 		}
 
-		// Compute status: DELETED > OVERDUE > DORMANT > OK
-		secretStatus := "OK"
-		switch {
-		case secret.DeletedDate != nil:
-			secretStatus = "DELETED"
-		case secret.RotationEnabled != nil && *secret.RotationEnabled && secret.NextRotationDate != nil && time.Now().After(*secret.NextRotationDate):
-			secretStatus = "OVERDUE"
-		case secret.LastAccessedDate != nil && time.Since(*secret.LastAccessedDate) > 180*24*time.Hour:
-			secretStatus = "DORMANT"
+		secretStatus := secretsStateActive
+		if secret.DeletedDate != nil {
+			secretStatus = secretsStateDeleted
 		}
 
 		r := resource.Resource{
 			ID:       secretName,
 			Name:     secretName,
-			Findings: secretFindings(secretStatus, rotationEnabled, lastChanged),
+			Findings: withState("secrets", secretStatus, secretPostureFindings(secret, rotationEnabled, lastChanged)),
 			Fields: map[string]string{
 				"secret_name":      secretName,
 				"description":      description,
@@ -113,16 +108,20 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 	}, nil
 }
 
-// secretFindings is the one predicate for a secret: its status first, and only
-// when the status says nothing, the rotation and staleness checks. colorSecrets
-// runs it over Fields for rows built outside the fetcher.
-func secretFindings(status, rotationEnabled, lastChanged string) []domain.Finding {
-	switch status {
-	case "DELETED":
-		return []domain.Finding{wave1Finding(CodeSecretStateDeleted)}
-	case "OVERDUE":
+// The lifecycle a ListSecrets entry states, which has no status field: a
+// DeletedDate is "Not present on active secrets", and a secret that carries
+// one "can be recovered until the number of days in the recovery window has
+// passed" (SecretListEntry.DeletedDate).
+const (
+	secretsStateActive  = "active"
+	secretsStateDeleted = "deleted"
+)
+
+func secretPostureFindings(secret smtypes.SecretListEntry, rotationEnabled, lastChanged string) []domain.Finding {
+	if secret.RotationEnabled != nil && *secret.RotationEnabled && secret.NextRotationDate != nil && time.Now().After(*secret.NextRotationDate) {
 		return []domain.Finding{wave1Finding(CodeSecretStateRotationOverdue)}
-	case "DORMANT":
+	}
+	if secret.LastAccessedDate != nil && time.Since(*secret.LastAccessedDate) > 180*24*time.Hour {
 		return []domain.Finding{wave1Finding(CodeSecretStateDormant)}
 	}
 	if rotationEnabled == "No" {

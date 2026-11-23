@@ -39,6 +39,29 @@ func mustParseCFNTime(s string) time.Time {
 	return t
 }
 
+// stackEvent is one DescribeStackEvents entry. AWS gives the stack's own
+// events the stack ID as PhysicalResourceId, which is how the latest operation
+// is found; an empty logicalID makes it such an event.
+func stackEvent(stackName, stackID, eventID, at, logicalID, resType, physicalID string, status cfntypes.ResourceStatus, reason string) cfntypes.StackEvent {
+	if logicalID == "" {
+		logicalID, resType, physicalID = stackName, "AWS::CloudFormation::Stack", stackID
+	}
+	ev := cfntypes.StackEvent{
+		EventId:            aws.String(eventID),
+		StackName:          aws.String(stackName),
+		StackId:            aws.String(stackID),
+		Timestamp:          aws.Time(mustParseCFNTime(at)),
+		LogicalResourceId:  aws.String(logicalID),
+		ResourceType:       aws.String(resType),
+		PhysicalResourceId: aws.String(physicalID),
+		ResourceStatus:     status,
+	}
+	if reason != "" {
+		ev.ResourceStatusReason = aws.String(reason)
+	}
+	return ev
+}
+
 // minimalCreateEventSequence returns the 4 canonical CREATE events for a stack:
 // stack-create-in-progress, primary-resource-create-in-progress,
 // primary-resource-create-complete, stack-create-complete, so every graph-root
@@ -96,7 +119,7 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			CreationTime:                aws.Time(mustParseCFNTime("2024-10-15T09:00:00+00:00")),
 			LastUpdatedTime:             aws.Time(mustParseCFNTime("2025-06-20T14:30:00+00:00")),
 			Description:                 aws.String("Core VPC networking stack for Acme Corp production"),
-			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111"),
+			StackId:                     aws.String(cfnVPCStackID),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
 			Capabilities:                []cfntypes.Capability{cfntypes.CapabilityCapabilityIam},
 			EnableTerminationProtection: aws.Bool(true),
@@ -323,8 +346,8 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
-		// DELETE_COMPLETE → Dim (cfnStackFindings). DescribeStacks still reports a
-		// recently torn-down stack for a retention window after deletion.
+		// DescribeStacks still reports a recently torn-down stack for a
+		// retention window after deletion.
 		{
 			StackName:                   aws.String("acme-decommissioned-poc"),
 			EnableTerminationProtection: aws.Bool(true),
@@ -336,7 +359,6 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
-		// StackStatus=CREATE_FAILED → wave1 finding (CodeCFNStackFailed, SevBroken) → Broken.
 		{
 			StackName:                   aws.String("acme-experimental-queue"),
 			EnableTerminationProtection: aws.Bool(true),
@@ -350,6 +372,43 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			Tags: []cfntypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
+		},
+		{
+			StackName:                   aws.String(CFNTerminationProtectionOff),
+			EnableTerminationProtection: aws.Bool(false),
+			StackStatus:                 cfntypes.StackStatusUpdateRollbackFailed,
+			StackStatusReason:           aws.String("The following resource(s) failed to update: [BillingTable]."),
+			CreationTime:                aws.Time(mustParseCFNTime("2025-10-02T08:30:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-14T16:05:00+00:00")),
+			Description:                 aws.String("Billing API: Lambda functions, API Gateway and DynamoDB tables"),
+			StackId:                     aws.String(cfnBillingStackID),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Team"), Value: aws.String("payments")},
+			},
+		},
+		{
+			StackName:                   aws.String(CFNDeletingStack),
+			EnableTerminationProtection: aws.Bool(false),
+			StackStatus:                 cfntypes.StackStatusDeleteInProgress,
+			StackStatusReason:           aws.String("User Initiated"),
+			CreationTime:                aws.Time(mustParseCFNTime("2025-06-11T13:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-27T10:40:00+00:00")),
+			Description:                 aws.String("Nightly batch workers, replaced by the Step Functions pipeline"),
+			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-retired-batch/0000aaaa-1111-bbbb-2222-cccc3333dddd"),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
+		},
+		{
+			StackName:                   aws.String(CFNDeleteFailedStack),
+			EnableTerminationProtection: aws.Bool(false),
+			StackStatus:                 cfntypes.StackStatusDeleteFailed,
+			StackStatusReason:           aws.String("The following resource(s) failed to delete: [ArtifactBucket]."),
+			CreationTime:                aws.Time(mustParseCFNTime("2025-03-04T09:00:00+00:00")),
+			LastUpdatedTime:             aws.Time(mustParseCFNTime("2026-04-20T15:22:00+00:00")),
+			Description:                 aws.String("Legacy ETL jobs and their artifact bucket"),
+			StackId:                     aws.String(cfnRetiredETLStackID),
+			RoleARN:                     aws.String(prodCIDeployRoleARN),
 		},
 	}
 
@@ -391,23 +450,24 @@ var sharedCFNFixtures = shared(func() *CFNFixtures {
 			},
 		},
 		"acme-vpc-stack": {
-			{
-				EventId:              aws.String("evt-001"),
-				StackName:            aws.String("acme-vpc-stack"),
-				Timestamp:            aws.Time(mustParseCFNTime("2026-03-20T10:00:00+00:00")),
-				LogicalResourceId:    aws.String("acme-vpc-stack"),
-				ResourceType:         aws.String("AWS::CloudFormation::Stack"),
-				ResourceStatus:       cfntypes.ResourceStatusUpdateInProgress,
-				ResourceStatusReason: aws.String("User Initiated"),
-			},
-			{
-				EventId:           aws.String("evt-002"),
-				StackName:         aws.String("acme-vpc-stack"),
-				Timestamp:         aws.Time(mustParseCFNTime("2026-03-20T10:02:00+00:00")),
-				LogicalResourceId: aws.String("acme-vpc-stack"),
-				ResourceType:      aws.String("AWS::CloudFormation::Stack"),
-				ResourceStatus:    cfntypes.ResourceStatusUpdateComplete,
-			},
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-002", "2026-03-20T10:02:00+00:00", "", "", "", cfntypes.ResourceStatusUpdateComplete, ""),
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-001", "2026-03-20T10:00:00+00:00", "", "", "", cfntypes.ResourceStatusUpdateInProgress, "User Initiated"),
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-006", "2026-02-11T09:20:00+00:00", "", "", "", cfntypes.ResourceStatus("UPDATE_ROLLBACK_COMPLETE"), ""),
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-005", "2026-02-11T09:15:00+00:00", "", "", "", cfntypes.ResourceStatus("UPDATE_ROLLBACK_IN_PROGRESS"), "The following resource(s) failed to update: [PublicSubnet1]."),
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-004", "2026-02-11T09:12:00+00:00", "PublicSubnet1", "AWS::EC2::Subnet", "subnet-0aaa111111111111a", cfntypes.ResourceStatusUpdateFailed, "Resource handler returned message: \"The CIDR '10.0.0.0/23' conflicts with another subnet\" (HandlerErrorCode: AlreadyExists)"),
+			stackEvent("acme-vpc-stack", cfnVPCStackID, "evt-003", "2026-02-11T09:10:00+00:00", "", "", "", cfntypes.ResourceStatusUpdateInProgress, "User Initiated"),
+		},
+		CFNTerminationProtectionOff: {
+			stackEvent(CFNTerminationProtectionOff, cfnBillingStackID, "evt-billing-005", "2026-04-14T16:05:00+00:00", "", "", "", cfntypes.ResourceStatus("UPDATE_ROLLBACK_FAILED"), "The following resource(s) failed to update: [BillingTable]."),
+			stackEvent(CFNTerminationProtectionOff, cfnBillingStackID, "evt-billing-004", "2026-04-14T16:03:00+00:00", "BillingTable", "AWS::DynamoDB::Table", "acme-billing-invoices", cfntypes.ResourceStatusUpdateFailed, "Resource handler returned message: \"Subscriber limit exceeded: Provisioned throughput decreases are limited within a given UTC day\""),
+			stackEvent(CFNTerminationProtectionOff, cfnBillingStackID, "evt-billing-003", "2026-04-14T16:01:00+00:00", "", "", "", cfntypes.ResourceStatus("UPDATE_ROLLBACK_IN_PROGRESS"), "The following resource(s) failed to update: [BillingFunction]."),
+			stackEvent(CFNTerminationProtectionOff, cfnBillingStackID, "evt-billing-002", "2026-04-14T15:58:00+00:00", "BillingFunction", "AWS::Lambda::Function", "acme-billing-api-BillingFunction-4D5E6F", cfntypes.ResourceStatusUpdateFailed, "Resource handler returned message: \"Unzipped size must be smaller than 262144000 bytes\""),
+			stackEvent(CFNTerminationProtectionOff, cfnBillingStackID, "evt-billing-001", "2026-04-14T15:55:00+00:00", "", "", "", cfntypes.ResourceStatusUpdateInProgress, "User Initiated"),
+		},
+		CFNDeleteFailedStack: {
+			stackEvent(CFNDeleteFailedStack, cfnRetiredETLStackID, "evt-etl-003", "2026-04-20T15:22:00+00:00", "", "", "", cfntypes.ResourceStatusDeleteFailed, "The following resource(s) failed to delete: [ArtifactBucket]."),
+			stackEvent(CFNDeleteFailedStack, cfnRetiredETLStackID, "evt-etl-002", "2026-04-20T15:21:00+00:00", "ArtifactBucket", "AWS::S3::Bucket", "acme-retired-etl-artifactbucket-1a2b3c", cfntypes.ResourceStatusDeleteFailed, "The bucket you tried to delete is not empty"),
+			stackEvent(CFNDeleteFailedStack, cfnRetiredETLStackID, "evt-etl-001", "2026-04-20T15:18:00+00:00", "", "", "", cfntypes.ResourceStatusDeleteInProgress, "User Initiated"),
 		},
 		// acme-search-stack events — required so opensearch→cfn drill lands
 		// on a non-empty cfn_events child view. Without these, the cfn→cfn_events
@@ -535,12 +595,19 @@ func NewCFNFixtures() *CFNFixtures {
 // healthy value for that condition.
 const (
 	// CFNTerminationProtectionOff — a live top-level stack that can be
-	// deleted in one call.
-	CFNTerminationProtectionOff = "acme-legacy-api"
+	// deleted in one call; its update failed and so did the rollback, so it
+	// is also the failed-live stack whose posture stands beside its state.
+	CFNTerminationProtectionOff = "acme-billing-api"
+	CFNDeletingStack            = "acme-retired-batch"
+	CFNDeleteFailedStack        = "acme-retired-etl"
+
+	cfnVPCStackID        = "arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111"
+	cfnBillingStackID    = "arn:aws:cloudformation:us-east-1:123456789012:stack/acme-billing-api/ffff8888-aaaa-9999-bbbb-cccccccccccc"
+	cfnRetiredETLStackID = "arn:aws:cloudformation:us-east-1:123456789012:stack/acme-retired-etl/1111bbbb-2222-cccc-3333-dddd4444eeee"
 	// CFNOutputSecret — a stack output whose value looks like a credential.
 	CFNOutputSecret = "acme-rds-aurora"
 )
 
 func init() {
-	Register(Pin{ShortName: "cfn", Rows: 16, Issues: 5})
+	Register(Pin{ShortName: "cfn", Rows: 19, Issues: 8})
 }

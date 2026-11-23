@@ -227,15 +227,15 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 	v0File.Version = 0
 	writeTypeFile(t, dir, "ec2", v0File)
 
-	v3File := v1File
-	v3File.Version = 3
-	writeTypeFile(t, dir, "lambda", v3File)
+	v4File := v1File
+	v4File.Version = 4
+	writeTypeFile(t, dir, "lambda", v4File)
 
 	store := cache.LoadDirForTest("migrate-profile", "us-east-1")
 
 	vpcTF, ok := store.Type("vpc")
 	if !ok {
-		t.Fatal(`Type("vpc") missing — a version-1 file must still load once SchemaVersion is 2 (migration, not rejection)`)
+		t.Fatal(`Type("vpc") missing — a version-1 file must still load under the current schema (migration, not rejection)`)
 	}
 	if len(vpcTF.Rows) != 1 {
 		t.Fatalf("migrated vpc TypeFile has %d rows, want 1", len(vpcTF.Rows))
@@ -256,6 +256,59 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 		t.Error(`Type("ec2") should be absent — a version-0 file is still an unsupported schema and must be skipped, not treated as a migration target`)
 	}
 	if _, ok := store.Type("lambda"); ok {
-		t.Error(`Type("lambda") should be absent — a version-3 file is still an unsupported schema and must be skipped, not treated as a migration target`)
+		t.Error(`Type("lambda") should be absent — a version-4 file is an unsupported schema and must be skipped, not treated as a migration target`)
+	}
+}
+
+// A version 1 or 2 file holds a finding phrase under a type's status key,
+// where version 3 holds the lifecycle value AWS reported, so loading such a
+// file drops that value rather than show "public endpoint" as a raw state. The row keeps
+// its findings, and a version 3 file keeps the AWS value as written. A type
+// with no state table (eip) keeps its status key across the step.
+func TestCacheSchema_PrePhraseStatusIsDroppedOnLoad(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	public := domain.Finding{Code: "dbi.warn.publicly_accessible", Phrase: "public endpoint", Severity: domain.SevWarn, Source: "wave1"}
+	file := func(version int, status string) cache.TypeFile {
+		return cache.TypeFile{
+			Version: version, HasResources: true, Count: 1, Exact: true,
+			Rows: []cache.Row{{
+				ID: "warn-dbi-public", Name: "warn-dbi-public",
+				Fields:   map[string]string{"status": status, "engine": "postgres"},
+				Findings: []domain.Finding{public},
+			}},
+			SavedAt: time.Date(2026, 11, 1, 8, 0, 0, 0, time.UTC),
+		}
+	}
+	for _, tc := range []struct {
+		profile, short string
+		version        int
+		stored, want   string
+	}{
+		{"schema-v1", "dbi", 1, "public endpoint", ""},
+		{"schema-v2", "dbi", 2, "public endpoint", ""},
+		{"schema-v3", "dbi", 3, "available", "available"},
+		{"schema-v2-eip", "eip", 2, "UNATTACHED", "UNATTACHED"},
+	} {
+		t.Run(tc.profile, func(t *testing.T) {
+			d := cache.DirForTest(tc.profile, "us-east-1")
+			if err := os.MkdirAll(d, 0700); err != nil {
+				t.Fatalf("creating cache dir: %v", err)
+			}
+			writeTypeFile(t, d, tc.short, file(tc.version, tc.stored))
+			tf, ok := cache.LoadDirForTest(tc.profile, "us-east-1").Type(tc.short)
+			if !ok || len(tf.Rows) != 1 {
+				t.Fatalf("version %d %s file did not load one row", tc.version, tc.short)
+			}
+			row := tf.Rows[0]
+			if got := row.Fields["status"]; got != tc.want {
+				t.Errorf("version %d: Fields[status] = %q, want %q", tc.version, got, tc.want)
+			}
+			if row.Fields["engine"] != "postgres" {
+				t.Errorf("version %d: Fields[engine] = %q, want %q", tc.version, row.Fields["engine"], "postgres")
+			}
+			if len(row.Findings) != 1 || row.Findings[0].Code != public.Code {
+				t.Errorf("version %d: findings = %v, want the stored %s", tc.version, row.Findings, public.Code)
+			}
+		})
 	}
 }

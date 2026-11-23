@@ -19,18 +19,18 @@ func TestScenario_DBCVisual(t *testing.T) {
 
 	// The menu badge is read while the menu is the root view.
 	// N = rows whose Wave-1-only colour IsIssue, plus Healthy rows carrying a
-	// Wave-2 `!`. Over the 23 dbc fixtures:
+	// Wave-2 `!`. Over the 24 dbc fixtures:
 	//   Wave-1 Broken (9):   broken-dbc-{failed,no-writer,incompat-params,
 	//                        enc-unreachable,encryption-recoverable,stopped,
 	//                        cloning-failed,migration-failed,upgrade-failed}
-	//   Wave-1 Warning (11): warn-dbc-{modifying,no-bkp,no-prot,unenc,multi,
+	//   Wave-1 Warning (12): warn-dbc-{modifying,no-bkp,no-prot,unenc,multi,
 	//                        no-bkp-plus-maint,single-az,minor-upgrade-off,
 	//                        iam-auth-off,default-master-user,
-	//                        unrecognised-status}
+	//                        unrecognised-status,deleting}
 	//   Healthy + Wave-2 `!` (1): healthy-dbc-maint-overdue
 	//   Not counted (2): acme-docdb-prod, prod-aurora-cluster — Healthy, no finding
-	// 9 + 11 + 1 = 21.
-	scenario.ExpectMenuIssueCount("dbc", 21)
+	// 9 + 12 + 1 = 22.
+	scenario.ExpectMenuIssueCount("dbc", 22)
 
 	scenario.OpenList("dbc")
 

@@ -173,10 +173,9 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 }
 
 // sgRiskFindings ranks wide-open ahead of dangerous ports: a rule opening every
-// port says everything the specific list would. The row colour derives from
-// these findings alone (colorAnyFindingOrHealthy), and risk_summary is the
-// phrase they carry, so the Status cell and the Attention block cannot word one
-// verdict two ways.
+// port says everything the specific list would. The row colour and the Status
+// cell derive from these findings alone, so the Status cell and the Attention
+// block cannot word one verdict two ways.
 //
 // The ports arrive as the list, never as a sentence to take apart: an empty one
 // beside a non-zero count reaches the slot filler, which refuses it, rather than
@@ -276,11 +275,6 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		dangerousCount, wideOpen, openPorts := computeSGRiskFields(sg.IpPermissions)
 
 		findings := sgRiskFindings(wideOpen, dangerousCount, openPorts, sgOpenRange(sg.IpPermissions, wideOpen == "true"))
-		// The Status cell is the risk verdict's own phrase, read back off the
-		// finding rather than assembled a second time. Taken before the
-		// default-group finding is appended, which is a separate fact and does
-		// not belong in the risk cell.
-		riskSummary := domain.StatusPhrase(findings)
 		var attentionDetails map[domain.FindingCode]domain.AttentionDetail
 		if sgDefaultAllowsTraffic(sg) {
 			findings = append(findings, wave1Finding(sgCodeDefaultWithRules))
@@ -303,7 +297,6 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"dangerous_open_count": dangerousCount,
 				"wide_open":            wideOpen,
 				"open_ports":           openPorts,
-				"risk_summary":         riskSummary,
 			},
 			Findings:         findings,
 			AttentionDetails: attentionDetails,

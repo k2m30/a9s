@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -58,7 +57,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 			lbArn = *lb.LoadBalancerArn
 		}
 
-		findings := elbStateFindings(state)
+		findings := withState("elb", state, nil)
 
 		r := resource.Resource{
 			ID:   lbName,
@@ -100,19 +99,4 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// elbStateFindings is the one predicate for a load balancer's state. active
-// reports nothing. colorELB runs it over Fields for rows built outside the
-// fetcher.
-func elbStateFindings(state string) []domain.Finding {
-	switch state {
-	case "provisioning":
-		return []domain.Finding{wave1Finding(CodeELBStateProvisioning)}
-	case "active_impaired":
-		return []domain.Finding{wave1Finding(CodeELBStateActiveImpaired)}
-	case "failed":
-		return []domain.Finding{wave1Finding(CodeELBStateFailed)}
-	}
-	return nil
 }
