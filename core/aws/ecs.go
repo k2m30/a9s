@@ -65,7 +65,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
 			servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
 
-			r := resource.Resource{
+			r := withWave1("ecs", resource.Resource{
 				ID:   clusterName,
 				Name: clusterName,
 				Fields: map[string]string{
@@ -75,9 +75,8 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 					"pending_tasks":  pendingTasks,
 					"services_count": servicesCount,
 				},
-				Findings:  withState("ecs", status, nil),
 				RawStruct: cluster,
-			}
+			}, withState("ecs", status, nil)...)
 			ans.rows = append(ans.rows, r)
 		}
 		resources, failures = keepListed("DescribeClusters", listOutput.ClusterArns, ecsClusterRowID, ans, err, func(arn string, err error) resource.Resource {

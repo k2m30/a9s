@@ -191,7 +191,7 @@ func TestT1aDev_ECSStopCodeIsDeclaredForEveryTaskState(t *testing.T) {
 	}
 	for _, raw := range td.StateEnum {
 		class := awsclient.LifecycleClassOf("ecs-task", raw)
-		if !catalog.Applies(awsclient.CodeECSTaskStopCodeFailed, class, raw) {
+		if !catalog.Applies("ecs-task", awsclient.CodeECSTaskStopCodeFailed, class, raw, "") {
 			t.Errorf("stop-code finding does not apply in %s (%v)", raw, class)
 		}
 		t.Run(raw, func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestT1aDev_PostureNarrowingsAreDeclaredOnTheirFindingDefs(t *testing.T) {
 		{"asg", "asg.launch-config.public-ip", "Delete in progress", false},
 	} {
 		class := awsclient.LifecycleClassOf(tc.short, tc.raw)
-		if got := catalog.Applies(tc.code, class, tc.raw); got != tc.want {
+		if got := catalog.Applies(tc.short, tc.code, class, tc.raw, ""); got != tc.want {
 			t.Errorf("Applies(%s, %s %q) = %v, want %v", tc.code, tc.short, tc.raw, got, tc.want)
 		}
 	}

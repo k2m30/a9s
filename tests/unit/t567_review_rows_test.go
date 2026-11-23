@@ -293,7 +293,7 @@ func TestT567ReverseScans_NothingReadIsUnknownEverywhere(t *testing.T) {
 		t.Fatalf("no demo %s row answers its %s pivot", typ, target)
 		return resource.Resource{}
 	}
-	sfnRows := append(slices.Clone(b.byType["sfn"]), awsclient.DegradedDetails("sfn", "acme-nightly-export", t567Denied("states:DescribeStateMachine")))
+	sfnRows := append(slices.Clone(b.byType["sfn"]), resource.Resource{ID: "acme-nightly-export", Name: "acme-nightly-export", Fields: map[string]string{"name": "acme-nightly-export"}})
 	cases := []struct {
 		source, target string
 		src            resource.Resource

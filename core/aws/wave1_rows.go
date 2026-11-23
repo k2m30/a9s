@@ -8,6 +8,7 @@ package aws
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,9 +21,10 @@ import (
 
 // addWave1Rows attaches supporting rows to a Wave-1 Finding already appended
 // to r.Findings, keyed by that Finding's own Code so two independently
-// evaluated conditions on one resource never crowd out each other's rows.
+// evaluated conditions on one resource never crowd out each other's rows. A
+// finding the emit door withheld takes no rows.
 func addWave1Rows(r *resource.Resource, code domain.FindingCode, rows ...domain.DetailRow) {
-	if len(rows) == 0 {
+	if len(rows) == 0 || !slices.ContainsFunc(r.Findings, func(f domain.Finding) bool { return f.Code == code }) {
 		return
 	}
 	if r.AttentionDetails == nil {
@@ -155,9 +157,47 @@ func fillSlot(slot, value string) string {
 	return strings.ReplaceAll(slot, pluralMarker, "s")
 }
 
-// addWave1Finding appends the Wave-1 posture Finding for code to r.
-func addWave1Finding(r *resource.Resource, code domain.FindingCode, values ...string) {
-	r.Findings = append(r.Findings, wave1Finding(code, values...))
+// addWave1Finding appends the Wave-1 posture Finding for code to r, through
+// emitWave1.
+func addWave1Finding(rowType string, r *resource.Resource, code domain.FindingCode, values ...string) {
+	emitWave1(rowType, r, wave1Finding(code, values...))
+}
+
+// withWave1 is emitWave1 for a row built as one literal.
+func withWave1(rowType string, r resource.Resource, fs ...domain.Finding) resource.Resource {
+	emitWave1(rowType, &r, fs...)
+	return r
+}
+
+// rebuiltWave1 is withWave1 for a copy of a row whose findings are rebuilt
+// whole: the copy's slice shares its backing array with the original, so it
+// is replaced rather than appended to.
+func rebuiltWave1(rowType string, r resource.Resource, fs ...domain.Finding) resource.Resource {
+	r.Findings = nil
+	return withWave1(rowType, r, fs...)
+}
+
+// emitWave1 is the Wave 1 emit door, the one writer of a row's Findings in
+// core/aws: each finding lands on r, a row of the type rowType, only where
+// catalog.AppliesToRow allows it for the row's lifecycle and kind, so a
+// fetcher evaluates its predicates and never decides applicability. r carries
+// its Fields and RawStruct before the call, because the kind is read from
+// them. The supporting rows of a finding the door withholds go with it.
+func emitWave1(rowType string, r *resource.Resource, fs ...domain.Finding) {
+	for _, f := range fs {
+		// A code rowType does not declare stands unjudged, so a call naming
+		// the wrong type would pass every finding through.
+		if testing.Testing() && !catalog.Declares(rowType, f.Code) {
+			panic(fmt.Sprintf("emitWave1: %s emits %s, which it does not declare", rowType, f.Code))
+		}
+		if catalog.AppliesToRow(rowType, f.Code, *r) {
+			r.Findings = append(r.Findings, f)
+			continue
+		}
+		if !slices.ContainsFunc(r.Findings, func(g domain.Finding) bool { return g.Code == f.Code }) {
+			delete(r.AttentionDetails, f.Code)
+		}
+	}
 }
 
 // secretScanRows and secretScanTextRows scan the two shapes a credential
@@ -190,11 +230,11 @@ func secretScanHitRows(hits []secretscan.Hit) []domain.DetailRow {
 
 // addSecretScanFinding scans kv and, on any hit, emits the Wave-1 finding
 // plus its supporting rows.
-func addSecretScanFinding(r *resource.Resource, code domain.FindingCode, kv map[string]string) {
+func addSecretScanFinding(rowType string, r *resource.Resource, code domain.FindingCode, kv map[string]string) {
 	rows := secretScanRows(kv)
 	if len(rows) == 0 {
 		return
 	}
-	addWave1Finding(r, code)
+	addWave1Finding(rowType, r, code)
 	addWave1Rows(r, code, rows...)
 }

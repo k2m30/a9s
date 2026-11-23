@@ -157,13 +157,12 @@ func fetchECSTasksPageWithJoin(
 
 				findings := ecsTaskFindings(status, stopCode, healthStatus)
 
-				r := resource.Resource{
+				r := withWave1("ecs-task", resource.Resource{
 					ID:        taskID,
 					Name:      taskID,
 					Fields:    fields,
-					Findings:  findings,
 					RawStruct: task,
-				}
+				}, findings...)
 				ans.rows = append(ans.rows, r)
 			}
 			rows, batchFailures := keepListed("DescribeTasks", taskArns, ecsTaskRowID, ans, err, func(arn string, err error) resource.Resource {

@@ -52,6 +52,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			ContextKeys:    map[string]string{"job_name": "ID"},
 			DisplayNameKey: "job_name",
 		}},
+		Kind:           glueKind,
+		Kinds:          glueKinds,
 		Color:          colorGlue,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.Glue} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -75,9 +77,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		IssueEnricherFieldKeys: []string{"last_run"},
 		Findings: []catalog.FindingDef{
 			{Code: glueCodeLatestRunFailed, Phrase: "latest run <status>", Severity: domain.SevBroken, Source: "wave2", Detail: "The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job."},
-			{Code: CodeGlueNoSecurityConfiguration, Phrase: "no security configuration", Severity: domain.SevWarn, Source: "wave1", Detail: "This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are not encrypted with a key you control — they get only the storage defaults AWS applies. Create a security configuration with a KMS key and attach it to the job."},
-			{Code: glueCodeSecurityConfigEncryptionOff, Phrase: "security configuration leaves encryption off", Severity: domain.SevWarn, Source: "wave2", Detail: "The security configuration this job names turns off encryption for the targets listed below, so those are not encrypted with a key you control. Set each of them to a KMS-backed mode in the security configuration; every job naming it picks the change up."},
-			{Code: CodeGlueContinuousLoggingOff, Phrase: "continuous logging off", Severity: domain.SevWarn, Source: "wave1", Detail: "Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments."},
+			{Code: CodeGlueNoSecurityConfiguration, Phrase: "no security configuration", Severity: domain.SevWarn, Source: "wave1", NotKinds: []string{glueKindRay}, Detail: "This job names no security configuration, so its S3 output and its CloudWatch log stream are not encrypted with a key you control — they get only the storage defaults AWS applies. Create a security configuration with a KMS key and attach it to the job."},
+			{Code: glueCodeSecurityConfigEncryptionOff, Phrase: "security configuration leaves encryption off", Severity: domain.SevWarn, Source: "wave2", NotKinds: []string{glueKindRay}, Rows: []catalog.RowDecl{{Label: glueRowJobBookmarks, OnlyKinds: glueBookmarkKinds}}, Detail: "The security configuration this job names turns off encryption for the targets listed below, so those are not encrypted with a key you control. Set each of them to a KMS-backed mode in the security configuration; every job naming it picks the change up."},
+			{Code: CodeGlueContinuousLoggingOff, Phrase: "continuous logging off", Severity: domain.SevWarn, Source: "wave1", OnlyKinds: []string{glueKindSparkETL, glueKindSparkStreaming}, Detail: "Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments."},
 			{Code: CodeGlueArgumentSecret, Phrase: "credential in job arguments", Severity: domain.SevBroken, Source: "wave1", Detail: "A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential."},
 		},
 	},

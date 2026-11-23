@@ -74,7 +74,7 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			}
 		}
 
-		r := resource.Resource{
+		r := withWave1("tgw", resource.Resource{
 			ID:   tgwID,
 			Name: name,
 			Fields: map[string]string{
@@ -85,10 +85,9 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 				"auto_accept": autoAccept,
 				"description": description,
 			},
-			Findings:         findings,
 			AttentionDetails: attentionDetails,
 			RawStruct:        tgw,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

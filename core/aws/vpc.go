@@ -108,7 +108,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 
 		findings := withState("vpc", state, nil)
 
-		r := resource.Resource{
+		r := withWave1("vpc", resource.Resource{
 			ID:   vpcID,
 			Name: name,
 			Fields: map[string]string{
@@ -118,9 +118,8 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 				"state":      state,
 				"is_default": isDefault,
 			},
-			Findings:  findings,
 			RawStruct: vpc,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

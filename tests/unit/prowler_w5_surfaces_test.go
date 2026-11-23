@@ -261,21 +261,21 @@ func TestW5WarnThenBrokenReadsAsBroken(t *testing.T) {
 }
 
 // The Type column renders Fields["identity_type"] verbatim, so whatever the
-// fetcher stores there is what an operator reads. DOMAIN and EMAIL_ADDRESS
-// are SDK enum constants; the column shows words.
+// fetcher stores there is what an operator reads. DOMAIN, EMAIL_ADDRESS and
+// MANAGED_DOMAIN are SDK enum constants; the column shows words.
 func TestW5SESTypeColumnRendersWordsNotEnums(t *testing.T) {
 	rows := w5Bench(t)["ses"]
 	if len(rows) == 0 {
 		t.Fatal("no demo ses rows")
 	}
-	allowed := map[string]bool{"domain": true, "email address": true}
+	allowed := map[string]bool{"domain": true, "email address": true, "managed domain": true}
 	seen := map[string]bool{}
 	for _, r := range rows {
 		got := r.Fields["identity_type"]
 		seen[got] = true
 		if !allowed[got] {
-			t.Errorf("ses row %q Type cell = %q; the column shows %q or %q, never an SDK enum constant",
-				r.ID, got, "domain", "email address")
+			t.Errorf("ses row %q Type cell = %q; the column shows one of %v, never an SDK enum constant",
+				r.ID, got, allowed)
 		}
 	}
 	// A bench where every identity is a domain would pass the loop above

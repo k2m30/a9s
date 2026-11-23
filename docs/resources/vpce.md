@@ -227,7 +227,7 @@ vpce — NETWORKING. Status key: `state` — the key the status cell reads, and 
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | vpce.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports an endpoint state a9s does not recognise, so a9s cannot tell whether the service is reachable through it. Check it in the AWS console before relying on it. |
-| vpce.state.pending\_acceptance | pending acceptance | warn | wave1 | The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request. |
+| vpce.state.pending_acceptance | pending acceptance | warn | wave1 | The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request. |
 | vpce.state.pending | pending | warn | wave1 | The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available. |
 | vpce.state.deleting | deleting | warn | wave1 | The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it. |
 | vpce.state.failed | failed | broken | wave1 | The endpoint could not be created, so the service it was meant to reach privately is unreachable from this VPC. Check the subnets, the security groups and the service name, then create it again. |

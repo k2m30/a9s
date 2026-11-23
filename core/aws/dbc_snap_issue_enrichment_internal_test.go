@@ -285,19 +285,17 @@ func TestDbcSnapExtractors_DualShape(t *testing.T) {
 		}
 	})
 
-	t.Run("dbcSnapType_docdb", func(t *testing.T) {
+	t.Run("dbcSnapKind_docdb", func(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{SnapshotType: aws.String("manual")}
-		got, ok := dbcSnapType(snap)
-		if !ok || got != "manual" {
-			t.Errorf("dbcSnapType docdb: got %q, ok=%v, want manual/true", got, ok)
+		if got := dbcSnapKind(resource.Resource{RawStruct: snap}); got != "manual" {
+			t.Errorf("dbcSnapKind docdb: got %q, want manual", got)
 		}
 	})
 
-	t.Run("dbcSnapType_rds", func(t *testing.T) {
+	t.Run("dbcSnapKind_rds", func(t *testing.T) {
 		snap := rdstypes.DBClusterSnapshot{SnapshotType: aws.String("automated")}
-		got, ok := dbcSnapType(snap)
-		if !ok || got != "automated" {
-			t.Errorf("dbcSnapType rds: got %q, ok=%v, want automated/true", got, ok)
+		if got := dbcSnapKind(resource.Resource{RawStruct: snap}); got != "automated" {
+			t.Errorf("dbcSnapKind rds: got %q, want automated", got)
 		}
 	})
 

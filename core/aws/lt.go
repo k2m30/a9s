@@ -129,7 +129,7 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 	name := aws.ToString(tpl.LaunchTemplateName)
 
 	raw := &LTRaw{Template: tpl, DefaultVersion: ver}
-	return resource.Resource{
+	return withWave1("lt", resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
@@ -140,8 +140,7 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 			"created":         ltFormatTime(tpl.CreateTime),
 		},
 		RawStruct: raw,
-		Findings:  findings,
-	}
+	}, findings...)
 }
 
 // ltFormatTime formats *time.Time as the house "Created" column format

@@ -202,6 +202,7 @@ func policyDeclOf(short string) catalog.PolicyDecl {
 // is never clean", the own-account fallback and the rows of the finding hold
 // for every type at once.
 type policyReading struct {
+	short   string
 	decl    catalog.PolicyDecl
 	present bool
 	parsed  bool
@@ -214,7 +215,7 @@ type policyReading struct {
 // declaration says. resourceARN is "" for a type whose ARN names no account.
 // An empty document and the JSON null both carry no policy.
 func readPolicy(short, document, ownAccount, resourceARN string) policyReading {
-	p := policyReading{decl: policyDeclOf(short)}
+	p := policyReading{short: short, decl: policyDeclOf(short)}
 	document = strings.TrimSpace(document)
 	p.present = document != "" && document != "null"
 	if !p.present {
@@ -364,13 +365,13 @@ func (p policyReading) raiseIn(result *IssueEnricherResult, id string, class cat
 	switch {
 	case p.markUnread(result, id):
 	case p.public():
-		if catalog.Applies(d.Public, class, state) {
+		if catalog.Applies(p.short, d.Public, class, state, "") {
 			setWave2Finding(result, id, d.Public, p.detail().Rows)
 		}
 	case d.Cross == "" || len(p.ex.CrossAccount) == 0:
 	case p.own == "":
 		markUninspected(result, id, CheckOwnAccountUnknown)
-	case catalog.Applies(d.Cross, class, state):
+	case catalog.Applies(p.short, d.Cross, class, state, ""):
 		setWave2Finding(result, id, d.Cross, []domain.DetailRow{
 			{Label: "Accounts", Value: strings.Join(p.ex.CrossAccount, ", "), Tier: tierOf(d.Cross)},
 		})

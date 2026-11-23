@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -27,10 +28,6 @@ const (
 	iamUserCodeKeyUnused        domain.FindingCode = "iam-user.access-key-unused"
 	iamUserCodeTwoActiveKeys    domain.FindingCode = "iam-user.two-active-keys"
 	iamUserCodeConsoleDormant   domain.FindingCode = "iam-user.console-dormant"
-
-	// unusedCredentialAge is the age past which an untouched credential is
-	// reported. Matches the 90-day threshold used for key rotation.
-	unusedCredentialAge = 90 * 24 * time.Hour
 )
 
 // EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
@@ -169,12 +166,12 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if riskLabel == "" {
 				riskLabel = riskConsoleDormant
 			}
-			setWave2Finding(&result, r.ID, f.Code, []domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: tierOf(f.Code)}})
+			addWave2Finding(&result, r.ID, f, []domain.DetailRow{{Label: "Last Sign-in", Value: r.Fields["password_last_used"], Tier: tierOf(f.Code)}})
 
 		}
 
 		if hasConsolePassword && r.Fields["password_last_used"] == "Never" &&
-			olderThan(r.Fields["create_date"], unusedCredentialAge) {
+			olderThan(r.Fields["create_date"], days(unusedCredentialAfterDays)) {
 			if riskLabel == "" {
 				riskLabel = riskConsoleNeverUsed
 			}
@@ -183,7 +180,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 
 		for _, key := range activeKeys {
-			if key.CreateDate == nil || time.Since(*key.CreateDate) <= unusedCredentialAge {
+			if key.CreateDate == nil || time.Since(*key.CreateDate) <= days(unusedCredentialAfterDays) {
 				continue
 			}
 			if riskLabel == "" {
@@ -273,7 +270,7 @@ type idleKey struct {
 
 // unusedAccessKeys calls GetAccessKeyLastUsed per active key and returns the
 // keys whose last use (or, absent any use, whose creation) is older than
-// unusedCredentialAge. ok is false when any key's last use could not be read:
+// unusedCredentialAfterDays. ok is false when any key's last use could not be read:
 // the user is then unknown for this check, not clean, since the unread key is
 // exactly the one that might be idle. A client that does not serve the API
 // reports no keys and stays ok — nothing was attempted, so nothing is unknown.
@@ -306,7 +303,7 @@ func unusedAccessKeys(ctx context.Context, api IAMGetAccessKeyLastUsedAPI, keys 
 			continue
 		}
 		idle := time.Since(*since)
-		if idle <= unusedCredentialAge {
+		if idle <= days(unusedCredentialAfterDays) {
 			continue
 		}
 		out = append(out, idleKey{
@@ -329,11 +326,11 @@ func lastFourOfKeyID(keyID string) string {
 }
 
 // iamUserConsoleDormantFindings is the one predicate for a console login
-// nobody has used in unusedCredentialAge. A password that was never used at
+// nobody has used in unusedCredentialAfterDays. A password that was never used at
 // all is the separate iamUserCodeConsoleNeverUsed finding.
 func iamUserConsoleDormantFindings(hasConsolePassword, passwordLastUsed string) []domain.Finding {
-	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, unusedCredentialAge) {
+	if hasConsolePassword != "true" || !olderThan(passwordLastUsed, days(unusedCredentialAfterDays)) {
 		return nil
 	}
-	return []domain.Finding{wave2Finding(iamUserCodeConsoleDormant)}
+	return []domain.Finding{wave2Finding(iamUserCodeConsoleDormant, strconv.Itoa(unusedCredentialAfterDays))}
 }

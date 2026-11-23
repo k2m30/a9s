@@ -237,10 +237,9 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 		}
 		findings, attentionDetails := computeDBCFindings(cluster, expectsWriter)
 
-		r := resource.Resource{
-			ID:       clusterID,
-			Name:     clusterID,
-			Findings: findings,
+		r := withWave1("dbc", resource.Resource{
+			ID:   clusterID,
+			Name: clusterID,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
 				"engine":                  engine,
@@ -258,7 +257,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			},
 			RawStruct:        cluster,
 			AttentionDetails: attentionDetails,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

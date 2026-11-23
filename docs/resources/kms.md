@@ -103,7 +103,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
 
 `GetKeyRotationStatus` and the key policy read on the second pass; `KeyState` is already on the row by then and its signals are in §3.1.
 
-- **Signal**: `KeyRotationEnabled==false` on CMK.
+- **Signal**: `KeyRotationEnabled==false` on CMK that is not a multi-Region replica (`MultiRegionConfiguration.MultiRegionKeyType=REPLICA`): "You can enable and disable automatic key rotation only on a primary key" (AWS KMS Developer Guide, "Multi-Region keys in AWS KMS").
   - **State bucket**: Warning.
   - **API call**: `GetKeyRotationStatus` — one per key that can rotate automatically (`KeySpec=SYMMETRIC_DEFAULT`, `Origin=AWS_KMS`, no custom key store). A customer key that cannot rotate automatically gets the signal without the call.
   - **Cost shape**: per-resource.
@@ -144,7 +144,7 @@ One row per signal from §3:
 | `KeyState` outside `KeyState.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<key state> (unrecognised)` |
 | `DescribeKey` was denied for this key | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `access denied (kms:DescribeKey)` |
 | `DescribeKey` failed for this key for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
-| `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
+| `KeyRotationEnabled==false` on CMK, not a replica | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
 | Key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `key policy open to anyone` |
 | Key policy admits another account — names a principal in it, or a condition on a `*` or service-principal grant names it | 2 | Warning | `~` | S2, S3, S4, S5 | `key policy grants another account` |
 
@@ -186,18 +186,18 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| kms.state.pending\_deletion | pending deletion | broken | wave1 | The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it. |
-| kms.state.disabled | disabled | warn | wave1 | The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it. |
-| kms.state.unavailable | <key state> | broken | wave1 | The key is not usable in the state it reports, and what to do depends on which state that is. A key awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read. |
-| kms.state.transitional | <key state> in progress | warn | wave1 | The key is being created or updated, for example a multi-Region replica being copied or a key in a custom key store being set up, and becomes usable on its own once AWS finishes. Wait it out before treating a failed encrypt or decrypt as a permission problem. |
-| kms.state.unrecognised | <key state> (unrecognised) | warn | wave1 | AWS reports a key state a9s does not recognise, so a9s cannot tell whether the key can be used. Check the key in the AWS console before relying on it. |
-| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
-| kms.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
-| kms.rotation-disabled | key rotation disabled | warn | wave2 | The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it. |
-| kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows any principal, so anyone can use this key, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
-| kms.cross-account-policy | key policy grants another account | warn | wave2 | The key policy admits a caller from another AWS account, so that account can use this key, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the key policy. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| kms.state.pending_deletion | pending deletion | broken | wave1 | all | The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it. |
+| kms.state.disabled | disabled | warn | wave1 | all | The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it. |
+| kms.state.unavailable | <key state> | broken | wave1 | all | The key is not usable in the state it reports, and what to do depends on which state that is. A key awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read. |
+| kms.state.transitional | <key state> in progress | warn | wave1 | all | The key is being created or updated, for example a multi-Region replica being copied or a key in a custom key store being set up, and becomes usable on its own once AWS finishes. Wait it out before treating a failed encrypt or decrypt as a permission problem. |
+| kms.state.unrecognised | <key state> (unrecognised) | warn | wave1 | all | AWS reports a key state a9s does not recognise, so a9s cannot tell whether the key can be used. Check the key in the AWS console before relying on it. |
+| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | all | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
+| kms.warn.details_unavailable | details unavailable | warn | wave1 | all | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
+| kms.rotation-disabled | key rotation disabled | warn | wave2 | automatic rotation, manual rotation, metadata not read | The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it. |
+| kms.public-policy | key policy open to anyone | broken | wave2 | automatic rotation, manual rotation, multi-Region replica, metadata not read | The key policy allows any principal, so anyone can use this key, depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
+| kms.cross-account-policy | key policy grants another account | warn | wave2 | automatic rotation, manual rotation, multi-Region replica, metadata not read | The key policy admits a caller from another AWS account, so that account can use this key, depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, and remove the rest from the key policy. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

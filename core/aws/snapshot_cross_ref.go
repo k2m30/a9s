@@ -38,6 +38,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -45,6 +46,8 @@ import (
 // SnapshotCrossRefConfig parameterizes the cross-ref enricher pattern shared
 // across snapshot resource types.
 type SnapshotCrossRefConfig struct {
+	ShortName string
+
 	// ParentShortName is the resource type whose ResourceCache entry the
 	// helper scans for parents (e.g. "dbi", "dbc", "ec2").
 	ParentShortName string
@@ -69,11 +72,6 @@ type SnapshotCrossRefConfig struct {
 	// Required when RetentionEnabled is true; may be nil otherwise.
 	GetCreatedAt func(snapRaw any) (time.Time, bool)
 
-	// GetSnapshotType extracts the snapshot type ("automated"/"manual"/etc).
-	// Returns ("", false) if absent — past-retention rule skips this row.
-	// Required when RetentionEnabled is true; may be nil otherwise.
-	GetSnapshotType func(snapRaw any) (string, bool)
-
 	// GetParentRetention extracts the BackupRetentionPeriod (in days) from
 	// the parent's RawStruct. Returns (0, false) when absent or zero — the
 	// past-retention rule will not fire on this row.
@@ -94,7 +92,7 @@ type SnapshotCrossRefConfig struct {
 	// RetentionEnabled gates the past-retention rule. Set false for snapshot
 	// types whose parent has no retention concept (e.g. future ebs-snap, where
 	// ec2.Volume has no BackupRetentionPeriod). When false, only the orphan
-	// rule fires; GetParentRetention/GetSnapshotType/GetCreatedAt may be nil.
+	// rule fires; GetParentRetention/GetCreatedAt may be nil.
 	RetentionEnabled bool
 
 	// OrphanCode is the canonical FindingCode emitted when the orphan rule
@@ -227,15 +225,12 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 					Tier:  tierOf(code),
 				})
 			case cfg.RetentionEnabled:
-				// Past-retention rule: only for "automated" snapshots whose
-				// parent has a positive BackupRetentionPeriod.
-				snapType, hasType := cfg.GetSnapshotType(res.RawStruct)
 				createdAt, hasCreated := cfg.GetCreatedAt(res.RawStruct)
 				retention, hasRetention := cfg.GetParentRetention(parent.RawStruct)
-				if !hasType || !hasCreated || !hasRetention {
+				if !hasCreated || !hasRetention || !catalog.AppliesToRow(cfg.ShortName, cfg.PastRetentionCode, res) {
 					continue
 				}
-				if snapType != "automated" || retention <= 0 {
+				if retention <= 0 {
 					continue
 				}
 				ageD := int(time.Since(createdAt).Hours() / 24)
@@ -290,14 +285,10 @@ func enrichSnapshotPublicShare(
 	if cfg.PublicAttr == nil || clients == nil {
 		return nil
 	}
-	// An automated snapshot cannot be shared (AWS shares only a manual copy),
-	// so it has no share attribute to ask about.
+	// A snapshot of a kind that cannot be shared has no share attribute to ask
+	// about.
 	resources = capAtEnrichmentCap(result, resources, func(res resource.Resource) bool {
-		if cfg.GetSnapshotType == nil {
-			return true
-		}
-		snapType, ok := cfg.GetSnapshotType(res.RawStruct)
-		return !ok || snapType != "automated"
+		return rowAppliesAny(cfg.ShortName, res, cfg.PublicCode)
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure

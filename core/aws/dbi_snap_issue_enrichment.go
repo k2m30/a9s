@@ -37,10 +37,31 @@ const (
 	dbiSnapPublicCode        domain.FindingCode = "dbi-snap.public"
 )
 
+// The snapshot kinds DescribeDBSnapshots and DescribeDBClusterSnapshots list
+// when no SnapshotType is asked for: "both automated and manual snapshots are
+// returned". Only a manual snapshot can be shared, and only an automated one
+// ages out of a retention period.
+const (
+	snapKindAutomated = "automated"
+	snapKindManual    = "manual"
+)
+
+var snapKinds = []string{snapKindAutomated, snapKindManual} //nolint:gochecknoglobals // static AWS value set
+
+// dbiSnapKind is the snapshot's SnapshotType, or the value the fetcher stored
+// for a row rebuilt from Fields alone.
+func dbiSnapKind(r domain.Resource) string {
+	if snap, ok := assertStruct[rdstypes.DBSnapshot](r.RawStruct); ok {
+		return aws.ToString(snap.SnapshotType)
+	}
+	return r.Fields["snapshot_type"]
+}
+
 // enrichDBISnapCrossRef is the IssueEnricherFunc registered for dbi-snap.
 // It is the SnapshotCrossRef helper instantiated with rds.DBSnapshot /
 // rds.DBInstance extractors.
 var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
+	ShortName:       "dbi-snap",
 	ParentShortName: "dbi",
 	GetParentID: func(raw any) (string, bool) {
 		snap, ok := assertStruct[rdstypes.DBSnapshot](raw)
@@ -63,13 +84,6 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 			return time.Time{}, false
 		}
 		return *snap.SnapshotCreateTime, true
-	},
-	GetSnapshotType: func(raw any) (string, bool) {
-		snap, ok := assertStruct[rdstypes.DBSnapshot](raw)
-		if !ok || snap.SnapshotType == nil {
-			return "", false
-		}
-		return *snap.SnapshotType, true
 	},
 	GetParentRetention: func(raw any) (int32, bool) {
 		db, ok := assertStruct[rdstypes.DBInstance](raw)

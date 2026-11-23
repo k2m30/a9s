@@ -58,7 +58,7 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 			logValidation = "true"
 		}
 
-		r := resource.Resource{
+		r := withWave1("trail", resource.Resource{
 			ID:   trailName,
 			Name: trailName,
 			Fields: map[string]string{
@@ -70,9 +70,8 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 				"org_trail":                   orgTrail,
 				"log_file_validation_enabled": logValidation,
 			},
-			Findings:  trailWave1Wave2Findings("", "", "", logValidation),
 			RawStruct: trail,
-		}
+		}, trailWave1Wave2Findings("", "", "", logValidation)...)
 		trailPostureFindings(&r, trail)
 
 		resources = append(resources, r)

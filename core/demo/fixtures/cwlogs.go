@@ -462,6 +462,35 @@ var sharedCWLogsFixtures = shared(func() *CWLogsFixtures {
 		CreationTime:    aws.Int64(1735689600000),
 	})
 
+	// One group of each class other than Standard. Two sit under the
+	// "/aws/cloudtrail/" prefix the metric-filter check reads, so the class is
+	// all that keeps that check off them.
+	logGroups = append(logGroups,
+		cwlogstypes.LogGroup{
+			LogGroupName:    aws.String(LogGroupInfrequentAccess),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupInfrequentAccess + ":*"),
+			StoredBytes:     aws.Int64(73400320),
+			RetentionInDays: aws.Int32(365),
+			CreationTime:    aws.Int64(1740787200000),
+			LogGroupClass:   cwlogstypes.LogGroupClassInfrequentAccess,
+		},
+		cwlogstypes.LogGroup{
+			LogGroupName:    aws.String(LogGroupEssentials),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupEssentials + ":*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(365),
+			CreationTime:    aws.Int64(1764547200000),
+			LogGroupClass:   cwlogstypes.LogGroupClassEssentials,
+		},
+		cwlogstypes.LogGroup{
+			LogGroupName:  aws.String(LogGroupDelivery),
+			Arn:           aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + LogGroupDelivery + ":*"),
+			StoredBytes:   aws.Int64(1048576),
+			CreationTime:  aws.Int64(1756704000000),
+			LogGroupClass: cwlogstypes.LogGroupClassDelivery,
+		},
+	)
+
 	// The second page. Every other group in this file is the target of some
 	// pivot, so cutting the list anywhere inside them lowers a pivot count;
 	// this one is named to match no pivot's convention and is appended
@@ -1005,7 +1034,15 @@ const LogGroupSecondPageOnly = "/app/archive/2019-batch-export"
 // A group appended after LogGroupSecondPageOnly would land on page two with it
 // and take its pivot's count down with it; append before it instead, and raise
 // this number in step.
-const LogGroupsPageSize = 182
+const LogGroupsPageSize = 185
+
+// The log groups of the classes other than Standard: Infrequent Access, the
+// value read-path APIs return for it from December 2026, and Delivery.
+const (
+	LogGroupInfrequentAccess = "/aws/cloudtrail/acme-archive-trail"
+	LogGroupEssentials       = "/aws/cloudtrail/acme-essentials-trail"
+	LogGroupDelivery         = "/aws/vendedlogs/acme-delivery-stream"
+)
 
 // derivedLogGroups returns a log group for every one the other demo fixtures
 // name and have does not hold yet: each MWAA environment's component groups,
@@ -1091,5 +1128,5 @@ const ECSExecLogGroup = "/ecs/exec/acme-services"
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"
 
 func init() {
-	Register(Pin{ShortName: "logs", Rows: 182, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "logs", Rows: 185, Issues: 3, Truncated: true, CoverageGaps: []string{"broken", "dim"}})
 }

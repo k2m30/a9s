@@ -114,7 +114,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 		findings = append(findings, wave1Finding(transferCodeAgreementInactive))
 	}
 
-	return resource.Resource{
+	return withWave1("transfer_agreements", resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -127,8 +127,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 			"server_id":       serverID,
 		},
 		RawStruct: agreement,
-		Findings:  findings,
-	}
+	}, findings...)
 }
 
 // buildTransferAgreementDegradedResource: the listed Status still decides the
@@ -144,7 +143,7 @@ func buildTransferAgreementDegradedResource(listed transfertypes.ListedAgreement
 	}
 	findings = append(findings, degradedDetailsFinding("transfer_agreements", err))
 
-	return resource.Resource{
+	return withWave1("transfer_agreements", resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -156,8 +155,7 @@ func buildTransferAgreementDegradedResource(listed transfertypes.ListedAgreement
 			"server_id":       serverID,
 		},
 		RawStruct: &listed,
-		Findings:  findings,
-	}
+	}, findings...)
 }
 
 // enrichTransferAgreement is the on-demand DetailEnrich for the Agreements
@@ -215,7 +213,7 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 		enriched.Fields["partner_profile"] = partnerAs2ID
 	}
 
-	enriched.Findings = slices.Concat(res.Findings, localCertFindings, partnerCertFindings)
+	enriched = rebuiltWave1("transfer_agreements", enriched, slices.Concat(res.Findings, localCertFindings, partnerCertFindings)...)
 
 	// The enriched detail is returned either way — a profile that did not
 	// resolve must not blank the agreement. The error travels with it so the

@@ -135,8 +135,8 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 		RawStruct: cluster,
 	}
 
-	var issueRows []domain.DetailRow
-	r.Findings, issueRows = eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
+	findings, issueRows := eksClusterFindings(status, healthIssuesCount, issueCodes, version, posture)
+	emitWave1("eks", &r, findings...)
 	if len(r.Findings) > 0 {
 		// The rows belong to whichever finding built them — the failed state
 		// folds them in, an active cluster leaves them on the health-issue

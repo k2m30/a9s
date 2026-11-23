@@ -93,7 +93,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N job(s)> failed in last 24h` |
+| recent job `FAILED` / `EXPIRED` / `ABORTED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<N job(s)> failed in last <N>h` |
 | recent job `PARTIAL` | 2 | Warning | `~` | S2, S3, S4, S5 | `partial: <N> of <M resource(s)> skipped` |
 
 Rules for filling list and detail text:
@@ -105,7 +105,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, the operator sees a red plan row reading `<N job(s)> failed in last 24h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
+At 3am, glancing at the list, the operator sees a red plan row reading `<N job(s)> failed in last <N>h` and knows immediately to open the detail view for the error message and to pivot into the `role` and `kms` related panels. All problem rows are self-explanatory in the list — operator can triage without opening detail; detail adds the exact timestamp of the most recent failure so the operator can correlate with CloudTrail.
 
 ## 5. Out of Scope
 
@@ -149,7 +149,7 @@ backup — BACKUP. Status key: `status` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| backup.job-failed | <N job(s)> failed in last 24h | broken | wave2 | A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run. |
+| backup.job-failed | <N job(s)> failed in last <N>h | broken | wave2 | A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run. |
 | backup.job-partial | partial: <N> of <M resource(s)> skipped | warn | wave2 | The plan ran but skipped some of the resources it selects, so those resources have no recovery point for this window even though the job reports progress. Check the job's resource list against the plan's selection, and the backup role's permissions on the resources that were missed. |
 <!-- END GENERATED: findings -->
 

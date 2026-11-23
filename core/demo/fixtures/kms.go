@@ -40,6 +40,11 @@ const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 // state, raising kms.state.transitional.
 const KMSCreatingReplicaKeyID = "f1a2b3c4-d5e6-4f70-8a9b-1c2d3e4f5a6b"
 
+// KMSReplicaKeyID is an enabled multi-Region replica whose rotation status
+// reads off: its primary sets rotation for it, so it carries no
+// kms.rotation-disabled.
+const KMSReplicaKeyID = "mrk-7d1c2b3a4f5e46a7b8c9d0e1f2a3b4c5"
+
 // WarnKMSDetailsUnavailableID names the ListKeys entry whose DescribeKey call
 // the KMSFake fails with KMSInternalException, raising
 // kms.warn.details_unavailable: the key is listed, its state never read.
@@ -174,6 +179,26 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 			Origin:       kmstypes.OriginTypeAwsKms,
 			MultiRegion:  aws.Bool(true),
 			CreationDate: aws.Time(time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)),
+		},
+		{
+			KeyId:        aws.String(KMSReplicaKeyID),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSReplicaKeyID),
+			Description:  aws.String("Payments replica key — primary in eu-west-1"),
+			KeyState:     kmstypes.KeyStateEnabled,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			KeySpec:      kmstypes.KeySpecSymmetricDefault,
+			Origin:       kmstypes.OriginTypeAwsKms,
+			MultiRegion:  aws.Bool(true),
+			CreationDate: aws.Time(time.Date(2026, 2, 3, 9, 0, 0, 0, time.UTC)),
+			Enabled:      true,
+			MultiRegionConfiguration: &kmstypes.MultiRegionConfiguration{
+				MultiRegionKeyType: kmstypes.MultiRegionKeyTypeReplica,
+				PrimaryKey: &kmstypes.MultiRegionKey{
+					Arn:    aws.String("arn:aws:kms:eu-west-1:123456789012:key/" + KMSReplicaKeyID),
+					Region: aws.String("eu-west-1"),
+				},
+			},
 		},
 		// Access-denied key — DescribeKey is denied for this ID (see
 		// KMSFake.DescribeKey), raising kms.access-denied. Real key state
@@ -583,5 +608,5 @@ func NewKMSFixtures() *KMSFixtures {
 func init() {
 	// dim: no kms state finding is Dim — Disabled is declared Warning — and
 	// docs/resources/kms.md documents no Dim-producing signal.
-	Register(Pin{ShortName: "kms", Rows: 24, Issues: 10, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "kms", Rows: 25, Issues: 10, CoverageGaps: []string{"dim"}})
 }

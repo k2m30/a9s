@@ -195,13 +195,13 @@ glue — DATA & ANALYTICS. Status key: `state` — the column naming it is the s
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| glue.latest-run-failed | latest run <status> | broken | wave2 | The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job. |
-| glue.no-security-configuration | no security configuration | warn | wave1 | This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are not encrypted with a key you control — they get only the storage defaults AWS applies. Create a security configuration with a KMS key and attach it to the job. |
-| glue.security-configuration-encryption-off | security configuration leaves encryption off | warn | wave2 | The security configuration this job names turns off encryption for the targets listed below, so those are not encrypted with a key you control. Set each of them to a KMS-backed mode in the security configuration; every job naming it picks the change up. |
-| glue.continuous-logging-off | continuous logging off | warn | wave1 | Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments. |
-| glue.argument-secret | credential in job arguments | broken | wave1 | A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| glue.latest-run-failed | latest run <status> | broken | wave2 | all | The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job. |
+| glue.no-security-configuration | no security configuration | warn | wave1 | glueetl, gluestreaming, pythonshell | This job names no security configuration, so its S3 output and its CloudWatch log stream are not encrypted with a key you control — they get only the storage defaults AWS applies. Create a security configuration with a KMS key and attach it to the job. |
+| glue.security-configuration-encryption-off | security configuration leaves encryption off | warn | wave2 | glueetl, gluestreaming, pythonshell | The security configuration this job names turns off encryption for the targets listed below, so those are not encrypted with a key you control. Set each of them to a KMS-backed mode in the security configuration; every job naming it picks the change up. |
+| glue.continuous-logging-off | continuous logging off | warn | wave1 | glueetl, gluestreaming | Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments. |
+| glue.argument-secret | credential in job arguments | broken | wave1 | all | A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

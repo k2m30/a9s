@@ -42,7 +42,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 	// the jobs we care about. Without this, accounts with months of job
 	// history scan far more pages than needed and hit EnrichmentCap early,
 	// reporting a cut walk even when zero issues exist in the window.
-	cutoff := time.Now().Add(-24 * time.Hour)
+	cutoff := time.Now().Add(-backupJobLookbackHours * time.Hour)
 	allJobs, pages, walkErr := walkAccountPages(ctx, &result, resources, manyItemsPerRow,
 		func(job backuptypes.BackupJob) string {
 			if job.CreatedBy == nil {
@@ -109,7 +109,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			// The status cell says what the finding says, read off the same
 			// declaration, so the cell and the phrase cannot word the same
 			// fact two ways.
-			summary := fillPhrase(catalog.Phrase(backupCodeJobFailed), strconv.Itoa(failedCount))
+			summary := fillPhrase(catalog.Phrase(backupCodeJobFailed), strconv.Itoa(failedCount), strconv.Itoa(backupJobLookbackHours))
 
 			// The two facts about the whole bucket lead, and the per-job rows
 			// follow, because only the per-job list is unbounded: capRows
@@ -144,7 +144,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 				})
 			}
 
-			setWave2Finding(&result, planID, backupCodeJobFailed, rows, strconv.Itoa(failedCount))
+			setWave2Finding(&result, planID, backupCodeJobFailed, rows, strconv.Itoa(failedCount), strconv.Itoa(backupJobLookbackHours))
 			if result.FieldUpdates[planID] == nil {
 				result.FieldUpdates[planID] = make(map[string]string)
 			}

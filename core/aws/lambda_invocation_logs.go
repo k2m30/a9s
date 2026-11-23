@@ -158,10 +158,9 @@ func readInvocationLog(ctx context.Context, api CWLogsFilterLogEventsAPI, input 
 
 			status := classifyLogEventStatus(message)
 
-			resources = append(resources, resource.Resource{
-				ID:       id,
-				Name:     logEventDisplayName(message),
-				Findings: logEventFindings(status),
+			resources = append(resources, withWave1("lambda_invocation_logs", resource.Resource{
+				ID:   id,
+				Name: logEventDisplayName(message),
 				Fields: map[string]string{
 					"timestamp":  ts,
 					"message":    message,
@@ -170,7 +169,7 @@ func readInvocationLog(ctx context.Context, api CWLogsFilterLogEventsAPI, input 
 					"log_stream": aws.ToString(event.LogStreamName),
 				},
 				RawStruct: event,
-			})
+			}, logEventFindings(status)...))
 			if marker == "report" {
 				return resource.FetchResult{Resources: resources, Pagination: logReadPagination(len(resources), "")}, nil
 			}

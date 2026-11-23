@@ -83,7 +83,7 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			}
 		}
 
-		r := resource.Resource{
+		r := withWave1("subnet", resource.Resource{
 			ID:   subnetID,
 			Name: name,
 			Fields: map[string]string{
@@ -96,10 +96,9 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 				"available_ips":     availableIPs,
 				"auto_public_ip":    autoPublicIP,
 			},
-			Findings:         findings,
 			AttentionDetails: attentionDetails,
 			RawStruct:        subnet,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

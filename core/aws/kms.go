@@ -72,10 +72,10 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			if descOutput.KeyMetadata == nil {
 				return nil, UnusableAnswerErr{Call: "DescribeKey", Field: "key metadata"}
 			}
-			if descOutput.KeyMetadata.KeyManager != kmstypes.KeyManagerTypeCustomer {
+			r := kmsKeyResource(descOutput.KeyMetadata, aliasMap)
+			if kmsKind(r) == kmsKindAWSManaged {
 				return nil, errNotInList
 			}
-			r := kmsKeyResource(descOutput.KeyMetadata, aliasMap)
 			return &r, nil
 		}, func(err error) resource.Resource {
 			r := DegradedDetails("kms", listedID, err)
@@ -213,10 +213,9 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			known = append(slices.Clone(known), requested)
 		}
 		alias, aliases := kmsAliasFields(known)
-		resources = append(resources, resource.Resource{
-			ID:       keyID,
-			Name:     alias,
-			Findings: withState("kms", status, nil),
+		resources = append(resources, withWave1("kms", resource.Resource{
+			ID:   keyID,
+			Name: alias,
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"arn":         aws.ToString(meta.Arn),
@@ -226,7 +225,7 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 				"description": description,
 			},
 			RawStruct: meta,
-		})
+		}, withState("kms", status, nil)...))
 	}
 
 	return resources, errors.Join(
@@ -257,14 +256,50 @@ func kmsAliasName(keyID string) (string, bool) {
 	return res, ok && strings.HasPrefix(res, "alias/")
 }
 
+// The kinds of KMS key, by who can change it and how it rotates. AWS owns an
+// AWS-managed key's policy and rotation. "Automatic key rotation is supported
+// only on symmetric encryption KMS keys with key material that AWS KMS
+// generates" (AWS KMS Developer Guide, "Rotate AWS KMS keys"), which excludes
+// asymmetric and HMAC keys, imported key material and keys in a custom key
+// store; those rotate by hand. "You can enable and disable automatic key
+// rotation only on a primary key" (AWS KMS Developer Guide, "Multi-Region keys
+// in AWS KMS"), so a multi-Region replica rotates with its primary.
+const (
+	kmsKindAutomaticRotation = "automatic rotation"
+	kmsKindManualRotation    = "manual rotation"
+	kmsKindAWSManaged        = "AWS managed"
+	kmsKindReplica           = "multi-Region replica"
+	// kmsKindMetadataUnread is a listed key whose DescribeKey was refused or
+	// came back empty, so nothing says which kind it is.
+	kmsKindMetadataUnread = "metadata not read"
+)
+
+// kmsListedKinds are the kinds the kms list holds: FetchKMSKeysPage leaves
+// AWS-managed keys out, and one reaches a row only as a drill target.
+var kmsListedKinds = []string{kmsKindAutomaticRotation, kmsKindManualRotation, kmsKindReplica, kmsKindMetadataUnread} //nolint:gochecknoglobals // static value set
+
+func kmsKind(r domain.Resource) string {
+	meta, ok := assertStruct[kmstypes.KeyMetadata](r.RawStruct)
+	switch {
+	case !ok:
+		return kmsKindMetadataUnread
+	case meta.KeyManager == kmstypes.KeyManagerTypeAws:
+		return kmsKindAWSManaged
+	case meta.MultiRegionConfiguration != nil && meta.MultiRegionConfiguration.MultiRegionKeyType == kmstypes.MultiRegionKeyTypeReplica:
+		return kmsKindReplica
+	case meta.KeySpec == kmstypes.KeySpecSymmetricDefault && meta.Origin == kmstypes.OriginTypeAwsKms && aws.ToString(meta.CustomKeyStoreId) == "":
+		return kmsKindAutomaticRotation
+	}
+	return kmsKindManualRotation
+}
+
 func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) resource.Resource {
 	keyID := aws.ToString(meta.KeyId)
 	status := string(meta.KeyState)
 	alias, aliases := kmsAliasFields(aliasMap[keyID])
-	return resource.Resource{
-		ID:       keyID,
-		Name:     alias,
-		Findings: withState("kms", status, nil),
+	return withWave1("kms", resource.Resource{
+		ID:   keyID,
+		Name: alias,
 		Fields: map[string]string{
 			"key_id":      keyID,
 			"arn":         aws.ToString(meta.Arn),
@@ -274,7 +309,7 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 			"description": aws.ToString(meta.Description),
 		},
 		RawStruct: meta,
-	}
+	}, withState("kms", status, nil)...)
 }
 
 // kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call
@@ -282,14 +317,13 @@ func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) re
 // (from ListKeys) is not in question, so it stays visible with a finding
 // distinguishing it from a key whose state was read.
 func kmsAccessDeniedResource(keyID, keyARN string) resource.Resource {
-	return resource.Resource{
+	return withWave1("kms", resource.Resource{
 		ID: keyID,
-		Findings: []domain.Finding{
-			wave1Finding(CodeKMSAccessDenied),
-		},
 		Fields: map[string]string{
 			"key_id": keyID,
 			"arn":    keyARN,
 		},
-	}
+	}, []domain.Finding{
+		wave1Finding(CodeKMSAccessDenied),
+	}...)
 }

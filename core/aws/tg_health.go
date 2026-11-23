@@ -75,7 +75,7 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 	}
 	reasonHuman := humanizeTargetHealthReason(reason)
 
-	return resource.Resource{
+	return withWave1("tg_health", resource.Resource{
 		ID:   tgHealthRowID(targetID, port, az),
 		Name: targetID,
 		Fields: map[string]string{
@@ -88,9 +88,8 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn 
 			"description":      description,
 			"target_group_arn": targetGroupArn,
 		},
-		Findings:  targetHealthFindings(health, reasonHuman),
 		RawStruct: thd,
-	}
+	}, targetHealthFindings(health, reasonHuman)...)
 }
 
 // tgHealthRowID is the row identity of one registration in a target group.

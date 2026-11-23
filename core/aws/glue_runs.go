@@ -135,10 +135,9 @@ func convertGlueJobRun(run gluetypes.JobRun) resource.Resource {
 		jobName = *run.JobName
 	}
 
-	return resource.Resource{
-		ID:       runID,
-		Name:     startedOn,
-		Findings: glueRunFindings(run.JobRunState),
+	return withWave1("glue_runs", resource.Resource{
+		ID:   runID,
+		Name: startedOn,
 		Fields: map[string]string{
 			"run_id_short":         runIDShort,
 			"job_run_state":        jobRunState,
@@ -150,5 +149,5 @@ func convertGlueJobRun(run gluetypes.JobRun) resource.Resource {
 			"job_name":             jobName,
 		},
 		RawStruct: run,
-	}
+	}, glueRunFindings(run.JobRunState)...)
 }

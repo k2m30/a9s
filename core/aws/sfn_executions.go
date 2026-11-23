@@ -148,7 +148,7 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 		redriveDate = item.RedriveDate.UTC().Format("2006-01-02 15:04")
 	}
 
-	return resource.Resource{
+	return withWave1("sfn_executions", resource.Resource{
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{
@@ -166,9 +166,8 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 			"redrive_count":             redriveCount,
 			"redrive_date":              redriveDate,
 		},
-		Findings:  sfnExecutionFindings(item.Status),
 		RawStruct: item,
-	}
+	}, sfnExecutionFindings(item.Status)...)
 }
 
 // FormatHumanDuration formats a time.Duration into a human-readable string.

@@ -96,7 +96,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 		if policyErr == nil {
 			readPolicy("lambda", policy, ownAccount, r.Fields["arn"]).raiseIn(&result, r.ID, class, state)
 		}
-		if urlPublic && catalog.Applies(lambdaCodeFunctionURLPublic, class, state) {
+		if urlPublic && catalog.Applies("lambda", lambdaCodeFunctionURLPublic, class, state, "") {
 			setWave2Finding(&result, r.ID, lambdaCodeFunctionURLPublic, urlRows)
 		}
 		// Each read that failed is recorded: two calls refused for two

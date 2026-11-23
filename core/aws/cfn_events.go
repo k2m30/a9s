@@ -127,10 +127,9 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 		stackArn = *event.StackId
 	}
 
-	return resource.Resource{
-		ID:       id,
-		Name:     name,
-		Findings: cfnEventFindings(event.ResourceStatus),
+	return withWave1("cfn_events", resource.Resource{
+		ID:   id,
+		Name: name,
 		Fields: map[string]string{
 			"timestamp":              timestamp,
 			"logical_resource_id":    logicalResourceID,
@@ -140,5 +139,5 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 			"stack_arn":              stackArn,
 		},
 		RawStruct: event,
-	}
+	}, cfnEventFindings(event.ResourceStatus)...)
 }

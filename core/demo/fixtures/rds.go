@@ -44,7 +44,7 @@ var sharedRDSFixtures = shared(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances:        slices.Concat(dbi.Instances, []rdstypes.DBInstance{dbiDocDBClusterMember()}, normalizeRDSInstancePosture(legacy), dbiLifecycleWitnesses(), []rdstypes.DBInstance{dbiNeptuneClusterMember()}),
+		DBInstances:        slices.Concat(dbi.Instances, []rdstypes.DBInstance{dbiDocDBClusterMember()}, normalizeRDSInstancePosture(legacy), dbiLifecycleWitnesses(), []rdstypes.DBInstance{dbiNeptuneClusterMember()}, dbiKindWitnesses()),
 		DBSnapshots:        NewDBISnapFixtures().Instances,
 		Events:             buildRDSEvents(),
 		DBClusters:         normalizeRDSClusterPosture(buildRDSDBClusters()),
@@ -86,6 +86,9 @@ const (
 	// DBCNeptune is the Neptune cluster the shared endpoint answers beside
 	// the Aurora and DocumentDB ones; DB Clusters does not list it.
 	DBCNeptune = "acme-graph-neptune"
+	// DBCMultiAZ is an RDS Multi-AZ DB cluster: a mysql engine whose
+	// instances DescribeDBInstances lists with its DBClusterIdentifier.
+	DBCMultiAZ = "acme-orders-maz"
 	// DBCSnapPublic is the cluster snapshot shared with every AWS account.
 	DBCSnapPublic = "shared-with-all-aurora-snap"
 	// DBISnapPublic is the DB instance snapshot shared with every AWS account.
@@ -605,6 +608,15 @@ func buildRDSDBClusters() []rdstypes.DBCluster {
 			c.Port = aws.Int32(8182)
 			c.Endpoint = aws.String(DBCNeptune + ".cluster-c9xyz123.us-east-1.neptune.amazonaws.com")
 		}),
+		rdsPostureWitnessCluster(DBCMultiAZ, func(c *rdstypes.DBCluster) {
+			c.Engine = aws.String("mysql")
+			c.EngineVersion = aws.String("8.0.39")
+			c.Port = aws.Int32(3306)
+			c.MasterUsername = aws.String("ordersadmin")
+			c.DBClusterMembers = []rdstypes.DBClusterMember{
+				{DBInstanceIdentifier: aws.String(DBIMultiAZClusterMember), IsClusterWriter: aws.Bool(true)},
+			}
+		}),
 	}
 }
 
@@ -762,10 +774,10 @@ func buildRDSEvents() []rdstypes.Event {
 func init() {
 	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
 	// carries dbi.warn.deletion_protection_off.
-	Register(Pin{ShortName: "dbi", Rows: 59, Issues: 35, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbi", Rows: 61, Issues: 35, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 13, Issues: 7, CoverageGaps: []string{"dim"}})
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.
-	Register(Pin{ShortName: "dbc", Rows: 24, Issues: 21, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbc", Rows: 25, Issues: 21, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbc-snap", Rows: 14, Issues: 6, CoverageGaps: []string{"dim"}})
 }

@@ -286,7 +286,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 			}
 		}
 
-		r := resource.Resource{
+		r := withWave1("sg", resource.Resource{
 			ID:   groupID,
 			Name: groupName,
 			Fields: map[string]string{
@@ -298,10 +298,9 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"wide_open":            wideOpen,
 				"open_ports":           openPorts,
 			},
-			Findings:         findings,
 			AttentionDetails: attentionDetails,
 			RawStruct:        sg,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

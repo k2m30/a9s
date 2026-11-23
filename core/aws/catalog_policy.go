@@ -17,7 +17,7 @@ func policyFindingDefs(d catalog.PolicyDecl) []catalog.FindingDef {
 	var defs []catalog.FindingDef
 	if d.Public != "" {
 		defs = append(defs, catalog.FindingDef{
-			Code: d.Public, Phrase: d.Noun + " policy open to anyone", Severity: d.PublicSeverity, Source: d.Source,
+			Code: d.Public, Phrase: d.Noun + " policy open to anyone", Severity: d.PublicSeverity, Source: d.Source, NotKinds: d.NotKinds,
 			Detail: "The " + d.Noun + " policy allows any principal, so anyone can use this " + d.Subject +
 				", depending on the actions allowed. Replace the wildcard principal with the accounts or roles that need it, " +
 				"or add a condition that requires the caller's account or ARN to equal one you expect; " +
@@ -26,7 +26,7 @@ func policyFindingDefs(d catalog.PolicyDecl) []catalog.FindingDef {
 	}
 	if d.Cross != "" {
 		defs = append(defs, catalog.FindingDef{
-			Code: d.Cross, Phrase: d.Noun + " policy grants another account", Severity: domain.SevWarn, Source: d.Source,
+			Code: d.Cross, Phrase: d.Noun + " policy grants another account", Severity: domain.SevWarn, Source: d.Source, NotKinds: d.NotKinds,
 			Detail: "The " + d.Noun + " policy admits a caller from another AWS account, so that account can use this " + d.Subject +
 				", depending on the actions allowed. Confirm each account belongs to a partner you meant to share with, " +
 				"and remove the rest from the " + d.Noun + " policy.",

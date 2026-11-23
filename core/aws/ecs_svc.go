@@ -91,7 +91,7 @@ func FetchECSServicesPage(
 
 				findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
-				r := resource.Resource{
+				r := withWave1("ecs-svc", resource.Resource{
 					ID:   ecsSvcID(clusterName, serviceName),
 					Name: serviceName,
 					Fields: map[string]string{
@@ -104,9 +104,8 @@ func FetchECSServicesPage(
 						"task_definition": taskDefinition,
 						"arn":             arn,
 					},
-					Findings:  findings,
 					RawStruct: svc,
-				}
+				}, findings...)
 				ans.rows = append(ans.rows, r)
 			}
 			clusterName, _ := ecsRefToID(clusterArn, domain.RefContext{})

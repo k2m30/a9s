@@ -35,6 +35,28 @@ const (
 	awsServiceRolePathPrefix = "/aws-service-role/"
 )
 
+// The two kinds of IAM role: one AWS creates and owns for a service, and
+// every other.
+const (
+	roleKindServiceLinked = "service-linked"
+	roleKindStandard      = "standard"
+)
+
+var roleKinds = []string{roleKindServiceLinked, roleKindStandard} //nolint:gochecknoglobals // static value set
+
+// roleKind reads the role's Path. A row rebuilt from Fields alone reads the
+// path the fetcher stored.
+func roleKind(r domain.Resource) string {
+	path := r.Fields["path"]
+	if role, ok := assertStruct[iamtypes.Role](r.RawStruct); ok {
+		path = aws.ToString(role.Path)
+	}
+	if strings.HasPrefix(path, awsServiceRolePathPrefix) {
+		return roleKindServiceLinked
+	}
+	return roleKindStandard
+}
+
 // roleTrustAnalysis is one parse of a role's trust policy: the Findings it
 // yields, their supporting Attention rows, and the trust_summary display
 // field. The Findings list, the Trust column and the row color all read this
@@ -45,7 +67,7 @@ type roleTrustAnalysis struct {
 	summary  string
 }
 
-func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
+func analyseRoleTrust(assumeRolePolicyDoc string) roleTrustAnalysis {
 	trust := readPolicy("role", assumeRolePolicyDoc, "", "")
 	// The summary is a9s's own verdict on the trust policy, not a value IAM
 	// returned, so it is written in the words the Trust column and the detail
@@ -56,7 +78,7 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust))
 		out.details[roleCodeWildcardTrust] = trust.detail()
 	}
-	if svcs := unscopedServicePrincipals(trust.servicePrincipalsWithoutSourceScope(), path); len(svcs) > 0 {
+	if svcs := unscopedServicePrincipals(trust.servicePrincipalsWithoutSourceScope()); len(svcs) > 0 {
 		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy))
 		out.details[roleCodeConfusedDeputy] = domain.AttentionDetail{Rows: []domain.DetailRow{
 			{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
@@ -70,14 +92,10 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 }
 
 // unscopedServicePrincipals returns the confused-deputy service principals
-// worth reporting on a role's trust policy. AWS service-linked roles are
-// excluded (AWS owns the document), and so is a role trusted only by
-// ec2.amazonaws.com: an EC2 instance profile is assumed by the instance
-// itself, so there is no third-party caller to scope.
-func unscopedServicePrincipals(svcs []string, path string) []string {
-	if strings.HasPrefix(path, awsServiceRolePathPrefix) {
-		return nil
-	}
+// worth reporting on a role's trust policy. A role trusted only by
+// ec2.amazonaws.com is excluded: an EC2 instance profile is assumed by the
+// instance itself, so there is no third-party caller to scope.
+func unscopedServicePrincipals(svcs []string) []string {
 	if len(svcs) == 1 && svcs[0] == "ec2" {
 		return nil
 	}
@@ -140,7 +158,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			assumeRolePolicyDoc = iampolicy.Decode(*role.AssumeRolePolicyDocument)
 		}
 
-		trust := analyseRoleTrust(assumeRolePolicyDoc, path)
+		trust := analyseRoleTrust(assumeRolePolicyDoc)
 		findings, details := trust.findings, trust.details
 
 		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
@@ -149,7 +167,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			failures = append(failures, inline.failures...)
 		}
 
-		r := resource.Resource{
+		r := withWave1("role", resource.Resource{
 			ID:   roleName,
 			Name: roleName,
 			Type: "role",
@@ -163,10 +181,9 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"assume_role_policy_document": assumeRolePolicyDoc,
 				"trust_summary":               trust.summary,
 			},
-			Findings:         findings,
 			AttentionDetails: details,
 			RawStruct:        role,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}
@@ -288,7 +305,7 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		assumeRolePolicyDoc = iampolicy.Decode(*role.AssumeRolePolicyDocument)
 	}
 
-	trust := analyseRoleTrust(assumeRolePolicyDoc, path)
+	trust := analyseRoleTrust(assumeRolePolicyDoc)
 	findings, details := trust.findings, trust.details
 
 	listPoliciesAPI, okList := api.(IAMListRolePoliciesAPI)
@@ -300,7 +317,7 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 		failures = inline.failures
 	}
 
-	return resource.Resource{
+	return withWave1("role", resource.Resource{
 		ID:   roleName,
 		Name: roleName,
 		Type: "role",
@@ -314,10 +331,9 @@ func roleToResource(ctx context.Context, api any, role iamtypes.Role) (resource.
 			"assume_role_policy_document": assumeRolePolicyDoc,
 			"trust_summary":               trust.summary,
 		},
-		Findings:         findings,
 		AttentionDetails: details,
 		RawStruct:        role,
-	}, failures
+	}, findings...), failures
 }
 
 // inlinePolicyScan carries the privilege-escalation verdict of a role's

@@ -55,13 +55,13 @@ const (
 // DescribeTrails payload alone, and attaches each one's supporting rows.
 func trailPostureFindings(r *resource.Resource, trail cttypes.Trail) {
 	if aws.ToString(trail.CloudWatchLogsLogGroupArn) == "" {
-		addWave1Finding(r, CodeTrailNoCloudWatchLogs)
+		addWave1Finding("trail", r, CodeTrailNoCloudWatchLogs)
 		addWave1Rows(r, CodeTrailNoCloudWatchLogs, domain.DetailRow{
 			Label: "Log group", Value: "none", Tier: "~",
 		})
 	}
 	if aws.ToString(trail.KmsKeyId) == "" {
-		addWave1Finding(r, CodeTrailNoKMS)
+		addWave1Finding("trail", r, CodeTrailNoKMS)
 		addWave1Rows(r, CodeTrailNoKMS, domain.DetailRow{
 			Label: "KMS key", Value: "none", Tier: "~",
 		})

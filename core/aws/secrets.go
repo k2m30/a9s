@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -67,10 +68,9 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			secretStatus = secretsStateDeleted
 		}
 
-		r := resource.Resource{
-			ID:       secretName,
-			Name:     secretName,
-			Findings: withState("secrets", secretStatus, secretPostureFindings(secret, rotationEnabled, lastChanged)),
+		r := withWave1("secrets", resource.Resource{
+			ID:   secretName,
+			Name: secretName,
 			Fields: map[string]string{
 				"secret_name":      secretName,
 				"description":      description,
@@ -81,7 +81,7 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 				"status":           secretStatus,
 			},
 			RawStruct: secret,
-		}
+		}, withState("secrets", secretStatus, secretPostureFindings(secret, rotationEnabled, lastChanged))...)
 		resources = append(resources, r)
 	}
 
@@ -117,20 +117,23 @@ const (
 	secretsStateDeleted = "deleted"
 )
 
+// secretPostureFindings evaluates each posture check on its own: a secret
+// with two defects has two fixes and shows both.
 func secretPostureFindings(secret smtypes.SecretListEntry, rotationEnabled, lastChanged string) []domain.Finding {
+	var findings []domain.Finding
 	if secret.RotationEnabled != nil && *secret.RotationEnabled && secret.NextRotationDate != nil && time.Now().After(*secret.NextRotationDate) {
-		return []domain.Finding{wave1Finding(CodeSecretStateRotationOverdue)}
+		findings = append(findings, wave1Finding(CodeSecretStateRotationOverdue))
 	}
-	if secret.LastAccessedDate != nil && time.Since(*secret.LastAccessedDate) > 180*24*time.Hour {
-		return []domain.Finding{wave1Finding(CodeSecretStateDormant)}
+	if secret.LastAccessedDate != nil && time.Since(*secret.LastAccessedDate) > days(secretDormantAfterDays) {
+		findings = append(findings, wave1Finding(CodeSecretStateDormant))
 	}
 	if rotationEnabled == "No" {
-		return []domain.Finding{wave1Finding(CodeSecretRotationDisabled)}
+		findings = append(findings, wave1Finding(CodeSecretRotationDisabled))
 	}
-	if t, err := time.Parse("2006-01-02", lastChanged); err == nil && time.Since(t) > 365*24*time.Hour {
-		return []domain.Finding{wave1Finding(CodeSecretStaleValue)}
+	if t, err := time.Parse("2006-01-02", lastChanged); err == nil && time.Since(t) > days(secretStaleAfterDays) {
+		findings = append(findings, wave1Finding(CodeSecretStaleValue, strconv.Itoa(secretStaleAfterDays)))
 	}
-	return nil
+	return findings
 }
 
 // RevealSecret calls the SecretsManager GetSecretValue API and returns the

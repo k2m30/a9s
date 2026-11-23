@@ -43,7 +43,10 @@ func hasFinding(findings []domain.Finding, code domain.FindingCode) bool {
 // the classifier runs the type's OWN findings predicate over those Fields
 // rather than reading the same raw fields a second way.
 func colorFromFindings(findings []domain.Finding) domain.Color {
-	return colorAnyFindingOrHealthy(domain.Resource{Findings: findings})
+	if top, ok := domain.TopFinding(findings); ok {
+		return top.Severity.Color()
+	}
+	return domain.ColorHealthy
 }
 
 // colorAnyFindingOrHealthy classifies r from colorFromAnyFinding, defaulting

@@ -340,9 +340,6 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcLogs(ctx, c.ECS, sessionLogs{c}, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),
-		Findings: []catalog.FindingDef{
-			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
-			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1", Detail: "The workload logged something it could work around but wanted recorded — a retry, a deprecated setting, or a near-limit condition. Worth reading if it repeats; a single one is usually noise."},
-		},
+		Findings: logEventFindingDefs,
 	},
 }

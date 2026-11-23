@@ -545,7 +545,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			unrecognisedStateDef(CodeECSTaskStateUnrecognised, "<status>", "wave1", "Amazon ECS reports a task status a9s does not recognise, so a9s cannot tell whether the task is running its containers. Check the task in the ECS console before relying on it."),
 			ecsTaskStopCodeFailedDef,
 			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1", Detail: "The container health check inside this task is failing. A task run by a service is replaced by the scheduler under its deployment settings, and a load balancer stops routing to it only if its target group also marks it unhealthy; a task started on its own is neither replaced nor drained. Read the container logs from when the check started failing, and confirm the check command and its grace period suit the application's startup."},
-			{Code: ecsTaskCodeTaskFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave2", Detail: "This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why."},
+			{Code: ecsTaskCodeTaskFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave2", AppliesIn: ecsTaskStopCodeFailedDef.AppliesIn, Detail: "This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why."},
 			{Code: ecsTaskCodePrivileged, Phrase: "privileged container", Severity: domain.SevBroken, Source: "wave2", Detail: "A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs."},
 			{Code: ecsTaskCodeHostNamespace, Phrase: "shares the host network or process namespace", Severity: domain.SevWarn, Source: "wave2", Detail: "This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset."},
 			{Code: ecsTaskCodeWritableRoot, Phrase: "writable root filesystem", Severity: domain.SevWarn, Source: "wave2", Detail: "A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes."},
@@ -1003,6 +1003,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			}
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
 		}),
+		Findings: logEventFindingDefs,
 	},
 	{
 		Name:         "Scaling Activities",

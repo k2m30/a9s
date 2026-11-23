@@ -73,32 +73,43 @@ func Lifecycle(td ResourceTypeDef, raw string) (LifecycleClass, domain.FindingCo
 	return LifecycleTransitional, td.UnknownState
 }
 
+// declKey names one type's declaration of a code. One code can be declared
+// by two types with different rules (a top-level type and its child view), so
+// a finding is judged by the declaration of the type whose row carries it.
+type declKey struct {
+	shortName string
+	code      domain.FindingCode
+}
+
 var (
-	stateTables     map[string]ResourceTypeDef              //nolint:gochecknoglobals // process-scope catalog index, set with the registry
-	appliesIn       map[domain.FindingCode][]LifecycleClass //nolint:gochecknoglobals // process-scope catalog index, set with the registry
-	appliesInStates map[domain.FindingCode][]string         //nolint:gochecknoglobals // process-scope catalog index, set with the registry
+	stateTables map[string]ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog index, set with the registry
+	rowTypes    map[string]ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog index, set with the registry
+	decls       map[declKey]FindingDef     //nolint:gochecknoglobals // process-scope catalog index, set with the registry
 )
 
 func indexStateTables(types []ResourceTypeDef) {
 	if stateTables == nil {
 		stateTables = map[string]ResourceTypeDef{}
 	}
-	if appliesIn == nil {
-		appliesIn = map[domain.FindingCode][]LifecycleClass{}
+	if rowTypes == nil {
+		rowTypes = map[string]ResourceTypeDef{}
 	}
-	if appliesInStates == nil {
-		appliesInStates = map[domain.FindingCode][]string{}
+	if decls == nil {
+		decls = map[declKey]FindingDef{}
 	}
 	for _, t := range types {
+		name := strings.ToLower(t.ShortName)
+		rowTypes[name] = t
 		if len(t.StateEnum) > 0 {
-			stateTables[strings.ToLower(t.ShortName)] = t
+			stateTables[name] = t
 		}
 		for _, f := range t.Findings {
-			if len(f.AppliesIn) > 0 {
-				appliesIn[f.Code] = f.AppliesIn
+			decls[declKey{name, f.Code}] = f
+			if (len(f.OnlyKinds)+len(f.NotKinds) > 0 || len(f.Rows) > 0) && t.Kind == nil {
+				panic("catalog: " + string(f.Code) + " declares kinds and " + t.ShortName + " declares no Kind classifier")
 			}
-			if len(f.AppliesInStates) > 0 {
-				appliesInStates[f.Code] = f.AppliesInStates
+			if len(f.Rows) > 0 && f.Source != "wave2" {
+				panic("catalog: " + string(f.Code) + " declares rows by kind, which only the Wave 2 door judges")
 			}
 		}
 	}
@@ -128,16 +139,66 @@ func RowLifecycle(td ResourceTypeDef, r domain.Resource) LifecycleClass {
 	return class
 }
 
-// Applies is the one rule for whether posture stands in a lifecycle class, so
-// no fetcher returns early on a status string.
-func Applies(code domain.FindingCode, class LifecycleClass, raw string) bool {
-	if only, narrowed := appliesIn[code]; narrowed {
-		if !slices.Contains(only, class) {
+// Applies is the one rule for whether a finding stands on a row of the type
+// shortName: the lifecycle class and value the row is in, and the kind its
+// type's classifier names it, against what that type declares for code. No
+// fetcher returns early on a status string and no enricher tests a kind field
+// itself. kind is "" when the caller holds no row to classify; a finding
+// narrowed by OnlyKinds does not stand on a kind nobody read.
+func Applies(shortName string, code domain.FindingCode, class LifecycleClass, raw, kind string) bool {
+	def := decls[declKey{strings.ToLower(shortName), code}]
+	if len(def.AppliesIn) > 0 {
+		if !slices.Contains(def.AppliesIn, class) {
 			return false
 		}
 	} else if !class.Live() {
 		return false
 	}
-	only, narrowed := appliesInStates[code]
-	return !narrowed || slices.Contains(only, raw)
+	if len(def.AppliesInStates) > 0 && !slices.Contains(def.AppliesInStates, raw) {
+		return false
+	}
+	return kindAllowed(def.OnlyKinds, def.NotKinds, kind)
+}
+
+func kindAllowed(only, not []string, kind string) bool {
+	return (len(only) == 0 || slices.Contains(only, kind)) && !slices.Contains(not, kind)
+}
+
+// RowApplies reports whether the supporting row labelled label of the
+// finding code stands on r, a row of the type shortName, by the kind the
+// finding's Rows declare for it. A row the finding does not declare stands.
+func RowApplies(shortName string, code domain.FindingCode, label string, r domain.Resource) bool {
+	name := strings.ToLower(shortName)
+	def := decls[declKey{name, code}]
+	i := slices.IndexFunc(def.Rows, func(d RowDecl) bool { return d.Label == label })
+	if i < 0 {
+		return true
+	}
+	return kindAllowed(def.Rows[i].OnlyKinds, def.Rows[i].NotKinds, rowTypes[name].Kind(r))
+}
+
+// Declares answers for installed types only: a type a test registers at run
+// time declares nothing here.
+func Declares(shortName string, code domain.FindingCode) bool {
+	_, ok := decls[declKey{strings.ToLower(shortName), code}]
+	return ok
+}
+
+// AppliesToRow is Applies for a row of the type shortName, in the lifecycle
+// its status field holds. The state finding that value raises stands whatever
+// the class, since it is the lifecycle value itself; a code the type does not
+// declare stands.
+func AppliesToRow(shortName string, code domain.FindingCode, r domain.Resource) bool {
+	name := strings.ToLower(shortName)
+	if _, declared := decls[declKey{name, code}]; !declared {
+		return true
+	}
+	td := rowTypes[name]
+	raw := r.Fields[td.StatusKey()]
+	class, state := Lifecycle(td, raw)
+	kind := ""
+	if td.Kind != nil {
+		kind = td.Kind(r)
+	}
+	return code == state || Applies(shortName, code, class, raw, kind)
 }

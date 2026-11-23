@@ -32,6 +32,7 @@ type testParent struct {
 
 func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 	return awsclient.SnapshotCrossRefConfig{
+		ShortName:       "dbi-snap",
 		ParentShortName: "test-parent",
 		GetParentID: func(raw any) (string, bool) {
 			s, ok := raw.(testSnap)
@@ -46,13 +47,6 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 				return time.Time{}, false
 			}
 			return s.CreatedAt, !s.CreatedAt.IsZero()
-		},
-		GetSnapshotType: func(raw any) (string, bool) {
-			s, ok := raw.(testSnap)
-			if !ok {
-				return "", false
-			}
-			return s.Type, s.Type != ""
 		},
 		GetParentRetention: func(raw any) (int32, bool) {
 			p, ok := raw.(testParent)
@@ -73,6 +67,7 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 func snapRes(snap testSnap) resource.Resource {
 	return resource.Resource{
 		ID:        snap.ID,
+		Fields:    map[string]string{"snapshot_type": snap.Type},
 		RawStruct: snap,
 	}
 }
@@ -80,7 +75,7 @@ func snapRes(snap testSnap) resource.Resource {
 func snapResWithStatus(snap testSnap, status string, issues []string) resource.Resource {
 	r := resource.Resource{
 		ID:        snap.ID,
-		Fields:    map[string]string{},
+		Fields:    map[string]string{"snapshot_type": snap.Type},
 		RawStruct: snap,
 	}
 	if status != "" {

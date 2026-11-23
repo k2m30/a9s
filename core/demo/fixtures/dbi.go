@@ -247,6 +247,7 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	// taken before one carries the name of the day and this id, and only the
 	// id still leads back here.
 	prodDbi1.DbiResourceId = aws.String(ProdDbiResourceID)
+	prodDbi1.ReadReplicaDBInstanceIdentifiers = []string{DBIReadReplica}
 
 	// prod-dbi-aurora-1 — Aurora cluster member, Healthy, and the graph
 	// root for dbi: every related pivot is non-zero. Aurora
@@ -445,6 +446,34 @@ func dbiNeptuneClusterMember() rdstypes.DBInstance {
 	db.Endpoint.Address = aws.String(DBINeptuneMember + ".c9xyz123.us-east-1.neptune.amazonaws.com")
 	db.Endpoint.Port = aws.Int32(8182)
 	return db
+}
+
+// The DB instance kinds beside a standalone instance and the Aurora,
+// DocumentDB and Neptune members above: a member of an RDS Multi-AZ DB
+// cluster, whose engine is mysql or postgres, and a read replica of
+// prod-dbi-1.
+const (
+	DBIMultiAZClusterMember = DBCMultiAZ + "-instance-1"
+	DBIReadReplica          = "prod-dbi-1-replica"
+)
+
+// dbiKindWitnesses carry the instance-level values the cluster or the source
+// decides — deletion protection off and a single Availability Zone — so only
+// the kind keeps those findings off them.
+func dbiKindWitnesses() []rdstypes.DBInstance {
+	member := dbiBaselineHealthy(DBIMultiAZClusterMember, "arn:aws:rds:us-east-1:123456789012:db:"+DBIMultiAZClusterMember)
+	member.Engine = aws.String("mysql")
+	member.EngineVersion = aws.String("8.0.39")
+	member.MasterUsername = aws.String("ordersadmin")
+	member.DBClusterIdentifier = aws.String(DBCMultiAZ)
+	member.DeletionProtection = aws.Bool(false)
+	member.MultiAZ = aws.Bool(false)
+	member.Endpoint.Port = aws.Int32(3306)
+
+	replica := dbiBaselineHealthy(DBIReadReplica, "arn:aws:rds:us-east-1:123456789012:db:"+DBIReadReplica)
+	replica.ReadReplicaSourceDBInstanceIdentifier = aws.String(ProdDbiID)
+	replica.MultiAZ = aws.Bool(false)
+	return []rdstypes.DBInstance{member, replica}
 }
 
 func buildDBIPendingMaintenance() []rdstypes.ResourcePendingMaintenanceActions {

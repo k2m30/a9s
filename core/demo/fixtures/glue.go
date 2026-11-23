@@ -135,6 +135,25 @@ var sharedGlueFixtures = shared(func() *GlueFixtures {
 				},
 				SecurityConfiguration: aws.String(glueSecurityConfigName),
 			},
+			{
+				Name:            aws.String(GlueRayJob),
+				Role:            aws.String("acme-glue-role"),
+				GlueVersion:     aws.String("4.0"),
+				WorkerType:      gluetypes.WorkerType("Z.2X"),
+				NumberOfWorkers: aws.Int32(5),
+				MaxRetries:      0,
+				CreatedOn:       aws.Time(mustParseGlueTime("2025-11-04T10:00:00+00:00")),
+				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-02-18T13:20:00+00:00")),
+				Command: &gluetypes.JobCommand{
+					Name:           aws.String("glueray"),
+					Runtime:        aws.String("Ray2.4"),
+					PythonVersion:  aws.String("3.9"),
+					ScriptLocation: aws.String("s3://" + HealthyBucketName + "/scripts/feature_builder.py"),
+				},
+				DefaultArguments: map[string]string{
+					"--job-language": "python",
+				},
+			},
 			// Issue: latest JobRun=ERROR → Broken (job script threw an unhandled exception)
 			{
 				Name:            aws.String("glue-error-run"),
@@ -276,8 +295,11 @@ const (
 	GlueLoggingOff = "acme-etl-clickstream"
 	// GlueArgumentSecret — a default argument value looks like a credential.
 	GlueArgumentSecret = "glue-error-run"
+	// GlueRayJob — a Ray job, the kind the security-configuration and
+	// continuous-logging findings do not apply to.
+	GlueRayJob = "acme-feature-builder"
 )
 
 func init() {
-	Register(Pin{ShortName: "glue", Rows: 5, Issues: 3, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "glue", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
 }

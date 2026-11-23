@@ -55,7 +55,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
-			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2", Detail: "A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run."},
+			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last <N>h", Severity: domain.SevBroken, Source: "wave2", Detail: "A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run."},
 			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M resource(s)> skipped", Severity: domain.SevWarn, Source: "wave2", Detail: "The plan ran but skipped some of the resources it selects, so those resources have no recovery point for this window even though the job reports progress. Check the job's resource list against the plan's selection, and the backup role's permissions on the resources that were missed."},
 		},
 	},

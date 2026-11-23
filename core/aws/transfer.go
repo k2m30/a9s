@@ -100,7 +100,7 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 	id := aws.ToString(server.ServerId)
 	findings := computeTransferFindings(server)
 
-	return resource.Resource{
+	return withWave1("transfer", resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -113,8 +113,7 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 			"arn":                    aws.ToString(server.Arn),
 		},
 		RawStruct: server,
-		Findings:  findings,
-	}
+	}, findings...)
 }
 
 // computeTransferFindings builds the ordered Finding slice for one server:
@@ -147,7 +146,7 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 	findings := append(withState("transfer", string(listed.State), nil), degradedDetailsFinding("transfer", err))
 
 	raw := listed
-	return resource.Resource{
+	return withWave1("transfer", resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
@@ -160,6 +159,5 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer, err error)
 			"arn":                    aws.ToString(listed.Arn),
 		},
 		RawStruct: &raw,
-		Findings:  findings,
-	}
+	}, findings...)
 }

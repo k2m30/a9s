@@ -31,14 +31,9 @@ type rdsPostureCodes struct {
 type rdsPosture struct {
 	Engine                  string
 	MultiAZ                 *bool
-	IsReadReplica           bool
 	AutoMinorVersionUpgrade *bool
 	IAMAuthEnabled          *bool
 	MasterUsername          *string
-	// SkipSingleAZ suppresses the single-AZ predicate for shapes where
-	// MultiAZ is not the operator's lever — Aurora instances inherit the
-	// cluster's topology.
-	SkipSingleAZ bool
 }
 
 // iamAuthEngines are the RDS engine families that support IAM database
@@ -88,7 +83,7 @@ func rdsPostureFindings(p rdsPosture, c rdsPostureCodes) ([]domain.Finding, map[
 		details[code] = domain.AttentionDetail{Rows: rows}
 	}
 
-	if !p.SkipSingleAZ && !p.IsReadReplica && p.MultiAZ != nil && !*p.MultiAZ {
+	if p.MultiAZ != nil && !*p.MultiAZ {
 		add(c.singleAZ, []domain.DetailRow{{Label: "Multi-AZ", Value: "no", Tier: "~"}})
 	}
 	if p.AutoMinorVersionUpgrade != nil && !*p.AutoMinorVersionUpgrade {

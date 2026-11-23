@@ -199,17 +199,17 @@ dbc-snap — DATABASES & STORAGE. Status key: `status` — the column naming it 
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| dbc-snap.broken.failed | failed | broken | wave1 | The cluster snapshot did not complete, so it cannot be restored and the recovery point you think you have for that time does not exist. Take a new snapshot and delete this one. |
-| dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | This snapshot cannot be restored in its current form, usually because its engine version or options are no longer offered. Copy it and upgrade the copy, or restore into a configuration matching the cluster it came from. |
-| dbc-snap.warn.creating | creating | warn | wave1 | The snapshot is still being written and is not restorable yet. Wait for it to complete before treating it as a recovery point. |
-| dbc-snap.warn.transitional | <status> | warn | wave1 | The snapshot is being copied or modified and cannot be restored from while that runs. Wait for it to become available. |
-| dbc-snap.warn.manual\_unused | manual, unused <N>d | warn | wave1 | This manual snapshot has sat unused for a long time, and manual snapshots are never removed automatically, so it is billed indefinitely until somebody deletes it. Confirm whether it is a deliberate archive, and delete it if it is not. |
-| dbc-snap.warn.unencrypted | unencrypted | warn | wave1 | The snapshot is stored unencrypted, and any cluster restored from it inherits that. Copy it with a KMS key and restore from the copy. Delete the original only if it is a manual snapshot; an automated one goes when its retention period expires. |
-| dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 | The cluster this snapshot came from is gone, so nothing is producing newer recovery points from it. Check the other snapshots and backups of that cluster before deciding whether this is the last copy. Give it a retention decision and an owner, or delete it. |
-| dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 | This automated cluster snapshot is older than the retention period that should have removed it, so it is outliving the policy meant to manage it. Copy it to a manual snapshot if the data is worth keeping deliberately; otherwise adjust the retention setting or remove the retained automated backup that holds it. |
-| dbc-snap.public | shared with all AWS accounts | broken | wave2 | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| dbc-snap.broken.failed | failed | broken | wave1 | all | The cluster snapshot did not complete, so it cannot be restored and the recovery point you think you have for that time does not exist. Take a new snapshot and delete this one. |
+| dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | all | This snapshot cannot be restored in its current form, usually because its engine version or options are no longer offered. Copy it and upgrade the copy, or restore into a configuration matching the cluster it came from. |
+| dbc-snap.warn.creating | creating | warn | wave1 | all | The snapshot is still being written and is not restorable yet. Wait for it to complete before treating it as a recovery point. |
+| dbc-snap.warn.transitional | <status> | warn | wave1 | all | The snapshot is being copied or modified and cannot be restored from while that runs. Wait for it to become available. |
+| dbc-snap.warn.manual_unused | manual, unused <N>d | warn | wave1 | manual | This manual snapshot has sat unused for a long time, and manual snapshots are never removed automatically, so it is billed indefinitely until somebody deletes it. Confirm whether it is a deliberate archive, and delete it if it is not. |
+| dbc-snap.warn.unencrypted | unencrypted | warn | wave1 | all | The snapshot is stored unencrypted, and any cluster restored from it inherits that. Copy it with a KMS key and restore from the copy. Delete the original only if it is a manual snapshot; an automated one goes when its retention period expires. |
+| dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 | all | The cluster this snapshot came from is gone, so nothing is producing newer recovery points from it. Check the other snapshots and backups of that cluster before deciding whether this is the last copy. Give it a retention decision and an owner, or delete it. |
+| dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 | automated | This automated cluster snapshot is older than the retention period that should have removed it, so it is outliving the policy meant to manage it. Copy it to a manual snapshot if the data is worth keeping deliberately; otherwise adjust the retention setting or remove the retained automated backup that holds it. |
+| dbc-snap.public | shared with all AWS accounts | broken | wave2 | manual | The snapshot is shared with every AWS account, so anyone can restore it and read the cluster it came from. Remove `all` from the snapshot's restore attribute. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

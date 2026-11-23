@@ -235,13 +235,13 @@ ct-events — MONITORING. Status key: `status` — the key the status cell reads
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ct\_event.severity.danger | destructive call | broken | wave1 | CloudTrail recorded a call that deletes or tears something down. Verify it was expected and, if not, find out who made it. |
-| ct\_event.danger.failed | failed: <error> | broken | wave1 | CloudTrail recorded a call that AWS rejected; the error code is in the phrase. A denied call is either a permission gap or someone probing for one. |
-| ct\_event.severity.attention | root account activity | warn | wave1 | CloudTrail recorded a call made by the account root user. Root should not be doing day-to-day work; move the task onto a named principal. |
-| ct\_event.attention.write | modifying call | warn | wave1 | CloudTrail recorded a call that changed configuration. Verify the change was expected and that whoever made it meant to. |
-| ct\_event.attention.cross-account | cross-account access | warn | wave1 | The caller belongs to a different account than the one that recorded the event, so this is access across an account boundary. Verify the trust it came through is one you meant to grant. |
-| ct\_event.attention.sensitive-read | reads sensitive data (<event>) | warn | wave1 | CloudTrail recorded a read of secret or parameter material. Verify the caller was expected: a read leaves the value in the caller's hands with nothing to revoke afterwards. |
-| ct\_event.severity.info | routine event | dim | wave1 | — |
+| ct_event.severity.danger | destructive call | broken | wave1 | CloudTrail recorded a call that deletes or tears something down. Verify it was expected and, if not, find out who made it. |
+| ct_event.danger.failed | failed: <error> | broken | wave1 | CloudTrail recorded a call that AWS rejected; the error code is in the phrase. A denied call is either a permission gap or someone probing for one. |
+| ct_event.severity.attention | root account activity | warn | wave1 | CloudTrail recorded a call made by the account root user. Root should not be doing day-to-day work; move the task onto a named principal. |
+| ct_event.attention.write | modifying call | warn | wave1 | CloudTrail recorded a call that changed configuration. Verify the change was expected and that whoever made it meant to. |
+| ct_event.attention.cross-account | cross-account access | warn | wave1 | The caller belongs to a different account than the one that recorded the event, so this is access across an account boundary. Verify the trust it came through is one you meant to grant. |
+| ct_event.attention.sensitive-read | reads sensitive data (<event>) | warn | wave1 | CloudTrail recorded a read of secret or parameter material. Verify the caller was expected: a read leaves the value in the caller's hands with nothing to revoke afterwards. |
+| ct_event.severity.info | routine event | dim | wave1 | — |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

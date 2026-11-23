@@ -96,7 +96,7 @@ func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Res
 		cause = strings.ReplaceAll(cause, "\r", " ")
 	}
 
-	return resource.Resource{
+	return withWave1("asg_activities", resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
@@ -106,9 +106,8 @@ func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Res
 			"cause":       cause,
 			"asg_name":    asgName,
 		},
-		Findings:  asgActivityFindings(activity.StatusCode),
 		RawStruct: activity,
-	}
+	}, asgActivityFindings(activity.StatusCode)...)
 }
 
 // asgActivityFindings returns a wave1 finding for a scaling activity whose

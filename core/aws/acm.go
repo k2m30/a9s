@@ -136,7 +136,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 
 		keyAlgorithm := acmKeyAlgorithmWords(string(cert.KeyAlgorithm))
 
-		r := resource.Resource{
+		r := withWave1("acm", resource.Resource{
 			ID:   id,
 			Name: domainName,
 			Fields: map[string]string{
@@ -149,9 +149,8 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 				"days_left":       daysLeft,
 				"key_algorithm":   keyAlgorithm,
 			},
-			Findings:  acmFindings(status, notAfter, inUse, keyAlgorithm, now),
 			RawStruct: cert,
-		}
+		}, acmFindings(status, notAfter, inUse, keyAlgorithm, now)...)
 
 		if acmKeyIsWeak(keyAlgorithm) {
 			addWave1Rows(&r, CodeACMWeakKey, domain.DetailRow{

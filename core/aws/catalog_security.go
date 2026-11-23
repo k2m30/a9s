@@ -62,6 +62,8 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			DisplayNameKey: "role_name",
 		}},
 		Color:          colorRole,
+		Kind:           roleKind,
+		Kinds:          roleKinds,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.IAM} }),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMRolesPage(ctx, c.IAM, continuationToken)
@@ -90,10 +92,10 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("role"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping", Severity: domain.SevWarn, Source: "wave1", Detail: "An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing."},
+			{Code: roleCodeConfusedDeputy, Phrase: "service can assume without source scoping", Severity: domain.SevWarn, Source: "wave1", NotKinds: []string{roleKindServiceLinked}, Detail: "An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing."},
 			{Code: roleCodeInlinePrivEsc, Phrase: "inline policy allows privilege escalation", Severity: domain.SevBroken, Source: "wave1", Detail: "An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together."},
-			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role."},
-			{Code: iamRoleCodeAdminAttached, Phrase: adminAttachedPhrase, Severity: domain.SevWarn, Source: "wave2", Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
+			{Code: iamRoleCodeDormant, Phrase: "dormant role (><N>d)", Severity: domain.SevWarn, Source: "wave2", NotKinds: []string{roleKindServiceLinked}, Detail: "Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role."},
+			{Code: iamRoleCodeAdminAttached, Phrase: adminAttachedPhrase, Severity: domain.SevWarn, Source: "wave2", NotKinds: []string{roleKindServiceLinked}, Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
 		},
 		Policy: &catalog.PolicyDecl{Noun: "trust", Subject: "role", Public: roleCodeWildcardTrust, PublicSeverity: domain.SevBroken, Unread: roleCodeTrustUnread, Source: "wave1"},
 	},
@@ -257,7 +259,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Code: iamUserCodeOldKey, Phrase: "access key past rotation", Severity: domain.SevWarn, Source: "wave2", Detail: "This access key has been valid for more than 90 days, so a copy taken at any point since it was created still works. Create a replacement key, move callers onto it, then deactivate and delete the old one."},
 			{Code: iamUserCodeAdminAttached, Phrase: adminAttachedPhrase, Severity: domain.SevWarn, Source: "wave2", Detail: "This principal is attached to an AWS-managed policy that grants administrator-equivalent access, so anything it can be used for it can be used for everything. Replace the managed policy with a scoped policy covering only the actions this principal needs."},
 			{Code: iamUserCodeConsoleNeverUsed, Phrase: "console password never used", Severity: domain.SevWarn, Source: "wave2", Detail: "This user has a console password that has never been used since the account was created, so it is an unguarded sign-in path nobody is watching. Delete the login profile and leave the user with programmatic access only."},
-			{Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for 90 days", Severity: domain.SevWarn, Source: "wave2", Detail: "Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not."},
+			{Code: iamUserCodeConsoleDormant, Phrase: "console sign-in unused for <N day(s)>", Severity: domain.SevWarn, Source: "wave2", Detail: "Nobody has signed in to this console login for over 90 days. Confirm the person still needs it and delete the login profile if they do not."},
 			{Code: iamUserCodeKeyUnused, Phrase: "access key unused", Severity: domain.SevWarn, Source: "wave2", Detail: "This access key is active but has not signed a request in over 90 days, so it is a live credential with no owner watching it. Deactivate the key, confirm nothing breaks, then delete it."},
 			{Code: iamUserCodeTwoActiveKeys, Phrase: "two active access keys", Severity: domain.SevWarn, Source: "wave2", Detail: "This user has both of its access-key slots active at once, which doubles the exposure and means a rotation cannot be completed. Deactivate and delete the key that is no longer in use."},
 		},

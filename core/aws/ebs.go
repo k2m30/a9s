@@ -18,10 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ebsOrphanAge is the unattached-volume age threshold past which an
-// "available" volume is flagged as an orphan (billed hourly, no workload).
-const ebsOrphanAge = 7 * 24 * time.Hour
-
 // FetchEBSVolumesPage calls the EC2 DescribeVolumes API and returns a single
 // page of volumes. Pass an empty continuationToken for the first page.
 func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continuationToken string) (resource.FetchResult, error) {
@@ -111,7 +107,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			RawStruct: vol,
 		}
 
-		r.Findings = ebsFindings(state, attachedTo, created, encrypted)
+		emitWave1("ebs", &r, ebsFindings(state, attachedTo, created, encrypted)...)
 
 		resources = append(resources, r)
 	}
@@ -270,7 +266,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	r.Findings = withState("ebs-snap", state, ebsSnapStructuralFindings(snap))
+	emitWave1("ebs-snap", &r, withState("ebs-snap", state, ebsSnapStructuralFindings(snap))...)
 	return r
 }
 
@@ -281,16 +277,12 @@ func ebsSnapUnencrypted(snap ec2types.Snapshot) bool {
 	return snap.Encrypted == nil || !*snap.Encrypted
 }
 
-// ebsSnapAge is the automated-snapshot age threshold past which a completed
-// snapshot is flagged as a cost concern (no retention policy pruning it).
-const ebsSnapAge = 365 * 24 * time.Hour
-
 func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
 	if ebsSnapUnencrypted(snap) {
 		return []domain.Finding{wave1Finding(CodeEBSSnapUnencrypted)}
 	}
 	if snap.StartTime != nil {
-		if age := time.Since(*snap.StartTime); age > ebsSnapAge {
+		if age := time.Since(*snap.StartTime); age > days(ebsSnapAgedAfterDays) {
 			desc := ""
 			if snap.Description != nil {
 				desc = *snap.Description
@@ -313,7 +305,7 @@ func ebsFindings(state, attachedTo, created, encrypted string) []domain.Finding 
 	var posture []domain.Finding
 	if attachedTo == "" {
 		if t, err := time.Parse("2006-01-02 15:04", created); err == nil {
-			if age := time.Since(t); age > ebsOrphanAge {
+			if age := time.Since(t); age > days(ebsOrphanAfterDays) {
 				days := int(age.Hours() / 24)
 				posture = append(posture, wave1Finding(CodeEBSOrphanUnattached, strconv.Itoa(days)))
 			}

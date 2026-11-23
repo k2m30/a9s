@@ -81,7 +81,7 @@ func convertEventBridgeTarget(target ebtypes.Target, ruleName, eventBus string) 
 		roleArn = *target.RoleArn
 	}
 
-	return resource.Resource{
+	return withWave1("eb_rule_targets", resource.Resource{
 		ID:   targetID,
 		Name: targetID,
 		Fields: map[string]string{
@@ -93,9 +93,8 @@ func convertEventBridgeTarget(target ebtypes.Target, ruleName, eventBus string) 
 			"rule_name":          ruleName,
 			"event_bus":          eventBus,
 		},
-		Findings:  ebRuleTargetFindings(target),
 		RawStruct: target,
-	}
+	}, ebRuleTargetFindings(target)...)
 }
 
 // ebRuleTargetFindings flags a target with no DeadLetterConfig. Without a

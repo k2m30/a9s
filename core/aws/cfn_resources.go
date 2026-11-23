@@ -115,10 +115,9 @@ func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource
 		lastUpdated = summary.LastUpdatedTimestamp.UTC().Format("2006-01-02 15:04")
 	}
 
-	return resource.Resource{
-		ID:       logicalResourceID,
-		Name:     logicalResourceID,
-		Findings: cfnResourceFindings(summary.ResourceStatus),
+	return withWave1("cfn_resources", resource.Resource{
+		ID:   logicalResourceID,
+		Name: logicalResourceID,
 		Fields: map[string]string{
 			"logical_resource_id":  logicalResourceID,
 			"physical_resource_id": physicalResourceID,
@@ -128,5 +127,5 @@ func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource
 			"last_updated":         lastUpdated,
 		},
 		RawStruct: summary,
-	}
+	}, cfnResourceFindings(summary.ResourceStatus)...)
 }

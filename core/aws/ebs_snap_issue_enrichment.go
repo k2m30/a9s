@@ -101,6 +101,7 @@ func ebsSnapPublicShares(ctx context.Context, clients *ServiceClients, resources
 // ebsSnapOrphanCrossRef is the SnapshotCrossRef helper instantiated with
 // ec2types.Snapshot / ec2types.Volume extractors.
 var ebsSnapOrphanCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
+	ShortName:       "ebs-snap",
 	ParentShortName: "ebs",
 	GetParentID: func(raw any) (string, bool) {
 		snap, ok := assertStruct[ec2types.Snapshot](raw)

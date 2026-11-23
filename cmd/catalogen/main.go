@@ -211,12 +211,24 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 
 	var findingsContent strings.Builder
 	if len(rt.Findings) > 0 {
-		findingsContent.WriteString("| Code | Phrase | Severity | Source | Detail |\n")
-		findingsContent.WriteString("| --- | --- | --- | --- | --- |\n")
+		if rt.Kind != nil {
+			findingsContent.WriteString("| Code | Phrase | Severity | Source | Applies to | Detail |\n")
+			findingsContent.WriteString("| --- | --- | --- | --- | --- | --- |\n")
+		} else {
+			findingsContent.WriteString("| Code | Phrase | Severity | Source | Detail |\n")
+			findingsContent.WriteString("| --- | --- | --- | --- | --- |\n")
+		}
 		for _, f := range rt.Findings {
-			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s | %s |\n",
-				escapeMarkdownCell(string(f.Code)), escapeMarkdownCell(f.Phrase),
-				severityLabel(f.Severity), escapeMarkdownCell(f.Source), detailCell(f))
+			applies := ""
+			if rt.Kind != nil {
+				applies = " " + appliesToCell(rt.Kinds, f) + " |"
+			}
+			// The code is written as itself, so a search of the docs for it finds
+			// it: codes are lower-case words joined by dots, hyphens and
+			// underscores, and an underscore inside a word starts no emphasis.
+			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s |%s %s |\n",
+				string(f.Code), escapeMarkdownCell(f.Phrase),
+				severityLabel(f.Severity), escapeMarkdownCell(f.Source), applies, detailCell(f))
 		}
 	}
 
@@ -353,6 +365,25 @@ func escapeMarkdownCell(s string) string {
 		"`", "\\`",
 	)
 	return replacer.Replace(s)
+}
+
+// appliesToCell names the kinds of the type's value set a finding stands on,
+// read from its OnlyKinds and NotKinds, the declaration catalog.Applies reads.
+// Kinds are AWS enum values and words, written as themselves like codes.
+func appliesToCell(kinds []string, f catalog.FindingDef) string {
+	if len(f.OnlyKinds)+len(f.NotKinds) == 0 {
+		return "all"
+	}
+	var out []string
+	for _, k := range kinds {
+		if (len(f.OnlyKinds) == 0 || slices.Contains(f.OnlyKinds, k)) && !slices.Contains(f.NotKinds, k) {
+			out = append(out, k)
+		}
+	}
+	if len(out) == 0 {
+		return "none"
+	}
+	return strings.Join(out, ", ")
 }
 
 // detailCell is the Detail column of a findings table: the declared operator

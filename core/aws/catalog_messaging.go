@@ -641,6 +641,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color:          colorAnyFindingOrHealthy,
 		StateEnum:      enumValues[sesv2types.VerificationStatus](),
+		Kind:           sesKind,
+		Kinds:          enumValues[sesv2types.IdentityType](),
 		NormalStates:   []string{string(sesv2types.VerificationStatusSuccess)},
 		UnknownState:   CodeSESVerificationUnknown,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.SESv2} }),
@@ -667,7 +669,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS has paused sending for this account, usually after sustained bounces or complaints, so no mail leaves until it is lifted. Read the account's reputation metrics, fix the list hygiene or content that caused it, and open a case to request reinstatement."},
 			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2", Detail: "The account is under review because its bounce or complaint rate crossed a threshold, and sending will be paused if it does not improve. Find the campaigns or senders driving the rate, suppress the bad addresses, and fix the acquisition path that produced them."},
 			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2", Detail: "The account has used most of its 24-hour sending quota, and once it is exhausted further sends are rejected until the window rolls. Spread the load out, or request a quota increase before the next campaign."},
-			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2", Detail: "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."},
+			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2", OnlyKinds: []string{string(sesv2types.IdentityTypeDomain)}, Detail: "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."},
 		},
 	},
 }

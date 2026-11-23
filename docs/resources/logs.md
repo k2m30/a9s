@@ -83,7 +83,7 @@ Transcribed from `docs/attention-signals.md § Signals § MONITORING` row `logs`
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `retentionInDays` is nil → Warning (Never Expire = cost drift).
+- **Signal**: `retentionInDays` is nil on a group of any class but Delivery → Warning (Never Expire = cost drift). A Delivery group's retention "is fixed and cannot be changed" (CloudWatch Logs User Guide, "Log classes").
   - **State bucket**: Warning.
   - **How obtained**: `DescribeLogGroups` list response — field `retentionInDays` (`AWS SDK Go v2 — cloudwatchlogs/types.LogGroup § RetentionInDays`, `*int32`; nil means "retain forever").
 
@@ -119,8 +119,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `retentionInDays` nil | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `retention: never expire` |
-| `storedBytes==0` + age >90d | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `empty, created over 90 days ago` |
+| `retentionInDays` nil, class not Delivery | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `retention: never expire` |
+| `storedBytes==0` + age >90d | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `empty, created over <N day(s)> ago` |
 | `kmsKeyId` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not encrypted with KMS` |
 | an audit log group with no metric filter over it | 2 | Warning | `~` | S2, S3, S4, S5 | `audit log group missing metric filters` |
 
@@ -166,12 +166,12 @@ logs — MONITORING. Status key: `state` — the column naming it is the status 
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| logs.retention-never-expire | retention: never expire | warn | wave1 | Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks. |
-| logs.stale-empty | empty, created over 90 days ago | warn | wave1 | The group has existed for months and holds no events now. That may mean nothing ever wrote to it, or that everything it held has aged out of its retention period. Check the retention setting and the incoming-byte metric, and find the producer that should be writing, before deleting the group. |
-| logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 | This group carries audit or security logs and has no metric filter over it, so nothing here turns an event into an alarm. A subscription filter may be shipping the events somewhere that does, so check for one before concluding nothing watches them. If nothing does, add metric filters and alarms for the events worth waking up for. |
-| logs.no-kms | not encrypted with KMS | warn | wave1 | Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| logs.retention-never-expire | retention: never expire | warn | wave1 | STANDARD, INFREQUENT_ACCESS, ESSENTIALS | Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks. |
+| logs.stale-empty | empty, created over <N day(s)> ago | warn | wave1 | all | The group has existed for months and holds no events now. That may mean nothing ever wrote to it, or that everything it held has aged out of its retention period. Check the retention setting and the incoming-byte metric, and find the producer that should be writing, before deleting the group. |
+| logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 | STANDARD | This group carries audit or security logs and has no metric filter over it, so nothing here turns an event into an alarm. A subscription filter may be shipping the events somewhere that does, so check for one before concluding nothing watches them. If nothing does, add metric filters and alarms for the events worth waking up for. |
+| logs.no-kms | not encrypted with KMS | warn | wave1 | all | Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

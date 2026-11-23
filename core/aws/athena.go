@@ -61,7 +61,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		}
 
 		listed := func(row AthenaWorkGroupRow, outputLocation, costCap string) resource.Resource {
-			return resource.Resource{
+			return withWave1("athena", resource.Resource{
 				ID:   wgName,
 				Name: wgName,
 				Fields: map[string]string{
@@ -73,9 +73,8 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 					"result_output_location": outputLocation,
 					"cost_cap":               costCap,
 				},
-				Findings:  withState("athena", state, nil),
 				RawStruct: row,
-			}
+			}, withState("athena", state, nil)...)
 		}
 		// The result location and the cost cap live on the workgroup's
 		// configuration, which ListWorkGroups does not carry: a row whose
@@ -85,7 +84,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		unread := func(err error) resource.Resource {
 			r := listed(AthenaWorkGroupRow{WorkGroupSummary: wg}, "", "")
 			r.Fields[athenaConfigUnreadField] = "true"
-			r.Findings = append(r.Findings, degradedDetailsFinding("athena", err))
+			emitWave1("athena", &r, degradedDetailsFinding("athena", err))
 			return r
 		}
 		if getAPI == nil {

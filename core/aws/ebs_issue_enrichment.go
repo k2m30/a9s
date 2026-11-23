@@ -195,8 +195,7 @@ func addEBSSnapshotCoverage(cache resource.ResourceCache, resources []resource.R
 		if volumeID == "" {
 			volumeID = r.ID
 		}
-		state := r.Fields["state"]
-		if volumeID == "" || !catalog.Applies(CodeEBSNoSnapshot, LifecycleClassOf("ebs", state), state) || snapshotted[volumeID] {
+		if volumeID == "" || !catalog.AppliesToRow("ebs", CodeEBSNoSnapshot, r) || snapshotted[volumeID] {
 			continue
 		}
 		if !listed {

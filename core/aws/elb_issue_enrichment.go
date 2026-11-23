@@ -67,13 +67,26 @@ func elbPolicyProtocols(ctx context.Context, api ELBv2DescribeSSLPoliciesAPI) (m
 // versions older than TLS 1.2.
 var elbProtocolsBelowTLS12 = []string{"TLSv1", "TLSv1.1"} //nolint:gochecknoglobals // AWS protocol names
 
+// elbListenerLogged reports whether access logs record the listener's
+// traffic: an Application Load Balancer logs the HTTP and HTTPS requests it
+// serves, and a Network Load Balancer's access logs "are created only if the
+// load balancer has a TLS listener" (ELB Network Load Balancers guide, "Access
+// logs").
+func elbListenerLogged(l elbtypes.Listener) bool {
+	switch l.Protocol {
+	case elbtypes.ProtocolEnumHttp, elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
+		return true
+	}
+	return false
+}
+
 // elbCheckPolicyUnknown is what a balancer records when a listener names a
 // security policy DescribeSSLPolicies did not return.
 const elbCheckPolicyUnknown = "security policy not returned by DescribeSSLPolicies"
 
-// elbListenerExposure classifies one listener of a load balancer of the given
-// type ("application" / "network") for cleartext exposure, returning the
-// finding code and the Attention row, or ok=false when the listener is fine.
+// elbListenerExposure classifies one listener of a load balancer for
+// cleartext exposure, returning the finding code and the Attention row, or
+// ok=false when the listener is fine.
 // The phrase is the caller's: the code names every offending port of the
 // balancer at once, so no single listener knows what it will say. The
 // security policy of an HTTPS or TLS listener is judged from the protocols
@@ -84,7 +97,7 @@ const elbCheckPolicyUnknown = "security policy not returned by DescribeSSLPolici
 // Application Load Balancer speaks only HTTP and HTTPS and a Network one only
 // TCP, TLS and the datagram protocols, so the listener protocol already says
 // which kind of balancer this is.
-func elbListenerExposure(lbType string, listener elbtypes.Listener) (domain.FindingCode, domain.DetailRow, bool) {
+func elbListenerExposure(listener elbtypes.Listener) (domain.FindingCode, domain.DetailRow, bool) {
 	port := int32(0)
 	if listener.Port != nil {
 		port = *listener.Port
@@ -181,9 +194,9 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	policyProtocols := sync.OnceValues(func() (map[string][]string, error) {
 		return elbPolicyProtocols(ctx, policiesAPI)
 	})
-	// A Network Load Balancer writes access logs only for a TLS listener, so
-	// its access-log setting is judged once its listeners are read.
-	nlbAccessLogsOff := map[string]bool{}
+	// Access logs record what a listener of a logged protocol carries, so the
+	// access-log setting is judged once the listeners are read.
+	accessLogsOff := map[string]bool{}
 	var mu sync.Mutex
 	attrErr := ForEachRow(ctx, &result, ids, EnrichmentParallelism, func(i int) {
 		r := resources[i]
@@ -210,7 +223,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			return
 		}
 		var rows []domain.DetailRow
-		isALB := r.Fields["type"] == "application"
 		for _, attr := range out.Attributes {
 			if attr.Key == nil || attr.Value == nil {
 				continue
@@ -221,20 +233,14 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 					rows = append(rows, domain.DetailRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
 				}
 			case "access_logs.s3.enabled":
-				switch {
-				case *attr.Value != "false":
-				case r.Fields["type"] == "network":
-					nlbAccessLogsOff[r.ID] = true
-				default:
-					rows = append(rows, domain.DetailRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
-				}
+				accessLogsOff[r.ID] = *attr.Value == "false"
 			case "routing.http.desync_mitigation_mode":
-				if isALB && *attr.Value == elbDesyncMonitorMode {
+				if *attr.Value == elbDesyncMonitorMode {
 					setWave2Finding(&result, r.ID, elbCodeDesyncMitigationOff, []domain.DetailRow{{Label: "Desync mitigation", Value: elbDesyncMonitorMode, Tier: tierOf(elbCodeDesyncMitigationOff)}})
 
 				}
 			case "routing.http.drop_invalid_header_fields.enabled":
-				if isALB && *attr.Value != "true" {
+				if *attr.Value != "true" {
 					setWave2Finding(&result, r.ID, elbCodeInvalidHeadersKept, []domain.DetailRow{{Label: "Drop invalid headers", Value: "disabled", Tier: tierOf(elbCodeInvalidHeadersKept)}})
 
 				}
@@ -267,7 +273,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if policiesErr != nil {
 			MarkSkipped(&result, r.ID, &failures, policiesErr)
 		}
-		if nlbAccessLogsOff[r.ID] && slices.ContainsFunc(listeners, func(l elbtypes.Listener) bool { return l.Protocol == elbtypes.ProtocolEnumTls }) {
+		if accessLogsOff[r.ID] && slices.ContainsFunc(listeners, elbListenerLogged) {
 			setWave2Finding(&result, r.ID, elbCodeMisconfigured, []domain.DetailRow{{Label: "Access Logs", Value: "disabled", Tier: "~"}})
 		}
 		// Every offending port is a port to fix, so each finding names all of
@@ -288,7 +294,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 						row: domain.DetailRow{Label: "Security policy", Value: fmt.Sprintf("%d: %s", port, policy), Tier: "~"}})
 				}
 			}
-			code, row, bad := elbListenerExposure(r.Fields["type"], listener)
+			code, row, bad := elbListenerExposure(listener)
 			if !bad {
 				continue
 			}

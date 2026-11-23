@@ -57,10 +57,9 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 
 		actionsCount := len(alarm.AlarmActions)
 
-		r := resource.Resource{
-			ID:       alarmName,
-			Name:     alarmName,
-			Findings: alarmStateFindings(stateValue, actionsCount),
+		r := withWave1("alarm", resource.Resource{
+			ID:   alarmName,
+			Name: alarmName,
 			Fields: map[string]string{
 				"alarm_name":    alarmName,
 				"state":         stateValue,
@@ -70,14 +69,14 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 				"actions_count": strconv.Itoa(actionsCount),
 			},
 			RawStruct: alarm,
-		}
+		}, alarmStateFindings(stateValue, actionsCount)...)
 
 		// Independent of the state/no-actions pair: an alarm can have actions
 		// wired and still have execution switched off, and it reads as healthy
 		// in the console. Nil means DescribeAlarms did not resolve the switch,
 		// which is not evidence that it is off.
 		if alarm.ActionsEnabled != nil && !*alarm.ActionsEnabled {
-			addWave1Finding(&r, CodeAlarmActionsDisabled)
+			addWave1Finding("alarm", &r, CodeAlarmActionsDisabled)
 			// The phrase already says the actions are off; the row says how
 			// much is wired behind the switch — every transition, not just
 			// the one alarm.no_actions is scoped to.

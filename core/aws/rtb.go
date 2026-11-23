@@ -93,7 +93,7 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 			RawStruct: rtb,
 		}
 
-		r.Findings = rtbFindings(blackholeCount, len(rtb.Associations), isMain)
+		emitWave1("rtb", &r, rtbFindings(blackholeCount, len(rtb.Associations), isMain)...)
 
 		resources = append(resources, r)
 	}

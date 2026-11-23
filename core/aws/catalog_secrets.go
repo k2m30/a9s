@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -73,7 +74,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1", Detail: "Rotation is configured but the secret is past the interval it should have rotated in, so either the rotation function is failing or it was never invoked. Check the rotation function's logs, and run a rotation by hand to prove it works."},
 			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1", Detail: "Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed."},
 			{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source."},
-			{Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days", Severity: domain.SevWarn, Source: "wave1", Detail: "The value has not changed in over a year, so anyone who has ever held a copy still holds a working credential. Rotate it, and set up scheduled rotation so the next year does not look the same."},
+			{Code: CodeSecretStaleValue, Phrase: "value unchanged in over <N day(s)>", Severity: domain.SevWarn, Source: "wave1", Detail: "The value has not changed in over a year, so anyone who has ever held a copy still holds a working credential. Rotate it, and set up scheduled rotation so the next year does not look the same."},
 		},
 		// GetResourcePolicy omits ResourcePolicy for a secret with none.
 		Policy: &catalog.PolicyDecl{Noun: "resource", Subject: "secret", Public: secretsCodePublicPolicy, Cross: secretsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2"},
@@ -84,6 +85,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		RefToID:        ssmRefToID,
 		LifecycleKey:   "risk",
 		HumanizeFields: []string{"type"},
+		Kind:           ssmKind,
+		Kinds:          enumValues[ssmtypes.ParameterType](),
 		Aliases:        []string{"ssm", "parameters", "parameter-store"},
 		Category:       "SECRETS & CONFIG",
 		CloudTrailKey:  "ResourceName:ID",
@@ -116,8 +119,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "KeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: ssmCodePlaintextSensitive, Phrase: "plaintext value looks like a credential", Severity: domain.SevBroken, Source: "wave1", Detail: "This parameter holds what looks like a credential in plain text, so it is unencrypted at rest and readable by anyone allowed to read parameters on that path. Store it as an encrypted parameter under a KMS key, update the readers, then rotate the exposed value."},
-			{Code: ssmCodeStaleValue, Phrase: "not modified in over 365 days", Severity: domain.SevWarn, Source: "wave1", Detail: "The parameter has not been touched in over a year, and if it holds a credential that credential has been valid all that time. Confirm it is still current, and rotate it if it is a secret."},
+			{Code: ssmCodePlaintextSensitive, Phrase: "plaintext value looks like a credential", Severity: domain.SevBroken, Source: "wave1", OnlyKinds: []string{string(ssmtypes.ParameterTypeString)}, Detail: "This parameter holds what looks like a credential in plain text, so it is unencrypted at rest and readable by anyone allowed to read parameters on that path. Store it as an encrypted parameter under a KMS key, update the readers, then rotate the exposed value."},
+			{Code: ssmCodeStaleValue, Phrase: "not modified in over <N day(s)>", Severity: domain.SevWarn, Source: "wave1", OnlyKinds: []string{string(ssmtypes.ParameterTypeSecureString)}, Detail: "The parameter has not been touched in over a year, and if it holds a credential that credential has been valid all that time. Confirm it is still current, and rotate it if it is a secret."},
 		},
 	},
 	{
@@ -141,6 +144,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Color:                  colorAnyFindingOrHealthy,
 		StateEnum:              enumValues[kmstypes.KeyState](),
+		Kind:                   kmsKind,
+		Kinds:                  kmsListedKinds,
 		NormalStates:           []string{string(kmstypes.KeyStateEnabled)},
 		UnknownState:           CodeKMSUnrecognisedState,
 		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.KMS} }),
@@ -164,10 +169,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			unrecognisedStateDef(CodeKMSUnrecognisedState, "<key state>", "wave1", "AWS reports a key state a9s does not recognise, so a9s cannot tell whether the key can be used. Check the key in the AWS console before relying on it."),
 			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1", Detail: "This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key."},
 			DetailsUnavailableFindingDef("kms"),
-			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it."},
+			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2", NotKinds: []string{kmsKindAWSManaged, kmsKindReplica}, Detail: "The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it."},
 		},
 		// "Every KMS key must have exactly one key policy" (AWS KMS Developer
 		// Guide, Key policies in AWS KMS).
-		Policy: &catalog.PolicyDecl{Noun: "key", Subject: "key", Public: kmsCodePublicPolicy, Cross: kmsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true},
+		Policy: &catalog.PolicyDecl{Noun: "key", Subject: "key", Public: kmsCodePublicPolicy, Cross: kmsCodeCrossAccountPolicy, PublicSeverity: domain.SevBroken, Source: "wave2", Required: true, NotKinds: []string{kmsKindAWSManaged}},
 	},
 }

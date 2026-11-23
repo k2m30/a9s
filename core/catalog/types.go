@@ -223,6 +223,13 @@ type ResourceTypeDef struct {
 
 	// Findings is the declarative table of finding codes for this type.
 	Findings []FindingDef
+	// Kind names what sort of resource a row is, read from the one AWS field
+	// that says so (a Glue job's Command.Name, a DB instance's cluster
+	// membership); Kinds is every value it returns for a row the list holds.
+	// A finding that exists on some kinds only says which in OnlyKinds or
+	// NotKinds, and Applies reads that beside its lifecycle declaration.
+	Kind  func(domain.Resource) string
+	Kinds []string
 	// Policy declares the policy document attached to this type's resources.
 	// nil means the type reads none.
 	Policy *PolicyDecl
@@ -270,6 +277,9 @@ type PolicyDecl struct {
 	// AWS answers "no policy" with an error, or every resource has one. An
 	// answer without a document is then unknown, not "no policy".
 	Required bool
+	// NotKinds is the kinds of resource whose policy is not the operator's to
+	// write, so neither policy finding applies there.
+	NotKinds []string
 }
 
 // CloudTrailQualifier is how a row of a parent-scoped type is told from its
@@ -363,6 +373,24 @@ type FindingDef struct {
 	// unattached network interface is "available", an attached one "in-use").
 	AppliesIn       []LifecycleClass
 	AppliesInStates []string
+	// OnlyKinds names the kinds of resource the defect can exist on, and
+	// NotKinds the kinds it cannot, as the type's Kind names them. A kind
+	// neither list names is included by NotKinds and excluded by OnlyKinds,
+	// so a value AWS adds later reads the way the declaration's form says.
+	OnlyKinds []string
+	NotKinds  []string
+	// Rows declares, by label, the supporting rows of a Wave 2 finding that
+	// exist on some kinds only. A finding whose every row is excluded has
+	// nothing left to say and does not stand.
+	Rows []RowDecl
+}
+
+// RowDecl narrows one supporting row of a finding to kinds, read the way
+// FindingDef.OnlyKinds and NotKinds are read.
+type RowDecl struct {
+	Label     string
+	OnlyKinds []string
+	NotKinds  []string
 }
 
 // HumanizeFieldKey normalizes a field identifier to the FACT it names: case

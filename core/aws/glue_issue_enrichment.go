@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -23,12 +24,14 @@ const (
 	// glueCodeSecurityConfigEncryptionOff — the security configuration the
 	// job names leaves S3, CloudWatch Logs or job bookmark encryption off.
 	glueCodeSecurityConfigEncryptionOff domain.FindingCode = "glue.security-configuration-encryption-off"
+
+	glueRowJobBookmarks = "Job bookmarks"
 )
 
 // glueSecurityConfigOffRows names each target the security configuration
 // leaves without a key the account controls: an S3 setting that is absent or
 // DISABLED, and a CloudWatch or job bookmark setting that is absent or
-// DISABLED. It returns nil when all three are on.
+// DISABLED. It returns nil when every target is on.
 func glueSecurityConfigOffRows(cfg *gluetypes.SecurityConfiguration) []domain.DetailRow {
 	var ec gluetypes.EncryptionConfiguration
 	if cfg != nil && cfg.EncryptionConfiguration != nil {
@@ -47,7 +50,7 @@ func glueSecurityConfigOffRows(cfg *gluetypes.SecurityConfiguration) []domain.De
 	}
 	if ec.JobBookmarksEncryption == nil || ec.JobBookmarksEncryption.JobBookmarksEncryptionMode == "" ||
 		ec.JobBookmarksEncryption.JobBookmarksEncryptionMode == gluetypes.JobBookmarksEncryptionModeDisabled {
-		rows = append(rows, domain.DetailRow{Label: "Job bookmarks", Value: "not encrypted", Tier: tier})
+		rows = append(rows, domain.DetailRow{Label: glueRowJobBookmarks, Value: "not encrypted", Tier: tier})
 	}
 	return rows
 }
@@ -110,13 +113,14 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		var cfgErr error
 		job, _ := assertStruct[gluetypes.Job](r.RawStruct)
 		cfgName := aws.ToString(job.SecurityConfiguration)
-		if cfgName != "" && secConfigAPI != nil {
+		applies := catalog.AppliesToRow("glue", glueCodeSecurityConfigEncryptionOff, r)
+		if cfgName != "" && secConfigAPI != nil && applies {
 			cfg, cfgErr = secConfig(cfgName)
 		}
 		mu.Lock()
 		defer mu.Unlock()
 		switch {
-		case cfgName == "" || secConfigAPI == nil:
+		case cfgName == "" || secConfigAPI == nil || !applies:
 		case cfgErr != nil:
 			MarkSkipped(&result, r.ID, &cfgFailures, cfgErr)
 		default:

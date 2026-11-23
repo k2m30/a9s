@@ -5,11 +5,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -21,7 +22,7 @@ import (
 const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-expire"
 
 // logsCodeStaleEmpty is the canonical FindingCode for a log group that is
-// empty (StoredBytes == 0) and was created more than 90 days ago — likely an
+// empty (StoredBytes == 0) and was created more than logsStaleEmptyAfterDays ago — likely an
 // orphaned log group no application still writes to.
 const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 
@@ -29,7 +30,32 @@ const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 // managed KMS key (KmsKeyId empty).
 const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 
-const logsStaleEmptyAge = 90 * 24 * time.Hour
+// logsFullFeatureClasses are the log classes that carry metric filters and
+// answer GetLogEvents. AWS, "Log classes": metric filters are Standard only,
+// GetLogEvents and FilterLogEvents are "Not supported" on Infrequent Access
+// (read-path APIs return ESSENTIALS for it from December 2026), and the
+// Delivery class "doesn't offer rich CloudWatch Logs capabilities". A class
+// AWS adds later is outside the list until it is known to support them.
+var logsFullFeatureClasses = []string{string(cwlogstypes.LogGroupClassStandard)} //nolint:gochecknoglobals // static AWS value set
+
+// logsKind is the group's log class. DescribeLogGroups reports no class on a
+// group created before classes existed, and such a group is Standard.
+func logsKind(r domain.Resource) string {
+	class := r.Fields["log_group_class"]
+	if lg, ok := assertStruct[cwlogstypes.LogGroup](r.RawStruct); ok {
+		class = string(lg.LogGroupClass)
+	}
+	if class == "" {
+		return string(cwlogstypes.LogGroupClassStandard)
+	}
+	return class
+}
+
+// logsOffersEvents gates the drill into a group's streams and their events,
+// which read GetLogEvents.
+func logsOffersEvents(r domain.Resource) bool {
+	return slices.Contains(logsFullFeatureClasses, logsKind(r))
+}
 
 // The words the fetcher writes into Fields for the two settings a log group is
 // judged on. logsGroupFindings reads these rather than the SDK struct, so a row
@@ -52,8 +78,8 @@ func logsGroupFindings(retention, storedBytes, creationTime, encryption string) 
 	switch {
 	case retention == logsRetentionNeverExpires:
 		out = append(out, wave1Finding(logsCodeRetentionNeverExpire))
-	case storedBytes == "0 B" && olderThan(creationTime, logsStaleEmptyAge):
-		out = append(out, wave1Finding(logsCodeStaleEmpty))
+	case storedBytes == "0 B" && olderThan(creationTime, days(logsStaleEmptyAfterDays)):
+		out = append(out, wave1Finding(logsCodeStaleEmpty, strconv.Itoa(logsStaleEmptyAfterDays)))
 	}
 	if encryption == logsEncryptionNone {
 		out = append(out, wave1Finding(CodeLogsNoKMS))
@@ -119,11 +145,12 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				"kms_key_id":       kmsKeyID,
 				"retention":        retention,
 				"encryption":       encryption,
+				"log_group_class":  string(lg.LogGroupClass),
 			},
 			RawStruct: lg,
 		}
 
-		r.Findings = logsGroupFindings(retention, storedBytes, creationTime, encryption)
+		emitWave1("logs", &r, logsGroupFindings(retention, storedBytes, creationTime, encryption)...)
 		if encryption == logsEncryptionNone {
 			addWave1Rows(&r, CodeLogsNoKMS, domain.DetailRow{
 				Label: "KMS key", Value: "none", Tier: "~",

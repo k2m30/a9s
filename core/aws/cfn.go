@@ -60,10 +60,9 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 		secretRows := secretScanRows(cfnStackOutputs(stack))
 		protection, outputSecret := cfnPostureOf(stack, len(secretRows) > 0)
 
-		r := resource.Resource{
-			ID:       stackName,
-			Name:     stackName,
-			Findings: withState("cfn", status, cfnPostureFindings(protection, outputSecret), cfnStatusWords(status)),
+		r := withWave1("cfn", resource.Resource{
+			ID:   stackName,
+			Name: stackName,
 
 			Fields: map[string]string{
 				"stack_name":             stackName,
@@ -76,7 +75,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 				"output_secret":          outputSecret,
 			},
 			RawStruct: stack,
-		}
+		}, withState("cfn", status, cfnPostureFindings(protection, outputSecret), cfnStatusWords(status))...)
 
 		addCFNPostureRows(&r, secretRows)
 		resources = append(resources, r)

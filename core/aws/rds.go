@@ -5,7 +5,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -92,10 +91,9 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 
 		findings, attentionDetails := computeDBIFindings(db, now)
 
-		r := resource.Resource{
-			ID:       dbIdentifier,
-			Name:     dbIdentifier,
-			Findings: findings,
+		r := withWave1("dbi", resource.Resource{
+			ID:   dbIdentifier,
+			Name: dbIdentifier,
 			Fields: map[string]string{
 				"db_identifier":           dbIdentifier,
 				"engine":                  engine,
@@ -113,7 +111,7 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 			},
 			RawStruct:        db,
 			AttentionDetails: attentionDetails,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}
@@ -139,6 +137,35 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// The three kinds of DB instance, read from DescribeDBInstances: a member of
+// a DB cluster names it in DBClusterIdentifier ("If the DB instance is a
+// member of a DB cluster, indicates the name of the DB cluster"), a read
+// replica names its source in ReadReplicaSourceDBInstanceIdentifier, and any
+// other instance stands alone. A member's deletion protection, backup
+// retention and Availability Zones are the cluster's (CreateDBInstance:
+// "This setting doesn't apply to Amazon Aurora DB instances"; CreateDBCluster:
+// "Valid for Cluster Type: Aurora DB clusters and Multi-AZ DB clusters").
+const (
+	dbiKindStandalone    = "standalone"
+	dbiKindClusterMember = "cluster member"
+	dbiKindReadReplica   = "read replica"
+)
+
+var dbiKinds = []string{dbiKindStandalone, dbiKindClusterMember, dbiKindReadReplica} //nolint:gochecknoglobals // static value set
+
+func dbiKind(r domain.Resource) string {
+	db, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)
+	switch {
+	case !ok:
+		return ""
+	case db.DBClusterIdentifier != nil:
+		return dbiKindClusterMember
+	case db.ReadReplicaSourceDBInstanceIdentifier != nil:
+		return dbiKindReadReplica
+	}
+	return dbiKindStandalone
 }
 
 // computeDBIFindings returns the findings for an RDS DB instance plus the
@@ -172,17 +199,12 @@ func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 // dbiPostureFindings evaluates the shared RDS posture predicates plus the
 // CA-certificate countdown against an instance.
 func dbiPostureFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
-	engine := aws.ToString(db.Engine)
 	findings, details := rdsPostureFindings(rdsPosture{
-		Engine:                  engine,
+		Engine:                  aws.ToString(db.Engine),
 		MultiAZ:                 db.MultiAZ,
-		IsReadReplica:           db.ReadReplicaSourceDBInstanceIdentifier != nil,
 		AutoMinorVersionUpgrade: db.AutoMinorVersionUpgrade,
 		IAMAuthEnabled:          db.IAMDatabaseAuthenticationEnabled,
 		MasterUsername:          db.MasterUsername,
-		// Aurora instances take their AZ topology from the cluster; the
-		// per-instance MultiAZ flag is not the operator's lever there.
-		SkipSingleAZ: strings.HasPrefix(strings.ToLower(engine), "aurora"),
 	}, dbiPostureCodes)
 
 	if db.CertificateDetails != nil {

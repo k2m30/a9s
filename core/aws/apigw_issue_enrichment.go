@@ -62,7 +62,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	v1, hasV1 := clients.APIGatewayV1.(apigwV1API)
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return r.Fields["protocol"] != "REST" || hasV1
+		return apigwKind(r) != apigwKindREST || hasV1
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -75,7 +75,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		}
 		// The REST lane is a different API with different calls. An account
 		// with no REST client still gets its HTTP APIs enriched.
-		if r.Fields["protocol"] == "REST" {
+		if apigwKind(r) == apigwKindREST {
 			row, rowFailures := apigwRESTRow(ctx, v1, r, ownAccount)
 			mergeRowResult(&mu, &result, &failures, row, rowFailures)
 			return
@@ -180,7 +180,7 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 		// is sitting undeployed, which the phrase cannot.
 		setWave2Finding(&row, apiID, apigwCodeNoDeployedStages, []domain.DetailRow{{
 			Label: "Protocol",
-			Value: strings.ToLower(r.Fields["protocol"]),
+			Value: strings.ToLower(apigwKind(r)),
 			Tier:  "~",
 		}})
 

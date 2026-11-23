@@ -101,7 +101,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		// A group created minutes ago has no members yet by construction;
 		// only one left empty for a month is evidence of an orphan.
 		grp, _ := assertStruct[iamtypes.Group](r.RawStruct)
-		aged := grp.CreateDate != nil && time.Since(*grp.CreateDate) > 30*24*time.Hour
+		aged := grp.CreateDate != nil && time.Since(*grp.CreateDate) > days(emptyGroupAfterDays)
 
 		if memberCount == 0 && !memberTruncated && aged {
 			rows = append(rows, domain.DetailRow{

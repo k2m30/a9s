@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -87,7 +86,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		}
 
 		if unassociated {
-			r.Findings = []domain.Finding{wave1Finding(CodeEIPUnassociated)}
+			emitWave1("eip", &r, wave1Finding(CodeEIPUnassociated))
 		}
 
 		resources = append(resources, r)

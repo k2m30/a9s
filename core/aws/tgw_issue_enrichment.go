@@ -24,15 +24,11 @@ const (
 	tgwCodeAttachmentTransitional domain.FindingCode = "tgw.attachment-transitional"
 )
 
-// tgwPendingAcceptanceGrace is how long a cross-account attachment may sit
-// unaccepted before it reads as stuck rather than in progress.
-const tgwPendingAcceptanceGrace = 24 * time.Hour
-
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
 // per-TGW pagination up to PerParentPageCap pages) and returns a Finding for any TGW with
 // attachments in a failed or transitional state.
 // Severity "!" for failed/failing/rejected/rejecting; severity "~" for
-// modifying/rollingBack and for pendingAcceptance older than tgwPendingAcceptanceGrace.
+// modifying/rollingBack and for pendingAcceptance older than tgwPendingAcceptanceGraceHours.
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
 // Per-TGW errors are aggregated and returned as a composite error alongside partial findings.
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -100,7 +96,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 				// The owning account has a request waiting, which is the
 				// normal first minutes of every cross-account attachment.
 				// Only one left sitting is something to chase.
-				if att.CreationTime == nil || time.Since(*att.CreationTime) <= tgwPendingAcceptanceGrace {
+				if att.CreationTime == nil || time.Since(*att.CreationTime) <= tgwPendingAcceptanceGraceHours*time.Hour {
 					continue
 				}
 				code = tgwCodeAttachmentTransitional

@@ -527,8 +527,12 @@ func (f *t581GlueSecConfigFake) GetSecurityConfiguration(_ context.Context, in *
 	return &glue.GetSecurityConfigurationOutput{SecurityConfiguration: &cfg}, nil
 }
 
+// t581GlueJob is a Spark ETL job, the kind that keeps job bookmarks.
 func t581GlueJob(name, secConfig string) resource.Resource {
-	return resource.Resource{ID: name, Name: name, RawStruct: gluetypes.Job{Name: aws.String(name), SecurityConfiguration: aws.String(secConfig)}}
+	return resource.Resource{ID: name, Name: name, RawStruct: gluetypes.Job{
+		Name: aws.String(name), SecurityConfiguration: aws.String(secConfig),
+		Command: &gluetypes.JobCommand{Name: aws.String("glueetl")},
+	}}
 }
 
 // A job that names a security configuration is still unencrypted where that

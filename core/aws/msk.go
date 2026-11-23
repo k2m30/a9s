@@ -52,10 +52,9 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 
 		findings := withState("msk", state, nil)
 
-		r := resource.Resource{
-			ID:       clusterName,
-			Name:     clusterName,
-			Findings: findings,
+		r := withWave1("msk", resource.Resource{
+			ID:   clusterName,
+			Name: clusterName,
 			Fields: map[string]string{
 				"cluster_name": clusterName,
 				"cluster_arn":  clusterARN,
@@ -64,7 +63,7 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 				"version":      version,
 			},
 			RawStruct: cluster,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

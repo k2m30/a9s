@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -23,6 +24,12 @@ func colorCTEvents(r domain.Resource) domain.Color {
 	// the row dim — so the fallback never returns healthy here.
 	return colorFromFindings(ctEventFindings(
 		r.Fields["status"], r.Fields["_ct.cause"], r.Fields["_ct.error_code"], r.Name))
+}
+
+// logEventFindingDefs are declared by every type whose rows are log lines.
+var logEventFindingDefs = []catalog.FindingDef{ //nolint:gochecknoglobals // static catalog declaration
+	{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
+	{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1", Detail: "The workload logged something it could work around but wanted recorded — a retry, a deprecated setting, or a near-limit condition. Worth reading if it repeats; a single one is usually noise."},
 }
 
 var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -106,18 +113,22 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "creation_time", Title: "Created", Width: 16},
 		},
 		Children: []domain.ChildViewDef{{
-			ChildType:      "log_streams",
-			Key:            "enter",
-			ContextKeys:    map[string]string{"log_group_name": "Name"},
-			DisplayNameKey: "log_group_name",
+			ChildType:         "log_streams",
+			Key:               "enter",
+			ContextKeys:       map[string]string{"log_group_name": "Name"},
+			DisplayNameKey:    "log_group_name",
+			DrillCondition:    logsOffersEvents,
+			DrillBlockMessage: "This log class does not support reading log events",
 		}},
 		Color:          colorAnyFindingOrHealthy,
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.CloudWatchLogs} }),
+		Kind:           logsKind,
+		Kinds:          enumValues[cwlogstypes.LogGroupClass](),
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
-		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id", "encryption"},
+		FieldKeys:              []string{"log_group_name", "stored_bytes", "stored_bytes_raw", "retention", "creation_time", "kms_key_id", "encryption", "log_group_class"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true, Truncated: true, Distinct: "the function this group's /aws/lambda/<name> name carries"},
@@ -133,9 +144,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1", Detail: "Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks."},
-			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1", Detail: "The group has existed for months and holds no events now. That may mean nothing ever wrote to it, or that everything it held has aged out of its retention period. Check the retention setting and the incoming-byte metric, and find the producer that should be writing, before deleting the group."},
-			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2", Detail: "This group carries audit or security logs and has no metric filter over it, so nothing here turns an event into an alarm. A subscription filter may be shipping the events somewhere that does, so check for one before concluding nothing watches them. If nothing does, add metric filters and alarms for the events worth waking up for."},
+			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1", NotKinds: []string{string(cwlogstypes.LogGroupClassDelivery)}, Detail: "Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks."},
+			{Code: logsCodeStaleEmpty, Phrase: "empty, created over <N day(s)> ago", Severity: domain.SevWarn, Source: "wave1", Detail: "The group has existed for months and holds no events now. That may mean nothing ever wrote to it, or that everything it held has aged out of its retention period. Check the retention setting and the incoming-byte metric, and find the producer that should be writing, before deleting the group."},
+			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2", OnlyKinds: logsFullFeatureClasses, Detail: "This group carries audit or security logs and has no metric filter over it, so nothing here turns an event into an alarm. A subscription filter may be shipping the events somewhere that does, so check for one before concluding nothing watches them. If nothing does, add metric filters and alarms for the events worth waking up for."},
 			{Code: CodeLogsNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave1", Detail: "Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group."},
 		},
 	},
@@ -292,10 +303,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),
-		Findings: []catalog.FindingDef{
-			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
-			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1", Detail: "The workload logged something it could work around but wanted recorded — a retry, a deprecated setting, or a near-limit condition. Worth reading if it repeats; a single one is usually noise."},
-		},
+		Findings: logEventFindingDefs,
 	},
 	{
 		Name:         "Alarm History",

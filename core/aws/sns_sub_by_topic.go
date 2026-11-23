@@ -101,7 +101,7 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 
 	findings, details := snsSubFindings(subscriptionArn, protocol, endpoint)
 
-	return resource.Resource{
+	return withWave1("sns_subscriptions", resource.Resource{
 		ID:   id,
 		Name: endpoint,
 		Fields: map[string]string{
@@ -115,8 +115,7 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 		// snsSubFindings (sns_sub.go) is the single source both fetchers
 		// and the colour fallback share, so this list can never differ from
 		// what the top-level subscription list shows for the same row.
-		Findings:         findings,
 		AttentionDetails: details,
 		RawStruct:        sub,
-	}
+	}, findings...)
 }

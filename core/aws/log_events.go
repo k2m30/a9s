@@ -158,10 +158,9 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 
 		status := classifyLogEventStatus(message)
 
-		r := resource.Resource{
-			ID:       id,
-			Name:     name,
-			Findings: logEventFindings(status),
+		r := withWave1("log_events", resource.Resource{
+			ID:   id,
+			Name: name,
 			Fields: map[string]string{
 				"timestamp":      ts,
 				"message":        message,
@@ -172,7 +171,7 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 				"log_stream":     logStreamName,
 			},
 			RawStruct: event,
-		}
+		}, logEventFindings(status)...)
 
 		resources = append(resources, r)
 	}

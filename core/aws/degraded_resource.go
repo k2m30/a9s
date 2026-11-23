@@ -118,15 +118,14 @@ func degradedDetailsFinding(shortName string, err error) domain.Finding {
 // and RawStruct does not.
 func DegradedDetails(shortName, id string, err error) resource.Resource {
 	finding := degradedDetailsFinding(shortName, err)
-	return resource.Resource{
+	return withWave1(shortName, resource.Resource{
 		ID:   id,
 		Name: id,
 		Fields: map[string]string{
 			"name":               id,
 			DegradedFindingField: string(finding.Code),
 		},
-		Findings: []domain.Finding{finding},
-	}
+	}, []domain.Finding{finding}...)
 }
 
 type listedAnswer struct {

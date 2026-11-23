@@ -60,10 +60,9 @@ func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
 		arn = *table.TableArn
 	}
 
-	r := resource.Resource{
-		ID:       name,
-		Name:     name,
-		Findings: findings,
+	r := withWave1("ddb", resource.Resource{
+		ID:   name,
+		Name: name,
 		Fields: map[string]string{
 			"table_name":     name,
 			"status":         string(table.TableStatus),
@@ -75,7 +74,7 @@ func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
 		},
 		RawStruct:        table,
 		AttentionDetails: attentionDetails,
-	}
+	}, findings...)
 	return r
 }
 

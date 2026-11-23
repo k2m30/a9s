@@ -114,10 +114,9 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 
 		findings := ComputeDBISnapStatusAndIssues(snap)
 
-		r := resource.Resource{
-			ID:       snapshotID,
-			Name:     snapshotID,
-			Findings: findings,
+		r := withWave1("dbi-snap", resource.Resource{
+			ID:   snapshotID,
+			Name: snapshotID,
 			Fields: map[string]string{
 				"snapshot_id":   snapshotID,
 				"db_instance":   dbInstance,
@@ -128,7 +127,7 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 				"arn":           snapARN,
 			},
 			RawStruct: snap,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

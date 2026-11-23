@@ -196,7 +196,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Category:       "DNS & CDN",
 		CloudTrailKey:  "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			if r.Fields["protocol"] == "REST" {
+			if apigwKind(r) == apigwKindREST {
 				return consolelink.Regional(region, "apigateway/home?region="+region+"#/apis/"+r.ID)
 			}
 			return consolelink.Regional(region, "apigateway/main/api-detail?api="+r.ID+"&region="+region)
@@ -211,6 +211,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Color:                  colorAPIGW,
+		Kind:                   apigwKind,
+		Kinds:                  apigwKinds,
 		FetcherClients:         clientsOf(func(c *ServiceClients) []any { return []any{c.APIGatewayV2} }),
 		Fetcher:                fetcherWithClients(FetchAPIGatewaysPageMerged),
 		Wave2:                  IssueEnricher{Fn: EnrichAPIGatewayStage, Priority: 100},
@@ -235,7 +237,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Code: CodeAPIGWNoAuthorizerPublic, Phrase: "internet-facing with no authorizer", Severity: domain.SevBroken, Source: "wave2", Detail: "Nothing checks the caller's identity and no resource policy scopes the caller, so anyone on the internet can call the routes this gateway exposes. Attach an authorizer, or scope the resource policy to the callers that should reach it."},
 			{Code: CodeAPIGWNoAuthorizer, Phrase: "no authorizer", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing checks the caller's identity, so any client that can reach the network this gateway sits on can call the routes it exposes. Attach an authorizer."},
 			{Code: CodeAPIGWNoAccessLogs, Phrase: "no access logs", Severity: domain.SevWarn, Source: "wave2", Detail: "The stage records no access logs, so a burst of abusive or failing requests leaves nothing to investigate. Point the stage's access logging at a log group."},
-			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2", Detail: "Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage."},
+			{Code: CodeAPIGWTracingOff, Phrase: "X-Ray tracing off", Severity: domain.SevWarn, Source: "wave2", OnlyKinds: []string{apigwKindREST}, Detail: "Requests through this stage are not traced, so a slow or failing integration cannot be followed to its cause. Turn on X-Ray tracing for the stage."},
 			{Code: CodeAPIGWStageVariableSecret, Phrase: "credential in stage variables", Severity: domain.SevBroken, Source: "wave2", Detail: "A stage variable holds what looks like a credential, and stage variables are readable by anyone who can read the gateway's configuration. Move the value into Secrets Manager and reference it from the integration."},
 		},
 		Policy: &catalog.PolicyDecl{},

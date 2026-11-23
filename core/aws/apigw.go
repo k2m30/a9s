@@ -12,9 +12,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	apigatewayv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// apigwKindREST is the protocol a9s writes for an API Gateway V1 REST API; a
+// V2 API carries its ProtocolType (HTTP or WEBSOCKET).
+const apigwKindREST = "REST"
+
+var apigwKinds = append([]string{apigwKindREST}, enumValues[apigatewayv2types.ProtocolType]()...) //nolint:gochecknoglobals // static AWS value set
+
+func apigwKind(r domain.Resource) string { return r.Fields["protocol"] }
 
 // apigwMergedCursor encodes the two independent pagination lanes
 // FetchAPIGatewaysPageMerged combines: V1Position resumes APIGateway V1's
@@ -80,7 +90,6 @@ func (c apigwMergedCursor) encode() string {
 // independent: either can still be truncated while the other is done, and
 // the merged result is truncated (with a cursor carrying whichever lane(s)
 // still have more) until both report exhaustion.
-// V1 REST API resources have Fields["protocol"] == "REST".
 // If c.APIGatewayV1 is nil, only V2 resources are returned.
 func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	cur, err := decodeAPIGWMergedCursor(continuationToken)
@@ -205,7 +214,7 @@ func fetchAPIGWV1RestApisBatch(ctx context.Context, api APIGatewayV1GetRestApisA
 				Fields: map[string]string{
 					"api_id":      apiID,
 					"name":        name,
-					"protocol":    "REST",
+					"protocol":    apigwKindREST,
 					"endpoint":    endpoint,
 					"description": description,
 				},

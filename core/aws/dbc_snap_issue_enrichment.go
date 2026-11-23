@@ -52,12 +52,12 @@ const (
 
 // enrichDBCSnapCrossRef is the IssueEnricherFunc registered for dbc-snap.
 var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
+	ShortName:          "dbc-snap",
 	ParentShortName:    "dbc",
 	GetParentID:        dbcSnapParentID,
 	ParentIsLocal:      dbcSnapParentIsLocal,
 	IsParent:           dbcSnapTakenFrom,
 	GetCreatedAt:       dbcSnapCreatedAt,
-	GetSnapshotType:    dbcSnapType,
 	GetParentRetention: dbcParentRetention,
 	ParentRowLabel:     "Source Cluster",
 	ParentNoun:         "cluster",
@@ -233,22 +233,17 @@ func dbcSnapCreatedAt(raw any) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// dbcSnapType extracts SnapshotType from either a
-// docdbtypes.DBClusterSnapshot or rdstypes.DBClusterSnapshot.
-func dbcSnapType(raw any) (string, bool) {
-	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
-		if snap.SnapshotType == nil {
-			return "", false
-		}
-		return *snap.SnapshotType, true
+// dbcSnapKind is the cluster snapshot's SnapshotType, from a
+// docdbtypes.DBClusterSnapshot or an rdstypes.DBClusterSnapshot, or the value
+// the fetcher stored for a row rebuilt from Fields alone.
+func dbcSnapKind(r domain.Resource) string {
+	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](r.RawStruct); ok {
+		return aws.ToString(snap.SnapshotType)
 	}
-	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
-		if snap.SnapshotType == nil {
-			return "", false
-		}
-		return *snap.SnapshotType, true
+	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](r.RawStruct); ok {
+		return aws.ToString(snap.SnapshotType)
 	}
-	return "", false
+	return r.Fields["snapshot_type"]
 }
 
 // dbcParentRetention extracts BackupRetentionPeriod from a parent cluster row.

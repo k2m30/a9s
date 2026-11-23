@@ -16,6 +16,8 @@ import (
 // (ses.dkim-off). Every other domain identity signs its outbound mail.
 const SESDKIMOff = "nodkim.acme-corp.com"
 
+const SESManagedDomain = "acme-corp.awsapps.com"
+
 // Exported ID/ARN constants — referenced by this file, sibling fixtures, and tests.
 const (
 	// SESGraphRootIdentity is the domain identity used as the demo graph-root.
@@ -161,6 +163,12 @@ func buildSESIdentities() []sesv2types.IdentityInfo {
 		{
 			IdentityName:       aws.String(SESDKIMOff),
 			IdentityType:       sesv2types.IdentityTypeDomain,
+			SendingEnabled:     true,
+			VerificationStatus: sesv2types.VerificationStatusSuccess,
+		},
+		{
+			IdentityName:       aws.String(SESManagedDomain),
+			IdentityType:       sesv2types.IdentityTypeManagedDomain,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusSuccess,
 		},
@@ -320,5 +328,5 @@ func init() {
 	// per account with no per-resource dimension to vary, and the demo account
 	// is modeled healthy so the rest of the fleet has a working sending
 	// identity to reference.
-	Register(Pin{ShortName: "ses", Rows: 9, Issues: 6, CoverageGaps: []string{"dim", "ses.account-shutdown", "ses.account-probation", "ses.quota-high"}})
+	Register(Pin{ShortName: "ses", Rows: 10, Issues: 6, CoverageGaps: []string{"dim", "ses.account-shutdown", "ses.account-probation", "ses.quota-high"}})
 }

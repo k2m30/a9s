@@ -128,10 +128,9 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 		}
 		findings, attentionDetails := computeRDSDBClusterFindings(cluster, expectsWriter)
 
-		r := resource.Resource{
-			ID:       clusterID,
-			Name:     clusterID,
-			Findings: findings,
+		r := withWave1("dbc", resource.Resource{
+			ID:   clusterID,
+			Name: clusterID,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
 				"engine":                  engine,
@@ -149,7 +148,7 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			},
 			RawStruct:        cluster,
 			AttentionDetails: attentionDetails,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

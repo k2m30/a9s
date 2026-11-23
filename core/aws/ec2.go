@@ -197,7 +197,7 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 	if publicIP != "" {
 		posture = append(posture, wave1Finding(CodeEC2PublicIP))
 	}
-	r.Findings = withState("ec2", state, posture)
+	emitWave1("ec2", &r, withState("ec2", state, posture)...)
 	if hasFinding(r.Findings, CodeEC2IMDSv1Allowed) {
 		addWave1Rows(&r, CodeEC2IMDSv1Allowed, domain.DetailRow{Label: "Metadata tokens", Value: "optional", Tier: "~"})
 	}

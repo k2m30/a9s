@@ -85,7 +85,7 @@ func ConvertHistoryEvent(event sfntypes.HistoryEvent, lastStateName *string) res
 
 	stateName := resolveStateName(event, lastStateName)
 
-	return resource.Resource{
+	return withWave1("sfn_execution_history", resource.Resource{
 		ID:   fmt.Sprintf("%d", event.Id),
 		Name: HumanizeEventType(eventType),
 		Fields: map[string]string{
@@ -98,9 +98,8 @@ func ConvertHistoryEvent(event sfntypes.HistoryEvent, lastStateName *string) res
 			"event_id":          fmt.Sprintf("%d", event.Id),
 			"previous_event_id": fmt.Sprintf("%d", event.PreviousEventId),
 		},
-		Findings:  sfnHistoryEventFindings(eventType),
 		RawStruct: event,
-	}
+	}, sfnHistoryEventFindings(eventType)...)
 }
 
 // sfnHistoryEventFindings returns a wave1 finding for a history event whose

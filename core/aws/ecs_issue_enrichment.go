@@ -87,7 +87,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 				continue
 			}
 			status := aws.ToString(cluster.Status)
-			if !catalog.Applies(ecsCodeClusterIssue, LifecycleClassOf("ecs", status), status) {
+			if !catalog.Applies("ecs", ecsCodeClusterIssue, LifecycleClassOf("ecs", status), status, "") {
 				continue
 			}
 

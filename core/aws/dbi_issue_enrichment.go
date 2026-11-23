@@ -222,8 +222,8 @@ func dbiBackupTarget(r resource.Resource) backupTarget {
 		}
 		return t
 	}
-	if a, ok := ARNForService(t.arn, "rds"); ok && strings.HasPrefix(a.Resource, "db:") && db.DBClusterIdentifier != nil {
-		a.Resource = "cluster:" + *db.DBClusterIdentifier
+	if a, ok := ARNForService(t.arn, "rds"); ok && strings.HasPrefix(a.Resource, "db:") && dbiKind(r) == dbiKindClusterMember {
+		a.Resource = "cluster:" + aws.ToString(db.DBClusterIdentifier)
 		t.arn = a.String()
 	}
 	return t

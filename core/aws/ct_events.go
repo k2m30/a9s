@@ -353,10 +353,9 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	// sees WHY the row is flagged, not just its severity name.
 	status, cause := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
 
-	r := resource.Resource{
-		ID:       eventID,
-		Name:     eventName,
-		Findings: ctEventFindings(status, cause, errorCode, eventName),
+	r := withWave1("ct-events", resource.Resource{
+		ID:   eventID,
+		Name: eventName,
 		Fields: map[string]string{
 			"event_name":    eventName,
 			"status":        status,
@@ -394,7 +393,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"_ct.region":            region,
 		},
 		RawStruct: event,
-	}
+	}, ctEventFindings(status, cause, errorCode, eventName)...)
 	return r
 }
 

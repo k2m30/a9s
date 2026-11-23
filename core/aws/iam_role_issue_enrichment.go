@@ -6,7 +6,7 @@ package aws
 import (
 	"context"
 	"errors"
-	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -42,7 +42,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return !strings.HasPrefix(r.Fields["path"], awsServiceRolePathPrefix)
+		return rowAppliesAny("role", r, iamRoleCodeDormant, iamRoleCodeAdminAttached)
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -85,12 +85,12 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			// IAM never records a last-used date for a role nobody has
 			// assumed yet, so age since creation is the only evidence that
 			// the role has had time to be used at all.
-			isDormant = out.Role.CreateDate != nil && time.Since(*out.Role.CreateDate) > 90*24*time.Hour
-		} else if time.Since(*out.Role.RoleLastUsed.LastUsedDate) > 90*24*time.Hour {
+			isDormant = out.Role.CreateDate != nil && time.Since(*out.Role.CreateDate) > days(roleDormantAfterDays)
+		} else if time.Since(*out.Role.RoleLastUsed.LastUsedDate) > days(roleDormantAfterDays) {
 			isDormant = true
 		}
 		if isDormant {
-			setWave2Finding(&result, r.ID, iamRoleCodeDormant, nil)
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, nil, strconv.Itoa(roleDormantAfterDays))
 		}
 	})
 	return result, errors.Join(loopErr, AggregateFailures("role last-used", failures, n))

@@ -228,7 +228,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 
 	findings := ecsTaskStructuralFindings(status, stopCode, health)
 
-	return resource.Resource{
+	return withWave1("ecs_tasks", resource.Resource{
 		ID:   taskIDShort,
 		Name: taskIDShort,
 		Fields: map[string]string{
@@ -241,7 +241,6 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 			"stop_code":      stopCode,
 			"task_arn":       taskArn,
 		},
-		Findings:  findings,
 		RawStruct: task,
-	}
+	}, findings...)
 }

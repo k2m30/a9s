@@ -126,7 +126,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 	if policy.Arn != nil {
 		arn = *policy.Arn
 	}
-	return resource.Resource{
+	return withWave1("policy", resource.Resource{
 		ID:   arn,
 		Name: policyName,
 		Fields: map[string]string{
@@ -138,9 +138,8 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 			"create_date":      createDate,
 			"arn":              arn,
 		},
-		Findings:  orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable),
 		RawStruct: policy,
-	}
+	}, orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable)...)
 }
 
 // awsManagedPolicyPathPrefixes are the ARN path prefixes AWS-managed policies

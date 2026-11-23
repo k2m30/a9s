@@ -109,7 +109,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 
 	findings, issueRows := ngFindings(status, healthIssuesCount, issueCodes)
 
-	r := resource.Resource{
+	r := withWave1("ng", resource.Resource{
 		ID:   ngRowID(ngClusterName, nodegroupName),
 		Name: nodegroupName,
 		Fields: map[string]string{
@@ -121,9 +121,8 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
 			"health_issues":       strings.Join(issueCodes, ", "),
 		},
-		Findings:  findings,
 		RawStruct: ng,
-	}
+	}, findings...)
 	if len(findings) > 0 {
 		// The rows belong to whichever finding built them — degraded folds
 		// them into its state finding, ACTIVE-with-issues into the

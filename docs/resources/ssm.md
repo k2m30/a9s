@@ -75,7 +75,7 @@ Badge aggregation for `ssm`: Wave 1 issue-colored rows only — this type regist
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `SecureString not rotated >365d` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not modified in over 365 days` |
+| `SecureString not rotated >365d` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `not modified in over <N day(s)>` |
 | `String name looks like a secret` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `plaintext value looks like a credential` |
 | `Advanced tier aged >90d` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` |
 
@@ -87,7 +87,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for both signals — the Status column explicitly names the cause (`not modified in over 365 days`, `plaintext value looks like a credential`) so the operator can triage (rotate or retype) without pressing detail. The detail line (S5) is a fuller sentence for operators who want the remediation action spelled out; the list line is the 3am-glance primary.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for both signals — the Status column explicitly names the cause (`not modified in over <N day(s)>`, `plaintext value looks like a credential`) so the operator can triage (rotate or retype) without pressing detail. The detail line (S5) is a fuller sentence for operators who want the remediation action spelled out; the list line is the 3am-glance primary.
 
 ## 5. Out of Scope
 
@@ -120,10 +120,10 @@ ssm — SECRETS & CONFIG. Status key: `risk` — the key the status cell reads, 
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 | This parameter holds what looks like a credential in plain text, so it is unencrypted at rest and readable by anyone allowed to read parameters on that path. Store it as an encrypted parameter under a KMS key, update the readers, then rotate the exposed value. |
-| ssm.value.stale | not modified in over 365 days | warn | wave1 | The parameter has not been touched in over a year, and if it holds a credential that credential has been valid all that time. Confirm it is still current, and rotate it if it is a secret. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 | String | This parameter holds what looks like a credential in plain text, so it is unencrypted at rest and readable by anyone allowed to read parameters on that path. Store it as an encrypted parameter under a KMS key, update the readers, then rotate the exposed value. |
+| ssm.value.stale | not modified in over <N day(s)> | warn | wave1 | SecureString | The parameter has not been touched in over a year, and if it holds a credential that credential has been valid all that time. Confirm it is still current, and rotate it if it is a secret. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

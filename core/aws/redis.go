@@ -98,10 +98,9 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 
 		findings, attentionDetails := computeRedisFindings(status, multiAZ, autoFailover, rg)
 
-		r := resource.Resource{
-			ID:       rgID,
-			Name:     rgID,
-			Findings: findings,
+		r := withWave1("redis", resource.Resource{
+			ID:   rgID,
+			Name: rgID,
 			Fields: map[string]string{
 				"cluster_id": rgID,
 				"node_type":  nodeType,
@@ -113,7 +112,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 			},
 			RawStruct:        rg,
 			AttentionDetails: attentionDetails,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

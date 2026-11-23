@@ -53,10 +53,9 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 
 		findings := withState("kinesis", rawStatus, nil)
 
-		r := resource.Resource{
-			ID:       streamName,
-			Name:     streamName,
-			Findings: findings,
+		r := withWave1("kinesis", resource.Resource{
+			ID:   streamName,
+			Name: streamName,
 			Fields: map[string]string{
 				"stream_name":   streamName,
 				"status":        rawStatus,
@@ -66,7 +65,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 				"stream_mode":   streamMode,
 			},
 			RawStruct: stream,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

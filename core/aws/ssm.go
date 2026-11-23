@@ -5,10 +5,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -60,8 +62,7 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			description = *param.Description
 		}
 
-		findings := ssmColorFindings(paramName, paramType, param.LastModifiedDate)
-		r := resource.Resource{
+		r := withWave1("ssm", resource.Resource{
 			ID:   paramName,
 			Name: paramName,
 			Fields: map[string]string{
@@ -70,11 +71,10 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 				"version":       version,
 				"last_modified": lastModified,
 				"description":   description,
-				"risk":          ssmRiskWord(findings),
 			},
-			Findings:  findings,
 			RawStruct: param,
-		}
+		}, ssmColorFindings(paramName, param.LastModifiedDate)...)
+		r.Fields["risk"] = ssmRiskWord(r.Findings)
 
 		resources = append(resources, r)
 	}
@@ -102,20 +102,30 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 	}, nil
 }
 
-// ssmColorFindings is the one judgment of a parameter: an unencrypted value
-// whose name says it holds a credential first, then a value nothing has
-// changed in over a year, whatever its type. The Status cell, the row colour
+// ssmColorFindings is the one judgment of a parameter: a value whose name
+// says it holds a credential, and a value nothing has changed in
+// ssmStaleAfterDays. Each is its own predicate. The Status cell, the row colour
 // and the Attention block all read it. A parameter's path is the name over
 // its value, so the name says "credential" here exactly when it says so on
 // an environment variable or a task definition — secretscan's key rule.
-func ssmColorFindings(paramName, paramType string, lastModifiedDate *time.Time) []domain.Finding {
-	if paramType == "String" && secretscan.KeyNamesCredential(paramName) {
-		return []domain.Finding{wave1Finding(ssmCodePlaintextSensitive)}
+func ssmColorFindings(paramName string, lastModifiedDate *time.Time) []domain.Finding {
+	var findings []domain.Finding
+	if secretscan.KeyNamesCredential(paramName) {
+		findings = append(findings, wave1Finding(ssmCodePlaintextSensitive))
 	}
-	if lastModifiedDate != nil && time.Since(*lastModifiedDate) > 365*24*time.Hour {
-		return []domain.Finding{wave1Finding(ssmCodeStaleValue)}
+	if lastModifiedDate != nil && time.Since(*lastModifiedDate) > days(ssmStaleAfterDays) {
+		findings = append(findings, wave1Finding(ssmCodeStaleValue, strconv.Itoa(ssmStaleAfterDays)))
 	}
-	return nil
+	return findings
+}
+
+// ssmKind is the parameter's Type. A row rebuilt from Fields alone reads the
+// value the fetcher stored.
+func ssmKind(r domain.Resource) string {
+	if p, ok := assertStruct[ssmtypes.ParameterMetadata](r.RawStruct); ok {
+		return string(p.Type)
+	}
+	return r.Fields["type"]
 }
 
 // ssmRiskWord is the Status column's word for what ssmColorFindings found,

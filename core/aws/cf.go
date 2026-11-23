@@ -89,7 +89,7 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 				}
 			}
 
-			r := resource.Resource{
+			r := withWave1("cf", resource.Resource{
 				ID:   distID,
 				Name: distID,
 				Fields: map[string]string{
@@ -102,9 +102,8 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 					"price_class":          priceClass,
 					"lambda_function_arns": strings.Join(lambdaARNs, ","),
 				},
-				Findings:  cfWave1Findings(enabled, status),
 				RawStruct: dist,
-			}
+			}, cfWave1Findings(enabled, status)...)
 
 			resources = append(resources, r)
 		}

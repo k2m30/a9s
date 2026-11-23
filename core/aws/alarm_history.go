@@ -92,7 +92,7 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) re
 		historyData = *item.HistoryData
 	}
 
-	return resource.Resource{
+	return withWave1("alarm_history", resource.Resource{
 		ID:   eventRowID(at, historyItemType, historySummary, historyData),
 		Name: timestamp,
 		Fields: map[string]string{
@@ -101,9 +101,8 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) re
 			"history_summary":   historySummary,
 			"alarm_name":        alarmName,
 		},
-		Findings:  alarmHistoryFindings(historyItemType, historyData),
 		RawStruct: item,
-	}
+	}, alarmHistoryFindings(historyItemType, historyData)...)
 }
 
 // alarmHistoryStateData is the shape of the JSON payload CloudWatch's

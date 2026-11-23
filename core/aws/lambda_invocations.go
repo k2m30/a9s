@@ -357,7 +357,7 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 		name = name[:8]
 	}
 
-	return resource.Resource{
+	return withWave1("lambda_invocations", resource.Resource{
 		ID:   report.requestID,
 		Name: name,
 		Fields: map[string]string{
@@ -380,9 +380,8 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 			"log_group":              logGroup,
 			"log_stream":             aws.ToString(event.LogStreamName),
 		},
-		Findings:  lambdaInvocationFindings(status),
 		RawStruct: event,
-	}, true
+	}, lambdaInvocationFindings(status)...), true
 }
 
 // lambdaInvocationFindings returns the wave1 finding of an invocation that

@@ -76,10 +76,9 @@ func FetchRolePolicies(
 			policyArn = *p.PolicyArn
 		}
 
-		managed = append(managed, resource.Resource{
-			ID:       policyArn,
-			Name:     policyName,
-			Findings: rolePolicyFindings(policyArn),
+		managed = append(managed, withWave1("role_policies", resource.Resource{
+			ID:   policyArn,
+			Name: policyName,
 			Fields: map[string]string{
 				"policy_name": policyName,
 				"policy_arn":  policyArn,
@@ -91,7 +90,7 @@ func FetchRolePolicies(
 				PolicyArn:  policyArn,
 				PolicyType: "Managed",
 			},
-		})
+		}, rolePolicyFindings(policyArn)...))
 	}
 
 	inlineOutput, err := inlineAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
@@ -103,10 +102,9 @@ func FetchRolePolicies(
 
 	var inline []resource.Resource
 	for _, name := range inlineOutput.PolicyNames {
-		inline = append(inline, resource.Resource{
-			ID:       name,
-			Name:     name,
-			Findings: inlineRolePolicyFindings(),
+		inline = append(inline, withWave1("role_policies", resource.Resource{
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"policy_name": name,
 				"policy_arn":  "",
@@ -118,7 +116,7 @@ func FetchRolePolicies(
 				PolicyArn:  "",
 				PolicyType: "Inline",
 			},
-		})
+		}, inlineRolePolicyFindings()...))
 	}
 
 	resources := make([]resource.Resource, 0, len(managed)+len(inline))

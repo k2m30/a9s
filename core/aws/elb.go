@@ -8,9 +8,20 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// elbKind is the load balancer's Type (application, network or gateway). A
+// row rebuilt from Fields alone reads the value the fetcher stored.
+func elbKind(r domain.Resource) string {
+	if lb, ok := assertStruct[elbtypes.LoadBalancer](r.RawStruct); ok {
+		return string(lb.Type)
+	}
+	return r.Fields["type"]
+}
 
 // FetchLoadBalancersPage fetches a single page of load balancers.
 func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersAPI, continuationToken string) (resource.FetchResult, error) {
@@ -59,7 +70,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 
 		findings := withState("elb", state, nil)
 
-		r := resource.Resource{
+		r := withWave1("elb", resource.Resource{
 			ID:   lbName,
 			Name: lbName,
 			Fields: map[string]string{
@@ -71,9 +82,8 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 				"vpc_id":            vpcID,
 				"load_balancer_arn": lbArn,
 			},
-			Findings:  findings,
 			RawStruct: lb,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

@@ -54,6 +54,8 @@ const (
 	fixtLambdaProcessorTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-processor-tg/3333333333333333"
 )
 
+const ELBGatewayLB = "acme-inspection-gwlb"
+
 // GRPCTargetGroupARN carries a finding with more
 // supporting rows than the detail view shows: acme-grpc-tg registers more
 // wholly unhealthy targets than the row cap, which is the only way `--demo`
@@ -268,12 +270,25 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 		},
 	})
 
+	lbs = append(lbs, elbv2types.LoadBalancer{
+		LoadBalancerName: aws.String(ELBGatewayLB),
+		LoadBalancerArn:  aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/gwy/" + ELBGatewayLB + "/7777eeee8888ffff"),
+		Type:             elbv2types.LoadBalancerTypeEnumGateway,
+		State:            &elbv2types.LoadBalancerState{Code: elbv2types.LoadBalancerStateEnumActive},
+		VpcId:            aws.String(fixtELBProdVPCID),
+		IpAddressType:    elbv2types.IpAddressTypeIpv4,
+		CreatedTime:      aws.Time(time.Date(2025, 12, 2, 9, 0, 0, 0, time.UTC)),
+		AvailabilityZones: []elbv2types.AvailabilityZone{
+			{SubnetId: aws.String(fixtELBSubnetA), ZoneName: aws.String("us-east-1a")},
+		},
+	})
+
 	names := []string{
 		"api-services-alb", "data-pipeline-nlb", "monitoring-alb", "ci-build-alb",
 		"acme-dev-web", "analytics-alb", "auth-service-alb", "reporting-alb",
 		"webhooks-nlb", "cache-layer-alb", "events-alb", "grpc-nlb",
 		"media-upload-alb", "search-alb", "notification-alb", "worker-alb",
-		"batch-nlb", "gateway-alb",
+		"batch-nlb",
 	}
 	lbTypes := []elbv2types.LoadBalancerTypeEnum{
 		elbv2types.LoadBalancerTypeEnumApplication, elbv2types.LoadBalancerTypeEnumNetwork,

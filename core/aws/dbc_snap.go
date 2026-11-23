@@ -39,9 +39,9 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 		// ready, the way computeDBCFindings does for a cluster.
 		findings = append(findings, wave1Finding(CodeDBCSnapTransitional, rawStatus))
 	}
-	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
+	if snap.SnapshotCreateTime != nil {
 		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
-		if ageD > 365 {
+		if ageD > dbcSnapManualUnusedAfterDays {
 			findings = append(findings, wave1Finding(CodeDBCSnapManualUnused, strconv.Itoa(ageD)))
 		}
 	}
@@ -111,10 +111,9 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 			storageEncrypted = strconv.FormatBool(*snapshot.StorageEncrypted)
 		}
 
-		r := resource.Resource{
-			ID:       snapshotID,
-			Name:     snapshotID,
-			Findings: findings,
+		r := withWave1("dbc-snap", resource.Resource{
+			ID:   snapshotID,
+			Name: snapshotID,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
@@ -125,7 +124,7 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 				"storage_encrypted":    storageEncrypted,
 			},
 			RawStruct: snapshot,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

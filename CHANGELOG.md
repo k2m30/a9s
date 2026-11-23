@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A finding now shows only on the kinds of resource that can have its defect,
+  and each resource page lists the kinds a finding applies to:
+  - Glue: a Ray job no longer reports "no security configuration" (AWS Glue
+    security configurations are not supported in Ray jobs). Python shell and
+    Ray jobs no longer report "continuous logging off", which is a Spark
+    setting. "Job bookmarks: not encrypted" shows only for Spark ETL jobs,
+    the only kind with job bookmarks, and a Ray job's security
+    configuration is not read.
+  - SSM: "not modified in over 365 days" shows only for `SecureString`
+    parameters.
+  - RDS: an instance in a DB cluster (Aurora, DocumentDB, Neptune, or a
+    Multi-AZ DB cluster of `mysql` or `postgres`) no longer reports
+    deletion protection off, no automated backups or single-AZ, because the
+    cluster owns those settings.
+  - CloudWatch Logs: a log group whose class is not Standard (Infrequent
+    Access, which AWS starts to report as `ESSENTIALS` in December 2026, or
+    Delivery) is not checked for metric filters, and its log events view is
+    not offered, because AWS does not support either for that class. A
+    Delivery log group no longer reports "retention: never expire", because
+    AWS fixes its retention.
+  - KMS: a multi-Region replica key no longer reports "key rotation
+    disabled"; AWS sets rotation on the primary key only.
+  - ELB: "Access Logs: disabled" shows for a load balancer with a listener
+    AWS logs (HTTP or HTTPS on an Application Load Balancer, TLS on a
+    Network Load Balancer).
+- A secret with several posture defects shows each of them. Before, a secret
+  nobody reads, with rotation off and a year-old value, showed only
+  "dormant".
+
 - A view file in `~/.a9s/views/` now follows the version of a9s you run, and your edits to it are merged with the new defaults instead of freezing the file. Each generated file records a hash of every column and detail field it was generated with. A column or field you did not touch takes the new version's value or disappears with it, a new one appears, and a column or field you changed, added or removed stays the way you left it, in your order if you reordered. When a new version changes something the file takes, the first start rewrites it with the merged result and drops its comments; other starts leave it as it is. An empty section (`list: {}`) removes every generated item from the file; a list with no columns is shown with the built-in columns. On the first start, a file an earlier version generated (it has a `generated:` line and no hashes) is replaced by the file this version generates, including any edits you made to it; make them again in the new file. A file without a `generated:` line is yours and is never rewritten.
 - Each resource status now has one meaning on every type. A status AWS
   reports that a9s does not know shows as `<status> (unrecognised)` and is a

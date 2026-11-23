@@ -116,6 +116,33 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 	}, nil
 }
 
+// The job kinds GetJobs reports in Command.Name (AWS Glue API, JobCommand:
+// "glueetl" for a Spark ETL job, "gluestreaming" for a Spark streaming job,
+// "pythonshell" for a Python shell job, "glueray" for a Ray job).
+const (
+	glueKindSparkETL       = "glueetl"
+	glueKindSparkStreaming = "gluestreaming"
+	glueKindPythonShell    = "pythonshell"
+	glueKindRay            = "glueray"
+)
+
+var glueKinds = []string{glueKindSparkETL, glueKindSparkStreaming, glueKindPythonShell, glueKindRay} //nolint:gochecknoglobals // static AWS value set
+
+// glueBookmarkKinds are the job kinds that keep job bookmarks. AWS Glue: "You
+// can't use job bookmarks with Python shell jobs"; streaming jobs "use
+// checkpoints rather than job bookmarks"; Ray jobs take no security
+// configuration at all.
+var glueBookmarkKinds = []string{glueKindSparkETL} //nolint:gochecknoglobals // static AWS value set
+
+// glueKind is the job's Command.Name. A row rebuilt from Fields alone reads
+// the value the fetcher stored.
+func glueKind(r domain.Resource) string {
+	if job, ok := assertStruct[gluetypes.Job](r.RawStruct); ok && job.Command != nil {
+		return aws.ToString(job.Command.Name)
+	}
+	return r.Fields["command"]
+}
+
 // glueContinuousLogArgument is the default-argument flag that sends driver and
 // executor output to CloudWatch as the run happens.
 const glueContinuousLogArgument = "--enable-continuous-cloudwatch-log"
@@ -135,14 +162,14 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	// bookmark encryption all live on the security configuration a job either
 	// names or does not, so a job naming none fails all three at once.
 	if aws.ToString(job.SecurityConfiguration) == "" {
-		addWave1Finding(r, CodeGlueNoSecurityConfiguration)
+		addWave1Finding("glue", r, CodeGlueNoSecurityConfiguration)
 	}
 
 	// The flag is a string, so "false" is off exactly as surely as absent.
-	// Glue 5.0 streams executor output without it, so the argument is only
-	// something to add on 4.0 and earlier.
+	// Glue 5.0 streams Spark executor output without it, so the argument is
+	// only something to add on 4.0 and earlier.
 	if glueVersionBefore5(aws.ToString(job.GlueVersion)) && job.DefaultArguments[glueContinuousLogArgument] != "true" {
-		addWave1Finding(r, CodeGlueContinuousLoggingOff)
+		addWave1Finding("glue", r, CodeGlueContinuousLoggingOff)
 		addWave1Rows(r, CodeGlueContinuousLoggingOff, domain.DetailRow{
 			Label: "Argument to add", Value: glueContinuousLogArgument, Tier: "~",
 		})
@@ -155,5 +182,5 @@ func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	for k, v := range job.DefaultArguments {
 		args[strings.TrimPrefix(k, "--")] = v
 	}
-	addSecretScanFinding(r, CodeGlueArgumentSecret, args)
+	addSecretScanFinding("glue", r, CodeGlueArgumentSecret, args)
 }

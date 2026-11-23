@@ -80,10 +80,9 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 		findings, attentionDetails := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets, fs.Encrypted)
 
-		r := resource.Resource{
-			ID:       fsID,
-			Name:     name,
-			Findings: findings,
+		r := withWave1("efs", resource.Resource{
+			ID:   fsID,
+			Name: name,
 			Fields: map[string]string{
 				"file_system_id":   fsID,
 				"name":             name,
@@ -95,7 +94,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			},
 			RawStruct:        fs,
 			AttentionDetails: attentionDetails,
-		}
+		}, findings...)
 
 		if listsAccessPoints && fsID != "" {
 			asked++

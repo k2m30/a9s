@@ -170,9 +170,10 @@ func TestT567EKSPivots_DegradedClusterKeepsADetailMatchALowerBound(t *testing.T)
 	}
 }
 
-// TestT567AlarmSFN_DegradedRowHidesAnARNMatch: an alarm names a state machine
-// by its ARN, which a row without its details does not carry, so that row may
-// be the one the alarm names.
+// TestT567AlarmSFN_DegradedRowHidesAnARNMatch: a target row marked degraded,
+// of a type the alarm matches from the row's struct, carries none of the values
+// the match reads, so it may be the one the alarm names. The rule holds for any
+// struct-matched target; the row here is a state machine named by its ARN.
 func TestT567AlarmSFN_DegradedRowHidesAnARNMatch(t *testing.T) {
 	b := newRefBench(t)
 	const sm = "order-fulfillment-workflow"
@@ -181,7 +182,7 @@ func TestT567AlarmSFN_DegradedRowHidesAnARNMatch(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("demo sfn list has no %s", sm)
 	}
-	rows[i] = awsclient.DegradedDetails("sfn", sm, t567Denied("states:DescribeStateMachine"))
+	rows[i] = resource.Resource{ID: sm, Name: sm, Fields: map[string]string{"name": sm, awsclient.DegradedFindingField: "sfn.warn.details_denied"}}
 	cache := t567CacheWith(b.cache, "sfn", resource.ResourceCacheEntry{Resources: rows})
 	alarm := resource.Resource{ID: "order-fulfillment-failures", Name: "order-fulfillment-failures", Type: "alarm", RawStruct: cwtypes.MetricAlarm{
 		AlarmName:  aws.String("order-fulfillment-failures"),

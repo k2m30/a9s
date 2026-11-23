@@ -141,10 +141,9 @@ func FetchEcsSvcLogs(
 		// CloudWatch log lines as log_events/lambda_invocation_logs.
 		status := classifyLogEventStatus(message)
 
-		r := resource.Resource{
-			ID:       id,
-			Name:     name,
-			Findings: logEventFindings(status),
+		r := withWave1("ecs_svc_logs", resource.Resource{
+			ID:   id,
+			Name: name,
 			Fields: map[string]string{
 				"timestamp":      timestamp,
 				"ingestion_time": ingestionTime,
@@ -156,7 +155,7 @@ func FetchEcsSvcLogs(
 				"log_stream":     logStream,
 			},
 			RawStruct: event.FilteredLogEvent,
-		}
+		}, logEventFindings(status)...)
 
 		resources = append(resources, r)
 	}

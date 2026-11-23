@@ -132,7 +132,7 @@ func eniToResource(eni ec2types.NetworkInterface) resource.Resource {
 		}
 	}
 
-	return resource.Resource{
+	return withWave1("eni", resource.Resource{
 		ID:   eniID,
 		Name: name,
 		Fields: map[string]string{
@@ -154,8 +154,7 @@ func eniToResource(eni ec2types.NetworkInterface) resource.Resource {
 			"security_groups": strings.Join(securityGroupIDs, ","),
 		},
 		RawStruct: eni,
-		Findings:  eniFindings(status, requesterManaged),
-	}
+	}, eniFindings(status, requesterManaged)...)
 }
 
 // eniFindings is the one predicate for a network interface. An unattached

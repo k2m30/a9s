@@ -103,7 +103,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	}
 
 	audit := capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		return strings.HasPrefix(logGroupNameOf(r), "/aws/cloudtrail/")
+		return strings.HasPrefix(logGroupNameOf(r), "/aws/cloudtrail/") && rowAppliesAny("logs", r, logsCodeMissingMetricFilters)
 	}, resourceIDsOf)
 	loopErr := ForEachRow(ctx, &result, resourceIDs(audit), EnrichmentParallelism, func(i int) {
 		r := audit[i]

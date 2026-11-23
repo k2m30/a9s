@@ -66,7 +66,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 
 		findings := withState("eb-rule", state, nil)
 
-		r := resource.Resource{
+		r := withWave1("eb-rule", resource.Resource{
 			ID:   ebRuleID(eventBus, name),
 			Name: name,
 			Fields: map[string]string{
@@ -77,9 +77,8 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 				"schedule":      schedule,
 				"event_pattern": eventPattern,
 			},
-			Findings:  findings,
 			RawStruct: rule,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

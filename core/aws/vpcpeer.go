@@ -88,7 +88,7 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 
 	requesterVPC, requesterOwner := vpcPeerSide(pc.RequesterVpcInfo)
 	accepterVPC, accepterOwner := vpcPeerSide(pc.AccepterVpcInfo)
-	return resource.Resource{
+	return withWave1("vpc-peer", resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
@@ -101,9 +101,8 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 			"expires":         ltFormatTime(pc.ExpirationTime),
 		},
 		RawStruct:        pc,
-		Findings:         findings,
 		AttentionDetails: attention,
-	}
+	}, findings...)
 }
 
 // vpcPeerSide extracts one side's VpcId/OwnerId, "","" for a nil pointer.

@@ -149,7 +149,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 	id := stageName + "/" + actionName
 	status := pipelineActionStatus(actionStatus)
 
-	return resource.Resource{
+	return withWave1("pipeline_stages", resource.Resource{
 		ID:   id,
 		Name: actionName,
 		Fields: map[string]string{
@@ -166,7 +166,6 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 			"revision_summary":     revisionSummary,
 			"pipeline_name":        pipelineName,
 		},
-		Findings: pipelineActionFindings(cptypes.ActionExecutionStatus(actionStatus)),
 		RawStruct: PipelineStageRow{
 			StageName:        stageName,
 			StageStatus:      stageStatus,
@@ -180,7 +179,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 			RevisionId:       revisionID,
 			RevisionSummary:  revisionSummary,
 		},
-	}
+	}, pipelineActionFindings(cptypes.ActionExecutionStatus(actionStatus))...)
 }
 
 // pipelineActionFindings returns a wave1 finding for an action execution

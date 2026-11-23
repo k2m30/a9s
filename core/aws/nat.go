@@ -65,7 +65,7 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 
 		findings := withState("nat", state, nil)
 
-		r := resource.Resource{
+		r := withWave1("nat", resource.Resource{
 			ID:   natID,
 			Name: name,
 			Fields: map[string]string{
@@ -76,9 +76,8 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 				"state":          state,
 				"public_ip":      publicIP,
 			},
-			Findings:  findings,
 			RawStruct: nat,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

@@ -55,7 +55,7 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 
 		findings := withState("igw", state, nil)
 
-		r := resource.Resource{
+		r := withWave1("igw", resource.Resource{
 			ID:   igwID,
 			Name: name,
 			Fields: map[string]string{
@@ -65,9 +65,8 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 				"state":             state,
 				"attachments_count": fmt.Sprintf("%d", len(igw.Attachments)),
 			},
-			Findings:  findings,
 			RawStruct: igw,
-		}
+		}, findings...)
 
 		resources = append(resources, r)
 	}

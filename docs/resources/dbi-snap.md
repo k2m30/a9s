@@ -187,16 +187,16 @@ dbi-snap — DATABASES & STORAGE. Status key: `status` — the column naming it 
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| dbi-snap.broken.failed | failed | broken | wave1 | This snapshot did not complete, so it holds no restorable copy and any recovery plan naming it has a gap. Take a new snapshot of the instance and delete this one. |
-| dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | The snapshot cannot be restored as it stands, usually because its engine version or options are no longer offered in this account or region. Copy it and upgrade the copy's engine version, or restore into a configuration matching what it was taken from. |
-| dbi-snap.warn.creating | creating: <pct>% | warn | wave1 | The snapshot is still being written and cannot be restored from or copied yet. Wait for it to complete before counting it as this window's recovery point. |
-| dbi-snap.warn.transitional | <status> | warn | wave1 | The snapshot is being modified or copied and is not usable for a restore until it settles. Wait for it to reach an available state. |
-| dbi-snap.warn.unencrypted | unencrypted | warn | wave1 | The snapshot's contents are stored unencrypted, and any instance restored from it starts unencrypted too. Copy it with a KMS key and restore from the copy. An automated snapshot cannot be deleted on its own, so remove the original only if it is a manual one and otherwise let the retention period expire it. |
-| dbi-snap.orphan | orphan: source DB deleted | broken | wave2 | The instance this snapshot was taken from no longer exists, so nothing is producing newer recovery points from it. Check what else covers that data before you decide: this may be the last copy or one of several. Give it a retention decision and an owner, or delete it, because it is billed for its stored size either way. |
-| dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 | This automated snapshot has outlived the instance's retention period, so something other than the backup policy is keeping it and nobody is managing its lifecycle. An automated snapshot cannot be renamed into a managed manual one, so copy it if the data is worth keeping deliberately, and otherwise adjust the retention setting or remove the retained automated backup that holds it. |
-| dbi-snap.public | shared with all AWS accounts | broken | wave2 | The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove `all` from the snapshot's restore attribute. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| dbi-snap.broken.failed | failed | broken | wave1 | all | This snapshot did not complete, so it holds no restorable copy and any recovery plan naming it has a gap. Take a new snapshot of the instance and delete this one. |
+| dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 | all | The snapshot cannot be restored as it stands, usually because its engine version or options are no longer offered in this account or region. Copy it and upgrade the copy's engine version, or restore into a configuration matching what it was taken from. |
+| dbi-snap.warn.creating | creating: <pct>% | warn | wave1 | all | The snapshot is still being written and cannot be restored from or copied yet. Wait for it to complete before counting it as this window's recovery point. |
+| dbi-snap.warn.transitional | <status> | warn | wave1 | all | The snapshot is being modified or copied and is not usable for a restore until it settles. Wait for it to reach an available state. |
+| dbi-snap.warn.unencrypted | unencrypted | warn | wave1 | all | The snapshot's contents are stored unencrypted, and any instance restored from it starts unencrypted too. Copy it with a KMS key and restore from the copy. An automated snapshot cannot be deleted on its own, so remove the original only if it is a manual one and otherwise let the retention period expire it. |
+| dbi-snap.orphan | orphan: source DB deleted | broken | wave2 | all | The instance this snapshot was taken from no longer exists, so nothing is producing newer recovery points from it. Check what else covers that data before you decide: this may be the last copy or one of several. Give it a retention decision and an owner, or delete it, because it is billed for its stored size either way. |
+| dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 | automated | This automated snapshot has outlived the instance's retention period, so something other than the backup policy is keeping it and nobody is managing its lifecycle. An automated snapshot cannot be renamed into a managed manual one, so copy it if the data is worth keeping deliberately, and otherwise adjust the retention setting or remove the retained automated backup that holds it. |
+| dbi-snap.public | shared with all AWS accounts | broken | wave2 | manual | The snapshot is shared with every AWS account, so anyone can restore it and read the database it came from. Remove `all` from the snapshot's restore attribute. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

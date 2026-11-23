@@ -114,7 +114,7 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 		certShort = extractCertID(*listener.Certificates[0].CertificateArn)
 	}
 
-	return resource.Resource{
+	return withWave1("elb_listeners", resource.Resource{
 		ID:   arn,
 		Name: port,
 		Fields: map[string]string{
@@ -126,9 +126,8 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 			"certificate_short":     certShort,
 			"listener_display":      fmt.Sprintf(":%s %s", port, protocol),
 		},
-		Findings:  elbListenerFindings(listener),
 		RawStruct: listener,
-	}
+	}, elbListenerFindings(listener)...)
 }
 
 // elbListenerFindings flags an HTTPS/TLS listener carrying zero certificates.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func enumValues[T interface {
@@ -43,24 +44,33 @@ func StateFinding(shortName, raw string, slots ...string) (domain.Finding, bool)
 	return wave1Finding(code, slots...), true
 }
 
-// appliesAny is catalog.Applies for a pass that reads once for several
-// codes: the read is worth making when any of them can stand on the row.
+// appliesAny is catalog.Applies for a pass that reads one object for several
+// codes, in the lifecycle the read itself reported: the read is worth making
+// when any of them can stand. The types it serves declare no kind.
 func appliesAny(shortName, raw string, codes ...domain.FindingCode) bool {
 	class := LifecycleClassOf(shortName, raw)
-	return slices.ContainsFunc(codes, func(c domain.FindingCode) bool { return catalog.Applies(c, class, raw) })
+	return slices.ContainsFunc(codes, func(c domain.FindingCode) bool { return catalog.Applies(shortName, c, class, raw, "") })
 }
 
-// withState is the composer every fetcher with a state table returns
-// through, so whether posture stands in a state is decided by the class and
-// never by where a check sits in a fetcher.
+// rowAppliesAny is catalog.AppliesToRow for a per-row read that answers
+// several codes: the read is made, and the row marked when it fails, only
+// when one of them can stand on the row's lifecycle and kind.
+func rowAppliesAny(shortName string, r resource.Resource, codes ...domain.FindingCode) bool {
+	return slices.ContainsFunc(codes, func(c domain.FindingCode) bool { return catalog.AppliesToRow(shortName, c, r) })
+}
+
+// withState composes a row's state finding with its posture findings, for
+// the emit door to keep the ones the row's lifecycle and kind allow. A
+// posture finding of the state finding's own code is the state already
+// stated.
 func withState(shortName, raw string, posture []domain.Finding, slots ...string) []domain.Finding {
-	class, _ := catalog.LifecycleOf(shortName, raw)
-	var out []domain.Finding
-	if f, ok := StateFinding(shortName, raw, slots...); ok {
-		out = append(out, f)
+	state, ok := StateFinding(shortName, raw, slots...)
+	if !ok {
+		return posture
 	}
+	out := []domain.Finding{state}
 	for _, f := range posture {
-		if catalog.Applies(f.Code, class, raw) {
+		if f.Code != state.Code {
 			out = append(out, f)
 		}
 	}

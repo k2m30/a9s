@@ -184,10 +184,9 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 		}
 	}
 
-	return resource.Resource{
-		ID:       buildID,
-		Name:     name,
-		Findings: cbBuildFindings(build.BuildStatus),
+	return withWave1("cb_builds", resource.Resource{
+		ID:   buildID,
+		Name: name,
 		Fields: map[string]string{
 			"build_number":            buildNumber,
 			"build_status":            status,
@@ -205,7 +204,7 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 			"log_stream_name":         logStreamName,
 		},
 		RawStruct: build,
-	}
+	}, cbBuildFindings(build.BuildStatus)...)
 }
 
 // shortSHA returns the first 8 characters of the source version or resolved

@@ -204,10 +204,9 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 	enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
 	nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
 
-	r := resource.Resource{
-		ID:       domainName,
-		Name:     domainName,
-		Findings: computeOpenSearchFindings(domain, now),
+	r := withWave1("opensearch", resource.Resource{
+		ID:   domainName,
+		Name: domainName,
 		Fields: map[string]string{
 			"domain_name":                       domainName,
 			"engine_version":                    engineVersion,
@@ -229,7 +228,7 @@ func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) res
 			"node_to_node_encryption_enabled":   nodeToNode,
 		},
 		RawStruct: domain,
-	}
+	}, computeOpenSearchFindings(domain, now)...)
 
 	if updateAvailable == "true" {
 		var rows []domainpkg.DetailRow

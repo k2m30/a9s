@@ -144,7 +144,7 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
   - **API call**: `DescribeSSLPolicies` (every page, no names), once per enrichment and only when a balancer has an HTTPS or TLS listener with a policy, beside the per-balancer `DescribeListeners`.
   - **Cost shape**: per-resource, plus one region-wide read.
 
-- **Signal**: `deletion_protection.enabled` or `access_logs.s3.enabled` is `false`. On a Network Load Balancer access logs count only when it has a TLS listener: "Access logs are created only if the load balancer has a TLS listener and they contain information only about TLS requests" (Network Load Balancers User Guide, "Access logs for your Network Load Balancer").
+- **Signal**: `deletion_protection.enabled` or `access_logs.s3.enabled` is `false`. Access logs count only when the load balancer has a listener they record: HTTP or HTTPS on an Application Load Balancer, TLS on a Network Load Balancer ("Access logs are created only if the load balancer has a TLS listener and they contain information only about TLS requests", Network Load Balancers User Guide, "Access logs for your Network Load Balancer").
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -175,7 +175,7 @@ sentence would restate it. Their S5 cell reads `—`.
 | ALB `routing.http.drop_invalid_header_fields.enabled != true` | 2 | Warning | `~` | S2, S3, S4, S5 | `invalid HTTP headers not dropped` |
 | ALB `HTTP` listener with no redirect to HTTPS, or NLB `TCP` listener on 443 | 2 | Warning | `~` | S2, S3, S4, S5 | `<port(s) LIST> in the clear` |
 | `HTTPS`/`TLS` listener whose policy's `SslProtocols` lists `TLSv1` or `TLSv1.1` | 2 | Warning | `~` | S2, S3, S4, S5 | `weak TLS policy on <port(s) LIST>` |
-| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` (access logs on a Network Load Balancer only with a TLS listener) | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
+| `deletion_protection.enabled` or `access_logs.s3.enabled` is `false` (access logs only with an HTTP, HTTPS or TLS listener) | 2 | Warning | `~` | S2, S3, S4, S5 | `deletion protection or access logs disabled` |
 | `State.Code` outside `LoadBalancerStateEnum.Values()` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<state> (unrecognised)` |
 
 Healthy ELBv2 rows (`State.Code == active`) and Classic (ELBv1) rows are omitted from this table per the §4 rule: Healthy renders green with a blank Status column.
@@ -214,17 +214,17 @@ elb — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
-| Code | Phrase | Severity | Source | Detail |
-| --- | --- | --- | --- | --- |
-| elb.state.unrecognised | <state> (unrecognised) | warn | wave1 | AWS reports a load balancer state a9s does not recognise, so a9s cannot tell whether it routes traffic. Check it in the AWS console before relying on it. |
-| elb.state.provisioning | provisioning | warn | wave1 | The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses. |
-| elb.state.active\_impaired | active impaired | warn | wave1 | The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses. |
-| elb.state.failed | failed | broken | wave1 | The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime. |
-| elb.misconfigured | deletion protection or access logs disabled | warn | wave2 | This load balancer can be deleted with a single call, or is not writing access logs, so an outage is one call away, or leaves no record of the requests that hit it. Turn deletion protection on and point access logs at a bucket. |
-| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest. |
-| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields. |
-| elb.plain-http-listener | <port(s) LIST> in the clear | warn | wave2 | A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener. |
-| elb.weak-tls-policy | weak TLS policy on <port(s) LIST> | warn | wave2 | A listener's security policy still negotiates TLS 1.0 or 1.1, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to a security policy whose protocols start at TLS 1.2. |
+| Code | Phrase | Severity | Source | Applies to | Detail |
+| --- | --- | --- | --- | --- | --- |
+| elb.state.unrecognised | <state> (unrecognised) | warn | wave1 | all | AWS reports a load balancer state a9s does not recognise, so a9s cannot tell whether it routes traffic. Check it in the AWS console before relying on it. |
+| elb.state.provisioning | provisioning | warn | wave1 | all | The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses. |
+| elb.state.active_impaired | active impaired | warn | wave1 | all | The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses. |
+| elb.state.failed | failed | broken | wave1 | all | The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime. |
+| elb.misconfigured | deletion protection or access logs disabled | warn | wave2 | all | This load balancer can be deleted with a single call, or is not writing access logs, so an outage is one call away, or leaves no record of the requests that hit it. Turn deletion protection on and point access logs at a bucket. |
+| elb.desync-mitigation-off | HTTP desync mitigation off | warn | wave2 | application | The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest. |
+| elb.invalid-headers-kept | invalid HTTP headers not dropped | warn | wave2 | application | Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields. |
+| elb.plain-http-listener | <port(s) LIST> in the clear | warn | wave2 | all | A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener. |
+| elb.weak-tls-policy | weak TLS policy on <port(s) LIST> | warn | wave2 | all | A listener's security policy still negotiates TLS 1.0 or 1.1, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to a security policy whose protocols start at TLS 1.2. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

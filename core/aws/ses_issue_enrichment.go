@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
-	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -60,11 +59,10 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 }
 
 // sesIdentityDKIM calls GetEmailIdentity per identity (cap EnrichmentCap) and
-// reports a domain that does not sign its outbound mail. A single verified
-// address cannot carry DKIM at all, so only domains are checked.
+// reports a domain that does not sign its outbound mail.
 func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) error {
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		return r.Fields["identity_type"] != sesIdentityTypeEmailAddress
+		return rowAppliesAny("ses", r, sesCodeDKIMOff)
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
@@ -81,9 +79,6 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 		defer mu.Unlock()
 		if err != nil {
 			MarkSkipped(result, r.ID, &failures, err)
-			return
-		}
-		if out.IdentityType != sesv2types.IdentityTypeDomain {
 			return
 		}
 		if out.DkimAttributes != nil && out.DkimAttributes.SigningEnabled {
