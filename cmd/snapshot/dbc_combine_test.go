@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // errThrottled is a stand-in AWS API error used across this file's
@@ -22,9 +25,39 @@ var errThrottled = errors.New("ThrottlingException: rate exceeded")
 //   - both sides fail: top-level error is non-nil and the caller omits the
 //     section from the snapshot.
 
-var _ func([]dbcCluster, error, []dbcCluster, error) (dbcData, error) = combineDBCClusters
+func combineDBCClusters(docdbRows []dbcCluster, docdbErr error, rdsRows []dbcCluster, rdsErr error) (dbcData, error) {
+	got, err := composed[dbcData]("dbc", fixed(
+		part[dbcData]{name: "docdb", run: func(_ context.Context, _ aws.Config, d *dbcData) error {
+			d.Clusters = append(d.Clusters, docdbRows...)
+			return docdbErr
+		}},
+		part[dbcData]{name: "rds", run: func(_ context.Context, _ aws.Config, d *dbcData) error {
+			d.Clusters = append(d.Clusters, rdsRows...)
+			return rdsErr
+		}},
+	), dbcDedup)(context.Background(), aws.Config{})
+	if err != nil {
+		return dbcData{}, err
+	}
+	return got.(dbcData), nil
+}
 
-var _ func([]dbcSnapshot, error, []dbcSnapshot, error) (dbcSnapData, error) = combineDBCSnapshots
+func combineDBCSnapshots(docdbRows []dbcSnapshot, docdbErr error, rdsRows []dbcSnapshot, rdsErr error) (dbcSnapData, error) {
+	got, err := composed[dbcSnapData]("dbc-snap", fixed(
+		part[dbcSnapData]{name: "docdb", run: func(_ context.Context, _ aws.Config, d *dbcSnapData) error {
+			d.Snapshots = append(d.Snapshots, docdbRows...)
+			return docdbErr
+		}},
+		part[dbcSnapData]{name: "rds", run: func(_ context.Context, _ aws.Config, d *dbcSnapData) error {
+			d.Snapshots = append(d.Snapshots, rdsRows...)
+			return rdsErr
+		}},
+	), dbcSnapDedup)(context.Background(), aws.Config{})
+	if err != nil {
+		return dbcSnapData{}, err
+	}
+	return got.(dbcSnapData), nil
+}
 
 // TestCombineDBCClusters_BothOK_MergesWithDocDBFirstDedup pins the happy
 // path: both sides succeed, rows are merged with the docdb-first dedup

@@ -49,8 +49,8 @@ go run ./cmd/checklist --snapshot tests/e2e/testdata/snapshot/<profile>--<region
     "shown": 50,                 // rows on the first page
     "truncated": true,           // "Results truncated" indicator
     "colors":     { "healthy": 50, "warning": 0, "broken": 0, "dim": 0 },
-    "decorators": { "!": 5, "~": 0 },
-    "flagged": [ { "name": "...", "decorator": "!", "status": "public access block incomplete" } ]
+    "decorators": { "!": 5, "~": 40 },
+    "flagged": [ { "name": "...", "decorator": "~", "status": "public access block incomplete (+3)" } ]
   }
 }
 ```
@@ -66,10 +66,10 @@ from §3, plus list-level items from `docs/resources/<type>-impl-plan.md`. For s
 
 | Surface | Rule (s3.md §4) | Checklist output |
 |---------|-----------------|---------------|
-| S1 menu `issues:N` | count of `!`-severity findings (`~` does not bump) | `menu.issues` |
+| S1 menu `issues:N` | rows with a `!`-severity finding (`~` does not bump); a lower bound (`N+`) past one page or when a bucket left not inspected has no `!` finding | `menu.issues`, `menu.issues_truncated` |
 | S2 row color | color by state; s3 has no Wave-1 signal → all Healthy=green | `list.colors` all `healthy` |
-| S3 `!`/`~` glyph before the name | on a Healthy (green) row only; PAB-incomplete → `!` | `list.flagged[].decorator` |
-| S4 Status text | finding cause on flagged rows; **Healthy rows render blank** | `flagged[].status` + blank elsewhere |
+| S3 `!`/`~` glyph before the name | on a Healthy (green) row only; the glyph of the row's most severe finding: publicly accessible → `!`, every other s3 finding → `~` | `list.flagged[].decorator` |
+| S4 Status text | the phrase of the row's most severe finding, first in the §4 order, followed by `(+N)` for the others; **Healthy rows render blank** | `flagged[].status` + blank elsewhere |
 | U10 (impl-plan) | exact columns; no jargon headers | `list.columns` / `list.jargon` |
 
 ### Framework constants

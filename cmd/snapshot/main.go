@@ -108,7 +108,8 @@ func main() {
 	}
 
 	// One type failing (missing permission, unavailable service) must not sink
-	// the other 65 — record the error and keep going.
+	// the others — record the error and keep going. A type that lost one of
+	// its sources keeps the other sources' rows and is an error of the run too.
 	failed := 0
 	for _, name := range selected {
 		start := time.Now()
@@ -121,6 +122,12 @@ func main() {
 		}
 		snap.Types[name] = data
 		delete(snap.Errors, name)
+		if p, ok := data.(interface{ partial() []string }); ok && len(p.partial()) > 0 {
+			failed++
+			snap.Errors[name] = strings.Join(p.partial(), "; ")
+			fmt.Fprintf(os.Stderr, "  %-14s PARTIAL %s\n", name, snap.Errors[name])
+			continue
+		}
 		fmt.Fprintf(os.Stderr, "  %-14s ok (%s)\n", name, time.Since(start).Round(time.Millisecond))
 	}
 	if len(snap.Errors) == 0 {

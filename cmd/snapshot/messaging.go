@@ -1,16 +1,19 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	v2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
@@ -71,7 +74,8 @@ func captureSNS(ctx context.Context, cfg aws.Config) (any, error) {
 func captureSNSTopicAttributes(ctx context.Context, client *sns.Client, topicArn string) (snsTopicAttrs, map[string]string) {
 	out, err := client.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: aws.String(topicArn)})
 	if err != nil {
-		return snsTopicAttrs{Outcome: "error", ErrorCode: err.Error()}, nil
+		o, code := outcomeOf(err)
+		return snsTopicAttrs{Outcome: o, ErrorCode: code}, nil
 	}
 	attrs := snsTopicAttrs{
 		Outcome:                "ok",
@@ -172,45 +176,49 @@ type sqsQueueAttrs struct {
 func captureSQS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sqs.NewFromConfig(cfg)
 
-	var queues []sqsQueue
+	var urls []string
 	paginator := sqs.NewListQueuesPaginator(client, &sqs.ListQueuesInput{})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
-		for _, url := range out.QueueUrls {
-			queues = append(queues, sqsQueue{QueueUrl: url})
-		}
+		urls = append(urls, out.QueueUrls...)
 	}
 
-	for i := range queues {
-		queues[i].Attributes, queues[i].RawAttrs = captureSQSQueueAttributes(ctx, client, queues[i].QueueUrl)
+	rows := describeListed(urls, 1, func(batch []string) (map[string]map[string]string, []string, error) {
+		out, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+			QueueUrl:       aws.String(batch[0]),
+			AttributeNames: []sqstypes.QueueAttributeName{sqstypes.QueueAttributeNameAll},
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(out.Attributes) == 0 {
+			return nil, nil, nil
+		}
+		return map[string]map[string]string{batch[0]: out.Attributes}, nil, nil
+	})
+
+	queues := make([]sqsQueue, 0, len(rows))
+	for _, row := range rows {
+		q := sqsQueue{QueueUrl: row.id, Attributes: sqsQueueAttrs{Outcome: row.read.Outcome, ErrorCode: row.read.ErrorCode}}
+		if row.item != nil {
+			a := *row.item
+			q.RawAttrs = a
+			q.Attributes.QueueArn = a["QueueArn"]
+			q.Attributes.ApproximateNumberOfMessages = a["ApproximateNumberOfMessages"]
+			q.Attributes.ApproximateAgeOfOldestMessage = a["ApproximateAgeOfOldestMessage"]
+			q.Attributes.VisibilityTimeout = a["VisibilityTimeout"]
+			q.Attributes.RedrivePolicy = a["RedrivePolicy"]
+			q.Attributes.RedriveAllowPolicy = a["RedriveAllowPolicy"]
+			q.Attributes.KmsMasterKeyId = a["KmsMasterKeyId"]
+			q.Attributes.Policy = a["Policy"]
+		}
+		queues = append(queues, q)
 	}
 
 	return sqsData{Queues: queues}, nil
-}
-
-func captureSQSQueueAttributes(ctx context.Context, client *sqs.Client, queueURL string) (sqsQueueAttrs, map[string]string) {
-	out, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-		QueueUrl:       aws.String(queueURL),
-		AttributeNames: []sqstypes.QueueAttributeName{sqstypes.QueueAttributeNameAll},
-	})
-	if err != nil {
-		return sqsQueueAttrs{Outcome: "error", ErrorCode: err.Error()}, nil
-	}
-	attrs := sqsQueueAttrs{
-		Outcome:                       "ok",
-		QueueArn:                      out.Attributes["QueueArn"],
-		ApproximateNumberOfMessages:   out.Attributes["ApproximateNumberOfMessages"],
-		ApproximateAgeOfOldestMessage: out.Attributes["ApproximateAgeOfOldestMessage"],
-		VisibilityTimeout:             out.Attributes["VisibilityTimeout"],
-		RedrivePolicy:                 out.Attributes["RedrivePolicy"],
-		RedriveAllowPolicy:            out.Attributes["RedriveAllowPolicy"],
-		KmsMasterKeyId:                out.Attributes["KmsMasterKeyId"],
-		Policy:                        out.Attributes["Policy"],
-	}
-	return attrs, out.Attributes
 }
 
 // ---------------------------------------------------------------------
@@ -219,6 +227,7 @@ func captureSQSQueueAttributes(ctx context.Context, client *sqs.Client, queueURL
 
 type ebRuleData struct {
 	Rules []ebRule `json:"rules"`
+	partialRead
 }
 
 type ebRule struct {
@@ -248,40 +257,66 @@ type ebRuleTarget struct {
 	DeadLetterConfigArn string `json:"dead_letter_config_arn,omitempty"`
 }
 
-func captureEBRule(ctx context.Context, cfg aws.Config) (any, error) {
+// ebRuleParts plans one part per event bus: ListRules answers for one bus,
+// the default when none is named. An answer naming no bus has answered for
+// nothing, since every account has a default one, so that bus is read.
+func ebRuleParts(ctx context.Context, cfg aws.Config) ([]part[ebRuleData], error) {
 	client := eventbridge.NewFromConfig(cfg)
-
-	// The eventbridge SDK ships no paginators (its api_op_*.go files define no
-	// NewXxxPaginator), so the loop is hand-rolled.
-	var rules []ebRule
-	var nextToken *string
-	for {
-		out, err := client.ListRules(ctx, &eventbridge.ListRulesInput{NextToken: nextToken})
+	buses, err := pageAll(ctx, &eventbridge.ListEventBusesInput{},
+		func(ctx context.Context, in *eventbridge.ListEventBusesInput) (*eventbridge.ListEventBusesOutput, error) {
+			return client.ListEventBuses(ctx, in)
+		},
+		func(out *eventbridge.ListEventBusesOutput) []ebtypes.EventBus { return out.EventBuses }, allPages)
+	var names []string
+	for _, b := range buses {
+		if name := aws.ToString(b.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
 		if err != nil {
 			return nil, err
 		}
-		for _, r := range out.Rules {
-			rules = append(rules, ebRule{
-				Name:               aws.ToString(r.Name),
-				Arn:                aws.ToString(r.Arn),
-				State:              string(r.State),
-				EventBusName:       aws.ToString(r.EventBusName),
-				ScheduleExpression: aws.ToString(r.ScheduleExpression),
-				RoleArn:            aws.ToString(r.RoleArn),
-				Description:        aws.ToString(r.Description),
-			})
-		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
+		names = []string{""}
 	}
-
-	for i := range rules {
-		rules[i].Targets = captureEBRuleTargets(ctx, client, rules[i].Name, rules[i].EventBusName)
+	parts := make([]part[ebRuleData], 0, len(names))
+	for _, bus := range names {
+		parts = append(parts, part[ebRuleData]{name: cmp.Or(bus, "default"), run: func(ctx context.Context, cfg aws.Config, d *ebRuleData) error {
+			in := &eventbridge.ListRulesInput{}
+			if bus != "" {
+				in.EventBusName = aws.String(bus)
+			}
+			rules, listErr := pageAll(ctx, in,
+				func(ctx context.Context, in *eventbridge.ListRulesInput) (*eventbridge.ListRulesOutput, error) {
+					return client.ListRules(ctx, in)
+				},
+				func(out *eventbridge.ListRulesOutput) []ebtypes.Rule { return out.Rules }, allPages)
+			for _, r := range rules {
+				d.Rules = append(d.Rules, ebRule{
+					Name:               aws.ToString(r.Name),
+					Arn:                aws.ToString(r.Arn),
+					State:              string(r.State),
+					EventBusName:       aws.ToString(r.EventBusName),
+					ScheduleExpression: aws.ToString(r.ScheduleExpression),
+					RoleArn:            aws.ToString(r.RoleArn),
+					Description:        aws.ToString(r.Description),
+				})
+			}
+			if isGone(listErr) {
+				return nil
+			}
+			return listErr
+		}})
 	}
+	return parts, err
+}
 
-	return ebRuleData{Rules: rules}, nil
+func ebRuleTargetsFinish(ctx context.Context, cfg aws.Config, d *ebRuleData) error {
+	client := eventbridge.NewFromConfig(cfg)
+	for i := range d.Rules {
+		d.Rules[i].Targets = captureEBRuleTargets(ctx, client, d.Rules[i].Name, d.Rules[i].EventBusName)
+	}
+	return nil
 }
 
 func captureEBRuleTargets(ctx context.Context, client *eventbridge.Client, ruleName, eventBusName string) ebRuleTargets {
@@ -290,30 +325,21 @@ func captureEBRuleTargets(ctx context.Context, client *eventbridge.Client, ruleN
 		in.EventBusName = aws.String(eventBusName)
 	}
 
-	// The eventbridge SDK ships no paginators (see captureEBRule), so the loop is
-	// hand-rolled.
-	var items []ebRuleTarget
-	var nextToken *string
-	for {
-		in.NextToken = nextToken
-		out, err := client.ListTargetsByRule(ctx, in)
-		if err != nil {
-			return ebRuleTargets{Outcome: "error", ErrorCode: err.Error()}
-		}
-		for _, t := range out.Targets {
-			items = append(items, ebRuleTarget{
-				Arn:                 aws.ToString(t.Arn),
-				RoleArn:             aws.ToString(t.RoleArn),
-				DeadLetterConfigArn: deadLetterArn(t.DeadLetterConfig),
-			})
-		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
+	targets, err := pageAll(ctx, in,
+		func(ctx context.Context, in *eventbridge.ListTargetsByRuleInput) (*eventbridge.ListTargetsByRuleOutput, error) {
+			return client.ListTargetsByRule(ctx, in)
+		},
+		func(out *eventbridge.ListTargetsByRuleOutput) []ebtypes.Target { return out.Targets }, allPages)
+	result := ebRuleTargets{}
+	result.Outcome, result.ErrorCode = outcomeOf(err)
+	for _, t := range targets {
+		result.Items = append(result.Items, ebRuleTarget{
+			Arn:                 aws.ToString(t.Arn),
+			RoleArn:             aws.ToString(t.RoleArn),
+			DeadLetterConfigArn: deadLetterArn(t.DeadLetterConfig),
+		})
 	}
-
-	return ebRuleTargets{Outcome: "ok", Items: items}
+	return result
 }
 
 func deadLetterArn(dlq *ebtypes.DeadLetterConfig) string {
@@ -378,18 +404,19 @@ func captureKinesis(ctx context.Context, cfg aws.Config) (any, error) {
 }
 
 func captureKinesisStreamSummary(ctx context.Context, client *kinesis.Client, streamName string) kinesisStreamSummary {
-	out, err := client.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
-	if err != nil {
-		return kinesisStreamSummary{Outcome: "error", ErrorCode: err.Error()}
+	got, read := readOne(func() (*kinesistypes.StreamDescriptionSummary, error) {
+		out, err := client.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
+		if err != nil {
+			return nil, err
+		}
+		return out.StreamDescriptionSummary, nil
+	})
+	summary := kinesisStreamSummary{Outcome: read.Outcome, ErrorCode: read.ErrorCode}
+	if got != nil {
+		summary.KeyId = aws.ToString(got.KeyId)
+		summary.EncryptionType = string(got.EncryptionType)
 	}
-	if out.StreamDescriptionSummary == nil {
-		return kinesisStreamSummary{Outcome: "ok"}
-	}
-	return kinesisStreamSummary{
-		Outcome:        "ok",
-		KeyId:          aws.ToString(out.StreamDescriptionSummary.KeyId),
-		EncryptionType: string(out.StreamDescriptionSummary.EncryptionType),
-	}
+	return summary
 }
 
 // ---------------------------------------------------------------------
@@ -503,7 +530,8 @@ func captureSES(ctx context.Context, cfg aws.Config) (any, error) {
 func captureSESAccount(ctx context.Context, client *sesv2.Client) sesAccount {
 	out, err := client.GetAccount(ctx, &sesv2.GetAccountInput{})
 	if err != nil {
-		return sesAccount{Outcome: "error", ErrorCode: err.Error()}
+		o, code := outcomeOf(err)
+		return sesAccount{Outcome: o, ErrorCode: code}
 	}
 	acct := sesAccount{
 		Outcome:           "ok",
@@ -525,25 +553,26 @@ type sfnData struct {
 }
 
 type sfnStateMachine struct {
-	Name            string            `json:"name"`
-	StateMachineArn string            `json:"state_machine_arn"`
-	Type            string            `json:"type"`
-	CreationDate    string            `json:"creation_date,omitempty"`
-	LastFailed      sfnExecutionProbe `json:"last_failed_execution"`
-	LastSucceeded   sfnExecutionProbe `json:"last_succeeded_execution"`
+	Name            string `json:"name"`
+	StateMachineArn string `json:"state_machine_arn"`
+	Type            string `json:"type"`
+	CreationDate    string `json:"creation_date,omitempty"`
+	// LastExecution is absent for an EXPRESS machine: Step Functions does not
+	// list its executions (ListExecutions answers StateMachineTypeNotSupported).
+	LastExecution *sfnExecutionProbe `json:"last_execution,omitempty"`
 }
 
-// sfnExecutionProbe captures a single ListExecutions(statusFilter=X, maxResults=1)
-// outcome — the most recent execution in that status, used by the checklist generator to
-// detect a failure loop (most recent FAILED newer than most recent SUCCEEDED).
+// sfnExecutionProbe is the ListExecutions(maxResults=1) answer: the newest
+// execution, whatever its status.
 //
-//	Outcome "found":    an execution in that status exists; fields populated.
-//	Outcome "none":     no execution in that status.
+//	Outcome "found":    an execution exists; fields populated.
+//	Outcome "none":     the machine never ran.
 //	Outcome "error":    call failed.
 type sfnExecutionProbe struct {
 	Outcome      string `json:"outcome"`
 	ErrorCode    string `json:"error_code,omitempty"`
 	ExecutionArn string `json:"execution_arn,omitempty"`
+	Status       string `json:"status,omitempty"`
 	StartDate    string `json:"start_date,omitempty"`
 	StopDate     string `json:"stop_date,omitempty"`
 }
@@ -569,29 +598,36 @@ func captureSFN(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	for i := range machines {
-		machines[i].LastFailed = captureSFNLastExecution(ctx, client, machines[i].StateMachineArn, sfntypes.ExecutionStatusFailed)
-		machines[i].LastSucceeded = captureSFNLastExecution(ctx, client, machines[i].StateMachineArn, sfntypes.ExecutionStatusSucceeded)
+		if machines[i].Type != string(sfntypes.StateMachineTypeExpress) {
+			machines[i].LastExecution = captureSFNLastExecution(ctx, client, machines[i].StateMachineArn)
+		}
 	}
 
 	return sfnData{StateMachines: machines}, nil
 }
 
-func captureSFNLastExecution(ctx context.Context, client *sfn.Client, stateMachineArn string, status sfntypes.ExecutionStatus) sfnExecutionProbe {
-	out, err := client.ListExecutions(ctx, &sfn.ListExecutionsInput{
+func captureSFNLastExecution(ctx context.Context, client *sfn.Client, stateMachineArn string) *sfnExecutionProbe {
+	executions, err := pageAll(ctx, &sfn.ListExecutionsInput{
 		StateMachineArn: aws.String(stateMachineArn),
-		StatusFilter:    status,
 		MaxResults:      1,
-	})
+	},
+		func(ctx context.Context, in *sfn.ListExecutionsInput) (*sfn.ListExecutionsOutput, error) {
+			return client.ListExecutions(ctx, in)
+		},
+		func(out *sfn.ListExecutionsOutput) []sfntypes.ExecutionListItem { return out.Executions }, onePage)
 	if err != nil {
-		return sfnExecutionProbe{Outcome: "error", ErrorCode: err.Error()}
+		probe := &sfnExecutionProbe{}
+		probe.Outcome, probe.ErrorCode = outcomeOf(err)
+		return probe
 	}
-	if len(out.Executions) == 0 {
-		return sfnExecutionProbe{Outcome: "none"}
+	if len(executions) == 0 {
+		return &sfnExecutionProbe{Outcome: "none"}
 	}
-	e := out.Executions[0]
-	return sfnExecutionProbe{
+	e := executions[0]
+	return &sfnExecutionProbe{
 		Outcome:      "found",
 		ExecutionArn: aws.ToString(e.ExecutionArn),
+		Status:       string(e.Status),
 		StartDate:    snapFormatTime(e.StartDate),
 		StopDate:     snapFormatTime(e.StopDate),
 	}
@@ -604,6 +640,7 @@ func captureSFNLastExecution(ctx context.Context, client *sfn.Client, stateMachi
 type apigwData struct {
 	V2APIs []apigwV2API `json:"v2_apis"`
 	V1APIs []apigwV1API `json:"v1_apis"`
+	partialRead
 }
 
 type apigwV2API struct {
@@ -635,67 +672,62 @@ type apigwV1API struct {
 	CreatedDate string `json:"created_date,omitempty"`
 }
 
-func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
-	v2Client := apigatewayv2.NewFromConfig(cfg)
-	v1Client := apigateway.NewFromConfig(cfg)
-
-	// apigatewayv2 generates only NewListRoutingRulesPaginator, so the GetApis
-	// loop is hand-rolled.
-	var v2APIs []apigwV2API
-	var v2NextToken *string
-	for {
-		out, err := v2Client.GetApis(ctx, &apigatewayv2.GetApisInput{NextToken: v2NextToken})
-		if err != nil {
-			return nil, err
+func apigwRESTPart() part[apigwData] {
+	return part[apigwData]{name: "rest", run: func(ctx context.Context, cfg aws.Config, d *apigwData) error {
+		paginator := apigateway.NewGetRestApisPaginator(apigateway.NewFromConfig(cfg), &apigateway.GetRestApisInput{})
+		for paginator.HasMorePages() {
+			out, err := paginator.NextPage(ctx)
+			if err != nil {
+				return err
+			}
+			for _, a := range out.Items {
+				d.V1APIs = append(d.V1APIs, apigwV1API{
+					Id:          aws.ToString(a.Id),
+					Name:        aws.ToString(a.Name),
+					CreatedDate: snapFormatTime(a.CreatedDate),
+				})
+			}
 		}
-		for _, a := range out.Items {
-			v2APIs = append(v2APIs, apigwV2API{
+		return nil
+	}}
+}
+
+func apigwHTTPPart() part[apigwData] {
+	return part[apigwData]{name: "http", run: func(ctx context.Context, cfg aws.Config, d *apigwData) error {
+		client := apigatewayv2.NewFromConfig(cfg)
+		apis, err := pageAll(ctx, &apigatewayv2.GetApisInput{},
+			func(ctx context.Context, in *apigatewayv2.GetApisInput) (*apigatewayv2.GetApisOutput, error) {
+				return client.GetApis(ctx, in)
+			},
+			func(out *apigatewayv2.GetApisOutput) []v2types.Api { return out.Items }, allPages)
+		for _, a := range apis {
+			d.V2APIs = append(d.V2APIs, apigwV2API{
 				ApiId:        aws.ToString(a.ApiId),
 				Name:         aws.ToString(a.Name),
 				ProtocolType: string(a.ProtocolType),
 				CreatedDate:  snapFormatTime(a.CreatedDate),
 			})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
+		for i := range d.V2APIs {
+			d.V2APIs[i].Stages = captureAPIGWStages(ctx, client, d.V2APIs[i].ApiId)
 		}
-		v2NextToken = out.NextToken
-	}
-
-	for i := range v2APIs {
-		v2APIs[i].Stages = captureAPIGWStages(ctx, v2Client, v2APIs[i].ApiId)
-	}
-
-	var v1APIs []apigwV1API
-	v1Paginator := apigateway.NewGetRestApisPaginator(v1Client, &apigateway.GetRestApisInput{})
-	for v1Paginator.HasMorePages() {
-		out, err := v1Paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, a := range out.Items {
-			v1APIs = append(v1APIs, apigwV1API{
-				Id:          aws.ToString(a.Id),
-				Name:        aws.ToString(a.Name),
-				CreatedDate: snapFormatTime(a.CreatedDate),
-			})
-		}
-	}
-
-	return apigwData{V2APIs: v2APIs, V1APIs: v1APIs}, nil
+		return err
+	}}
 }
 
 func captureAPIGWStages(ctx context.Context, client *apigatewayv2.Client, apiId string) apigwV2Stages {
-	out, err := client.GetStages(ctx, &apigatewayv2.GetStagesInput{ApiId: aws.String(apiId)})
-	if err != nil {
-		return apigwV2Stages{Outcome: "error", ErrorCode: err.Error()}
-	}
-	items := make([]apigwV2Stage, 0, len(out.Items))
-	for _, s := range out.Items {
-		items = append(items, apigwV2Stage{
+	stages, err := pageAll(ctx, &apigatewayv2.GetStagesInput{ApiId: aws.String(apiId)},
+		func(ctx context.Context, in *apigatewayv2.GetStagesInput) (*apigatewayv2.GetStagesOutput, error) {
+			return client.GetStages(ctx, in)
+		},
+		func(out *apigatewayv2.GetStagesOutput) []v2types.Stage { return out.Items }, allPages)
+	result := apigwV2Stages{}
+	result.Outcome, result.ErrorCode = outcomeOf(err)
+	for _, s := range stages {
+		result.Items = append(result.Items, apigwV2Stage{
 			StageName:    aws.ToString(s.StageName),
 			DeploymentId: aws.ToString(s.DeploymentId),
 		})
 	}
-	return apigwV2Stages{Outcome: "ok", Items: items}
+	return result
 }

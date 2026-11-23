@@ -1,59 +1,12 @@
 package main
 
 import (
-	"encoding/json"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 )
-
-// A pipeline action's configuration is provider-defined and free-form: a
-// CodeBuild action's EnvironmentVariables holds PLAINTEXT values and a Lambda
-// action's UserParameters is arbitrary text, so the record keeps keys only.
-func TestSecretValue_PipelineActionKeepsConfigurationKeysOnly(t *testing.T) {
-	action := cptypes.ActionDeclaration{
-		Name: aws.String("Build"),
-		ActionTypeId: &cptypes.ActionTypeId{
-			Category: cptypes.ActionCategoryBuild,
-			Owner:    cptypes.ActionOwnerAws,
-			Provider: aws.String("CodeBuild"),
-			Version:  aws.String("1"),
-		},
-		Configuration: map[string]string{
-			"ProjectName":          "orders-build",
-			"EnvironmentVariables": `[{"name":"API_TOKEN","value":"tok-example-123","type":"PLAINTEXT"}]`,
-		},
-		RoleArn: aws.String("arn:aws:iam::123456789012:role/pipeline-action"),
-	}
-
-	pa := pipelineActionOf("BuildStage", action)
-
-	if want := []string{"EnvironmentVariables", "ProjectName"}; !reflect.DeepEqual(pa.ConfigurationKeys, want) {
-		t.Errorf("ConfigurationKeys = %q, want %q", pa.ConfigurationKeys, want)
-	}
-	if pa.StageName != "BuildStage" || pa.ActionName != "Build" || pa.Provider != "CodeBuild" || pa.RoleArn != "arn:aws:iam::123456789012:role/pipeline-action" {
-		t.Errorf("pipelineActionOf lost identity fields: %+v", pa)
-	}
-	raw, err := json.Marshal(pa)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(raw), "tok-example-123") {
-		t.Errorf("record JSON carries a configuration value: %s", raw)
-	}
-
-	raw, err = json.Marshal(pipelineActionOf("Source", cptypes.ActionDeclaration{Name: aws.String("Checkout")}))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(raw), "configuration") {
-		t.Errorf("action without configuration emits a configuration field: %s", raw)
-	}
-}
 
 // CodeBuild treats a variable with no type as PLAINTEXT, so its value is the
 // secret itself.

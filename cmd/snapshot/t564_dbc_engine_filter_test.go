@@ -43,7 +43,7 @@ func (e *t564SharedEndpoint) RoundTrip(req *http.Request) (*http.Response, error
 			engines = append(engines, form.Get(fmt.Sprintf("Filters.Filter.%d.Values.Value.%d", i, j)))
 		}
 	}
-	if strings.Contains(req.Header.Get("User-Agent"), "api/docdb") {
+	if strings.Contains(req.Header.Get("User-Agent"), "api/docdb") && form.Get("Action") == "DescribeDBClusters" {
 		e.docdbEngineFilters = append(e.docdbEngineFilters, engines)
 	}
 

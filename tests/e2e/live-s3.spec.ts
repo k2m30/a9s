@@ -83,11 +83,11 @@ test("live s3: root menu + list match the checklist", async ({ page }) => {
   }
 
   // --- wait for live Wave-2 enrichment to land (glyphs appear) -------------
-  if (expected.list.decorators["!"] > 0) {
+  if (expected.list.decorators["!"] + expected.list.decorators["~"] > 0) {
     await expect
-      .poll(async () => page.locator(".list-table tbody tr.dec-error").count(), {
+      .poll(async () => page.locator(".list-table tbody tr.dec-error, .list-table tbody tr.dec-warn").count(), {
         timeout: ENRICH_WAIT_MS,
-        message: "Wave-2 enrichment (dec-error rows) never arrived in the live web UI",
+        message: "Wave-2 enrichment (dec-error / dec-warn rows) never arrived in the live web UI",
       })
       .toBeGreaterThan(0);
   }

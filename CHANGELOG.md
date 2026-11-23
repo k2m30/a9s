@@ -489,8 +489,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and for ECR records each image the app inspects (the first ten), its
   severity counts from `DescribeImageScanFindings` with any read error kept,
   and the critical and high totals.
+- The snapshot collector reads every S3 setting the bucket checks read (policy status, access
+  control list, versioning, logging, lifecycle rules, object lock), each from the bucket's own
+  region, and the s3 checklist judges every S3 finding from them: a publicly accessible bucket
+  carries `!` and counts in the issue badge, the other findings carry `~`, and the Status reads
+  the most severe finding with `(+N)` for the others. A refused read that adds to a listed
+  resource no longer fails the whole type, and a setting AWS states does not exist is recorded
+  as `none`.
 - The snapshot collector no longer writes secret values to `snapshot.json`. Glue job arguments,
-  CodeBuild environment variables and pipeline action configurations are recorded by name,
+  and CodeBuild environment variables are recorded by name,
   Parameter Store and Secrets Manager variables by reference, CloudTrail events without their
   request and response payload, a source repository URL without its credentials and a webhook
   subscription by its origin. A `snapshot.json` written by an earlier version still holds the

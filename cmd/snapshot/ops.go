@@ -1,9 +1,9 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"maps"
 	"net/url"
 	"slices"
@@ -11,23 +11,28 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
+	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 	backupsvc "github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	cwltypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
+	caTypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
+	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	smithy "github.com/aws/smithy-go"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
 // ---------------------------------------------------------------------------
@@ -39,7 +44,8 @@ type cbData struct {
 }
 
 type cbProject struct {
-	Name             string       `json:"name"`
+	Name string `json:"name"`
+	readOutcome
 	ServiceRole      string       `json:"service_role,omitempty"`
 	EncryptionKey    string       `json:"encryption_key,omitempty"`
 	SourceType       string       `json:"source_type,omitempty"`
@@ -106,18 +112,24 @@ func captureCB(ctx context.Context, cfg aws.Config) (any, error) {
 		names = append(names, out.Projects...)
 	}
 
-	var projects []cbProject
-	for start := 0; start < len(names); start += 100 {
-		end := min(start+100, len(names))
-		batch, err := client.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{Names: names[start:end]})
+	rows := describeListed(names, 100, func(batch []string) (map[string]cbtypes.Project, []string, error) {
+		out, err := client.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{Names: batch})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		for _, p := range batch.Projects {
-			proj := cbProject{Name: aws.ToString(p.Name), ServiceRole: aws.ToString(p.ServiceRole)}
-			if p.EncryptionKey != nil {
-				proj.EncryptionKey = *p.EncryptionKey
-			}
+		found := map[string]cbtypes.Project{}
+		for _, p := range out.Projects {
+			found[aws.ToString(p.Name)] = p
+		}
+		return found, out.ProjectsNotFound, nil
+	})
+
+	projects := make([]cbProject, 0, len(rows))
+	for _, row := range rows {
+		proj := cbProject{Name: row.id, readOutcome: row.read}
+		if p := row.item; p != nil {
+			proj.ServiceRole = aws.ToString(p.ServiceRole)
+			proj.EncryptionKey = aws.ToString(p.EncryptionKey)
 			if p.Source != nil {
 				proj.SourceType = string(p.Source.Type)
 				proj.SourceLocation = cbSourceLocationOf(aws.ToString(p.Source.Location))
@@ -141,45 +153,64 @@ func captureCB(ctx context.Context, cfg aws.Config) (any, error) {
 				proj.SecurityGroupIds = p.VpcConfig.SecurityGroupIds
 				proj.SubnetIds = p.VpcConfig.Subnets
 			}
-			proj.LatestBuild = captureLatestBuild(ctx, client, proj.Name)
-			projects = append(projects, proj)
 		}
+		projects = append(projects, proj)
 	}
+	captureLatestBuilds(ctx, client, projects)
 
 	return cbData{Projects: projects}, nil
 }
 
-func captureLatestBuild(ctx context.Context, client *codebuild.Client, projectName string) *cbBuildInfo {
-	listOut, err := client.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
-		ProjectName: aws.String(projectName),
+// BatchGetBuilds takes at most 100 ids.
+func captureLatestBuilds(ctx context.Context, client *codebuild.Client, projects []cbProject) {
+	var ids []string
+	var asking []int
+	for i := range projects {
+		id, info := captureLatestBuild(ctx, client, projects[i].Name)
+		projects[i].LatestBuild = info
+		if info == nil {
+			ids = append(ids, id)
+			asking = append(asking, i)
+		}
+	}
+	rows := describeListed(ids, 100, func(batch []string) (map[string]cbtypes.Build, []string, error) {
+		out, err := client.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{Ids: batch})
+		if err != nil {
+			return nil, nil, err
+		}
+		found := map[string]cbtypes.Build{}
+		for _, b := range out.Builds {
+			found[aws.ToString(b.Id)] = b
+		}
+		return found, out.BuildsNotFound, nil
 	})
-	if err != nil {
-		return &cbBuildInfo{Outcome: "error", ErrorCode: apiErrorCode(err)}
-	}
-	if len(listOut.Ids) == 0 {
-		return &cbBuildInfo{Outcome: "none"}
-	}
-	getOut, err := client.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{Ids: listOut.Ids[:1]})
-	if err != nil {
-		return &cbBuildInfo{Outcome: "error", ErrorCode: apiErrorCode(err)}
-	}
-	if len(getOut.Builds) == 0 {
-		return &cbBuildInfo{Outcome: "none"}
-	}
-	b := getOut.Builds[0]
-	return &cbBuildInfo{
-		Outcome:      "found",
-		BuildStatus:  string(b.BuildStatus),
-		CurrentPhase: aws.ToString(b.CurrentPhase),
-		EndTime:      snapFormatTime(b.EndTime),
+	for i, id := range ids {
+		row := rowOf(rows, id)
+		info := &cbBuildInfo{Outcome: row.read.Outcome, ErrorCode: row.read.ErrorCode}
+		if b := row.item; b != nil {
+			info = &cbBuildInfo{Outcome: "found", BuildStatus: string(b.BuildStatus), CurrentPhase: aws.ToString(b.CurrentPhase), EndTime: snapFormatTime(b.EndTime)}
+		}
+		projects[asking[i]].LatestBuild = info
 	}
 }
 
-func apiErrorCode(err error) string {
-	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-		return apiErr.ErrorCode()
+// captureLatestBuild returns the id of the project's newest build, or the
+// record of a project with no build to read.
+func captureLatestBuild(ctx context.Context, client *codebuild.Client, projectName string) (string, *cbBuildInfo) {
+	listed, err := pageAll(ctx, &codebuild.ListBuildsForProjectInput{ProjectName: aws.String(projectName)},
+		func(ctx context.Context, in *codebuild.ListBuildsForProjectInput) (*codebuild.ListBuildsForProjectOutput, error) {
+			return client.ListBuildsForProject(ctx, in)
+		},
+		func(out *codebuild.ListBuildsForProjectOutput) []string { return out.Ids }, onePage)
+	if err != nil {
+		info := &cbBuildInfo{}
+		info.Outcome, info.ErrorCode = outcomeOf(err)
+		return "", info
 	}
-	return err.Error()
+	if len(listed) == 0 {
+		return "", &cbBuildInfo{Outcome: outcomeNone}
+	}
+	return listed[0], nil
 }
 
 // ---------------------------------------------------------------------------
@@ -191,10 +222,8 @@ type pipelineData struct {
 }
 
 type pipelineInfo struct {
-	Name        string         `json:"name"`
-	RoleArn     string         `json:"role_arn,omitempty"`
-	State       *pipelineState `json:"state,omitempty"`
-	Declaration *pipelineDecl  `json:"declaration,omitempty"`
+	Name  string         `json:"name"`
+	State *pipelineState `json:"state,omitempty"`
 }
 
 type pipelineState struct {
@@ -209,49 +238,6 @@ type pipelineStg struct {
 	LatestStartTime    string `json:"latest_start_time,omitempty"`
 	LatestLastUpdate   string `json:"latest_last_status_change,omitempty"`
 	ApprovalTokenExist bool   `json:"approval_token_pending,omitempty"`
-}
-
-type pipelineDecl struct {
-	Outcome        string             `json:"outcome"`
-	Code           string             `json:"error_code,omitempty"`
-	ArtifactStores []pipelineArtStore `json:"artifact_stores,omitempty"`
-	Actions        []pipelineAction   `json:"actions,omitempty"`
-	ActionRoleArns []string           `json:"action_role_arns,omitempty"`
-}
-
-type pipelineArtStore struct {
-	Location          string `json:"location,omitempty"`
-	Region            string `json:"region,omitempty"`
-	EncryptionKeyID   string `json:"encryption_key_id,omitempty"`
-	EncryptionKeyType string `json:"encryption_key_type,omitempty"`
-}
-
-type pipelineAction struct {
-	StageName         string   `json:"stage_name"`
-	ActionName        string   `json:"action_name"`
-	Category          string   `json:"category"`
-	Owner             string   `json:"owner"`
-	Provider          string   `json:"provider"`
-	ConfigurationKeys []string `json:"configuration_keys,omitempty"`
-	RoleArn           string   `json:"role_arn,omitempty"`
-}
-
-// Action configuration is provider-defined and free-form (a CodeBuild action's
-// EnvironmentVariables carries PLAINTEXT values, a Lambda action's
-// UserParameters is arbitrary), so the record keeps which keys exist only.
-func pipelineActionOf(stageName string, action cptypes.ActionDeclaration) pipelineAction {
-	pa := pipelineAction{
-		StageName:         stageName,
-		ActionName:        aws.ToString(action.Name),
-		ConfigurationKeys: slices.Sorted(maps.Keys(action.Configuration)),
-		RoleArn:           aws.ToString(action.RoleArn),
-	}
-	if action.ActionTypeId != nil {
-		pa.Category = string(action.ActionTypeId.Category)
-		pa.Owner = string(action.ActionTypeId.Owner)
-		pa.Provider = aws.ToString(action.ActionTypeId.Provider)
-	}
-	return pa
 }
 
 func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
@@ -274,10 +260,9 @@ func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
 		info := pipelineInfo{Name: name}
 
 		stateOut, err := client.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{Name: aws.String(name)})
-		if err != nil {
-			info.State = &pipelineState{Outcome: "error", Code: apiErrorCode(err)}
-		} else {
-			st := &pipelineState{Outcome: "ok"}
+		info.State = &pipelineState{}
+		info.State.Outcome, info.State.Code = outcomeOf(err)
+		if stateOut != nil {
 			for _, s := range stateOut.StageStates {
 				stg := pipelineStg{StageName: aws.ToString(s.StageName)}
 				if s.LatestExecution != nil {
@@ -291,51 +276,14 @@ func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
 						stg.LatestLastUpdate = snapFormatTime(a.LatestExecution.LastStatusChange)
 					}
 				}
-				st.Stages = append(st.Stages, stg)
+				info.State.Stages = append(info.State.Stages, stg)
 			}
-			info.State = st
-		}
-
-		declOut, err := client.GetPipeline(ctx, &codepipeline.GetPipelineInput{Name: aws.String(name)})
-		if err != nil {
-			info.Declaration = &pipelineDecl{Outcome: "error", Code: apiErrorCode(err)}
-		} else if declOut.Pipeline != nil {
-			decl := &pipelineDecl{Outcome: "ok"}
-			info.RoleArn = aws.ToString(declOut.Pipeline.RoleArn)
-
-			if declOut.Pipeline.ArtifactStore != nil {
-				decl.ArtifactStores = append(decl.ArtifactStores, toArtifactStore(declOut.Pipeline.ArtifactStore))
-			}
-			for region, as := range declOut.Pipeline.ArtifactStores {
-				store := toArtifactStore(&as)
-				store.Region = region
-				decl.ArtifactStores = append(decl.ArtifactStores, store)
-			}
-
-			for _, stage := range declOut.Pipeline.Stages {
-				for _, action := range stage.Actions {
-					if action.RoleArn != nil {
-						decl.ActionRoleArns = append(decl.ActionRoleArns, *action.RoleArn)
-					}
-					decl.Actions = append(decl.Actions, pipelineActionOf(aws.ToString(stage.Name), action))
-				}
-			}
-			info.Declaration = decl
 		}
 
 		pipelines = append(pipelines, info)
 	}
 
 	return pipelineData{Pipelines: pipelines}, nil
-}
-
-func toArtifactStore(as *cptypes.ArtifactStore) pipelineArtStore {
-	store := pipelineArtStore{Location: aws.ToString(as.Location)}
-	if as.EncryptionKey != nil {
-		store.EncryptionKeyID = aws.ToString(as.EncryptionKey.Id)
-		store.EncryptionKeyType = string(as.EncryptionKey.Type)
-	}
-	return store
 }
 
 // ---------------------------------------------------------------------------
@@ -356,15 +304,13 @@ type codeArtifactRepo struct {
 	Description         string `json:"description,omitempty"`
 	PackageCountOutcome string `json:"package_count_outcome"`
 	PackageCountCode    string `json:"package_count_error_code,omitempty"`
-	HasPackages         bool   `json:"has_packages"`
-	DomainEncryptionKey string `json:"domain_encryption_key,omitempty"`
+	PackageCount        int    `json:"package_count,omitempty"`
 }
 
 func captureCodeArtifact(ctx context.Context, cfg aws.Config) (any, error) {
 	client := codeartifact.NewFromConfig(cfg)
 
 	var repos []codeArtifactRepo
-	domainKeyCache := map[string]string{}
 	paginator := codeartifact.NewListRepositoriesPaginator(client, &codeartifact.ListRepositoriesInput{})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
@@ -382,33 +328,17 @@ func captureCodeArtifact(ctx context.Context, cfg aws.Config) (any, error) {
 				Description:       aws.ToString(r.Description),
 			}
 
-			pkgOut, err := client.ListPackages(ctx, &codeartifact.ListPackagesInput{
+			pkgs, err := pageAll(ctx, &codeartifact.ListPackagesInput{
 				Domain:      r.DomainName,
 				DomainOwner: r.DomainOwner,
 				Repository:  r.Name,
-				MaxResults:  aws.Int32(1),
-			})
-			if err != nil {
-				repo.PackageCountOutcome = "error"
-				repo.PackageCountCode = apiErrorCode(err)
-			} else {
-				repo.PackageCountOutcome = "ok"
-				repo.HasPackages = len(pkgOut.Packages) > 0
-			}
-
-			cacheKey := aws.ToString(r.DomainName) + "|" + aws.ToString(r.DomainOwner)
-			if key, ok := domainKeyCache[cacheKey]; ok {
-				repo.DomainEncryptionKey = key
-			} else {
-				domOut, err := client.DescribeDomain(ctx, &codeartifact.DescribeDomainInput{
-					Domain:      r.DomainName,
-					DomainOwner: r.DomainOwner,
-				})
-				if err == nil && domOut.Domain != nil {
-					repo.DomainEncryptionKey = aws.ToString(domOut.Domain.EncryptionKey)
-				}
-				domainKeyCache[cacheKey] = repo.DomainEncryptionKey
-			}
+			},
+				func(ctx context.Context, in *codeartifact.ListPackagesInput) (*codeartifact.ListPackagesOutput, error) {
+					return client.ListPackages(ctx, in)
+				},
+				func(out *codeartifact.ListPackagesOutput) []caTypes.PackageSummary { return out.Packages }, allPages)
+			repo.PackageCountOutcome, repo.PackageCountCode = outcomeOf(err)
+			repo.PackageCount = len(pkgs)
 
 			repos = append(repos, repo)
 		}
@@ -478,24 +408,21 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 				stack.DriftLastCheckTime = snapFormatTime(s.DriftInformation.LastCheckTimestamp)
 			}
 
-			evOut, err := client.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
-				StackName: s.StackName,
-			})
-			if err != nil {
-				stack.RecentEventsOutcome = "error"
-				stack.RecentEventsCode = apiErrorCode(err)
-			} else {
-				stack.RecentEventsOutcome = "ok"
-				for _, ev := range evOut.StackEvents {
-					if string(ev.ResourceStatus) != "" && stackEventIsFailed(ev.ResourceStatus) {
-						stack.RecentFailedEvent = &cfnEventInfo{
-							LogicalResourceId:    aws.ToString(ev.LogicalResourceId),
-							ResourceStatus:       string(ev.ResourceStatus),
-							ResourceStatusReason: aws.ToString(ev.ResourceStatusReason),
-							Timestamp:            snapFormatTime(ev.Timestamp),
-						}
-						break
+			events, err := pageAll(ctx, &cloudformation.DescribeStackEventsInput{StackName: s.StackName},
+				func(ctx context.Context, in *cloudformation.DescribeStackEventsInput) (*cloudformation.DescribeStackEventsOutput, error) {
+					return client.DescribeStackEvents(ctx, in)
+				},
+				func(out *cloudformation.DescribeStackEventsOutput) []cfntypes.StackEvent { return out.StackEvents }, onePage)
+			stack.RecentEventsOutcome, stack.RecentEventsCode = outcomeOf(err)
+			for _, ev := range events {
+				if string(ev.ResourceStatus) != "" && stackEventIsFailed(ev.ResourceStatus) {
+					stack.RecentFailedEvent = &cfnEventInfo{
+						LogicalResourceId:    aws.ToString(ev.LogicalResourceId),
+						ResourceStatus:       string(ev.ResourceStatus),
+						ResourceStatusReason: aws.ToString(ev.ResourceStatusReason),
+						Timestamp:            snapFormatTime(ev.Timestamp),
 					}
+					break
 				}
 			}
 
@@ -624,20 +551,19 @@ func captureLogs(ctx context.Context, cfg aws.Config) (any, error) {
 				info.RetentionInDays = *g.RetentionInDays
 			}
 
-			streamOut, err := client.DescribeLogStreams(ctx, &cloudwatchlogs.DescribeLogStreamsInput{
+			streams, err := pageAll(ctx, &cloudwatchlogs.DescribeLogStreamsInput{
 				LogGroupName: g.LogGroupName,
 				OrderBy:      "LastEventTime",
 				Descending:   aws.Bool(true),
 				Limit:        aws.Int32(1),
-			})
-			if err != nil {
-				info.LastEventOutcome = "error"
-				info.LastEventErrorCode = apiErrorCode(err)
-			} else {
-				info.LastEventOutcome = "ok"
-				if len(streamOut.LogStreams) > 0 {
-					info.LastEventTimestamp = opsFormatEpochMillis(streamOut.LogStreams[0].LastEventTimestamp)
-				}
+			},
+				func(ctx context.Context, in *cloudwatchlogs.DescribeLogStreamsInput) (*cloudwatchlogs.DescribeLogStreamsOutput, error) {
+					return client.DescribeLogStreams(ctx, in)
+				},
+				func(out *cloudwatchlogs.DescribeLogStreamsOutput) []cwltypes.LogStream { return out.LogStreams }, onePage)
+			info.LastEventOutcome, info.LastEventErrorCode = outcomeOf(err)
+			if len(streams) > 0 {
+				info.LastEventTimestamp = opsFormatEpochMillis(streams[0].LastEventTimestamp)
 			}
 
 			groups = append(groups, info)
@@ -677,7 +603,7 @@ type trailInfo struct {
 	IsOrganizationTrail       bool   `json:"is_organization_trail"`
 	StatusOutcome             string `json:"status_outcome"`
 	StatusErrorCode           string `json:"status_error_code,omitempty"`
-	IsLogging                 bool   `json:"is_logging"`
+	IsLogging                 bool   `json:"is_logging,omitempty"`
 	LatestDeliveryError       string `json:"latest_delivery_error,omitempty"`
 	LatestDeliveryTime        string `json:"latest_delivery_time,omitempty"`
 	StopLoggingTime           string `json:"stop_logging_time,omitempty"`
@@ -709,11 +635,8 @@ func captureTrail(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 
 		statusOut, err := client.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: t.TrailARN})
-		if err != nil {
-			info.StatusOutcome = "error"
-			info.StatusErrorCode = apiErrorCode(err)
-		} else {
-			info.StatusOutcome = "ok"
+		info.StatusOutcome, info.StatusErrorCode = outcomeOf(err)
+		if statusOut != nil {
 			info.IsLogging = aws.ToBool(statusOut.IsLogging)
 			info.LatestDeliveryError = aws.ToString(statusOut.LatestDeliveryError)
 			info.LatestDeliveryTime = snapFormatTime(statusOut.LatestDeliveryTime)
@@ -772,7 +695,6 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudtrail.NewFromConfig(cfg)
 
 	var events []ctEventInfo
-	truncated := false
 	paginator := cloudtrail.NewLookupEventsPaginator(client, &cloudtrail.LookupEventsInput{})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
@@ -780,6 +702,9 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 			return nil, err
 		}
 		for _, e := range out.Events {
+			if len(events) == ctEventsCap {
+				return ctEventsData{Events: events, Truncated: true}, nil
+			}
 			info := ctEventInfo{
 				EventId:         aws.ToString(e.EventId),
 				EventName:       aws.ToString(e.EventName),
@@ -795,17 +720,13 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 				info.ResourceNames = append(info.ResourceNames, aws.ToString(r.ResourceName))
 			}
 			events = append(events, info)
-			if len(events) >= ctEventsCap {
-				truncated = true
-				break
-			}
 		}
-		if truncated {
-			break
+		if len(events) == ctEventsCap {
+			return ctEventsData{Events: events, Truncated: paginator.HasMorePages()}, nil
 		}
 	}
 
-	return ctEventsData{Events: events, Truncated: truncated}, nil
+	return ctEventsData{Events: events}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -814,21 +735,90 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 
 type backupData struct {
 	Plans []backupPlanInfo `json:"plans"`
+	// RegionOptIn is the Region's ResourceTypeOptInPreference: the resource
+	// types AWS Backup protects here, which coverage is judged against.
+	RegionOptIn backupRegionOptIn `json:"region_opt_in"`
+}
+
+type backupRegionOptIn struct {
+	readOutcome
+	ResourceTypes map[string]bool `json:"resource_types,omitempty"`
 }
 
 type backupPlanInfo struct {
-	BackupPlanId      string   `json:"backup_plan_id"`
-	BackupPlanName    string   `json:"backup_plan_name"`
-	CreationDate      string   `json:"creation_date,omitempty"`
-	DeletionDate      string   `json:"deletion_date,omitempty"`
-	LastExecutionDate string   `json:"last_execution_date,omitempty"`
-	VersionId         string   `json:"version_id,omitempty"`
-	SelectionsOutcome string   `json:"selections_outcome"`
-	SelectionsCode    string   `json:"selections_error_code,omitempty"`
-	IamRoleArns       []string `json:"iam_role_arns,omitempty"`
-	RecentJobsOutcome string   `json:"recent_jobs_outcome"`
-	RecentJobsCode    string   `json:"recent_jobs_error_code,omitempty"`
-	RecentJobStates   []string `json:"recent_job_states,omitempty"`
+	BackupPlanId      string            `json:"backup_plan_id"`
+	BackupPlanName    string            `json:"backup_plan_name"`
+	CreationDate      string            `json:"creation_date,omitempty"`
+	DeletionDate      string            `json:"deletion_date,omitempty"`
+	LastExecutionDate string            `json:"last_execution_date,omitempty"`
+	VersionId         string            `json:"version_id,omitempty"`
+	SelectionsOutcome string            `json:"selections_outcome"`
+	SelectionsCode    string            `json:"selections_error_code,omitempty"`
+	IamRoleArns       []string          `json:"iam_role_arns,omitempty"`
+	Selections        []backupSelection `json:"selections,omitempty"`
+	RecentJobsOutcome string            `json:"recent_jobs_outcome"`
+	RecentJobsCode    string            `json:"recent_jobs_error_code,omitempty"`
+	RecentJobStates   []string          `json:"recent_job_states,omitempty"`
+}
+
+type backupSelection struct {
+	SelectionId string `json:"selection_id"`
+	readOutcome
+	Resources    []string          `json:"resources,omitempty"`
+	NotResources []string          `json:"not_resources,omitempty"`
+	Conditions   []backupCondition `json:"conditions,omitempty"`
+}
+
+type backupCondition struct {
+	Type  string `json:"type"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func backupConditionsOf(sel *backuptypes.BackupSelection) []backupCondition {
+	var out []backupCondition
+	for _, t := range sel.ListOfTags {
+		out = append(out, backupCondition{Type: string(t.ConditionType), Key: aws.ToString(t.ConditionKey), Value: aws.ToString(t.ConditionValue)})
+	}
+	if c := sel.Conditions; c != nil {
+		for typ, params := range map[string][]backuptypes.ConditionParameter{
+			"StringEquals": c.StringEquals, "StringLike": c.StringLike, "StringNotEquals": c.StringNotEquals, "StringNotLike": c.StringNotLike,
+		} {
+			for _, p := range params {
+				out = append(out, backupCondition{Type: typ, Key: aws.ToString(p.ConditionKey), Value: aws.ToString(p.ConditionValue)})
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b backupCondition) int {
+		return cmp.Or(cmp.Compare(a.Type, b.Type), cmp.Compare(a.Key, b.Key), cmp.Compare(a.Value, b.Value))
+	})
+	return out
+}
+
+func captureBackupSelection(ctx context.Context, client *backupsvc.Client, planID, selectionID string) backupSelection {
+	got, read := readOne(func() (*backuptypes.BackupSelection, error) {
+		out, err := client.GetBackupSelection(ctx, &backupsvc.GetBackupSelectionInput{BackupPlanId: aws.String(planID), SelectionId: aws.String(selectionID)})
+		if err != nil {
+			return nil, err
+		}
+		return out.BackupSelection, nil
+	})
+	sel := backupSelection{SelectionId: selectionID, readOutcome: read}
+	if got != nil {
+		sel.Resources = got.Resources
+		sel.NotResources = got.NotResources
+		sel.Conditions = backupConditionsOf(got)
+	}
+	return sel
+}
+
+func captureBackupRegionOptIn(ctx context.Context, client *backupsvc.Client) backupRegionOptIn {
+	out, err := client.DescribeRegionSettings(ctx, &backupsvc.DescribeRegionSettingsInput{})
+	opt := backupRegionOptIn{readOutcome: readOf(err)}
+	if out != nil {
+		opt.ResourceTypes = out.ResourceTypeOptInPreference
+	}
+	return opt
 }
 
 func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
@@ -851,16 +841,18 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 				VersionId:         aws.ToString(p.VersionId),
 			}
 
-			selOut, err := client.ListBackupSelections(ctx, &backupsvc.ListBackupSelectionsInput{
-				BackupPlanId: p.BackupPlanId,
-			})
-			if err != nil {
-				info.SelectionsOutcome = "error"
-				info.SelectionsCode = apiErrorCode(err)
-			} else {
-				info.SelectionsOutcome = "ok"
-				for _, s := range selOut.BackupSelectionsList {
-					info.IamRoleArns = append(info.IamRoleArns, aws.ToString(s.IamRoleArn))
+			members, err := pageAll(ctx, &backupsvc.ListBackupSelectionsInput{BackupPlanId: p.BackupPlanId},
+				func(ctx context.Context, in *backupsvc.ListBackupSelectionsInput) (*backupsvc.ListBackupSelectionsOutput, error) {
+					return client.ListBackupSelections(ctx, in)
+				},
+				func(out *backupsvc.ListBackupSelectionsOutput) []backuptypes.BackupSelectionsListMember {
+					return out.BackupSelectionsList
+				}, allPages)
+			info.SelectionsOutcome, info.SelectionsCode = outcomeOf(err)
+			for _, s := range members {
+				info.IamRoleArns = append(info.IamRoleArns, aws.ToString(s.IamRoleArn))
+				if id := aws.ToString(s.SelectionId); id != "" {
+					info.Selections = append(info.Selections, captureBackupSelection(ctx, client, info.BackupPlanId, id))
 				}
 			}
 
@@ -869,35 +861,26 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	since := time.Now().Add(-24 * time.Hour)
+	jobs, jobsErr := pageAll(ctx, &backupsvc.ListBackupJobsInput{ByCreatedAfter: aws.Time(since)},
+		func(ctx context.Context, in *backupsvc.ListBackupJobsInput) (*backupsvc.ListBackupJobsOutput, error) {
+			return client.ListBackupJobs(ctx, in)
+		},
+		func(out *backupsvc.ListBackupJobsOutput) []backuptypes.BackupJob { return out.BackupJobs }, allPages)
 	jobsByPlan := map[string][]string{}
-	jobsOutcome := "ok"
-	jobsCode := ""
-	jobPaginator := backupsvc.NewListBackupJobsPaginator(client, &backupsvc.ListBackupJobsInput{
-		ByCreatedAfter: aws.Time(since),
-	})
-	for jobPaginator.HasMorePages() {
-		out, err := jobPaginator.NextPage(ctx)
-		if err != nil {
-			jobsOutcome = "error"
-			jobsCode = apiErrorCode(err)
-			break
+	for _, j := range jobs {
+		planID := ""
+		if j.CreatedBy != nil {
+			planID = aws.ToString(j.CreatedBy.BackupPlanId)
 		}
-		for _, j := range out.BackupJobs {
-			planID := ""
-			if j.CreatedBy != nil {
-				planID = aws.ToString(j.CreatedBy.BackupPlanId)
-			}
-			jobsByPlan[planID] = append(jobsByPlan[planID], string(j.State))
-		}
+		jobsByPlan[planID] = append(jobsByPlan[planID], string(j.State))
 	}
 
 	for i := range plans {
-		plans[i].RecentJobsOutcome = jobsOutcome
-		plans[i].RecentJobsCode = jobsCode
+		plans[i].RecentJobsOutcome, plans[i].RecentJobsCode = outcomeOf(jobsErr)
 		plans[i].RecentJobStates = jobsByPlan[plans[i].BackupPlanId]
 	}
 
-	return backupData{Plans: plans}, nil
+	return backupData{Plans: plans, RegionOptIn: captureBackupRegionOptIn(ctx, client)}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -915,14 +898,14 @@ type athenaWorkGroup struct {
 	Description                   string `json:"description,omitempty"`
 	GetOutcome                    string `json:"get_outcome"`
 	GetErrorCode                  string `json:"get_error_code,omitempty"`
-	EnforceWorkGroupConfiguration bool   `json:"enforce_workgroup_configuration"`
+	EnforceWorkGroupConfiguration bool   `json:"enforce_workgroup_configuration,omitempty"`
 	OutputLocation                string `json:"output_location,omitempty"`
 	EncryptionKmsKey              string `json:"encryption_kms_key,omitempty"`
 	CustomerContentKmsKey         string `json:"customer_content_kms_key,omitempty"`
-	LoggingEnabled                bool   `json:"logging_enabled"`
+	LoggingEnabled                bool   `json:"logging_enabled,omitempty"`
 	LogGroup                      string `json:"log_group,omitempty"`
 	ExecutionRole                 string `json:"execution_role,omitempty"`
-	BytesScannedCutoffSet         bool   `json:"bytes_scanned_cutoff_set"`
+	BytesScannedCutoffSet         bool   `json:"bytes_scanned_cutoff_set,omitempty"`
 	BytesScannedCutoffPerQuery    int64  `json:"bytes_scanned_cutoff_per_query,omitempty"`
 }
 
@@ -946,23 +929,33 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 	}
 
-	var workgroups []athenaWorkGroup
+	listed := map[string]athenaSummaryEntry{}
+	var names []string
 	for _, s := range summaries {
+		listed[s.Name] = s
+		names = append(names, s.Name)
+	}
+	rows := describeListed(names, 1, func(batch []string) (map[string]athenatypes.WorkGroup, []string, error) {
+		out, err := client.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(batch[0])})
+		if err != nil {
+			return nil, nil, err
+		}
+		return describedAs(batch[0], out.WorkGroup), nil, nil
+	})
+
+	var workgroups []athenaWorkGroup
+	for _, row := range rows {
+		s := listed[row.id]
 		wg := athenaWorkGroup{
-			Name:         s.Name,
+			Name:         row.id,
 			State:        s.State,
 			CreationTime: s.CreationTime,
 			Description:  s.Description,
+			GetOutcome:   row.read.Outcome,
+			GetErrorCode: row.read.ErrorCode,
 		}
-
-		getOut, err := client.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(s.Name)})
-		switch {
-		case err != nil:
-			wg.GetOutcome = "error"
-			wg.GetErrorCode = apiErrorCode(err)
-		case getOut.WorkGroup != nil && getOut.WorkGroup.Configuration != nil:
-			wg.GetOutcome = "ok"
-			c := getOut.WorkGroup.Configuration
+		if row.item != nil && row.item.Configuration != nil {
+			c := row.item.Configuration
 			wg.EnforceWorkGroupConfiguration = aws.ToBool(c.EnforceWorkGroupConfiguration)
 			wg.ExecutionRole = aws.ToString(c.ExecutionRole)
 			if c.BytesScannedCutoffPerQuery != nil {
@@ -983,8 +976,6 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 				wg.LoggingEnabled = aws.ToBool(cwl.Enabled)
 				wg.LogGroup = aws.ToString(cwl.LogGroup)
 			}
-		default:
-			wg.GetOutcome = "ok"
 		}
 
 		workgroups = append(workgroups, wg)
@@ -1058,21 +1049,20 @@ func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 		for _, j := range out.Jobs {
 			info := glueJobInfoOf(j)
-			runsOut, err := client.GetJobRuns(ctx, &glue.GetJobRunsInput{
+			runs, err := pageAll(ctx, &glue.GetJobRunsInput{
 				JobName:    j.Name,
 				MaxResults: aws.Int32(1),
-			})
-			if err != nil {
-				info.RunsOutcome = "error"
-				info.RunsErrorCode = apiErrorCode(err)
-			} else {
-				info.RunsOutcome = "ok"
-				if len(runsOut.JobRuns) > 0 {
-					r := runsOut.JobRuns[0]
-					info.LatestRunState = string(r.JobRunState)
-					info.LatestRunErrorMessage = aws.ToString(r.ErrorMessage)
-					info.LatestRunStartedOn = snapFormatTime(r.StartedOn)
-				}
+			},
+				func(ctx context.Context, in *glue.GetJobRunsInput) (*glue.GetJobRunsOutput, error) {
+					return client.GetJobRuns(ctx, in)
+				},
+				func(out *glue.GetJobRunsOutput) []gluetypes.JobRun { return out.JobRuns }, onePage)
+			info.RunsOutcome, info.RunsErrorCode = outcomeOf(err)
+			if len(runs) > 0 {
+				r := runs[0]
+				info.LatestRunState = string(r.JobRunState)
+				info.LatestRunErrorMessage = aws.ToString(r.ErrorMessage)
+				info.LatestRunStartedOn = snapFormatTime(r.StartedOn)
 			}
 
 			jobs = append(jobs, info)
@@ -1096,18 +1086,18 @@ type opensearchDomainInfo struct {
 	DescribeOutcome              string             `json:"describe_outcome"`
 	DescribeErrorCode            string             `json:"describe_error_code,omitempty"`
 	Arn                          string             `json:"arn,omitempty"`
-	Deleted                      bool               `json:"deleted"`
-	Processing                   bool               `json:"processing"`
-	UpgradeProcessing            bool               `json:"upgrade_processing"`
+	Deleted                      bool               `json:"deleted,omitempty"`
+	Processing                   bool               `json:"processing,omitempty"`
+	UpgradeProcessing            bool               `json:"upgrade_processing,omitempty"`
 	DomainProcessingStatus       string             `json:"domain_processing_status,omitempty"`
-	ServiceSoftwareUpdateAvail   bool               `json:"service_software_update_available"`
+	ServiceSoftwareUpdateAvail   bool               `json:"service_software_update_available,omitempty"`
 	ServiceSoftwareAutoUpdate    string             `json:"service_software_automated_update_date,omitempty"`
-	EncryptionAtRestEnabled      bool               `json:"encryption_at_rest_enabled"`
+	EncryptionAtRestEnabled      bool               `json:"encryption_at_rest_enabled,omitempty"`
 	EncryptionAtRestKmsKeyId     string             `json:"encryption_at_rest_kms_key_id,omitempty"`
 	VpcId                        string             `json:"vpc_id,omitempty"`
 	SubnetIds                    []string           `json:"subnet_ids,omitempty"`
 	SecurityGroupIds             []string           `json:"security_group_ids,omitempty"`
-	CustomEndpointEnabled        bool               `json:"custom_endpoint_enabled"`
+	CustomEndpointEnabled        bool               `json:"custom_endpoint_enabled,omitempty"`
 	CustomEndpointCertificateArn string             `json:"custom_endpoint_certificate_arn,omitempty"`
 	LogPublishingOptions         []opensearchLogOpt `json:"log_publishing_options,omitempty"`
 }
@@ -1134,38 +1124,33 @@ func captureOpenSearch(ctx context.Context, cfg aws.Config) (any, error) {
 		engineByName[name] = string(d.EngineType)
 	}
 
-	var domains []opensearchDomainInfo
-	for start := 0; start < len(names); start += 5 {
-		end := min(start+5, len(names))
-		batch := names[start:end]
-
-		descOut, err := client.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
+	// DescribeDomains takes at most 5 domain names per call.
+	rows := describeListed(names, 5, func(batch []string) (map[string]ostypes.DomainStatus, []string, error) {
+		out, err := client.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
 		if err != nil {
-			for _, n := range batch {
-				domains = append(domains, opensearchDomainInfo{
-					DomainName:        n,
-					EngineType:        engineByName[n],
-					DescribeOutcome:   "error",
-					DescribeErrorCode: apiErrorCode(err),
-				})
-			}
-			continue
+			return nil, nil, err
 		}
+		found := map[string]ostypes.DomainStatus{}
+		for _, ds := range out.DomainStatusList {
+			found[aws.ToString(ds.DomainName)] = ds
+		}
+		return found, nil, nil
+	})
 
-		found := map[string]bool{}
-		for _, ds := range descOut.DomainStatusList {
-			name := aws.ToString(ds.DomainName)
-			found[name] = true
-			info := opensearchDomainInfo{
-				DomainName:             name,
-				EngineType:             engineByName[name],
-				DescribeOutcome:        "ok",
-				Arn:                    aws.ToString(ds.ARN),
-				Deleted:                aws.ToBool(ds.Deleted),
-				Processing:             aws.ToBool(ds.Processing),
-				UpgradeProcessing:      aws.ToBool(ds.UpgradeProcessing),
-				DomainProcessingStatus: string(ds.DomainProcessingStatus),
-			}
+	domains := make([]opensearchDomainInfo, 0, len(rows))
+	for _, row := range rows {
+		info := opensearchDomainInfo{
+			DomainName:        row.id,
+			EngineType:        engineByName[row.id],
+			DescribeOutcome:   row.read.Outcome,
+			DescribeErrorCode: row.read.ErrorCode,
+		}
+		if ds := row.item; ds != nil {
+			info.Arn = aws.ToString(ds.ARN)
+			info.Deleted = aws.ToBool(ds.Deleted)
+			info.Processing = aws.ToBool(ds.Processing)
+			info.UpgradeProcessing = aws.ToBool(ds.UpgradeProcessing)
+			info.DomainProcessingStatus = string(ds.DomainProcessingStatus)
 			if ds.ServiceSoftwareOptions != nil {
 				info.ServiceSoftwareUpdateAvail = aws.ToBool(ds.ServiceSoftwareOptions.UpdateAvailable)
 				info.ServiceSoftwareAutoUpdate = snapFormatTime(ds.ServiceSoftwareOptions.AutomatedUpdateDate)
@@ -1190,17 +1175,8 @@ func captureOpenSearch(ctx context.Context, cfg aws.Config) (any, error) {
 					CloudWatchLogsLogGroupArn: aws.ToString(opt.CloudWatchLogsLogGroupArn),
 				})
 			}
-			domains = append(domains, info)
 		}
-		for _, n := range batch {
-			if !found[n] {
-				domains = append(domains, opensearchDomainInfo{
-					DomainName:      n,
-					EngineType:      engineByName[n],
-					DescribeOutcome: "not_found",
-				})
-			}
-		}
+		domains = append(domains, info)
 	}
 
 	return opensearchData{Domains: domains}, nil
@@ -1228,7 +1204,7 @@ type cfDistribution struct {
 	LambdaFunctionARNs           []string   `json:"lambda_function_arns,omitempty"`
 	ConfigOutcome                string     `json:"config_outcome"`
 	ConfigErrorCode              string     `json:"config_error_code,omitempty"`
-	LoggingEnabled               bool       `json:"logging_enabled"`
+	LoggingEnabled               bool       `json:"logging_enabled,omitempty"`
 	LoggingBucket                string     `json:"logging_bucket,omitempty"`
 }
 
@@ -1283,16 +1259,17 @@ func captureCF(ctx context.Context, cfg aws.Config) (any, error) {
 				}
 			}
 
-			cfgOut, err := client.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: d.Id})
-			if err != nil {
-				info.ConfigOutcome = "error"
-				info.ConfigErrorCode = apiErrorCode(err)
-			} else if cfgOut.DistributionConfig != nil {
-				info.ConfigOutcome = "ok"
-				if cfgOut.DistributionConfig.Logging != nil {
-					info.LoggingEnabled = aws.ToBool(cfgOut.DistributionConfig.Logging.Enabled)
-					info.LoggingBucket = aws.ToString(cfgOut.DistributionConfig.Logging.Bucket)
+			distCfg, read := readOne(func() (*cftypes.DistributionConfig, error) {
+				out, err := client.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: d.Id})
+				if err != nil {
+					return nil, err
 				}
+				return out.DistributionConfig, nil
+			})
+			info.ConfigOutcome, info.ConfigErrorCode = read.Outcome, read.ErrorCode
+			if distCfg != nil && distCfg.Logging != nil {
+				info.LoggingEnabled = aws.ToBool(distCfg.Logging.Enabled)
+				info.LoggingBucket = aws.ToString(distCfg.Logging.Bucket)
 			}
 
 			dists = append(dists, info)
@@ -1315,11 +1292,10 @@ type r53Zone struct {
 	Name                     string        `json:"name"`
 	PrivateZone              bool          `json:"private_zone"`
 	ResourceRecordSetCount   int64         `json:"resource_record_set_count"`
-	DNSSECOutcome            string        `json:"dnssec_outcome"`
-	DNSSECErrorCode          string        `json:"dnssec_error_code,omitempty"`
-	ServeSignature           string        `json:"serve_signature,omitempty"`
-	KeySigningKeyStatuses    []string      `json:"key_signing_key_statuses,omitempty"`
-	VPCAssociationsOutcome   string        `json:"vpc_associations_outcome"`
+	RecordsOutcome           string        `json:"records_outcome"`
+	RecordsErrorCode         string        `json:"records_error_code,omitempty"`
+	Records                  []r53Record   `json:"records,omitempty"`
+	VPCAssociationsOutcome   string        `json:"vpc_associations_outcome,omitempty"`
 	VPCAssociationsErrorCode string        `json:"vpc_associations_error_code,omitempty"`
 	VPCs                     []r53VPCAssoc `json:"vpcs,omitempty"`
 }
@@ -1327,6 +1303,36 @@ type r53Zone struct {
 type r53VPCAssoc struct {
 	VPCId     string `json:"vpc_id"`
 	VPCRegion string `json:"vpc_region"`
+}
+
+type r53Record struct {
+	Name          string   `json:"name"`
+	Type          string   `json:"type"`
+	SetIdentifier string   `json:"set_identifier,omitempty"`
+	AliasDNSName  string   `json:"alias_dns_name,omitempty"`
+	Values        []string `json:"values,omitempty"`
+}
+
+func captureR53Records(ctx context.Context, client *route53.Client, zoneID *string) ([]r53Record, error) {
+	sets, err := pageAll(ctx, &route53.ListResourceRecordSetsInput{HostedZoneId: zoneID},
+		func(ctx context.Context, in *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error) {
+			return client.ListResourceRecordSets(ctx, in)
+		},
+		func(out *route53.ListResourceRecordSetsOutput) []r53types.ResourceRecordSet {
+			return out.ResourceRecordSets
+		}, allPages)
+	records := make([]r53Record, 0, len(sets))
+	for _, s := range sets {
+		r := r53Record{Name: aws.ToString(s.Name), Type: string(s.Type), SetIdentifier: aws.ToString(s.SetIdentifier)}
+		if s.AliasTarget != nil {
+			r.AliasDNSName = aws.ToString(s.AliasTarget.DNSName)
+		}
+		for _, v := range s.ResourceRecords {
+			r.Values = append(r.Values, aws.ToString(v.Value))
+		}
+		records = append(records, r)
+	}
+	return records, err
 }
 
 func captureR53(ctx context.Context, cfg aws.Config) (any, error) {
@@ -1349,29 +1355,14 @@ func captureR53(ctx context.Context, cfg aws.Config) (any, error) {
 				zone.PrivateZone = z.Config.PrivateZone
 			}
 
-			if !zone.PrivateZone {
-				dnssecOut, err := client.GetDNSSEC(ctx, &route53.GetDNSSECInput{HostedZoneId: z.Id})
-				if err != nil {
-					zone.DNSSECOutcome = "error"
-					zone.DNSSECErrorCode = apiErrorCode(err)
-				} else {
-					zone.DNSSECOutcome = "ok"
-					if dnssecOut.Status != nil {
-						zone.ServeSignature = aws.ToString(dnssecOut.Status.ServeSignature)
-					}
-					for _, ksk := range dnssecOut.KeySigningKeys {
-						zone.KeySigningKeyStatuses = append(zone.KeySigningKeyStatuses, aws.ToString(ksk.Status))
-					}
-				}
-			} else {
-				zone.DNSSECOutcome = "skipped_private_zone"
+			var err error
+			zone.Records, err = captureR53Records(ctx, client, z.Id)
+			zone.RecordsOutcome, zone.RecordsErrorCode = outcomeOf(err)
 
+			if zone.PrivateZone {
 				vpcOut, err := client.GetHostedZone(ctx, &route53.GetHostedZoneInput{Id: z.Id})
-				if err != nil {
-					zone.VPCAssociationsOutcome = "error"
-					zone.VPCAssociationsErrorCode = apiErrorCode(err)
-				} else {
-					zone.VPCAssociationsOutcome = "ok"
+				zone.VPCAssociationsOutcome, zone.VPCAssociationsErrorCode = outcomeOf(err)
+				if vpcOut != nil {
 					for _, v := range vpcOut.VPCs {
 						zone.VPCs = append(zone.VPCs, r53VPCAssoc{
 							VPCId:     aws.ToString(v.VPCId),

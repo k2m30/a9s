@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,13 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
-	smithy "github.com/aws/smithy-go"
 )
 
 // ---------------------------------------------------------------------------
@@ -25,8 +23,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type dbiData struct {
-	Instances          []dbiInstance           `json:"instances"`
-	PendingMaintenance []dbiPendingMaintenance `json:"pending_maintenance"`
+	Instances              []dbiInstance           `json:"instances"`
+	PendingMaintenanceRead readOutcome             `json:"pending_maintenance_read"`
+	PendingMaintenance     []dbiPendingMaintenance `json:"pending_maintenance"`
+	partialRead
 }
 
 type dbiInstance struct {
@@ -68,27 +68,29 @@ type dbiPendingMaintenance struct {
 	CurrentApplyDate     string `json:"current_apply_date,omitempty"`
 }
 
-func captureDBI(ctx context.Context, cfg aws.Config) (any, error) {
+// dbiParts lists the instances; the account-wide pending-maintenance read is
+// a part of its own, so a refused or failed read keeps the instances.
+func dbiParts(ctx context.Context, cfg aws.Config) ([]part[dbiData], error) {
 	client := rds.NewFromConfig(cfg)
-
-	var instances []dbiInstance
-	paginator := rds.NewDescribeDBInstancesPaginator(client, &rds.DescribeDBInstancesInput{})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, d := range out.DBInstances {
-			instances = append(instances, dbiInstanceFromSDK(d))
-		}
-	}
-
-	pending, err := captureDBIPendingMaintenance(ctx, client)
-	if err != nil {
+	listed, err := pageAll(ctx, &rds.DescribeDBInstancesInput{},
+		func(ctx context.Context, in *rds.DescribeDBInstancesInput) (*rds.DescribeDBInstancesOutput, error) {
+			return client.DescribeDBInstances(ctx, in)
+		},
+		func(out *rds.DescribeDBInstancesOutput) []rdstypes.DBInstance { return out.DBInstances }, allPages)
+	if len(listed) == 0 {
 		return nil, err
 	}
-
-	return dbiData{Instances: instances, PendingMaintenance: pending}, nil
+	instances := make([]dbiInstance, 0, len(listed))
+	for _, d := range listed {
+		instances = append(instances, dbiInstanceFromSDK(d))
+	}
+	return []part[dbiData]{
+		{name: "instances", run: func(_ context.Context, _ aws.Config, d *dbiData) error {
+			d.Instances = instances
+			return nil
+		}},
+		{name: "pending_maintenance", run: dbiPendingMaintenanceActions},
+	}, err
 }
 
 func dbiInstanceFromSDK(d rdstypes.DBInstance) dbiInstance {
@@ -131,29 +133,30 @@ func dbiInstanceFromSDK(d rdstypes.DBInstance) dbiInstance {
 	return inst
 }
 
-func captureDBIPendingMaintenance(ctx context.Context, client *rds.Client) ([]dbiPendingMaintenance, error) {
-	var out []dbiPendingMaintenance
-	paginator := rds.NewDescribePendingMaintenanceActionsPaginator(client, &rds.DescribePendingMaintenanceActionsInput{})
-	for paginator.HasMorePages() {
-		resp, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, pma := range resp.PendingMaintenanceActions {
-			resourceID := aws.ToString(pma.ResourceIdentifier)
-			for _, action := range pma.PendingMaintenanceActionDetails {
-				out = append(out, dbiPendingMaintenance{
-					ResourceIdentifier:   resourceID,
-					Action:               aws.ToString(action.Action),
-					Description:          aws.ToString(action.Description),
-					ForcedApplyDate:      snapFormatTime(action.ForcedApplyDate),
-					AutoAppliedAfterDate: snapFormatTime(action.AutoAppliedAfterDate),
-					CurrentApplyDate:     snapFormatTime(action.CurrentApplyDate),
-				})
-			}
+func dbiPendingMaintenanceActions(ctx context.Context, cfg aws.Config, d *dbiData) error {
+	client := rds.NewFromConfig(cfg)
+	actions, err := pageAll(ctx, &rds.DescribePendingMaintenanceActionsInput{},
+		func(ctx context.Context, in *rds.DescribePendingMaintenanceActionsInput) (*rds.DescribePendingMaintenanceActionsOutput, error) {
+			return client.DescribePendingMaintenanceActions(ctx, in)
+		},
+		func(out *rds.DescribePendingMaintenanceActionsOutput) []rdstypes.ResourcePendingMaintenanceActions {
+			return out.PendingMaintenanceActions
+		}, allPages)
+	d.PendingMaintenanceRead = readOf(err)
+	for _, pma := range actions {
+		resourceID := aws.ToString(pma.ResourceIdentifier)
+		for _, action := range pma.PendingMaintenanceActionDetails {
+			d.PendingMaintenance = append(d.PendingMaintenance, dbiPendingMaintenance{
+				ResourceIdentifier:   resourceID,
+				Action:               aws.ToString(action.Action),
+				Description:          aws.ToString(action.Description),
+				ForcedApplyDate:      snapFormatTime(action.ForcedApplyDate),
+				AutoAppliedAfterDate: snapFormatTime(action.AutoAppliedAfterDate),
+				CurrentApplyDate:     snapFormatTime(action.CurrentApplyDate),
+			})
 		}
 	}
-	return out, nil
+	return err
 }
 
 // ---------------------------------------------------------------------------
@@ -162,71 +165,58 @@ func captureDBIPendingMaintenance(ctx context.Context, client *rds.Client) ([]db
 
 type dbcData struct {
 	Clusters []dbcCluster `json:"clusters"`
-	// PartialErrors records per-source list failures (e.g. "rds: AccessDenied")
-	// when the other source still returned rows — mirrors the app fetcher's
-	// partial-success contract so a half-readable account keeps its DocDB
-	// coverage instead of losing the whole section.
-	PartialErrors []string `json:"partial_errors,omitempty"`
+	partialRead
 }
 
 type dbcCluster struct {
-	Source                       string   `json:"source"` // "docdb" or "rds"
-	DBClusterIdentifier          string   `json:"db_cluster_identifier"`
-	DBClusterArn                 string   `json:"db_cluster_arn"`
-	Status                       string   `json:"status"`
-	Engine                       string   `json:"engine,omitempty"`
-	EngineVersion                string   `json:"engine_version,omitempty"`
-	HasWriterMember              bool     `json:"has_writer_member"`
-	MemberInstanceIdentifiers    []string `json:"member_instance_identifiers,omitempty"`
-	DeletionProtection           bool     `json:"deletion_protection"`
-	StorageEncrypted             bool     `json:"storage_encrypted"`
-	BackupRetentionPeriod        int32    `json:"backup_retention_period"`
-	KmsKeyId                     string   `json:"kms_key_id,omitempty"`
-	EnabledCloudwatchLogsExports []string `json:"enabled_cloudwatch_logs_exports,omitempty"`
-	MasterUserSecretArn          string   `json:"master_user_secret_arn,omitempty"`
-	VpcSecurityGroupIds          []string `json:"vpc_security_group_ids,omitempty"`
-	DBSubnetGroupName            string   `json:"db_subnet_group_name,omitempty"`
-}
-
-func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
-	docdbRows, docdbErr := listDocDBClusters(ctx, docdb.NewFromConfig(cfg))
-	rdsRows, rdsErr := listRDSClusters(ctx, rds.NewFromConfig(cfg))
-	return combineDBCClusters(docdbRows, docdbErr, rdsRows, rdsErr)
+	Source                       string      `json:"source"` // "docdb" or "rds"
+	DBClusterIdentifier          string      `json:"db_cluster_identifier"`
+	DBClusterArn                 string      `json:"db_cluster_arn"`
+	Status                       string      `json:"status"`
+	Engine                       string      `json:"engine,omitempty"`
+	EngineVersion                string      `json:"engine_version,omitempty"`
+	HasWriterMember              bool        `json:"has_writer_member"`
+	MemberInstanceIdentifiers    []string    `json:"member_instance_identifiers,omitempty"`
+	DeletionProtection           bool        `json:"deletion_protection"`
+	StorageEncrypted             bool        `json:"storage_encrypted"`
+	BackupRetentionPeriod        int32       `json:"backup_retention_period"`
+	KmsKeyId                     string      `json:"kms_key_id,omitempty"`
+	EnabledCloudwatchLogsExports []string    `json:"enabled_cloudwatch_logs_exports,omitempty"`
+	MasterUserSecretArn          string      `json:"master_user_secret_arn,omitempty"`
+	VpcSecurityGroupIds          []string    `json:"vpc_security_group_ids,omitempty"`
+	DBSubnetGroupName            string      `json:"db_subnet_group_name,omitempty"`
+	GlobalMembers                readOutcome `json:"global_members"`
+	GlobalWriter                 *bool       `json:"global_writer,omitempty"`
 }
 
 func listDocDBClusters(ctx context.Context, client *docdb.Client) ([]dbcCluster, error) {
-	var clusters []dbcCluster
-	paginator := docdb.NewDescribeDBClustersPaginator(client, &docdb.DescribeDBClustersInput{
+	listed, err := pageAll(ctx, &docdb.DescribeDBClustersInput{
 		Filters: []docdbtypes.Filter{{Name: aws.String("engine"), Values: []string{"docdb"}}},
-	})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range out.DBClusters {
-			clusters = append(clusters, dbcClusterFromDocDB(c))
-		}
+	},
+		func(ctx context.Context, in *docdb.DescribeDBClustersInput) (*docdb.DescribeDBClustersOutput, error) {
+			return client.DescribeDBClusters(ctx, in)
+		},
+		func(out *docdb.DescribeDBClustersOutput) []docdbtypes.DBCluster { return out.DBClusters }, allPages)
+	clusters := make([]dbcCluster, 0, len(listed))
+	for _, c := range listed {
+		clusters = append(clusters, dbcClusterFromDocDB(c))
 	}
-	return clusters, nil
+	return clusters, err
 }
 
 func listRDSClusters(ctx context.Context, client *rds.Client) ([]dbcCluster, error) {
+	listed, err := pageAll(ctx, &rds.DescribeDBClustersInput{},
+		func(ctx context.Context, in *rds.DescribeDBClustersInput) (*rds.DescribeDBClustersOutput, error) {
+			return client.DescribeDBClusters(ctx, in)
+		},
+		func(out *rds.DescribeDBClustersOutput) []rdstypes.DBCluster { return out.DBClusters }, allPages)
 	var clusters []dbcCluster
-	paginator := rds.NewDescribeDBClustersPaginator(client, &rds.DescribeDBClustersInput{})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range out.DBClusters {
-			if !rdsSideDBCEngine(aws.ToString(c.Engine)) {
-				continue
-			}
+	for _, c := range listed {
+		if rdsSideDBCEngine(aws.ToString(c.Engine)) {
 			clusters = append(clusters, dbcClusterFromRDS(c))
 		}
 	}
-	return clusters, nil
+	return clusters, err
 }
 
 // rdsSideDBCEngine reports whether a cluster or cluster snapshot the RDS call
@@ -237,24 +227,60 @@ func rdsSideDBCEngine(engine string) bool {
 	return engine != "docdb" && engine != "neptune"
 }
 
-// combineDBCClusters merges the two DescribeDBClusters sources with docdb-first
-// dedup, tolerating one-sided failures: when one source errors but the other
-// returned rows, the rows are kept and the failure lands in PartialErrors
-// instead of sinking the section (the app's DBC fetcher behaves the same way).
-// Both sides failing is a real capture failure.
-func combineDBCClusters(docdbRows []dbcCluster, docdbErr error, rdsRows []dbcCluster, rdsErr error) (dbcData, error) {
-	if docdbErr != nil && rdsErr != nil {
-		return dbcData{}, fmt.Errorf("dbc: docdb: %v; rds: %v", docdbErr, rdsErr)
+func dbcDocDBPart() part[dbcData] {
+	return part[dbcData]{name: "docdb", run: func(ctx context.Context, cfg aws.Config, d *dbcData) error {
+		client := docdb.NewFromConfig(cfg)
+		rows, listErr := listDocDBClusters(ctx, client)
+		globals, err := pageAll(ctx, &docdb.DescribeGlobalClustersInput{},
+			func(ctx context.Context, in *docdb.DescribeGlobalClustersInput) (*docdb.DescribeGlobalClustersOutput, error) {
+				return client.DescribeGlobalClusters(ctx, in)
+			},
+			func(out *docdb.DescribeGlobalClustersOutput) []docdbtypes.GlobalCluster { return out.GlobalClusters }, allPages)
+		writer := map[string]bool{}
+		for _, g := range globals {
+			for _, m := range g.GlobalClusterMembers {
+				writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
+			}
+		}
+		d.Clusters = append(d.Clusters, withGlobalRoles(rows, writer, readOf(err))...)
+		return listErr
+	}}
+}
+
+func dbcRDSPart() part[dbcData] {
+	return part[dbcData]{name: "rds", run: func(ctx context.Context, cfg aws.Config, d *dbcData) error {
+		client := rds.NewFromConfig(cfg)
+		rows, listErr := listRDSClusters(ctx, client)
+		globals, err := pageAll(ctx, &rds.DescribeGlobalClustersInput{},
+			func(ctx context.Context, in *rds.DescribeGlobalClustersInput) (*rds.DescribeGlobalClustersOutput, error) {
+				return client.DescribeGlobalClusters(ctx, in)
+			},
+			func(out *rds.DescribeGlobalClustersOutput) []rdstypes.GlobalCluster { return out.GlobalClusters }, allPages)
+		writer := map[string]bool{}
+		for _, g := range globals {
+			for _, m := range g.GlobalClusterMembers {
+				writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
+			}
+		}
+		d.Clusters = append(d.Clusters, withGlobalRoles(rows, writer, readOf(err))...)
+		return listErr
+	}}
+}
+
+func withGlobalRoles(rows []dbcCluster, writer map[string]bool, read readOutcome) []dbcCluster {
+	for i := range rows {
+		rows[i].GlobalMembers = read
+		if w, ok := writer[rows[i].DBClusterArn]; ok {
+			rows[i].GlobalWriter = aws.Bool(w)
+		}
 	}
-	var partial []string
-	if docdbErr != nil {
-		partial = append(partial, "docdb: "+docdbErr.Error())
-	}
-	if rdsErr != nil {
-		partial = append(partial, "rds: "+rdsErr.Error())
-	}
-	merged := append(append([]dbcCluster{}, docdbRows...), rdsRows...)
-	return dbcData{Clusters: dedupDBCByID(merged), PartialErrors: partial}, nil
+	return rows
+}
+
+// dbcDedup keeps the first row of an identifier; the docdb part runs first.
+func dbcDedup(_ context.Context, _ aws.Config, d *dbcData) error {
+	d.Clusters = dedupDBCByID(d.Clusters)
+	return nil
 }
 
 // dedupDBCByID dedups by DBClusterIdentifier, first-occurrence-wins, matching
@@ -387,8 +413,7 @@ func captureDBISnap(ctx context.Context, cfg aws.Config) (any, error) {
 
 type dbcSnapData struct {
 	Snapshots []dbcSnapshot `json:"snapshots"`
-	// PartialErrors — same partial-success contract as dbcData.PartialErrors.
-	PartialErrors []string `json:"partial_errors,omitempty"`
+	partialRead
 }
 
 type dbcSnapshot struct {
@@ -405,86 +430,85 @@ type dbcSnapshot struct {
 	PercentProgress             int32  `json:"percent_progress"`
 }
 
-func captureDBCSnap(ctx context.Context, cfg aws.Config) (any, error) {
-	docdbRows, docdbErr := listDocDBClusterSnapshots(ctx, docdb.NewFromConfig(cfg))
-	rdsRows, rdsErr := listRDSClusterSnapshots(ctx, rds.NewFromConfig(cfg))
-	return combineDBCSnapshots(docdbRows, docdbErr, rdsRows, rdsErr)
-}
-
 func listDocDBClusterSnapshots(ctx context.Context, client *docdb.Client) ([]dbcSnapshot, error) {
+	listed, err := pageAll(ctx, &docdb.DescribeDBClusterSnapshotsInput{},
+		func(ctx context.Context, in *docdb.DescribeDBClusterSnapshotsInput) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+			return client.DescribeDBClusterSnapshots(ctx, in)
+		},
+		func(out *docdb.DescribeDBClusterSnapshotsOutput) []docdbtypes.DBClusterSnapshot {
+			return out.DBClusterSnapshots
+		}, allPages)
 	var snaps []dbcSnapshot
-	paginator := docdb.NewDescribeDBClusterSnapshotsPaginator(client, &docdb.DescribeDBClusterSnapshotsInput{})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
+	for _, s := range listed {
+		if e := aws.ToString(s.Engine); e != "" && e != "docdb" {
+			continue
 		}
-		for _, s := range out.DBClusterSnapshots {
-			if e := aws.ToString(s.Engine); e != "" && e != "docdb" {
-				continue
-			}
-			snaps = append(snaps, dbcSnapshot{
-				Source:                      "docdb",
-				DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),
-				DBClusterSnapshotArn:        aws.ToString(s.DBClusterSnapshotArn),
-				DBClusterIdentifier:         aws.ToString(s.DBClusterIdentifier),
-				Status:                      aws.ToString(s.Status),
-				SnapshotType:                aws.ToString(s.SnapshotType),
-				StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
-				KmsKeyId:                    aws.ToString(s.KmsKeyId),
-				VpcId:                       aws.ToString(s.VpcId),
-				SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
-				PercentProgress:             aws.ToInt32(s.PercentProgress),
-			})
-		}
+		snaps = append(snaps, dbcSnapshot{
+			Source:                      "docdb",
+			DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),
+			DBClusterSnapshotArn:        aws.ToString(s.DBClusterSnapshotArn),
+			DBClusterIdentifier:         aws.ToString(s.DBClusterIdentifier),
+			Status:                      aws.ToString(s.Status),
+			SnapshotType:                aws.ToString(s.SnapshotType),
+			StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
+			KmsKeyId:                    aws.ToString(s.KmsKeyId),
+			VpcId:                       aws.ToString(s.VpcId),
+			SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
+			PercentProgress:             aws.ToInt32(s.PercentProgress),
+		})
 	}
-	return snaps, nil
+	return snaps, err
 }
 
 func listRDSClusterSnapshots(ctx context.Context, client *rds.Client) ([]dbcSnapshot, error) {
+	listed, err := pageAll(ctx, &rds.DescribeDBClusterSnapshotsInput{},
+		func(ctx context.Context, in *rds.DescribeDBClusterSnapshotsInput) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+			return client.DescribeDBClusterSnapshots(ctx, in)
+		},
+		func(out *rds.DescribeDBClusterSnapshotsOutput) []rdstypes.DBClusterSnapshot {
+			return out.DBClusterSnapshots
+		}, allPages)
 	var snaps []dbcSnapshot
-	paginator := rds.NewDescribeDBClusterSnapshotsPaginator(client, &rds.DescribeDBClusterSnapshotsInput{})
-	for paginator.HasMorePages() {
-		out, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, err
+	for _, s := range listed {
+		if !rdsSideDBCEngine(aws.ToString(s.Engine)) {
+			continue
 		}
-		for _, s := range out.DBClusterSnapshots {
-			if !rdsSideDBCEngine(aws.ToString(s.Engine)) {
-				continue
-			}
-			snaps = append(snaps, dbcSnapshot{
-				Source:                      "rds",
-				DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),
-				DBClusterSnapshotArn:        aws.ToString(s.DBClusterSnapshotArn),
-				DBClusterIdentifier:         aws.ToString(s.DBClusterIdentifier),
-				Status:                      aws.ToString(s.Status),
-				SnapshotType:                aws.ToString(s.SnapshotType),
-				StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
-				KmsKeyId:                    aws.ToString(s.KmsKeyId),
-				VpcId:                       aws.ToString(s.VpcId),
-				SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
-				PercentProgress:             aws.ToInt32(s.PercentProgress),
-			})
-		}
+		snaps = append(snaps, dbcSnapshot{
+			Source:                      "rds",
+			DBClusterSnapshotIdentifier: aws.ToString(s.DBClusterSnapshotIdentifier),
+			DBClusterSnapshotArn:        aws.ToString(s.DBClusterSnapshotArn),
+			DBClusterIdentifier:         aws.ToString(s.DBClusterIdentifier),
+			Status:                      aws.ToString(s.Status),
+			SnapshotType:                aws.ToString(s.SnapshotType),
+			StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
+			KmsKeyId:                    aws.ToString(s.KmsKeyId),
+			VpcId:                       aws.ToString(s.VpcId),
+			SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
+			PercentProgress:             aws.ToInt32(s.PercentProgress),
+		})
 	}
-	return snaps, nil
+	return snaps, err
 }
 
-// combineDBCSnapshots — same partial-success contract as combineDBCClusters.
-func combineDBCSnapshots(docdbRows []dbcSnapshot, docdbErr error, rdsRows []dbcSnapshot, rdsErr error) (dbcSnapData, error) {
-	if docdbErr != nil && rdsErr != nil {
-		return dbcSnapData{}, fmt.Errorf("dbc-snap: docdb: %v; rds: %v", docdbErr, rdsErr)
-	}
-	var partial []string
-	if docdbErr != nil {
-		partial = append(partial, "docdb: "+docdbErr.Error())
-	}
-	if rdsErr != nil {
-		partial = append(partial, "rds: "+rdsErr.Error())
-	}
-	merged := append(append([]dbcSnapshot{}, docdbRows...), rdsRows...)
-	return dbcSnapData{Snapshots: dedupDBCSnapByID(merged), PartialErrors: partial}, nil
+func dbcSnapDocDBPart() part[dbcSnapData] {
+	return part[dbcSnapData]{name: "docdb", run: func(ctx context.Context, cfg aws.Config, d *dbcSnapData) error {
+		rows, err := listDocDBClusterSnapshots(ctx, docdb.NewFromConfig(cfg))
+		d.Snapshots = append(d.Snapshots, rows...)
+		return err
+	}}
+}
+
+func dbcSnapRDSPart() part[dbcSnapData] {
+	return part[dbcSnapData]{name: "rds", run: func(ctx context.Context, cfg aws.Config, d *dbcSnapData) error {
+		rows, err := listRDSClusterSnapshots(ctx, rds.NewFromConfig(cfg))
+		d.Snapshots = append(d.Snapshots, rows...)
+		return err
+	}}
+}
+
+func dbcSnapDedup(_ context.Context, _ aws.Config, d *dbcSnapData) error {
+	d.Snapshots = dedupDBCSnapByID(d.Snapshots)
+	return nil
 }
 
 // dedupDBCSnapByID dedups by DBClusterSnapshotIdentifier, first-occurrence-wins
@@ -516,8 +540,8 @@ type ddbTable struct {
 	TableArn                   string `json:"table_arn,omitempty"`
 	TableStatus                string `json:"table_status"`
 	CreationDateTime           string `json:"creation_date_time,omitempty"`
-	ItemCount                  int64  `json:"item_count"`
-	TableSizeBytes             int64  `json:"table_size_bytes"`
+	ItemCount                  int64  `json:"item_count,omitempty"`
+	TableSizeBytes             int64  `json:"table_size_bytes,omitempty"`
 	SSEKMSMasterKeyArn         string `json:"sse_kms_master_key_arn,omitempty"`
 	LatestStreamArn            string `json:"latest_stream_arn,omitempty"`
 	ArchivalReason             string `json:"archival_reason,omitempty"`
@@ -543,57 +567,47 @@ func captureDDB(ctx context.Context, cfg aws.Config) (any, error) {
 		names = append(names, out.TableNames...)
 	}
 
-	tables := make([]ddbTable, 0, len(names))
-	for _, name := range names {
-		t := ddbTable{TableName: name}
-
-		descOut, err := client.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(name)})
+	rows := describeListed(names, 1, func(batch []string) (map[string]ddbtypes.TableDescription, []string, error) {
+		out, err := client.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(batch[0])})
 		if err != nil {
-			t.DescribeTableOutcome = "error"
-			t.DescribeTableErrorCode = ddbErrorCode(err)
-		} else {
-			t.DescribeTableOutcome = "ok"
-			td := descOut.Table
-			if td != nil {
-				t.TableArn = aws.ToString(td.TableArn)
-				t.TableStatus = string(td.TableStatus)
-				t.CreationDateTime = snapFormatTime(td.CreationDateTime)
-				t.ItemCount = aws.ToInt64(td.ItemCount)
-				t.TableSizeBytes = aws.ToInt64(td.TableSizeBytes)
-				t.LatestStreamArn = aws.ToString(td.LatestStreamArn)
-				if td.SSEDescription != nil {
-					t.SSEKMSMasterKeyArn = aws.ToString(td.SSEDescription.KMSMasterKeyArn)
-				}
-				if td.ArchivalSummary != nil {
-					t.ArchivalReason = aws.ToString(td.ArchivalSummary.ArchivalReason)
-					t.ArchivalDateTime = snapFormatTime(td.ArchivalSummary.ArchivalDateTime)
-					t.ArchivalBackupArn = aws.ToString(td.ArchivalSummary.ArchivalBackupArn)
-				}
+			return nil, nil, err
+		}
+		if out.Table == nil {
+			return nil, nil, nil
+		}
+		return describedAs(aws.ToString(out.Table.TableName), out.Table), nil, nil
+	})
+
+	tables := make([]ddbTable, 0, len(rows))
+	for _, row := range rows {
+		t := ddbTable{TableName: row.id, DescribeTableOutcome: row.read.Outcome, DescribeTableErrorCode: row.read.ErrorCode}
+		if td := row.item; td != nil {
+			t.TableArn = aws.ToString(td.TableArn)
+			t.TableStatus = string(td.TableStatus)
+			t.CreationDateTime = snapFormatTime(td.CreationDateTime)
+			t.ItemCount = aws.ToInt64(td.ItemCount)
+			t.TableSizeBytes = aws.ToInt64(td.TableSizeBytes)
+			t.LatestStreamArn = aws.ToString(td.LatestStreamArn)
+			if td.SSEDescription != nil {
+				t.SSEKMSMasterKeyArn = aws.ToString(td.SSEDescription.KMSMasterKeyArn)
+			}
+			if td.ArchivalSummary != nil {
+				t.ArchivalReason = aws.ToString(td.ArchivalSummary.ArchivalReason)
+				t.ArchivalDateTime = snapFormatTime(td.ArchivalSummary.ArchivalDateTime)
+				t.ArchivalBackupArn = aws.ToString(td.ArchivalSummary.ArchivalBackupArn)
 			}
 		}
 
-		cbOut, err := client.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{TableName: aws.String(name)})
-		if err != nil {
-			t.ContinuousBackupsOutcome = "error"
-			t.ContinuousBackupsErrorCode = ddbErrorCode(err)
-		} else {
-			t.ContinuousBackupsOutcome = "ok"
-			if cbOut.ContinuousBackupsDescription != nil && cbOut.ContinuousBackupsDescription.PointInTimeRecoveryDescription != nil {
-				t.PITRStatus = string(cbOut.ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus)
-			}
+		cbOut, err := client.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{TableName: aws.String(row.id)})
+		t.ContinuousBackupsOutcome, t.ContinuousBackupsErrorCode = outcomeOf(err)
+		if cbOut != nil && cbOut.ContinuousBackupsDescription != nil && cbOut.ContinuousBackupsDescription.PointInTimeRecoveryDescription != nil {
+			t.PITRStatus = string(cbOut.ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus)
 		}
 
 		tables = append(tables, t)
 	}
 
 	return ddbData{Tables: tables}, nil
-}
-
-func ddbErrorCode(err error) string {
-	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-		return apiErr.ErrorCode()
-	}
-	return err.Error()
 }
 
 // ---------------------------------------------------------------------------
@@ -766,6 +780,8 @@ type efsFileSystem struct {
 	Encrypted             bool             `json:"encrypted"`
 	KmsKeyId              string           `json:"kms_key_id,omitempty"`
 	CreationTime          string           `json:"creation_time,omitempty"`
+	AccessPoints          readOutcome      `json:"access_points"`
+	AccessPointIds        []string         `json:"access_point_ids,omitempty"`
 	MountTargetsOutcome   string           `json:"mount_targets_outcome"`
 	MountTargetsErrorCode string           `json:"mount_targets_error_code,omitempty"`
 	MountTargets          []efsMountTarget `json:"mount_targets,omitempty"`
@@ -804,17 +820,29 @@ func captureEFS(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	for i := range systems {
-		mts, err := captureEFSMountTargets(ctx, client, systems[i].FileSystemId)
-		if err != nil {
-			systems[i].MountTargetsOutcome = "error"
-			systems[i].MountTargetsErrorCode = ddbErrorCode(err)
-			continue
-		}
-		systems[i].MountTargetsOutcome = "ok"
-		systems[i].MountTargets = mts
+		var err error
+		systems[i].AccessPointIds, err = captureEFSAccessPoints(ctx, client, systems[i].FileSystemId)
+		systems[i].AccessPoints = readOf(err)
+		systems[i].MountTargets, err = captureEFSMountTargets(ctx, client, systems[i].FileSystemId)
+		systems[i].MountTargetsOutcome, systems[i].MountTargetsErrorCode = outcomeOf(err)
 	}
 
 	return efsData{FileSystems: systems}, nil
+}
+
+func captureEFSAccessPoints(ctx context.Context, client *efs.Client, fsID string) ([]string, error) {
+	var ids []string
+	paginator := efs.NewDescribeAccessPointsPaginator(client, &efs.DescribeAccessPointsInput{FileSystemId: aws.String(fsID)})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return ids, err
+		}
+		for _, ap := range out.AccessPoints {
+			ids = append(ids, aws.ToString(ap.AccessPointId))
+		}
+	}
+	return ids, nil
 }
 
 func captureEFSMountTargets(ctx context.Context, client *efs.Client, fsID string) ([]efsMountTarget, error) {

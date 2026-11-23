@@ -1,5 +1,7 @@
 package main
 
+import wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+
 // captures maps every a9s resource short name to its capture function.
 // captureOrder fixes the execution order (and the stderr progress log);
 // the JSON output itself is a map, so file order is alphabetical.
@@ -73,6 +75,11 @@ var captures = map[string]captureFunc{
 	"ssm":       captureSSM,
 
 	// devops & monitoring (ops.go)
+	"lt":       captureLT,
+	"vpc-peer": captureVPCPeer,
+	"transfer": captureTransfer,
+	"mwaa":     captureMWAA,
+
 	"cb":           captureCB,
 	"pipeline":     capturePipeline,
 	"codeartifact": captureCodeArtifact,
@@ -93,4 +100,21 @@ var captureOrder = []string{
 	"sns", "sns-sub", "sqs", "eb-rule", "kinesis", "msk", "ses", "sfn",
 	"iam-user", "iam-group", "role", "policy", "kms", "secrets", "acm", "waf", "ssm",
 	"cb", "pipeline", "codeartifact", "cfn", "alarm", "logs", "trail", "ct-events",
+	"lt", "vpc-peer", "transfer", "mwaa",
 }
+
+// Types whose rows come from more than one list call are declared here, each
+// with the calls that make it up; the app lists the same calls.
+var (
+	captureAPIGW   = composed[apigwData]("apigw", fixed(apigwRESTPart(), apigwHTTPPart()), nil)
+	captureEBRule  = composed[ebRuleData]("eb-rule", ebRuleParts, ebRuleTargetsFinish)
+	captureWAF     = composed[wafData]("waf", fixed(wafScopePart(wafv2types.ScopeRegional), wafScopePart(wafv2types.ScopeCloudfront)), wafDescribe)
+	captureDBC     = composed[dbcData]("dbc", fixed(dbcDocDBPart(), dbcRDSPart()), dbcDedup)
+	captureDBCSnap = composed[dbcSnapData]("dbc-snap", fixed(dbcSnapDocDBPart(), dbcSnapRDSPart()), dbcSnapDedup)
+	captureEC2     = composed[ec2Data]("ec2", ec2Parts, nil)
+	captureEBS     = composed[ebsData]("ebs", ebsParts, nil)
+	captureDBI     = composed[dbiData]("dbi", dbiParts, nil)
+	captureECSSvc  = composed[ecsSvcData]("ecs-svc", perParent(listECSClusterArns, ecsSvcCluster), nil)
+	captureECSTask = composed[ecsTaskData]("ecs-task", perParent(listECSClusterArns, ecsTaskCluster), nil)
+	captureNG      = composed[ngData]("ng", perParent(listEKSClusterNames, ngCluster), nil)
+)

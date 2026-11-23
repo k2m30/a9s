@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -10,11 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	smithy "github.com/aws/smithy-go"
 )
 
 // iamUserData is the raw, per-account view of IAM users the checklist generator reads.
@@ -29,25 +28,22 @@ type iamUser struct {
 	Arn              string         `json:"arn"`
 	CreateDate       string         `json:"create_date,omitempty"`
 	PasswordLastUsed string         `json:"password_last_used,omitempty"`
+	AccessKeysRead   readOutcome    `json:"access_keys_read"`
 	AccessKeys       []iamAccessKey `json:"access_keys"`
-	LoginProfile     iamOutcome     `json:"login_profile"`
-	MFADeviceCount   int            `json:"mfa_device_count"`
+	// LoginProfile is "present", or outcomeNone when the user has no console
+	// password.
+	LoginProfile   readOutcome  `json:"login_profile"`
+	MFADevices     *readOutcome `json:"mfa_devices,omitempty"`
+	MFADeviceCount int          `json:"mfa_device_count,omitempty"`
 }
 
 // iamAccessKey captures ListAccessKeys + GetAccessKeyLastUsed per key.
 type iamAccessKey struct {
-	AccessKeyId  string `json:"access_key_id"`
-	Status       string `json:"status"`
-	CreateDate   string `json:"create_date,omitempty"`
-	LastUsedDate string `json:"last_used_date,omitempty"`
-}
-
-// iamOutcome captures an outcome/error-code pair for a per-item describe call
-// that either succeeds with no useful payload (login profile exists) or fails
-// with a recorded error code (e.g. NoSuchEntity when no login profile exists).
-type iamOutcome struct {
-	Outcome   string `json:"outcome"`
-	ErrorCode string `json:"error_code,omitempty"`
+	AccessKeyId  string      `json:"access_key_id"`
+	Status       string      `json:"status"`
+	CreateDate   string      `json:"create_date,omitempty"`
+	LastUsed     readOutcome `json:"last_used"`
+	LastUsedDate string      `json:"last_used_date,omitempty"`
 }
 
 // captureIAMUser lists every IAM user (ListUsers, all pages) and captures the
@@ -73,54 +69,52 @@ func captureIAMUser(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	for i := range users {
-		users[i].AccessKeys = captureIAMUserAccessKeys(ctx, client, users[i].UserName)
+		users[i].AccessKeys, users[i].AccessKeysRead = captureIAMUserAccessKeys(ctx, client, users[i].UserName)
 		users[i].LoginProfile = captureIAMLoginProfile(ctx, client, users[i].UserName)
 		if users[i].LoginProfile.Outcome == "present" {
-			users[i].MFADeviceCount = captureIAMMFADeviceCount(ctx, client, users[i].UserName)
+			devices, err := pageAll(ctx, &iam.ListMFADevicesInput{UserName: aws.String(users[i].UserName)},
+				func(ctx context.Context, in *iam.ListMFADevicesInput) (*iam.ListMFADevicesOutput, error) {
+					return client.ListMFADevices(ctx, in)
+				},
+				func(out *iam.ListMFADevicesOutput) []iamtypes.MFADevice { return out.MFADevices }, allPages)
+			read := readOf(err)
+			users[i].MFADevices = &read
+			users[i].MFADeviceCount = len(devices)
 		}
 	}
 
 	return iamUserData{Users: users}, nil
 }
 
-func captureIAMUserAccessKeys(ctx context.Context, client *iam.Client, userName string) []iamAccessKey {
-	out, err := client.ListAccessKeys(ctx, &iam.ListAccessKeysInput{UserName: aws.String(userName)})
-	if err != nil {
-		return nil
-	}
-	keys := make([]iamAccessKey, 0, len(out.AccessKeyMetadata))
-	for _, meta := range out.AccessKeyMetadata {
+func captureIAMUserAccessKeys(ctx context.Context, client *iam.Client, userName string) ([]iamAccessKey, readOutcome) {
+	metas, err := pageAll(ctx, &iam.ListAccessKeysInput{UserName: aws.String(userName)},
+		func(ctx context.Context, in *iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error) {
+			return client.ListAccessKeys(ctx, in)
+		},
+		func(out *iam.ListAccessKeysOutput) []iamtypes.AccessKeyMetadata { return out.AccessKeyMetadata }, allPages)
+	keys := make([]iamAccessKey, 0, len(metas))
+	for _, meta := range metas {
 		key := iamAccessKey{
 			AccessKeyId: aws.ToString(meta.AccessKeyId),
 			Status:      string(meta.Status),
 			CreateDate:  snapFormatTime(meta.CreateDate),
 		}
-		lastUsedOut, err := client.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: meta.AccessKeyId})
-		if err == nil && lastUsedOut.AccessKeyLastUsed != nil {
+		lastUsedOut, lastUsedErr := client.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: meta.AccessKeyId})
+		key.LastUsed = readOf(lastUsedErr)
+		if lastUsedOut != nil && lastUsedOut.AccessKeyLastUsed != nil {
 			key.LastUsedDate = snapFormatTime(lastUsedOut.AccessKeyLastUsed.LastUsedDate)
 		}
 		keys = append(keys, key)
 	}
-	return keys
+	return keys, readOf(err)
 }
 
-func captureIAMLoginProfile(ctx context.Context, client *iam.Client, userName string) iamOutcome {
+func captureIAMLoginProfile(ctx context.Context, client *iam.Client, userName string) readOutcome {
 	_, err := client.GetLoginProfile(ctx, &iam.GetLoginProfileInput{UserName: aws.String(userName)})
 	if err != nil {
-		if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-			return iamOutcome{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
-		}
-		return iamOutcome{Outcome: "error", ErrorCode: err.Error()}
+		return readOf(err)
 	}
-	return iamOutcome{Outcome: "present"}
-}
-
-func captureIAMMFADeviceCount(ctx context.Context, client *iam.Client, userName string) int {
-	out, err := client.ListMFADevices(ctx, &iam.ListMFADevicesInput{UserName: aws.String(userName)})
-	if err != nil {
-		return 0
-	}
-	return len(out.MFADevices)
+	return readOutcome{Outcome: "present"}
 }
 
 // iamGroupData is the raw view of IAM groups the checklist generator reads.
@@ -129,10 +123,11 @@ type iamGroupData struct {
 }
 
 type iamGroup struct {
-	GroupName  string `json:"group_name"`
-	Arn        string `json:"arn"`
-	CreateDate string `json:"create_date,omitempty"`
-	UserCount  int    `json:"user_count"`
+	GroupName  string      `json:"group_name"`
+	Arn        string      `json:"arn"`
+	CreateDate string      `json:"create_date,omitempty"`
+	Members    readOutcome `json:"members"`
+	UserCount  int         `json:"user_count,omitempty"`
 }
 
 // captureIAMGroup lists every IAM group (ListGroups, all pages) and captures
@@ -157,11 +152,13 @@ func captureIAMGroup(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	for i := range groups {
-		out, err := client.GetGroup(ctx, &iam.GetGroupInput{GroupName: aws.String(groups[i].GroupName)})
-		if err != nil {
-			continue
-		}
-		groups[i].UserCount = len(out.Users)
+		users, err := pageAll(ctx, &iam.GetGroupInput{GroupName: aws.String(groups[i].GroupName)},
+			func(ctx context.Context, in *iam.GetGroupInput) (*iam.GetGroupOutput, error) {
+				return client.GetGroup(ctx, in)
+			},
+			func(out *iam.GetGroupOutput) []iamtypes.User { return out.Users }, allPages)
+		groups[i].Members = readOf(err)
+		groups[i].UserCount = len(users)
 	}
 
 	return iamGroupData{Groups: groups}, nil
@@ -173,11 +170,41 @@ type roleData struct {
 }
 
 type roleEntry struct {
-	RoleName                 string `json:"role_name"`
-	Arn                      string `json:"arn"`
-	CreateDate               string `json:"create_date,omitempty"`
-	AssumeRolePolicyDocument string `json:"assume_role_policy_document,omitempty"`
-	RoleLastUsedDate         string `json:"role_last_used_date,omitempty"`
+	RoleName                 string             `json:"role_name"`
+	Arn                      string             `json:"arn"`
+	CreateDate               string             `json:"create_date,omitempty"`
+	AssumeRolePolicyDocument string             `json:"assume_role_policy_document,omitempty"`
+	RoleLastUsed             readOutcome        `json:"role_last_used"`
+	RoleLastUsedDate         string             `json:"role_last_used_date,omitempty"`
+	InlinePoliciesRead       readOutcome        `json:"inline_policies_read"`
+	InlinePolicies           []roleInlinePolicy `json:"inline_policies,omitempty"`
+}
+
+type roleInlinePolicy struct {
+	PolicyName string `json:"policy_name"`
+	readOutcome
+	// Document is URL-encoded, as IAM returns it.
+	Document string `json:"document,omitempty"`
+}
+
+func captureRoleInlinePolicies(ctx context.Context, client *iam.Client, roleName string) ([]roleInlinePolicy, readOutcome) {
+	var policies []roleInlinePolicy
+	paginator := iam.NewListRolePoliciesPaginator(client, &iam.ListRolePoliciesInput{RoleName: aws.String(roleName)})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return policies, readOf(err)
+		}
+		for _, name := range out.PolicyNames {
+			got, getErr := client.GetRolePolicy(ctx, &iam.GetRolePolicyInput{RoleName: aws.String(roleName), PolicyName: aws.String(name)})
+			p := roleInlinePolicy{PolicyName: name, readOutcome: readOf(getErr)}
+			if got != nil {
+				p.Document = aws.ToString(got.PolicyDocument)
+			}
+			policies = append(policies, p)
+		}
+	}
+	return policies, readOf(nil)
 }
 
 // captureRole lists every IAM role (ListRoles, all pages) and captures
@@ -203,11 +230,18 @@ func captureRole(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	for i := range roles {
-		out, err := client.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roles[i].RoleName)})
-		if err != nil || out.Role == nil || out.Role.RoleLastUsed == nil {
-			continue
+		roles[i].InlinePolicies, roles[i].InlinePoliciesRead = captureRoleInlinePolicies(ctx, client, roles[i].RoleName)
+		role, read := readOne(func() (*iamtypes.Role, error) {
+			out, err := client.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(roles[i].RoleName)})
+			if err != nil {
+				return nil, err
+			}
+			return out.Role, nil
+		})
+		roles[i].RoleLastUsed = read
+		if role != nil && role.RoleLastUsed != nil {
+			roles[i].RoleLastUsedDate = snapFormatTime(role.RoleLastUsed.LastUsedDate)
 		}
-		roles[i].RoleLastUsedDate = snapFormatTime(out.Role.RoleLastUsed.LastUsedDate)
 	}
 
 	return roleData{Roles: roles}, nil
@@ -216,16 +250,59 @@ func captureRole(ctx context.Context, cfg aws.Config) (any, error) {
 // policyData is the raw view of customer-managed IAM policies the checklist generator reads.
 type policyData struct {
 	Policies []policyEntry `json:"policies"`
+	// GroupInlinePolicies are the policies embedded in groups, which the
+	// policy list shows as rows of their own.
+	GroupsRead          readOutcome           `json:"groups_read"`
+	GroupInlinePolicies []groupInlinePolicies `json:"group_inline_policies"`
 }
 
 type policyEntry struct {
-	PolicyName       string `json:"policy_name"`
-	Arn              string `json:"arn"`
-	AttachmentCount  int32  `json:"attachment_count"`
-	DefaultVersionId string `json:"default_version_id,omitempty"`
-	CreateDate       string `json:"create_date,omitempty"`
-	UpdateDate       string `json:"update_date,omitempty"`
-	Document         string `json:"document,omitempty"`
+	PolicyName       string      `json:"policy_name"`
+	Arn              string      `json:"arn"`
+	AttachmentCount  int32       `json:"attachment_count"`
+	DefaultVersionId string      `json:"default_version_id,omitempty"`
+	CreateDate       string      `json:"create_date,omitempty"`
+	UpdateDate       string      `json:"update_date,omitempty"`
+	DocumentRead     readOutcome `json:"document_read"`
+	Document         string      `json:"document,omitempty"`
+}
+
+type groupInlinePolicies struct {
+	GroupName string `json:"group_name"`
+	readOutcome
+	PolicyNames []string `json:"policy_names,omitempty"`
+}
+
+func captureGroupInlinePolicies(ctx context.Context, client *iam.Client) (readOutcome, []groupInlinePolicies) {
+	groups, err := pageAll(ctx, &iam.ListGroupsInput{},
+		func(ctx context.Context, in *iam.ListGroupsInput) (*iam.ListGroupsOutput, error) {
+			return client.ListGroups(ctx, in)
+		},
+		func(out *iam.ListGroupsOutput) []iamtypes.Group { return out.Groups }, allPages)
+	names := make([]string, 0, len(groups))
+	for _, g := range groups {
+		names = append(names, aws.ToString(g.GroupName))
+	}
+	rows := describeListed(names, 1, func(batch []string) (map[string][]string, []string, error) {
+		policies, listErr := pageAll(ctx, &iam.ListGroupPoliciesInput{GroupName: aws.String(batch[0])},
+			func(ctx context.Context, in *iam.ListGroupPoliciesInput) (*iam.ListGroupPoliciesOutput, error) {
+				return client.ListGroupPolicies(ctx, in)
+			},
+			func(out *iam.ListGroupPoliciesOutput) []string { return out.PolicyNames }, allPages)
+		if listErr != nil {
+			return nil, nil, listErr
+		}
+		return map[string][]string{batch[0]: policies}, nil, nil
+	})
+	out := make([]groupInlinePolicies, 0, len(rows))
+	for _, row := range rows {
+		g := groupInlinePolicies{GroupName: row.id, readOutcome: row.read}
+		if row.item != nil {
+			g.PolicyNames = *row.item
+		}
+		out = append(out, g)
+	}
+	return readOf(err), out
 }
 
 // capturePolicy lists every customer-managed policy (ListPolicies with
@@ -259,41 +336,56 @@ func capturePolicy(ctx context.Context, cfg aws.Config) (any, error) {
 		if policies[i].DefaultVersionId == "" {
 			continue
 		}
-		out, err := client.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
-			PolicyArn: aws.String(policies[i].Arn),
-			VersionId: aws.String(policies[i].DefaultVersionId),
+		version, read := readOne(func() (*iamtypes.PolicyVersion, error) {
+			out, err := client.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
+				PolicyArn: aws.String(policies[i].Arn),
+				VersionId: aws.String(policies[i].DefaultVersionId),
+			})
+			if err != nil {
+				return nil, err
+			}
+			return out.PolicyVersion, nil
 		})
-		if err != nil || out.PolicyVersion == nil {
-			continue
+		policies[i].DocumentRead = read
+		if version != nil {
+			policies[i].Document = aws.ToString(version.Document)
 		}
-		policies[i].Document = aws.ToString(out.PolicyVersion.Document)
 	}
 
-	return policyData{Policies: policies}, nil
+	data := policyData{Policies: policies}
+	data.GroupsRead, data.GroupInlinePolicies = captureGroupInlinePolicies(ctx, client)
+	return data, nil
 }
 
 // kmsData is the raw view of KMS keys the checklist generator reads.
 type kmsData struct {
 	Keys []kmsKey `json:"keys"`
+	// Aliases is the account's ListAliases answer the key list names its keys
+	// by.
+	Aliases readOutcome `json:"aliases"`
 }
 
 type kmsKey struct {
-	KeyId               string     `json:"key_id"`
-	KeyArn              string     `json:"key_arn"`
-	KeyState            string     `json:"key_state,omitempty"`
-	KeyManager          string     `json:"key_manager,omitempty"`
-	Describe            iamOutcome `json:"describe"`
-	KeyRotationEnabled  bool       `json:"key_rotation_enabled"`
-	RotationStatusKnown bool       `json:"rotation_status_known"`
+	KeyId              string       `json:"key_id"`
+	KeyArn             string       `json:"key_arn"`
+	AliasNames         []string     `json:"alias_names,omitempty"`
+	Describe           readOutcome  `json:"describe"`
+	KeyState           string       `json:"key_state,omitempty"`
+	KeyManager         string       `json:"key_manager,omitempty"`
+	KeySpec            string       `json:"key_spec,omitempty"`
+	Origin             string       `json:"origin,omitempty"`
+	CustomKeyStoreId   string       `json:"custom_key_store_id,omitempty"`
+	Rotation           *readOutcome `json:"rotation,omitempty"`
+	KeyRotationEnabled bool         `json:"key_rotation_enabled,omitempty"`
 }
 
-// captureKMS lists every KMS key (ListKeys, all pages) and captures
-// DescribeKey (KeyState, KeyManager) + GetKeyRotationStatus — all KMS
-// attention signals are Wave 2.
+// ListKeys returns ids only: the state and manager come from DescribeKey, the
+// names from the account's aliases.
 func captureKMS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := kms.NewFromConfig(cfg)
 
-	var keys []kmsKey
+	var ids []string
+	arns := map[string]string{}
 	paginator := kms.NewListKeysPaginator(client, &kms.ListKeysInput{})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
@@ -301,37 +393,69 @@ func captureKMS(ctx context.Context, cfg aws.Config) (any, error) {
 			return nil, err
 		}
 		for _, k := range out.Keys {
-			keys = append(keys, kmsKey{
-				KeyId:  aws.ToString(k.KeyId),
-				KeyArn: aws.ToString(k.KeyArn),
-			})
+			ids = append(ids, aws.ToString(k.KeyId))
+			arns[aws.ToString(k.KeyId)] = aws.ToString(k.KeyArn)
 		}
 	}
 
-	for i := range keys {
-		describeOut, err := client.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(keys[i].KeyId)})
+	aliases, aliasesRead := captureKMSAliases(ctx, client)
+	rows := describeListed(ids, 1, func(batch []string) (map[string]kmstypes.KeyMetadata, []string, error) {
+		out, err := client.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(batch[0])})
 		if err != nil {
-			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-				keys[i].Describe = iamOutcome{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
-			} else {
-				keys[i].Describe = iamOutcome{Outcome: "error", ErrorCode: err.Error()}
+			return nil, nil, err
+		}
+		return describedAs(batch[0], out.KeyMetadata), nil, nil
+	})
+	keys := make([]kmsKey, 0, len(rows))
+	for _, row := range rows {
+		key := kmsKey{KeyId: row.id, KeyArn: arns[row.id], AliasNames: aliases[row.id], Describe: row.read}
+		if m := row.item; m != nil {
+			key.KeyState = string(m.KeyState)
+			key.KeyManager = string(m.KeyManager)
+			key.KeySpec = string(m.KeySpec)
+			key.Origin = string(m.Origin)
+			key.CustomKeyStoreId = aws.ToString(m.CustomKeyStoreId)
+			if kmsKeyRotates(m) {
+				rotationOut, err := client.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{KeyId: aws.String(row.id)})
+				read := readOf(err)
+				key.Rotation = &read
+				if rotationOut != nil {
+					key.KeyRotationEnabled = rotationOut.KeyRotationEnabled
+				}
 			}
-			continue
 		}
-		keys[i].Describe = iamOutcome{Outcome: "ok"}
-		if describeOut.KeyMetadata != nil {
-			keys[i].KeyState = string(describeOut.KeyMetadata.KeyState)
-			keys[i].KeyManager = string(describeOut.KeyMetadata.KeyManager)
-		}
-
-		rotationOut, err := client.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{KeyId: aws.String(keys[i].KeyId)})
-		if err == nil {
-			keys[i].KeyRotationEnabled = rotationOut.KeyRotationEnabled
-			keys[i].RotationStatusKnown = true
-		}
+		keys = append(keys, key)
 	}
 
-	return kmsData{Keys: keys}, nil
+	return kmsData{Keys: keys, Aliases: aliasesRead}, nil
+}
+
+// kmsKeyRotates reports whether a key's rotation is the operator's to set:
+// automatic rotation exists only for a symmetric encryption key whose key
+// material KMS generated, outside a custom key store, and KMS rotates
+// AWS-managed keys itself.
+func kmsKeyRotates(m *kmstypes.KeyMetadata) bool {
+	return m.KeyManager == kmstypes.KeyManagerTypeCustomer && m.KeySpec == kmstypes.KeySpecSymmetricDefault &&
+		m.Origin == kmstypes.OriginTypeAwsKms && aws.ToString(m.CustomKeyStoreId) == ""
+}
+
+// captureKMSAliases returns the alias names of every key, in ListAliases
+// order.
+func captureKMSAliases(ctx context.Context, client *kms.Client) (map[string][]string, readOutcome) {
+	byKey := map[string][]string{}
+	paginator := kms.NewListAliasesPaginator(client, &kms.ListAliasesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return byKey, readOf(err)
+		}
+		for _, a := range out.Aliases {
+			if id := aws.ToString(a.TargetKeyId); id != "" {
+				byKey[id] = append(byKey[id], aws.ToString(a.AliasName))
+			}
+		}
+	}
+	return byKey, readOf(nil)
 }
 
 // secretsData is the raw view of Secrets Manager secrets the checklist generator reads.
@@ -340,27 +464,25 @@ type secretsData struct {
 }
 
 type secretEntry struct {
-	Name                   string     `json:"name"`
-	Arn                    string     `json:"arn"`
-	KmsKeyId               string     `json:"kms_key_id,omitempty"`
-	RotationEnabled        bool       `json:"rotation_enabled"`
-	RotationLambdaARN      string     `json:"rotation_lambda_arn,omitempty"`
-	LastRotatedDate        string     `json:"last_rotated_date,omitempty"`
-	NextRotationDate       string     `json:"next_rotation_date,omitempty"`
-	LastAccessedDate       string     `json:"last_accessed_date,omitempty"`
-	DeletedDate            string     `json:"deleted_date,omitempty"`
-	AutomaticallyAfterDays int64      `json:"automatically_after_days,omitempty"`
-	Describe               iamOutcome `json:"describe"`
-	StuckOnAwsPending      bool       `json:"stuck_on_aws_pending"`
+	Name                   string `json:"name"`
+	Arn                    string `json:"arn"`
+	KmsKeyId               string `json:"kms_key_id,omitempty"`
+	RotationEnabled        bool   `json:"rotation_enabled"`
+	RotationLambdaARN      string `json:"rotation_lambda_arn,omitempty"`
+	LastRotatedDate        string `json:"last_rotated_date,omitempty"`
+	NextRotationDate       string `json:"next_rotation_date,omitempty"`
+	LastAccessedDate       string `json:"last_accessed_date,omitempty"`
+	DeletedDate            string `json:"deleted_date,omitempty"`
+	AutomaticallyAfterDays int64  `json:"automatically_after_days,omitempty"`
 }
 
-// captureSecrets lists every secret (ListSecrets, all pages) and captures
-// DescribeSecret's VersionIdsToStages (stuck-AWSPENDING signal).
+// captureSecrets lists every secret (ListSecrets, all pages, with the secrets
+// scheduled for deletion); every secret signal reads the list entry.
 func captureSecrets(ctx context.Context, cfg aws.Config) (any, error) {
 	client := secretsmanager.NewFromConfig(cfg)
 
 	var secrets []secretEntry
-	paginator := secretsmanager.NewListSecretsPaginator(client, &secretsmanager.ListSecretsInput{})
+	paginator := secretsmanager.NewListSecretsPaginator(client, &secretsmanager.ListSecretsInput{IncludePlannedDeletion: aws.Bool(true)})
 	for paginator.HasMorePages() {
 		out, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -385,26 +507,6 @@ func captureSecrets(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 	}
 
-	for i := range secrets {
-		out, err := client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{SecretId: aws.String(secrets[i].Arn)})
-		if err != nil {
-			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-				secrets[i].Describe = iamOutcome{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
-			} else {
-				secrets[i].Describe = iamOutcome{Outcome: "error", ErrorCode: err.Error()}
-			}
-			continue
-		}
-		secrets[i].Describe = iamOutcome{Outcome: "ok"}
-		for _, stages := range out.VersionIdsToStages {
-			for _, stage := range stages {
-				if stage == "AWSPENDING" {
-					secrets[i].StuckOnAwsPending = true
-				}
-			}
-		}
-	}
-
 	return secretsData{Secrets: secrets}, nil
 }
 
@@ -414,19 +516,17 @@ type acmData struct {
 }
 
 type acmCertificate struct {
-	CertificateArn          string     `json:"certificate_arn"`
-	DomainName              string     `json:"domain_name,omitempty"`
-	Status                  string     `json:"status,omitempty"`
-	NotBefore               string     `json:"not_before,omitempty"`
-	NotAfter                string     `json:"not_after,omitempty"`
-	InUse                   bool       `json:"in_use"`
-	Describe                iamOutcome `json:"describe"`
-	RenewalStatus           string     `json:"renewal_status,omitempty"`
-	FailedValidationDomains []string   `json:"failed_validation_domains,omitempty"`
+	CertificateArn string `json:"certificate_arn"`
+	DomainName     string `json:"domain_name,omitempty"`
+	Status         string `json:"status,omitempty"`
+	NotBefore      string `json:"not_before,omitempty"`
+	NotAfter       string `json:"not_after,omitempty"`
+	InUse          bool   `json:"in_use"`
+	KeyAlgorithm   string `json:"key_algorithm,omitempty"`
 }
 
-// captureACM lists every certificate (ListCertificates, all pages) and
-// captures DescribeCertificate's RenewalSummary + DomainValidationOptions.
+// captureACM lists every certificate (ListCertificates, all pages); every
+// certificate signal reads the list summary.
 func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 	client := acm.NewFromConfig(cfg)
 
@@ -450,31 +550,8 @@ func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 				NotBefore:      snapFormatTime(c.NotBefore),
 				NotAfter:       snapFormatTime(c.NotAfter),
 				InUse:          aws.ToBool(c.InUse),
+				KeyAlgorithm:   string(c.KeyAlgorithm),
 			})
-		}
-	}
-
-	for i := range certs {
-		out, err := client.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: aws.String(certs[i].CertificateArn)})
-		if err != nil {
-			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-				certs[i].Describe = iamOutcome{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
-			} else {
-				certs[i].Describe = iamOutcome{Outcome: "error", ErrorCode: err.Error()}
-			}
-			continue
-		}
-		certs[i].Describe = iamOutcome{Outcome: "ok"}
-		if out.Certificate == nil {
-			continue
-		}
-		if out.Certificate.RenewalSummary != nil {
-			certs[i].RenewalStatus = string(out.Certificate.RenewalSummary.RenewalStatus)
-		}
-		for _, dv := range out.Certificate.DomainValidationOptions {
-			if dv.ValidationStatus == "FAILED" {
-				certs[i].FailedValidationDomains = append(certs[i].FailedValidationDomains, aws.ToString(dv.DomainName))
-			}
 		}
 	}
 
@@ -485,92 +562,78 @@ func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 // REGIONAL and CLOUDFRONT scopes.
 type wafData struct {
 	WebACLs []wafWebACL `json:"web_acls"`
+	partialRead
 }
 
 type wafWebACL struct {
-	Name                 string     `json:"name"`
-	Id                   string     `json:"id"`
-	ARN                  string     `json:"arn"`
-	Scope                string     `json:"scope"`
-	Describe             iamOutcome `json:"describe"`
-	RuleCount            int        `json:"rule_count"`
-	DefaultActionIsAllow bool       `json:"default_action_is_allow"`
+	Name                 string      `json:"name"`
+	Id                   string      `json:"id"`
+	ARN                  string      `json:"arn"`
+	Scope                string      `json:"scope"`
+	Describe             readOutcome `json:"describe"`
+	RuleCount            int         `json:"rule_count,omitempty"`
+	DefaultActionIsAllow bool        `json:"default_action_is_allow,omitempty"`
 }
 
-// captureWAF lists Web ACLs in both the REGIONAL and the CLOUDFRONT scope,
-// then captures GetWebACL's Rules/DefaultAction. AWS serves every
+// wafClientFor returns the client that serves a scope. AWS serves every
 // CLOUDFRONT-scope operation from the us-east-1 endpoint alone, whatever
 // region the profile names, so that scope is read through a client of its
 // own.
-func captureWAF(ctx context.Context, cfg aws.Config) (any, error) {
-	edgeCfg := cfg.Copy()
-	edgeCfg.Region = "us-east-1"
-	regional, edge := wafv2.NewFromConfig(cfg), wafv2.NewFromConfig(edgeCfg)
-	clientFor := func(scope wafv2types.Scope) *wafv2.Client {
-		if scope == wafv2types.ScopeCloudfront {
-			return edge
-		}
-		return regional
+func wafClientFor(cfg aws.Config, scope wafv2types.Scope) *wafv2.Client {
+	if scope == wafv2types.ScopeCloudfront {
+		edgeCfg := cfg.Copy()
+		edgeCfg.Region = "us-east-1"
+		return wafv2.NewFromConfig(edgeCfg)
 	}
+	return wafv2.NewFromConfig(cfg)
+}
 
-	scopes := []wafv2types.Scope{wafv2types.ScopeRegional, wafv2types.ScopeCloudfront}
-
-	var acls []wafWebACL
-	for _, scope := range scopes {
-		marker := ""
-		for {
-			in := &wafv2.ListWebACLsInput{Scope: scope}
-			if marker != "" {
-				in.NextMarker = aws.String(marker)
-			}
-			out, err := clientFor(scope).ListWebACLs(ctx, in)
-			if err != nil {
-				return nil, err
-			}
-			for _, w := range out.WebACLs {
-				acls = append(acls, wafWebACL{
-					Name:  aws.ToString(w.Name),
-					Id:    aws.ToString(w.Id),
-					ARN:   aws.ToString(w.ARN),
-					Scope: string(scope),
-				})
-			}
-			if out.NextMarker == nil || aws.ToString(out.NextMarker) == "" {
-				break
-			}
-			marker = aws.ToString(out.NextMarker)
+func wafScopePart(scope wafv2types.Scope) part[wafData] {
+	return part[wafData]{name: string(scope), run: func(ctx context.Context, cfg aws.Config, d *wafData) error {
+		client := wafClientFor(cfg, scope)
+		summaries, err := pageAll(ctx, &wafv2.ListWebACLsInput{Scope: scope},
+			func(ctx context.Context, in *wafv2.ListWebACLsInput) (*wafv2.ListWebACLsOutput, error) {
+				return client.ListWebACLs(ctx, in)
+			},
+			func(out *wafv2.ListWebACLsOutput) []wafv2types.WebACLSummary { return out.WebACLs }, allPages)
+		for _, w := range summaries {
+			d.WebACLs = append(d.WebACLs, wafWebACL{
+				Name:  aws.ToString(w.Name),
+				Id:    aws.ToString(w.Id),
+				ARN:   aws.ToString(w.ARN),
+				Scope: string(scope),
+			})
 		}
-	}
+		return err
+	}}
+}
 
+func wafDescribe(ctx context.Context, cfg aws.Config, d *wafData) error {
+	acls := d.WebACLs
 	for i := range acls {
 		scope := wafv2types.ScopeRegional
 		if acls[i].Scope == string(wafv2types.ScopeCloudfront) {
 			scope = wafv2types.ScopeCloudfront
 		}
-		out, err := clientFor(scope).GetWebACL(ctx, &wafv2.GetWebACLInput{
-			Name:  aws.String(acls[i].Name),
-			Id:    aws.String(acls[i].Id),
-			Scope: scope,
-		})
-		if err != nil {
-			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
-				acls[i].Describe = iamOutcome{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
-			} else {
-				acls[i].Describe = iamOutcome{Outcome: "error", ErrorCode: err.Error()}
+		acl, read := readOne(func() (*wafv2types.WebACL, error) {
+			out, err := wafClientFor(cfg, scope).GetWebACL(ctx, &wafv2.GetWebACLInput{
+				Name:  aws.String(acls[i].Name),
+				Id:    aws.String(acls[i].Id),
+				Scope: scope,
+			})
+			if err != nil {
+				return nil, err
 			}
-			continue
-		}
-		acls[i].Describe = iamOutcome{Outcome: "ok"}
-		if out.WebACL == nil {
-			continue
-		}
-		acls[i].RuleCount = len(out.WebACL.Rules)
-		if out.WebACL.DefaultAction != nil {
-			acls[i].DefaultActionIsAllow = out.WebACL.DefaultAction.Allow != nil
+			return out.WebACL, nil
+		})
+		acls[i].Describe = read
+		if acl != nil {
+			acls[i].RuleCount = len(acl.Rules)
+			acls[i].DefaultActionIsAllow = acl.DefaultAction != nil && acl.DefaultAction.Allow != nil
 		}
 	}
 
-	return wafData{WebACLs: acls}, nil
+	return nil
 }
 
 // ssmData is the raw view of SSM parameters the checklist generator reads.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -13,8 +14,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type ec2Data struct {
-	Instances []ec2Instance `json:"instances"`
-	Statuses  []ec2Status   `json:"instance_statuses"`
+	Instances    []ec2Instance `json:"instances"`
+	StatusesRead readOutcome   `json:"instance_statuses_read"`
+	Statuses     []ec2Status   `json:"instance_statuses"`
+	partialRead
 }
 
 type ec2Instance struct {
@@ -59,95 +62,106 @@ type ec2StatusEvent struct {
 	NotAfter  string `json:"not_after,omitempty"`
 }
 
-func captureEC2(ctx context.Context, cfg aws.Config) (any, error) {
+// ec2Parts lists the instances; the account-wide status read is a part of its
+// own, so a refused or failed status read keeps the instances.
+func ec2Parts(ctx context.Context, cfg aws.Config) ([]part[ec2Data], error) {
 	client := ec2.NewFromConfig(cfg)
-
+	reservations, err := pageAll(ctx, &ec2.DescribeInstancesInput{},
+		func(ctx context.Context, in *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+			return client.DescribeInstances(ctx, in)
+		},
+		func(out *ec2.DescribeInstancesOutput) []types.Reservation { return out.Reservations }, allPages)
+	if len(reservations) == 0 {
+		return nil, err
+	}
 	var instances []ec2Instance
-	pager := ec2.NewDescribeInstancesPaginator(client, &ec2.DescribeInstancesInput{})
-	for pager.HasMorePages() {
-		out, err := pager.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range out.Reservations {
-			for _, i := range r.Instances {
-				inst := ec2Instance{
-					InstanceId:            aws.ToString(i.InstanceId),
-					ImageId:               aws.ToString(i.ImageId),
-					SubnetId:              aws.ToString(i.SubnetId),
-					VpcId:                 aws.ToString(i.VpcId),
-					LaunchTime:            snapFormatTime(i.LaunchTime),
-					StateTransitionReason: aws.ToString(i.StateTransitionReason),
-				}
-				if i.State != nil {
-					inst.State = string(i.State.Name)
-				}
-				if i.StateReason != nil {
-					inst.StateReasonCode = aws.ToString(i.StateReason.Code)
-					inst.StateReasonMessage = aws.ToString(i.StateReason.Message)
-				}
-				if i.IamInstanceProfile != nil {
-					inst.IamInstanceProfileArn = aws.ToString(i.IamInstanceProfile.Arn)
-				}
-				for _, sg := range i.SecurityGroups {
-					inst.SecurityGroups = append(inst.SecurityGroups, ec2GroupRef{
-						GroupId:   aws.ToString(sg.GroupId),
-						GroupName: aws.ToString(sg.GroupName),
-					})
-				}
-				for _, ni := range i.NetworkInterfaces {
-					inst.NetworkInterfaceIds = append(inst.NetworkInterfaceIds, aws.ToString(ni.NetworkInterfaceId))
-				}
-				for _, bdm := range i.BlockDeviceMappings {
-					bd := ec2BlockDevice{DeviceName: aws.ToString(bdm.DeviceName)}
-					if bdm.Ebs != nil {
-						bd.VolumeId = aws.ToString(bdm.Ebs.VolumeId)
-					}
-					inst.BlockDeviceMappings = append(inst.BlockDeviceMappings, bd)
-				}
-				if len(i.Tags) > 0 {
-					inst.Tags = make(map[string]string, len(i.Tags))
-					for _, t := range i.Tags {
-						inst.Tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
-					}
-				}
-				instances = append(instances, inst)
-			}
+	for _, r := range reservations {
+		for _, i := range r.Instances {
+			instances = append(instances, ec2InstanceOf(i))
 		}
 	}
+	return []part[ec2Data]{
+		{name: "instances", run: func(_ context.Context, _ aws.Config, d *ec2Data) error {
+			d.Instances = instances
+			return nil
+		}},
+		{name: "instance_statuses", run: ec2Statuses},
+	}, err
+}
 
-	var statuses []ec2Status
-	statusPager := ec2.NewDescribeInstanceStatusPaginator(client, &ec2.DescribeInstanceStatusInput{
-		IncludeAllInstances: aws.Bool(true),
-	})
-	for statusPager.HasMorePages() {
-		out, err := statusPager.NextPage(ctx)
-		if err != nil {
-			return nil, err
+func ec2InstanceOf(i types.Instance) ec2Instance {
+	inst := ec2Instance{
+		InstanceId:            aws.ToString(i.InstanceId),
+		ImageId:               aws.ToString(i.ImageId),
+		SubnetId:              aws.ToString(i.SubnetId),
+		VpcId:                 aws.ToString(i.VpcId),
+		LaunchTime:            snapFormatTime(i.LaunchTime),
+		StateTransitionReason: aws.ToString(i.StateTransitionReason),
+	}
+	if i.State != nil {
+		inst.State = string(i.State.Name)
+	}
+	if i.StateReason != nil {
+		inst.StateReasonCode = aws.ToString(i.StateReason.Code)
+		inst.StateReasonMessage = aws.ToString(i.StateReason.Message)
+	}
+	if i.IamInstanceProfile != nil {
+		inst.IamInstanceProfileArn = aws.ToString(i.IamInstanceProfile.Arn)
+	}
+	for _, sg := range i.SecurityGroups {
+		inst.SecurityGroups = append(inst.SecurityGroups, ec2GroupRef{
+			GroupId:   aws.ToString(sg.GroupId),
+			GroupName: aws.ToString(sg.GroupName),
+		})
+	}
+	for _, ni := range i.NetworkInterfaces {
+		inst.NetworkInterfaceIds = append(inst.NetworkInterfaceIds, aws.ToString(ni.NetworkInterfaceId))
+	}
+	for _, bdm := range i.BlockDeviceMappings {
+		bd := ec2BlockDevice{DeviceName: aws.ToString(bdm.DeviceName)}
+		if bdm.Ebs != nil {
+			bd.VolumeId = aws.ToString(bdm.Ebs.VolumeId)
 		}
-		for _, s := range out.InstanceStatuses {
-			st := ec2Status{InstanceId: aws.ToString(s.InstanceId)}
-			if s.InstanceState != nil {
-				st.InstanceStateName = string(s.InstanceState.Name)
-			}
-			if s.SystemStatus != nil {
-				st.SystemStatus = string(s.SystemStatus.Status)
-			}
-			if s.InstanceStatus != nil {
-				st.InstanceStatusStatus = string(s.InstanceStatus.Status)
-			}
-			for _, e := range s.Events {
-				st.Events = append(st.Events, ec2StatusEvent{
-					Code:      string(e.Code),
-					NotBefore: snapFormatTime(e.NotBefore),
-					NotAfter:  snapFormatTime(e.NotAfter),
-				})
-			}
-			statuses = append(statuses, st)
+		inst.BlockDeviceMappings = append(inst.BlockDeviceMappings, bd)
+	}
+	if len(i.Tags) > 0 {
+		inst.Tags = make(map[string]string, len(i.Tags))
+		for _, t := range i.Tags {
+			inst.Tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
 		}
 	}
+	return inst
+}
 
-	return ec2Data{Instances: instances, Statuses: statuses}, nil
+func ec2Statuses(ctx context.Context, cfg aws.Config, d *ec2Data) error {
+	client := ec2.NewFromConfig(cfg)
+	statuses, err := pageAll(ctx, &ec2.DescribeInstanceStatusInput{IncludeAllInstances: aws.Bool(true)},
+		func(ctx context.Context, in *ec2.DescribeInstanceStatusInput) (*ec2.DescribeInstanceStatusOutput, error) {
+			return client.DescribeInstanceStatus(ctx, in)
+		},
+		func(out *ec2.DescribeInstanceStatusOutput) []types.InstanceStatus { return out.InstanceStatuses }, allPages)
+	d.StatusesRead = readOf(err)
+	for _, s := range statuses {
+		st := ec2Status{InstanceId: aws.ToString(s.InstanceId)}
+		if s.InstanceState != nil {
+			st.InstanceStateName = string(s.InstanceState.Name)
+		}
+		if s.SystemStatus != nil {
+			st.SystemStatus = string(s.SystemStatus.Status)
+		}
+		if s.InstanceStatus != nil {
+			st.InstanceStatusStatus = string(s.InstanceStatus.Status)
+		}
+		for _, e := range s.Events {
+			st.Events = append(st.Events, ec2StatusEvent{
+				Code:      string(e.Code),
+				NotBefore: snapFormatTime(e.NotBefore),
+				NotAfter:  snapFormatTime(e.NotAfter),
+			})
+		}
+		d.Statuses = append(d.Statuses, st)
+	}
+	return err
 }
 
 // ---------------------------------------------------------------------------
@@ -226,8 +240,10 @@ func captureAMI(ctx context.Context, cfg aws.Config) (any, error) {
 // ---------------------------------------------------------------------------
 
 type ebsData struct {
-	Volumes  []ebsVolume       `json:"volumes"`
-	Statuses []ebsVolumeStatus `json:"volume_statuses"`
+	Volumes      []ebsVolume       `json:"volumes"`
+	StatusesRead readOutcome       `json:"volume_statuses_read"`
+	Statuses     []ebsVolumeStatus `json:"volume_statuses"`
+	partialRead
 }
 
 type ebsVolume struct {
@@ -260,67 +276,76 @@ type ebsVolumeEvent struct {
 	NotAfter    string `json:"not_after,omitempty"`
 }
 
-func captureEBS(ctx context.Context, cfg aws.Config) (any, error) {
+// ebsParts lists the volumes; the account-wide status read is a part of its
+// own, so a refused or failed status read keeps the volumes.
+func ebsParts(ctx context.Context, cfg aws.Config) ([]part[ebsData], error) {
 	client := ec2.NewFromConfig(cfg)
-
-	var volumes []ebsVolume
-	pager := ec2.NewDescribeVolumesPaginator(client, &ec2.DescribeVolumesInput{})
-	for pager.HasMorePages() {
-		out, err := pager.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, v := range out.Volumes {
-			vol := ebsVolume{
-				VolumeId:   aws.ToString(v.VolumeId),
-				State:      string(v.State),
-				Encrypted:  aws.ToBool(v.Encrypted),
-				CreateTime: snapFormatTime(v.CreateTime),
-				KmsKeyId:   aws.ToString(v.KmsKeyId),
-				Size:       aws.ToInt32(v.Size),
-				VolumeType: string(v.VolumeType),
-			}
-			for _, a := range v.Attachments {
-				vol.Attachments = append(vol.Attachments, ebsAttachment{
-					InstanceId: aws.ToString(a.InstanceId),
-					State:      string(a.State),
-				})
-			}
-			if len(v.Tags) > 0 {
-				vol.Tags = make(map[string]string, len(v.Tags))
-				for _, t := range v.Tags {
-					vol.Tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
-				}
-			}
-			volumes = append(volumes, vol)
-		}
+	listed, err := pageAll(ctx, &ec2.DescribeVolumesInput{},
+		func(ctx context.Context, in *ec2.DescribeVolumesInput) (*ec2.DescribeVolumesOutput, error) {
+			return client.DescribeVolumes(ctx, in)
+		},
+		func(out *ec2.DescribeVolumesOutput) []types.Volume { return out.Volumes }, allPages)
+	if len(listed) == 0 {
+		return nil, err
 	}
-
-	var statuses []ebsVolumeStatus
-	statusPager := ec2.NewDescribeVolumeStatusPaginator(client, &ec2.DescribeVolumeStatusInput{})
-	for statusPager.HasMorePages() {
-		out, err := statusPager.NextPage(ctx)
-		if err != nil {
-			return nil, err
+	volumes := make([]ebsVolume, 0, len(listed))
+	for _, v := range listed {
+		vol := ebsVolume{
+			VolumeId:   aws.ToString(v.VolumeId),
+			State:      string(v.State),
+			Encrypted:  aws.ToBool(v.Encrypted),
+			CreateTime: snapFormatTime(v.CreateTime),
+			KmsKeyId:   aws.ToString(v.KmsKeyId),
+			Size:       aws.ToInt32(v.Size),
+			VolumeType: string(v.VolumeType),
 		}
-		for _, s := range out.VolumeStatuses {
-			vs := ebsVolumeStatus{VolumeId: aws.ToString(s.VolumeId)}
-			if s.VolumeStatus != nil {
-				vs.Status = string(s.VolumeStatus.Status)
-			}
-			for _, e := range s.Events {
-				vs.Events = append(vs.Events, ebsVolumeEvent{
-					EventType:   aws.ToString(e.EventType),
-					Description: aws.ToString(e.Description),
-					NotBefore:   snapFormatTime(e.NotBefore),
-					NotAfter:    snapFormatTime(e.NotAfter),
-				})
-			}
-			statuses = append(statuses, vs)
+		for _, a := range v.Attachments {
+			vol.Attachments = append(vol.Attachments, ebsAttachment{
+				InstanceId: aws.ToString(a.InstanceId),
+				State:      string(a.State),
+			})
 		}
+		if len(v.Tags) > 0 {
+			vol.Tags = make(map[string]string, len(v.Tags))
+			for _, t := range v.Tags {
+				vol.Tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+			}
+		}
+		volumes = append(volumes, vol)
 	}
+	return []part[ebsData]{
+		{name: "volumes", run: func(_ context.Context, _ aws.Config, d *ebsData) error {
+			d.Volumes = volumes
+			return nil
+		}},
+		{name: "volume_statuses", run: ebsStatuses},
+	}, err
+}
 
-	return ebsData{Volumes: volumes, Statuses: statuses}, nil
+func ebsStatuses(ctx context.Context, cfg aws.Config, d *ebsData) error {
+	client := ec2.NewFromConfig(cfg)
+	statuses, err := pageAll(ctx, &ec2.DescribeVolumeStatusInput{},
+		func(ctx context.Context, in *ec2.DescribeVolumeStatusInput) (*ec2.DescribeVolumeStatusOutput, error) {
+			return client.DescribeVolumeStatus(ctx, in)
+		},
+		func(out *ec2.DescribeVolumeStatusOutput) []types.VolumeStatusItem { return out.VolumeStatuses }, allPages)
+	d.StatusesRead = readOf(err)
+	for _, s := range statuses {
+		vs := ebsVolumeStatus{VolumeId: aws.ToString(s.VolumeId)}
+		if s.VolumeStatus != nil {
+			vs.Status = string(s.VolumeStatus.Status)
+		}
+		for _, e := range s.Events {
+			vs.Events = append(vs.Events, ebsVolumeEvent{
+				EventType:   aws.ToString(e.EventType),
+				Description: aws.ToString(e.Description),
+				NotBefore:   snapFormatTime(e.NotBefore),
+				NotAfter:    snapFormatTime(e.NotAfter),
+			})
+		}
+		d.Statuses = append(d.Statuses, vs)
+	}
+	return err
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +354,9 @@ func captureEBS(ctx context.Context, cfg aws.Config) (any, error) {
 
 type ebsSnapData struct {
 	Snapshots []ebsSnapshot `json:"snapshots"`
+	// PublicRead is the DescribeSnapshots(RestorableByUserIds=all) answer
+	// that sets each snapshot's Public.
+	PublicRead readOutcome `json:"public_read"`
 }
 
 type ebsSnapshot struct {
@@ -342,6 +370,27 @@ type ebsSnapshot struct {
 	KmsKeyId     string `json:"kms_key_id,omitempty"`
 	Description  string `json:"description,omitempty"`
 	OwnerId      string `json:"owner_id,omitempty"`
+	Public       *bool  `json:"public,omitempty"`
+}
+
+// ebsSnapPublicIDs asks once, account-wide, which of the account's own
+// snapshots everyone may restore.
+func ebsSnapPublicIDs(ctx context.Context, client *ec2.Client) (map[string]bool, error) {
+	public := map[string]bool{}
+	pager := ec2.NewDescribeSnapshotsPaginator(client, &ec2.DescribeSnapshotsInput{
+		OwnerIds:            []string{"self"},
+		RestorableByUserIds: []string{"all"},
+	})
+	for pager.HasMorePages() {
+		out, err := pager.NextPage(ctx)
+		if err != nil {
+			return public, err
+		}
+		for _, s := range out.Snapshots {
+			public[aws.ToString(s.SnapshotId)] = true
+		}
+	}
+	return public, nil
 }
 
 func captureEBSSnap(ctx context.Context, cfg aws.Config) (any, error) {
@@ -372,7 +421,15 @@ func captureEBSSnap(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 	}
 
-	return ebsSnapData{Snapshots: snapshots}, nil
+	public, err := ebsSnapPublicIDs(ctx, client)
+	read := readOf(err)
+	for i := range snapshots {
+		if public[snapshots[i].SnapshotId] || read.Outcome == "ok" {
+			snapshots[i].Public = aws.Bool(public[snapshots[i].SnapshotId])
+		}
+	}
+
+	return ebsSnapData{Snapshots: snapshots, PublicRead: read}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +467,7 @@ func captureENI(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ec2.NewFromConfig(cfg)
 
 	var enis []eniInterface
-	pager := ec2.NewDescribeNetworkInterfacesPaginator(client, &ec2.DescribeNetworkInterfacesInput{})
+	pager := ec2.NewDescribeNetworkInterfacesPaginator(client, &ec2.DescribeNetworkInterfacesInput{IncludeManagedResources: aws.Bool(true)})
 	for pager.HasMorePages() {
 		out, err := pager.NextPage(ctx)
 		if err != nil {
@@ -575,23 +632,80 @@ func capturePermissions(perms []types.IpPermission) []sgPermission {
 // ---------------------------------------------------------------------------
 
 type vpcData struct {
-	Vpcs     []vpcVpc     `json:"vpcs"`
-	FlowLogs []vpcFlowLog `json:"flow_logs"`
+	Vpcs []vpcVpc `json:"vpcs"`
 }
 
 type vpcVpc struct {
-	VpcId     string            `json:"vpc_id"`
-	State     string            `json:"state,omitempty"`
-	CidrBlock string            `json:"cidr_block,omitempty"`
-	IsDefault bool              `json:"is_default"`
-	OwnerId   string            `json:"owner_id,omitempty"`
-	Tags      map[string]string `json:"tags,omitempty"`
+	VpcId       string            `json:"vpc_id"`
+	State       string            `json:"state,omitempty"`
+	CidrBlock   string            `json:"cidr_block,omitempty"`
+	IsDefault   bool              `json:"is_default"`
+	OwnerId     string            `json:"owner_id,omitempty"`
+	Tags        map[string]string `json:"tags,omitempty"`
+	SubnetsRead readOutcome       `json:"subnets_read"`
+	SubnetIds   []string          `json:"subnet_ids,omitempty"`
+	// FlowLogs are the flow logs on the VPC or on any of its subnets: a flow
+	// log on every subnet logs the VPC's traffic as one on the VPC does.
+	FlowLogsRead readOutcome  `json:"flow_logs_read"`
+	FlowLogs     []vpcFlowLog `json:"flow_logs,omitempty"`
 }
 
 type vpcFlowLog struct {
-	FlowLogId     string `json:"flow_log_id"`
-	ResourceId    string `json:"resource_id,omitempty"`
-	FlowLogStatus string `json:"flow_log_status,omitempty"`
+	FlowLogId         string `json:"flow_log_id"`
+	ResourceId        string `json:"resource_id,omitempty"`
+	FlowLogStatus     string `json:"flow_log_status,omitempty"`
+	DeliverLogsStatus string `json:"deliver_logs_status,omitempty"`
+	TrafficType       string `json:"traffic_type,omitempty"`
+}
+
+// vpcSubnetIDs reads the subnets of vpcs, 50 VPC ids per request as the VPC
+// list asks.
+func vpcSubnetIDs(ctx context.Context, client *ec2.Client, vpcs []vpcVpc) {
+	for chunk := range slices.Chunk(vpcs, 50) {
+		ids := make([]string, 0, len(chunk))
+		for _, v := range chunk {
+			ids = append(ids, v.VpcId)
+		}
+		subnets, err := pageAll(ctx, &ec2.DescribeSubnetsInput{Filters: []types.Filter{{Name: aws.String("vpc-id"), Values: ids}}},
+			func(ctx context.Context, in *ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
+				return client.DescribeSubnets(ctx, in)
+			},
+			func(out *ec2.DescribeSubnetsOutput) []types.Subnet { return out.Subnets }, allPages)
+		byVPC := map[string][]string{}
+		for _, sn := range subnets {
+			byVPC[aws.ToString(sn.VpcId)] = append(byVPC[aws.ToString(sn.VpcId)], aws.ToString(sn.SubnetId))
+		}
+		for i := range chunk {
+			chunk[i].SubnetsRead = readOf(err)
+			chunk[i].SubnetIds = byVPC[chunk[i].VpcId]
+		}
+	}
+}
+
+// vpcFlowLogs reads the flow logs on the VPC and on each subnet read for it;
+// a VPC whose subnets were not read is asked about alone.
+func vpcFlowLogs(ctx context.Context, client *ec2.Client, v *vpcVpc) {
+	scopes := append([]string{v.VpcId}, v.SubnetIds...)
+	pager := ec2.NewDescribeFlowLogsPaginator(client, &ec2.DescribeFlowLogsInput{
+		Filter: []types.Filter{{Name: aws.String("resource-id"), Values: scopes}},
+	})
+	for pager.HasMorePages() {
+		out, err := pager.NextPage(ctx)
+		if err != nil {
+			v.FlowLogsRead = readOf(err)
+			return
+		}
+		for _, fl := range out.FlowLogs {
+			v.FlowLogs = append(v.FlowLogs, vpcFlowLog{
+				FlowLogId:         aws.ToString(fl.FlowLogId),
+				ResourceId:        aws.ToString(fl.ResourceId),
+				FlowLogStatus:     aws.ToString(fl.FlowLogStatus),
+				DeliverLogsStatus: aws.ToString(fl.DeliverLogsStatus),
+				TrafficType:       string(fl.TrafficType),
+			})
+		}
+	}
+	v.FlowLogsRead = readOf(nil)
 }
 
 func captureVPC(ctx context.Context, cfg aws.Config) (any, error) {
@@ -622,23 +736,12 @@ func captureVPC(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 	}
 
-	var flowLogs []vpcFlowLog
-	flPager := ec2.NewDescribeFlowLogsPaginator(client, &ec2.DescribeFlowLogsInput{})
-	for flPager.HasMorePages() {
-		out, err := flPager.NextPage(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, fl := range out.FlowLogs {
-			flowLogs = append(flowLogs, vpcFlowLog{
-				FlowLogId:     aws.ToString(fl.FlowLogId),
-				ResourceId:    aws.ToString(fl.ResourceId),
-				FlowLogStatus: aws.ToString(fl.FlowLogStatus),
-			})
-		}
+	vpcSubnetIDs(ctx, client, vpcs)
+	for i := range vpcs {
+		vpcFlowLogs(ctx, client, &vpcs[i])
 	}
 
-	return vpcData{Vpcs: vpcs, FlowLogs: flowLogs}, nil
+	return vpcData{Vpcs: vpcs}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -953,7 +1056,8 @@ func captureTGWAttachments(ctx context.Context, client *ec2.Client, transitGatew
 	for pager.HasMorePages() {
 		out, err := pager.NextPage(ctx)
 		if err != nil {
-			return tgwAttachmentResult{Outcome: "error", ErrorCode: err.Error()}
+			o, code := outcomeOf(err)
+			return tgwAttachmentResult{Outcome: o, ErrorCode: code}
 		}
 		for _, a := range out.TransitGatewayAttachments {
 			items = append(items, tgwAttachment{
