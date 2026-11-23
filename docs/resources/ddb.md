@@ -131,7 +131,7 @@ One bullet per distinct signal. `DescribeTable` and `DescribeContinuousBackups` 
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: Resource policy allows any principal.
-  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged. `GetResourcePolicy` takes the table ARN, which only `DescribeTable` returns: a table whose `DescribeTable` failed is not asked for its policy, is marked not inspected on `DescribeTable`; the list fetch reports the `DescribeTable` failure once.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

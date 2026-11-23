@@ -38,54 +38,53 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		return resource.FetchResult{}, fmt.Errorf("listing SQS queues: %w", err)
 	}
 
-	total := len(listOutput.QueueUrls)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for _, queueURL := range listOutput.QueueUrls {
-		attrOutput, attrErr := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-			QueueUrl: &queueURL,
-			AttributeNames: []sqstypes.QueueAttributeName{
-				sqstypes.QueueAttributeNameAll,
-			},
-		})
-		if attrErr != nil {
-			failures = append(failures, FailedCall(queueURL, attrErr))
-			continue
-		}
-
-		attrs := attrOutput.Attributes
-
 		queueName := queueURL
 		if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
 			queueName = parts[len(parts)-1]
 		}
-
-		approxMessages := attrs["ApproximateNumberOfMessages"]
-		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
-		delaySeconds := attrs["DelaySeconds"]
-		queueArn := attrs["QueueArn"]
-		kmsKeyID := attrs["KmsMasterKeyId"]
-
-		r := resource.Resource{
-			ID:   queueName,
-			Name: queueName,
-			Fields: map[string]string{
-				"queue_name":         queueName,
-				"queue_url":          queueURL,
-				"arn":                queueArn,
-				"approx_messages":    approxMessages,
-				"approx_not_visible": approxNotVisible,
-				"delay_seconds":      delaySeconds,
-				"kms_key_id":         kmsKeyID,
-			},
-			RawStruct: SQSQueueAttributesRow{
-				QueueURL:   queueURL,
-				QueueName:  queueName,
-				Attributes: attrs,
-			},
-		}
-
-		resources = append(resources, r)
+		rows := tally.one("GetQueueAttributes", queueURL, queueName, func() (*resource.Resource, error) {
+			attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+				QueueUrl: &queueURL,
+				AttributeNames: []sqstypes.QueueAttributeName{
+					sqstypes.QueueAttributeNameAll,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+			if attrOutput.Attributes == nil {
+				return nil, UnusableAnswerErr{Call: "GetQueueAttributes", Field: "queue attributes"}
+			}
+			attrs := attrOutput.Attributes
+			r := resource.Resource{
+				ID:   queueName,
+				Name: queueName,
+				Fields: map[string]string{
+					"queue_name":         queueName,
+					"queue_url":          queueURL,
+					"arn":                attrs["QueueArn"],
+					"approx_messages":    attrs["ApproximateNumberOfMessages"],
+					"approx_not_visible": attrs["ApproximateNumberOfMessagesNotVisible"],
+					"delay_seconds":      attrs["DelaySeconds"],
+					"kms_key_id":         attrs["KmsMasterKeyId"],
+				},
+				RawStruct: SQSQueueAttributesRow{
+					QueueURL:   queueURL,
+					QueueName:  queueName,
+					Attributes: attrs,
+				},
+			}
+			return &r, nil
+		}, func(err error) resource.Resource {
+			r := DegradedDetails("sqs", queueName, err)
+			r.Fields["queue_name"] = queueName
+			r.Fields["queue_url"] = queueURL
+			return r
+		})
+		resources = append(resources, rows...)
 	}
 
 	nextToken := ""
@@ -108,5 +107,5 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, AggregateFailures("sqs: GetQueueAttributes", failures, total)
+	}, tally.err("sqs: GetQueueAttributes")
 }

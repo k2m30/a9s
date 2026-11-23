@@ -18,15 +18,21 @@
 // unavailable" row. degradedDetailsFinding is the one place that decides
 // which.
 //
-// Every N+1 fetcher (list-of-names + describe-per-name) MUST route its
-// per-item failure path through DegradedDetails (or its own
-// degradedDetailsFinding-based builder) and declare both
+// Every list-then-describe fetcher (N+1 or batch) MUST keep a row for every
+// listed name through keepListed (or describeTally.one), building the degraded
+// row with DegradedDetails or degradedDetailsFinding only in the function it
+// hands them, and declare both
 // DetailsDeniedFindingDef and DetailsUnavailableFindingDef on its catalog
 // literal, so the phrase, severity, and finding-code shape can never diverge
 // per type.
 package aws
 
 import (
+	"errors"
+	"maps"
+	"strings"
+
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -68,8 +74,9 @@ func detailsUnavailableFinding(shortName string) domain.Finding {
 // finding it emitted, so a row rebuilt from Fields alone carries the finding's
 // one identity. The status cell holds the same finding's rendered phrase, but
 // a phrase is wording: reading it back would make every reword a silent
-// retirement of the recovery below.
-const DegradedFindingField = "degraded_finding"
+// retirement of the recovery below, and catalog.ResolveColor reads it for the
+// colour of every type.
+const DegradedFindingField = catalog.DegradedFindingField
 
 // degradedFindings recovers the degraded row's finding for a row rebuilt from
 // Fields alone — a cache read, a colour fallback. It reads the code
@@ -121,9 +128,10 @@ func degradedDetailsFinding(shortName string, err error) domain.Finding {
 // RawStruct stays nil on purpose. A synthetic struct carrying only the name
 // is assertable, so every pivot that reads a field off the struct would find
 // it empty and answer a confident zero — "this node group has no IAM role" —
-// about a resource nobody was allowed to describe. Nil makes those pivots
-// answer Unknown instead. Identity a pivot can legitimately use goes in
-// Fields, which the disk cache preserves and RawStruct does not.
+// about a resource nobody was allowed to describe. Every pivot runs through
+// DegradedRowAnswer, which answers any zero on such a row Unknown. Identity a
+// pivot can legitimately use goes in Fields, which the disk cache preserves
+// and RawStruct does not.
 func DegradedDetails(shortName, id string, err error) resource.Resource {
 	finding := degradedDetailsFinding(shortName, err)
 	return resource.Resource{
@@ -136,4 +144,122 @@ func DegradedDetails(shortName, id string, err error) resource.Resource {
 		},
 		Findings: []domain.Finding{finding},
 	}
+}
+
+type listedAnswer struct {
+	rows []resource.Resource
+	gone map[string]bool
+}
+
+// keepListed is the one place a list-then-describe fetcher turns its listed
+// names into rows. idOf maps a listed name to the ID of the row it lists.
+// Every listed name keeps a row, in list order: the row the describe built
+// for it, or degraded(name, err) when the describe failed (err) or left the
+// name out (err nil), recorded as a failure of op under the row's ID. A name
+// the service reports gone — in ans.gone, or through an IsNotFoundErr error —
+// was deleted after the list call and is dropped without a failure. A name
+// listed twice is one row. A described row no listed name maps to is kept
+// after them, unless it names no ID at all: an answer that does not say what
+// it describes is no answer for any listed name.
+func keepListed(op string, names []string, idOf func(name string) string, ans listedAnswer, err error, degraded func(name string, err error) resource.Resource) ([]resource.Resource, []Failure) {
+	described := make(map[string]resource.Resource, len(ans.rows))
+	for _, r := range ans.rows {
+		if r.ID != "" {
+			described[r.ID] = r
+		}
+	}
+	rows := make([]resource.Resource, 0, len(names))
+	var failures []Failure
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		id := idOf(name)
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if r, ok := described[id]; ok {
+			rows = append(rows, r)
+			continue
+		}
+		if ans.gone[name] || IsNotFoundErr(err) || errors.Is(err, errNotInList) {
+			continue
+		}
+		r := stampDegraded(degraded(name, err))
+		rows = append(rows, r)
+		if err != nil {
+			failures = append(failures, FailedCall(r.ID, err))
+		} else {
+			failures = append(failures, UnusableAnswer(r.ID, op+" returned no answer"))
+		}
+	}
+	for _, r := range ans.rows {
+		if r.ID != "" && !seen[r.ID] {
+			seen[r.ID] = true
+			rows = append(rows, r)
+		}
+	}
+	return rows, failures
+}
+
+// stampDegraded records on r the code of the degraded finding its builder
+// added, so every reader that keys on DegradedFindingField — the Wave-2
+// describedRow gate, DegradedRowAnswer, a row rebuilt from Fields — knows the row
+// whichever builder made it.
+func stampDegraded(r resource.Resource) resource.Resource {
+	for _, f := range r.Findings {
+		code := string(f.Code)
+		if strings.HasSuffix(code, ".warn.details_denied") || strings.HasSuffix(code, ".warn.details_unavailable") {
+			fields := make(map[string]string, len(r.Fields)+1)
+			maps.Copy(fields, r.Fields)
+			fields[DegradedFindingField] = code
+			r.Fields = fields
+			return r
+		}
+	}
+	return r
+}
+
+func listedNameIsID(name string) string { return name }
+
+// describeTally is keepListed for a fetcher that describes one listed name
+// per call. It counts the requests it sent next to the failures they
+// recorded, so the aggregate's "N of M" is out of the calls made, never out
+// of list entries that sent none.
+type describeTally struct {
+	failures []Failure
+	sent     int
+}
+
+func (t *describeTally) one(op, name, id string, describe func() (*resource.Resource, error), degraded func(err error) resource.Resource) []resource.Resource {
+	if name == "" {
+		return nil
+	}
+	t.sent++
+	row, err := describe()
+	var ans listedAnswer
+	if err == nil && row != nil {
+		ans.rows = []resource.Resource{*row}
+	}
+	rows, failures := keepListed(op, []string{name}, func(string) string { return id }, ans, err, func(_ string, err error) resource.Resource {
+		return degraded(err)
+	})
+	t.failures = append(t.failures, failures...)
+	return rows
+}
+
+func (t *describeTally) err(label string) error {
+	return AggregateFailures(label, t.failures, t.sent)
+}
+
+// errNotInList is what a describeTally describe returns for a name its answer
+// places outside the list — a KMS key AWS manages, on the customer-key list.
+// The name is dropped without a failure, like a gone one.
+var errNotInList = errors.New("not in this list")
+
+// describedRow is the eligibility of a wave-2 pass that sends again the
+// describe the list fetch made for the row: a degraded row's finding already
+// states that call failed, and a second answer would mark or report the same
+// failure twice.
+func describedRow(r resource.Resource) bool {
+	return r.Fields[DegradedFindingField] == ""
 }

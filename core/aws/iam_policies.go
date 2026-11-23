@@ -180,7 +180,7 @@ func getAWSManagedPolicy(ctx context.Context, api IAMGetPolicyAPI, partition, re
 		if out != nil && out.Policy != nil {
 			return managedPolicyToResource(*out.Policy), nil
 		}
-		lastErr = fmt.Errorf("GetPolicy(%s): no policy returned", arn)
+		lastErr = UnusableAnswerErr{Call: "GetPolicy", Field: "policy"}
 	}
 	return resource.Resource{}, fmt.Errorf("AWS-managed policy %q not resolvable by name: %w", name, lastErr)
 }
@@ -230,41 +230,21 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 		}
 		store.MarkManagedBuilt()
 	}
+	var inlineErr error
 	if !store.InlineBuilt() {
 		// Include inline group policies so checkGroupPolicy (which emits
 		// both attached and inline names) finds the inline entries in
-		// cache too. Per-group failures are surfaced via the returned error
-		// and propagated into the composite failure list below.
-		inlines, _, inlineErr := fetchInlineGroupPolicies(ctx, api)
+		// cache too. A failed walk keeps what it read and leaves InlineBuilt
+		// unset, so the next call retries it; the ids below still resolve
+		// against the store and AWS-managed names by GetPolicy.
+		var inlines []resource.Resource
+		inlines, _, inlineErr = fetchInlineGroupPolicies(ctx, api)
 		for _, r := range inlines {
 			store.Set(r.ID, r)
 		}
-		if inlineErr != nil {
-			// Non-fatal: managed policies are already loaded; partial inline
-			// results are incorporated above. Leave InlineBuilt=false
-			// so next call retries the inline fetch — it might succeed after a
-			// transient throttle. Surface as aggregate failure with the partial
-			// results we did recover.
-			var failures []Failure
-			resources := make([]resource.Resource, 0, len(ids))
-			seen := make(map[string]struct{}, len(ids))
-			for _, id := range ids {
-				if id == "" {
-					continue
-				}
-				if _, dup := seen[id]; dup {
-					continue
-				}
-				seen[id] = struct{}{}
-				if r, hit := store.Lookup(id); hit {
-					resources = append(resources, r)
-				} else {
-					failures = append(failures, UnusableAnswer(id, "not found"))
-				}
-			}
-			return resources, JoinAggregates(AggregateFailures("policy FetchByIDs", failures, len(ids)), inlineErr)
+		if inlineErr == nil {
+			store.MarkInlineBuilt()
 		}
-		store.MarkInlineBuilt()
 	}
 
 	var failures []Failure
@@ -294,7 +274,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 			failures = append(failures, FailedCall(id, err))
 		}
 	}
-	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
+	return resources, JoinAggregates(AggregateFailures("policy FetchByIDs", failures, len(seen)), inlineErr)
 }
 
 // buildLocalPolicies paginates ListPolicies(Scope=Local) and populates the
@@ -306,7 +286,10 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
 	// ListPolicies pages by IsTruncated and Marker, at most 1000 items a page
 	// (https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListPolicies.html).
-	policies, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Policy, *string, error) {
+	// IAM may answer short pages, so PerParentPageCap can stop below the 10,000
+	// customer managed policies an account may hold: the store then holds the
+	// policies read, and an ARN past them still resolves by GetPolicy below.
+	policies, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, marker *string) ([]iamtypes.Policy, *string, error) {
 		out, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
 			Scope:    iamtypes.PolicyScopeTypeLocal,
 			MaxItems: aws.Int32(1000),
@@ -317,9 +300,6 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 		}
 		return out.Policies, iamNextMarker(out.IsTruncated, out.Marker), nil
 	})
-	if err == nil && !complete {
-		err = fmt.Errorf("more than %d pages", PerParentPageCap)
-	}
 	if err != nil {
 		return fmt.Errorf("listing customer-managed IAM policies for lazy-add: %w", err)
 	}

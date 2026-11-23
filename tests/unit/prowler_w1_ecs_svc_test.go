@@ -183,7 +183,9 @@ func TestECSSvc_PublicIP_HealthyNeighbourStillEvaluated(t *testing.T) {
 func TestECSSvc_DemoBench_OnlyWitnessAssignsPublicIPs(t *testing.T) {
 	fake := fakes.NewECS()
 	out, err := awsclient.FetchECSServicesPage(context.Background(), fake, fake, fake, "")
-	if err != nil {
+	// The demo keeps one service DescribeServices leaves out; its failure is
+	// the row's, and every listed row is still on the page.
+	if err != nil && !awsclient.RowsHeld(err, out.Resources) {
 		t.Fatalf("FetchECSServicesPage(demo): %v", err)
 	}
 	res, err := awsclient.EnrichECSServices(context.Background(),

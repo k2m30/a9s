@@ -9,7 +9,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
-	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -355,9 +354,8 @@ func (m *mockPaginatedECSTaskDescribeTasksClient) DescribeTasks(
 }
 
 // The registered ecs-task fetcher reads ListClusters/ListTasks/DescribeTasks
-// off a single ServiceClients.ECS field. DescribeTaskDefinition returns a
-// ClientException ("does not exist"), so Fields["task_def_join_error"] stays
-// unset.
+// off a single ServiceClients.ECS field. Without a DescribeTaskDefinition
+// answer every task would be marked unjoined (task_def_join_error).
 type ecsTaskFullPaginatedFake struct {
 	*mockPaginatedECSTaskListClustersClient
 	*mockPaginatedECSTaskListTasksClient
@@ -367,7 +365,7 @@ type ecsTaskFullPaginatedFake struct {
 func (f *ecsTaskFullPaginatedFake) DescribeTaskDefinition(
 	_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options),
 ) (*ecs.DescribeTaskDefinitionOutput, error) {
-	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
 func (f *ecsTaskFullPaginatedFake) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {

@@ -46,6 +46,9 @@ func (f *TransferFake) DescribeServer(_ context.Context, input *transfer.Describ
 			Message: aws.String("User is not authorized to perform: transfer:DescribeServer on resource: " + id),
 		}
 	}
+	if id == fixtures.WarnTransferDetailsUnavailableID {
+		return nil, &transfertypes.InternalServiceError{Message: aws.String("Internal service error")}
+	}
 	server, ok := f.fix.Servers[id]
 	if !ok {
 		return nil, &transfertypes.ResourceNotFoundException{
@@ -66,9 +69,13 @@ func (f *TransferFake) ListAgreements(_ context.Context, input *transfer.ListAgr
 }
 
 // DescribeAgreement returns the fixture's described agreement for the given id.
-// Unknown ids return ResourceNotFoundException.
 func (f *TransferFake) DescribeAgreement(_ context.Context, input *transfer.DescribeAgreementInput, _ ...func(*transfer.Options)) (*transfer.DescribeAgreementOutput, error) {
 	id := aws.ToString(input.AgreementId)
+	if slices.Contains(f.fix.DeniedAgreementIDs, id) {
+		return nil, &transfertypes.AccessDeniedException{
+			Message: aws.String("User is not authorized to perform: transfer:DescribeAgreement on resource: " + id),
+		}
+	}
 	agreement, ok := f.fix.Agreements[id]
 	if !ok {
 		return nil, &transfertypes.ResourceNotFoundException{
@@ -92,9 +99,13 @@ func (f *TransferFake) DescribeProfile(_ context.Context, input *transfer.Descri
 }
 
 // DescribeCertificate returns the fixture's described certificate for the given id.
-// Unknown ids return ResourceNotFoundException.
 func (f *TransferFake) DescribeCertificate(_ context.Context, input *transfer.DescribeCertificateInput, _ ...func(*transfer.Options)) (*transfer.DescribeCertificateOutput, error) {
 	id := aws.ToString(input.CertificateId)
+	if slices.Contains(f.fix.DeniedCertificateIDs, id) {
+		return nil, &transfertypes.AccessDeniedException{
+			Message: aws.String("User is not authorized to perform: transfer:DescribeCertificate on resource: " + id),
+		}
+	}
 	cert, ok := f.fix.Certificates[id]
 	if !ok {
 		return nil, &transfertypes.ResourceNotFoundException{

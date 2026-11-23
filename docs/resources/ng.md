@@ -90,6 +90,8 @@ Transcribed from `docs/attention-signals.md § Signals § CONTAINERS` row `ng`.
 
 `ListNodegroups` returns node-group name strings only, so the fetcher reads each node group with `DescribeNodegroup` before it builds the row. Every signal below is computed from that response as the row is built, with no second pass.
 
+A failed read is reported under the call that failed, counted against what that call was asked for: `ListNodegroups` per cluster attempted, `DescribeNodegroup` per node group attempted, `DescribeLaunchTemplateVersions` per node group with a launch template.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal. Each signal is derived from the `DescribeNodegroup` response.

@@ -235,7 +235,7 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 		}
 		if err != nil || output == nil || output.Role == nil {
 			if err == nil {
-				err = fmt.Errorf("empty response")
+				err = UnusableAnswerErr{Call: "GetRole", Field: "role"}
 			}
 			failures = append(failures, FailedCall(id, err))
 			continue
@@ -244,7 +244,7 @@ func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]re
 		resources = append(resources, r)
 		failures = append(failures, roleFailures...)
 	}
-	return resources, AggregateFailures("role FetchByIDs", failures, len(ids))
+	return resources, AggregateFailures("role FetchByIDs", failures, len(seen))
 }
 
 // roleToResource converts a single iam.Role (as returned by GetRole) into the

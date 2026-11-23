@@ -52,59 +52,38 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 	// via the composite error — silently stopping would hide a permissions
 	// issue or throttling that's actively degrading the view.
 	aliasMap, aliasFailures := buildKMSAliasMap(ctx, c)
-	var failures []Failure
+	var tally describeTally
 
 	var resources []resource.Resource
 	for _, key := range listOutput.Keys {
-		if key.KeyId == nil {
-			continue
-		}
-		descOutput, descErr := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
-			KeyId: aws.String(*key.KeyId),
-		})
-		if descErr != nil {
+		listedID := aws.ToString(key.KeyId)
+		rows := tally.one("DescribeKey", listedID, listedID, func() (*resource.Resource, error) {
+			descOutput, descErr := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(listedID)})
+			// A key policy that keeps the browsing role out of another team's key
+			// is routine, not a failed read: the row says so itself, and the
+			// page reports no failure for it.
 			if IsAccessDenied(descErr) {
-				resources = append(resources, kmsAccessDeniedResource(*key.KeyId, aws.ToString(key.KeyArn)))
-				continue
+				r := kmsAccessDeniedResource(listedID, aws.ToString(key.KeyArn))
+				return &r, nil
 			}
-			failures = append(failures, FailedCall(*key.KeyId, descErr))
-			continue
-		}
-		meta := descOutput.KeyMetadata
-		if meta == nil {
-			continue
-		}
-		if meta.KeyManager != kmstypes.KeyManagerTypeCustomer {
-			continue
-		}
-
-		keyID := ""
-		if meta.KeyId != nil {
-			keyID = *meta.KeyId
-		}
-
-		description := ""
-		if meta.Description != nil {
-			description = *meta.Description
-		}
-
-		status := string(meta.KeyState)
-		alias, aliases := kmsAliasFields(aliasMap[keyID])
-
-		resources = append(resources, resource.Resource{
-			ID:       keyID,
-			Name:     alias,
-			Findings: kmsStateFindings(meta.KeyState, status),
-			Fields: map[string]string{
-				"key_id":      keyID,
-				"arn":         aws.ToString(meta.Arn),
-				"alias":       alias,
-				"aliases":     aliases,
-				"status":      status,
-				"description": description,
-			},
-			RawStruct: meta,
+			if descErr != nil {
+				return nil, descErr
+			}
+			if descOutput.KeyMetadata == nil {
+				return nil, UnusableAnswerErr{Call: "DescribeKey", Field: "key metadata"}
+			}
+			if descOutput.KeyMetadata.KeyManager != kmstypes.KeyManagerTypeCustomer {
+				return nil, errNotInList
+			}
+			r := kmsKeyResource(descOutput.KeyMetadata, aliasMap)
+			return &r, nil
+		}, func(err error) resource.Resource {
+			r := DegradedDetails("kms", listedID, err)
+			r.Fields["key_id"] = listedID
+			r.Fields["arn"] = aws.ToString(key.KeyArn)
+			return r
 		})
+		resources = append(resources, rows...)
 	}
 
 	isTruncated := listOutput.Truncated
@@ -115,7 +94,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 
 	err = errors.Join(
 		kmsAliasFailure(aliasFailures),
-		AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys)),
+		tally.err("kms: DescribeKey"),
 	)
 	return resource.FetchResult{
 		Resources: resources,
@@ -276,6 +255,26 @@ func kmsAliasFields(aliases []string) (display, all string) {
 func kmsAliasName(keyID string) (string, bool) {
 	res, _, ok := localARN(keyID, domain.RefContext{}, "kms")
 	return res, ok && strings.HasPrefix(res, "alias/")
+}
+
+func kmsKeyResource(meta *kmstypes.KeyMetadata, aliasMap map[string][]string) resource.Resource {
+	keyID := aws.ToString(meta.KeyId)
+	status := string(meta.KeyState)
+	alias, aliases := kmsAliasFields(aliasMap[keyID])
+	return resource.Resource{
+		ID:       keyID,
+		Name:     alias,
+		Findings: kmsStateFindings(meta.KeyState, status),
+		Fields: map[string]string{
+			"key_id":      keyID,
+			"arn":         aws.ToString(meta.Arn),
+			"alias":       alias,
+			"aliases":     aliases,
+			"status":      status,
+			"description": aws.ToString(meta.Description),
+		},
+		RawStruct: meta,
+	}
 }
 
 // kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call

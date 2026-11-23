@@ -405,7 +405,7 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		},
 		errByName: map[string]error{
 			"env-denied":  &mwaatypes.AccessDeniedException{Message: aws.String("not authorized")},
-			"env-missing": &mwaatypes.ResourceNotFoundException{Message: aws.String("Environment env-missing not found")},
+			"env-missing": &mwaatypes.InternalServerException{Message: aws.String("internal error")},
 		},
 	}
 	clients := &awsclient.ServiceClients{MWAA: fake}
@@ -419,8 +419,8 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 			"rows — a denied GetEnvironment must never make a listed environment vanish)", len(result.Resources))
 	}
 	// env-denied → AccessDenied (auth) → "details denied"; env-missing →
-	// ResourceNotFound (non-auth) → the neutral "details unavailable". A
-	// not-found environment never reads as an IAM denial.
+	// InternalServerException (non-auth) → the neutral "details unavailable".
+	// A failed read never reads as an IAM denial.
 	wantByID := map[string]struct{ phrase, detail string }{
 		"env-denied":  {"details denied", "Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh."},
 		"env-missing": {"details unavailable", "The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled."},
@@ -442,7 +442,7 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		}
 	}
 	errStr := err.Error()
-	for _, want := range []string{"env-denied", "env-missing", "AccessDenied", "ResourceNotFound", "2 of 5"} {
+	for _, want := range []string{"env-denied", "env-missing", "AccessDenied", "InternalServer", "2 of 5"} {
 		if !strings.Contains(errStr, want) {
 			t.Errorf("composite error must contain %q, got: %q", want, errStr)
 		}

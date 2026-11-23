@@ -37,6 +37,7 @@ func (f *ECSFake) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ..
 	for _, c := range f.fix.Clusters {
 		arns = append(arns, aws.ToString(c.ClusterArn))
 	}
+	arns = append(arns, f.fix.UnavailableClusters...)
 	return &ecs.ListClustersOutput{ClusterArns: arns}, nil
 }
 
@@ -70,6 +71,7 @@ func (f *ECSFake) ListServices(_ context.Context, input *ecs.ListServicesInput, 
 			arns = append(arns, aws.ToString(svc.ServiceArn))
 		}
 	}
+	arns = append(arns, inCluster(f.fix.UnavailableServices, clusterFilter)...)
 	return &ecs.ListServicesOutput{ServiceArns: arns}, nil
 }
 
@@ -131,6 +133,9 @@ func (f *ECSFake) ListTasks(_ context.Context, input *ecs.ListTasksInput, _ ...f
 			continue
 		}
 		arns = append(arns, aws.ToString(t.TaskArn))
+	}
+	if serviceFilter == "" && input.DesiredStatus == "" {
+		arns = append(arns, inCluster(f.fix.UnavailableTasks, clusterFilter)...)
 	}
 	return &ecs.ListTasksOutput{TaskArns: arns}, nil
 }
@@ -238,5 +243,23 @@ func (f *ECSFake) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeT
 func (f *ECSFake) hasCluster(nameOrARN string) bool {
 	return slices.ContainsFunc(f.fix.Clusters, func(c ecstypes.Cluster) bool {
 		return aws.ToString(c.ClusterName) == nameOrARN || aws.ToString(c.ClusterArn) == nameOrARN
+	}) || slices.ContainsFunc(f.fix.UnavailableClusters, func(arn string) bool {
+		return arn == nameOrARN || arnResourceName(arn) == nameOrARN
 	})
+}
+
+// inCluster: ARNs read "<kind>/<cluster>/<id>"; cluster may be a short name or
+// an ARN, and an empty cluster matches all.
+func inCluster(arns []string, cluster string) []string {
+	var out []string
+	for _, ref := range arns {
+		a, err := arn.Parse(ref)
+		if err != nil {
+			continue
+		}
+		if parts := strings.Split(a.Resource, "/"); cluster == "" || (len(parts) == 3 && parts[1] == arnResourceName(cluster)) {
+			out = append(out, ref)
+		}
+	}
+	return out
 }

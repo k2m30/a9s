@@ -105,6 +105,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `Cluster.Status` field from `DescribeClusters` (per SDK: `INACTIVE` = deleted but still visible for a grace period — surfaces as Broken so operators notice a stale reference).
 
+A cluster `DescribeClusters` did not describe is KEPT name-only: `details denied` (Warning) when the call was refused for authorization, `details unavailable` (Warning) when it failed otherwise or left the cluster out. A cluster the call reports `MISSING` was deleted after the list call and is dropped. Wave 2 does not send `DescribeClusters` again for a kept cluster: its finding already states that call failed.
+
+- **Signal**: `DescribeClusters` was denied for this cluster.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DescribeClusters` did not answer for this cluster.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -136,6 +146,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `DescribeClusters` was denied for this cluster | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `DescribeClusters` did not answer for this cluster | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `status == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
 | `status == DEPROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprovisioning` |
 | `status == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
@@ -188,6 +200,8 @@ ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the
 | ecs.state.failed | failed | broken | wave1 | The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster. |
 | ecs.state.inactive | inactive (cluster deleted) | broken | wave1 | The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster. |
 | ecs.cluster-issue | tasks pending or not running | warn | wave2 | The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short. |
+| ecs.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| ecs.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

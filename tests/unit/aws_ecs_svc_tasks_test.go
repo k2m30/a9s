@@ -349,8 +349,11 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if result.Resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
+	// A refused DescribeTasks hides the task's details, not the task: the task
+	// ListTasks named stays listed as an unjudged row.
+	if len(result.Resources) != 1 || result.Resources[0].ID != "some-task" ||
+		result.Resources[0].Fields["status"] != "details unavailable" {
+		t.Errorf("resources = %+v, want the listed task kept as a details-unavailable row", result.Resources)
 	}
 }
 
@@ -422,10 +425,12 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 		},
 	}
 
+	// DescribeTasks always names the task it answers for; every other field may
+	// be absent.
 	describeTasksMock := &mockECSDescribeTasksClient{
 		output: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
-				{},
+				{TaskArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task/nil-cluster/nil-task")},
 			},
 		},
 	}
@@ -451,9 +456,9 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	t.Run("no_panic", func(t *testing.T) {
 	})
 
-	t.Run("task_id_empty", func(t *testing.T) {
-		if r.Fields["task_id"] != "" {
-			t.Errorf("Fields[task_id]: expected empty, got %q", r.Fields["task_id"])
+	t.Run("task_id_from_arn", func(t *testing.T) {
+		if r.Fields["task_id"] != "nil-task" {
+			t.Errorf("Fields[task_id]: expected %q, got %q", "nil-task", r.Fields["task_id"])
 		}
 	})
 

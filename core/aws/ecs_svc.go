@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -25,6 +26,8 @@ func FetchECSServicesPage(
 	describeServicesAPI ECSDescribeServicesAPI,
 	continuationToken string,
 ) (resource.FetchResult, error) {
+	var failures []Failure
+	attempted := 0
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
 			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
@@ -33,6 +36,7 @@ func FetchECSServicesPage(
 			}
 			return out.ClusterArns, out.NextToken, nil
 		},
+		listOp: "ecs-svc: ListServices",
 		listChildren: func(ctx context.Context, clusterArn string, token *string) ([]string, *string, error) {
 			out, err := listServicesAPI.ListServices(ctx, &ecs.ListServicesInput{
 				Cluster:    aws.String(clusterArn),
@@ -40,7 +44,7 @@ func FetchECSServicesPage(
 				NextToken:  token,
 			})
 			if err != nil {
-				return nil, nil, fmt.Errorf("listing ECS services: %w", err)
+				return nil, nil, err
 			}
 			return out.ServiceArns, out.NextToken, nil
 		},
@@ -52,11 +56,13 @@ func FetchECSServicesPage(
 				Services: serviceArns,
 				Include:  []ecstypes.ServiceField{ecstypes.ServiceFieldTags},
 			})
-			if err != nil {
-				return nil, fmt.Errorf("describing ECS services: %w", err)
+			attempted += len(serviceArns)
+			var ans listedAnswer
+			var services []ecstypes.Service
+			if err == nil {
+				services, ans.gone = descOutput.Services, ecsGone(descOutput.Failures)
 			}
-			resources := make([]resource.Resource, 0, len(descOutput.Services))
-			for _, svc := range descOutput.Services {
+			for _, svc := range services {
 				serviceName := ""
 				if svc.ServiceName != nil {
 					serviceName = *svc.ServiceName
@@ -102,14 +108,33 @@ func FetchECSServicesPage(
 					Findings:  findings,
 					RawStruct: svc,
 				}
-
-				resources = append(resources, r)
+				ans.rows = append(ans.rows, r)
 			}
-			return resources, nil
+			clusterName, _ := ecsRefToID(clusterArn, domain.RefContext{})
+			// A listed service belongs to the cluster being walked, so its row ID
+			// pairs that cluster with the name the ARN carries.
+			nameOf := func(arn string) string {
+				id, _ := ecsSvcRefToID(arn, domain.RefContext{})
+				if _, name, qualified := strings.Cut(id, "/"); qualified {
+					return name
+				}
+				return id
+			}
+			idOf := func(arn string) string { return ecsSvcID(clusterName, nameOf(arn)) }
+			rows, batchFailures := keepListed("DescribeServices", serviceArns, idOf, ans, err, func(arn string, err error) resource.Resource {
+				serviceName := nameOf(arn)
+				r := DegradedDetails("ecs-svc", idOf(arn), err)
+				r.Name = serviceName
+				r.Fields["service_name"], r.Fields["cluster"], r.Fields["arn"] = serviceName, clusterName, arn
+				return r
+			})
+			failures = append(failures, batchFailures...)
+			return rows, nil
 		},
 		batch: 10,
 	}
-	return walk.page(ctx, continuationToken)
+	result, err := walk.page(ctx, continuationToken)
+	return result, JoinAggregates(err, AggregateFailures("ecs-svc: DescribeServices", failures, attempted))
 }
 
 // ecsSvcID is the row identity of an ECS service: AWS scopes a service name

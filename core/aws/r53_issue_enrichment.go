@@ -193,6 +193,7 @@ func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resourc
 		return row, rowFailures
 	}
 	if out.HostedZone == nil {
+		MarkSkipped(&row, r.ID, &rowFailures, UnusableAnswerErr{Call: "GetHostedZone", Field: "hosted zone"})
 		return row, rowFailures
 	}
 	// Only raise the orphan finding for private zones — public zones

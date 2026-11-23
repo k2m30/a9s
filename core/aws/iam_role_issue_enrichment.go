@@ -77,6 +77,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			return
 		}
 		if out.Role == nil {
+			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "GetRole", Field: "role"})
 			return
 		}
 		isDormant := false

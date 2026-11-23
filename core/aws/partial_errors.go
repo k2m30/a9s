@@ -87,6 +87,10 @@ var notFoundCodes = map[string][]string{ //nolint:gochecknoglobals // static AWS
 	"NoSuchHostedZone":           nil,
 	"ResourceNotFoundException":  nil,
 	"InvalidInstanceID.NotFound": nil,
+	// EC2 spells a launch template deleted after DescribeLaunchTemplates
+	// with one code per way the template was named.
+	"InvalidLaunchTemplateId.NotFound":            nil,
+	"InvalidLaunchTemplateName.NotFoundException": nil,
 	// RDS and DocumentDB spell the same race with their own codes; a
 	// snapshot deleted between the list call and a per-snapshot describe
 	// answers one of these.

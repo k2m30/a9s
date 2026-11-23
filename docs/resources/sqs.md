@@ -81,7 +81,17 @@ Transcribed from `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-No Wave 1 signals — the list API does not return fields usable for attention. `ListQueues` returns only `QueueUrls []string` (SDK `sqs.ListQueuesOutput § QueueUrls`); there is no state field and no attribute map on the list response.
+The list API returns no field usable for attention: `ListQueues` returns only `QueueUrls []string` (SDK `sqs.ListQueuesOutput § QueueUrls`), with no state field and no attribute map. The only Wave 1 signals are the two degraded rows below.
+
+A queue whose `GetQueueAttributes` fails is KEPT name-only: `details denied` (Warning) for an authorization refusal, `details unavailable` (Warning) otherwise. A queue the call reports gone was deleted after the list call and is dropped without a failure.
+
+- **Signal**: `GetQueueAttributes` was denied for this queue.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `GetQueueAttributes` did not answer for this queue.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -139,6 +149,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `GetQueueAttributes` was denied for this queue | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `GetQueueAttributes` did not answer for this queue | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S3, S4, S5 | `no DLQ configured` |
 | `KmsMasterKeyId` unset and `SqsManagedSseEnabled` off | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `queue policy open to anyone` |
@@ -187,7 +199,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §2 `sqs` (self) why related — `docs/related-resources.md` § `sqs` ("DLQ reference / RedriveTarget") and `AWS SDK Go v2 — sqs/types.QueueAttributeName § RedrivePolicy § RedriveAllowPolicy`.
 - §2 `sqs` (self) how discovered — a9s-devops (2026-04-21): possible=yes, worth=yes. Outbound: parse `RedrivePolicy.deadLetterTargetArn` from Wave 2 attributes. Inbound: scan sibling queues' `RedrivePolicy` for this queue's ARN. Zero extra API calls; dedicated `ListDeadLetterSourceQueues` is redundant when sibling list is cached.
 - §2 `sqs` (self) count shown — a9s-devops (2026-04-21): possible=yes, worth=yes. Combined DLQ count (own DLQ + queues I am DLQ for) is a primary messaging-topology signal.
-- §3.1 no Wave 1 signals — `ListQueues` returns URLs only, `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`; every `sqs` finding is wave 2, `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
+- §3.1 the only Wave 1 signals are the two degraded rows — `ListQueues` returns URLs only, `AWS SDK Go v2 — sqs.ListQueuesOutput § QueueUrls`; every posture finding is wave 2, `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
 - §3.2 Wave 2 signals (backlog threshold, rising unbounded, oldest-message age, is-DLQ with messages, RedrivePolicy unset) — `docs/attention-signals.md § Signals § MESSAGING` row `sqs`.
 - §3.2 attribute field names (`ApproximateNumberOfMessages`, `ApproximateAgeOfOldestMessage`, `VisibilityTimeout`, `RedrivePolicy`, `RedriveAllowPolicy`) — `AWS SDK Go v2 — sqs/types.QueueAttributeName` enum constants.
 - §3.3 Wave 3 CloudWatch trend — `docs/attention-signals.md § Not yet implemented`.
@@ -206,6 +218,8 @@ sqs — MESSAGING. Status key: `state` — the column naming it is the status co
 | sqs.missing-dlq | no DLQ configured | warn | wave2 | Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue. |
 | sqs.no-kms | not encrypted with KMS | warn | wave2 | The queue has neither the AWS-managed queue encryption nor a KMS key, so message bodies are held without server-side encryption. Turn on the managed queue encryption, which costs nothing and needs no key policy, or attach a KMS key when you need to control and audit the key yourself. |
 | sqs.public-policy | queue policy open to anyone | broken | wave2 | The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue. |
+| sqs.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| sqs.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

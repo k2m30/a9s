@@ -681,13 +681,14 @@ func (f *codeArtifactPackageFake) ListPackages(
 	return &codeartifactsvc.ListPackagesOutput{Packages: pkgs}, nil
 }
 
-// GetRepositoryPermissionsPolicy returns a non-error empty output (no policy configured).
+// GetRepositoryPermissionsPolicy answers ResourceNotFoundException, which is
+// how CodeArtifact says no policy is configured.
 func (f *codeArtifactPackageFake) GetRepositoryPermissionsPolicy(
 	_ context.Context,
 	_ *codeartifactsvc.GetRepositoryPermissionsPolicyInput,
 	_ ...func(*codeartifactsvc.Options),
 ) (*codeartifactsvc.GetRepositoryPermissionsPolicyOutput, error) {
-	return &codeartifactsvc.GetRepositoryPermissionsPolicyOutput{}, nil
+	return nil, &codeartifacttypes.ResourceNotFoundException{Message: aws.String("no permissions policy")}
 }
 
 var _ awsclient.CodeArtifactAPI = (*codeArtifactPackageFake)(nil)

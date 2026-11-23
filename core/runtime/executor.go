@@ -978,7 +978,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	// which catalog.SetTypes/SetChildTypes (core/catalog/catalog.go) guarantee
 	// is never empty for any registered RelatedDef. This is the containment
 	// that keeps an empty-TargetType result from ever reaching rendering.
-	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache).WithTargetType(def.TargetType)
+	checkResult := awsclient.DegradedRowAnswer(op.Resource, def.Checker(checkCtx, op.Clients, op.Resource, localCache)).WithTargetType(def.TargetType)
 	if op.Region != "" && checkResult.Region() == "" {
 		checkResult = checkResult.WithRegion(op.Region)
 	}

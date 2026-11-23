@@ -46,7 +46,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 	if clients.Athena == nil {
 		return result, nil
 	}
-	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, describedRow, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure
 	var mu sync.Mutex
@@ -69,6 +69,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			return
 		}
 		if out.WorkGroup == nil || out.WorkGroup.Configuration == nil {
+			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "GetWorkGroup", Field: "workgroup configuration"})
 			return
 		}
 		cfg := out.WorkGroup.Configuration

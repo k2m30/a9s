@@ -34,7 +34,8 @@ func fetchECSTasksPageWithJoin(
 ) (resource.FetchResult, error) {
 	// Memoize DescribeTaskDefinition results across every cluster of the page.
 	seenTaskDefs := make(map[string]taskDefRead)
-	var joinFailures []Failure
+	var joinFailures, failures []Failure
+	attempted, joined := 0, 0
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
 			out, err := listClustersAPI.ListClusters(ctx, &ecs.ListClustersInput{NextToken: token})
@@ -43,6 +44,7 @@ func fetchECSTasksPageWithJoin(
 			}
 			return out.ClusterArns, out.NextToken, nil
 		},
+		listOp: "ecs-task: ListTasks",
 		listChildren: func(ctx context.Context, clusterArn string, token *string) ([]string, *string, error) {
 			out, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
 				Cluster:    aws.String(clusterArn),
@@ -50,7 +52,7 @@ func fetchECSTasksPageWithJoin(
 				NextToken:  token,
 			})
 			if err != nil {
-				return nil, nil, fmt.Errorf("listing ECS tasks: %w", err)
+				return nil, nil, err
 			}
 			return out.TaskArns, out.NextToken, nil
 		},
@@ -61,11 +63,13 @@ func fetchECSTasksPageWithJoin(
 				Tasks:   taskArns,
 				Include: []ecstypes.TaskField{ecstypes.TaskFieldTags},
 			})
-			if err != nil {
-				return nil, fmt.Errorf("describing ECS tasks: %w", err)
+			attempted += len(taskArns)
+			var ans listedAnswer
+			var tasks []ecstypes.Task
+			if err == nil {
+				tasks, ans.gone = descOutput.Tasks, ecsGone(descOutput.Failures)
 			}
-			resources := make([]resource.Resource, 0, len(descOutput.Tasks))
-			for _, task := range descOutput.Tasks {
+			for _, task := range tasks {
 				taskID := ""
 				taskArn := ""
 				if task.TaskArn != nil {
@@ -120,6 +124,9 @@ func fetchECSTasksPageWithJoin(
 				// fetcher lying about pagination truncation (which would
 				// misleadingly surface "m: load more").
 				taskDefJoin, joinErr := ecsJoinTaskDefinition(ctx, task, seenTaskDefs, describeTaskDefAPI)
+				if describeTaskDefAPI != nil && taskDefinition != "" {
+					joined++
+				}
 
 				fields := map[string]string{
 					"task_id":             taskID,
@@ -157,17 +164,26 @@ func fetchECSTasksPageWithJoin(
 					Findings:  findings,
 					RawStruct: task,
 				}
-
-				resources = append(resources, r)
+				ans.rows = append(ans.rows, r)
 			}
-			return resources, nil
+			rows, batchFailures := keepListed("DescribeTasks", taskArns, ecsTaskRowID, ans, err, func(arn string, err error) resource.Resource {
+				taskID := ecsTaskRowID(arn)
+				r := DegradedDetails("ecs-task", taskID, err)
+				r.Fields["task_id"], r.Fields["cluster"], r.Fields["arn"] = taskID, clusterArn, arn
+				return r
+			})
+			failures = append(failures, batchFailures...)
+			return rows, nil
 		},
 		batch: 100,
 	}
 	// A task whose definition could not be read keeps its row: the failure
 	// is the row's, reported once with the page, and leaves the list whole.
 	result, err := walk.page(ctx, continuationToken)
-	return result, JoinAggregates(err, AggregateFailures("ecs-task: DescribeTaskDefinition", joinFailures, len(result.Resources)))
+	return result, JoinAggregates(
+		JoinAggregates(err, AggregateFailures("ecs-task: DescribeTasks", failures, attempted)),
+		AggregateFailures("ecs-task: DescribeTaskDefinition", joinFailures, joined),
+	)
 }
 
 // taskDefJoinFields holds the per-task fields resolved by ecsJoinTaskDefinition
@@ -202,22 +218,20 @@ type taskDefRead struct {
 	err error
 }
 
-// readTaskDefinition reads one task definition. "Task definition does not
-// exist" (ClientException) is a definitive absence, not an error worth
-// surfacing as truncation — no volumes = no EFS IDs. Every other error
-// (access denied, throttled, transient) is kept so the task is marked
-// unjoined and reverse-scan checkers report Truncated.
+// readTaskDefinition keeps every answer that is not a definition as the
+// read's error, so the task is marked unjoined and reverse-scan checkers
+// report Truncated: ClientException covers a caller
+// not permitted the definition as well as one AWS deleted while a task still
+// runs it, and neither says the definition has no volumes or secrets.
 func readTaskDefinition(ctx context.Context, api ECSDescribeTaskDefinitionAPI, arn string) taskDefRead {
 	out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &arn,
 	})
 	switch {
-	case ErrCodeIs(err, "ClientException"):
-		return taskDefRead{}
 	case err != nil:
 		return taskDefRead{err: fmt.Errorf("describing task definition %s: %w", arn, err)}
-	case out == nil:
-		return taskDefRead{}
+	case out == nil || out.TaskDefinition == nil:
+		return taskDefRead{err: UnusableAnswerErr{Call: "DescribeTaskDefinition", Field: "task definition"}}
 	}
 	return taskDefRead{def: out.TaskDefinition}
 }

@@ -64,22 +64,21 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 		return resource.FetchResult{}, fmt.Errorf("listing MWAA environments: %w", err)
 	}
 
-	total := len(listOutput.Environments)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for _, name := range listOutput.Environments {
-		getOutput, getErr := c.MWAA.GetEnvironment(ctx, &mwaa.GetEnvironmentInput{Name: aws.String(name)})
-		if getErr != nil {
-			failures = append(failures, FailedCall(name, getErr))
-			resources = append(resources, buildMWAADegradedResource(name, getErr))
-			continue
-		}
-		if getOutput.Environment == nil {
-			failures = append(failures, UnusableAnswer(name, "nil environment in response"))
-			resources = append(resources, buildMWAADegradedResource(name, nil))
-			continue
-		}
-		resources = append(resources, buildMWAAResource(name, getOutput.Environment))
+		rows := tally.one("GetEnvironment", name, name, func() (*resource.Resource, error) {
+			out, err := c.MWAA.GetEnvironment(ctx, &mwaa.GetEnvironmentInput{Name: aws.String(name)})
+			if err != nil {
+				return nil, err
+			}
+			if out.Environment == nil {
+				return nil, UnusableAnswerErr{Call: "GetEnvironment", Field: "environment"}
+			}
+			r := buildMWAAResource(name, out.Environment)
+			return &r, nil
+		}, func(err error) resource.Resource { return buildMWAADegradedResource(name, err) })
+		resources = append(resources, rows...)
 	}
 
 	return resource.FetchResult{
@@ -90,7 +89,7 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, AggregateFailures("mwaa-fetch: GetEnvironment", failures, total)
+	}, tally.err("mwaa-fetch: GetEnvironment")
 }
 
 // buildMWAAResource constructs a Resource from a GetEnvironment response.

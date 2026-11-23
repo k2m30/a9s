@@ -14,7 +14,13 @@ type CodeBuildFixtures struct {
 	Projects []cbtypes.Project
 	// Builds maps project name to its builds (for ListBuildsForProject + BatchGetBuilds).
 	Builds map[string][]cbtypes.Build
+	// UnavailableProjects are names ListProjects lists and BatchGetProjects
+	// leaves out of its answer, which the fetcher keeps as `details
+	// unavailable` rows.
+	UnavailableProjects []string
 }
+
+const WarnCBDetailsUnavailableID = "warn-cb-details-unavailable"
 
 const prodCBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 
@@ -240,8 +246,9 @@ var sharedCodeBuildFixtures = shared(func() *CodeBuildFixtures {
 	}
 
 	return &CodeBuildFixtures{
-		Projects: projects,
-		Builds:   buildsByProject,
+		Projects:            projects,
+		Builds:              buildsByProject,
+		UnavailableProjects: []string{WarnCBDetailsUnavailableID},
 	}
 })
 
@@ -264,5 +271,5 @@ const (
 )
 
 func init() {
-	Register(Pin{ShortName: "cb", Rows: 6, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "cb", Rows: 7, Issues: 5, CoverageGaps: []string{"dim", "cb.warn.details_denied"}})
 }

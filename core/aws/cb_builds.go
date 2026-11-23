@@ -66,21 +66,28 @@ func FetchCBBuilds(
 	pageIDs := listOutput.Ids
 
 	var resources []resource.Resource
-
+	var failures []Failure
 	for i := 0; i < len(pageIDs); i += 100 {
-		end := min(i+100, len(pageIDs))
-		chunk := pageIDs[i:end]
-
+		chunk := pageIDs[i:min(i+100, len(pageIDs))]
 		batchOutput, err := batchAPI.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 			Ids: chunk,
 		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("batch get builds for %s: %w", projectName, err)
+		ans := listedAnswer{gone: map[string]bool{}}
+		if err == nil {
+			for _, id := range batchOutput.BuildsNotFound {
+				ans.gone[id] = true
+			}
+			for _, build := range batchOutput.Builds {
+				ans.rows = append(ans.rows, convertCBBuild(build))
+			}
 		}
-
-		for _, build := range batchOutput.Builds {
-			resources = append(resources, convertCBBuild(build))
-		}
+		rows, chunkFailures := keepListed("BatchGetBuilds", chunk, listedNameIsID, ans, err, func(id string, err error) resource.Resource {
+			r := DegradedDetails("cb_builds", id, err)
+			r.Fields["build_id"] = id
+			return r
+		})
+		resources = append(resources, rows...)
+		failures = append(failures, chunkFailures...)
 	}
 
 	nextToken := ""
@@ -103,7 +110,7 @@ func FetchCBBuilds(
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("cb_builds: BatchGetBuilds", failures, len(pageIDs))
 }
 
 // convertCBBuild converts a single cbtypes.Build into a generic Resource.

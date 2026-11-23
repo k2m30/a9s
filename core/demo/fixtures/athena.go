@@ -29,6 +29,15 @@ const (
 	AthenaSparkLogGroup  = "/aws/athena/" + AthenaSparkWorkgroup
 )
 
+// Degraded rows: listed by ListWorkGroups, but GetWorkGroup answers
+// AccessDeniedException for the first and InternalServerException for the
+// second, so their configuration is unread (athena.warn.details_denied /
+// athena.warn.details_unavailable).
+const (
+	WarnAthenaDetailsDeniedID      = "warn-athena-details-denied"
+	WarnAthenaDetailsUnavailableID = "warn-athena-details-unavailable"
+)
+
 // AthenaFixtures holds typed fixture data for Athena.
 type AthenaFixtures struct {
 	WorkGroups       []athenatypes.WorkGroupSummary
@@ -124,6 +133,16 @@ var sharedAthenaFixtures = shared(func() *AthenaFixtures {
 					EffectiveEngineVersion: aws.String("Athena engine version 3"),
 					SelectedEngineVersion:  aws.String("Athena engine version 3"),
 				},
+			},
+			{
+				Name:         aws.String(WarnAthenaDetailsDeniedID),
+				State:        athenatypes.WorkGroupStateEnabled,
+				CreationTime: aws.Time(mustParseAthenaTime("2025-06-02T09:00:00+00:00")),
+			},
+			{
+				Name:         aws.String(WarnAthenaDetailsUnavailableID),
+				State:        athenatypes.WorkGroupStateEnabled,
+				CreationTime: aws.Time(mustParseAthenaTime("2025-06-03T09:00:00+00:00")),
 			},
 		},
 		WorkGroupDetails: map[string]*athena.GetWorkGroupOutput{
@@ -271,5 +290,5 @@ func NewAthenaFixtures() *AthenaFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "athena", Rows: 7, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "athena", Rows: 9, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
 }

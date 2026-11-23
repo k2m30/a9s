@@ -1009,13 +1009,11 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 // rows' own not-inspected marks, read under the store lock every writer holds,
 // and the enricher's cut flag from the session.
 func (c *Core) badgeLowerBound(shortName string, tf cache.TypeFile, pageTruncated bool) bool {
-	marked, found := 0, tf.Issues > 0
+	found := tf.Issues > 0
 	for _, row := range tf.Rows {
-		if row.Uninspected != nil {
-			marked++
-		}
 		found = found || rowHasWave2Finding(row.Findings)
 	}
+	marked := uncountedMarks(shortName, rowsFromCacheRows(shortName, tf.Rows), uninspectedFromCacheRows(tf.Rows))
 	return issueLowerBound(shortName, pageTruncated, c.session.EnrichmentCutGet(shortName), found, marked)
 }
 

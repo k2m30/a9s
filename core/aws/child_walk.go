@@ -21,7 +21,11 @@ import (
 type parentChildWalk struct {
 	listParents  func(ctx context.Context, token *string) (parents []string, next *string, err error)
 	listChildren func(ctx context.Context, parent string, token *string) (children []string, next *string, err error)
-	describe     func(ctx context.Context, parent string, children []string) ([]resource.Resource, error)
+	// listOp labels the aggregate of listChildren failures. One parent whose
+	// children could not be listed costs that parent's rows, never the page:
+	// every other parent answered, and a parent reported gone has no rows.
+	listOp   string
+	describe func(ctx context.Context, parent string, children []string) ([]resource.Resource, error)
 	// batch is the most children one describe call accepts.
 	batch int
 }
@@ -117,6 +121,9 @@ func (w parentChildWalk) page(ctx context.Context, continuationToken string) (re
 	}
 
 	var rows []resource.Resource
+	var listFailures []Failure
+	listed := 0
+	listErr := func() error { return AggregateFailures(w.listOp, listFailures, listed) }
 	// describeUntilFull describes names batch at a time and returns the tail
 	// left undescribed when the page filled up.
 	describeUntilFull := func(parent string, names []string) ([]string, error) {
@@ -160,24 +167,28 @@ func (w parentChildWalk) page(ctx context.Context, continuationToken string) (re
 				return resource.FetchResult{}, err
 			}
 			if len(left) > 0 {
-				return resumeAt(parent, left, childToken, parents[i+1:]), nil
+				return resumeAt(parent, left, childToken, parents[i+1:]), listErr()
 			}
 			if childToken == nil {
 				continue
 			}
 			token = childToken
 		}
+		listed++
 		for {
 			names, next, err := w.listChildren(ctx, parent, token)
 			if err != nil {
-				return resource.FetchResult{}, err
+				if !IsNotFoundErr(err) {
+					listFailures = append(listFailures, FailedCall(parent, err))
+				}
+				break
 			}
 			left, err := describeUntilFull(parent, names)
 			if err != nil {
 				return resource.FetchResult{}, err
 			}
 			if len(left) > 0 {
-				return resumeAt(parent, left, next, parents[i+1:]), nil
+				return resumeAt(parent, left, next, parents[i+1:]), listErr()
 			}
 			if aws.ToString(next) == "" {
 				break
@@ -194,5 +205,5 @@ func (w parentChildWalk) page(ctx context.Context, continuationToken string) (re
 			PageSize:    len(rows),
 			TotalHint:   -1,
 		},
-	}, nil
+	}, listErr()
 }

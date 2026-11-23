@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -39,11 +38,10 @@ func (f *qaECSTaskFake) DescribeServices(_ context.Context, _ *ecs.DescribeServi
 	return &ecs.DescribeServicesOutput{}, nil
 }
 
-// DescribeTaskDefinition returns a ClientException ("does not exist"), the
-// production join's own signal for "no such task definition" — this keeps
-// Fields["task_def_join_error"] unset.
+// Without a DescribeTaskDefinition answer every task would be marked unjoined
+// (task_def_join_error).
 func (f *qaECSTaskFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
-	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
 func qaECSTaskFetch(ctx context.Context, listClusters *mockECSListClustersClient, listTasks *mockECSListTasksClient, describeTasks *mockECSDescribeTasksClient, token string) (resource.FetchResult, error) {

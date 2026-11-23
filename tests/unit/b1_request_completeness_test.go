@@ -80,7 +80,11 @@ func TestB1FetchECSServices_AsksForTags(t *testing.T) {
 	listServices := &mockECSListServicesClient{outputs: map[string]*ecs.ListServicesOutput{
 		clusterARN: {ServiceArns: []string{"arn:aws:ecs:us-east-1:123456789012:service/prod-cluster/web"}},
 	}}
-	describe := &b1DescribeServicesCapture{output: &ecs.DescribeServicesOutput{}}
+	describe := &b1DescribeServicesCapture{output: &ecs.DescribeServicesOutput{Services: []ecstypes.Service{{
+		ServiceName: aws.String("web"),
+		ServiceArn:  aws.String("arn:aws:ecs:us-east-1:123456789012:service/prod-cluster/web"),
+		ClusterArn:  aws.String(clusterARN),
+	}}}}
 
 	if _, err := awsclient.FetchECSServicesPage(context.Background(), listClusters, listServices, describe, ""); err != nil {
 		t.Fatalf("FetchECSServicesPage: %v", err)

@@ -66,7 +66,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 	// deterministic (grouping first would make it depend on map order) while
 	// recording every dropped row as uninspected. Resource.ID IS the task ID
 	// (core/aws/ecs_task.go), which is also how TruncatedIDs is keyed below.
-	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, describedRow, resourceIDsOf)
 
 	clusterTasks := make(map[string][]string)
 	taskIDToResource := make(map[string]string) // taskID → resource key (task_id field)

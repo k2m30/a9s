@@ -142,149 +142,129 @@ func FetchOpenSearchDomainsAt(
 
 	// DescribeDomains accepts at most five names per call (AWS API reference,
 	// DomainNames: "Maximum number of 5 items").
-	var statuses []opensearchtypes.DomainStatus
-	describeErrs := map[string]error{}
-	for batch := range slices.Chunk(domainNames, 5) {
-		out, err := describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
-		if err != nil {
-			for _, name := range batch {
-				describeErrs[name] = err
-			}
-			continue
-		}
-		statuses = append(statuses, out.DomainStatusList...)
-	}
-
 	var resources []resource.Resource
-	described := make(map[string]bool, len(domainNames))
-
-	for _, domain := range statuses {
-		domainName := aws.ToString(domain.DomainName)
-		described[domainName] = true
-
-		engineVersion := aws.ToString(domain.EngineVersion)
-		endpoint := aws.ToString(domain.Endpoint)
-
-		instanceType := ""
-		instanceCount := ""
-		if domain.ClusterConfig != nil {
-			instanceType = string(domain.ClusterConfig.InstanceType)
-			if domain.ClusterConfig.InstanceCount != nil {
-				instanceCount = fmt.Sprintf("%d", *domain.ClusterConfig.InstanceCount)
-			}
-		}
-
-		deleted := strconv.FormatBool(aws.ToBool(domain.Deleted))
-		processing := strconv.FormatBool(aws.ToBool(domain.Processing))
-		upgradeProcessing := strconv.FormatBool(aws.ToBool(domain.UpgradeProcessing))
-
-		// DomainProcessingStatus: always emit at least "Active" so the Color func's
-		// Isolated branch is deterministic even when the AWS field is zero-value.
-		processingStatus := "Active"
-		if domain.DomainProcessingStatus != "" {
-			processingStatus = string(domain.DomainProcessingStatus)
-		}
-
-		updateAvailable := "false"
-		updateDate := ""
-		currentVersion := ""
-		newVersion := ""
-		if domain.ServiceSoftwareOptions != nil {
-			sso := domain.ServiceSoftwareOptions
-			if openSearchUpdateForcedSoon(domain, now) {
-				updateAvailable = "true"
-			}
-			if sso.AutomatedUpdateDate != nil {
-				updateDate = sso.AutomatedUpdateDate.Format(time.RFC3339)
-			}
-			currentVersion = aws.ToString(sso.CurrentVersion)
-			newVersion = aws.ToString(sso.NewVersion)
-		}
-
-		encEnabled := strconv.FormatBool(!openSearchEncryptionAtRestOff(domain))
-
-		// VPC placement and the access policy verdict are read here, at
-		// the one point that holds the DomainStatus, and handed to the
-		// wave-2 enricher as Fields — the enricher makes no AWS calls of
-		// its own and must not re-derive them from RawStruct.
-		vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
-		accessPolicyPublic := strconv.FormatBool(openSearchPolicyIsPublic(domain))
-		enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
-		nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
-
-		findings := computeOpenSearchFindings(domain, now)
-		statusPhrase := domainpkg.StatusPhrase(findings)
-
-		r := resource.Resource{
-			ID:       domainName,
-			Name:     domainName,
-			Findings: findings,
-			Fields: map[string]string{
-				"domain_name":                       domainName,
-				"engine_version":                    engineVersion,
-				"instance_type":                     instanceType,
-				"instance_count":                    instanceCount,
-				"endpoint":                          endpoint,
-				"status":                            statusPhrase,
-				"deleted":                           deleted,
-				"processing":                        processing,
-				"upgrade_processing":                upgradeProcessing,
-				"domain_processing_status":          processingStatus,
-				"service_software_update_available": updateAvailable,
-				"encryption_at_rest_enabled":        encEnabled,
-				"automated_update_date":             updateDate,
-				"current_version":                   currentVersion,
-				"new_version":                       newVersion,
-				"vpc_enabled":                       vpcEnabled,
-				"access_policy_public":              accessPolicyPublic,
-				"enforce_https":                     enforceHTTPS,
-				"node_to_node_encryption_enabled":   nodeToNode,
-			},
-			RawStruct: domain,
-		}
-
-		if updateAvailable == "true" {
-			var rows []domainpkg.DetailRow
-			if updateDate != "" {
-				rows = append(rows, domainpkg.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "~"})
-			}
-			if currentVersion != "" {
-				rows = append(rows, domainpkg.DetailRow{Label: "Current Version", Value: currentVersion})
-			}
-			if newVersion != "" {
-				rows = append(rows, domainpkg.DetailRow{Label: "New Version", Value: newVersion})
-			}
-			addWave1Rows(&r, opensearchCodeUpdateForced, rows...)
-		}
-
-		if vpcEnabled == "false" && accessPolicyPublic == "true" {
-			addWave1Rows(&r, opensearchCodePublic,
-				domainpkg.DetailRow{Label: "Endpoint", Value: "public", Tier: "!"},
-				domainpkg.DetailRow{Label: "Access policy", Value: "open", Tier: "!"},
-			)
-		}
-
-		resources = append(resources, r)
-	}
-
-	// Domains the account listed but DescribeDomains did not return them for
-	// — either the batch call itself failed (e.g. an es:DescribeDomains IAM
-	// denial) or this domain was individually absent from its response —
-	// are KEPT as name-only degraded rows; a listed domain must never
-	// vanish from the list.
 	var failures []Failure
-	for _, name := range domainNames {
-		if described[name] {
-			continue
+	for batch := range slices.Chunk(domainNames, 5) {
+		var ans listedAnswer
+		out, err := describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{DomainNames: batch})
+		if err == nil {
+			for _, domain := range out.DomainStatusList {
+				ans.rows = append(ans.rows, openSearchDomainRow(domain, now))
+			}
 		}
-		describeErr := describeErrs[name]
-		if describeErr != nil {
-			failures = append(failures, FailedCall(name, describeErr))
-		} else {
-			failures = append(failures, UnusableAnswer(name, "absent from DescribeDomains response"))
+		rows, batchFailures := keepListed("DescribeDomains", batch, listedNameIsID, ans, err, func(name string, err error) resource.Resource {
+			return DegradedDetails("opensearch", name, err)
+		})
+		resources = append(resources, rows...)
+		failures = append(failures, batchFailures...)
+	}
+	return resources, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))
+}
+
+func openSearchDomainRow(domain opensearchtypes.DomainStatus, now time.Time) resource.Resource {
+	domainName := aws.ToString(domain.DomainName)
+
+	engineVersion := aws.ToString(domain.EngineVersion)
+	endpoint := aws.ToString(domain.Endpoint)
+
+	instanceType := ""
+	instanceCount := ""
+	if domain.ClusterConfig != nil {
+		instanceType = string(domain.ClusterConfig.InstanceType)
+		if domain.ClusterConfig.InstanceCount != nil {
+			instanceCount = fmt.Sprintf("%d", *domain.ClusterConfig.InstanceCount)
 		}
-		resources = append(resources, DegradedDetails("opensearch", name, describeErr))
 	}
 
-	return resources, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))
+	deleted := strconv.FormatBool(aws.ToBool(domain.Deleted))
+	processing := strconv.FormatBool(aws.ToBool(domain.Processing))
+	upgradeProcessing := strconv.FormatBool(aws.ToBool(domain.UpgradeProcessing))
+
+	// DomainProcessingStatus: always emit at least "Active" so the Color func's
+	// Isolated branch is deterministic even when the AWS field is zero-value.
+	processingStatus := "Active"
+	if domain.DomainProcessingStatus != "" {
+		processingStatus = string(domain.DomainProcessingStatus)
+	}
+
+	updateAvailable := "false"
+	updateDate := ""
+	currentVersion := ""
+	newVersion := ""
+	if domain.ServiceSoftwareOptions != nil {
+		sso := domain.ServiceSoftwareOptions
+		if openSearchUpdateForcedSoon(domain, now) {
+			updateAvailable = "true"
+		}
+		if sso.AutomatedUpdateDate != nil {
+			updateDate = sso.AutomatedUpdateDate.Format(time.RFC3339)
+		}
+		currentVersion = aws.ToString(sso.CurrentVersion)
+		newVersion = aws.ToString(sso.NewVersion)
+	}
+
+	encEnabled := strconv.FormatBool(!openSearchEncryptionAtRestOff(domain))
+
+	// VPC placement and the access policy verdict are read here, at
+	// the one point that holds the DomainStatus, and handed to the
+	// wave-2 enricher as Fields — the enricher makes no AWS calls of
+	// its own and must not re-derive them from RawStruct.
+	vpcEnabled := strconv.FormatBool(domain.VPCOptions != nil)
+	accessPolicyPublic := strconv.FormatBool(openSearchPolicyIsPublic(domain))
+	enforceHTTPS := strconv.FormatBool(!openSearchHTTPSNotEnforced(domain))
+	nodeToNode := strconv.FormatBool(!openSearchNodeToNodeOff(domain))
+
+	findings := computeOpenSearchFindings(domain, now)
+	statusPhrase := domainpkg.StatusPhrase(findings)
+
+	r := resource.Resource{
+		ID:       domainName,
+		Name:     domainName,
+		Findings: findings,
+		Fields: map[string]string{
+			"domain_name":                       domainName,
+			"engine_version":                    engineVersion,
+			"instance_type":                     instanceType,
+			"instance_count":                    instanceCount,
+			"endpoint":                          endpoint,
+			"status":                            statusPhrase,
+			"deleted":                           deleted,
+			"processing":                        processing,
+			"upgrade_processing":                upgradeProcessing,
+			"domain_processing_status":          processingStatus,
+			"service_software_update_available": updateAvailable,
+			"encryption_at_rest_enabled":        encEnabled,
+			"automated_update_date":             updateDate,
+			"current_version":                   currentVersion,
+			"new_version":                       newVersion,
+			"vpc_enabled":                       vpcEnabled,
+			"access_policy_public":              accessPolicyPublic,
+			"enforce_https":                     enforceHTTPS,
+			"node_to_node_encryption_enabled":   nodeToNode,
+		},
+		RawStruct: domain,
+	}
+
+	if updateAvailable == "true" {
+		var rows []domainpkg.DetailRow
+		if updateDate != "" {
+			rows = append(rows, domainpkg.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "~"})
+		}
+		if currentVersion != "" {
+			rows = append(rows, domainpkg.DetailRow{Label: "Current Version", Value: currentVersion})
+		}
+		if newVersion != "" {
+			rows = append(rows, domainpkg.DetailRow{Label: "New Version", Value: newVersion})
+		}
+		addWave1Rows(&r, opensearchCodeUpdateForced, rows...)
+	}
+
+	if vpcEnabled == "false" && accessPolicyPublic == "true" {
+		addWave1Rows(&r, opensearchCodePublic,
+			domainpkg.DetailRow{Label: "Endpoint", Value: "public", Tier: "!"},
+			domainpkg.DetailRow{Label: "Access policy", Value: "open", Tier: "!"},
+		)
+	}
+
+	return r
 }

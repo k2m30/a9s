@@ -59,7 +59,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ekssvc "github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -783,9 +782,8 @@ func (m *pr03cECSDescribeTasksMock) DescribeTasks(
 // awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher reads
 // ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
 // field. DescribeClusters/ListServices/DescribeServices are stubbed since
-// these ecs-task tests never touch them. DescribeTaskDefinition returns a
-// ClientException ("does not exist"), so Fields["task_def_join_error"]
-// stays unset.
+// these ecs-task tests never touch them. Without a DescribeTaskDefinition
+// answer every task would be marked unjoined (task_def_join_error).
 type pr03cECSFake struct {
 	*pr03cECSListClustersMock
 	*pr03cECSListTasksMock
@@ -805,7 +803,7 @@ func (f *pr03cECSFake) DescribeServices(_ context.Context, _ *ecssvc.DescribeSer
 }
 
 func (f *pr03cECSFake) DescribeTaskDefinition(_ context.Context, _ *ecssvc.DescribeTaskDefinitionInput, _ ...func(*ecssvc.Options)) (*ecssvc.DescribeTaskDefinitionOutput, error) {
-	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+	return &ecssvc.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
 func pr03cFetchECSTasks(ctx context.Context, listClusters *pr03cECSListClustersMock, listTasks *pr03cECSListTasksMock, describeTasks *pr03cECSDescribeTasksMock) (resource.FetchResult, error) {

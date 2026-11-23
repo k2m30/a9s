@@ -490,10 +490,11 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}
-		if out == nil || out.UserData == nil || aws.ToString(out.UserData.Value) == "" {
-			return
+		var raw string
+		if out != nil && out.UserData != nil {
+			raw = aws.ToString(out.UserData.Value)
 		}
-		rows := secretScanTextRows(decodeUserData(*out.UserData.Value))
+		rows := secretScanTextRows(decodeUserData(raw))
 		if len(rows) == 0 {
 			return
 		}

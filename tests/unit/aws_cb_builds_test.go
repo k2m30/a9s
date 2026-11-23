@@ -324,8 +324,11 @@ func TestFetchCBBuilds_BatchError(t *testing.T) {
 	if !strings.Contains(err.Error(), "throttling") {
 		t.Errorf("error should contain 'throttling', got %q", err.Error())
 	}
-	if result.Resources != nil {
-		t.Errorf("expected nil resources on error, got %d", len(result.Resources))
+	// A refused BatchGetBuilds hides the build's details, not the build: the
+	// build ListBuildsForProject named stays listed as an unjudged row.
+	if len(result.Resources) != 1 || result.Resources[0].ID != "my-project:build-id-001" ||
+		result.Resources[0].Fields["status"] != "details unavailable" {
+		t.Errorf("resources = %+v, want the listed build kept as a details-unavailable row", result.Resources)
 	}
 }
 
@@ -495,8 +498,11 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 	batchMock := &mockCodeBuildBatchGetBuildsClient{
 		outputs: []*codebuild.BatchGetBuildsOutput{
 			{
+				// BatchGetBuilds always names the build it answers for; every other
+				// field may be absent.
 				Builds: []cbtypes.Build{
 					{
+						Id:          aws.String("proj:b-nil"),
 						BuildStatus: cbtypes.StatusTypeSucceeded,
 					},
 				},

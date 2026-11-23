@@ -150,6 +150,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: compare `Service.RunningCount` and `Service.DesiredCount` on the list-load response. No awareness of active deployments at this stage — a running deployment is the common benign cause and is distinguished in Wave 2.
 
+A service `DescribeServices` did not describe is KEPT with its name and cluster: `details denied` (Warning) when the call was refused for authorization, `details unavailable` (Warning) when it failed otherwise or left the service out. A service the call reports `MISSING` is dropped. A refused batch no longer fails the whole page. Wave 2 does not send `DescribeServices` again for a kept service: its finding already states that call failed. The Service Tasks child view keeps a task `DescribeTasks` did not describe the same way.
+
+- **Signal**: `DescribeServices` was denied for this service.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DescribeServices` did not answer for this service.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -200,6 +210,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `DescribeServices` was denied for this service | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `DescribeServices` did not answer for this service | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `status == DRAINING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `draining` |
 | `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive (service deleted)` |
 | `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no tasks running` |
@@ -282,6 +294,8 @@ ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and
 | ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks. |
 | ecs-svc.deployment-failed | not running its desired tasks | broken | wave2 | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |
 | ecs-svc.public-ip | tasks get public IPs | warn | wave2 | Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway. |
+| ecs-svc.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| ecs-svc.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

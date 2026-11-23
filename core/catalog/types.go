@@ -247,11 +247,25 @@ type CloudTrailAlso struct {
 	Where []CloudTrailMatch
 }
 
+// DegradedFindingField is where a degraded row records the code of the
+// finding it carries, so a row rebuilt from Fields alone keeps the finding's
+// one identity.
+const DegradedFindingField = "degraded_finding"
+
 // ResolveColor classifies r using d.Color, defaulting to a generic
 // status-based color when d.Color is nil, reading Fields["status"]. All
 // registered types have non-nil Color; the fallback exists only for ad-hoc
 // test doubles.
 func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
+	// A degraded row rebuilt from Fields alone carries its finding's code in
+	// DegradedFindingField, and the code's declared severity is its colour.
+	if code := r.Fields[DegradedFindingField]; code != "" && len(r.Findings) == 0 {
+		for _, def := range d.Findings {
+			if string(def.Code) == code {
+				return def.Severity.Color()
+			}
+		}
+	}
 	if d.Color != nil {
 		return d.Color(r)
 	}

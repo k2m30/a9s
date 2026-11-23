@@ -64,25 +64,28 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 		return resource.FetchResult{}, fmt.Errorf("listing Transfer agreements for %s: %w", serverID, err)
 	}
 
-	total := len(listOutput.Agreements)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for i := range listOutput.Agreements {
 		listed := listOutput.Agreements[i]
 		id := aws.ToString(listed.AgreementId)
-
-		describeOutput, describeErr := api.DescribeAgreement(ctx, &transfer.DescribeAgreementInput{
-			AgreementId: aws.String(id),
-			ServerId:    aws.String(serverID),
-		})
-		if describeErr != nil || describeOutput.Agreement == nil {
-			if describeErr == nil {
-				describeErr = fmt.Errorf("nil agreement in DescribeAgreement response")
+		rows := tally.one("DescribeAgreement", id, id, func() (*resource.Resource, error) {
+			out, err := api.DescribeAgreement(ctx, &transfer.DescribeAgreementInput{
+				AgreementId: aws.String(id),
+				ServerId:    aws.String(serverID),
+			})
+			if err != nil {
+				return nil, err
 			}
-			failures = append(failures, FailedCall(id, describeErr))
-			continue
-		}
-		resources = append(resources, buildTransferAgreementResource(describeOutput.Agreement, serverID))
+			if out.Agreement == nil {
+				return nil, UnusableAnswerErr{Call: "DescribeAgreement", Field: "agreement"}
+			}
+			r := buildTransferAgreementResource(out.Agreement, serverID)
+			return &r, nil
+		}, func(err error) resource.Resource {
+			return buildTransferAgreementDegradedResource(listed, serverID, err)
+		})
+		resources = append(resources, rows...)
 	}
 
 	return resource.FetchResult{
@@ -93,7 +96,7 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, AggregateFailures("transfer: DescribeAgreement", failures, total)
+	}, tally.err("transfer: DescribeAgreement")
 }
 
 // buildTransferAgreementResource constructs a Resource from a
@@ -124,6 +127,35 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 			"server_id":       serverID,
 		},
 		RawStruct: agreement,
+		Findings:  findings,
+	}
+}
+
+// buildTransferAgreementDegradedResource: the listed Status still decides the
+// inactive warning, and RawStruct is the *ListedAgreement, so the detail
+// renders the listed fields and enrichTransferAgreement still resolves both
+// profiles.
+func buildTransferAgreementDegradedResource(listed transfertypes.ListedAgreement, serverID string, err error) resource.Resource {
+	id := aws.ToString(listed.AgreementId)
+
+	var findings []domain.Finding
+	if listed.Status == transfertypes.AgreementStatusTypeInactive {
+		findings = append(findings, wave1Finding(transferCodeAgreementInactive))
+	}
+	findings = append(findings, degradedDetailsFinding("transfer_agreements", err))
+
+	return resource.Resource{
+		ID:   id,
+		Name: id,
+		Fields: map[string]string{
+			"agreement_id":    id,
+			"description":     aws.ToString(listed.Description),
+			"status":          domain.StatusPhrase(findings),
+			"local_profile":   aws.ToString(listed.LocalProfileId),
+			"partner_profile": aws.ToString(listed.PartnerProfileId),
+			"server_id":       serverID,
+		},
+		RawStruct: &listed,
 		Findings:  findings,
 	}
 }
@@ -160,13 +192,14 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 		return res, errClientMissing
 	}
 
-	agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct)
-	if !ok {
+	var localProfileID, partnerProfileID string
+	if agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct); ok {
+		localProfileID, partnerProfileID = aws.ToString(agreement.LocalProfileId), aws.ToString(agreement.PartnerProfileId)
+	} else if listed, ok := assertStruct[transfertypes.ListedAgreement](res.RawStruct); ok {
+		localProfileID, partnerProfileID = aws.ToString(listed.LocalProfileId), aws.ToString(listed.PartnerProfileId)
+	} else {
 		return res, fmt.Errorf("unexpected RawStruct type: %T", res.RawStruct)
 	}
-
-	localProfileID := aws.ToString(agreement.LocalProfileId)
-	partnerProfileID := aws.ToString(agreement.PartnerProfileId)
 	localAs2ID, localCertFindings, localErr := resolveTransferProfile(ctx, transferAPI, localProfileID)
 	partnerAs2ID, partnerCertFindings, partnerErr := resolveTransferProfile(ctx, transferAPI, partnerProfileID)
 
@@ -188,7 +221,10 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 	// resolve must not blank the agreement. The error travels with it so the
 	// operator is told a certificate check did not run, rather than reading an
 	// agreement with no expiry warning as one with no expiring certificate.
-	return enriched, errors.Join(localErr, partnerErr)
+	if err := errors.Join(localErr, partnerErr); err != nil {
+		return enriched, domain.PartialDetailErr{Err: err}
+	}
+	return enriched, nil
 }
 
 // resolveTransferProfile resolves a profile id to its As2Id fact

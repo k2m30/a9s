@@ -390,7 +390,7 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 		},
 		ErrByName: map[string]error{
 			"server-denied":  &transfertypes.AccessDeniedException{Message: aws.String("not authorized")},
-			"server-missing": &transfertypes.ResourceNotFoundException{Message: aws.String("Server server-missing not found")},
+			"server-missing": &transfertypes.InternalServiceError{Message: aws.String("internal error")},
 		},
 	}
 	clients := &awsclient.ServiceClients{Transfer: fake}
@@ -404,8 +404,8 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 	}
 
 	// server-denied → AccessDenied (auth) → "details denied";
-	// server-missing → ResourceNotFound (non-auth) → the neutral "details
-	// unavailable". A not-found server must never read as an IAM denial.
+	// server-missing → InternalServiceError (non-auth) → the neutral "details
+	// unavailable". A failed read must never read as an IAM denial.
 	wantPhrase := map[string]string{"server-denied": "details denied", "server-missing": "details unavailable"}
 	for _, r := range result.Resources {
 		if phrase, ok := wantPhrase[r.ID]; ok {
@@ -420,7 +420,7 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 	}
 
 	errStr := err.Error()
-	for _, want := range []string{"server-denied", "server-missing", "AccessDenied", "ResourceNotFound", "2 of 5"} {
+	for _, want := range []string{"server-denied", "server-missing", "AccessDenied", "InternalServiceError", "2 of 5"} {
 		if !strings.Contains(errStr, want) {
 			t.Errorf("composite error must contain %q, got: %q", want, errStr)
 		}

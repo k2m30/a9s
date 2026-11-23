@@ -719,7 +719,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Wave2:          IssueEnricher{Fn: EnrichTransferSecurityPolicy, Priority: 100},
 		FieldKeys: []string{
 			"server_id", "status", "domain", "endpoint_type",
-			"identity_provider_type", "user_count", "arn",
+			"identity_provider_type", "user_count", "arn", "degraded_finding",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkTransferACM},
@@ -902,6 +902,8 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			{Code: transferCodeAgreementInactive, Phrase: "inactive: partner traffic rejected", Severity: domain.SevWarn, Source: "wave1", Detail: "The agreement is inactive, so traffic from this partner is rejected while the server itself is healthy and everything else about the configuration looks correct. Activate it, or tell the partner it is deliberate."},
 			{Code: transferCodeCertExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate has expired, so partner connections that present or verify it now fail. Import a renewed certificate and point the profile at it."},
 			{Code: transferCodeCertExpiring, Phrase: "expires in <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The certificate expires soon; once it does, partner connections that present or verify it will fail. Import a renewed certificate before the inactive date."},
+			DetailsDeniedFindingDef("transfer_agreements", "Reading this agreement was denied, so its base directory, access role and signing settings are unjudged rather than clean. Grant the role you browse with permission to describe the agreement, then refresh."),
+			DetailsUnavailableFindingDef("transfer_agreements"),
 		},
 	},
 }

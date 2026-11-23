@@ -33,10 +33,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 	}
 
 	var resources []resource.Resource
-	rules, complete, err := ebRulesOnBuses(ctx, api, buses)
-	if err != nil {
-		return resource.FetchResult{}, err
-	}
+	rules, complete, rulesErr := ebRulesOnBuses(ctx, api, buses)
 	complete = complete && busesComplete && busErr == nil
 
 	for _, rule := range rules {
@@ -103,7 +100,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 			PageSize:       len(resources),
 			TotalHint:      totalHint,
 		},
-	}, busErr
+	}, JoinAggregates(busErr, rulesErr)
 }
 
 // ebRuleBuses returns the names of the account's event buses. Both ListRules
@@ -148,9 +145,13 @@ func ebRuleBuses(ctx context.Context, api any) ([]string, bool, error) {
 }
 
 // ebRulesOnBuses returns every rule on each of buses, in bus order. An empty
-// bus name asks for the rules ListRules answers with when no bus is named.
+// bus name asks for the rules ListRules answers with when no bus is named. A
+// bus whose rules could not be listed costs its own rules, recorded as a
+// failure, and leaves the list a lower bound; a bus reported gone has none.
 func ebRulesOnBuses(ctx context.Context, api EventBridgeListRulesAPI, buses []string) (rules []eventbridgetypes.Rule, complete bool, err error) {
 	complete = true
+	var failures []Failure
+	var firstErr error
 	for _, bus := range buses {
 		onBus, busComplete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]eventbridgetypes.Rule, *string, error) {
 			input := &eventbridge.ListRulesInput{
@@ -166,13 +167,19 @@ func ebRulesOnBuses(ctx context.Context, api EventBridgeListRulesAPI, buses []st
 			}
 			return out.Rules, out.NextToken, nil
 		})
-		if err != nil {
-			return nil, false, fmt.Errorf("fetching EventBridge rules: %w", err)
-		}
 		rules = append(rules, onBus...)
 		complete = complete && busComplete
+		if err != nil && !IsNotFoundErr(err) {
+			failures = append(failures, FailedCall(cmp.Or(bus, "default"), err))
+			firstErr = cmp.Or(firstErr, err)
+			complete = false
+		}
 	}
-	return rules, complete, nil
+	// Every bus refused is no list at all: the failure is the page's.
+	if len(failures) == len(buses) {
+		return nil, false, fmt.Errorf("fetching EventBridge rules: %w", firstErr)
+	}
+	return rules, complete, AggregateFailures("eb-rule: ListRules", failures, len(buses))
 }
 
 // ebRuleID is the row identity of an EventBridge rule: a rule name is unique

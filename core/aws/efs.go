@@ -75,6 +75,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 	var resources []resource.Resource
 	var failures []Failure
+	asked := 0
 	apAPI, listsAccessPoints := api.(EFSDescribeAccessPointsAPI)
 
 	for _, fs := range output.FileSystems {
@@ -119,6 +120,7 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 		}
 
 		if listsAccessPoints && fsID != "" {
+			asked++
 			ids, err := efsAccessPointIDs(ctx, apAPI, fsID)
 			if err != nil {
 				failures = append(failures, FailedCall(fsID, err))
@@ -149,15 +151,15 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, AggregateFailures("efs: DescribeAccessPoints", failures, len(output.FileSystems))
+	}, AggregateFailures("efs: DescribeAccessPoints", failures, asked)
 }
 
-// efsAccessPointIDs returns the IDs of fsID's access points, every page of
-// them.
+// efsAccessPointIDs: a walk stopped at PerParentPageCap (100 a page, against a quota of 10,000 access points per
+// file system) returns the IDs it read: a lower bound, and no call failed.
 func efsAccessPointIDs(ctx context.Context, api EFSDescribeAccessPointsAPI, fsID string) ([]string, error) {
 	// DescribeAccessPoints pages by NextToken
 	// (https://docs.aws.amazon.com/efs/latest/ug/API_DescribeAccessPoints.html).
-	points, complete, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]efstypes.AccessPointDescription, *string, error) {
+	points, _, err := PageAll(ctx, PerParentPageCap, func(ctx context.Context, token *string) ([]efstypes.AccessPointDescription, *string, error) {
 		out, err := api.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{FileSystemId: &fsID, NextToken: token})
 		if err != nil {
 			return nil, nil, err
@@ -169,9 +171,6 @@ func efsAccessPointIDs(ctx context.Context, api EFSDescribeAccessPointsAPI, fsID
 		if ap.AccessPointId != nil {
 			ids = append(ids, *ap.AccessPointId)
 		}
-	}
-	if err == nil && !complete {
-		err = fmt.Errorf("DescribeAccessPoints: more than %d pages for %s", PerParentPageCap, fsID)
 	}
 	return ids, err
 }

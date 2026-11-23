@@ -454,10 +454,27 @@ func candidatesResult(target string, ids []string, truncated bool) resource.Rela
 // real list was read with whatever filter the row's Fields could supply, and
 // that lower bound is honest whether or not the RawStruct was there.
 func unreadZero(res resource.Resource, r resource.RelatedCheckResult) resource.RelatedCheckResult {
-	if res.RawStruct != nil || r.State() != domain.RelatedResolved || r.Count() != 0 || r.Truncated() {
+	if res.RawStruct != nil {
+		return r
+	}
+	return zeroUnknown(r)
+}
+
+func zeroUnknown(r resource.RelatedCheckResult) resource.RelatedCheckResult {
+	if r.State() != domain.RelatedResolved || r.Count() != 0 || r.Truncated() {
 		return r
 	}
 	return NotRead(r.TargetType()).WithRegion(r.Region())
+}
+
+// DegradedRowAnswer answers a zero unknown on a degraded row: its Fields hold
+// the listed identity and nothing the describe would have filled, so the zero
+// is a claim about a resource nobody read.
+func DegradedRowAnswer(res resource.Resource, r resource.RelatedCheckResult) resource.RelatedCheckResult {
+	if res.Fields[DegradedFindingField] == "" {
+		return r
+	}
+	return zeroUnknown(r)
 }
 
 // unreadZeroScanned is unreadZero for a checker that did read the target list.

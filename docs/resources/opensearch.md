@@ -140,6 +140,8 @@ One bullet per distinct signal.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+A domain whose `DescribeDomains` batch answers `ResourceNotFoundException` was deleted after the list call: it is no row and no failure. Every other listed domain keeps its place in the list order.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 None. `DescribeDomains` is the fetcher's own call and its `DomainStatus`

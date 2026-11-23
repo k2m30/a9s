@@ -350,8 +350,8 @@ func TestFetchKMSKeysPage_AccessDeniedKeyRowCarriesOwnerFinding(t *testing.T) {
 // TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError
 // pins that non-AccessDenied error kinds (throttle exhaustion, 500/internal)
 // are NOT reclassified as benign — they must keep contributing to the
-// composite AggregateFailures error, and the failing key must be excluded
-// from Resources.
+// composite AggregateFailures error. ListKeys proved each key exists, so a
+// key whose DescribeKey failed keeps its row as "details unavailable".
 func TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError(t *testing.T) {
 	throttleErr := &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded", Fault: smithy.FaultClient}
 	serverErr := &smithy.GenericAPIError{Code: "InternalServiceErrorException", Message: "internal error", Fault: smithy.FaultServer}
@@ -376,17 +376,20 @@ func TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError
 		t.Errorf("composite error must not mention AccessDenied when no access-denied failures occurred: %q", err.Error())
 	}
 
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected only the 1 successful key as a resource, got %d", len(result.Resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected every listed key as a resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "key-ok" {
-		t.Errorf("surviving resource ID = %q, want %q", result.Resources[0].ID, "key-ok")
+	for _, r := range result.Resources[1:] {
+		if len(r.Findings) != 1 || r.Findings[0].Code != awsclient.DetailsUnavailableCode("kms") {
+			t.Errorf("%s findings = %+v, want the single kms details-unavailable finding", r.ID, r.Findings)
+		}
 	}
 }
 
 // TestFetchKMSKeysPage_MixedAccessDeniedAndThrottleErrors pins the combined
 // case: composite error must report and count ONLY the non-access-denied
-// failure, while the access-denied key still gets a synthesized row.
+// failure, while every listed key keeps a row: the denied key its
+// kms.access-denied row, the throttled key a details-unavailable row.
 func TestFetchKMSKeysPage_MixedAccessDeniedAndThrottleErrors(t *testing.T) {
 	throttleErr := &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded", Fault: smithy.FaultClient}
 
@@ -407,8 +410,8 @@ func TestFetchKMSKeysPage_MixedAccessDeniedAndThrottleErrors(t *testing.T) {
 		t.Errorf("composite error = %q, want it to report exactly 1 of 3 IDs failing (throttle only, access-denied excluded)", err.Error())
 	}
 
-	if len(result.Resources) != 2 {
-		t.Fatalf("expected 2 resources (key-ok and the synthesized key-denied row), got %d", len(result.Resources))
+	if len(result.Resources) != 3 {
+		t.Fatalf("expected 3 resources (key-ok, the key-denied row and the key-throttled row), got %d", len(result.Resources))
 	}
 	var sawDenied bool
 	for _, r := range result.Resources {

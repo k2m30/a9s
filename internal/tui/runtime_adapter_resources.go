@@ -40,6 +40,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -184,17 +185,15 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // dropped. On success,
 // applies the enriched resource to detail state via
 // ctrl.ApplyDetailEnrichmentIn (the same merge
-// Controller.foldEnrichDetailResultLocked calls for the web/headless lane),
-// then regenerates syntax-colored YAML/JSON content when the active screen is
-// a text viewer for this resource: a TUI-only rendering concern with no
-// Controller equivalent. Calling the SAME Core.HandleEnrichDetailResult the
+// Controller.foldEnrichDetailResultLocked calls for the web/headless lane).
+// Calling the SAME Core.HandleEnrichDetailResult the
 // web/headless lane calls also means this lane's successful Ctrl+R clears
 // the resource's pending sticky-refresh demand; otherwise a successful TUI
 // refresh would leave the latch armed and force every later cfn/IAM open to
 // re-fetch live.
 //
-// The Err branch returns early so the detail-state merge and the
-// syntax-color regeneration never fire on a half-populated EnrichedRes.
+// A half-populated EnrichedRes never reaches the merge; a partial result
+// (domain.DetailResultApplies) is applied and still flashed.
 func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Model, tea.Cmd) {
 	if messages.IsStale(msg, m.core) {
 		return m, nil
@@ -208,49 +207,30 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	})
 	flashCmd := m.dispatchDetailOpResultIntents(intents)
 	coreCmd := m.dispatchTaskRequests(tasks)
-	if msg.Err != nil {
+	if !domain.DetailResultApplies(msg.Err) {
 		return m, tea.Batch(flashCmd, coreCmd)
 	}
 
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
 	m.ctrl.ApplyDetailEnrichmentIn(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, ef, ad)
 
-	// When the active screen is a YAML or JSON text viewer for this resource,
-	// regenerate the syntax-colored content lines from the enriched resource
-	// and push them into the controller's TextState.
-	if m.activeRS().kind == rsKindText {
-		screenID, _ := m.ctrl.GetTextScreenContext()
-		if screenID != "" && m.ctrl.TopShows(msg.ResourceType, msg.Region, msg.ResourceID) {
-			w, h := m.innerSize()
-			var newLines []string
-			switch screenID {
-			case runtime.ScreenYAML:
-				rt := resource.FindResourceType(msg.ResourceType)
-				if rt == nil {
-					rt = resource.GetChildType(msg.ResourceType)
-				}
-				if rt != nil {
-					y := views.NewYAMLWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
-					y.SetSize(w, h)
-					newLines = y.ContentLines()
-				}
-			case runtime.ScreenJSON:
-				rt := resource.FindResourceType(msg.ResourceType)
-				if rt == nil {
-					rt = resource.GetChildType(msg.ResourceType)
-				}
-				if rt != nil {
-					j := views.NewJSONWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
-					j.SetSize(w, h)
-					newLines = j.ContentLines()
-				}
-			}
-			if len(newLines) > 0 {
-				m.ctrl.UpdateTextLines(newLines)
-				m.ctrl.SetTextResource(msg.EnrichedRes)
-			}
+	w, h := m.innerSize()
+	m.ctrl.RegenerateTextScreens(msg.ResourceType, msg.Region, msg.ResourceID, msg.EnrichedRes, func(id runtime.ScreenID) []string {
+		if resource.FindResourceType(msg.ResourceType) == nil && resource.GetChildType(msg.ResourceType) == nil {
+			return nil
 		}
-	}
+		switch id {
+		case runtime.ScreenYAML:
+			y := views.NewYAMLWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
+			y.SetSize(w, h)
+			return y.ContentLines()
+		case runtime.ScreenJSON:
+			j := views.NewJSONWithCtrl(msg.EnrichedRes, msg.ResourceType, m.keys, m.ctrl)
+			j.SetSize(w, h)
+			return j.ContentLines()
+		}
+		return nil
+	})
 	return m, tea.Batch(flashCmd, coreCmd)
 }
 

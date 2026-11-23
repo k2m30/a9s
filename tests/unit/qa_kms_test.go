@@ -310,21 +310,22 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 	resources := result.Resources
 	// FetchKMSKeysPage folds a per-key DescribeKey failure into a composite
 	// error via AggregateFailures — same never-silent-skip contract as the
-	// EKS/NG/ECS fetchers. The key still gets skipped from the results; the
-	// failure is not invisible.
+	// EKS/NG/ECS fetchers. ListKeys proved the key exists, so it keeps a
+	// details-unavailable row in list order.
 	if err == nil || !strings.Contains(err.Error(), "key-denied") {
 		t.Fatalf("expected composite error naming the undescribable key %q, got %v", "key-denied", err)
 	}
 
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources (skipping denied key), got %d", len(resources))
+	if len(resources) != 3 {
+		t.Fatalf("expected 3 resources (every listed key), got %d", len(resources))
 	}
-
-	if resources[0].ID != "key-ok-1" {
-		t.Errorf("resource[0].ID: expected %q, got %q", "key-ok-1", resources[0].ID)
+	for i, want := range []string{"key-ok-1", "key-denied", "key-ok-2"} {
+		if resources[i].ID != want {
+			t.Errorf("resource[%d].ID: expected %q, got %q", i, want, resources[i].ID)
+		}
 	}
-	if resources[1].ID != "key-ok-2" {
-		t.Errorf("resource[1].ID: expected %q, got %q", "key-ok-2", resources[1].ID)
+	if f := resources[1].Findings; len(f) != 1 || f[0].Code != awsclient.DetailsUnavailableCode("kms") {
+		t.Errorf("key-denied findings = %+v, want the single kms details-unavailable finding", f)
 	}
 }
 
@@ -355,7 +356,8 @@ func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
 		t.Fatalf("expected composite error naming both undescribable keys, got %v", err)
 	}
 
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources when all describes fail, got %d", len(resources))
+	// ListKeys proved both keys exist: each keeps a details-unavailable row.
+	if len(resources) != 2 {
+		t.Errorf("expected 2 degraded rows when all describes fail, got %d", len(resources))
 	}
 }

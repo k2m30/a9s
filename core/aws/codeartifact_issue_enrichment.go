@@ -113,6 +113,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			return
 		}
 		if out.Policy == nil || out.Policy.Document == nil {
+			truncated = true
+			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "GetRepositoryPermissionsPolicy", Field: "policy document"})
 			return
 		}
 		parsed, perr := iampolicy.Parse(*out.Policy.Document)

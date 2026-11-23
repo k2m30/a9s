@@ -31,6 +31,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 	}
 
 	var resources []resource.Resource
+	var failures []Failure
 
 	// AWS treats an empty/omitted Clusters list on DescribeClusters as "describe
 	// the default cluster" rather than "describe nothing" — so this call must be
@@ -44,11 +45,12 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			Clusters: listOutput.ClusterArns,
 			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldConfigurations, ecstypes.ClusterFieldTags},
 		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing ECS clusters: %w", err)
+		var ans listedAnswer
+		var clusters []ecstypes.Cluster
+		if err == nil {
+			clusters, ans.gone = descOutput.Clusters, ecsGone(descOutput.Failures)
 		}
-
-		for _, cluster := range descOutput.Clusters {
+		for _, cluster := range clusters {
 			clusterName := ""
 			if cluster.ClusterName != nil {
 				clusterName = *cluster.ClusterName
@@ -78,9 +80,14 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 				Findings:  findings,
 				RawStruct: cluster,
 			}
-
-			resources = append(resources, r)
+			ans.rows = append(ans.rows, r)
 		}
+		resources, failures = keepListed("DescribeClusters", listOutput.ClusterArns, ecsClusterRowID, ans, err, func(arn string, err error) resource.Resource {
+			name := ecsClusterRowID(arn)
+			r := DegradedDetails("ecs", name, err)
+			r.Fields["cluster_name"] = name
+			return r
+		})
 	}
 
 	nextToken := ""
@@ -103,7 +110,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("ecs: DescribeClusters", failures, len(listOutput.ClusterArns))
 }
 
 // ecsClusterFindings is the one predicate for a cluster's lifecycle state.
@@ -121,4 +128,26 @@ func ecsClusterFindings(status string) []domain.Finding {
 		return []domain.Finding{wave1Finding(CodeECSStateInactive)}
 	}
 	return nil
+}
+
+// ecsGone reads the names an ECS Describe* call reports as no longer
+// existing: a Failure whose Reason is MISSING.
+func ecsGone(failures []ecstypes.Failure) map[string]bool {
+	gone := map[string]bool{}
+	for _, f := range failures {
+		if aws.ToString(f.Reason) == "MISSING" {
+			gone[aws.ToString(f.Arn)] = true
+		}
+	}
+	return gone
+}
+
+func ecsClusterRowID(arn string) string {
+	id, _ := ecsRefToID(arn, domain.RefContext{})
+	return id
+}
+
+func ecsTaskRowID(arn string) string {
+	id, _ := ecsTaskRefToID(arn, domain.RefContext{})
+	return id
 }

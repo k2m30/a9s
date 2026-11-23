@@ -28,7 +28,20 @@ type ECSFixtures struct {
 	ContainerInstances []ecstypes.ContainerInstance
 	// CapacityProviders is the list DescribeCapacityProviders answers from.
 	CapacityProviders []ecstypes.CapacityProvider
+	// UnavailableClusters, UnavailableServices and UnavailableTasks are ARNs the
+	// List* calls name and the batched Describe* calls leave out of their
+	// answer — the absent-from-response shape, which the fetchers keep as
+	// `details unavailable` rows.
+	UnavailableClusters []string
+	UnavailableServices []string
+	UnavailableTasks    []string
 }
+
+const (
+	WarnECSDetailsUnavailableID     = "warn-ecs-details-unavailable"
+	WarnECSSvcDetailsUnavailableID  = "warn-ecs-svc-details-unavailable"
+	WarnECSTaskDetailsUnavailableID = "0f0e0d0c0b0a09080706050403020100"
+)
 
 // NewECSFixtures builds and returns a fully-populated ECSFixtures struct.
 var sharedECSFixtures = shared(func() *ECSFixtures {
@@ -42,6 +55,9 @@ var sharedECSFixtures = shared(func() *ECSFixtures {
 		Tasks:                 tasks,
 		TaskDefinitions:       tdefs,
 		DeniedTaskDefinitions: map[string]bool{ecsDeniedTaskDefARN: true},
+		UnavailableClusters:   []string{"arn:aws:ecs:us-east-1:123456789012:cluster/" + WarnECSDetailsUnavailableID},
+		UnavailableServices:   []string{"arn:aws:ecs:us-east-1:123456789012:service/acme-services/" + WarnECSSvcDetailsUnavailableID},
+		UnavailableTasks:      []string{"arn:aws:ecs:us-east-1:123456789012:task/acme-services/" + WarnECSTaskDetailsUnavailableID},
 		ContainerInstances: []ecstypes.ContainerInstance{{
 			ContainerInstanceArn: aws.String(ecsBatchContainerInstanceArn),
 			Ec2InstanceId:        aws.String(ECSBatchHostInstanceID),
@@ -1253,9 +1269,7 @@ func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 }
 
 func init() {
-	Register(Pin{ShortName: "ecs", Rows: 7, Issues: 4, CoverageGaps: []string{"dim"}})
-	// acme-svc-stalled wants tasks and runs none, so it is one of the 26 rows
-	// and one of the 7 Broken badges.
-	Register(Pin{ShortName: "ecs-svc", Rows: 27, Issues: 7, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ecs-task", Rows: 19, Issues: 8})
+	Register(Pin{ShortName: "ecs", Rows: 8, Issues: 5, CoverageGaps: []string{"dim", "ecs.warn.details_denied"}})
+	Register(Pin{ShortName: "ecs-svc", Rows: 28, Issues: 8, CoverageGaps: []string{"dim", "ecs-svc.warn.details_denied"}})
+	Register(Pin{ShortName: "ecs-task", Rows: 20, Issues: 9, CoverageGaps: []string{"ecs-task.warn.details_denied"}})
 }

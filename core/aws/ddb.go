@@ -50,6 +50,58 @@ func computeDDBFindings(table *ddbtypes.TableDescription) ([]domain.Finding, map
 	return append(lifecycle, wave1Finding(CodeDDBDeletionProtectionOff)), nil
 }
 
+func ddbTableResource(table *ddbtypes.TableDescription) resource.Resource {
+	name := ""
+	if table.TableName != nil {
+		name = *table.TableName
+	}
+
+	findings, attentionDetails := computeDDBFindings(table)
+	statusPhrase := domain.StatusPhrase(findings)
+
+	itemCount := ""
+	if table.ItemCount != nil {
+		itemCount = fmt.Sprintf("%d", *table.ItemCount)
+	}
+
+	sizeBytes, sizeBytesRaw := "", ""
+	if table.TableSizeBytes != nil {
+		sizeBytes = formatBytes(*table.TableSizeBytes)
+		sizeBytesRaw = strconv.FormatInt(*table.TableSizeBytes, 10)
+	}
+
+	// DynamoDB omits BillingModeSummary entirely for a table that has
+	// never switched mode, and PROVISIONED is the mode a table gets when
+	// CreateTable names none.
+	billingMode := domain.HumanizeStatusPhrase(string(ddbtypes.BillingModeProvisioned))
+	if table.BillingModeSummary != nil {
+		billingMode = domain.HumanizeStatusPhrase(string(table.BillingModeSummary.BillingMode))
+	}
+
+	arn := ""
+	if table.TableArn != nil {
+		arn = *table.TableArn
+	}
+
+	r := resource.Resource{
+		ID:       name,
+		Name:     name,
+		Findings: findings,
+		Fields: map[string]string{
+			"table_name":     name,
+			"status":         statusPhrase,
+			"item_count":     itemCount,
+			"size_bytes":     sizeBytes,
+			"size_bytes_raw": sizeBytesRaw,
+			"billing_mode":   billingMode,
+			"arn":            arn,
+		},
+		RawStruct:        table,
+		AttentionDetails: attentionDetails,
+	}
+	return r
+}
+
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get
 // names, then DescribeTable per table for full details.
 // Pass an empty continuationToken for the first page.
@@ -66,77 +118,21 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		return resource.FetchResult{}, fmt.Errorf("listing DynamoDB tables: %w", err)
 	}
 
-	var failures []Failure
+	var tally describeTally
 	var resources []resource.Resource
 	for _, tableName := range listOutput.TableNames {
-		descOutput, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(tableName),
-		})
-		if err != nil {
-			// Surface per-table failures to the error log AND keep the row —
-			// a listed table must never vanish behind a describe denial.
-			failures = append(failures, FailedCall(tableName, err))
-			resources = append(resources, DegradedDetails("ddb", tableName, err))
-			continue
-		}
-
-		table := descOutput.Table
-		if table == nil {
-			failures = append(failures, UnusableAnswer(tableName, "nil table in response"))
-			resources = append(resources, DegradedDetails("ddb", tableName, nil))
-			continue
-		}
-
-		name := ""
-		if table.TableName != nil {
-			name = *table.TableName
-		}
-
-		findings, attentionDetails := computeDDBFindings(table)
-		statusPhrase := domain.StatusPhrase(findings)
-
-		itemCount := ""
-		if table.ItemCount != nil {
-			itemCount = fmt.Sprintf("%d", *table.ItemCount)
-		}
-
-		sizeBytes, sizeBytesRaw := "", ""
-		if table.TableSizeBytes != nil {
-			sizeBytes = formatBytes(*table.TableSizeBytes)
-			sizeBytesRaw = strconv.FormatInt(*table.TableSizeBytes, 10)
-		}
-
-		// DynamoDB omits BillingModeSummary entirely for a table that has
-		// never switched mode, and PROVISIONED is the mode a table gets when
-		// CreateTable names none.
-		billingMode := domain.HumanizeStatusPhrase(string(ddbtypes.BillingModeProvisioned))
-		if table.BillingModeSummary != nil {
-			billingMode = domain.HumanizeStatusPhrase(string(table.BillingModeSummary.BillingMode))
-		}
-
-		arn := ""
-		if table.TableArn != nil {
-			arn = *table.TableArn
-		}
-
-		r := resource.Resource{
-			ID:       name,
-			Name:     name,
-			Findings: findings,
-			Fields: map[string]string{
-				"table_name":     name,
-				"status":         statusPhrase,
-				"item_count":     itemCount,
-				"size_bytes":     sizeBytes,
-				"size_bytes_raw": sizeBytesRaw,
-				"billing_mode":   billingMode,
-				"arn":            arn,
-			},
-			RawStruct:        table,
-			AttentionDetails: attentionDetails,
-		}
-
-		resources = append(resources, r)
+		rows := tally.one("DescribeTable", tableName, tableName, func() (*resource.Resource, error) {
+			out, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(tableName)})
+			if err != nil {
+				return nil, err
+			}
+			if out.Table == nil {
+				return nil, UnusableAnswerErr{Call: "DescribeTable", Field: "table"}
+			}
+			r := ddbTableResource(out.Table)
+			return &r, nil
+		}, func(err error) resource.Resource { return DegradedDetails("ddb", tableName, err) })
+		resources = append(resources, rows...)
 	}
 
 	nextToken := ""
@@ -159,5 +155,5 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, AggregateFailures("ddb: DescribeTable", failures, len(listOutput.TableNames))
+	}, tally.err("ddb: DescribeTable")
 }

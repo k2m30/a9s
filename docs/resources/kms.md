@@ -104,6 +104,10 @@ Transcribed from `docs/attention-signals.md § Signals § SECRETS & CONFIG` row 
   - **State bucket**: Broken.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+- **Signal**: `DescribeKey` failed for this key for any reason but a denial (throttling past the retries, a service fault, an answer without `KeyMetadata`).
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call. `ListKeys` proved the key exists, so it keeps a row; a key `DescribeKey` reports gone was deleted after the list call and is dropped without a failure.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 `GetKeyRotationStatus` and the key policy read on the second pass; `KeyState` is already on the row by then and its signals are in §3.1.
@@ -143,6 +147,7 @@ One row per signal from §3:
 | `KeyState==PendingReplicaDeletion` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
 | `KeyState==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<key state>` |
 | `DescribeKey` was denied for this key | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `access denied (kms:DescribeKey)` |
+| `DescribeKey` failed for this key for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `KeyRotationEnabled==false` on CMK | 2 | Warning | `~` | S2, S3, S4, S5 | `key rotation disabled` |
 | Default key policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `key policy open to anyone` |
 
@@ -188,6 +193,7 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 | kms.state.disabled | disabled | warn | wave1 | The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it. |
 | kms.state.unavailable | <key state> | broken | wave1 | The key is not usable in the state it reports, and what to do depends on which state that is. A key still being created or updated only needs waiting out; one awaiting imported material needs the material imported; one whose custom key store is disconnected needs the store reconnected before anything encrypted under it can be read. |
 | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
+| kms.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | The key material never changes on a schedule, so anything that has ever been able to decrypt with this key still can. Turn on automatic rotation if this is a symmetric customer managed key with AWS-generated material, the only kind that supports it; for an asymmetric key, a message-authentication key, one with imported material, or one in a custom key store, plan a manual rotation to a new key and re-encrypt what depends on it. |
 | kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Add a condition that requires the caller's account or role to equal one you expect, and keep any condition limiting which service the request may come through: that one narrows the path but not the caller, so it bounds the exposure without closing it. |
 <!-- END GENERATED: findings -->

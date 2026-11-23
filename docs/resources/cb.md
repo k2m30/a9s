@@ -136,6 +136,16 @@ project that is wrong four ways carries four of them.
   - **API call**: same `BatchGetProjects` — `Environment.EnvironmentVariables`.
   - **Cost shape**: per-sweep.
 
+A project `BatchGetProjects` did not describe is KEPT name-only: `details denied` (Warning) when the call was refused for authorization, `details unavailable` (Warning) when it failed otherwise or left the project out. A name in `ProjectsNotFound` was deleted after the list call and is dropped. The Builds child view keeps a build `BatchGetBuilds` did not describe the same way, and drops one in `BuildsNotFound`.
+
+- **Signal**: `BatchGetProjects` was denied for this project.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `BatchGetProjects` did not answer for this project.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -163,6 +173,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `BatchGetProjects` was denied for this project | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `BatchGetProjects` did not answer for this project | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | build results public | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `build results publicly visible` |
 | buildspec from the source repository | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `buildspec taken from the source repository` |
 | credential in the source address | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in the source repository address` |
@@ -223,6 +235,8 @@ cb — CI/CD. Status key: `last_build` — the key the status cell reads, and th
 | cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches. |
 | cb.source-url-credential | credential in the source repository address | broken | wave1 | The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked. |
 | cb.env-secret | credential in environment variables | broken | wave1 | A plaintext environment variable on this project holds what looks like a credential; every build log and anyone who can read the project definition sees its value. Move it to Secrets Manager or Parameter Store, reference it by type, and rotate the exposed value. |
+| cb.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| cb.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

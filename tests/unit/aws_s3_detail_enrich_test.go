@@ -9,6 +9,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -369,7 +371,10 @@ func TestEnrichS3_AllThreeCallsCrossRegion_WrapperAttachedAllNilNoError(t *testi
 	}
 }
 
-func TestEnrichS3_RealError_PropagatedAndResUnchanged(t *testing.T) {
+// The three bucket reads are independent: a refused policy read is reported
+// as a partial result, and the CORS and lifecycle reads that answered are
+// still attached.
+func TestEnrichS3_RealError_PropagatedWithTheOtherReads(t *testing.T) {
 	fake := fullS3Fake()
 	fake.getPolicyFn = func(_ *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
 		return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "not authorized to get bucket policy"}
@@ -379,11 +384,18 @@ func TestEnrichS3_RealError_PropagatedAndResUnchanged(t *testing.T) {
 	res := makeS3Res(s3TestBucketName)
 
 	got, err := enricher(context.Background(), makeS3Ctx(fake), res)
-	if err == nil {
-		t.Fatal("expected error for AccessDenied (not a benign-absence code), got nil")
+	if _, partial := errors.AsType[domain.PartialDetailErr](err); !partial {
+		t.Fatalf("err = %v, want a PartialDetailErr for AccessDenied (not a benign-absence code)", err)
 	}
-	if _, ok := got.RawStruct.(awsclient.BucketEnriched); ok {
-		t.Error("res.RawStruct must stay the original type when enrichment fails, got BucketEnriched")
+	enriched, ok := got.RawStruct.(awsclient.BucketEnriched)
+	if !ok {
+		t.Fatalf("RawStruct = %T, want BucketEnriched carrying the reads that answered", got.RawStruct)
+	}
+	if enriched.Policy != nil {
+		t.Errorf("enriched.Policy = %v, want nil for the refused read", enriched.Policy)
+	}
+	if enriched.CORSRules == nil || enriched.LifecycleRules == nil {
+		t.Errorf("CORS %v / lifecycle %v must carry what their reads answered", enriched.CORSRules, enriched.LifecycleRules)
 	}
 }
 

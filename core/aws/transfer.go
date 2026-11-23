@@ -61,24 +61,24 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		return resource.FetchResult{}, fmt.Errorf("listing Transfer Family servers: %w", err)
 	}
 
-	total := len(listOutput.Servers)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for i := range listOutput.Servers {
 		listed := listOutput.Servers[i]
 		id := aws.ToString(listed.ServerId)
 
-		describeOutput, describeErr := c.Transfer.DescribeServer(ctx, &transfer.DescribeServerInput{ServerId: aws.String(id)})
-		switch {
-		case describeErr != nil:
-			failures = append(failures, FailedCall(id, describeErr))
-			resources = append(resources, buildTransferDegradedResource(listed, describeErr))
-		case describeOutput.Server == nil:
-			failures = append(failures, UnusableAnswer(id, "nil server in DescribeServer response"))
-			resources = append(resources, buildTransferDegradedResource(listed, nil))
-		default:
-			resources = append(resources, buildTransferResource(describeOutput.Server))
-		}
+		rows := tally.one("DescribeServer", id, id, func() (*resource.Resource, error) {
+			out, err := c.Transfer.DescribeServer(ctx, &transfer.DescribeServerInput{ServerId: aws.String(id)})
+			if err != nil {
+				return nil, err
+			}
+			if out.Server == nil {
+				return nil, UnusableAnswerErr{Call: "DescribeServer", Field: "server"}
+			}
+			r := buildTransferResource(out.Server)
+			return &r, nil
+		}, func(err error) resource.Resource { return buildTransferDegradedResource(listed, err) })
+		resources = append(resources, rows...)
 	}
 
 	return resource.FetchResult{
@@ -89,7 +89,7 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, AggregateFailures("transfer: DescribeServer", failures, total)
+	}, tally.err("transfer: DescribeServer")
 }
 
 // buildTransferResource constructs a Resource from a DescribeServer

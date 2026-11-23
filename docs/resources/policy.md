@@ -68,7 +68,7 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `p
 - **Signal**: Policy document (default version) contains an `"Effect":"Allow","Action":"*","Resource":"*"` statement → Broken (wildcard admin — the policy is effectively administrator access, regardless of name).
   - **Explicit Deny**: an unconditional Deny that takes any action away (a Deny `Action`, or a Deny `NotAction` that does not except `*`) leaves less than every action, so the policy is not admin; its escalation combos are then read as below.
   - **State bucket**: Broken.
-  - **API call**: `GetPolicyVersion(PolicyArn, VersionId=<DefaultVersionId>)` — one call per policy. The `Document` field is URL-encoded JSON per SDK docs — decode, parse, then scan the `Statement[]` array for any entry with `Effect==Allow`, `Action` containing `*`, and `Resource` containing `*` (accounting for the field being either a string or a list).
+  - **API call**: `GetPolicyVersion(PolicyArn, VersionId=<DefaultVersionId>)` — one call per policy. The `Document` field is URL-encoded JSON per SDK docs — decode, parse, then scan the `Statement[]` array for any entry with `Effect==Allow`, `Action` containing `*`, and `Resource` containing `*` (accounting for the field being either a string or a list). An answer without the default version id or the document marks the row not inspected, naming the call and the missing field.
   - **Cost shape**: per-resource.
 
 - **Signal**: Document grants a known privilege-escalation action combination (and is not already reported as admin).

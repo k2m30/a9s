@@ -49,6 +49,9 @@ func (f *MWAAFake) GetEnvironment(_ context.Context, input *mwaa.GetEnvironmentI
 			Message: aws.String("User is not authorized to perform: airflow:GetEnvironment on resource: " + name),
 		}
 	}
+	if slices.Contains(f.fix.UnavailableNames, name) {
+		return nil, &mwaatypes.InternalServerException{Message: aws.String("Internal server error")}
+	}
 	env, ok := f.fix.Environments[name]
 	if !ok {
 		return nil, &mwaatypes.ResourceNotFoundException{

@@ -229,7 +229,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100},
-		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds", "kms_key_id"},
+		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds", "kms_key_id", "degraded_finding", "name", "status"},
 		IssueEnricherFieldKeys: []string{"dlq"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true, Truncated: true},
@@ -245,6 +245,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2", Detail: "Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue."},
 			{Code: sqsCodeNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave2", Detail: "The queue has neither the AWS-managed queue encryption nor a KMS key, so message bodies are held without server-side encryption. Turn on the managed queue encryption, which costs nothing and needs no key policy, or attach a KMS key when you need to control and audit the key yourself."},
 			{Code: sqsCodePublicPolicy, Phrase: "queue policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue."},
+			DetailsDeniedFindingDef("sqs", ""),
+			DetailsUnavailableFindingDef("sqs"),
 		},
 	},
 	{

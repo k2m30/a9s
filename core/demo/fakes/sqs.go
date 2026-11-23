@@ -5,9 +5,11 @@ package fakes
 import (
 	"context"
 	"maps"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -27,6 +29,8 @@ func (f *SQSFake) ListQueues(_ context.Context, _ *sqs.ListQueuesInput, _ ...fun
 	for _, q := range f.fix.Queues {
 		urls = append(urls, q.QueueURL)
 	}
+	urls = append(urls, f.fix.DeniedQueueURLs...)
+	urls = append(urls, f.fix.UnavailableQueueURLs...)
 	return &sqs.ListQueuesOutput{QueueUrls: urls}, nil
 }
 
@@ -34,6 +38,12 @@ func (f *SQSFake) GetQueueAttributes(_ context.Context, input *sqs.GetQueueAttri
 	var queueURL string
 	if input != nil && input.QueueUrl != nil {
 		queueURL = *input.QueueUrl
+	}
+	if slices.Contains(f.fix.DeniedQueueURLs, queueURL) {
+		return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "User is not authorized to perform: sqs:GetQueueAttributes on resource: " + queueURL}
+	}
+	if slices.Contains(f.fix.UnavailableQueueURLs, queueURL) {
+		return nil, &smithy.GenericAPIError{Code: "InternalError", Message: "We encountered an internal error. Please try again.", Fault: smithy.FaultServer}
 	}
 	for _, q := range f.fix.Queues {
 		if q.QueueURL == queueURL {

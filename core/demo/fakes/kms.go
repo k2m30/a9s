@@ -45,6 +45,9 @@ func (f *KMSFake) DescribeKey(_ context.Context, input *kms.DescribeKeyInput, _ 
 			Fault:   smithy.FaultClient,
 		}
 	}
+	if *input.KeyId == fixtures.WarnKMSDetailsUnavailableID {
+		return nil, &smithy.GenericAPIError{Code: "KMSInternalException", Message: "internal error", Fault: smithy.FaultServer}
+	}
 	meta, ok := f.fix.Keys[*input.KeyId]
 	if !ok {
 		return nil, &kmstypes.NotFoundException{Message: notFoundMessage("Key", *input.KeyId)}
@@ -79,7 +82,9 @@ func (f *KMSFake) GetKeyPolicy(_ context.Context, input *kms.GetKeyPolicyInput, 
 	}
 	policy, ok := f.fix.KeyPolicies[*input.KeyId]
 	if !ok {
-		return &kms.GetKeyPolicyOutput{}, nil
+		// Every KMS key has a key policy; a key created without one carries
+		// the default, which grants the owning account and nothing else.
+		policy = `{"Version":"2012-10-17","Id":"key-default-1","Statement":[{"Sid":"Enable IAM User Permissions","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"}]}`
 	}
 	return &kms.GetKeyPolicyOutput{Policy: &policy}, nil
 }

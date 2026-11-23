@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -799,8 +800,8 @@ func TestFetchManagedPolicyDocument_NilPolicy(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil Policy, got nil")
 	}
-	if !strings.Contains(err.Error(), "nil policy or version ID") {
-		t.Errorf("expected 'nil policy or version ID' in error, got: %v", err)
+	if u, ok := errors.AsType[awsclient.UnusableAnswerErr](err); !ok || u.Call != "GetPolicy" {
+		t.Errorf("want an UnusableAnswerErr for GetPolicy, got: %v", err)
 	}
 }
 
@@ -817,8 +818,8 @@ func TestFetchManagedPolicyDocument_NilDefaultVersionId(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil DefaultVersionId, got nil")
 	}
-	if !strings.Contains(err.Error(), "nil policy or version ID") {
-		t.Errorf("expected 'nil policy or version ID' in error, got: %v", err)
+	if u, ok := errors.AsType[awsclient.UnusableAnswerErr](err); !ok || u.Call != "GetPolicy" {
+		t.Errorf("want an UnusableAnswerErr for GetPolicy, got: %v", err)
 	}
 }
 
@@ -839,8 +840,8 @@ func TestFetchManagedPolicyDocument_NilPolicyVersionDocument(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil PolicyVersion.Document, got nil")
 	}
-	if !strings.Contains(err.Error(), "nil document") {
-		t.Errorf("expected 'nil document' in error, got: %v", err)
+	if u, ok := errors.AsType[awsclient.UnusableAnswerErr](err); !ok || u.Call != "GetPolicyVersion" {
+		t.Errorf("want an UnusableAnswerErr for GetPolicyVersion, got: %v", err)
 	}
 }
 
@@ -853,7 +854,7 @@ func TestFetchInlinePolicyDocument_NilDocument(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil PolicyDocument, got nil")
 	}
-	if !strings.Contains(err.Error(), "nil document") {
-		t.Errorf("expected 'nil document' in error, got: %v", err)
+	if u, ok := errors.AsType[awsclient.UnusableAnswerErr](err); !ok || u.Call != "GetRolePolicy" {
+		t.Errorf("want an UnusableAnswerErr for GetRolePolicy, got: %v", err)
 	}
 }

@@ -2,7 +2,10 @@
 
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // ─── Column / view types ───────────────────────────────────────────────────
 
@@ -169,7 +172,24 @@ type RevealFetcher func(ctx context.Context, clients any, resourceID string) (st
 type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Resource, error)
 
 // DetailEnricher enriches a single resource on demand for detail views.
+// On a non-nil error the returned Resource is discarded, unless the error is a
+// PartialDetailErr.
 type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
+
+// PartialDetailErr is what a DetailEnricher returns when it read part of the
+// resource and some of its lookups failed: the returned Resource carries
+// everything that was read and is applied, and the error is still reported.
+type PartialDetailErr struct{ Err error }
+
+func (e PartialDetailErr) Error() string { return e.Err.Error() }
+func (e PartialDetailErr) Unwrap() error { return e.Err }
+
+// DetailResultApplies is the one rule both detail-fold lanes use to decide
+// whether an enricher's returned Resource reaches the open detail.
+func DetailResultApplies(err error) bool {
+	_, partial := errors.AsType[PartialDetailErr](err)
+	return err == nil || partial
+}
 
 // RelatedChecker returns a count of related resources of a specific type.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult

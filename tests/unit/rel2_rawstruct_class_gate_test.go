@@ -187,7 +187,9 @@ func TestRel2WarmRowNeverGetsAConfidentZero(t *testing.T) {
 				warm := row
 				warm.RawStruct = nil
 				warmResult := def.Checker(context.Background(), clients, warm, cache)
-				if warmResult.State() != domain.RelatedResolved || warmResult.Count() != 0 {
+				// A truncated zero is a lower bound on the list, which holds whether
+				// or not the source row was read (TestRel2LowerBoundSurvivesTheUnreadRule).
+				if warmResult.State() != domain.RelatedResolved || warmResult.Count() != 0 || warmResult.Truncated() {
 					continue
 				}
 				// The control: the same checker on the same row with its struct

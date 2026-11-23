@@ -26,7 +26,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	"github.com/aws/smithy-go"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -130,8 +129,8 @@ func (f *fakeECSDescribeTasksWithImage) DescribeTasks(_ context.Context, _ *ecs.
 // ecsTaskRound2FullFake composes the three narrow ECS mocks into one
 // awsclient.ECSAPI: the registered "ecs-task" fetcher reads
 // ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
-// field. DescribeTaskDefinition answers a ClientException ("does not
-// exist"), so Fields["task_def_join_error"] stays unset.
+// field. Without a DescribeTaskDefinition answer every task would be marked
+// unjoined (task_def_join_error).
 type ecsTaskRound2FullFake struct {
 	*fakeECSListClustersOnly
 	*fakeECSListTasksOnly
@@ -151,7 +150,7 @@ func (f *ecsTaskRound2FullFake) DescribeServices(_ context.Context, _ *ecs.Descr
 }
 
 func (f *ecsTaskRound2FullFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
-	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
 func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {

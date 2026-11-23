@@ -30,6 +30,7 @@ func (f *CodeBuildFake) ListProjects(_ context.Context, _ *codebuild.ListProject
 			names = append(names, *p.Name)
 		}
 	}
+	names = append(names, f.fix.UnavailableProjects...)
 	return &codebuild.ListProjectsOutput{Projects: names}, nil
 }
 
@@ -76,7 +77,7 @@ func (f *CodeBuildFake) BatchGetBuilds(_ context.Context, input *codebuild.Batch
 // hasProject reports whether the fixtures register this CodeBuild project. A
 // project that has never been built still answers an empty build list.
 func (f *CodeBuildFake) hasProject(name string) bool {
-	return slices.ContainsFunc(f.fix.Projects, func(p cbtypes.Project) bool {
+	return slices.Contains(f.fix.UnavailableProjects, name) || slices.ContainsFunc(f.fix.Projects, func(p cbtypes.Project) bool {
 		return aws.ToString(p.Name) == name
 	})
 }

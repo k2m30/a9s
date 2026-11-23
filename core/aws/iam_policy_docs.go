@@ -23,7 +23,7 @@ func FetchManagedPolicyDocument(ctx context.Context, getPolAPI IAMGetPolicyAPI, 
 		return nil, fmt.Errorf("GetPolicy: %w", err)
 	}
 	if polOut.Policy == nil || polOut.Policy.DefaultVersionId == nil {
-		return nil, fmt.Errorf("GetPolicy returned nil policy or version ID")
+		return nil, UnusableAnswerErr{Call: "GetPolicy", Field: "default version id"}
 	}
 
 	verOut, err := getVerAPI.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
@@ -34,7 +34,7 @@ func FetchManagedPolicyDocument(ctx context.Context, getPolAPI IAMGetPolicyAPI, 
 		return nil, fmt.Errorf("GetPolicyVersion: %w", err)
 	}
 	if verOut.PolicyVersion == nil || verOut.PolicyVersion.Document == nil {
-		return nil, fmt.Errorf("GetPolicyVersion returned nil document")
+		return nil, UnusableAnswerErr{Call: "GetPolicyVersion", Field: "policy document"}
 	}
 
 	return decodePolicyDocument(*verOut.PolicyVersion.Document)
@@ -50,7 +50,7 @@ func FetchInlinePolicyDocument(ctx context.Context, api IAMGetRolePolicyAPI, rol
 		return nil, fmt.Errorf("GetRolePolicy: %w", err)
 	}
 	if out.PolicyDocument == nil {
-		return nil, fmt.Errorf("GetRolePolicy returned nil document")
+		return nil, UnusableAnswerErr{Call: "GetRolePolicy", Field: "policy document"}
 	}
 	return decodePolicyDocument(*out.PolicyDocument)
 }

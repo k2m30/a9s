@@ -203,7 +203,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichCodeBuildStatus, Priority: 10},
-		FieldKeys:              []string{"name", "source_type", "description", "last_modified", "arn"},
+		FieldKeys:              []string{"name", "source_type", "description", "last_modified", "arn", "degraded_finding", "status"},
 		IssueEnricherFieldKeys: []string{"last_build"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true, Truncated: true},
@@ -233,6 +233,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1", Detail: "The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches."},
 			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1", Detail: "The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked."},
 			{Code: CodeCBEnvSecret, Phrase: "credential in environment variables", Severity: domain.SevBroken, Source: "wave1", Detail: "A plaintext environment variable on this project holds what looks like a credential; every build log and anyone who can read the project definition sees its value. Move it to Secrets Manager or Parameter Store, reference it by type, and rotate the exposed value."},
+			DetailsDeniedFindingDef("cb", ""),
+			DetailsUnavailableFindingDef("cb"),
 		},
 	},
 	{
@@ -419,6 +421,8 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1", Detail: "The build hit the project's timeout and was killed part-way, so its artifacts are incomplete or absent. Find the phase that was still running when it was cut off — a hung test or a slow dependency fetch is typical — or raise the project's timeout if the build genuinely needs longer."},
 			{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "This build is still running, so its outcome is not known and any artifact it will publish does not exist yet. Wait for it to finish before treating the tag or artifact it targets as available."},
 			{Code: CodeCBBuildStopped, Phrase: "stopped (cancelled)", Severity: domain.SevDim, Source: "wave1"},
+			DetailsDeniedFindingDef("cb_builds", ""),
+			DetailsUnavailableFindingDef("cb_builds"),
 		},
 	},
 	{

@@ -4,12 +4,14 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -60,39 +62,47 @@ func enrichS3(ctx context.Context, clients any, res resource.Resource) (resource
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketPolicy")
 			}
-			policyOut, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(id)})
-			switch {
-			case err != nil && !s3BenignAbsenceErr(err, "NoSuchBucketPolicy") && !isS3CrossRegionErr(err):
-				return s3DetailPayload{}, err
-			case err == nil && policyOut.Policy != nil:
-				payload.Policy = parseJSONOrRaw(*policyOut.Policy)
-			}
-
 			corsAPI, ok := bucketS3.(S3GetBucketCorsAPI)
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketCors")
 			}
-			corsOut, err := corsAPI.GetBucketCors(ctx, &s3.GetBucketCorsInput{Bucket: aws.String(id)})
-			switch {
-			case err != nil && !s3BenignAbsenceErr(err, "NoSuchCORSConfiguration") && !isS3CrossRegionErr(err):
-				return s3DetailPayload{}, err
-			case err == nil:
-				payload.CORSRules = corsOut.CORSRules
-			}
-
 			lifecycleAPI, ok := bucketS3.(S3GetBucketLifecycleAPI)
 			if !ok {
 				return s3DetailPayload{}, fmt.Errorf("S3 client does not support GetBucketLifecycleConfiguration")
 			}
+
+			// The three calls are independent: one refused leaves the other
+			// two read, and the detail shows them with the refusal.
+			var errs []error
+			answered := func(err error, absent string) bool {
+				if err != nil && !s3BenignAbsenceErr(err, absent) && !isS3CrossRegionErr(err) {
+					errs = append(errs, err)
+				}
+				return err == nil
+			}
+
+			policyOut, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(id)})
+			if answered(err, "NoSuchBucketPolicy") && policyOut.Policy != nil {
+				payload.Policy = parseJSONOrRaw(*policyOut.Policy)
+			}
+
+			corsOut, err := corsAPI.GetBucketCors(ctx, &s3.GetBucketCorsInput{Bucket: aws.String(id)})
+			if answered(err, "NoSuchCORSConfiguration") {
+				payload.CORSRules = corsOut.CORSRules
+			}
+
 			lifecycleOut, err := lifecycleAPI.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{Bucket: aws.String(id)})
-			switch {
-			case err != nil && !s3BenignAbsenceErr(err, "NoSuchLifecycleConfiguration") && !isS3CrossRegionErr(err):
-				return s3DetailPayload{}, err
-			case err == nil:
+			if answered(err, "NoSuchLifecycleConfiguration") {
 				payload.LifecycleRules = lifecycleOut.Rules
 			}
 
-			return payload, nil
+			switch len(errs) {
+			case 0:
+				return payload, nil
+			case 3:
+				return s3DetailPayload{}, errors.Join(errs...)
+			}
+			return payload, domain.PartialDetailErr{Err: errors.Join(errs...)}
 		},
 		wrap: func(bucket s3types.Bucket, payload s3DetailPayload) any {
 			return BucketEnriched{Bucket: bucket, Policy: payload.Policy, CORSRules: payload.CORSRules, LifecycleRules: payload.LifecycleRules}

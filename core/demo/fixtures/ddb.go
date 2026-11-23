@@ -26,7 +26,7 @@ type DDBFixtures struct {
 	// ddb.warn.details_denied).
 	DeniedNames []string
 	// UnavailableNames are listed by ListTables but DescribeTable answers
-	// ResourceNotFoundException for them — the neutral failure, so the
+	// InternalServerError for them — the neutral failure, so the
 	// fetcher keeps a name-only `details unavailable` row (finding
 	// ddb.warn.details_unavailable).
 	UnavailableNames []string

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,7 +62,8 @@ var _ awsclient.IAMAPI = (*iamBareAPI)(nil)
 
 // TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped verifies that when GetRole
 // returns a non-error response with Role=nil, no finding is produced for that
-// role.
+// role, and the role is marked uninspected with a reported failure: an answer
+// without the role says nothing about whether it is dormant.
 func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 	fake := &iamGetRoleFakeWithNilRole{nilRoleName: "ghost-role"}
 	clients := &awsclient.ServiceClients{IAM: fake}
@@ -77,8 +79,11 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "GetRole returned no role") {
+		t.Fatalf("err = %v, want the short GetRole answer reported", err)
+	}
+	if _, marked := result.TruncatedIDs["ghost-role"]; !marked {
+		t.Errorf("ghost-role not marked uninspected: %+v", result.TruncatedIDs)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings when Role is nil, got %d", len(result.Findings))

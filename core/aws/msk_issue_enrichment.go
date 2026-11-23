@@ -66,6 +66,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			return
 		}
 		if out.ClusterInfo == nil {
+			MarkSkipped(&result, r.ID, &failures, UnusableAnswerErr{Call: "DescribeClusterV2", Field: "cluster info"})
 			return
 		}
 		prov := out.ClusterInfo.Provisioned

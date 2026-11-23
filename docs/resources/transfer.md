@@ -129,7 +129,7 @@ Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `LoggingRole == nil` (s
 
 Wave-2 detail facts (not signals): `Protocols`, `As2ServiceManagedEgressIpAddresses` (partners allowlist these — copyable), `HostKeyFingerprint` (SFTP clients pin it), `EndpointDetails` wiring, `IdentityProviderDetails.Url`.
 
-Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner traffic rejected`; certificate rows (on agreement detail): `InactiveDate` past or `Status == INACTIVE` → Broken `expired`, within 30 days → Warning `expires in <N>d`. Never bubbled account-wide to the server row.
+Child-row signals: agreement `Status == INACTIVE` → Warning `inactive: partner traffic rejected`; certificate rows (on agreement detail): `InactiveDate` past or `Status == INACTIVE` → Broken `expired`, within 30 days → Warning `expires in <N>d`. Never bubbled account-wide to the server row. An agreement whose `DescribeAgreement` fails is KEPT from its `ListedAgreement` (id, description, status, both profile ids): Warning `details denied` for an authorization refusal, `details unavailable` otherwise, and `INACTIVE` still raises its warning. A certificate lookup that fails on the agreement detail does not discard what did resolve: the profiles and the other certificate's finding are shown, and the failed lookup is reported in the header.
 
 - **Signal**: `DescribeServer` answered with nothing usable.
   - **State bucket**: Warning.

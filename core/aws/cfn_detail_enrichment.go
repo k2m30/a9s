@@ -65,7 +65,7 @@ func enrichCfn(ctx context.Context, clients any, res resource.Resource) (resourc
 				return nil, err
 			}
 			if out.TemplateBody == nil {
-				return nil, nil
+				return nil, UnusableAnswerErr{Call: "GetTemplate", Field: "template body"}
 			}
 			// CFN templates are frequently authored as YAML, not JSON —
 			// parseJSONOrRaw's raw-string fallback renders as a block scalar

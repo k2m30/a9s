@@ -19,15 +19,19 @@ type EKSFixtures struct {
 	// RawStructs are ekstypes.Nodegroup (values, matching production fetcher).
 	Nodegroups map[string][]ekstypes.Nodegroup
 	// DeniedClusters are listed by ListClusters but DescribeCluster answers
-	// AccessDeniedException; UnavailableClusters are listed but not found —
+	// AccessDeniedException; UnavailableClusters are listed but answer a service fault —
 	// the two degraded rows (eks.warn.details_denied / details_unavailable).
 	DeniedClusters      []string
 	UnavailableClusters []string
 	// DeniedNodegroups / UnavailableNodegroups map cluster name → node group
-	// names that ListNodegroups returns but DescribeNodegroup denies / cannot
-	// find (ng.warn.details_denied / details_unavailable).
+	// names that ListNodegroups returns but DescribeNodegroup denies / fails
+	// with a service fault (ng.warn.details_denied / details_unavailable).
 	DeniedNodegroups      map[string][]string
 	UnavailableNodegroups map[string][]string
+	// DeniedNodegroupListClusters are clusters whose ListNodegroups answers
+	// AccessDeniedException: the ng list loads every other cluster's node
+	// groups and reports this one call.
+	DeniedNodegroupListClusters []string
 }
 
 // Degraded rows. The node groups hang off the graph-root cluster.
@@ -43,12 +47,13 @@ var sharedEKSFixtures = shared(func() *EKSFixtures {
 	clusters := buildEKSClusters()
 	ngs := buildEKSNodegroups()
 	return &EKSFixtures{
-		Clusters:              clusters,
-		Nodegroups:            ngs,
-		DeniedClusters:        []string{WarnEKSDetailsDeniedID},
-		UnavailableClusters:   []string{WarnEKSDetailsUnavailableID},
-		DeniedNodegroups:      map[string][]string{"acme-prod": {WarnNGDetailsDeniedID}},
-		UnavailableNodegroups: map[string][]string{"acme-prod": {WarnNGDetailsUnavailableID}},
+		Clusters:                    clusters,
+		Nodegroups:                  ngs,
+		DeniedClusters:              []string{WarnEKSDetailsDeniedID},
+		UnavailableClusters:         []string{WarnEKSDetailsUnavailableID},
+		DeniedNodegroups:            map[string][]string{"acme-prod": {WarnNGDetailsDeniedID}},
+		UnavailableNodegroups:       map[string][]string{"acme-prod": {WarnNGDetailsUnavailableID}},
+		DeniedNodegroupListClusters: []string{WarnEKSDetailsDeniedID},
 	}
 })
 
@@ -374,6 +379,13 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					MinSize:     aws.Int32(1),
 					MaxSize:     aws.Int32(4),
 					DesiredSize: aws.Int32(2),
+				},
+				// Names the staging template whose DescribeLaunchTemplateVersions
+				// the EC2 fake refuses (WarnLTDeniedID): the node group stays,
+				// its image unread, and the ng list reports that call.
+				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+					Id:      aws.String(WarnLTDeniedID),
+					Version: aws.String("2"),
 				},
 				CreatedAt:      aws.Time(mustTime("2025-06-20T10:00:00Z")),
 				ReleaseVersion: aws.String("1.29.3-20240322"),

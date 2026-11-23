@@ -20,6 +20,7 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -27,6 +28,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -187,6 +189,19 @@ func TestNoDemoRowCarriesAPathCasedFieldsKey(t *testing.T) {
 	}
 }
 
+// demoAgreementDetailErr: fixtures.AgreementOldPartnerID's partial detail is
+// still the result, since only one of its certificate lookups is refused.
+func demoAgreementDetailErr(t *testing.T, id string, err error) {
+	t.Helper()
+	if err == nil {
+		return
+	}
+	if _, partial := errors.AsType[domain.PartialDetailErr](err); partial && id == fixtures.AgreementOldPartnerID {
+		return
+	}
+	t.Fatalf("transfer_agreements enricher on %q: %v", id, err)
+}
+
 // The agreement detail enricher resolves each profile's AS2 id once and writes
 // it once.
 func TestTransferAgreementProfileIsOneKey(t *testing.T) {
@@ -204,9 +219,7 @@ func TestTransferAgreementProfileIsOneKey(t *testing.T) {
 	sawResolved := false
 	for _, r := range rows {
 		out, err := enricher(context.Background(), newDemoDetailCtx(clients), r)
-		if err != nil {
-			t.Fatalf("transfer_agreements enricher on %q: %v", r.ID, err)
-		}
+		demoAgreementDetailErr(t, r.ID, err)
 		if out.Fields["local_profile"] != "" {
 			sawResolved = true
 		}
@@ -230,9 +243,7 @@ func TestTransferAgreementProfileReadableAfterDedup(t *testing.T) {
 	found := false
 	for _, r := range rows {
 		out, err := enricher(context.Background(), newDemoDetailCtx(clients), r)
-		if err != nil {
-			t.Fatalf("transfer_agreements enricher on %q: %v", r.ID, err)
-		}
+		demoAgreementDetailErr(t, r.ID, err)
 		if out.Fields["local_profile"] == "" {
 			continue
 		}

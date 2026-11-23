@@ -341,7 +341,7 @@ func ecrRepositoryExposure(ctx context.Context, api ECRAPI, repoName, ownAccount
 		return iampolicy.Exposure{}, err
 	}
 	if out.PolicyText == nil {
-		return iampolicy.Exposure{}, nil
+		return iampolicy.Exposure{}, UnusableAnswerErr{Call: "GetRepositoryPolicy", Field: "policy text"}
 	}
 	doc, perr := iampolicy.Parse(*out.PolicyText)
 	if perr != nil {

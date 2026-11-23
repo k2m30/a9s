@@ -82,28 +82,30 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		return resource.FetchResult{}, fmt.Errorf("listing launch templates: %w", err)
 	}
 
-	total := len(listOutput.LaunchTemplates)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for i := range listOutput.LaunchTemplates {
 		tpl := listOutput.LaunchTemplates[i]
 		id := aws.ToString(tpl.LaunchTemplateId)
 
-		versionOutput, versionErr := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
-			LaunchTemplateId: aws.String(id),
-			Versions:         []string{"$Default"},
+		rows := tally.one("DescribeLaunchTemplateVersions", id, id, func() (*resource.Resource, error) {
+			out, err := api.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
+				LaunchTemplateId: aws.String(id),
+				Versions:         []string{"$Default"},
+			})
+			if err != nil {
+				return nil, err
+			}
+			if len(out.LaunchTemplateVersions) == 0 {
+				return nil, UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "default version"}
+			}
+			ver := out.LaunchTemplateVersions[0]
+			r := ltResource(tpl, ver, nil)
+			return &r, nil
+		}, func(err error) resource.Resource {
+			return ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", err)})
 		})
-		switch {
-		case versionErr != nil:
-			failures = append(failures, FailedCall(id, versionErr))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", versionErr)}))
-		case len(versionOutput.LaunchTemplateVersions) == 0:
-			failures = append(failures, UnusableAnswer(id, "no $Default version in DescribeLaunchTemplateVersions response"))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil)}))
-		default:
-			ver := versionOutput.LaunchTemplateVersions[0]
-			resources = append(resources, ltResource(tpl, ver, nil))
-		}
+		resources = append(resources, rows...)
 	}
 
 	return resource.FetchResult{
@@ -114,7 +116,7 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, AggregateFailures("lt: DescribeLaunchTemplateVersions", failures, total)
+	}, tally.err("lt: DescribeLaunchTemplateVersions")
 }
 
 // ltResource constructs a Resource from the list LaunchTemplate, its

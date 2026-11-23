@@ -775,18 +775,13 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// message; unified simply stays 0 in that unreached case.
 		td := resource.FindResourceType(msg.ResourceType)
 		var unified int
+		rows, _ := c.ProbeResources(msg.ResourceType)
 		if td != nil {
-			// unifiedIssueCount's input is RowStore's own current rows for
-			// this type — this is the
-			// SAME rows applyEnrichment/AmendRows above just folded findings
-			// and FieldUpdates onto, so this aggregation is over the freshest
-			// per-type row state this call produced.
-			rows, _ := c.ProbeResources(msg.ResourceType)
 			unified = unifiedIssueCount(rows, *td)
 		}
 
 		c.session.EnrichmentCutSet(msg.ResourceType, msg.Truncated)
-		issueTruncated := issueLowerBound(msg.ResourceType, c.pageTruncated(msg.ResourceType), msg.Truncated, unified > 0 || len(allFindings) > 0, len(msg.TruncatedIDs))
+		issueTruncated := issueLowerBound(msg.ResourceType, c.pageTruncated(msg.ResourceType), msg.Truncated, unified > 0 || len(allFindings) > 0, uncountedMarks(msg.ResourceType, rows, msg.TruncatedIDs))
 
 		intents = append(intents, PatchMenu{
 			ResourceType: msg.ResourceType,
@@ -984,18 +979,40 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 	// Wave-2 finding on the same resource never double-counts it.
 	count := 0
 	for _, r := range wave1Resources {
-		if td.ResolveColor(Wave1Only(r)).IsIssue() {
-			count++
-			continue
-		}
-		// A Wave-2 "!"-severity finding bumps the badge; "~" (SevWarn) never does.
-		if slices.ContainsFunc(r.Findings, func(f domain.Finding) bool {
-			return f.Severity == domain.SevBroken && f.IsWave2Sourced()
-		}) {
+		if countsAsIssue(r, td) {
 			count++
 		}
 	}
 	return count
+}
+
+func countsAsIssue(r resource.Resource, td resource.ResourceTypeDef) bool {
+	return td.ResolveColor(Wave1Only(r)).IsIssue() || slices.ContainsFunc(r.Findings, func(f domain.Finding) bool {
+		return f.Severity == domain.SevBroken && f.IsWave2Sourced()
+	})
+}
+
+// uncountedMarks counts the rows marked not inspected that the badge does not
+// already count: a check left unrun on a row the badge counts cannot make the
+// count short. A mark naming no row in rows is counted.
+func uncountedMarks(shortName string, rows []resource.Resource, marks map[string]string) int {
+	td := resource.FindResourceType(shortName)
+	if td == nil || td.ExcludeFromIssueBadge {
+		return len(marks)
+	}
+	counted := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		if countsAsIssue(r, *td) {
+			counted[r.ID] = true
+		}
+	}
+	n := 0
+	for id := range marks {
+		if !counted[id] {
+			n++
+		}
+	}
+	return n
 }
 
 // Wave1Only returns a copy of r with every Wave-2-sourced Finding
@@ -1027,8 +1044,9 @@ func Wave1Only(r resource.Resource) resource.Resource {
 // short, used by the sweep, the on-demand row check and the type file alike.
 // A truncated page always leaves the count open. Otherwise the count can be
 // short only when something went unchecked and the type has a Wave-2 check
-// that raises an issue at all, since an unchecked "~" check hides none. Rows
-// marked not inspected are unchecked whatever was counted. A cut the enricher
+// that raises an issue at all, since an unchecked "~" check hides none.
+// uninspected is uncountedMarks: the marked rows the badge does not already
+// count are unchecked whatever else was counted. A cut the enricher
 // reports without marking a row only opens a count it produced: when it found
 // nothing and left no row unanswered there is no count to be short.
 func issueLowerBound(shortName string, pageTruncated, enricherCut, found bool, uninspected int) bool {

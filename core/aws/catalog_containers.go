@@ -185,8 +185,13 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 	if err != nil {
 		return resource.FetchResult{}, err
 	}
-	var failures []Failure
-	totalAttempted := 0
+	// One aggregate per call, each counted against what that call was asked
+	// for: a cluster whose node groups were never listed was described
+	// nowhere, and a template that did not read is not a node group that did
+	// not describe.
+	var ltFailures []Failure
+	var tally describeTally
+	ltAttempted := 0
 	walk := parentChildWalk{
 		listParents: func(ctx context.Context, token *string) ([]string, *string, error) {
 			out, callErr := c.EKS.ListClusters(ctx, &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize), NextToken: token})
@@ -195,6 +200,7 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			}
 			return out.Clusters, out.NextToken, nil
 		},
+		listOp: "ng: ListNodegroups",
 		listChildren: func(ctx context.Context, cluster string, token *string) ([]string, *string, error) {
 			out, callErr := c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
 				ClusterName: aws.String(cluster),
@@ -202,46 +208,46 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 				NextToken:   token,
 			})
 			if callErr != nil {
-				failures = append(failures, FailedCall(cluster, callErr))
-				return nil, nil, nil
+				return nil, nil, callErr
 			}
 			return out.Nodegroups, out.NextToken, nil
 		},
 		describe: func(ctx context.Context, cluster string, names []string) ([]resource.Resource, error) {
 			ngName := names[0]
-			totalAttempted++
-			descOutput, descErr := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-				ClusterName:   aws.String(cluster),
-				NodegroupName: aws.String(ngName),
-			})
-			if descErr != nil {
-				failures = append(failures, FailedCall(cluster+"/"+ngName, descErr))
-				return []resource.Resource{degradedNodeGroup(cluster, ngName, descErr)}, nil
-			}
-			if descOutput.Nodegroup == nil {
-				failures = append(failures, UnusableAnswer(cluster+"/"+ngName, "nil nodegroup in response"))
-				return []resource.Resource{degradedNodeGroup(cluster, ngName, nil)}, nil
-			}
-			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
-			if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
-				// A template nobody could read leaves image_id absent, which
-				// the ami → ng pivot reads as an image unread.
-				imageID, imgErr := resolveNGImageID(ctx, c.EC2, lt)
-				if imgErr != nil {
-					failures = append(failures, FailedCall(cluster+"/"+ngName, imgErr))
-				} else {
-					res.Fields["image_id"] = imageID
+			rows := tally.one("DescribeNodegroup", ngName, ngRowID(cluster, ngName), func() (*resource.Resource, error) {
+				descOutput, descErr := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+					ClusterName:   aws.String(cluster),
+					NodegroupName: aws.String(ngName),
+				})
+				if descErr != nil {
+					return nil, descErr
 				}
-			}
-			return []resource.Resource{res}, nil
+				if descOutput.Nodegroup == nil {
+					return nil, UnusableAnswerErr{Call: "DescribeNodegroup", Field: "node group"}
+				}
+				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
+				if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+					// A template nobody could read leaves image_id absent, which
+					// the ami → ng pivot reads as an image unread.
+					ltAttempted++
+					imageID, imgErr := resolveNGImageID(ctx, c.EC2, lt)
+					if imgErr != nil {
+						ltFailures = append(ltFailures, FailedCall(cluster+"/"+ngName, imgErr))
+					} else {
+						res.Fields["image_id"] = imageID
+					}
+				}
+				return &res, nil
+			}, func(err error) resource.Resource { return degradedNodeGroup(cluster, ngName, err) })
+			return rows, nil
 		},
 		batch: 1,
 	}
 	result, err := walk.page(ctx, continuationToken)
-	if err != nil {
-		return resource.FetchResult{}, err
-	}
-	return result, AggregateFailures("ng: DescribeNodegroup", failures, totalAttempted)
+	return result, JoinAggregates(
+		JoinAggregates(err, tally.err("ng: DescribeNodegroup")),
+		AggregateFailures("ng: DescribeLaunchTemplateVersions", ltFailures, ltAttempted),
+	)
 }
 
 // containersChildTypes is the declarative child-type catalog for the CONTAINERS
@@ -314,6 +320,8 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is being taken out of service and deregistered from its targets, so it is shedding traffic. Confirm a replacement task is already healthy if this service has to stay available."},
 			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it."},
 			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly."},
+			DetailsDeniedFindingDef("ecs_tasks", ""),
+			DetailsUnavailableFindingDef("ecs_tasks"),
 		},
 	},
 	{

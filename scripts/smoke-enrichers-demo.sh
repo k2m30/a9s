@@ -276,6 +276,8 @@ sleep 1
 tmux send-keys -t "$SESSION" 'e'
 sleep 2
 tmux capture-pane -t "$SESSION" -p > "$CAPDIR/transfer_agreements_list.txt"
+tmux send-keys -t "$SESSION" '/agr-prod-partner' Enter
+sleep 1
 tmux send-keys -t "$SESSION" 'd'
 wait_for transfer_agreement_detail.txt "ACME-LOCAL" "transfer agreement detail shows the resolved local profile As2Id"
 expect transfer_agreement_detail.txt "PARTNER-CO" "transfer agreement detail shows the resolved partner profile As2Id"

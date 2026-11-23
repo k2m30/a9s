@@ -222,6 +222,11 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	fetchCtx := WithDetailOp(ctx, dctx.OpID)
 	payload, err := spec.fetch(fetchCtx, dctx.Clients, id, item, res)
 	if err != nil {
+		// A partial payload is what was read; it is shown with the error and
+		// never cached, so the next open asks again for what failed.
+		if _, partial := errors.AsType[domain.PartialDetailErr](err); partial {
+			res.RawStruct = spec.wrap(item, payload)
+		}
 		return res, err
 	}
 

@@ -113,7 +113,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichAthenaWorkGroup, Priority: 100},
-		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location", "creation_time", "cost_cap"},
+		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location", "creation_time", "cost_cap", "degraded_finding", "result_config_unread"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3, Mirror: true},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS, Truncated: true},
@@ -123,6 +123,8 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Findings: []catalog.FindingDef{
 			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries."},
+			DetailsDeniedFindingDef("athena", "Reading this workgroup's configuration was denied, so its result location and per-query scan cap are unknown rather than unset. Grant the role you browse with permission to read the workgroup, then refresh."),
+			DetailsUnavailableFindingDef("athena"),
 			{Code: athenaCodeSettingsNotEnforced, Phrase: "settings can be overridden per query", Severity: domain.SevWarn, Source: "wave2", Detail: "Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query."},
 			{Code: athenaCodeResultsUnencrypted, Phrase: "result encryption not set", Severity: domain.SevWarn, Source: "wave2", Detail: "The workgroup sets no encryption for query results, so they take whatever default the results bucket applies (S3-managed keys at minimum), a key the workgroup neither chooses nor controls access through. Set an encryption option on the workgroup's result configuration so every result is encrypted the way the workgroup requires."},
 		},
@@ -152,7 +154,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		FetcherClients: clientsOf(func(c *ServiceClients) []any { return []any{c.MWAA} }),
 		Fetcher:        fetcherWithClients(FetchMWAAEnvironmentsPage),
 		FieldKeys: []string{
-			"name", "status", "airflow_version", "environment_class",
+			"name", "status", "degraded_finding", "airflow_version", "environment_class",
 			"min_workers", "max_workers", "schedulers", "min_webservers", "max_webservers",
 			"webserver_access_mode", "endpoint_management", "weekly_maintenance_window",
 			"webserver_url", "arn", "source_bucket_arn", "dag_s3_path", "kms_key",

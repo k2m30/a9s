@@ -47,6 +47,12 @@ var knownUnwitnessedFindings = map[string]bool{
 	// domain at once and no demo fixture can sit beside healthy domains —
 	// see knownStateCoverageGaps.
 	"opensearch:opensearch.warn.details_denied": true,
+	// BatchGetProjects, DescribeClusters, DescribeServices and DescribeTasks are
+	// batched the same way.
+	"cb:cb.warn.details_denied":             true,
+	"ecs:ecs.warn.details_denied":           true,
+	"ecs-svc:ecs-svc.warn.details_denied":   true,
+	"ecs-task:ecs-task.warn.details_denied": true,
 }
 
 // w6aCodesUnderTheNameKeyedGate are codes checked by

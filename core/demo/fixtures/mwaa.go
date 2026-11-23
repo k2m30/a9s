@@ -24,7 +24,7 @@ type MWAAFixtures struct {
 	// keeps these as name-only degraded rows (finding mwaa.warn.details_denied).
 	DeniedNames []string
 	// UnavailableNames are listed by ListEnvironments but GetEnvironment
-	// answers ResourceNotFoundException for them — the neutral failure, kept
+	// answers InternalServerException for them — the neutral failure, kept
 	// as name-only degraded rows (finding mwaa.warn.details_unavailable).
 	UnavailableNames []string
 }
@@ -32,24 +32,23 @@ type MWAAFixtures struct {
 // Exported environment-name constants — referenced by sibling fixture files
 // (as the alarm dimension value / log-group name segment) and by tests.
 const (
-	ProdAirflowEtlID            = "prod-airflow-etl"
-	ProdAirflowReportingID      = "prod-airflow-reporting"
-	WarnAirflowCreatingID       = "warn-airflow-creating"
-	WarnAirflowSnapshottingID   = "warn-airflow-snapshotting"
-	WarnAirflowPendingID        = "warn-airflow-pending"
-	WarnAirflowUpdatingID       = "warn-airflow-updating"
-	WarnAirflowMaintenanceID    = "warn-airflow-maintenance"
-	WarnAirflowRollbackID       = "warn-airflow-rollback"
-	BrokenAirflowCreateFailedID = "broken-airflow-create-failed"
-	BrokenAirflowUpdateFailedID = "broken-airflow-update-failed"
-	BrokenAirflowUnavailableID  = "broken-airflow-unavailable"
-	DimAirflowDeletingID        = "dim-airflow-deleting"
-	DimAirflowDeletedID         = "dim-airflow-deleted"
-	WarnAirflowStaleUpdateID    = "warn-airflow-stale-update"
-	WarnAirflowPublicID         = "warn-airflow-public"
-	WarnAirflowMultiID          = "warn-airflow-multi"
-	WarnAirflowDetailsDeniedID  = "warn-airflow-details-denied"
-	// WarnAirflowDetailsUnavailableID is listed but GetEnvironment cannot find it.
+	ProdAirflowEtlID                = "prod-airflow-etl"
+	ProdAirflowReportingID          = "prod-airflow-reporting"
+	WarnAirflowCreatingID           = "warn-airflow-creating"
+	WarnAirflowSnapshottingID       = "warn-airflow-snapshotting"
+	WarnAirflowPendingID            = "warn-airflow-pending"
+	WarnAirflowUpdatingID           = "warn-airflow-updating"
+	WarnAirflowMaintenanceID        = "warn-airflow-maintenance"
+	WarnAirflowRollbackID           = "warn-airflow-rollback"
+	BrokenAirflowCreateFailedID     = "broken-airflow-create-failed"
+	BrokenAirflowUpdateFailedID     = "broken-airflow-update-failed"
+	BrokenAirflowUnavailableID      = "broken-airflow-unavailable"
+	DimAirflowDeletingID            = "dim-airflow-deleting"
+	DimAirflowDeletedID             = "dim-airflow-deleted"
+	WarnAirflowStaleUpdateID        = "warn-airflow-stale-update"
+	WarnAirflowPublicID             = "warn-airflow-public"
+	WarnAirflowMultiID              = "warn-airflow-multi"
+	WarnAirflowDetailsDeniedID      = "warn-airflow-details-denied"
 	WarnAirflowDetailsUnavailableID = "warn-airflow-details-unavailable"
 )
 

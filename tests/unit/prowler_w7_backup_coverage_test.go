@@ -514,8 +514,14 @@ func (f *w7DDBTagFake) ListTagsOfResource(_ context.Context, in *dynamodb.ListTa
 	return out, nil
 }
 
+// DescribeContinuousBackups answers point-in-time recovery enabled. A
+// description without the recovery status is a short answer in the PITR pass,
+// which would mark the table skipped for a reason unrelated to the coverage
+// join.
 func (f *w7DDBTagFake) DescribeContinuousBackups(_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
-	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
+	return &dynamodb.DescribeContinuousBackupsOutput{ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
+		PointInTimeRecoveryDescription: &ddbtypes.PointInTimeRecoveryDescription{PointInTimeRecoveryStatus: ddbtypes.PointInTimeRecoveryStatusEnabled},
+	}}, nil
 }
 
 // GetResourcePolicy answers a well-formed empty policy. An absent document is

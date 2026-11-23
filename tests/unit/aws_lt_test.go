@@ -477,7 +477,7 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 		},
 		versionErr: map[string]error{
 			"lt-partial-denied":  &smithy.GenericAPIError{Code: "UnauthorizedOperation", Message: "not authorized"},
-			"lt-partial-missing": &smithy.GenericAPIError{Code: "InvalidLaunchTemplateId.NotFound", Message: "not found"},
+			"lt-partial-missing": &smithy.GenericAPIError{Code: "InternalError", Message: "internal error"},
 		},
 	}
 	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
@@ -498,10 +498,9 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	}
 
 	// lt-partial-denied → UnauthorizedOperation (EC2's authorization-denied
-	// code) → "details denied"; lt-partial-missing → InvalidLaunchTemplateId.
-	// NotFound (non-auth) → the neutral "details unavailable". A not-found
-	// template must never read as an IAM denial, and EC2 denials do not use
-	// the "AccessDenied" code.
+	// code) → "details denied"; lt-partial-missing → InternalError (non-auth)
+	// → the neutral "details unavailable". A failed read must never read as
+	// an IAM denial, and EC2 denials do not use the "AccessDenied" code.
 	wantPhrase := map[string]string{"lt-partial-denied": "details denied", "lt-partial-missing": "details unavailable"}
 	for _, r := range result.Resources {
 		if phrase, ok := wantPhrase[r.ID]; ok {
@@ -516,7 +515,7 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	}
 
 	errStr := err.Error()
-	for _, want := range []string{"lt-partial-denied", "lt-partial-missing", "UnauthorizedOperation", "InvalidLaunchTemplateId.NotFound", "2 of 5"} {
+	for _, want := range []string{"lt-partial-denied", "lt-partial-missing", "UnauthorizedOperation", "InternalError", "2 of 5"} {
 		if !strings.Contains(errStr, want) {
 			t.Errorf("composite error must contain %q, got: %q", want, errStr)
 		}

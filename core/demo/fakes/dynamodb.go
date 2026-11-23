@@ -47,6 +47,9 @@ func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.Describe
 			Message: fmt.Sprintf("not authorized to perform: dynamodb:DescribeTable on resource: %s", name),
 		}
 	}
+	if slices.Contains(f.fix.UnavailableNames, name) {
+		return nil, &smithy.GenericAPIError{Code: "InternalServerError", Message: "Internal server error", Fault: smithy.FaultServer}
+	}
 	for _, t := range f.fix.Tables {
 		if aws.ToString(t.TableName) == name {
 			return &dynamodb.DescribeTableOutput{Table: t}, nil

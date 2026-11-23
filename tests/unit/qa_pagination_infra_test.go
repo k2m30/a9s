@@ -19,7 +19,6 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -416,9 +415,9 @@ func (m *mockECSDescribeTasksAPIPaginated) DescribeTasks(_ context.Context, _ *e
 // one awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher
 // reads ListClusters/ListTasks/DescribeTasks off a single
 // *ServiceClients.ECS field. DescribeClusters/ListServices/DescribeServices
-// are stubbed since these tests never touch them. DescribeTaskDefinition
-// returns a ClientException ("does not exist"), which leaves
-// Fields["task_def_join_error"] unset.
+// are stubbed since these tests never touch them. Without a
+// DescribeTaskDefinition answer every task would be marked unjoined
+// (task_def_join_error).
 type ecsTaskInfraFullFake struct {
 	*mockECSListClustersAPIPaginated
 	*mockECSListTasksAPIPaginated
@@ -438,7 +437,7 @@ func (f *ecsTaskInfraFullFake) DescribeServices(_ context.Context, _ *ecs.Descri
 }
 
 func (f *ecsTaskInfraFullFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
-	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
 func qaInfraFetchECSTasks(ctx context.Context, listClusters *mockECSListClustersAPIPaginated, listTasks *mockECSListTasksAPIPaginated, describeTasks *mockECSDescribeTasksAPIPaginated, token string) (resource.FetchResult, error) {

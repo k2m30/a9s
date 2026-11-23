@@ -39,8 +39,10 @@ var (
 var errGlobalRolesUnread = errors.New("global database members not read")
 
 // dbcGlobalRoles is the global database member list: cluster ARN → whether
-// the member is its global database's writer. err is the failed read; a
-// client that cannot list global clusters has none to report.
+// the member is its global database's writer. err is the failed read, or
+// errPageCap when the list stopped at PerParentPageCap and writer holds only
+// the members read; a client that cannot list global clusters has none to
+// report.
 type dbcGlobalRoles struct {
 	writer map[string]bool
 	err    error
@@ -85,13 +87,13 @@ func readDocDBGlobalRoles(ctx context.Context, api any) dbcGlobalRoles {
 		}
 		return out.GlobalClusters, out.Marker, nil
 	})
-	if err == nil && !complete {
-		err = fmt.Errorf("more than %d pages", PerParentPageCap)
-	}
 	if err != nil {
 		return dbcGlobalRoles{err: fmt.Errorf("DocumentDB DescribeGlobalClusters: %w", err)}
 	}
 	roles := dbcGlobalRoles{writer: map[string]bool{}}
+	if !complete {
+		roles.err = errPageCap
+	}
 	for _, g := range globals {
 		for _, m := range g.GlobalClusterMembers {
 			roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)
@@ -114,13 +116,13 @@ func readRDSGlobalRoles(ctx context.Context, api any) dbcGlobalRoles {
 		}
 		return out.GlobalClusters, out.Marker, nil
 	})
-	if err == nil && !complete {
-		err = fmt.Errorf("more than %d pages", PerParentPageCap)
-	}
 	if err != nil {
 		return dbcGlobalRoles{err: fmt.Errorf("RDS DescribeGlobalClusters: %w", err)}
 	}
 	roles := dbcGlobalRoles{writer: map[string]bool{}}
+	if !complete {
+		roles.err = errPageCap
+	}
 	for _, g := range globals {
 		for _, m := range g.GlobalClusterMembers {
 			roles.writer[aws.ToString(m.DBClusterArn)] = aws.ToBool(m.IsWriter)

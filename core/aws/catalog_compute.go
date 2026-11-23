@@ -449,6 +449,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		FieldKeys: []string{
 			"service_name", "cluster", "status", "desired_count",
 			"running_count", "launch_type", "task_definition", "arn",
+			"degraded_finding", "name",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster, Mirror: true},
@@ -482,6 +483,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSSvcTasksBelowDesired, Phrase: "running below desired count", Severity: domain.SevWarn, Source: "wave1", Detail: "Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks."},
 			{Code: ecsSvcCodeDeploymentFailed, Phrase: "not running its desired tasks", Severity: domain.SevBroken, Source: "wave2", Detail: "This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them."},
 			{Code: ecsSvcCodePublicIP, Phrase: "tasks get public IPs", Severity: domain.SevWarn, Source: "wave2", Detail: "Every task this service launches gets its own routable public address, so each one is reachable from the internet on whatever its security groups leave open. Turn off public address assignment on the service and reach the tasks through a load balancer or NAT gateway."},
+			DetailsDeniedFindingDef("ecs-svc", ""),
+			DetailsUnavailableFindingDef("ecs-svc"),
 		},
 	},
 	{
@@ -509,7 +512,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichECSClusters, Priority: 100},
-		FieldKeys: []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"},
+		FieldKeys: []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count", "degraded_finding", "name"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSServices, NeedsTargetCache: true, Truncated: true, Mirror: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true, Truncated: true},
@@ -530,6 +533,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster."},
 			{Code: CodeECSStateInactive, Phrase: "inactive (cluster deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster."},
 			{Code: ecsCodeClusterIssue, Phrase: "tasks pending or not running", Severity: domain.SevWarn, Source: "wave2", Detail: "The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short."},
+			DetailsDeniedFindingDef("ecs", ""),
+			DetailsUnavailableFindingDef("ecs"),
 		},
 	},
 	{
@@ -568,7 +573,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "log_groups", "log_groups_unread", "container_images", "arn", "task_def_join_error"},
+		FieldKeys: []string{"task_id", "cluster", "status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "log_groups", "log_groups_unread", "container_images", "arn", "task_def_join_error", "degraded_finding", "name"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService, Mirror: true},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster, Mirror: true},
@@ -604,6 +609,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: ecsTaskCodeWritableRoot, Phrase: "writable root filesystem", Severity: domain.SevWarn, Source: "wave2", Detail: "A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes."},
 			{Code: ecsTaskCodeNoLogging, Phrase: "container without log driver", Severity: domain.SevWarn, Source: "wave2", Detail: "A container in this task has no log driver, so its stdout and stderr never leave where it runs: on Fargate they are not kept at all, and on EC2 they stay in the Docker daemon's default log on that instance until the task is cleaned up. Give the container a log driver pointing at awslogs or your log router."},
 			{Code: ecsTaskCodeEnvSecret, Phrase: "credential in container environment", Severity: domain.SevBroken, Source: "wave2", Detail: "A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block."},
+			DetailsDeniedFindingDef("ecs-task", ""),
+			DetailsUnavailableFindingDef("ecs-task"),
 		},
 	},
 	{
@@ -956,7 +963,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichLTDeprecatedAMI, Priority: 100, Reads: []string{"ami"}},
-		FieldKeys: []string{"name", "status", "default_version", "latest_version", "created_by", "created"},
+		FieldKeys: []string{"name", "status", "default_version", "latest_version", "created_by", "created", "degraded_finding"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkLTAMI},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkLTASG, NeedsTargetCache: true, Truncated: true},

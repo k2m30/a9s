@@ -39,24 +39,21 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 	// classified from the same answer.
 	versions := eksVersionCatalogue(ctx, c.EKS)
 
-	total := len(listOutput.Clusters)
 	var resources []resource.Resource
-	var failures []Failure
+	var tally describeTally
 	for _, name := range listOutput.Clusters {
-		descOutput, descErr := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
-			Name: aws.String(name),
-		})
-		if descErr != nil {
-			failures = append(failures, FailedCall(name, descErr))
-			resources = append(resources, DegradedDetails("eks", name, descErr))
-			continue
-		}
-		if descOutput.Cluster == nil {
-			failures = append(failures, UnusableAnswer(name, "nil cluster in response"))
-			resources = append(resources, DegradedDetails("eks", name, nil))
-			continue
-		}
-		resources = append(resources, buildEKSResource(name, descOutput.Cluster, versions))
+		rows := tally.one("DescribeCluster", name, name, func() (*resource.Resource, error) {
+			out, err := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{Name: aws.String(name)})
+			if err != nil {
+				return nil, err
+			}
+			if out.Cluster == nil {
+				return nil, UnusableAnswerErr{Call: "DescribeCluster", Field: "cluster"}
+			}
+			r := buildEKSResource(name, out.Cluster, versions)
+			return &r, nil
+		}, func(err error) resource.Resource { return DegradedDetails("eks", name, err) })
+		resources = append(resources, rows...)
 	}
 
 	isTruncated := listOutput.NextToken != nil
@@ -73,7 +70,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, AggregateFailures("eks: DescribeCluster", failures, total)
+	}, tally.err("eks: DescribeCluster")
 }
 
 // buildEKSResource constructs a Resource from a cluster name and EKS Cluster struct.

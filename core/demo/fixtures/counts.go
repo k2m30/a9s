@@ -40,11 +40,13 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 	s3 := NewS3Fixtures()
 	lambda := NewLambdaFixtures()
 	elb := NewELBFixtures()
+	sqsFix := NewSQSFixtures()
+	cbFix := NewCodeBuildFixtures()
 	return map[string]int{
 		"ec2":        countEC2Instances(ec2),
-		"ecs-svc":    len(ecs.Services),
-		"ecs":        len(ecs.Clusters),
-		"ecs-task":   len(ecs.Tasks),
+		"ecs-svc":    len(ecs.Services) + len(ecs.UnavailableServices),
+		"ecs":        len(ecs.Clusters) + len(ecs.UnavailableClusters),
+		"ecs-task":   len(ecs.Tasks) + len(ecs.UnavailableTasks),
 		"lambda":     len(lambda.Functions),
 		"asg":        len(NewASGFixtures().AutoScalingGroups),
 		"eb":         len(NewEBFixtures().Environments),
@@ -81,7 +83,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"logs":       min(len(NewCWLogsFixtures().LogGroups), LogGroupsPageSize),
 		"trail":      len(NewCloudTrailFixtures().Trails),
 		"ct-events":  len(NewCloudTrailFixtures().Events),
-		"sqs":        len(NewSQSFixtures().Queues),
+		"sqs":        len(sqsFix.Queues) + len(sqsFix.DeniedQueueURLs) + len(sqsFix.UnavailableQueueURLs),
 		"sns":        len(NewSNSFixtures().Topics),
 		"sns-sub":    len(NewSNSFixtures().Subscriptions),
 		"eb-rule":    len(NewEventBridgeFixtures().Rules),
@@ -103,7 +105,7 @@ func ExpectedTopLevelCountsForTest() map[string]int {
 		"waf":          len(NewWAFFixtures().WebACLSummaries) + len(NewWAFFixtures().CloudFrontWebACLSummaries),
 		"cfn":          len(NewCFNFixtures().Stacks),
 		"pipeline":     len(NewCodePipelineFixtures().Pipelines),
-		"cb":           len(NewCodeBuildFixtures().Projects),
+		"cb":           len(cbFix.Projects) + len(cbFix.UnavailableProjects),
 		"ecr":          len(NewECRFixtures().Repositories),
 		"codeartifact": len(NewCodeArtifactFixtures().Repositories),
 		"glue":         len(NewGlueFixtures().Jobs),

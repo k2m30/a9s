@@ -101,10 +101,11 @@ func enrichEc2(ctx context.Context, clients any, res resource.Resource) (resourc
 			if err != nil {
 				return "", err
 			}
-			if out.UserData == nil || out.UserData.Value == nil || *out.UserData.Value == "" {
-				return "", nil
+			var raw string
+			if out.UserData != nil && out.UserData.Value != nil {
+				raw = *out.UserData.Value
 			}
-			return decodeUserData(*out.UserData.Value), nil
+			return decodeUserData(raw), nil
 		},
 		wrap: func(instance ec2types.Instance, userData string) any {
 			return InstanceEnriched{Instance: instance, UserData: userData}

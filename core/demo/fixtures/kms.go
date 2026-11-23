@@ -36,6 +36,11 @@ type KMSFixtures struct {
 // key still shown).
 const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 
+// WarnKMSDetailsUnavailableID names the ListKeys entry whose DescribeKey call
+// the KMSFake fails with KMSInternalException, raising
+// kms.warn.details_unavailable: the key is listed, its state never read.
+const WarnKMSDetailsUnavailableID = "d0e1f2a3-b4c5-4789-a1de-aabbccddeeff"
+
 // KMSPublicPolicy is the key raising kms.public-policy: its default key
 // policy grants kms:Decrypt to a wildcard principal. Every other demo key
 // either has no policy fixture or names concrete principals.
@@ -155,6 +160,11 @@ var sharedKMSFixtures = shared(func() *KMSFixtures {
 		{
 			KeyId:      aws.String(KMSAccessDeniedKeyID),
 			Arn:        aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSAccessDeniedKeyID),
+			KeyManager: kmstypes.KeyManagerTypeCustomer,
+		},
+		{
+			KeyId:      aws.String(WarnKMSDetailsUnavailableID),
+			Arn:        aws.String("arn:aws:kms:us-east-1:123456789012:key/" + WarnKMSDetailsUnavailableID),
 			KeyManager: kmstypes.KeyManagerTypeCustomer,
 		},
 		// Backup prod-vault encryption key (checkBackupKMS pivot).
@@ -533,5 +543,5 @@ func init() {
 	// dim: colorKMS (core/aws/catalog_secrets.go) has exactly three branches —
 	// Enabled→Healthy, Disabled→Warning, Pending*/Unavailable→Broken — and
 	// docs/resources/kms.md documents no Dim-producing signal.
-	Register(Pin{ShortName: "kms", Rows: 21, Issues: 8, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "kms", Rows: 22, Issues: 9, CoverageGaps: []string{"dim"}})
 }

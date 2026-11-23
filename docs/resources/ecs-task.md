@@ -166,6 +166,16 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
+A task `DescribeTasks` did not describe is KEPT with its id and cluster: `details denied` (Warning) when the call was refused for authorization, `details unavailable` (Warning) when it failed otherwise or left the task out. A task the call reports `MISSING` is dropped. A refused batch no longer fails the whole page. Wave 2 does not send `DescribeTasks` again for a kept task: its finding already states that call failed.
+
+- **Signal**: `DescribeTasks` was denied for this task.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
+- **Signal**: `DescribeTasks` did not answer for this task.
+  - **State bucket**: Warning.
+  - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -211,6 +221,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
+| `DescribeTasks` was denied for this task | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `DescribeTasks` did not answer for this task | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 | `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
@@ -294,6 +306,8 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 | ecs-task.writable-root | writable root filesystem | warn | wave2 | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |
 | ecs-task.no-logging | container without log driver | warn | wave2 | A container in this task has no log driver, so its stdout and stderr never leave where it runs: on Fargate they are not kept at all, and on EC2 they stay in the Docker daemon's default log on that instance until the task is cleaned up. Give the container a log driver pointing at awslogs or your log router. |
 | ecs-task.env-secret | credential in container environment | broken | wave2 | A credential is stored as a plaintext environment variable in this task definition, readable by anyone who can call ecs:DescribeTaskDefinition. Move the value to Secrets Manager or Systems Manager Parameter Store and reference it through the container's `secrets` block. |
+| ecs-task.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| ecs-task.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

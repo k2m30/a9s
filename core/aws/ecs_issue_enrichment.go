@@ -36,7 +36,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 
 	clusterNames := make([]string, 0, len(resources))
 	for _, r := range resources {
-		if name := r.Fields["cluster_name"]; name != "" {
+		if name := r.Fields["cluster_name"]; name != "" && describedRow(r) {
 			clusterNames = append(clusterNames, name)
 		}
 	}

@@ -3,6 +3,7 @@
 package aws
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -110,46 +111,65 @@ func FetchEcsSvcTasks(
 	next := cur
 
 	var allTaskArns []string
-
-	if !cur.RunningDone {
-		arns, nextTok, done, err := fetchEcsTaskArnsPage(ctx, listAPI, cluster, serviceName, ecstypes.DesiredStatusRunning, cur.RunningNext)
+	var listFailures []Failure
+	var firstErr error
+	listed := 0
+	// A status whose tasks could not be listed costs its own tasks, recorded
+	// as a failure, and is not asked again on a later page; the other status
+	// still lists.
+	listStatus := func(status ecstypes.DesiredStatus, token string) (string, bool) {
+		listed++
+		arns, nextTok, done, err := fetchEcsTaskArnsPage(ctx, listAPI, cluster, serviceName, status, token)
 		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
+			if !IsNotFoundErr(err) {
+				listFailures = append(listFailures, FailedCall(string(status), err))
+				firstErr = cmp.Or(firstErr, err)
+			}
+			return "", true
 		}
 		allTaskArns = append(allTaskArns, arns...)
-		next.RunningNext, next.RunningDone = nextTok, done
+		return nextTok, done
+	}
+	if !cur.RunningDone {
+		next.RunningNext, next.RunningDone = listStatus(ecstypes.DesiredStatusRunning, cur.RunningNext)
 	}
 	if !cur.StoppedDone {
-		arns, nextTok, done, err := fetchEcsTaskArnsPage(ctx, listAPI, cluster, serviceName, ecstypes.DesiredStatusStopped, cur.StoppedNext)
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, err)
-		}
-		allTaskArns = append(allTaskArns, arns...)
-		next.StoppedNext, next.StoppedDone = nextTok, done
+		next.StoppedNext, next.StoppedDone = listStatus(ecstypes.DesiredStatusStopped, cur.StoppedNext)
+	}
+	// Every status refused is no list at all: the failure is the page's.
+	if listed > 0 && len(listFailures) == listed {
+		return resource.FetchResult{}, fmt.Errorf("listing ECS tasks for %s: %w", serviceName, firstErr)
 	}
 
 	isTruncated := !next.RunningDone || !next.StoppedDone
 
 	// DescribeTasks API accepts max 100 ARNs per call — batch if needed.
 	const descBatchSize = 100
-	var allTasks []ecstypes.Task
+	var resources []resource.Resource
+	var failures []Failure
 	for i := 0; i < len(allTaskArns); i += descBatchSize {
-		end := min(i+descBatchSize, len(allTaskArns))
+		chunk := allTaskArns[i:min(i+descBatchSize, len(allTaskArns))]
 		// Tags are returned only when named in Include.
 		descOutput, err := describeAPI.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 			Cluster: aws.String(cluster),
-			Tasks:   allTaskArns[i:end],
+			Tasks:   chunk,
 			Include: []ecstypes.TaskField{ecstypes.TaskFieldTags},
 		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("describing ECS tasks for %s: %w", serviceName, err)
+		var ans listedAnswer
+		if err == nil {
+			ans.gone = ecsGone(descOutput.Failures)
+			for _, task := range descOutput.Tasks {
+				ans.rows = append(ans.rows, convertEcsTask(task))
+			}
 		}
-		allTasks = append(allTasks, descOutput.Tasks...)
-	}
-
-	var resources []resource.Resource
-	for _, task := range allTasks {
-		resources = append(resources, convertEcsTask(task))
+		rows, chunkFailures := keepListed("DescribeTasks", chunk, ecsTaskRowID, ans, err, func(arn string, err error) resource.Resource {
+			taskID := ecsTaskRowID(arn)
+			r := DegradedDetails("ecs_tasks", taskID, err)
+			r.Fields["task_id"], r.Fields["task_arn"] = taskID, arn
+			return r
+		})
+		resources = append(resources, rows...)
+		failures = append(failures, chunkFailures...)
 	}
 
 	totalHint := len(resources)
@@ -160,14 +180,17 @@ func FetchEcsSvcTasks(
 	}
 
 	return resource.FetchResult{
-		Resources: resources,
-		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
-			PageSize:    len(resources),
-			TotalHint:   totalHint,
-		},
-	}, nil
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   totalHint,
+			},
+		}, JoinAggregates(
+			AggregateFailures("ecs_tasks: ListTasks", listFailures, listed),
+			AggregateFailures("ecs_tasks: DescribeTasks", failures, len(allTaskArns)),
+		)
 }
 
 // convertEcsTask converts a single ECS Task into a generic Resource.

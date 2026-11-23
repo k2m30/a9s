@@ -44,6 +44,9 @@ func (f *EKSFake) DescribeCluster(_ context.Context, input *eks.DescribeClusterI
 			Message: "User is not authorized to perform: eks:DescribeCluster on resource: " + name,
 		}
 	}
+	if slices.Contains(f.fix.UnavailableClusters, name) {
+		return nil, &smithy.GenericAPIError{Code: "ServerException", Message: "Internal server error", Fault: smithy.FaultServer}
+	}
 	for _, c := range f.fix.Clusters {
 		if aws.ToString(c.Name) == name {
 			return &eks.DescribeClusterOutput{Cluster: c}, nil
@@ -75,6 +78,12 @@ func (f *EKSFake) ngsForCluster(clusterName string) []ekstypes.Nodegroup {
 
 func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInput, _ ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error) {
 	clusterName := aws.ToString(input.ClusterName)
+	if slices.Contains(f.fix.DeniedNodegroupListClusters, clusterName) {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "User is not authorized to perform: eks:ListNodegroups on resource: " + clusterName,
+		}
+	}
 	found := slices.Contains(f.fix.DeniedClusters, clusterName) || slices.Contains(f.fix.UnavailableClusters, clusterName)
 	for _, c := range f.fix.Clusters {
 		if aws.ToString(c.Name) == clusterName {
@@ -106,6 +115,9 @@ func (f *EKSFake) DescribeNodegroup(_ context.Context, input *eks.DescribeNodegr
 			Code:    "AccessDeniedException",
 			Message: "User is not authorized to perform: eks:DescribeNodegroup on resource: " + ngName,
 		}
+	}
+	if slices.Contains(f.fix.UnavailableNodegroups[clusterName], ngName) {
+		return nil, &smithy.GenericAPIError{Code: "ServerException", Message: "Internal server error", Fault: smithy.FaultServer}
 	}
 	ngs := f.ngsForCluster(clusterName)
 	for i := range ngs {

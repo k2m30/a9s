@@ -32,11 +32,23 @@ const LambdaDLQueueName = "dead-letter-queue"
 type SQSFixtures struct {
 	// Queues maps queue URL to its attributes row.
 	Queues []awsclient.SQSQueueAttributesRow
+	// DeniedQueueURLs are listed queues GetQueueAttributes refuses for
+	// authorization; UnavailableQueueURLs are listed queues it fails for any
+	// other reason. The fetcher keeps both as name-only rows.
+	DeniedQueueURLs      []string
+	UnavailableQueueURLs []string
 }
+
+const (
+	WarnSQSDetailsDeniedID      = "warn-sqs-details-denied"
+	WarnSQSDetailsUnavailableID = "warn-sqs-details-unavailable"
+)
 
 // NewSQSFixtures constructs SQSFixtures from the canonical demo data.
 var sharedSQSFixtures = shared(func() *SQSFixtures {
 	return &SQSFixtures{
+		DeniedQueueURLs:      []string{"https://sqs.us-east-1.amazonaws.com/123456789012/" + WarnSQSDetailsDeniedID},
+		UnavailableQueueURLs: []string{"https://sqs.us-east-1.amazonaws.com/123456789012/" + WarnSQSDetailsUnavailableID},
 		Queues: []awsclient.SQSQueueAttributesRow{
 			{
 				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/order-processing-queue",
@@ -165,5 +177,5 @@ func NewSQSFixtures() *SQSFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "sqs", Rows: 9, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sqs", Rows: 11, Issues: 2, CoverageGaps: []string{"dim"}})
 }

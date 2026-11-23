@@ -103,8 +103,9 @@ func kmsKeyPolicyIsPublic(ctx context.Context, api KMSGetKeyPolicyAPI, r resourc
 		return ex, false, err
 	}
 	if out == nil || out.Policy == nil {
-		// No policy attached is a complete answer, not a gap.
-		return ex, false, nil
+		// Every KMS key has exactly one key policy, so an answer without it
+		// has said nothing about who may use the key.
+		return ex, false, UnusableAnswerErr{Call: "GetKeyPolicy", Field: "policy"}
 	}
 	doc, perr := iampolicy.Parse(*out.Policy)
 	if perr != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -42,6 +43,12 @@ func (f *AthenaFake) GetWorkGroup(_ context.Context, input *athena.GetWorkGroupI
 		return nil, &athenatypes.InvalidRequestException{
 			Message: aws.String("WorkGroup " + *input.WorkGroup + " is not found."),
 		}
+	}
+	switch *input.WorkGroup {
+	case fixtures.WarnAthenaDetailsDeniedID:
+		return nil, &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "User is not authorized to perform: athena:GetWorkGroup on resource: " + *input.WorkGroup}
+	case fixtures.WarnAthenaDetailsUnavailableID:
+		return nil, &athenatypes.InternalServerException{Message: aws.String("Internal server error")}
 	}
 	if out, ok := f.fix.WorkGroupDetails[*input.WorkGroup]; ok && out != nil {
 		return out, nil

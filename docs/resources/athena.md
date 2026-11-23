@@ -70,6 +70,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `WorkGroupSummary.State` from `ListWorkGroups`. Admin-off — the workgroup exists but will reject new query submissions.
 
+- **Signal**: `GetWorkGroup` was denied for this workgroup.
+  - **State bucket**: Warning.
+  - **How obtained**: the list fetch reads each workgroup's configuration with `GetWorkGroup` to fill the result location and cost cap columns. A workgroup whose read failed keeps its listed state; its result location and cost cap cells stay empty because nothing read them, and the row's finding says so; a workgroup the call reports gone was deleted after the list call and is dropped without a failure.
+
+- **Signal**: `GetWorkGroup` failed for this workgroup for any reason but a denial.
+  - **State bucket**: Warning.
+  - **How obtained**: as above; the row reads `details unavailable` instead of `details denied`.
+
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
@@ -108,6 +116,8 @@ One row per signal from §3:
 | `State == DISABLED` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `disabled` |
 | `EnforceWorkGroupConfiguration == false` without minimum encryption | 2 | Warning | `~` | S2, S3, S4, S5 | `settings can be overridden per query` |
 | `ResultConfiguration.EncryptionConfiguration == nil` without Athena owned storage | 2 | Warning | `~` | S2, S3, S4, S5 | `result encryption not set` |
+| `GetWorkGroup` was denied for this workgroup | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
+| `GetWorkGroup` failed for this workgroup for any reason but a denial | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
 
 Rules for filling list and detail text:
 
@@ -153,6 +163,8 @@ athena — DATA & ANALYTICS. Status key: `state` — the key the status cell rea
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | athena.workgroup-disabled | disabled | warn | wave1 | Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries. |
+| athena.warn.details\_denied | details denied | warn | wave1 | Reading this workgroup's configuration was denied, so its result location and per-query scan cap are unknown rather than unset. Grant the role you browse with permission to read the workgroup, then refresh. |
+| athena.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 | athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query. |
 | athena.results-unencrypted | result encryption not set | warn | wave2 | The workgroup sets no encryption for query results, so they take whatever default the results bucket applies (S3-managed keys at minimum), a key the workgroup neither chooses nor controls access through. Set an encryption option on the workgroup's result configuration so every result is encrypted the way the workgroup requires. |
 <!-- END GENERATED: findings -->

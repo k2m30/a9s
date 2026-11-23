@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/smithy-go"
 
@@ -211,12 +212,13 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	}
 }
 
-// The kms enricher also reads the key policy; a key with no policy attached
-// keeps these tests about rotation.
+// The kms enricher also reads the key policy; every key answers the default
+// policy, which grants only the owning account, so these tests stay about
+// rotation.
 func (f *kmsFake) GetKeyPolicy(
 	_ context.Context,
 	_ *kms.GetKeyPolicyInput,
 	_ ...func(*kms.Options),
 ) (*kms.GetKeyPolicyOutput, error) {
-	return &kms.GetKeyPolicyOutput{}, nil
+	return &kms.GetKeyPolicyOutput{Policy: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"}]}`)}, nil
 }

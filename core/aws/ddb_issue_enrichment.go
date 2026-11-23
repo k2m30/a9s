@@ -74,13 +74,11 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			MarkSkipped(&result, r.ID, &pitrFailures, err)
 			return
 		}
-		if out.ContinuousBackupsDescription == nil {
+		if out.ContinuousBackupsDescription == nil || out.ContinuousBackupsDescription.PointInTimeRecoveryDescription == nil {
+			MarkSkipped(&result, r.ID, &pitrFailures, UnusableAnswerErr{Call: "DescribeContinuousBackups", Field: "point-in-time recovery description"})
 			return
 		}
 		pitr := out.ContinuousBackupsDescription.PointInTimeRecoveryDescription
-		if pitr == nil {
-			return
-		}
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
 		if !pitrEnabled {
 			// The merged display phrase (e.g. "archived: kms key lost") is
@@ -103,8 +101,17 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 // A table with no policy at all is the common case and is not a finding.
 func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
+	// GetResourcePolicy takes the ARN only DescribeTable returns, so a table
+	// without one stays uninspected on that call, the way backup coverage
+	// marks it (backupTargetFromFields); the fetch has already reported the
+	// failure.
+	for _, r := range resources {
+		if r.Fields["arn"] == "" {
+			markUninspected(result, r.ID, "DescribeTable")
+		}
+	}
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		return !resourceIsTearingDown(r.RawStruct)
+		return r.Fields["arn"] != "" && !resourceIsTearingDown(r.RawStruct)
 	}, resourceIDsOf)
 	n := len(resources)
 	var failures []Failure

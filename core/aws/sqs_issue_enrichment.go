@@ -43,7 +43,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	ownAccount := accountIDFromClients(ctx, clients, clients.IdentityStore())
 	var failures []Failure
 	total := 0
-	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, describedRow, resourceIDsOf)
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]

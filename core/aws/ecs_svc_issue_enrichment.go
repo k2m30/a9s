@@ -79,7 +79,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 	// services a9s looked at, and capping the input keeps which services those
 	// are deterministic (grouping first would make it depend on map order) while
 	// recording every dropped row as uninspected.
-	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
+	resources = capAtEnrichmentCap(&result, resources, describedRow, resourceIDsOf)
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
 	// A service name is unique inside its cluster only, so the row a name

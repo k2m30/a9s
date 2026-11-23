@@ -120,6 +120,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An EBS volume, or any resource whose ARN is unknown, is reported as not
   covered by a backup plan when the backup plan list was read in full and is
   empty.
+- A Transfer Family agreement whose details are denied stays in the
+  Agreements list with its status, profiles and `details denied`, instead of
+  disappearing. An agreement detail where one certificate lookup fails still
+  shows the resolved profiles and the other certificate's expiry, and
+  reports the failed lookup.
+- An SQS queue, CodeBuild project or build, ECS cluster, service or task
+  whose details could not be read stays in its list with `details denied`
+  or `details unavailable`, instead of disappearing; a refused ECS
+  `DescribeServices` or `DescribeTasks` no longer empties the whole page.
+  The issue check does not ask again for an ECS cluster, service or task
+  whose details could not be read, so the row shows no `not inspected` line
+  for the same failed call; a row marked `not inspected` that is already
+  counted as an issue no longer turns the menu badge into `issues:N+` (ECS,
+  DynamoDB).
+- The related panel of a row whose details could not be read shows `?`
+  instead of `0` for every relation it found nothing for (for example an SQS
+  queue's KMS key, or an ECS task's IAM role, secrets and parameters), in
+  every resource type; relations it did find are still listed. Transfer
+  Family servers, agreements, MWAA environments and launch templates whose
+  details could not be read now get this treatment too, and the demo lists
+  the agreements of a server whose details are denied.
+- A DynamoDB table whose `DescribeTable` failed is no longer asked for its
+  resource policy with an empty ARN; it is marked `not inspected` on
+  `DescribeTable`.
+- A node group list whose `ListNodegroups` or launch template read fails
+  names that call and counts it against what was asked, instead of
+  `DescribeNodegroup failed for 1 of 0`.
+- An IAM policy, role or inline-policy read that comes back without the
+  version, policy or document it needs marks the row `not inspected`, naming
+  the call and the missing field.
+- An EFS access-point list, the customer-managed IAM policy list and the
+  global database member list that stop at a9s's own page limit keep what
+  they read and are no longer reported as a failed AWS call.
+- An EKS cluster, node group, DynamoDB table, MWAA environment, Transfer
+  Family server, launch template or OpenSearch domain deleted while the list
+  was loading is dropped, instead of showing as `details unavailable` and a
+  failed read. OpenSearch domains whose details could not be read keep their
+  place in the list order instead of moving to the end.
+- A KMS key whose `DescribeKey` fails for any reason but a denial stays in
+  the list as `details unavailable` and is reported as `kms: DescribeKey`,
+  instead of disappearing.
+- An Athena workgroup whose configuration could not be read shows `details
+  denied` or `details unavailable` and the failed `GetWorkGroup`, instead of
+  empty result location and cost cap cells that read as not configured.
+- One ECS cluster whose services or tasks could not be listed, one service
+  whose running or stopped tasks could not be listed, or one EventBridge bus
+  whose rules could not be listed costs only its own rows; the rest of the
+  list still loads and the failure is reported.
+- An ECS task whose task definition could not be read (`ClientException`, an
+  empty answer) is marked as not joined, so its EFS, secrets, roles and log
+  pivots read unknown instead of a proven zero.
+- An S3 bucket detail where one of the policy, CORS and lifecycle reads is
+  refused still shows the other two and reports the refused one.
+- An AWS-managed IAM policy opened from a related panel resolves when the
+  inline group policy walk fails.
+- A PITR, MSK, IAM role, Athena, Route 53, CodeArtifact, ECR, Lambda or KMS
+  policy read that answers without the field the check needs marks the row
+  `not inspected` instead of reading clean. An empty CloudFormation template
+  answer is reported instead of showing an empty template.
+- In the terminal UI, a YAML screen under a JSON screen of the same resource
+  shows the enriched content when you go back to it.
 
 ## [3.59.0] - 2026-09-24
 

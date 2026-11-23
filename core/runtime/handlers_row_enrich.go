@@ -78,7 +78,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 
 	rows, _ := c.ProbeResources(canon)
 	unified := unifiedIssueCount(rows, *td)
-	truncated := issueLowerBound(canon, c.pageTruncated(canon), c.session.EnrichmentCutGet(canon), unified > 0 || slices.ContainsFunc(rows, func(r resource.Resource) bool { return rowHasWave2Finding(r.Findings) }), len(c.session.EnrichmentTruncatedIDs[canon]))
+	truncated := issueLowerBound(canon, c.pageTruncated(canon), c.session.EnrichmentCutGet(canon), unified > 0 || slices.ContainsFunc(rows, func(r resource.Resource) bool { return rowHasWave2Finding(r.Findings) }), uncountedMarks(canon, rows, c.session.EnrichmentTruncatedIDs[canon]))
 	// Saved the way the sweep's answer is, with the set as it now stands.
 	var tasks []TaskRequest
 	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {

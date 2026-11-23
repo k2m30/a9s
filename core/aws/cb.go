@@ -56,54 +56,18 @@ func FetchCodeBuildProjectsPage(
 	batchOutput, err := batchAPI.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{
 		Names: listOutput.Projects,
 	})
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("batch getting CodeBuild projects: %w", err)
+	ans := listedAnswer{gone: map[string]bool{}}
+	if err == nil {
+		for _, name := range batchOutput.ProjectsNotFound {
+			ans.gone[name] = true
+		}
+		for _, project := range batchOutput.Projects {
+			ans.rows = append(ans.rows, codeBuildProjectResource(project))
+		}
 	}
-
-	var resources []resource.Resource
-
-	for _, project := range batchOutput.Projects {
-		name := ""
-		if project.Name != nil {
-			name = *project.Name
-		}
-
-		description := ""
-		if project.Description != nil {
-			description = *project.Description
-		}
-
-		sourceType := ""
-		if project.Source != nil {
-			sourceType = string(project.Source.Type)
-		}
-
-		lastModified := ""
-		if project.LastModified != nil {
-			lastModified = project.LastModified.Format("2006-01-02 15:04")
-		}
-
-		arn := ""
-		if project.Arn != nil {
-			arn = *project.Arn
-		}
-
-		r := resource.Resource{
-			ID:   name,
-			Name: name,
-			Fields: map[string]string{
-				"name":          name,
-				"source_type":   sourceType,
-				"description":   description,
-				"last_modified": lastModified,
-				"arn":           arn,
-			},
-			RawStruct: project,
-		}
-
-		addCBPostureFindings(&r, project)
-		resources = append(resources, r)
-	}
+	resources, failures := keepListed("BatchGetProjects", listOutput.Projects, listedNameIsID, ans, err, func(name string, err error) resource.Resource {
+		return DegradedDetails("cb", name, err)
+	})
 
 	nextToken := ""
 	isTruncated := false
@@ -120,7 +84,50 @@ func FetchCodeBuildProjectsPage(
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, nil
+	}, AggregateFailures("cb: BatchGetProjects", failures, len(listOutput.Projects))
+}
+
+func codeBuildProjectResource(project cbtypes.Project) resource.Resource {
+	name := ""
+	if project.Name != nil {
+		name = *project.Name
+	}
+
+	description := ""
+	if project.Description != nil {
+		description = *project.Description
+	}
+
+	sourceType := ""
+	if project.Source != nil {
+		sourceType = string(project.Source.Type)
+	}
+
+	lastModified := ""
+	if project.LastModified != nil {
+		lastModified = project.LastModified.Format("2006-01-02 15:04")
+	}
+
+	arn := ""
+	if project.Arn != nil {
+		arn = *project.Arn
+	}
+
+	r := resource.Resource{
+		ID:   name,
+		Name: name,
+		Fields: map[string]string{
+			"name":          name,
+			"source_type":   sourceType,
+			"description":   description,
+			"last_modified": lastModified,
+			"arn":           arn,
+		},
+		RawStruct: project,
+	}
+
+	addCBPostureFindings(&r, project)
+	return r
 }
 
 // cbContributorSourceTypes are the source types whose contents a pull-request

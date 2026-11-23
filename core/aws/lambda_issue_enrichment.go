@@ -144,7 +144,7 @@ func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, own
 		return nil, false, err
 	}
 	if out == nil || out.Policy == nil || *out.Policy == "" {
-		return nil, false, nil
+		return nil, false, UnusableAnswerErr{Call: "GetPolicy", Field: "policy"}
 	}
 	doc, parseErr := iampolicy.Parse(*out.Policy)
 	if parseErr != nil {

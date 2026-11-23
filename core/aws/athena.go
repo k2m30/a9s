@@ -36,6 +36,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 	getAPI, _ := api.(AthenaGetWorkGroupAPI)
 
 	var resources []resource.Resource
+	var tally describeTally
 
 	for _, wg := range output.WorkGroups {
 		wgName := ""
@@ -60,14 +61,51 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			engineVersion = *wg.EngineVersion.EffectiveEngineVersion
 		}
 
-		outputLocation := ""
-		costCap := ""
-		row := AthenaWorkGroupRow{WorkGroupSummary: wg}
-		if getAPI != nil && wgName != "" {
-			wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)})
-			row.configRead = wgErr == nil && wgOut != nil && wgOut.WorkGroup != nil
-			if row.configRead && wgOut.WorkGroup.Configuration != nil {
-				cfg := wgOut.WorkGroup.Configuration
+		listed := func(row AthenaWorkGroupRow, outputLocation, costCap string) resource.Resource {
+			return resource.Resource{
+				ID:   wgName,
+				Name: wgName,
+				Fields: map[string]string{
+					"workgroup_name":         wgName,
+					"state":                  state,
+					"description":            description,
+					"creation_time":          creationTime,
+					"engine_version":         engineVersion,
+					"result_output_location": outputLocation,
+					"cost_cap":               costCap,
+				},
+				Findings:  athenaStateFindings(state),
+				RawStruct: row,
+			}
+		}
+		// The result location and the cost cap live on the workgroup's
+		// configuration, which ListWorkGroups does not carry: a row whose
+		// GetWorkGroup did not answer holds neither, and a reader that takes
+		// the empty cell for "none configured" states it about a
+		// configuration nobody read.
+		unread := func(err error) resource.Resource {
+			r := listed(AthenaWorkGroupRow{WorkGroupSummary: wg}, "", "")
+			r.Fields[athenaConfigUnreadField] = "true"
+			r.Findings = append(r.Findings, degradedDetailsFinding("athena", err))
+			return r
+		}
+		if getAPI == nil {
+			r := listed(AthenaWorkGroupRow{WorkGroupSummary: wg}, "", "")
+			r.Fields[athenaConfigUnreadField] = "true"
+			resources = append(resources, r)
+			continue
+		}
+		rows := tally.one("GetWorkGroup", wgName, wgName, func() (*resource.Resource, error) {
+			wgOut, err := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)})
+			if err != nil {
+				return nil, err
+			}
+			if wgOut == nil || wgOut.WorkGroup == nil {
+				return nil, UnusableAnswerErr{Call: "GetWorkGroup", Field: "workgroup"}
+			}
+			row := AthenaWorkGroupRow{WorkGroupSummary: wg, configRead: true}
+			outputLocation, costCap := "", ""
+			if cfg := wgOut.WorkGroup.Configuration; cfg != nil {
 				row.Configuration = cfg
 				if cfg.ResultConfiguration != nil && cfg.ResultConfiguration.OutputLocation != nil {
 					outputLocation = *cfg.ResultConfiguration.OutputLocation
@@ -78,34 +116,10 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 					costCap = formatBytes(*cfg.BytesScannedCutoffPerQuery)
 				}
 			}
-		}
-
-		r := resource.Resource{
-			ID:   wgName,
-			Name: wgName,
-			Fields: map[string]string{
-				"workgroup_name":         wgName,
-				"state":                  state,
-				"description":            description,
-				"creation_time":          creationTime,
-				"engine_version":         engineVersion,
-				"result_output_location": outputLocation,
-				"cost_cap":               costCap,
-			},
-			RawStruct: row,
-		}
-		// The result location and the cost cap live on the workgroup's
-		// configuration, which ListWorkGroups does not carry: a row whose
-		// GetWorkGroup did not answer holds neither, and a reader that takes
-		// the empty cell for "none configured" states it about a
-		// configuration nobody read.
-		if !row.configRead {
-			r.Fields[athenaConfigUnreadField] = "true"
-		}
-
-		r.Findings = athenaStateFindings(state)
-
-		resources = append(resources, r)
+			r := listed(row, outputLocation, costCap)
+			return &r, nil
+		}, unread)
+		resources = append(resources, rows...)
 	}
 
 	nextToken := ""
@@ -128,7 +142,7 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, tally.err("athena: GetWorkGroup")
 }
 
 // AthenaWorkGroupRow is a workgroup row's RawStruct: the workgroup as listed,

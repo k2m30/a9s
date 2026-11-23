@@ -33,6 +33,10 @@ type TransferFixtures struct {
 	// Agreements backs transfer:DescribeAgreement, keyed by AgreementId
 	// (agreement ids are unique across the whole demo account).
 	Agreements map[string]transfertypes.DescribedAgreement
+	// DeniedAgreementIDs are listed by ListAgreements but DescribeAgreement
+	// answers AccessDeniedException: the role may list a server's agreements
+	// without reading one, so each is built from its ListedAgreement.
+	DeniedAgreementIDs []string
 
 	// Profiles backs transfer:DescribeProfile, keyed by ProfileId. Profiles
 	// are account-scoped (ListedProfile/DescribedProfile carry no ServerId)
@@ -42,25 +46,27 @@ type TransferFixtures struct {
 	// Certificates backs transfer:DescribeCertificate, keyed by
 	// CertificateId — resolved inline from a profile's CertificateIds.
 	Certificates map[string]transfertypes.DescribedCertificate
+	// DeniedCertificateIDs are named by a profile's CertificateIds but
+	// DescribeCertificate answers AccessDeniedException, so an agreement
+	// detail resolves its other certificates and reports this lookup.
+	DeniedCertificateIDs []string
 }
 
 // Exported server-id constants — referenced by sibling fixture files (ec2.go's
 // VpcEndpoint entry, cwlogs.go's log groups) and by tests.
 const (
-	ProdAS2GatewayID            = "prod-as2-gateway"
-	SftpUsersProdID             = "sftp-users-prod"
-	SftpLambdaAuthID            = "sftp-lambda-auth"
-	WarnTransferOfflineID       = "warn-transfer-offline"
-	WarnTransferStartingID      = "warn-transfer-starting"
-	WarnTransferStoppingID      = "warn-transfer-stopping"
-	BrokenTransferStartFailedID = "broken-transfer-start-failed"
-	WarnTransferStopFailedID    = "warn-transfer-stop-failed"
-	WarnTransferLegacyPolicyID  = "warn-transfer-legacy-policy"
-	WarnTransferNoLoggingID     = "warn-transfer-no-logging"
-	WarnTransferMultiID         = "warn-transfer-multi"
-	WarnTransferDetailsDeniedID = "warn-transfer-details-denied"
-	// WarnTransferDetailsUnavailableID is listed but DescribeServer cannot
-	// find it — the neutral degraded row (transfer.warn.details_unavailable).
+	ProdAS2GatewayID                 = "prod-as2-gateway"
+	SftpUsersProdID                  = "sftp-users-prod"
+	SftpLambdaAuthID                 = "sftp-lambda-auth"
+	WarnTransferOfflineID            = "warn-transfer-offline"
+	WarnTransferStartingID           = "warn-transfer-starting"
+	WarnTransferStoppingID           = "warn-transfer-stopping"
+	BrokenTransferStartFailedID      = "broken-transfer-start-failed"
+	WarnTransferStopFailedID         = "warn-transfer-stop-failed"
+	WarnTransferLegacyPolicyID       = "warn-transfer-legacy-policy"
+	WarnTransferNoLoggingID          = "warn-transfer-no-logging"
+	WarnTransferMultiID              = "warn-transfer-multi"
+	WarnTransferDetailsDeniedID      = "warn-transfer-details-denied"
 	WarnTransferDetailsUnavailableID = "warn-transfer-details-unavailable"
 )
 
@@ -71,8 +77,8 @@ const ProdAS2GatewayVpcEndpointID = "vpce-0transfer1111a"
 
 // Agreement, profile, and certificate constants — agr-old-partner is
 // INACTIVE ("inactive: partner traffic rejected" child-row finding); the
-// two profiles and three certificates back the agreement-detail inline
-// resolution (docs/resources/transfer.md).
+// profiles and certificates back the agreement-detail inline resolution
+// (docs/resources/transfer.md).
 const (
 	AgreementProdPartnerID = "agr-prod-partner"
 	AgreementOldPartnerID  = "agr-old-partner"
@@ -83,6 +89,17 @@ const (
 	certFreshID    = "cert-fresh"
 	CertExpiringID = "cert-expiring"
 	CertExpiredID  = "cert-expired"
+
+	// The agreements of WarnTransferDetailsDeniedID, listed but never
+	// described: the same role that cannot describe the server cannot
+	// describe its agreements. The inactive one keeps its warning.
+	AgreementDeniedActiveID   = "agr-denied-active"
+	AgreementDeniedInactiveID = "agr-denied-inactive"
+
+	// OldPartnerProfileID is agr-old-partner's partner profile: its expired
+	// certificate resolves and CertDeniedID's lookup is refused.
+	OldPartnerProfileID = "pp-old"
+	CertDeniedID        = "cert-denied"
 )
 
 const (
@@ -292,7 +309,7 @@ var sharedTransferFixtures = shared(func() *TransferFixtures {
 			AgreementId:           aws.String(AgreementOldPartnerID),
 			ServerId:              aws.String(ProdAS2GatewayID),
 			LocalProfileId:        aws.String(LocalProfileID),
-			PartnerProfileId:      aws.String(PartnerProfileID),
+			PartnerProfileId:      aws.String(OldPartnerProfileID),
 			BaseDirectory:         aws.String("/" + HealthyBucketName + "/archive/old-partner"),
 			AccessRole:            aws.String(fixtIAMProdLambdaRoleARN),
 			Status:                transfertypes.AgreementStatusTypeInactive,
@@ -302,10 +319,25 @@ var sharedTransferFixtures = shared(func() *TransferFixtures {
 		},
 	}
 
+	deniedAgreement := func(id string, status transfertypes.AgreementStatusType, description string) transfertypes.ListedAgreement {
+		return listedAgreementFromDescribed(transfertypes.DescribedAgreement{
+			Arn:              aws.String(transferAgreementArn(WarnTransferDetailsDeniedID, id)),
+			AgreementId:      aws.String(id),
+			ServerId:         aws.String(WarnTransferDetailsDeniedID),
+			LocalProfileId:   aws.String(LocalProfileID),
+			PartnerProfileId: aws.String(PartnerProfileID),
+			Status:           status,
+			Description:      aws.String(description),
+		})
+	}
 	listedAgreements := map[string][]transfertypes.ListedAgreement{
 		ProdAS2GatewayID: {
 			listedAgreementFromDescribed(agreements[AgreementProdPartnerID]),
 			listedAgreementFromDescribed(agreements[AgreementOldPartnerID]),
+		},
+		WarnTransferDetailsDeniedID: {
+			deniedAgreement(AgreementDeniedActiveID, transfertypes.AgreementStatusTypeActive, "Partner exchange this role may list but not read"),
+			deniedAgreement(AgreementDeniedInactiveID, transfertypes.AgreementStatusTypeInactive, "Retired partner exchange this role may list but not read"),
 		},
 	}
 
@@ -325,6 +357,13 @@ var sharedTransferFixtures = shared(func() *TransferFixtures {
 			As2Id:          aws.String("PARTNER-CO"),
 			ProfileType:    transfertypes.ProfileTypePartner,
 			CertificateIds: []string{CertExpiredID},
+		},
+		OldPartnerProfileID: {
+			Arn:            aws.String(transferProfileArn(OldPartnerProfileID)),
+			ProfileId:      aws.String(OldPartnerProfileID),
+			As2Id:          aws.String("OLD-PARTNER"),
+			ProfileType:    transfertypes.ProfileTypePartner,
+			CertificateIds: []string{CertExpiredID, CertDeniedID},
 		},
 	}
 
@@ -371,8 +410,10 @@ var sharedTransferFixtures = shared(func() *TransferFixtures {
 		DeniedServerIDs:          []string{WarnTransferDetailsDeniedID},
 		ListedAgreementsByServer: listedAgreements,
 		Agreements:               agreements,
+		DeniedAgreementIDs:       []string{AgreementDeniedActiveID, AgreementDeniedInactiveID},
 		Profiles:                 profiles,
 		Certificates:             certificates,
+		DeniedCertificateIDs:     []string{CertDeniedID},
 	}
 })
 
