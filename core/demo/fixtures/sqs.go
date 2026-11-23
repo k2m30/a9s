@@ -12,6 +12,10 @@ import (
 // wildcard grant an explicit Deny fences to the organisation.
 const SQSPublicPolicy = "sqs-public-policy"
 
+// SQSOrgPerimeterPolicy grants Principal "*" behind the AWS two-statement
+// organization perimeter.
+const SQSOrgPerimeterPolicy = "order-processing-queue"
+
 // sqsPublicPolicyQueueURL is the same queue addressed the way
 // GetQueueAttributes wants it; the row itself is keyed by queue name.
 const sqsPublicPolicyQueueURL = "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSPublicPolicy
@@ -65,10 +69,17 @@ var sharedSQSFixtures = shared(func() *SQSFixtures {
 					// KmsMasterKeyId — required for the sqs:kms related-panel pivot
 					// (checkSQSKMS).
 					"KmsMasterKeyId": OrdersProdKMSKeyID,
+					// SQSOrgPerimeterPolicy: the AWS two-statement perimeter. The
+					// first Deny keeps callers that are not AWS services inside
+					// the organization, the second keeps services to requests
+					// made for the organization's resources, so the wildcard
+					// grant is fenced for both and the queue is healthy.
 					"Policy": `{"Version":"2012-10-17","Statement":[` +
 						`{"Sid":"AllowOrgProducers","Effect":"Allow","Principal":"*","Action":"sqs:SendMessage","Resource":"arn:aws:sqs:us-east-1:123456789012:order-processing-queue"},` +
 						`{"Sid":"DenyOutsideOrg","Effect":"Deny","Principal":"*","Action":"sqs:*","Resource":"arn:aws:sqs:us-east-1:123456789012:order-processing-queue",` +
-						`"Condition":{"StringNotEquals":{"aws:PrincipalOrgID":"o-acme12345"}}}]}`,
+						`"Condition":{"StringNotEqualsIfExists":{"aws:PrincipalOrgID":"o-acme12345"},"BoolIfExists":{"aws:PrincipalIsAWSService":"false"}}},` +
+						`{"Sid":"DenyServicesOutsideOrg","Effect":"Deny","Principal":"*","Action":"sqs:*","Resource":"arn:aws:sqs:us-east-1:123456789012:order-processing-queue",` +
+						`"Condition":{"StringNotEqualsIfExists":{"aws:SourceOrgID":"o-acme12345"},"Null":{"aws:SourceAccount":"false"},"Bool":{"aws:PrincipalIsAWSService":"true"}}}]}`,
 				},
 			},
 			{
@@ -104,7 +115,9 @@ var sharedSQSFixtures = shared(func() *SQSFixtures {
 			},
 			// SQSPublicPolicy: the only queue whose access policy names a
 			// wildcard principal. Encrypted and with a redrive policy, so
-			// it trips that one finding alone.
+			// it trips that one finding alone. Its aws:SourceArn condition
+			// names buckets by a wildcard, and any account can create a
+			// bucket whose name matches it, so the grant stays public.
 			{
 				QueueURL:  sqsPublicPolicyQueueURL,
 				QueueName: SQSPublicPolicy,
@@ -114,7 +127,7 @@ var sharedSQSFixtures = shared(func() *SQSFixtures {
 					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + SQSPublicPolicy,
 					"RedrivePolicy":                         `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
 					"KmsMasterKeyId":                        OrdersQueueKMSAlias,
-					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `"}]}`,
+					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `","Condition":{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::acme-*"}}}]}`,
 				},
 			},
 			// SQSManagedSSE: encrypted by SQS with an AWS-owned key. A

@@ -22,8 +22,9 @@ import (
 // unconditioned statement: that combination, and only it, is the full-access
 // policy AWS attaches when the endpoint is created without one. A policy that
 // names concrete actions, confines the grant to named resources, or scopes
-// the wildcard principal with a condition is a deliberate grant and is not a
-// finding. An unparseable document is unknown, not open.
+// the wildcard principal with a condition to fixed values (no '*', '?' or
+// policy variable) is a deliberate grant and is not a finding. An
+// unparseable document is unknown, not open.
 //
 // Each Allow statement is evaluated beside the document's Deny statements:
 // the aggregate Exposure merges the actions of every public statement, so one
@@ -51,10 +52,10 @@ func vpcePolicyExposure(policyDocument string) ([]domain.DetailRow, bool) {
 		if !ex.Public || !slices.ContainsFunc(ex.PublicActions, isWildcardAction) {
 			continue
 		}
-		return []domain.DetailRow{
+		return append([]domain.DetailRow{
 			{Label: "Principal", Value: "*", Tier: "~"},
 			{Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "~"},
-		}, true
+		}, publicConditionRows(ex, "~")...), true
 	}
 	return nil, false
 }

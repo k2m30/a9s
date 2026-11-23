@@ -177,9 +177,10 @@ func w4FetchRole(t *testing.T, fake *w4RoleListFake, name string) resource.Resou
 
 // TestW4RoleWildcardTrustVerdict pins which trust policies are "anyone can
 // assume this role". The verdict is the shared policy evaluator's, so a
-// wildcard principal narrowed by any restrictive condition — sts:ExternalId
-// on a trust policy, aws:PrincipalOrgID anywhere — is a scoped grant and not
-// a finding, whichever JSON shape the principal is written in.
+// wildcard principal narrowed by a restrictive condition (aws:PrincipalOrgID)
+// is a scoped grant and not a finding, whichever JSON shape the principal is
+// written in. sts:ExternalId is not restrictive: any principal that presents
+// the value passes it.
 func TestW4RoleWildcardTrustVerdict(t *testing.T) {
 	cases := []struct {
 		name string
@@ -189,8 +190,8 @@ func TestW4RoleWildcardTrustVerdict(t *testing.T) {
 		{"bare_star_no_condition", w4TrustBareStarNoCondition, true},
 		{"object_star_no_condition", w4TrustObjectStarNoCondition, true},
 		{"statement_as_object", w4TrustStatementObjectStar, true},
-		{"bare_star_external_id", w4TrustBareStarWithExternalID, false},
-		{"object_star_external_id", w4TrustObjectStarWithExternalID, false},
+		{"bare_star_external_id", w4TrustBareStarWithExternalID, true},
+		{"object_star_external_id", w4TrustObjectStarWithExternalID, true},
 		{"bare_star_org_id", w4TrustBareStarWithOrgID, false},
 		{"service_principal_only", w4TrustLambdaNoSourceScope, false},
 	}
@@ -238,10 +239,12 @@ func TestW4ColorRoleHasNoRawDocumentFallback(t *testing.T) {
 	}
 }
 
-// TestW4TrustExternalIDIsTrustOnly pins that widening sts:ExternalId to
-// "restrictive" applies to trust policies only. On a bucket or key policy the
-// same key scopes nothing, so the resource-policy verdict must stay public.
-func TestW4TrustExternalIDIsTrustOnly(t *testing.T) {
+// TestW4TrustExternalIDScopesNoPolicyKind pins that sts:ExternalId scopes a
+// wildcard principal neither on a resource policy nor on a trust policy: any
+// principal in any account that presents the value passes it, and AWS pairs
+// the external ID with the partner's account in Principal, never with "*"
+// (IAM User Guide, Access to AWS accounts owned by third parties).
+func TestW4TrustExternalIDScopesNoPolicyKind(t *testing.T) {
 	doc, err := iampolicy.Parse(w4TrustObjectStarWithExternalID)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -249,12 +252,12 @@ func TestW4TrustExternalIDIsTrustOnly(t *testing.T) {
 	if ex := iampolicy.Evaluate(doc, ""); !ex.Public {
 		t.Errorf("Evaluate().Public = false; sts:ExternalId must not scope a resource policy")
 	}
-	ex := iampolicy.EvaluateTrust(doc, "")
-	if ex.Public {
-		t.Errorf("EvaluateTrust().Public = true; sts:ExternalId scopes a trust policy")
+	ex := iampolicy.Evaluate(doc, "")
+	if !ex.Public {
+		t.Errorf("EvaluateTrust().Public = false; sts:ExternalId does not scope a wildcard trust")
 	}
-	if !ex.Conditioned {
-		t.Errorf("EvaluateTrust().Conditioned = false, want true")
+	if ex.Conditioned {
+		t.Errorf("EvaluateTrust().Conditioned = true, want false")
 	}
 }
 

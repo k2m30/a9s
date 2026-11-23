@@ -34,6 +34,14 @@ func TestEvaluateExplicitDenySubtractsFromExposure(t *testing.T) {
 			wantPublic:      false,
 			wantConditioned: true,
 		},
+		// IAM applies a Deny only when every entry of its condition matches,
+		// so this Deny spares the callers through the named endpoint and every
+		// AWS service principal (aws:PrincipalIsAWSService is true "when a
+		// service uses a service principal to perform a direct action on your
+		// resources", IAM User Guide, AWS global condition context keys). A
+		// service acts for whichever account configured it, so behind a
+		// wildcard Allow the queue stays open to services acting for any
+		// account.
 		{
 			name: "the AWS-documented network perimeter deny that exempts service principals",
 			doc: `{"Version":"2012-10-17","Statement":[
@@ -41,8 +49,8 @@ func TestEvaluateExplicitDenySubtractsFromExposure(t *testing.T) {
 				{"Effect":"Deny","Principal":"*","Action":"sqs:*","Resource":"arn:aws:sqs:us-east-1:123456789012:acme-orders",
 				 "Condition":{"StringNotEquals":{"aws:SourceVpce":"vpce-0acme1234567890ab"},
 				              "BoolIfExists":{"aws:PrincipalIsAWSService":"false"}}}]}`,
-			wantPublic:      false,
-			wantConditioned: true,
+			wantPublic:  true,
+			wantActions: []string{"sqs:SendMessage"},
 		},
 		{
 			name: "deny unless the caller is inside the organisation",
@@ -145,20 +153,21 @@ func TestEvaluateExplicitDenyRemovesADeniedForeignAccount(t *testing.T) {
 	}
 }
 
-// aws:PrincipalIsAWSService is true only when an AWS service principal calls
-// the resource directly, and anonymous requests do not carry the key at all
-// (docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html).
-// A wildcard grant fenced by it at "true" admits AWS services only, which is
-// not public; the same key at "false" admits every signed caller that is not
-// a service, which is.
-func TestEvaluatePrincipalIsAWSServiceIsARestrictiveKey(t *testing.T) {
+// aws:PrincipalIsAWSService is true when "a service uses a service principal
+// to perform a direct action on your resources"
+// (docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html),
+// whichever account configured that service. A wildcard grant conditioned on
+// it at "true" admits every AWS service acting for any account, and no AWS
+// page counts the key as making a Principal "*" grant non-public, so the grant
+// is public; at "false" it admits every signed caller that is not a service.
+func TestEvaluatePrincipalIsAWSServiceScopesNoCaller(t *testing.T) {
 	const tmpl = `{"Version":"2012-10-17","Statement":[{"Sid":"AllowServices","Effect":"Allow","Principal":"*",
 		"Action":["codeartifact:GetAuthorizationToken","codeartifact:ReadFromRepository"],"Resource":"*",
 		"Condition":{"Bool":{"aws:PrincipalIsAWSService":"VALUE"}}}]}`
 
 	servicesOnly := iampolicy.Evaluate(mustParse(t, strings.Replace(tmpl, "VALUE", "true", 1)), "123456789012")
-	if servicesOnly.Public || !servicesOnly.Conditioned {
-		t.Errorf("aws:PrincipalIsAWSService=true: Public=%v Conditioned=%v, want Public=false Conditioned=true",
+	if !servicesOnly.Public || servicesOnly.Conditioned {
+		t.Errorf("aws:PrincipalIsAWSService=true: Public=%v Conditioned=%v, want Public=true Conditioned=false",
 			servicesOnly.Public, servicesOnly.Conditioned)
 	}
 

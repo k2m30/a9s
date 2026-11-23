@@ -169,10 +169,10 @@ func enrichEFSPolicies(
 		}
 		ex := iampolicy.Evaluate(doc, ownAccount)
 		if ex.Public {
-			setWave2Finding(result, fsID, efsCodePublicPolicy, []domain.DetailRow{
+			setWave2Finding(result, fsID, efsCodePublicPolicy, append([]domain.DetailRow{
 				{Label: "Principal", Value: "*", Tier: "!"},
 				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-			})
+			}, publicConditionRows(ex, "")...))
 
 		}
 	}

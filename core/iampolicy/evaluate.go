@@ -3,6 +3,7 @@
 package iampolicy
 
 import (
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,6 +30,15 @@ type Exposure struct {
 	// PublicActions: sorted, de-duplicated actions that made Public true.
 	// nil when !Public.
 	PublicActions []string
+	// PublicConditions: sorted, de-duplicated conditions of the grants that
+	// made Public true, one item per statement, its entries joined by " and "
+	// as IAM ANDs them. They scope no caller, and say what the grant is
+	// still open to. nil when !Public.
+	PublicConditions []string
+	// PublicDenyConditions: the same for the conditional Deny statements
+	// that overlap a public grant without closing it. They say which callers
+	// the Deny still lets through. nil when !Public.
+	PublicDenyConditions []string
 }
 
 // Principal is one principal a policy grants. Kind is "AWS", "Service",
@@ -68,20 +78,11 @@ func AccountFromARN(s string) string {
 	return ""
 }
 
-// Evaluate classifies the Allow statements of a resource policy, less what
-// its explicit Deny statements take away: IAM applies a matching Deny over
-// any Allow.
+// Evaluate classifies the Allow statements of a resource or trust policy,
+// less what its explicit Deny statements take away: IAM applies a matching
+// Deny over any Allow.
 func Evaluate(doc Document, ownAccount string) Exposure {
 	return evaluate(doc, ownAccount, restrictiveKeys)
-}
-
-// EvaluateTrust classifies a role's trust policy. Identical to Evaluate
-// except that sts:ExternalId counts as a restrictive condition: on an
-// AssumeRole trust policy a wildcard principal paired with a shared external
-// ID is the documented cross-account pattern, while on a resource policy the
-// same key scopes nothing.
-func EvaluateTrust(doc Document, ownAccount string) Exposure {
-	return evaluate(doc, ownAccount, trustRestrictiveKeys)
 }
 
 // EvaluateEndpoint classifies a VPC endpoint policy. Identical to Evaluate
@@ -97,17 +98,22 @@ func evaluate(doc Document, ownAccount string, keys []scopingKey) Exposure {
 	var conditioned bool
 	accounts := map[string]struct{}{}
 	actions := map[string]struct{}{}
+	conditions := map[string]struct{}{}
+	denies := map[string]struct{}{}
 	for _, st := range doc.Statement {
 		if st.Effect != "Allow" {
 			continue
 		}
 		if st.Principal.Wildcard || st.NotPrincipal != nil {
 			var open []string
+			var overlapping []Statement
 			fenced := false
 			for _, a := range st.grantedActions() {
-				switch doc.denied(a, anyone, keys) {
+				reach, seen := doc.denied(a, st.grantedResources(), anyone, keys)
+				switch reach {
 				case denyNone:
 					open = append(open, a)
+					overlapping = append(overlapping, seen...)
 				case denyFence:
 					fenced = true
 				}
@@ -118,6 +124,14 @@ func evaluate(doc Document, ownAccount string, keys []scopingKey) Exposure {
 				if len(st.Action) > 0 {
 					for _, a := range open {
 						actions[a] = struct{}{}
+					}
+				}
+				if len(st.Condition) > 0 {
+					conditions[conditionText(st.Condition)] = struct{}{}
+				}
+				for _, d := range overlapping {
+					if len(d.Condition) > 0 {
+						denies[conditionText(d.Condition)] = struct{}{}
 					}
 				}
 			case len(open) > 0 || fenced:
@@ -134,8 +148,23 @@ func evaluate(doc Document, ownAccount string, keys []scopingKey) Exposure {
 	ex.CrossAccount = sortedKeys(accounts)
 	if ex.Public {
 		ex.PublicActions = sortedKeys(actions)
+		ex.PublicConditions = sortedKeys(conditions)
+		ex.PublicDenyConditions = sortedKeys(denies)
 	}
 	return ex
+}
+
+// conditionText is one statement's condition as written: IAM ANDs its
+// entries, so they are joined by " and ".
+func conditionText(cond map[string]map[string][]string) string {
+	var out []string
+	for op, block := range cond {
+		for key, vals := range block {
+			out = append(out, op+" "+key+" "+strings.Join(vals, ", "))
+		}
+	}
+	slices.Sort(out)
+	return strings.Join(out, " and ")
 }
 
 var anyone = Principal{Kind: "*", Value: "*"}
@@ -168,10 +197,23 @@ func (st Statement) grantedActions() []string {
 	return st.Action
 }
 
+// grantedResources is what an Allow statement grants on. A NotResource grant,
+// or one with no Resource element (a trust policy), is read as every
+// resource: only a Deny of every resource then covers it.
+func (st Statement) grantedResources() []string {
+	if len(st.Resource) == 0 || len(st.NotResource) > 0 {
+		return []string{"*"}
+	}
+	return st.Resource
+}
+
 // grants reports whether st still grants p at least one action once the
 // document's unconditional Deny statements are applied.
 func (d Document) grants(st Statement, p Principal) bool {
-	return slices.ContainsFunc(st.grantedActions(), func(a string) bool { return d.denied(a, p, restrictiveKeys) != denyAll })
+	return slices.ContainsFunc(st.grantedActions(), func(a string) bool {
+		reach, _ := d.denied(a, st.grantedResources(), p, restrictiveKeys)
+		return reach != denyAll
+	})
 }
 
 // denyReach is how far a Deny statement reaches the callers it names.
@@ -185,23 +227,71 @@ const (
 	denyAll
 )
 
-// denied is the furthest reach of the document's Deny statements that name p
-// and cover action, a fence being read against keys.
-func (d Document) denied(action string, p Principal, keys []scopingKey) denyReach {
-	reach := denyNone
+// denied is how far the document's Deny statements reach p for action on
+// resources, a fence being read against keys, and every Deny statement that
+// names p and touches that request, for the finding to list. For the
+// wildcard principal the reach is the least over the caller classes, each
+// class taking the furthest reach of the Denies that apply to it: a grant is
+// closed only when every class is.
+func (d Document) denied(action string, resources []string, p Principal, keys []scopingKey) (denyReach, []Statement) {
+	classes := callerClasses
+	if p != anyone {
+		classes = []callerClass{callerClasses[slices.IndexFunc(callerClasses, func(c callerClass) bool { return c.isService == (p.Kind == "Service") })]}
+	}
+	reach := make([]denyReach, len(classes))
+	var seen []Statement
 	for _, st := range d.Statement {
-		if st.Effect != "Deny" || !st.covers(action) || !st.names(p) {
+		if st.Effect != "Deny" || !st.names(p) || !st.touches(action, resources) {
 			continue
 		}
-		r := st.denyReach(keys)
-		if st.NotPrincipal != nil && p == anyone {
-			// Everyone but the named principals is denied: the wildcard grant
-			// is fenced to them.
-			r = min(r, denyFence)
+		seen = append(seen, st)
+		if !st.covers(action) || !st.coversResources(resources) {
+			continue
 		}
-		reach = max(reach, r)
+		for i, c := range classes {
+			r := st.reachFor(c, keys)
+			if st.NotPrincipal != nil && p == anyone {
+				// Everyone but the named principals is denied: the wildcard grant
+				// is fenced to them.
+				r = min(r, denyFence)
+			}
+			reach[i] = max(reach[i], r)
+		}
 	}
-	return reach
+	return slices.Min(reach), seen
+}
+
+// touches is the overlap that puts a Deny beside a public grant in the
+// finding: matching only part of the request, it does not close the grant
+// but still shapes who passes. A NotAction Deny is always shown.
+func (st Statement) touches(action string, resources []string) bool {
+	actionOK := len(st.NotAction) > 0 || slices.ContainsFunc(st.Action, func(p string) bool { return overlaps(p, action) })
+	resourceOK := len(st.Resource) == 0 || slices.ContainsFunc(st.Resource, func(p string) bool {
+		return slices.ContainsFunc(resources, func(r string) bool { return overlapsIn(exactCase, p, r) })
+	})
+	return actionOK && resourceOK
+}
+
+// coversResources reports whether a Deny matches every resource in
+// resources, each of which may be a pattern. A Deny with no Resource element
+// (a trust policy) matches every resource; a NotResource Deny matches those
+// no listed entry overlaps. A Resource pattern contains a granted one when
+// the granted pattern, read literally, matches it and it has no '?' that a
+// granted '*' could stand for.
+func (st Statement) coversResources(resources []string) bool {
+	switch {
+	case len(st.NotResource) > 0:
+		return !slices.ContainsFunc(resources, func(r string) bool {
+			return slices.ContainsFunc(st.NotResource, func(p string) bool { return overlapsIn(exactCase, p, r) })
+		})
+	case len(st.Resource) == 0:
+		return true
+	}
+	return !slices.ContainsFunc(resources, func(r string) bool {
+		return !slices.ContainsFunc(st.Resource, func(p string) bool {
+			return p == r || !strings.Contains(p, "?") && matchIn(exactCase, p, r)
+		})
+	})
 }
 
 // names reports whether a Deny statement reaches p: its Principal block
@@ -232,23 +322,74 @@ func (b PrincipalBlock) names(p Principal) bool {
 	return false
 }
 
-// denyReach classifies a Deny statement by its condition, whose entries IAM
-// ANDs: none reaches every caller; entries that each fire outside a
-// restrictive scope fence the grant to that scope; any other entry is one a
-// caller can avoid (sending over TLS, presenting MFA), so the Deny reaches
-// nobody for certain.
-func (st Statement) denyReach(keys []scopingKey) denyReach {
+// callerClass is one part of the callers a Deny can single out by
+// classKey: AWS service principals, or everyone else. IAM ANDs a Deny's
+// condition entries, so an entry on classKey confines the Deny to one class,
+// and the AWS data perimeter pairs a Deny for each (IAM User Guide, AWS
+// global condition context keys, aws:SourceOrgID: the
+// RCPEnforceConfusedDeputyProtection example applies its control "only on
+// requests by service principals ... that have the aws:SourceAccount key
+// present").
+type callerClass struct {
+	isService bool
+	// presence lists the keys whose presence alone (Null key false) fences
+	// this class: a service call that carries no source acts for no
+	// customer's resource.
+	presence []scopingKey
+}
+
+const classKey = "aws:PrincipalIsAWSService"
+
+var callerClasses = []callerClass{{isService: false}, {isService: true, presence: sourceScopeKeys}}
+
+// selects reports, for an entry on classKey, whether the Deny applies to the
+// class; ok is false when the entry does not split the classes. A plain Bool
+// "false" leaves out an anonymous request, which carries no classKey, so only
+// its IfExists form reaches every caller that is not a service.
+func (c callerClass) selects(op string, vals []string) (applies, ok bool) {
+	bare := strings.TrimSuffix(op, "IfExists")
+	if !strings.EqualFold(bare, "Bool") || len(vals) != 1 {
+		return false, false
+	}
+	if strings.EqualFold(vals[0], strconv.FormatBool(c.isService)) {
+		return c.isService || bare != op, true
+	}
+	return false, true
+}
+
+// reachFor classifies a Deny statement for one caller class by its
+// condition, whose entries IAM ANDs: none reaches every caller; entries that
+// each confine the Deny to the class or fire outside a restrictive scope
+// fence the grant to that scope; an entry that leaves the class out, or one
+// a caller can avoid (sending over TLS, presenting MFA), means the Deny
+// reaches nobody in the class for certain.
+func (st Statement) reachFor(c callerClass, keys []scopingKey) denyReach {
 	if len(st.Condition) == 0 {
 		return denyAll
 	}
+	reach := denyAll
 	for op, block := range st.Condition {
 		for key, vals := range block {
-			if !fences(op, key, vals, keys) {
+			if strings.EqualFold(key, classKey) {
+				if applies, ok := c.selects(op, vals); ok {
+					if !applies {
+						return denyNone
+					}
+					continue
+				}
+			}
+			reach = denyFence
+			if !fences(op, key, vals, keys) && !c.presenceFences(op, key, vals) {
 				return denyNone
 			}
 		}
 	}
-	return denyFence
+	return reach
+}
+
+func (c callerClass) presenceFences(op, key string, vals []string) bool {
+	return strings.EqualFold(op, "Null") && len(vals) == 1 && strings.EqualFold(vals[0], "false") &&
+		slices.ContainsFunc(c.presence, func(k scopingKey) bool { return strings.EqualFold(k.Key, key) })
 }
 
 // negatedOperators pairs each negated operator with the positive one it
@@ -308,57 +449,112 @@ func isAccountID(s string) bool {
 	return true
 }
 
+// RestrictingKey is a condition key that scopes a Principal "*" grant, with
+// the AWS documentation page that makes it do so.
+type RestrictingKey struct{ Key, Citation string }
+
+// RestrictingKeys returns the key tables Evaluate and EvaluateEndpoint read.
+func RestrictingKeys() (resource, endpoint []RestrictingKey) {
+	view := func(keys []scopingKey) []RestrictingKey {
+		out := make([]RestrictingKey, len(keys))
+		for i, k := range keys {
+			out[i] = k.RestrictingKey
+		}
+		return out
+	}
+	return view(restrictiveKeys), view(endpointRestrictiveKeys)
+}
+
 // scopingKey is a condition key that can narrow a wildcard principal,
-// paired with the test its value must pass to actually do so. Most keys
-// name the caller and need only a concrete value; a key that scopes the
-// request path rather than the caller narrows nobody at its permissive
-// value, and aws:SourceIp is a range only the IpAddress operator compares.
+// paired with the test its value must pass to actually do so.
 type scopingKey struct {
-	key     string
+	RestrictingKey
 	narrows func(op, val string) bool
 }
 
-func concreteValue(_, val string) bool { return !isWildcardValue(val) }
-
-func concreteKeys(names ...string) []scopingKey {
-	out := make([]scopingKey, len(names))
-	for i, n := range names {
-		out[i] = scopingKey{n, concreteValue}
-	}
-	return out
-}
-
-// restrictiveKeys scope a wildcard principal to an account, org, ARN, VPC,
-// caller or address range, to AWS service principals, or to a signed caller
-// through the function-URL auth type. Compared with strings.EqualFold.
-var restrictiveKeys = slices.Concat(
-	concreteKeys(
-		"aws:SourceAccount", "aws:SourceOwner", "aws:SourceArn", "aws:SourceVpc", "aws:SourceVpce",
-		"aws:PrincipalAccount", "aws:PrincipalArn", "aws:PrincipalOrgID", "aws:PrincipalOrgPaths",
-		"aws:userid", "aws:username", "kms:CallerAccount", "aws:SourceOrgID", "elasticfilesystem:AccessPointArn",
-	),
-	[]scopingKey{
-		{"aws:SourceIp", func(op, val string) bool {
-			return strings.EqualFold(bareOperator(op), "IpAddress") && !isAnyIP(val)
-		}},
-		// True only for a service principal calling directly; anonymous
-		// requests carry no value, so plain Bool excludes them.
-		{"aws:PrincipalIsAWSService", func(op, val string) bool {
-			return strings.EqualFold(bareOperator(op), "Bool") && strings.EqualFold(val, "true")
-		}},
-		// AWS_IAM is the only value that forces a signed caller; NONE is
-		// what a public function URL is configured with.
-		{"lambda:FunctionUrlAuthType", func(_, val string) bool { return strings.EqualFold(val, "AWS_IAM") }},
-	},
+const (
+	citeS3Public   = "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#public-bucket-policies"
+	citeEFSPublic  = "https://docs.aws.amazon.com/efs/latest/ug/access-control-block-public-access.html#what-is-a-public-policy"
+	citeGlobalKeys = "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html"
 )
 
-// sourceScopeKeys, a subset of restrictiveKeys, name the account or resource
-// on whose behalf a service acts. They answer the confused-deputy question,
-// which an address range does not: an AWS service calls a role from
-// AWS-owned addresses whoever asked it to.
-var sourceScopeKeys = slices.DeleteFunc(slices.Clone(restrictiveKeys), func(k scopingKey) bool {
-	return !slices.Contains([]string{"aws:SourceAccount", "aws:SourceArn", "aws:SourceOrgID"}, k.key)
-})
+// fixedValue is AWS's test for a non-public grant: a value with no '*' or
+// '?' and no policy variable, each of which IAM expands at request time.
+func fixedValue(_, val string) bool {
+	return val != "" && !strings.ContainsAny(val, "*?") && !strings.Contains(val, "${")
+}
+
+// fixedOrgPath is fixedValue for an organization path, which may also end in
+// one '*' below a fixed organization ID ("o-…/*", ".../ou-*"): that names the
+// organization, an OU subtree, or an OU's children.
+func fixedOrgPath(op, val string) bool {
+	rest, trailing := strings.CutSuffix(val, "*")
+	org, _, below := strings.Cut(rest, "/")
+	return fixedValue(op, val) || trailing && below && len(org) > len("o-") && strings.HasPrefix(org, "o-") && fixedValue(op, rest)
+}
+
+// fixedUserID is fixedValue for aws:userid, which may also be one role ID
+// followed by ":*": every session of that role.
+func fixedUserID(op, val string) bool {
+	role, sessions := strings.CutSuffix(val, ":*")
+	return fixedValue(op, val) || sessions && strings.HasPrefix(role, "AROA") && !strings.Contains(role, ":") && fixedValue(op, role)
+}
+
+// boolTrue holds only when a Bool operator asserts the key true: plain Bool
+// is false for a request that does not carry the key.
+func boolTrue(op, val string) bool {
+	return strings.EqualFold(bareOperator(op), "Bool") && strings.EqualFold(val, "true")
+}
+
+// narrowSourceRange compares aws:SourceIp as a range under IpAddress only,
+// and a range broader than /8 (IPv4) or /32 (IPv6) counts as public.
+func narrowSourceRange(op, val string) bool {
+	broad, ok := rangeBroaderThan(val, 8, 32)
+	return strings.EqualFold(bareOperator(op), "IpAddress") && ok && !broad
+}
+
+// restrictiveKeys are matched to a condition key case-insensitively, as IAM
+// matches key names.
+var restrictiveKeys = []scopingKey{
+	{RestrictingKey{"aws:SourceAccount", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:SourceOwner", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:SourceArn", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:SourceVpc", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:SourceVpce", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:SourceOrgID", citeGlobalKeys + "#condition-keys-sourceorgid"}, fixedValue},
+	{RestrictingKey{"aws:SourceOrgPaths", citeGlobalKeys + "#condition-keys-sourceorgpaths"}, fixedOrgPath},
+	{RestrictingKey{"aws:SourceIp", citeS3Public}, narrowSourceRange},
+	{RestrictingKey{"aws:PrincipalAccount", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:PrincipalArn", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:PrincipalOrgID", citeS3Public}, fixedValue},
+	{RestrictingKey{"aws:PrincipalOrgPaths", citeGlobalKeys + "#condition-keys-principalorgpaths"}, fixedOrgPath},
+	{RestrictingKey{"aws:userid", citeS3Public}, fixedUserID},
+	{RestrictingKey{"kms:CallerAccount", "https://docs.aws.amazon.com/kms/latest/developerguide/conditions-kms.html#conditions-kms-caller-account"}, fixedValue},
+	{RestrictingKey{"elasticfilesystem:AccessedViaMountTarget", citeEFSPublic}, boolTrue},
+}
+
+// namesAccount is the confused-deputy test: the value names the account,
+// organization or resource a service acts for. An ARN that carries an
+// account names it by a 12-digit account, whatever its resource; any other
+// value (an ID, an S3 bucket ARN) must be fixed.
+func namesAccount(op, val string) bool {
+	a, err := arn.Parse(val)
+	if err != nil || a.AccountID == "" {
+		return fixedValue(op, val)
+	}
+	return isAccountID(a.AccountID)
+}
+
+// sourceScopeKeys name the account or resource on whose behalf a service
+// acts. They answer the confused-deputy question, which an address range
+// does not: an AWS service calls a role from AWS-owned addresses whoever
+// asked it to.
+var sourceScopeKeys = []scopingKey{
+	{RestrictingKey{"aws:SourceAccount", "https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html"}, namesAccount},
+	{RestrictingKey{"aws:SourceArn", "https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html"}, namesAccount},
+	{RestrictingKey{"aws:SourceOrgID", "https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html"}, namesAccount},
+	{RestrictingKey{"aws:SourceOrgPaths", citeGlobalKeys + "#condition-keys-sourceorgpaths"}, fixedOrgPath},
+}
 
 // positiveOperators assert that a key equals or matches a listed value (Bool
 // compares a boolean key with "true" or "false"), and
@@ -388,17 +584,16 @@ func bareOperator(op string) string {
 	return op
 }
 
-// trustRestrictiveKeys is restrictiveKeys plus the trust-policy-only
-// sts:ExternalId. Used by EvaluateTrust.
-var trustRestrictiveKeys = slices.Concat(concreteKeys("sts:ExternalId"), restrictiveKeys)
-
 // endpointRestrictiveKeys is restrictiveKeys plus the keys that name the
 // resource being called. On a resource's own policy they hold for every
 // caller of that resource and scope nobody; on a VPC endpoint policy they
 // narrow which resources the endpoint reaches. Used by EvaluateEndpoint.
-var endpointRestrictiveKeys = slices.Concat(concreteKeys(
-	"aws:ResourceAccount", "aws:ResourceOrgID", "aws:ResourceOrgPaths", "s3:ResourceAccount",
-), restrictiveKeys)
+var endpointRestrictiveKeys = slices.Concat([]scopingKey{
+	{RestrictingKey{"aws:ResourceAccount", citeGlobalKeys + "#condition-keys-resourceaccount"}, fixedValue},
+	{RestrictingKey{"aws:ResourceOrgID", citeGlobalKeys + "#condition-keys-resourceorgid"}, fixedValue},
+	{RestrictingKey{"aws:ResourceOrgPaths", citeGlobalKeys + "#condition-keys-resourceorgpaths"}, fixedOrgPath},
+	{RestrictingKey{"s3:ResourceAccount", "https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazon-s3-policy-keys.html#example-object-resource-account"}, fixedValue},
+}, restrictiveKeys)
 
 // hasSetPrefix reports whether op carries the ForAllValues: or ForAnyValue:
 // set prefix named by prefix.
@@ -419,7 +614,7 @@ func isRestrictive(cond map[string]map[string][]string, keys []scopingKey) bool 
 			continue
 		}
 		for key, vals := range block {
-			i := slices.IndexFunc(keys, func(k scopingKey) bool { return strings.EqualFold(k.key, key) })
+			i := slices.IndexFunc(keys, func(k scopingKey) bool { return strings.EqualFold(k.Key, key) })
 			if i < 0 || len(vals) == 0 {
 				continue
 			}
@@ -431,32 +626,31 @@ func isRestrictive(cond map[string]map[string][]string, keys []scopingKey) bool 
 	return false
 }
 
-func isAnyIP(v string) bool {
-	switch strings.TrimSpace(v) {
-	case "0.0.0.0/0", "::/0", "*", "":
-		return true
-	}
-	return false
+// OpenCIDR reports whether c reaches every address of its family: a prefix
+// of length zero, whatever base address is written in front of it, since a
+// range matches on its first prefix-length bits only.
+func OpenCIDR(c string) bool {
+	open, _ := rangeBroaderThan(c, 1, 1)
+	return open
 }
 
-// isWildcardValue is true for "*", "arn:aws:*", "arn:*:*:*" and the like:
-// an ARN whose every field after the partition is empty or a wildcard, so it
-// names no resource in particular. An ARN whose account is "*" is one too,
-// whatever it names inside that account: that is the same "names everyone"
-// shape isAnyoneARN reads on a principal, and both answer from one parse.
-func isWildcardValue(v string) bool {
-	v = strings.TrimSpace(v)
-	if v == "" || v == "*" {
-		return true
+// rangeBroaderThan reports whether c is a range with fewer than v4 prefix
+// bits (IPv4) or v6 prefix bits (IPv6); ok is false when c is neither a
+// range nor an address. A bare address is the range of that one address.
+func rangeBroaderThan(c string, v4, v6 int) (broad, ok bool) {
+	c = strings.TrimSpace(c)
+	p, err := netip.ParsePrefix(c)
+	if err != nil {
+		a, aerr := netip.ParseAddr(c)
+		if aerr != nil {
+			return false, false
+		}
+		p = netip.PrefixFrom(a, a.BitLen())
 	}
-	fields := strings.Split(v, ":")
-	if len(fields) < 2 || fields[0] != "arn" {
-		return false
+	if p.Addr().Is6() {
+		return p.Bits() < v6, true
 	}
-	if a, err := arn.Parse(v); err == nil && a.AccountID == "*" {
-		return true
-	}
-	return !slices.ContainsFunc(fields[2:], func(f string) bool { return f != "" && f != "*" })
+	return p.Bits() < v4, true
 }
 
 func sortedKeys(set map[string]struct{}) []string {

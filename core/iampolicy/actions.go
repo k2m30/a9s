@@ -42,11 +42,31 @@ func (st Statement) covers(action string) bool {
 	}
 }
 
+// caseMode is how a pattern compares letters: IAM matches action names
+// without regard to case, and a resource ARN with it.
+type caseMode bool
+
+const (
+	foldCase  caseMode = true
+	exactCase caseMode = false
+)
+
+func (m caseMode) normalize(s string) string {
+	if m == foldCase {
+		return strings.ToLower(s)
+	}
+	return s
+}
+
 // overlaps reports whether two IAM action patterns match at least one action
-// in common. A table over the two patterns rather than recursion, for the
-// same reason Match avoids backtracking.
-func overlaps(a, b string) bool {
-	a, b = strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b))
+// in common.
+func overlaps(a, b string) bool { return overlapsIn(foldCase, a, b) }
+
+// overlapsIn reports whether two IAM patterns match at least one string in
+// common. A table over the two patterns rather than recursion, for the same
+// reason Match avoids backtracking.
+func overlapsIn(m caseMode, a, b string) bool {
+	a, b = m.normalize(strings.TrimSpace(a)), m.normalize(strings.TrimSpace(b))
 	// dp[i][j]: a[i:] and b[j:] match a common string.
 	dp := make([][]bool, len(a)+1)
 	for i := range dp {
@@ -73,13 +93,17 @@ func matchesAny(patterns []string, action string) bool {
 	return slices.ContainsFunc(patterns, func(p string) bool { return Match(p, action) })
 }
 
-// Match implements IAM wildcard matching: '*' spans any run, '?' exactly one
-// character, everything else is literal, case-insensitive. A two-pointer
-// scan rather than a translated regexp: '*'-heavy patterns come from the
-// account being inspected and must not be able to backtrack.
-func Match(pattern, value string) bool {
-	p := strings.ToLower(strings.TrimSpace(pattern))
-	v := strings.ToLower(value)
+// Match implements IAM wildcard matching for action names: '*' spans any
+// run, '?' exactly one character, everything else is literal,
+// case-insensitive.
+func Match(pattern, value string) bool { return matchIn(foldCase, pattern, value) }
+
+// matchIn is Match with the letter comparison m. A two-pointer scan rather
+// than a translated regexp: '*'-heavy patterns come from the account being
+// inspected and must not be able to backtrack.
+func matchIn(m caseMode, pattern, value string) bool {
+	p := m.normalize(strings.TrimSpace(pattern))
+	v := m.normalize(value)
 	pi, vi := 0, 0
 	star, mark := -1, 0
 	for vi < len(v) {

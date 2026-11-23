@@ -10,17 +10,20 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// On a trust policy sts:ExternalId scopes a wildcard principal, so a Deny
-// that fires unless the caller presents the shared external ID fences the
-// grant just as an Allow conditioned on it does. On a resource policy the
-// key scopes nothing.
-func TestTrustDenyUnlessExternalIDScopesTheWildcard(t *testing.T) {
+// IAM applies a Deny whose condition matches: this one denies every caller
+// that does not present the external ID, so the grant survives for every
+// principal in any account that presents it. The external ID is a value any
+// caller can present, not a scope (IAM User Guide, Access to AWS accounts
+// owned by third parties: "The external ID is not a special value that you
+// need to create explicitly"), so the wildcard grant stays public on a trust
+// policy as on a resource policy.
+func TestTrustDenyUnlessExternalIDLeavesTheWildcardOpen(t *testing.T) {
 	doc := mustParse(t, policyOf(
 		`{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole"}`,
 		`{"Effect":"Deny","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":{"StringNotEquals":{"sts:ExternalId":"acme-ext-7f3a"}}}`,
 	))
-	if trust := iampolicy.EvaluateTrust(doc, "123456789012"); trust.Public || !trust.Conditioned {
-		t.Errorf("EvaluateTrust: Public=%v Conditioned=%v, want Public=false Conditioned=true", trust.Public, trust.Conditioned)
+	if trust := iampolicy.Evaluate(doc, "123456789012"); !trust.Public || trust.Conditioned {
+		t.Errorf("EvaluateTrust: Public=%v Conditioned=%v, want Public=true Conditioned=false", trust.Public, trust.Conditioned)
 	}
 	if res := iampolicy.Evaluate(doc, "123456789012"); !res.Public {
 		t.Errorf("Evaluate: sts:ExternalId scopes nothing on a resource policy, yet Public=false")

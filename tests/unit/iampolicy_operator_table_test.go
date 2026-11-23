@@ -140,10 +140,11 @@ var operatorTable = []condCase{
 		name: "FunctionUrlAuthType NONE lets anyone invoke the URL",
 		cond: `{"StringEquals":{"lambda:FunctionUrlAuthType":"NONE"}}`,
 	},
+	// AWS_IAM demands a signed request, and a signed caller from any AWS
+	// account passes a Principal "*" resource policy.
 	{
-		name:      "FunctionUrlAuthType AWS_IAM demands a signed request",
-		cond:      `{"StringEquals":{"lambda:FunctionUrlAuthType":"AWS_IAM"}}`,
-		restricts: true,
+		name: "FunctionUrlAuthType AWS_IAM admits a signed caller from any account",
+		cond: `{"StringEquals":{"lambda:FunctionUrlAuthType":"AWS_IAM"}}`,
 	},
 	{
 		name: "ViaService names the service the request comes through, not the account behind it",
@@ -173,23 +174,28 @@ var operatorTable = []condCase{
 		name: "PrincipalArn naming every account's root user",
 		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::*:root"}}`,
 	},
+	// A grant is non-public only at fixed values, "values that don't contain a
+	// wildcard" (S3 User Guide, Blocking public access, The meaning of
+	// "public"): a '*' in any field of the ARN leaves it public.
 	{
-		name:      "PrincipalArn with a concrete account still scopes, whatever the resource",
-		cond:      `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::123456789012:role/*"}}`,
-		restricts: true,
+		name: "PrincipalArn with a concrete account and a wildcard role name",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::123456789012:role/*"}}`,
 	},
 	{
 		name: "PrincipalArn with a wildcard partition and a wildcard account",
 		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:*:iam::*:root"}}`,
 	},
 	{
-		name:      "PrincipalArn with a wildcard partition but a concrete account still names one account",
-		cond:      `{"ArnLike":{"aws:PrincipalArn":"arn:*:iam::123456789012:root"}}`,
-		restricts: true,
+		name: "PrincipalArn with a wildcard partition and a concrete account",
+		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:*:iam::123456789012:root"}}`,
+	},
+	{
+		name: "a SourceArn with a wildcard object path",
+		cond: `{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::example-bucket/*"}}`,
 	},
 	{
 		name:        "a SourceArn naming a bucket keeps its empty account field, which is not a wildcard",
-		cond:        `{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::example-bucket/*"}}`,
+		cond:        `{"ArnLike":{"aws:SourceArn":"arn:aws:s3:::example-bucket"}}`,
 		restricts:   true,
 		sourceScope: true,
 	},
@@ -269,9 +275,13 @@ func TestHasServicePrincipalWithoutSourceScope_CallerKeysAreNotSourceScoping(t *
 	}
 }
 
-// sts:ExternalId is restrictive only on a trust policy, and only when it is
-// positively constrained. Null on it demands the caller pass no external ID
-// at all, which is the opposite of the scoping pattern it stands for.
+// sts:ExternalId does not scope a wildcard-principal trust policy under any
+// operator: any principal in any account that knows or guesses the value can
+// present it, and AWS pairs the external ID with the partner's account in
+// Principal, never with "*" (IAM User Guide, Access to AWS accounts owned by
+// third parties: "The external ID is not a special value that you need to
+// create explicitly"). Null on it demands the caller pass no external ID at
+// all.
 func TestEvaluateTrust_ExternalIDOperatorAware(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -279,9 +289,9 @@ func TestEvaluateTrust_ExternalIDOperatorAware(t *testing.T) {
 		wantPublic bool
 	}{
 		{
-			name:       "StringEquals on sts:ExternalId scopes the trust",
+			name:       "StringEquals on sts:ExternalId leaves the wildcard trust open",
 			cond:       `{"StringEquals":{"sts:ExternalId":"a9s-external-id"}}`,
-			wantPublic: false,
+			wantPublic: true,
 		},
 		{
 			name:       "Null on sts:ExternalId scopes nothing",
@@ -292,7 +302,7 @@ func TestEvaluateTrust_ExternalIDOperatorAware(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":` + tt.cond + `}}`
-			ex := iampolicy.EvaluateTrust(mustParse(t, doc), "123456789012")
+			ex := iampolicy.Evaluate(mustParse(t, doc), "123456789012")
 			if ex.Public != tt.wantPublic {
 				t.Errorf("EvaluateTrust Public = %v, want %v", ex.Public, tt.wantPublic)
 			}
@@ -387,9 +397,14 @@ func TestLambda_PublicPolicy_FunctionURLAuthTypeNoneIsPublic(t *testing.T) {
 		"invokable by anyone", domain.SevBroken, "wave2")
 }
 
-func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsHealthy(t *testing.T) {
+// With AWS_IAM a caller in another account needs "permissions granted to them
+// in a resource-based policy on the function" (Lambda Developer Guide,
+// Control access to Lambda function URLs); Principal "*" grants that to every
+// AWS account.
+func TestLambda_PublicPolicy_FunctionURLAuthTypeIAMIsPublic(t *testing.T) {
 	const name = "acme-url-policy-iam"
 	fake := &pw1LambdaPostureFake{policies: map[string]string{name: pw1FunctionURLPolicy(name, "AWS_IAM")}}
 	res := pw1EnrichLambda(t, fake, name)
-	pw1RequireNoFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy)
+	pw1RequireFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy,
+		"invokable by anyone", domain.SevBroken, "wave2")
 }

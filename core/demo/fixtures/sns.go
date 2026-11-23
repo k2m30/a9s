@@ -24,6 +24,11 @@ const (
 	snsPublicPolicyTopicName = "sns-public-policy"
 
 	SNSPublicPolicyARN = "arn:aws:sns:us-east-1:123456789012:" + snsPublicPolicyTopicName
+
+	// SNSRoleSessionsPolicyARN grants Principal "*" scoped by aws:userid to
+	// every session of the role SNSDeployRoleID names: a healthy topic.
+	SNSRoleSessionsPolicyARN = "arn:aws:sns:us-east-1:123456789012:deploy-notifications"
+	SNSDeployRoleID          = "AROAEXAMPLEDEPLOY0001"
 )
 
 // SNSDemoKMSKeyID is the at-rest key every demo topic but SNSNoKMS carries.
@@ -187,8 +192,18 @@ var sharedSNSFixtures = shared(func() *SNSFixtures {
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": {
 			"Policy": `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
 		},
+		// A /0 range matches every address whatever base it is written with,
+		// so this grant stays open to anyone. The data-perimeter Deny spares
+		// callers through the endpoint and every AWS service principal, which
+		// acts for any account, so it does not close the grant either; the
+		// finding shows it as "Deny when".
 		SNSPublicPolicyARN: {
-			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sns:Publish","sns:Subscribe"],"Resource":"` + SNSPublicPolicyARN + `"}]}`,
+			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sns:Publish","sns:Subscribe"],"Resource":"` + SNSPublicPolicyARN + `","Condition":{"IpAddress":{"aws:SourceIp":"10.0.0.0/0"}}},{"Sid":"DenyOutsidePerimeter","Effect":"Deny","Principal":"*","Action":"sns:*","Resource":"` + SNSPublicPolicyARN + `","Condition":{"StringNotEquals":{"aws:SourceVpce":"vpce-0acme1234567890ab"},"BoolIfExists":{"aws:PrincipalIsAWSService":"false"}}}]}`,
+		},
+		// One role ID followed by ":*" names every session of that one role,
+		// so this Principal "*" grant is not public.
+		SNSRoleSessionsPolicyARN: {
+			"Policy": `{"Version":"2012-10-17","Statement":[{"Sid":"DeployRoleSessions","Effect":"Allow","Principal":"*","Action":"sns:Publish","Resource":"` + SNSRoleSessionsPolicyARN + `","Condition":{"StringLike":{"aws:userid":"` + SNSDeployRoleID + `:*"}}}]}`,
 		},
 	}
 

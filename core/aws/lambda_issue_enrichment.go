@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -154,10 +153,7 @@ func lambdaPolicyExposure(ctx context.Context, api LambdaGetPolicyAPI, name, own
 	if !ex.Public {
 		return nil, false, nil
 	}
-	return []domain.DetailRow{
-		{Label: "Principal", Value: "*", Tier: "!"},
-		{Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "!"},
-	}, true, nil
+	return publicPolicyRows(ex), true, nil
 }
 
 // lambdaFunctionURLExposure reports a function URL whose AuthType is NONE.

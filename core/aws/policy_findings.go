@@ -145,6 +145,22 @@ func publicPolicyRows(ex iampolicy.Exposure) []domain.DetailRow {
 			Label: "Actions", Value: strings.Join(ex.PublicActions, ", "), Tier: "!",
 		})
 	}
+	return append(rows, publicConditionRows(ex, "!")...)
+}
+
+// publicConditionRows states the conditions a public grant carries and the
+// conditional Denies that did not close it: neither scopes the caller, so
+// together they say what the grant is still open to (every AWS service,
+// whoever presents an external ID, whoever calls over TLS). A Deny row reads
+// "Deny when" because IAM applies the Deny when its condition matches.
+func publicConditionRows(ex iampolicy.Exposure, tier string) []domain.DetailRow {
+	var rows []domain.DetailRow
+	if len(ex.PublicConditions) > 0 {
+		rows = append(rows, domain.DetailRow{Label: "Condition", Value: strings.Join(ex.PublicConditions, "; "), Tier: tier})
+	}
+	if len(ex.PublicDenyConditions) > 0 {
+		rows = append(rows, domain.DetailRow{Label: "Deny when", Value: strings.Join(ex.PublicDenyConditions, "; "), Tier: tier})
+	}
 	return rows
 }
 

@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A resource, trust or VPC endpoint policy that grants to every principal is no longer read as
+  scoped by a condition value that still matches anyone. A value with `*` or `?` anywhere (for
+  example `arn:aws:s3:::acme-*` or `o-acme*`), a policy variable, an `aws:SourceIp` range broader
+  than /8 for IPv4 or /32 for IPv6, or a /0 range written with any base address (`10.0.0.0/0`) now
+  leaves the grant public, by the rule the S3 "meaning of public" page states. An organization path
+  ending in a `*` below a fixed organization ID (`o-…/*`, `…/ou-*`) and `aws:userid` naming every
+  session of one role (`AROA…:*`) still scope the grant.
+- A role whose trust policy lets any AWS principal (`"*"`) assume it is now flagged "anyone can
+  assume this role" even with an `sts:ExternalId` condition: any caller that presents the value
+  passes it. Name the partner's account as the principal and keep the external ID beside it.
+- A resource policy that grants every principal under `aws:PrincipalIsAWSService = true` is now
+  flagged open: it admits every AWS service acting for any account. A Deny that spares AWS service
+  principals no longer clears the finding either, for the same reason; the finding shows that
+  Deny in its "Deny when" row. A perimeter that pairs it with a Deny keeping AWS services to
+  requests made for the organization's resources (AWS's two-statement perimeter) clears it.
+- A Deny now takes a public grant away only for the resources it names: a policy that grants every
+  principal `arn:aws:s3:::acme-bucket/*` and denies `acme-bucket/private/*` is flagged open, since
+  everything outside `private/` is still public. Before, such a policy read as not public.
+- A resource policy that grants every principal under an `aws:username` condition is now flagged
+  open: any account can create a user with that name.
+- The Attention block of a public-policy or wildcard-trust finding now shows a Condition row with
+  the conditions the grant carries, and a "Deny when" row with the condition of each Deny that
+  overlaps the grant without closing it (for example `Bool aws:SecureTransport false`), so the
+  operator sees what the grant is still open to. In both rows the conditions of one statement are
+  joined by "and" and statements are separated by ";".
+- A role that trusts an AWS service is no longer read as protected against the confused deputy by an
+  `aws:SourceAccount`, `aws:SourceOrgID` or `aws:SourceArn` value that matches every customer
+  (`????????????`, `o-*`, `arn:aws:s3:::*`, an ARN whose account has a wildcard).
+  `aws:SourceOrgPaths` now counts as source scoping.
+  `lambda:FunctionUrlAuthType = AWS_IAM` no longer scopes a `Principal: "*"` grant, since any AWS
+  account can sign the request. `elasticfilesystem:AccessedViaMountTarget = true` and
+  `aws:SourceOrgPaths` now scope a grant; `elasticfilesystem:AccessPointArn` no longer does.
 - Every AWS read retries when throttled, with one retry policy for all
   services: up to 5 attempts, a bare HTTP 429 counts as a throttle, and a
   burst of throttles during a wide sweep no longer stops retries early. A

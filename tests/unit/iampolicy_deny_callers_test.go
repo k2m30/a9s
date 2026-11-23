@@ -288,17 +288,20 @@ func TestAPIGatewayEscapedRESTPolicyIsReadAsTheDocumentItEncodes(t *testing.T) {
 	}
 }
 
-// CodeArtifact lets AWS services read a domain or repository through a
-// wildcard principal fenced by aws:PrincipalIsAWSService; only AWS service
-// principals satisfy it, so it is not a public repository.
-func TestCodeArtifactServicePrincipalGrantIsNotPublic(t *testing.T) {
+// A wildcard principal conditioned on aws:PrincipalIsAWSService true admits
+// every AWS service acting for any account: the key is true when "a service
+// uses a service principal to perform a direct action on your resources"
+// (IAM User Guide, AWS global condition context keys), and no AWS page counts
+// it as making a Principal "*" grant non-public. The repository is public.
+func TestCodeArtifactServicePrincipalGrantIsPublic(t *testing.T) {
 	const tmpl = `{"Version":"2012-10-17","Statement":[{"Sid":"AllowAWSServices","Effect":"Allow","Principal":"*",` +
 		`"Action":["codeartifact:GetAuthorizationToken","codeartifact:ReadFromRepository"],"Resource":"*",` +
 		`"Condition":{"Bool":{"aws:PrincipalIsAWSService":"VALUE"}}}]}`
 
 	services := enrichCodeArtifactPolicy(strings.Replace(tmpl, "VALUE", "true", 1))
-	if hasCode(services.Findings["acme-artifacts/acme-npm"], "codeartifact.public-access-policy") {
-		t.Errorf("a grant only AWS service principals satisfy was reported as public")
+	if !hasCode(services.Findings["acme-artifacts/acme-npm"], "codeartifact.public-access-policy") {
+		t.Errorf("a grant every AWS service acting for any account satisfies was not reported as public; got %v",
+			w2Codes(services.Findings["acme-artifacts/acme-npm"]))
 	}
 
 	everyoneElse := enrichCodeArtifactPolicy(strings.Replace(tmpl, "VALUE", "false", 1))

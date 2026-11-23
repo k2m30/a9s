@@ -151,10 +151,10 @@ func enrichDDBResourcePolicies(ctx context.Context, clients *ServiceClients, res
 		own := cmp.Or(ownAccount, iampolicy.AccountFromARN(r.Fields["arn"]))
 		ex := iampolicy.Evaluate(doc, own)
 		if ex.Public {
-			setWave2Finding(result, r.ID, ddbCodePublicPolicy, []domain.DetailRow{
+			setWave2Finding(result, r.ID, ddbCodePublicPolicy, append([]domain.DetailRow{
 				{Label: "Principal", Value: "*", Tier: "!"},
 				{Label: "Actions", Value: strings.Join(ex.PublicActions, ", ")},
-			})
+			}, publicConditionRows(ex, "")...))
 
 			return
 		}

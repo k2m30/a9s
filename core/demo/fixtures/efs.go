@@ -116,7 +116,13 @@ const (
 	HealthyEFSMTDownID        = "fs-0healthymtdown001"
 
 	// One carrier per efs posture finding. Every other file system is encrypted,
-	// has no file system policy, and has its backup policy enabled.
+	// has no file system policy or one EFS counts non-public, and has its
+	// backup policy enabled.
+
+	// EFSMountTargetOnlyPolicy grants Principal "*" only through a mount
+	// target (elasticfilesystem:AccessedViaMountTarget true), which EFS counts
+	// non-public: a healthy file system.
+	EFSMountTargetOnlyPolicy = ProdEFSID
 
 	// EFSUnencrypted is the file system stored without encryption at rest.
 	EFSUnencrypted = "fs-0unencrypted00001"
@@ -145,6 +151,19 @@ var sharedEFSFixtures = shared(func() *EFSFixtures {
       "Principal": {"AWS": "*"},
       "Action": ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"],
       "Resource": "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/` + EFSPublicPolicy + `"
+    }
+  ]
+}`,
+			EFSMountTargetOnlyPolicy: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "MountTargetClients",
+      "Effect": "Allow",
+      "Principal": {"AWS": "*"},
+      "Action": ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"],
+      "Resource": "` + ProdEFSARN + `",
+      "Condition": {"Bool": {"elasticfilesystem:AccessedViaMountTarget": "true"}}
     }
   ]
 }`,

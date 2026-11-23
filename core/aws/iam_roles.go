@@ -51,20 +51,25 @@ func analyseRoleTrust(assumeRolePolicyDoc, path string) roleTrustAnalysis {
 	if err != nil {
 		return out
 	}
-	if iampolicy.EvaluateTrust(doc, "").Public {
+	out.details = map[domain.FindingCode]domain.AttentionDetail{}
+	if ex := iampolicy.Evaluate(doc, ""); ex.Public {
 		// The summary is a9s's own verdict on the trust policy, not a value
 		// IAM returned, so it is written in the words the Trust column and the
 		// detail row render rather than in the shape of an SDK constant.
 		out.wildcard, out.summary = "true", "wildcard"
 		out.findings = append(out.findings, wave1Finding(roleCodeWildcardTrust))
+		if rows := publicConditionRows(ex, "!"); rows != nil {
+			out.details[roleCodeWildcardTrust] = domain.AttentionDetail{Rows: rows}
+		}
 	}
 	if svcs := unscopedServicePrincipals(doc, path); len(svcs) > 0 {
 		out.findings = append(out.findings, wave1Finding(roleCodeConfusedDeputy))
-		out.details = map[domain.FindingCode]domain.AttentionDetail{
-			roleCodeConfusedDeputy: {Rows: []domain.DetailRow{
-				{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
-			}},
-		}
+		out.details[roleCodeConfusedDeputy] = domain.AttentionDetail{Rows: []domain.DetailRow{
+			{Label: "Services", Value: strings.Join(svcs, ", "), Tier: "~"},
+		}}
+	}
+	if len(out.details) == 0 {
+		out.details = nil
 	}
 	return out
 }

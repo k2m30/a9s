@@ -106,7 +106,7 @@ A queue whose `GetQueueAttributes` fails is KEPT name-only: `details denied` (Wa
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
 - **Signal**: access `Policy` allows a wildcard principal.
-  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller on every granted resource clears the signal, and so do Deny statements that together fence both AWS service principals and every other caller to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. A conditional Deny that spares AWS service principals, or that names only part of the granted resources, does not clear it and is shown in the `Deny when` row. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody. A policy that does not parse leaves the row not inspected, never flagged.
   - **State bucket**: Broken.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 

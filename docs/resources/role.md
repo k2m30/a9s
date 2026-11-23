@@ -87,12 +87,12 @@ Transcribed from `docs/attention-signals.md § Signals § SECURITY & IAM` row `r
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `AssumeRolePolicyDocument` (URL-encoded JSON on `ListRoles`) contains `Principal:{"AWS":"*"}` without an external-id condition.
-  - **Explicit Deny**: a Deny statement that takes the grant from every caller, or fences it to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names, clears the signal. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody.
+- **Signal**: `AssumeRolePolicyDocument` (URL-encoded JSON on `ListRoles`) has an Allow to `"*"` that no condition scopes to fixed values (see How obtained); an `sts:ExternalId` condition does not clear it.
+  - **Explicit Deny**: a Deny statement that takes the grant from every caller on every granted resource clears the signal, and so do Deny statements that together fence both AWS service principals and every other caller to an account, organisation, VPC endpoint, address range or the principals a NotPrincipal block names. A conditional Deny that spares AWS service principals, or that names only part of the granted resources, does not clear it and is shown in the `Deny when` row. A condition that holds for a request without the key (a `ForAllValues:` operator), or that names the resource being called (`aws:ResourceAccount`, `aws:ResourceOrgID`, `aws:ResourceOrgPaths`, `s3:ResourceAccount`), scopes nobody.
   - **State bucket**: Broken.
-  - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; search for a `Statement` whose `Effect==Allow` and `Principal.AWS=="*"` with no matching `Condition.StringEquals["sts:ExternalId"]`.
+  - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; evaluate it with `iampolicy.Evaluate`: an Allow to `Principal.AWS=="*"` (or `"*"`) is flagged unless a condition scopes the caller to fixed values (`docs/architecture.md` Policy Evaluation); `sts:ExternalId` scopes nobody, and the Attention block's Condition row shows the conditions the grant carries.
 
-- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping — a condition scopes the trust only when a positive operator (`StringEquals`, `ArnLike` and their `ForAnyValue:` forms) compares one of those keys against a concrete value; `Null`, a negated operator, an `IfExists` variant and a `ForAllValues:` form (true for a request without the key) leave the trust unscoped. A service an unconditional Deny removes from the trust is not reported.
+- **Signal**: an AWS service is trusted with no `aws:SourceAccount` / `aws:SourceArn` scoping — a condition scopes the trust only when a positive operator (`StringEquals`, `ArnLike` and their `ForAnyValue:` forms) compares `aws:SourceAccount`, `aws:SourceArn`, `aws:SourceOrgID` or `aws:SourceOrgPaths` against a value that names one source: an ARN with a fixed 12-digit account (its resource may be a wildcard), or any other value with no `*`, `?` or policy variable (an organization path may end in `*` below a fixed organization ID); `Null`, a negated operator, an `IfExists` variant and a `ForAllValues:` form (true for a request without the key) leave the trust unscoped. A service an unconditional Deny removes from the trust is not reported.
   - **State bucket**: Warning.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
@@ -143,7 +143,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts, or add an external-id condition), and a yellow row reading `dormant role (>90d)` tells the operator this role is a candidate for deletion without needing to open detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reading `anyone can assume this role` is actionable on sight (name the accounts or the organization), and a yellow row reading `dormant role (>90d)` tells the operator this role is a candidate for deletion without needing to open detail.
 
 ## 5. Out of Scope
 
@@ -176,7 +176,7 @@ role — SECURITY & IAM. Status key: `state` — the column naming it is the sta
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or add an sts:ExternalId condition that requires the external id to equal the value you hand out; a condition that only says whether the key is set scopes nothing. |
+| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 | Any AWS account can call sts:AssumeRole on this role and obtain its permissions. Replace the "*" principal in the trust policy with the specific account or role ARNs, or scope it by the caller's account or organization (aws:PrincipalAccount, aws:PrincipalOrgID). An sts:ExternalId condition scopes nothing on a "*" principal: anyone who presents the value passes it, so keep it beside a named partner account. |
 | role.trust.confused-deputy | service can assume without source scoping | warn | wave1 | An AWS service principal can assume this role on behalf of any caller, so another customer's resource can trick the service into using your role. Add an aws:SourceAccount or aws:SourceArn condition that requires the key to equal the account or ARN you expect; a condition that only says whether the key is set, or that lists what it must not be, scopes nothing. |
 | role.inline-privilege-escalation | inline policy allows privilege escalation | broken | wave1 | An inline policy on this role grants a combination of actions that lets its holder grant itself full administrator. Split or scope the inline policy so the escalation actions are not all available together. |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 | Nothing has assumed this role in over 90 days, so its trust policy and permissions are live but unexercised. Confirm the workload that used it is gone, then delete the role. |

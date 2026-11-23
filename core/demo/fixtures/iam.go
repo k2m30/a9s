@@ -84,8 +84,8 @@ const (
 	// or aws:SourceArn condition — role.trust.confused-deputy.
 	RoleConfusedDeputy = "acme-invoker-callback-role"
 	// RoleScopedWildcardTrust is the healthy counterpart of
-	// role.trust.wildcard-principal: it trusts any AWS principal, but only one
-	// holding the agreed external ID, which is the documented cross-account
+	// role.trust.wildcard-principal: it trusts the partner's account, and only
+	// with the agreed external ID, which is the documented cross-account
 	// pattern. It must render with no finding. It is also filed under an IAM
 	// path, so it is the second role whose name is read out of a
 	// path-carrying ARN — one such role can match by a coincidence
@@ -373,7 +373,7 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:                     aws.String("/acme/partners/"),
 			CreateDate:               aws.Time(time.Date(2025, 4, 8, 10, 0, 0, 0, time.UTC)),
 			Description:              aws.String("Cross-account role a partner assumes with the agreed external ID"),
-			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"acme-partner-9f3c2"}}}]}`),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:root"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"acme-partner-9f3c2"}}}]}`),
 			// Recently assumed, so the scoped-trust role renders with a
 			// blank status rather than the dormant-role warning every other
 			// demo role carries.
@@ -456,7 +456,9 @@ func buildIAMRoles() []iamtypes.Role {
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"monitoring.rds.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
-	// Issue: AssumeRolePolicyDocument with Principal="*" without condition → Broken (wildcard trust)
+	// Issue: AssumeRolePolicyDocument with Principal="*" → Broken (wildcard
+	// trust). Its sts:ExternalId condition scopes nobody: any principal that
+	// presents the value can assume the role.
 	roles = append(roles, iamtypes.Role{
 		RoleName:                 aws.String("wildcard-trust-role"),
 		RoleId:                   aws.String("AROAEXAMPLE777777777"),
@@ -464,7 +466,7 @@ func buildIAMRoles() []iamtypes.Role {
 		Path:                     aws.String("/"),
 		CreateDate:               aws.Time(time.Date(2025, 8, 10, 12, 0, 0, 0, time.UTC)),
 		Description:              aws.String("Legacy role with overly broad trust — any AWS principal can assume it"),
-		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole"}]}`),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"sts:ExternalId":"acme-legacy-7c41e"}}}]}`),
 		MaxSessionDuration:       aws.Int32(3600),
 	})
 

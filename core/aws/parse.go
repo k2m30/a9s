@@ -3,27 +3,20 @@
 package aws
 
 import (
-	"net/netip"
 	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+
+	"github.com/k2m30/a9s/v3/core/iampolicy"
 )
 
 // CIDROpenToEveryone reports whether a list of CIDR blocks reaches every
-// address on the internet. A prefix of length zero in either family says so:
-// "0.0.0.0/0" and "::/0" are the same statement about different address
-// spaces, and a dual-stack resource open to all IPv6 clients is open. Any
-// longer prefix names a subset, whatever base address is written in front of
-// it, and an entry that does not parse names no range at all.
-//
-// It is the single owner of that question for every site in this package that
-// tests a CIDR list for "everyone".
+// address on the internet: one entry of either family that iampolicy.OpenCIDR
+// counts open is enough, since a dual-stack resource open to all IPv6 clients
+// is open.
 func CIDROpenToEveryone(cidrs []string) bool {
-	return slices.ContainsFunc(cidrs, func(c string) bool {
-		p, err := netip.ParsePrefix(c)
-		return err == nil && p.Bits() == 0
-	})
+	return slices.ContainsFunc(cidrs, iampolicy.OpenCIDR)
 }
 
 // S3OriginBucket returns the bucket an origin domain name addresses, and
